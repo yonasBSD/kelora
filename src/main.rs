@@ -55,7 +55,7 @@ pub struct Cli {
     pub end: Option<String>,
 
     /// Disable field auto-injection
-    #[arg(long = "no-inject-fields")]
+    #[arg(long = "no-inject")]
     pub no_inject_fields: bool,
 
     /// Prefix for injected variables
@@ -83,7 +83,7 @@ pub struct Cli {
     pub batch_timeout: u64,
 
     /// Disable ordered output (faster but may reorder results)
-    #[arg(long = "no-preserve-order")]
+    #[arg(long = "unordered")]
     pub no_preserve_order: bool,
 
     /// Enable parallel processing for high-throughput analysis (batch-size=1000 by default)

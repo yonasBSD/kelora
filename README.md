@@ -79,7 +79,7 @@ cat access.log | kelora -f json --keys user,status,response_time -F text
 - `--parallel` - Enable parallel processing
 - `--threads N` - Worker thread count (default: CPU cores)
 - `--batch-size N` - Lines per batch (default: 1000)
-- `--no-preserve-order` - Faster unordered output
+- `--unordered` - Faster unordered output
 
 ## Rhai Scripting
 

@@ -118,7 +118,7 @@ time ./target/release/kelora -f json /Users/dloss/git/klp/myexamples/incident75k
 - ✅ **Field Filtering**: `--keys` for selecting specific output fields
 - ✅ **Parallel Processing**: High-throughput batch processing with `--parallel`
 - ✅ **Threading**: Configurable worker threads and batch sizes
-- ✅ **Order Preservation**: Ordered output by default, `--no-preserve-order` for speed
+- ✅ **Order Preservation**: Ordered output by default, `--unordered` for speed
 
 ### 📋 TODO: Missing Input Formats
 - ❌ **Line Format Parser**: Raw text line processing
@@ -165,7 +165,7 @@ track_bucket(tracked, "status", code)    // Count by value
 ```
 
 ### 📋 TODO: Missing CLI Options
-- ❌ **`--no-inject-fields`**: Disable field auto-injection
+- ❌ **`--no-inject`**: Disable field auto-injection
 - ❌ **`--inject-prefix`**: Prefix for injected variables
 
 ### 📋 TODO: Development Tasks
