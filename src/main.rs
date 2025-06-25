@@ -27,7 +27,12 @@ pub struct Cli {
     pub format: InputFormat,
 
     /// Output format
-    #[arg(short = 'F', long = "output-format", value_enum, default_value = "json")]
+    #[arg(
+        short = 'F',
+        long = "output-format",
+        value_enum,
+        default_value = "json"
+    )]
     pub output_format: OutputFormat,
 
     /// Run once before processing
@@ -55,7 +60,7 @@ pub struct Cli {
     pub inject_prefix: Option<String>,
 
     /// Error handling strategy
-    #[arg(long = "on-error", value_enum, default_value = "skip")]
+    #[arg(long = "on-error", value_enum, default_value = "emit-errors")]
     pub on_error: ErrorStrategy,
 
     /// Output only specific fields (comma-separated)
@@ -91,20 +96,21 @@ fn main() -> Result<()> {
 
     // Create parser based on input format
     let parser = create_parser(&cli.format);
-    
+
     // Create formatter based on output format
     let formatter = create_formatter(&cli.output_format);
 
     // Create Rhai engine with custom functions
     let mut engine = RhaiEngine::new();
     
+    // Compile all expressions at startup
+    engine.compile_expressions(&cli.filters, &cli.evals, cli.begin.as_ref(), cli.end.as_ref())?;
+
     // Global tracking state
     let mut tracked: HashMap<String, rhai::Dynamic> = HashMap::new();
-    
+
     // Execute begin stage if provided
-    if let Some(begin_expr) = &cli.begin {
-        engine.execute_begin(begin_expr, &mut tracked)?;
-    }
+    engine.execute_begin(&mut tracked)?;
 
     // Process input
     let reader: Box<dyn BufRead> = if cli.files.is_empty() {
@@ -129,64 +135,48 @@ fn main() -> Result<()> {
         // Parse the line into an event
         let mut event = match parser.parse(&line) {
             Ok(event) => event,
-            Err(e) => {
-                match cli.on_error {
-                    ErrorStrategy::Skip => continue,
-                    ErrorStrategy::FailFast => return Err(e),
-                    ErrorStrategy::EmitErrors => {
-                        eprintln!("Parse error on line {}: {}", line_num, e);
-                        continue;
-                    }
-                    ErrorStrategy::DefaultValue => Event::default_with_line(line),
+            Err(e) => match cli.on_error {
+                ErrorStrategy::Skip => continue,
+                ErrorStrategy::FailFast => return Err(e),
+                ErrorStrategy::EmitErrors => {
+                    eprintln!("Parse error on line {}: {}", line_num, e);
+                    continue;
                 }
-            }
+                ErrorStrategy::DefaultValue => Event::default_with_line(line),
+            },
         };
 
         // Set metadata
         event.set_metadata(line_num, None);
 
         // Apply filters
-        let mut should_output = true;
-        for filter_expr in &cli.filters {
-            match engine.execute_filter(filter_expr, &event, &mut tracked) {
-                Ok(result) => {
-                    if !result {
-                        should_output = false;
-                        break;
-                    }
+        let should_output = match engine.execute_filters(&event, &mut tracked) {
+            Ok(result) => result,
+            Err(e) => match cli.on_error {
+                ErrorStrategy::Skip => false,
+                ErrorStrategy::FailFast => return Err(e),
+                ErrorStrategy::EmitErrors => {
+                    eprintln!("Filter error on line {}: {}", line_num, e);
+                    false
                 }
-                Err(e) => match cli.on_error {
-                    ErrorStrategy::Skip => {
-                        should_output = false;
-                        break;
-                    }
-                    ErrorStrategy::FailFast => return Err(e),
-                    ErrorStrategy::EmitErrors => {
-                        eprintln!("Filter error on line {}: {}", line_num, e);
-                        should_output = false;
-                        break;
-                    }
-                    ErrorStrategy::DefaultValue => continue,
-                },
-            }
-        }
+                ErrorStrategy::DefaultValue => true,
+            },
+        };
 
         if !should_output {
             continue;
         }
 
         // Apply eval expressions
-        for eval_expr in &cli.evals {
-            if let Err(e) = engine.execute_eval(eval_expr, &mut event, &mut tracked) {
-                match cli.on_error {
-                    ErrorStrategy::Skip => continue,
-                    ErrorStrategy::FailFast => return Err(e),
-                    ErrorStrategy::EmitErrors => {
-                        eprintln!("Eval error on line {}: {}", line_num, e);
-                        continue;
-                    }
-                    ErrorStrategy::DefaultValue => {}
+        if let Err(e) = engine.execute_evals(&mut event, &mut tracked) {
+            match cli.on_error {
+                ErrorStrategy::Skip => continue,
+                ErrorStrategy::FailFast => return Err(e),
+                ErrorStrategy::EmitErrors => {
+                    eprintln!("Eval error on line {}: {}", line_num, e);
+                    continue;
                 }
+                ErrorStrategy::DefaultValue => {}
             }
         }
 
@@ -200,9 +190,7 @@ fn main() -> Result<()> {
     }
 
     // Execute end stage if provided
-    if let Some(end_expr) = &cli.end {
-        engine.execute_end(end_expr, &tracked)?;
-    }
+    engine.execute_end(&tracked)?;
 
     Ok(())
 }

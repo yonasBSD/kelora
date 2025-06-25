@@ -1,11 +1,21 @@
 use anyhow::{Context, Result};
-use rhai::{Dynamic, Engine, Scope};
+use rhai::{Dynamic, Engine, Scope, AST};
 use std::collections::HashMap;
 
 use crate::event::Event;
 
+pub struct CompiledExpression {
+    ast: AST,
+    expr: String,
+}
+
 pub struct RhaiEngine {
     engine: Engine,
+    compiled_filters: Vec<CompiledExpression>,
+    compiled_evals: Vec<CompiledExpression>,
+    compiled_begin: Option<CompiledExpression>,
+    compiled_end: Option<CompiledExpression>,
+    scope_template: Scope<'static>,
 }
 
 impl RhaiEngine {
@@ -18,9 +28,65 @@ impl RhaiEngine {
         // Register custom functions for log analysis
         Self::register_functions(&mut engine);
         
+        let mut scope_template = Scope::new();
+        scope_template.push("line", "");
+        scope_template.push("event", rhai::Map::new());
+        scope_template.push("meta", rhai::Map::new());
+        scope_template.push("tracked", rhai::Map::new());
+        
         Self {
             engine,
+            compiled_filters: Vec::new(),
+            compiled_evals: Vec::new(),
+            compiled_begin: None,
+            compiled_end: None,
+            scope_template,
         }
+    }
+
+    pub fn compile_expressions(&mut self, 
+        filters: &[String], 
+        evals: &[String], 
+        begin: Option<&String>, 
+        end: Option<&String>
+    ) -> Result<()> {
+        for filter in filters {
+            let ast = self.engine.compile(filter)
+                .with_context(|| format!("Failed to compile filter expression: {}", filter))?;
+            self.compiled_filters.push(CompiledExpression {
+                ast,
+                expr: filter.clone(),
+            });
+        }
+
+        for eval in evals {
+            let ast = self.engine.compile(eval)
+                .with_context(|| format!("Failed to compile eval expression: {}", eval))?;
+            self.compiled_evals.push(CompiledExpression {
+                ast,
+                expr: eval.clone(),
+            });
+        }
+
+        if let Some(begin_expr) = begin {
+            let ast = self.engine.compile(begin_expr)
+                .with_context(|| format!("Failed to compile begin expression: {}", begin_expr))?;
+            self.compiled_begin = Some(CompiledExpression {
+                ast,
+                expr: begin_expr.clone(),
+            });
+        }
+
+        if let Some(end_expr) = end {
+            let ast = self.engine.compile(end_expr)
+                .with_context(|| format!("Failed to compile end expression: {}", end_expr))?;
+            self.compiled_end = Some(CompiledExpression {
+                ast,
+                expr: end_expr.clone(),
+            });
+        }
+
+        Ok(())
     }
 
     fn register_functions(engine: &mut Engine) {
@@ -79,53 +145,62 @@ impl RhaiEngine {
         });
     }
 
-    pub fn execute_begin(&mut self, expr: &str, tracked: &mut HashMap<String, Dynamic>) -> Result<()> {
-        let ast = self.engine.compile(expr)
-            .with_context(|| format!("Failed to compile begin expression: {}", expr))?;
-        
-        let mut scope = Scope::new();
-        let mut tracked_map = rhai::Map::new();
-        
-        // Convert HashMap to Rhai Map
-        for (k, v) in tracked.iter() {
-            tracked_map.insert(k.clone().into(), v.clone());
-        }
-        scope.push("tracked", tracked_map);
-        
-        let _ = self.engine.eval_ast_with_scope::<Dynamic>(&mut scope, &ast)
-            .map_err(|e| anyhow::anyhow!("Failed to execute begin expression '{}': {}", expr, e))?;
+    pub fn execute_begin(&mut self, tracked: &mut HashMap<String, Dynamic>) -> Result<()> {
+        if let Some(compiled) = &self.compiled_begin {
+            let mut scope = self.scope_template.clone();
+            let mut tracked_map = rhai::Map::new();
+            
+            // Convert HashMap to Rhai Map
+            for (k, v) in tracked.iter() {
+                tracked_map.insert(k.clone().into(), v.clone());
+            }
+            scope.set_value("tracked", tracked_map);
+            
+            let _ = self.engine.eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
+                .map_err(|e| anyhow::anyhow!("Failed to execute begin expression '{}': {}", compiled.expr, e))?;
 
-        // Convert back to HashMap
-        if let Some(tracked_result) = scope.get_value::<rhai::Map>("tracked") {
-            tracked.clear();
-            for (k, v) in tracked_result {
-                tracked.insert(k.to_string(), v);
+            // Convert back to HashMap
+            if let Some(tracked_result) = scope.get_value::<rhai::Map>("tracked") {
+                tracked.clear();
+                for (k, v) in tracked_result {
+                    tracked.insert(k.to_string(), v);
+                }
             }
         }
 
         Ok(())
     }
 
-    pub fn execute_filter(&mut self, expr: &str, event: &Event, tracked: &mut HashMap<String, Dynamic>) -> Result<bool> {
-        let ast = self.engine.compile(expr)
-            .with_context(|| format!("Failed to compile filter expression: {}", expr))?;
-        
+    pub fn execute_filters(&mut self, event: &Event, tracked: &mut HashMap<String, Dynamic>) -> Result<bool> {
+        if self.compiled_filters.is_empty() {
+            return Ok(true);
+        }
+
         let mut scope = self.create_scope_for_event(event, tracked);
         
-        let result = self.engine.eval_ast_with_scope::<bool>(&mut scope, &ast)
-            .map_err(|e| anyhow::anyhow!("Failed to execute filter expression '{}': {}", expr, e))?;
+        for compiled_filter in &self.compiled_filters {
+            let result = self.engine.eval_ast_with_scope::<bool>(&mut scope, &compiled_filter.ast)
+                .map_err(|e| anyhow::anyhow!("Failed to execute filter expression '{}': {}", compiled_filter.expr, e))?;
+            
+            if !result {
+                return Ok(false);
+            }
+        }
 
-        Ok(result)
+        Ok(true)
     }
 
-    pub fn execute_eval(&mut self, expr: &str, event: &mut Event, tracked: &mut HashMap<String, Dynamic>) -> Result<()> {
-        let ast = self.engine.compile(expr)
-            .with_context(|| format!("Failed to compile eval expression: {}", expr))?;
-        
+    pub fn execute_evals(&mut self, event: &mut Event, tracked: &mut HashMap<String, Dynamic>) -> Result<()> {
+        if self.compiled_evals.is_empty() {
+            return Ok(());
+        }
+
         let mut scope = self.create_scope_for_event(event, tracked);
         
-        let _ = self.engine.eval_ast_with_scope::<Dynamic>(&mut scope, &ast)
-            .map_err(|e| anyhow::anyhow!("Failed to execute eval expression '{}': {}", expr, e))?;
+        for compiled_eval in &self.compiled_evals {
+            let _ = self.engine.eval_ast_with_scope::<Dynamic>(&mut scope, &compiled_eval.ast)
+                .map_err(|e| anyhow::anyhow!("Failed to execute eval expression '{}': {}", compiled_eval.expr, e))?;
+        }
 
         // Update event fields from scope
         self.update_event_from_scope(event, &scope);
@@ -141,27 +216,26 @@ impl RhaiEngine {
         Ok(())
     }
 
-    pub fn execute_end(&mut self, expr: &str, tracked: &HashMap<String, Dynamic>) -> Result<()> {
-        let ast = self.engine.compile(expr)
-            .with_context(|| format!("Failed to compile end expression: {}", expr))?;
-        
-        let mut scope = Scope::new();
-        let mut tracked_map = rhai::Map::new();
-        
-        // Convert HashMap to Rhai Map (read-only)
-        for (k, v) in tracked.iter() {
-            tracked_map.insert(k.clone().into(), v.clone());
+    pub fn execute_end(&mut self, tracked: &HashMap<String, Dynamic>) -> Result<()> {
+        if let Some(compiled) = &self.compiled_end {
+            let mut scope = self.scope_template.clone();
+            let mut tracked_map = rhai::Map::new();
+            
+            // Convert HashMap to Rhai Map (read-only)
+            for (k, v) in tracked.iter() {
+                tracked_map.insert(k.clone().into(), v.clone());
+            }
+            scope.set_value("tracked", tracked_map);
+            
+            let _ = self.engine.eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
+                .map_err(|e| anyhow::anyhow!("Failed to execute end expression '{}': {}", compiled.expr, e))?;
         }
-        scope.push("tracked", tracked_map);
-        
-        let _ = self.engine.eval_ast_with_scope::<Dynamic>(&mut scope, &ast)
-            .map_err(|e| anyhow::anyhow!("Failed to execute end expression '{}': {}", expr, e))?;
 
         Ok(())
     }
 
     fn create_scope_for_event(&self, event: &Event, tracked: &HashMap<String, Dynamic>) -> Scope {
-        let mut scope = Scope::new();
+        let mut scope = self.scope_template.clone();
         
         // Inject event fields as variables
         for (key, value) in &event.fields {
@@ -170,17 +244,17 @@ impl RhaiEngine {
             }
         }
         
-        // Add built-in variables
-        scope.push("line", event.original_line.clone());
+        // Update built-in variables
+        scope.set_value("line", event.original_line.clone());
         
-        // Add event map for fields with invalid identifiers
+        // Update event map for fields with invalid identifiers
         let mut event_map = rhai::Map::new();
         for (k, v) in &event.fields {
             event_map.insert(k.clone().into(), self.convert_value_to_dynamic(v));
         }
-        scope.push("event", event_map);
+        scope.set_value("event", event_map);
         
-        // Add metadata
+        // Update metadata
         let mut meta_map = rhai::Map::new();
         if let Some(line_num) = event.line_number {
             meta_map.insert("linenum".into(), Dynamic::from(line_num as i64));
@@ -188,14 +262,14 @@ impl RhaiEngine {
         if let Some(filename) = &event.filename {
             meta_map.insert("filename".into(), Dynamic::from(filename.clone()));
         }
-        scope.push("meta", meta_map);
+        scope.set_value("meta", meta_map);
         
-        // Add tracked state
+        // Update tracked state
         let mut tracked_map = rhai::Map::new();
         for (k, v) in tracked.iter() {
             tracked_map.insert(k.clone().into(), v.clone());
         }
-        scope.push("tracked", tracked_map);
+        scope.set_value("tracked", tracked_map);
         
         scope
     }
