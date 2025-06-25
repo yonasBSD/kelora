@@ -92,34 +92,49 @@ impl GlobalTracker {
     pub fn merge_worker_state(&self, worker_state: HashMap<String, Value>) -> Result<()> {
         let mut global = self.internal_tracked.lock().unwrap();
         
-        for (key, value) in worker_state {
-            if let Some(existing) = global.get(&key) {
-                // Merge logic based on key suffix patterns
-                if key.ends_with("_count") || key.starts_with("internal_tracked_") {
-                    // Sum counts
-                    if let (Some(a), Some(b)) = (existing.as_i64(), value.as_i64()) {
-                        global.insert(key, Value::Number(serde_json::Number::from(a + b)));
-                        continue;
+        for (key, value) in &worker_state {
+            // Skip operation metadata keys - they're just for merge logic
+            if key.starts_with("__op_") {
+                global.insert(key.clone(), value.clone());
+                continue;
+            }
+            
+            if let Some(existing) = global.get(key) {
+                // Check operation metadata to determine merge strategy
+                let op_key = format!("__op_{}", key);
+                let operation = worker_state.get(&op_key)
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("replace"); // default operation
+                
+                match operation {
+                    "count" => {
+                        // Sum counts
+                        if let (Some(a), Some(b)) = (existing.as_i64(), value.as_i64()) {
+                            global.insert(key.clone(), Value::Number(serde_json::Number::from(a + b)));
+                            continue;
+                        }
+                    }
+                    "min" => {
+                        // Take minimum
+                        if let (Some(a), Some(b)) = (existing.as_i64(), value.as_i64()) {
+                            global.insert(key.clone(), Value::Number(serde_json::Number::from(a.min(b))));
+                            continue;
+                        }
+                    }
+                    "max" => {
+                        // Take maximum
+                        if let (Some(a), Some(b)) = (existing.as_i64(), value.as_i64()) {
+                            global.insert(key.clone(), Value::Number(serde_json::Number::from(a.max(b))));
+                            continue;
+                        }
+                    }
+                    _ => {
+                        // Default: replace with newer value
                     }
                 }
-                if key.ends_with("_min") {
-                    // Take minimum
-                    if let (Some(a), Some(b)) = (existing.as_i64(), value.as_i64()) {
-                        global.insert(key, Value::Number(serde_json::Number::from(a.min(b))));
-                        continue;
-                    }
-                }
-                if key.ends_with("_max") {
-                    // Take maximum
-                    if let (Some(a), Some(b)) = (existing.as_i64(), value.as_i64()) {
-                        global.insert(key, Value::Number(serde_json::Number::from(a.max(b))));
-                        continue;
-                    }
-                }
-                // Default: replace with newer value
-                global.insert(key, value);
+                global.insert(key.clone(), value.clone());
             } else {
-                global.insert(key, value);
+                global.insert(key.clone(), value.clone());
             }
         }
         

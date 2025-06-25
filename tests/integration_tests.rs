@@ -173,7 +173,7 @@ fn test_global_tracking() {
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json",
         "--filter", "status >= 400",
-        "--eval", "track_count(tracked, \"errors\")",
+        "--eval", "track_count(\"errors\")",
         "--end", "print(`Errors: ${tracked[\"errors\"]}`)"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -397,7 +397,7 @@ fn test_stdin_large_input_performance() {
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json",
         "--filter", "status >= 400",
-        "--eval", "track_count(tracked, \"errors\");",
+        "--eval", "track_count(\"errors\");",
         "--end", "print(`Errors: ${tracked[\"errors\"]}`);"
     ], &large_input);
     let duration = start_time.elapsed();
@@ -441,7 +441,7 @@ fn test_tracking_with_min_max() {
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json",
-        "--eval", "track_min(tracked, \"min_time\", response_time); track_max(tracked, \"max_time\", response_time);",
+        "--eval", "track_min(\"min_time\", response_time); track_max(\"max_time\", response_time);",
         "--end", "print(`Min: ${tracked[\"min_time\"]}, Max: ${tracked[\"max_time\"]}`);"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -484,7 +484,7 @@ fn test_multiline_real_world_scenario() {
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json",
         "--filter", "status >= 400",
-        "--eval", "let alert_level = if status >= 500 { \"critical\" } else { \"warning\" }; track_count(tracked, \"total_errors\");",
+        "--eval", "let alert_level = if status >= 500 { \"critical\" } else { \"warning\" }; track_count(\"total_errors\");",
         "--end", "print(`Total errors processed: ${tracked[\"total_errors\"]}`);"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");

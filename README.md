@@ -42,7 +42,7 @@ kelora -f json -F text logs.jsonl
 kelora -f json \
   --begin 'print("Starting analysis...")' \
   --filter 'status >= 400' \
-  --eval 'track_count(tracked, "errors"); track_max(tracked, "max_response", response_time)' \
+  --eval 'track_count("errors"); track_max("max_response", response_time)' \
   --end 'print(`Found ${tracked["errors"]} errors, max response: ${tracked["max_response"]}ms`)' \
   logs.jsonl
 
@@ -105,10 +105,12 @@ status.status_class()       // "2xx", "4xx", "5xx", etc.
 
 #### Global Tracking
 ```rhai
-track_count(tracked, "errors")              // Increment counter
-track_min(tracked, "min_time", response)    // Track minimum
-track_max(tracked, "max_time", response)    // Track maximum
+track_count("errors")                      // Increment counter
+track_min("min_time", response)            // Track minimum  
+track_max("max_time", response)            // Track maximum (use different key!)
 ```
+
+⚠️ **Important**: `track_min()` and `track_max()` operations on the same key will overwrite each other. Always use different keys for min/max tracking of the same data.
 
 ### Variable Declaration
 Use `let` for new variables:
@@ -134,7 +136,7 @@ kelora --parallel --filter 'status >= 400'
 ```bash
 kelora -f json \
   --filter 'status >= 400' \
-  --eval 'track_count(tracked, status.status_class())' \
+  --eval 'track_count(status.status_class())' \
   --end 'print(`4xx: ${tracked["4xx"] ?? 0}, 5xx: ${tracked["5xx"] ?? 0}`)' \
   access.log
 ```

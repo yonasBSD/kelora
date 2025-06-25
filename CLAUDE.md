@@ -27,7 +27,7 @@ cargo fmt --check
 ./target/release/kelora -f json logs.jsonl --filter "response_time.sub_string(0,2).to_int() > 98"
 
 # Count status codes and track metrics
-./target/release/kelora -f json access.log --eval "track_count(tracked, status_class(status))" --end "print(tracked)"
+./target/release/kelora -f json access.log --eval "track_count(status_class(status))" --end "print(tracked)"
 ```
 
 ## Architecture

@@ -22,7 +22,7 @@ kelora --filter 'status >= 400'
 # Multi-stage processing
 kelora --begin 'print("Starting analysis...")' \
        --filter 'status >= 400' \
-       --eval 'alert_level = "high"; track_count(tracked, "errors")' \
+       --eval 'alert_level = "high"; track_count("errors")' \
        --end 'print(`Found ${tracked["errors"]} errors`)'
 
 # Input/output formats
@@ -134,11 +134,11 @@ user_agent.is_bot()              // Detect bots
 
 #### Global Tracking
 ```rhai
-track_count(tracked, "errors")           // Increment counter
-track_min(tracked, "response_time", ms)  // Track minimum
-track_max(tracked, "response_time", ms)  // Track maximum
-track_unique(tracked, "ips", ip)         // Collect unique values
-track_bucket(tracked, "status", code)    // Count by value
+track_count("errors")                   // Increment counter
+track_min("min_response_time", ms)       // Track minimum
+track_max("max_response_time", ms)       // Track maximum (different key!)
+track_unique("ips", ip)                  // Collect unique values (TODO)
+track_bucket("status", code)             // Count by value (TODO)
 
 // Access in --end stage
 tracked["errors"]                        // Read-only access
@@ -155,7 +155,7 @@ alert_msg = `Error at ${meta.linenum}: ${message}`
 // Apache log processing
 ip = line.cols(0)
 status = line.cols(8).to_int()
-if status >= 400 { track_count(tracked, "errors") }
+if status >= 400 { track_count("errors") }
 
 // JSON log enhancement  
 severity = if level == "ERROR" { "high" } else { "low" }
