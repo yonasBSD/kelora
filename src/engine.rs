@@ -189,6 +189,47 @@ impl RhaiEngine {
             });
         });
 
+        engine.register_fn("track_unique", |key: &str, value: &str| {
+            THREAD_TRACKING_STATE.with(|state| {
+                let mut state = state.borrow_mut();
+                // Get existing set or create new one
+                let current = state.get(key).cloned().unwrap_or_else(|| {
+                    // Create a new array to store unique values
+                    Dynamic::from(rhai::Array::new())
+                });
+                
+                if let Ok(mut arr) = current.into_array() {
+                    let value_dynamic = Dynamic::from(value.to_string());
+                    // Check if value already exists in array
+                    if !arr.iter().any(|v| v.clone().into_string().unwrap_or_default() == value) {
+                        arr.push(value_dynamic);
+                    }
+                    state.insert(key.to_string(), Dynamic::from(arr));
+                    // Store operation type metadata for parallel merging
+                    state.insert(format!("__op_{}", key), Dynamic::from("unique"));
+                }
+            });
+        });
+
+        engine.register_fn("track_bucket", |key: &str, bucket: &str| {
+            THREAD_TRACKING_STATE.with(|state| {
+                let mut state = state.borrow_mut();
+                // Get existing map or create new one
+                let current = state.get(key).cloned().unwrap_or_else(|| {
+                    Dynamic::from(rhai::Map::new())
+                });
+                
+                if let Some(mut map) = current.try_cast::<rhai::Map>() {
+                    let count = map.get(bucket).cloned().unwrap_or(Dynamic::from(0i64));
+                    let new_count = count.as_int().unwrap_or(0) + 1;
+                    map.insert(bucket.into(), Dynamic::from(new_count));
+                    state.insert(key.to_string(), Dynamic::from(map));
+                    // Store operation type metadata for parallel merging
+                    state.insert(format!("__op_{}", key), Dynamic::from("bucket"));
+                }
+            });
+        });
+
         // String analysis functions
         engine.register_fn("contains", |text: &str, pattern: &str| {
             text.contains(pattern)

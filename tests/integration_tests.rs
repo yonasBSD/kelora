@@ -474,6 +474,112 @@ fn test_field_modification_and_addition() {
 }
 
 #[test]
+fn test_track_unique_function() {
+    let input = r#"{"ip": "1.1.1.1", "user": "alice"}
+{"ip": "2.2.2.2", "user": "bob"}
+{"ip": "1.1.1.1", "user": "charlie"}
+{"ip": "3.3.3.3", "user": "alice"}
+{"ip": "2.2.2.2", "user": "dave"}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--eval", "track_unique(\"unique_ips\", ip); track_unique(\"unique_users\", user);",
+        "--end", "print(`IPs: ${tracked[\"unique_ips\"].len()}, Users: ${tracked[\"unique_users\"].len()}`);"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    
+    // Should collect 3 unique IPs and 4 unique users
+    assert!(stdout.contains("IPs: 3"), "Should track 3 unique IP addresses");
+    assert!(stdout.contains("Users: 4"), "Should track 4 unique users");
+}
+
+#[test]
+fn test_track_bucket_function() {
+    let input = r#"{"status": "200", "method": "GET"}
+{"status": "404", "method": "POST"}
+{"status": "200", "method": "GET"}
+{"status": "500", "method": "PUT"}
+{"status": "404", "method": "GET"}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--eval", "track_bucket(\"status_counts\", status); track_bucket(\"method_counts\", method);",
+        "--end", "print(`Status 200: ${tracked[\"status_counts\"].get(\"200\") ?? 0}, GET requests: ${tracked[\"method_counts\"].get(\"GET\") ?? 0}`);"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    
+    // Should count 2 occurrences of status 200 and 3 GET requests
+    assert!(stdout.contains("Status 200: 2"), "Should count 2 occurrences of status 200");
+    assert!(stdout.contains("GET requests: 3"), "Should count 3 GET requests");
+}
+
+#[test]
+fn test_track_unique_parallel_mode() {
+    let input = r#"{"ip": "1.1.1.1"}
+{"ip": "2.2.2.2"}
+{"ip": "1.1.1.1"}
+{"ip": "3.3.3.3"}
+{"ip": "2.2.2.2"}
+{"ip": "4.4.4.4"}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--parallel",
+        "--batch-size", "2",
+        "--eval", "track_unique(\"ips\", ip);",
+        "--end", "print(`Unique IPs: ${tracked[\"ips\"].len()}`);"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully in parallel mode");
+    
+    // Should merge unique values from all workers
+    assert!(stdout.contains("Unique IPs: 4"), "Should collect 4 unique IPs across parallel workers");
+}
+
+#[test]
+fn test_track_bucket_parallel_mode() {
+    let input = r#"{"status": "200"}
+{"status": "404"}
+{"status": "200"}
+{"status": "500"}
+{"status": "404"}
+{"status": "200"}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--parallel",
+        "--batch-size", "2",
+        "--eval", "track_bucket(\"status_counts\", status);",
+        "--end", "let counts = tracked[\"status_counts\"]; print(`200: ${counts.get(\"200\") ?? 0}, 404: ${counts.get(\"404\") ?? 0}, 500: ${counts.get(\"500\") ?? 0}`);"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully in parallel mode");
+    
+    // Should merge bucket counts from all workers
+    assert!(stdout.contains("200: 3"), "Should count 3 occurrences of status 200");
+    assert!(stdout.contains("404: 2"), "Should count 2 occurrences of status 404");
+    assert!(stdout.contains("500: 1"), "Should count 1 occurrence of status 500");
+}
+
+#[test]
+fn test_mixed_tracking_functions() {
+    let input = r#"{"user": "alice", "response_time": 100, "status": "200"}
+{"user": "bob", "response_time": 250, "status": "404"}
+{"user": "alice", "response_time": 180, "status": "200"}
+{"user": "charlie", "response_time": 50, "status": "500"}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--eval", "track_count(\"total\"); track_unique(\"users\", user); track_bucket(\"status_dist\", status); track_min(\"min_time\", response_time); track_max(\"max_time\", response_time);",
+        "--end", "print(`Total: ${tracked[\"total\"]}, Users: ${tracked[\"users\"].len()}, Min: ${tracked[\"min_time\"]}, Max: ${tracked[\"max_time\"]}`);"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    
+    assert!(stdout.contains("Total: 4"), "Should count 4 total records");
+    assert!(stdout.contains("Users: 3"), "Should track 3 unique users");  
+    assert!(stdout.contains("Min: 50"), "Should track minimum response time");
+    assert!(stdout.contains("Max: 250"), "Should track maximum response time");
+}
+
+#[test]
 fn test_multiline_real_world_scenario() {
     let input = r#"{"timestamp": "2023-07-18T15:04:23.456Z", "user": "alice", "status": 200, "message": "login successful", "response_time": 45}
 {"timestamp": "2023-07-18T15:04:25.789Z", "user": "bob", "status": 404, "message": "page not found", "response_time": 12}

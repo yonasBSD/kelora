@@ -179,8 +179,7 @@ fn main() -> Result<()> {
 
         // Merge the parallel tracked state with our sequential tracked state
         let parallel_tracked = processor.get_final_tracked_state();
-        for (key, json_value) in parallel_tracked {
-            let dynamic_value = json_to_dynamic(&json_value);
+        for (key, dynamic_value) in parallel_tracked {
             tracked.insert(key, dynamic_value);
         }
 
@@ -282,22 +281,3 @@ fn create_formatter(format: &OutputFormat) -> Box<dyn Formatter> {
     }
 }
 
-fn json_to_dynamic(json_value: &serde_json::Value) -> rhai::Dynamic {
-    match json_value {
-        serde_json::Value::Null => rhai::Dynamic::UNIT,
-        serde_json::Value::Bool(b) => rhai::Dynamic::from(*b),
-        serde_json::Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                rhai::Dynamic::from(i)
-            } else if let Some(f) = n.as_f64() {
-                rhai::Dynamic::from(f)
-            } else {
-                rhai::Dynamic::from(n.to_string())
-            }
-        }
-        serde_json::Value::String(s) => rhai::Dynamic::from(s.clone()),
-        serde_json::Value::Array(_) | serde_json::Value::Object(_) => {
-            rhai::Dynamic::from(json_value.to_string())
-        }
-    }
-}

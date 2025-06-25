@@ -1,7 +1,6 @@
 use anyhow::Result;
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use rhai::Dynamic;
-use serde_json::Value;
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
@@ -67,7 +66,7 @@ pub struct Batch {
 pub struct BatchResult {
     pub batch_id: u64,
     pub results: Vec<ProcessedEvent>,
-    pub internal_tracked_updates: HashMap<String, Value>,
+    pub internal_tracked_updates: HashMap<String, Dynamic>,
 }
 
 /// An event that has been processed and is ready for output
@@ -79,7 +78,7 @@ pub struct ProcessedEvent {
 /// Thread-safe statistics tracker for merging worker states
 #[derive(Debug, Default, Clone)]
 pub struct GlobalTracker {
-    internal_tracked: Arc<Mutex<HashMap<String, Value>>>,
+    internal_tracked: Arc<Mutex<HashMap<String, Dynamic>>>,
 }
 
 impl GlobalTracker {
@@ -89,7 +88,7 @@ impl GlobalTracker {
         }
     }
 
-    pub fn merge_worker_state(&self, worker_state: HashMap<String, Value>) -> Result<()> {
+    pub fn merge_worker_state(&self, worker_state: HashMap<String, Dynamic>) -> Result<()> {
         let mut global = self.internal_tracked.lock().unwrap();
         
         for (key, value) in &worker_state {
@@ -103,28 +102,60 @@ impl GlobalTracker {
                 // Check operation metadata to determine merge strategy
                 let op_key = format!("__op_{}", key);
                 let operation = worker_state.get(&op_key)
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("replace"); // default operation
+                    .and_then(|v| v.clone().into_string().ok())
+                    .unwrap_or_else(|| "replace".to_string()); // default operation
                 
-                match operation {
+                match operation.as_str() {
                     "count" => {
                         // Sum counts
-                        if let (Some(a), Some(b)) = (existing.as_i64(), value.as_i64()) {
-                            global.insert(key.clone(), Value::Number(serde_json::Number::from(a + b)));
+                        if let (Ok(a), Ok(b)) = (existing.as_int(), value.as_int()) {
+                            global.insert(key.clone(), Dynamic::from(a + b));
                             continue;
                         }
                     }
                     "min" => {
                         // Take minimum
-                        if let (Some(a), Some(b)) = (existing.as_i64(), value.as_i64()) {
-                            global.insert(key.clone(), Value::Number(serde_json::Number::from(a.min(b))));
+                        if let (Ok(a), Ok(b)) = (existing.as_int(), value.as_int()) {
+                            global.insert(key.clone(), Dynamic::from(a.min(b)));
                             continue;
                         }
                     }
                     "max" => {
                         // Take maximum
-                        if let (Some(a), Some(b)) = (existing.as_i64(), value.as_i64()) {
-                            global.insert(key.clone(), Value::Number(serde_json::Number::from(a.max(b))));
+                        if let (Ok(a), Ok(b)) = (existing.as_int(), value.as_int()) {
+                            global.insert(key.clone(), Dynamic::from(a.max(b)));
+                            continue;
+                        }
+                    }
+                    "unique" => {
+                        // Merge unique arrays
+                        if let (Ok(existing_arr), Ok(new_arr)) = (existing.clone().into_array(), value.clone().into_array()) {
+                            let mut merged = existing_arr;
+                            for item in new_arr {
+                                if !merged.iter().any(|v| {
+                                    // Compare string representations for simplicity
+                                    v.to_string() == item.to_string()
+                                }) {
+                                    merged.push(item);
+                                }
+                            }
+                            global.insert(key.clone(), Dynamic::from(merged));
+                            continue;
+                        }
+                    }
+                    "bucket" => {
+                        // Merge bucket maps by summing counts
+                        if let (Some(existing_map), Some(new_map)) = (existing.clone().try_cast::<rhai::Map>(), value.clone().try_cast::<rhai::Map>()) {
+                            let mut merged = existing_map;
+                            for (bucket_key, bucket_value) in new_map {
+                                if let Ok(bucket_count) = bucket_value.as_int() {
+                                    let existing_count = merged.get(&bucket_key)
+                                        .and_then(|v| v.as_int().ok())
+                                        .unwrap_or(0);
+                                    merged.insert(bucket_key, Dynamic::from(existing_count + bucket_count));
+                                }
+                            }
+                            global.insert(key.clone(), Dynamic::from(merged));
                             continue;
                         }
                     }
@@ -141,7 +172,7 @@ impl GlobalTracker {
         Ok(())
     }
 
-    pub fn get_final_state(&self) -> HashMap<String, Value> {
+    pub fn get_final_state(&self) -> HashMap<String, Dynamic> {
         self.internal_tracked.lock().unwrap().clone()
     }
 }
@@ -253,7 +284,7 @@ impl ParallelProcessor {
 
     /// Get the final merged global state for use in --end stage
     /// This converts __internal_tracked to the user-visible 'tracked' variable
-    pub fn get_final_tracked_state(&self) -> HashMap<String, Value> {
+    pub fn get_final_tracked_state(&self) -> HashMap<String, Dynamic> {
         self.global_tracker.get_final_state()
     }
 
@@ -422,15 +453,14 @@ impl ParallelProcessor {
                 });
             }
 
-            // Get thread-local tracking state and convert to JSON for sending
+            // Get thread-local tracking state directly (no conversion needed with sync feature)
             let thread_local_state = crate::engine::RhaiEngine::get_thread_tracking_state();
-            let internal_tracked_json = Self::convert_tracked_to_json(&thread_local_state);
             
             // Send batch result
             let batch_result = BatchResult {
                 batch_id: batch.id,
                 results: batch_results,
-                internal_tracked_updates: internal_tracked_json,
+                internal_tracked_updates: thread_local_state,
             };
 
             if result_sender.send(batch_result).is_err() {
@@ -545,30 +575,4 @@ impl ParallelProcessor {
         }
     }
 
-    fn convert_tracked_to_json(tracked: &HashMap<String, Dynamic>) -> HashMap<String, Value> {
-        let mut result = HashMap::new();
-        for (key, dynamic_val) in tracked {
-            let json_val = Self::dynamic_to_json(dynamic_val);
-            result.insert(key.clone(), json_val);
-        }
-        result
-    }
-
-    fn dynamic_to_json(dynamic: &Dynamic) -> Value {
-        if dynamic.is_unit() {
-            Value::Null
-        } else if dynamic.is_bool() {
-            Value::Bool(dynamic.as_bool().unwrap_or(false))
-        } else if dynamic.is_int() {
-            Value::Number(serde_json::Number::from(dynamic.as_int().unwrap_or(0)))
-        } else if dynamic.is_float() {
-            serde_json::Number::from_f64(dynamic.as_float().unwrap_or(0.0))
-                .map(Value::Number)
-                .unwrap_or(Value::Null)
-        } else if dynamic.is_string() {
-            Value::String(dynamic.clone().into_string().unwrap_or_default())
-        } else {
-            Value::String(dynamic.to_string())
-        }
-    }
 }
