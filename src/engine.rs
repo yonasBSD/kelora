@@ -1,15 +1,11 @@
 use anyhow::{Context, Result};
-use rhai::{Dynamic, Engine, Scope, AST};
+use rhai::{Dynamic, Engine, Scope};
 use std::collections::HashMap;
 
 use crate::event::Event;
 
 pub struct RhaiEngine {
     engine: Engine,
-    begin_ast: Option<AST>,
-    filter_asts: Vec<AST>,
-    eval_asts: Vec<AST>,
-    end_ast: Option<AST>,
 }
 
 impl RhaiEngine {
@@ -24,10 +20,6 @@ impl RhaiEngine {
         
         Self {
             engine,
-            begin_ast: None,
-            filter_asts: Vec::new(),
-            eval_asts: Vec::new(),
-            end_ast: None,
         }
     }
 
@@ -219,7 +211,7 @@ impl RhaiEngine {
     }
 
     fn is_valid_identifier(&self, name: &str) -> bool {
-        name.chars().next().map_or(false, |c| c.is_alphabetic() || c == '_') &&
+        name.chars().next().is_some_and(|c| c.is_alphabetic() || c == '_') &&
         name.chars().all(|c| c.is_alphanumeric() || c == '_')
     }
 

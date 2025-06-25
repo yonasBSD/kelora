@@ -23,9 +23,6 @@ pub enum FieldValue {
 }
 
 impl Event {
-    pub fn new() -> Self {
-        Self::default()
-    }
 
     pub fn default_with_line(line: String) -> Self {
         Self {
@@ -125,22 +122,6 @@ impl Event {
         }
     }
 
-    /// Check if the event has any content to display
-    pub fn has_displayable_content(&self) -> bool {
-        self.timestamp.is_some()
-            || self.level.is_some()
-            || self.message.is_some()
-            || !self.fields.is_empty()
-    }
-}
-
-impl FieldValue {
-    pub fn as_string(&self) -> Option<&String> {
-        match self {
-            FieldValue::String(s) => Some(s),
-            _ => None,
-        }
-    }
 }
 
 impl std::fmt::Display for FieldValue {
