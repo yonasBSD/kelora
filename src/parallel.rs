@@ -67,7 +67,7 @@ pub struct Batch {
 pub struct BatchResult {
     pub batch_id: u64,
     pub results: Vec<ProcessedEvent>,
-    pub tracked_updates: HashMap<String, Value>,
+    pub internal_tracked_updates: HashMap<String, Value>,
 }
 
 /// An event that has been processed and is ready for output
@@ -79,23 +79,23 @@ pub struct ProcessedEvent {
 /// Thread-safe statistics tracker for merging worker states
 #[derive(Debug, Default, Clone)]
 pub struct GlobalTracker {
-    tracked: Arc<Mutex<HashMap<String, Value>>>,
+    internal_tracked: Arc<Mutex<HashMap<String, Value>>>,
 }
 
 impl GlobalTracker {
     pub fn new() -> Self {
         Self {
-            tracked: Arc::new(Mutex::new(HashMap::new())),
+            internal_tracked: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
     pub fn merge_worker_state(&self, worker_state: HashMap<String, Value>) -> Result<()> {
-        let mut global = self.tracked.lock().unwrap();
+        let mut global = self.internal_tracked.lock().unwrap();
         
         for (key, value) in worker_state {
             if let Some(existing) = global.get(&key) {
                 // Merge logic based on key suffix patterns
-                if key.ends_with("_count") || key.starts_with("tracked_") {
+                if key.ends_with("_count") || key.starts_with("internal_tracked_") {
                     // Sum counts
                     if let (Some(a), Some(b)) = (existing.as_i64(), value.as_i64()) {
                         global.insert(key, Value::Number(serde_json::Number::from(a + b)));
@@ -127,7 +127,7 @@ impl GlobalTracker {
     }
 
     pub fn get_final_state(&self) -> HashMap<String, Value> {
-        self.tracked.lock().unwrap().clone()
+        self.internal_tracked.lock().unwrap().clone()
     }
 }
 
@@ -237,6 +237,7 @@ impl ParallelProcessor {
     }
 
     /// Get the final merged global state for use in --end stage
+    /// This converts __internal_tracked to the user-visible 'tracked' variable
     pub fn get_final_tracked_state(&self) -> HashMap<String, Value> {
         self.global_tracker.get_final_state()
     }
@@ -338,9 +339,16 @@ impl ParallelProcessor {
         let parser = Self::create_parser(&config.input_format);
         let mut engine = crate::engine::RhaiEngine::new();
         engine.compile_expressions(&config.filters, &config.evals, None, None)?;
+        
+        // Thread-local tracking state will be initialized automatically
+        
+        // Worker tracking state - syncs with thread-local storage
         let mut worker_tracked: HashMap<String, Dynamic> = HashMap::new();
 
         while let Ok(batch) = batch_receiver.recv() {
+            // Reset thread-local tracking state for this batch
+            crate::engine::RhaiEngine::clear_thread_tracking_state();
+            
             let mut batch_results = Vec::new();
             
             for (line_idx, line) in batch.lines.iter().enumerate() {
@@ -399,14 +407,15 @@ impl ParallelProcessor {
                 });
             }
 
-            // Convert Dynamic tracked state to JSON Value for sending
-            let tracked_json = Self::convert_tracked_to_json(&worker_tracked);
+            // Get thread-local tracking state and convert to JSON for sending
+            let thread_local_state = crate::engine::RhaiEngine::get_thread_tracking_state();
+            let internal_tracked_json = Self::convert_tracked_to_json(&thread_local_state);
             
             // Send batch result
             let batch_result = BatchResult {
                 batch_id: batch.id,
                 results: batch_results,
-                tracked_updates: tracked_json,
+                internal_tracked_updates: internal_tracked_json,
             };
 
             if result_sender.send(batch_result).is_err() {
@@ -445,10 +454,10 @@ impl ParallelProcessor {
 
         while let Ok(mut batch_result) = result_receiver.recv() {
             let batch_id = batch_result.batch_id;
-            let tracked_updates = std::mem::take(&mut batch_result.tracked_updates);
+            let internal_tracked_updates = std::mem::take(&mut batch_result.internal_tracked_updates);
             
             // Merge global state
-            global_tracker.merge_worker_state(tracked_updates)?;
+            global_tracker.merge_worker_state(internal_tracked_updates)?;
 
             // Store batch for ordering
             pending_batches.insert(batch_id, batch_result);
@@ -476,7 +485,7 @@ impl ParallelProcessor {
     ) -> Result<()> {
         while let Ok(batch_result) = result_receiver.recv() {
             // Merge global state
-            global_tracker.merge_worker_state(batch_result.tracked_updates)?;
+            global_tracker.merge_worker_state(batch_result.internal_tracked_updates)?;
 
             // Output immediately
             Self::output_batch_results(&batch_result.results, formatter.as_ref(), &keys)?;

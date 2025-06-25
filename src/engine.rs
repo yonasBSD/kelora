@@ -1,6 +1,12 @@
 use anyhow::{Context, Result};
 use rhai::{Dynamic, Engine, Scope, AST};
 use std::collections::HashMap;
+use std::cell::RefCell;
+
+// Thread-local storage for tracking state
+thread_local! {
+    static THREAD_TRACKING_STATE: RefCell<HashMap<String, Dynamic>> = RefCell::new(HashMap::new());
+}
 
 use crate::event::Event;
 
@@ -37,6 +43,28 @@ impl Clone for RhaiEngine {
 }
 
 impl RhaiEngine {
+    // Thread-local state management functions
+    pub fn set_thread_tracking_state(tracked: &HashMap<String, Dynamic>) {
+        THREAD_TRACKING_STATE.with(|state| {
+            let mut state = state.borrow_mut();
+            state.clear();
+            for (k, v) in tracked {
+                state.insert(k.clone(), v.clone());
+            }
+        });
+    }
+
+    pub fn get_thread_tracking_state() -> HashMap<String, Dynamic> {
+        THREAD_TRACKING_STATE.with(|state| {
+            state.borrow().clone()
+        })
+    }
+
+    pub fn clear_thread_tracking_state() {
+        THREAD_TRACKING_STATE.with(|state| {
+            state.borrow_mut().clear();
+        });
+    }
     pub fn new() -> Self {
         let mut engine = Engine::new();
         
@@ -46,11 +74,13 @@ impl RhaiEngine {
         // Register custom functions for log analysis
         Self::register_functions(&mut engine);
         
+        // Register variable access callback for tracking functions
+        Self::register_variable_resolver(&mut engine);
+        
         let mut scope_template = Scope::new();
         scope_template.push("line", "");
         scope_template.push("event", rhai::Map::new());
         scope_template.push("meta", rhai::Map::new());
-        scope_template.push("tracked", rhai::Map::new());
         
         Self {
             engine,
@@ -109,27 +139,50 @@ impl RhaiEngine {
 
 
     fn register_functions(engine: &mut Engine) {
-        // Track functions for global state
-        engine.register_fn("track_count", |tracked: &mut rhai::Map, key: &str| {
-            let count = tracked.get(key).cloned().unwrap_or(Dynamic::from(0i64));
-            let new_count = count.as_int().unwrap_or(0) + 1;
-            tracked.insert(key.into(), Dynamic::from(new_count));
+        // Track functions using thread-local storage - clean user API
+        // Keys are automatically suffixed for proper parallel merging
+        engine.register_fn("track_count", |key: &str| {
+            THREAD_TRACKING_STATE.with(|state| {
+                let mut state = state.borrow_mut();
+                let count_key = format!("{}_count", key);
+                let count = state.get(&count_key).cloned().unwrap_or(Dynamic::from(0i64));
+                let new_count = count.as_int().unwrap_or(0) + 1;
+                state.insert(count_key, Dynamic::from(new_count));
+            });
         });
 
-        engine.register_fn("track_min", |tracked: &mut rhai::Map, key: &str, value: i64| {
-            let current = tracked.get(key).cloned().unwrap_or(Dynamic::from(i64::MAX));
-            let current_val = current.as_int().unwrap_or(i64::MAX);
-            if value < current_val {
-                tracked.insert(key.into(), Dynamic::from(value));
-            }
+        engine.register_fn("track_count", |key: &str, delta: i64| {
+            THREAD_TRACKING_STATE.with(|state| {
+                let mut state = state.borrow_mut();
+                let count_key = format!("{}_count", key);
+                let count = state.get(&count_key).cloned().unwrap_or(Dynamic::from(0i64));
+                let new_count = count.as_int().unwrap_or(0) + delta;
+                state.insert(count_key, Dynamic::from(new_count));
+            });
         });
 
-        engine.register_fn("track_max", |tracked: &mut rhai::Map, key: &str, value: i64| {
-            let current = tracked.get(key).cloned().unwrap_or(Dynamic::from(i64::MIN));
-            let current_val = current.as_int().unwrap_or(i64::MIN);
-            if value > current_val {
-                tracked.insert(key.into(), Dynamic::from(value));
-            }
+        engine.register_fn("track_min", |key: &str, value: i64| {
+            THREAD_TRACKING_STATE.with(|state| {
+                let mut state = state.borrow_mut();
+                let min_key = format!("{}_min", key);
+                let current = state.get(&min_key).cloned().unwrap_or(Dynamic::from(i64::MAX));
+                let current_val = current.as_int().unwrap_or(i64::MAX);
+                if value < current_val {
+                    state.insert(min_key, Dynamic::from(value));
+                }
+            });
+        });
+
+        engine.register_fn("track_max", |key: &str, value: i64| {
+            THREAD_TRACKING_STATE.with(|state| {
+                let mut state = state.borrow_mut();
+                let max_key = format!("{}_max", key);
+                let current = state.get(&max_key).cloned().unwrap_or(Dynamic::from(i64::MIN));
+                let current_val = current.as_int().unwrap_or(i64::MIN);
+                if value > current_val {
+                    state.insert(max_key, Dynamic::from(value));
+                }
+            });
         });
 
         // String analysis functions
@@ -164,27 +217,23 @@ impl RhaiEngine {
         });
     }
 
+    fn register_variable_resolver(_engine: &mut Engine) {
+        // For now, keep this empty - we'll implement proper function-based approach
+        // Variable resolver is not the right tool for function calls
+    }
+
     pub fn execute_begin(&mut self, tracked: &mut HashMap<String, Dynamic>) -> Result<()> {
         if let Some(compiled) = &self.compiled_begin {
-            let mut scope = self.scope_template.clone();
-            let mut tracked_map = rhai::Map::new();
+            // Set thread-local state from tracked
+            Self::set_thread_tracking_state(tracked);
             
-            // Convert HashMap to Rhai Map
-            for (k, v) in tracked.iter() {
-                tracked_map.insert(k.clone().into(), v.clone());
-            }
-            scope.set_value("tracked", tracked_map);
+            let mut scope = self.scope_template.clone();
             
             let _ = self.engine.eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
                 .map_err(|e| anyhow::anyhow!("Failed to execute begin expression '{}': {}", compiled.expr, e))?;
 
-            // Convert back to HashMap
-            if let Some(tracked_result) = scope.get_value::<rhai::Map>("tracked") {
-                tracked.clear();
-                for (k, v) in tracked_result {
-                    tracked.insert(k.to_string(), v);
-                }
-            }
+            // Update tracked from thread-local state
+            *tracked = Self::get_thread_tracking_state();
         }
 
         Ok(())
@@ -195,7 +244,10 @@ impl RhaiEngine {
             return Ok(true);
         }
 
-        let mut scope = self.create_scope_for_event(event, tracked);
+        // Set thread-local state (filters don't usually modify it, but just in case)
+        Self::set_thread_tracking_state(tracked);
+        
+        let mut scope = self.create_scope_for_event(event);
         
         for compiled_filter in &self.compiled_filters {
             let result = self.engine.eval_ast_with_scope::<bool>(&mut scope, &compiled_filter.ast)
@@ -206,6 +258,9 @@ impl RhaiEngine {
             }
         }
 
+        // Update tracked from thread-local state (in case filter modified it)
+        *tracked = Self::get_thread_tracking_state();
+
         Ok(true)
     }
 
@@ -214,7 +269,10 @@ impl RhaiEngine {
             return Ok(());
         }
 
-        let mut scope = self.create_scope_for_event(event, tracked);
+        // Set thread-local state for tracking functions
+        Self::set_thread_tracking_state(tracked);
+        
+        let mut scope = self.create_scope_for_event(event);
         
         for compiled_eval in &self.compiled_evals {
             let _ = self.engine.eval_ast_with_scope::<Dynamic>(&mut scope, &compiled_eval.ast)
@@ -224,13 +282,8 @@ impl RhaiEngine {
         // Update event fields from scope
         self.update_event_from_scope(event, &scope);
 
-        // Update tracked state
-        if let Some(tracked_result) = scope.get_value::<rhai::Map>("tracked") {
-            tracked.clear();
-            for (k, v) in tracked_result {
-                tracked.insert(k.to_string(), v);
-            }
-        }
+        // Update tracked state from thread-local storage
+        *tracked = Self::get_thread_tracking_state();
 
         Ok(())
     }
@@ -253,7 +306,7 @@ impl RhaiEngine {
         Ok(())
     }
 
-    fn create_scope_for_event(&self, event: &Event, tracked: &HashMap<String, Dynamic>) -> Scope {
+    fn create_scope_for_event(&self, event: &Event) -> Scope {
         let mut scope = self.scope_template.clone();
         
         // Inject event fields as variables
@@ -283,19 +336,12 @@ impl RhaiEngine {
         }
         scope.set_value("meta", meta_map);
         
-        // Update tracked state
-        let mut tracked_map = rhai::Map::new();
-        for (k, v) in tracked.iter() {
-            tracked_map.insert(k.clone().into(), v.clone());
-        }
-        scope.set_value("tracked", tracked_map);
-        
         scope
     }
 
     fn update_event_from_scope(&self, event: &mut Event, scope: &Scope) {
         for (name, _constant, value) in scope.iter() {
-            if name != "line" && name != "event" && name != "meta" && name != "tracked" {
+            if name != "line" && name != "event" && name != "meta" {
                 if let Some(json_value) = self.convert_dynamic_to_json_value(&value) {
                     event.fields.insert(name.to_string(), json_value);
                 }
