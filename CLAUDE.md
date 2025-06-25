@@ -81,6 +81,12 @@ Kelora is designed to leverage Rhai's built-in optimizations:
 - Verify both correctness and performance impact of changes
 - Test error handling with `--on-error` strategies
 
+### Git Guidelines
+- **NEVER use `git add .`** - Always add files explicitly by name
+- Use `git add src/main.rs src/parallel.rs Cargo.toml` etc.
+- Review each file individually before staging
+- This prevents accidental inclusion of temporary files, editor backups, or unintended changes
+
 ## Testing Data
 
 ### Performance Test Command

@@ -17,6 +17,8 @@ chrono = { version = "0.4", features = ["serde"] }
 regex = "1.10"
 anyhow = "1.0"
 rhai = "1.17"
+crossbeam-channel = "0.5"
+num_cpus = "1.16"
 
 [dev-dependencies]
 tempfile = "3.8"

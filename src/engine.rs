@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use crate::event::Event;
 
+#[derive(Clone)]
 pub struct CompiledExpression {
     ast: AST,
     expr: String,
@@ -16,6 +17,23 @@ pub struct RhaiEngine {
     compiled_begin: Option<CompiledExpression>,
     compiled_end: Option<CompiledExpression>,
     scope_template: Scope<'static>,
+}
+
+impl Clone for RhaiEngine {
+    fn clone(&self) -> Self {
+        let mut engine = Engine::new();
+        engine.set_optimization_level(rhai::OptimizationLevel::Simple);
+        Self::register_functions(&mut engine);
+        
+        Self {
+            engine,
+            compiled_filters: self.compiled_filters.clone(),
+            compiled_evals: self.compiled_evals.clone(),
+            compiled_begin: self.compiled_begin.clone(),
+            compiled_end: self.compiled_end.clone(),
+            scope_template: self.scope_template.clone(),
+        }
+    }
 }
 
 impl RhaiEngine {
@@ -88,6 +106,7 @@ impl RhaiEngine {
 
         Ok(())
     }
+
 
     fn register_functions(engine: &mut Engine) {
         // Track functions for global state

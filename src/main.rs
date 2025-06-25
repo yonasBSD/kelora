@@ -1,21 +1,24 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use std::collections::HashMap;
-use std::io::{self, BufRead, BufReader};
+use std::io::{self, BufRead, BufReader, Read, Write};
 
 mod engine;
 mod event;
 mod formatters;
+mod parallel;
 mod parsers;
 
 use engine::RhaiEngine;
 use event::Event;
 use formatters::{Formatter, JsonFormatter, TextFormatter};
+use parallel::{ParallelConfig, ParallelProcessor, ProcessRequest};
 use parsers::{JsonlParser, Parser as LogParser};
 
 #[derive(Parser)]
 #[command(name = "kelora")]
 #[command(about = "A command-line log analysis tool with embedded Rhai scripting")]
+#[command(long_about = "A command-line log analysis tool with embedded Rhai scripting\n\nMODES:\n  (default)   Sequential processing - best for streaming/interactive use\n  --parallel  Parallel processing - best for high-throughput batch analysis")]
 #[command(version = "0.2.0")]
 #[command(author = "Dirk Loss <mail@dirk-loss.de>")]
 pub struct Cli {
@@ -66,6 +69,26 @@ pub struct Cli {
     /// Output only specific fields (comma-separated)
     #[arg(long = "keys", value_delimiter = ',')]
     pub keys: Vec<String>,
+
+    /// Number of worker threads for parallel processing
+    #[arg(long = "threads", default_value_t = 0)]
+    pub threads: usize,
+
+    /// Batch size for parallel processing (default: 1000)
+    #[arg(long = "batch-size")]
+    pub batch_size: Option<usize>,
+
+    /// Batch timeout in milliseconds
+    #[arg(long = "batch-timeout", default_value_t = 200)]
+    pub batch_timeout: u64,
+
+    /// Disable ordered output (faster but may reorder results)
+    #[arg(long = "no-preserve-order")]
+    pub no_preserve_order: bool,
+
+    /// Enable parallel processing for high-throughput analysis (batch-size=1000 by default)
+    #[arg(long = "parallel")]
+    pub parallel: bool,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -109,88 +132,135 @@ fn main() -> Result<()> {
     // Global tracking state
     let mut tracked: HashMap<String, rhai::Dynamic> = HashMap::new();
 
-    // Execute begin stage if provided
-    engine.execute_begin(&mut tracked)?;
+    // Determine processing mode and smart defaults
+    let use_parallel = cli.parallel || cli.threads > 0 || cli.batch_size.is_some();
+    
+    // Smart defaults based on mode
+    let batch_size = cli.batch_size.unwrap_or(1000);
 
-    // Process input
-    let reader: Box<dyn BufRead> = if cli.files.is_empty() {
-        Box::new(io::stdin().lock())
+    if use_parallel {
+        // Parallel processing mode
+        let config = ParallelConfig {
+            num_workers: if cli.threads == 0 { num_cpus::get() } else { cli.threads },
+            batch_size,
+            batch_timeout_ms: cli.batch_timeout,
+            preserve_order: !cli.no_preserve_order,
+            buffer_size: Some(10000),
+        };
+
+        let processor = ParallelProcessor::new(config);
+        
+        // Execute begin stage sequentially if provided
+        engine.execute_begin(&mut tracked)?;
+
+        // Get reader
+        let reader: Box<dyn BufRead + Send> = if cli.files.is_empty() {
+            // For stdin, we need to read all into memory first since stdin lock isn't Send
+            let mut buffer = Vec::new();
+            io::stdin().read_to_end(&mut buffer)?;
+            Box::new(std::io::Cursor::new(buffer))
+        } else {
+            let file = std::fs::File::open(&cli.files[0])
+                .with_context(|| format!("Failed to open file: {}", cli.files[0]))?;
+            Box::new(BufReader::new(file))
+        };
+
+        // Process filter and eval stages in parallel
+        let request = ProcessRequest {
+            input_format: cli.format,
+            filters: cli.filters.clone(),
+            evals: cli.evals.clone(),
+            output_format: cli.output_format,
+            on_error: cli.on_error,
+            keys: cli.keys,
+        };
+        
+        processor.process(reader, request)?;
+
+        // Merge the parallel tracked state with our sequential tracked state
+        let parallel_tracked = processor.get_final_tracked_state();
+        for (key, json_value) in parallel_tracked {
+            let dynamic_value = json_to_dynamic(&json_value);
+            tracked.insert(key, dynamic_value);
+        }
+
+        // Execute end stage sequentially with merged state
+        engine.execute_end(&tracked)?;
     } else {
-        // For MVP, just handle first file
-        let file = std::fs::File::open(&cli.files[0])
-            .with_context(|| format!("Failed to open file: {}", cli.files[0]))?;
-        Box::new(BufReader::new(file))
-    };
+        // Original sequential processing mode
+        engine.execute_begin(&mut tracked)?;
 
-    let mut line_num = 0;
-    for line_result in reader.lines() {
-        let line = line_result?;
-        line_num += 1;
-
-        // Skip empty lines
-        if line.trim().is_empty() {
-            continue;
-        }
-
-        // Parse the line into an event
-        let mut event = match parser.parse(&line) {
-            Ok(event) => event,
-            Err(e) => match cli.on_error {
-                ErrorStrategy::Skip => continue,
-                ErrorStrategy::FailFast => return Err(e),
-                ErrorStrategy::EmitErrors => {
-                    eprintln!("Parse error on line {}: {}", line_num, e);
-                    continue;
-                }
-                ErrorStrategy::DefaultValue => Event::default_with_line(line),
-            },
+        let reader: Box<dyn BufRead> = if cli.files.is_empty() {
+            Box::new(io::stdin().lock())
+        } else {
+            let file = std::fs::File::open(&cli.files[0])
+                .with_context(|| format!("Failed to open file: {}", cli.files[0]))?;
+            Box::new(BufReader::new(file))
         };
 
-        // Set metadata
-        event.set_metadata(line_num, None);
+        let mut line_num = 0;
+        for line_result in reader.lines() {
+            let line = line_result?;
+            line_num += 1;
 
-        // Apply filters
-        let should_output = match engine.execute_filters(&event, &mut tracked) {
-            Ok(result) => result,
-            Err(e) => match cli.on_error {
-                ErrorStrategy::Skip => false,
-                ErrorStrategy::FailFast => return Err(e),
-                ErrorStrategy::EmitErrors => {
-                    eprintln!("Filter error on line {}: {}", line_num, e);
-                    false
-                }
-                ErrorStrategy::DefaultValue => true,
-            },
-        };
-
-        if !should_output {
-            continue;
-        }
-
-        // Apply eval expressions
-        if let Err(e) = engine.execute_evals(&mut event, &mut tracked) {
-            match cli.on_error {
-                ErrorStrategy::Skip => continue,
-                ErrorStrategy::FailFast => return Err(e),
-                ErrorStrategy::EmitErrors => {
-                    eprintln!("Eval error on line {}: {}", line_num, e);
-                    continue;
-                }
-                ErrorStrategy::DefaultValue => {}
+            if line.trim().is_empty() {
+                continue;
             }
+
+            let mut event = match parser.parse(&line) {
+                Ok(event) => event,
+                Err(e) => match cli.on_error {
+                    ErrorStrategy::Skip => continue,
+                    ErrorStrategy::FailFast => return Err(e),
+                    ErrorStrategy::EmitErrors => {
+                        eprintln!("Parse error on line {}: {}", line_num, e);
+                        continue;
+                    }
+                    ErrorStrategy::DefaultValue => Event::default_with_line(line),
+                },
+            };
+
+            event.set_metadata(line_num, None);
+
+            let should_output = match engine.execute_filters(&event, &mut tracked) {
+                Ok(result) => result,
+                Err(e) => match cli.on_error {
+                    ErrorStrategy::Skip => false,
+                    ErrorStrategy::FailFast => return Err(e),
+                    ErrorStrategy::EmitErrors => {
+                        eprintln!("Filter error on line {}: {}", line_num, e);
+                        false
+                    }
+                    ErrorStrategy::DefaultValue => true,
+                },
+            };
+
+            if !should_output {
+                continue;
+            }
+
+            if let Err(e) = engine.execute_evals(&mut event, &mut tracked) {
+                match cli.on_error {
+                    ErrorStrategy::Skip => continue,
+                    ErrorStrategy::FailFast => return Err(e),
+                    ErrorStrategy::EmitErrors => {
+                        eprintln!("Eval error on line {}: {}", line_num, e);
+                        continue;
+                    }
+                    ErrorStrategy::DefaultValue => {}
+                }
+            }
+
+            if !cli.keys.is_empty() {
+                event.filter_keys(&cli.keys);
+            }
+
+            println!("{}", formatter.format(&event));
+            io::stdout().flush().unwrap_or(());
         }
 
-        // Filter keys if specified
-        if !cli.keys.is_empty() {
-            event.filter_keys(&cli.keys);
-        }
-
-        // Output the event
-        println!("{}", formatter.format(&event));
+        engine.execute_end(&tracked)?;
     }
-
-    // Execute end stage if provided
-    engine.execute_end(&tracked)?;
 
     Ok(())
 }
@@ -209,5 +279,25 @@ fn create_formatter(format: &OutputFormat) -> Box<dyn Formatter> {
         OutputFormat::Json => Box::new(JsonFormatter::new()),
         OutputFormat::Text => Box::new(TextFormatter::new()),
         OutputFormat::Csv => todo!("CSV formatter not implemented yet"),
+    }
+}
+
+fn json_to_dynamic(json_value: &serde_json::Value) -> rhai::Dynamic {
+    match json_value {
+        serde_json::Value::Null => rhai::Dynamic::UNIT,
+        serde_json::Value::Bool(b) => rhai::Dynamic::from(*b),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                rhai::Dynamic::from(i)
+            } else if let Some(f) = n.as_f64() {
+                rhai::Dynamic::from(f)
+            } else {
+                rhai::Dynamic::from(n.to_string())
+            }
+        }
+        serde_json::Value::String(s) => rhai::Dynamic::from(s.clone()),
+        serde_json::Value::Array(_) | serde_json::Value::Object(_) => {
+            rhai::Dynamic::from(json_value.to_string())
+        }
     }
 }
