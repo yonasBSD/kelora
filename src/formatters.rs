@@ -15,37 +15,10 @@ impl JsonFormatter {
 
 impl Formatter for JsonFormatter {
     fn format(&self, event: &Event) -> String {
-        let mut json_obj = serde_json::Map::new();
-
-        // Add core fields if they exist
-        if let Some(timestamp) = &event.timestamp {
-            json_obj.insert(
-                "timestamp".to_string(),
-                serde_json::Value::String(timestamp.to_rfc3339()),
-            );
-        }
-
-        if let Some(level) = &event.level {
-            json_obj.insert(
-                "level".to_string(),
-                serde_json::Value::String(level.clone()),
-            );
-        }
-
-        if let Some(message) = &event.message {
-            json_obj.insert(
-                "message".to_string(),
-                serde_json::Value::String(message.clone()),
-            );
-        }
-
-        // Add all other fields
-        for (key, value) in &event.fields {
-            json_obj.insert(key.clone(), value.clone());
-        }
-
-        serde_json::to_string(&serde_json::Value::Object(json_obj))
-            .unwrap_or_else(|_| "{}".to_string())
+        // Use only the original fields from the JSON input
+        serde_json::to_string(&serde_json::Value::Object(
+            event.fields.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+        )).unwrap_or_else(|_| "{}".to_string())
     }
 }
 
@@ -62,23 +35,7 @@ impl Formatter for TextFormatter {
     fn format(&self, event: &Event) -> String {
         let mut parts = Vec::new();
 
-        // Add core fields first if they exist
-        if let Some(timestamp) = &event.timestamp {
-            parts.push(format!(
-                "timestamp=\"{}\"",
-                timestamp.format("%Y-%m-%dT%H:%M:%S%.3fZ")
-            ));
-        }
-
-        if let Some(level) = &event.level {
-            parts.push(format!("level=\"{}\"", level));
-        }
-
-        if let Some(message) = &event.message {
-            parts.push(format!("message=\"{}\"", escape_quotes(message)));
-        }
-
-        // Add other fields in sorted order
+        // Add all fields in sorted order (using original field names)
         let mut field_keys: Vec<_> = event.fields.keys().collect();
         field_keys.sort();
 
@@ -118,7 +75,6 @@ fn escape_quotes(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
 
     #[test]
     fn test_json_formatter_empty_event() {
@@ -131,8 +87,8 @@ mod tests {
     #[test]
     fn test_json_formatter_with_fields() {
         let mut event = Event::default();
-        event.level = Some("INFO".to_string());
-        event.message = Some("Test message".to_string());
+        event.set_field("level".to_string(), serde_json::json!("INFO"));
+        event.set_field("message".to_string(), serde_json::json!("Test message"));
         event.set_field("user".to_string(), serde_json::json!("alice"));
         event.set_field("status".to_string(), serde_json::json!(200));
 
@@ -148,7 +104,7 @@ mod tests {
     #[test]
     fn test_text_formatter() {
         let mut event = Event::default();
-        event.level = Some("INFO".to_string());
+        event.set_field("level".to_string(), serde_json::json!("INFO"));
         event.set_field("user".to_string(), serde_json::json!("alice"));
         event.set_field("count".to_string(), serde_json::json!(42));
 

@@ -105,3 +105,77 @@ time ./target/release/kelora -f json /Users/dloss/git/klp/myexamples/incident75k
 - Main design document: `DESIGN.md`
 - Rhai syntax and features documented here: https://rhai.rs/book/
 - Rhai integration patterns and best practices documented
+
+## Development Roadmap
+
+### 🚀 Completed Features
+- ✅ **Core Architecture**: Rhai engine integration with AST compilation and reuse
+- ✅ **JSON Input Format**: Full support for JSON log processing
+- ✅ **JSON/Text Output**: JSON objects and logfmt-style key=value output
+- ✅ **Expression Stages**: `--begin`, `--filter`, `--eval`, `--end` pipeline
+- ✅ **Global State Tracking**: `track_count()`, `track_min()`, `track_max()` functions
+- ✅ **Error Handling**: Four strategies (skip, fail-fast, emit-errors, default-value)
+- ✅ **Field Filtering**: `--keys` for selecting specific output fields
+- ✅ **Parallel Processing**: High-throughput batch processing with `--parallel`
+- ✅ **Threading**: Configurable worker threads and batch sizes
+- ✅ **Order Preservation**: Ordered output by default, `--no-preserve-order` for speed
+
+### 📋 TODO: Missing Input Formats
+- ❌ **Line Format Parser**: Raw text line processing
+- ❌ **CSV Format Parser**: Comma-separated values with header support
+- ❌ **Apache Format Parser**: Common Log Format and Combined Log Format
+
+### 📋 TODO: Missing Output Formats  
+- ❌ **CSV Output Formatter**: Comma-separated values output
+
+### 📋 TODO: Missing Rhai Functions
+These functions are documented in DESIGN.md but not yet implemented:
+
+#### Column Parsing Functions
+```rhai
+line.cols(0)              // First column
+line.cols(-1)             // Last column  
+line.cols("1:3")          // Columns 1-2 (slice)
+line.cols("2:")           // From column 2 to end
+line.cols(0, 2, 4)        // Multiple columns
+```
+
+#### String Analysis Functions
+```rhai
+text.matches("ERROR|WARN")        // Regex match
+text.replace("\\d+", "XXX")       // Regex replace
+text.extract("https?://([^/]+)")  // Extract capture group
+text.extract_pattern("email")     // Built-in patterns
+text.to_ts()                      // Parse timestamp
+```
+
+#### Log Analysis Functions
+```rhai
+status.status_class()             // "4xx", "5xx", etc. (partially implemented)
+level.normalize_level()           // "DEBUG", "INFO", etc.
+ip.is_private_ip()               // Boolean
+url.domain()                     // Extract domain
+user_agent.is_bot()              // Detect bots
+```
+
+#### Advanced Tracking Functions
+```rhai
+track_unique(tracked, "ips", ip)         // Collect unique values
+track_bucket(tracked, "status", code)    // Count by value
+```
+
+### 📋 TODO: Missing CLI Options
+- ❌ **`--no-inject-fields`**: Disable field auto-injection
+- ❌ **`--inject-prefix`**: Prefix for injected variables
+
+### 📋 TODO: Development Tasks
+- ❌ **Unit Tests**: Comprehensive test suite for all components
+- ✅ **Integration Tests**: Complete test suite covering current CLI interface and functionality
+- ❌ **Performance Benchmarks**: Baseline measurements and regression testing
+- ❌ **Documentation**: User guide and API documentation
+
+### 📋 TODO: Advanced Features
+- ❌ **Multiple File Support**: Process multiple input files
+- ❌ **Streaming Timeout Logic**: True timeout-based batching for sparse streams
+- ❌ **Memory Management**: Resource limits and cleanup
+- ❌ **Configuration Files**: YAML/TOML config file support

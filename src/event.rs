@@ -44,46 +44,11 @@ impl Event {
     pub fn filter_keys(&mut self, keys: &[String]) {
         let mut new_fields = HashMap::new();
 
-        // First, handle core fields - only keep them if they exist and are requested
-        let mut keep_timestamp = false;
-        let mut keep_level = false;
-        let mut keep_message = false;
-
+        // Only include fields that are both requested and exist
         for key in keys {
-            match key.as_str() {
-                "timestamp" | "ts" | "time" | "at" | "_t" | "@t" | "t" => {
-                    if self.timestamp.is_some() {
-                        keep_timestamp = true;
-                    }
-                }
-                "level" | "log_level" | "loglevel" | "lvl" | "severity" | "@l" => {
-                    if self.level.is_some() {
-                        keep_level = true;
-                    }
-                }
-                "message" | "msg" | "@m" => {
-                    if self.message.is_some() {
-                        keep_message = true;
-                    }
-                }
-                _ => {
-                    // For other fields, only include if they exist
-                    if let Some(value) = self.fields.get(key) {
-                        new_fields.insert(key.clone(), value.clone());
-                    }
-                }
+            if let Some(value) = self.fields.get(key) {
+                new_fields.insert(key.clone(), value.clone());
             }
-        }
-
-        // Clear core fields if they weren't requested or don't exist
-        if !keep_timestamp {
-            self.timestamp = None;
-        }
-        if !keep_level {
-            self.level = None;
-        }
-        if !keep_message {
-            self.message = None;
         }
 
         self.fields = new_fields;

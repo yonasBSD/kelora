@@ -1,10 +1,9 @@
 // tests/integration_tests.rs
-use std::fs;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use tempfile::NamedTempFile;
 
-/// Helper function to run kelora with given arguments and input
+/// Helper function to run kelora with given arguments and input via stdin
 fn run_kelora_with_input(args: &[&str], input: &str) -> (String, String, i32) {
     let mut cmd = Command::new("cargo")
         .arg("run")
@@ -42,449 +41,469 @@ fn run_kelora_with_file(args: &[&str], file_content: &str) -> (String, String, i
     let mut full_args = args.to_vec();
     full_args.push(temp_file.path().to_str().unwrap());
 
-    let mut cmd = Command::new("cargo")
+    let cmd = Command::new("cargo")
         .arg("run")
         .arg("--")
         .args(&full_args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .spawn()
-        .expect("Failed to start kelora");
-
-    let output = cmd.wait_with_output().expect("Failed to read output");
+        .output()
+        .expect("Failed to execute kelora");
 
     (
-        String::from_utf8_lossy(&output.stdout).to_string(),
-        String::from_utf8_lossy(&output.stderr).to_string(),
-        output.status.code().unwrap_or(-1),
+        String::from_utf8_lossy(&cmd.stdout).to_string(),
+        String::from_utf8_lossy(&cmd.stderr).to_string(),
+        cmd.status.code().unwrap_or(-1),
     )
 }
 
 #[test]
-fn test_basic_jsonl_parsing() {
-    let input = r#"{"timestamp":"2023-07-18T15:04:23.456Z","level":"ERROR","message":"Database connection failed","host":"db.example.com"}
-{"timestamp":"2023-07-18T15:04:25.789Z","level":"INFO","message":"Retrying connection","retry_count":1}"#;
+fn test_version_flag() {
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["--version"], "");
+    assert_eq!(exit_code, 0, "kelora --version should exit successfully");
+    assert!(stdout.contains("kelora 0.2.0"), "Version output should contain version number");
+}
 
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl"], input);
-
-    assert_eq!(exit_code, 0, "kelora should exit successfully");
-    assert!(
-        stdout.contains("level=\"ERROR\""),
-        "Should contain ERROR level"
-    );
-    assert!(
-        stdout.contains("message=\"Database connection failed\""),
-        "Should contain error message"
-    );
-    assert!(
-        stdout.contains("level=\"INFO\""),
-        "Should contain INFO level"
-    );
-    assert!(
-        stdout.contains("retry_count=1"),
-        "Should contain retry count"
-    );
+#[test] 
+fn test_help_flag() {
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["--help"], "");
+    assert_eq!(exit_code, 0, "kelora --help should exit successfully");
+    assert!(stdout.contains("command-line log analysis tool"), "Help should describe the tool");
+    assert!(stdout.contains("--filter"), "Help should mention filter option");
+    assert!(stdout.contains("--parallel"), "Help should mention parallel option");
 }
 
 #[test]
-fn test_basic_logfmt_parsing() {
-    let input = r#"timestamp="2023-07-18T15:04:23.456Z" level=ERROR message="Database connection failed" host="db.example.com"
-timestamp="2023-07-18T15:04:25.789Z" level=INFO message="Retrying connection" retry_count=1"#;
-
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "logfmt"], input);
-
+fn test_basic_json_parsing() {
+    let input = r#"{"level": "INFO", "message": "Hello world", "status": 200}
+{"level": "ERROR", "message": "Something failed", "status": 500}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json"], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
-    assert!(
-        stdout.contains("level=\"ERROR\""),
-        "Should contain ERROR level"
-    );
-    assert!(
-        stdout.contains("message=\"Database connection failed\""),
-        "Should contain error message"
-    );
-    assert!(
-        stdout.contains("level=\"INFO\""),
-        "Should contain INFO level"
-    );
-    assert!(
-        stdout.contains("retry_count=1"),
-        "Should contain retry count"
-    );
+    
+    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(lines.len(), 2, "Should output 2 lines");
+    
+    // Parse JSON output
+    let first_line: serde_json::Value = serde_json::from_str(lines[0]).expect("First line should be valid JSON");
+    assert_eq!(first_line["level"], "INFO");
+    assert_eq!(first_line["status"], 200);
 }
 
 #[test]
-fn test_key_filtering() {
-    let input = r#"{"timestamp":"2023-07-18T15:04:23.456Z","level":"ERROR","message":"Database failed","host":"db.example.com","port":5432}"#;
-
-    let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "-k", "timestamp,level,message"], input);
-
+fn test_filter_expression() {
+    let input = r#"{"level": "INFO", "status": 200}
+{"level": "ERROR", "status": 500}
+{"level": "DEBUG", "status": 404}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--filter", "status >= 400"], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
-    assert!(
-        stdout.contains("timestamp=\"2023-07-18T15:04:23.456Z\""),
-        "Should contain timestamp"
-    );
-    assert!(stdout.contains("level=\"ERROR\""), "Should contain level");
-    assert!(
-        stdout.contains("message=\"Database failed\""),
-        "Should contain message"
-    );
-    // Should not contain filtered out fields
-    assert!(!stdout.contains("host="), "Should not contain host field");
-    assert!(!stdout.contains("port="), "Should not contain port field");
+    
+    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(lines.len(), 2, "Should filter to 2 lines (status >= 400)");
+    
+    // Check that filtered results have status >= 400
+    for line in lines {
+        let parsed: serde_json::Value = serde_json::from_str(line).expect("Line should be valid JSON");
+        let status = parsed["status"].as_i64().expect("Status should be a number");
+        assert!(status >= 400, "Filtered results should have status >= 400");
+    }
 }
 
 #[test]
-fn test_common_fields_flag() {
-    let input = r#"{"timestamp":"2023-07-18T15:04:23.456Z","level":"ERROR","message":"Database failed","host":"db.example.com","port":5432}"#;
-
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl", "-c"], input);
-
+fn test_eval_expression() {
+    let input = r#"{"level": "INFO", "status": 200}
+{"level": "ERROR", "status": 500}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json", 
+        "--eval", "let alert_level = if status >= 400 { \"high\" } else { \"low\" };"
+    ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
-    assert!(
-        stdout.contains("timestamp=\"2023-07-18T15:04:23.456Z\""),
-        "Should contain timestamp"
-    );
-    assert!(stdout.contains("level=\"ERROR\""), "Should contain level");
-    assert!(
-        stdout.contains("message=\"Database failed\""),
-        "Should contain message"
-    );
-    // Should not contain other fields
-    assert!(!stdout.contains("host="), "Should not contain host field");
-    assert!(!stdout.contains("port="), "Should not contain port field");
+    
+    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(lines.len(), 2, "Should output 2 lines");
+    
+    // Check that eval expression added alert_level field
+    let first_line: serde_json::Value = serde_json::from_str(lines[0]).expect("First line should be valid JSON");
+    assert_eq!(first_line["alert_level"], "low");
+    
+    let second_line: serde_json::Value = serde_json::from_str(lines[1]).expect("Second line should be valid JSON");
+    assert_eq!(second_line["alert_level"], "high");
 }
 
 #[test]
-fn test_level_filtering() {
-    let input = r#"{"timestamp":"2023-07-18T15:04:23.456Z","level":"ERROR","message":"Error occurred"}
-{"timestamp":"2023-07-18T15:04:24.456Z","level":"INFO","message":"Info message"}
-{"timestamp":"2023-07-18T15:04:25.456Z","level":"DEBUG","message":"Debug message"}
-{"timestamp":"2023-07-18T15:04:26.456Z","level":"WARN","message":"Warning message"}"#;
-
-    let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "-l", "ERROR,WARN"], input);
-
+fn test_text_output_format() {
+    let input = r#"{"level": "INFO", "message": "Hello world", "status": 200}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json", "-F", "text"], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
-    assert!(
-        stdout.contains("Error occurred"),
-        "Should contain ERROR message"
-    );
-    assert!(
-        stdout.contains("Warning message"),
-        "Should contain WARN message"
-    );
-    assert!(
-        !stdout.contains("Info message"),
-        "Should not contain INFO message"
-    );
-    assert!(
-        !stdout.contains("Debug message"),
-        "Should not contain DEBUG message"
-    );
+    
+    // Text format should be key=value pairs
+    assert!(stdout.contains("level=\"INFO\""), "Text output should contain level=\"INFO\"");
+    assert!(stdout.contains("status=200"), "Text output should contain status=200");
+    assert!(stdout.contains("message=\"Hello world\""), "Text output should contain quoted message");
 }
 
 #[test]
-fn test_stats_only_mode() {
-    let input = r#"{"timestamp":"2023-07-18T15:04:23.456Z","level":"ERROR","message":"Error 1"}
-{"timestamp":"2023-07-18T15:04:24.456Z","level":"INFO","message":"Info 1"}
-{"timestamp":"2023-07-18T15:04:25.456Z","level":"ERROR","message":"Error 2"}"#;
-
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl", "-S"], input);
-
+fn test_keys_filtering() {
+    let input = r#"{"level": "INFO", "message": "Hello world", "status": 200, "timestamp": "2023-01-01T00:00:00Z"}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json", 
+        "--keys", "level,status"
+    ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
-    assert!(
-        stdout.is_empty(),
-        "Stdout should be empty in stats-only mode"
-    );
-    assert!(
-        stderr.contains("Events shown: 3"),
-        "Should show event count"
-    );
-    assert!(stderr.contains("ERROR(2)"), "Should show ERROR count");
-    assert!(stderr.contains("INFO(1)"), "Should show INFO count");
+    
+    let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("Output should be valid JSON");
+    
+    // Should only contain specified keys
+    assert!(parsed.get("level").is_some(), "Should contain level");
+    assert!(parsed.get("status").is_some(), "Should contain status");
+    assert!(parsed.get("message").is_none(), "Should not contain message");
+    assert!(parsed.get("timestamp").is_none(), "Should not contain timestamp");
 }
 
 #[test]
-fn test_stats_with_output() {
-    let input = r#"{"timestamp":"2023-07-18T15:04:23.456Z","level":"ERROR","message":"Error 1"}
-{"timestamp":"2023-07-18T15:04:24.456Z","level":"INFO","message":"Info 1"}"#;
-
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl", "-s"], input);
-
+fn test_global_tracking() {
+    let input = r#"{"level": "INFO", "status": 200}
+{"level": "ERROR", "status": 500}
+{"level": "ERROR", "status": 404}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--filter", "status >= 400",
+        "--eval", "track_count(tracked, \"errors\")",
+        "--end", "print(`Errors: ${tracked[\"errors\"]}`)"
+    ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
-    assert!(!stdout.is_empty(), "Stdout should contain log output");
-    assert!(stdout.contains("Error 1"), "Should contain log messages");
-    assert!(
-        stderr.contains("Events shown: 2"),
-        "Should show stats in stderr"
-    );
+    
+    // The end stage should print to stdout (Rhai print goes to stdout in this implementation)
+    assert!(stdout.contains("Errors: 2"), "Should track filtered error lines");
 }
 
 #[test]
-fn test_jsonl_output_format() {
-    let input = r#"timestamp="2023-07-18T15:04:23.456Z" level=ERROR message="Test message""#;
-
-    let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "logfmt", "-F", "jsonl"], input);
-
+fn test_begin_and_end_stages() {
+    let input = r#"{"level": "INFO"}
+{"level": "ERROR"}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--begin", "print(\"Starting analysis...\")",
+        "--end", "print(\"Analysis complete\")"
+    ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
-
-    // Parse the JSON output to verify it's valid
-    let json_line = stdout.trim();
-    let parsed: serde_json::Value =
-        serde_json::from_str(json_line).expect("Output should be valid JSON");
-
-    assert_eq!(parsed["level"], "ERROR");
-    assert_eq!(parsed["message"], "Test message");
-    assert_eq!(parsed["timestamp"], "2023-07-18T15:04:23.456Z");
+    
+    assert!(stdout.contains("Starting analysis..."), "Begin stage should execute");
+    assert!(stdout.contains("Analysis complete"), "End stage should execute");
 }
 
 #[test]
-fn test_syslog_parsing() {
-    let input = r#"<34>Oct 11 22:14:15 mymachine su: 'su root' failed for lonvick on /dev/pts/8
-<13>Oct 11 22:14:15 mymachine myapp[1234]: Application started successfully"#;
+fn test_error_handling_skip() {
+    let input = r#"{"level": "INFO", "status": 200}
+invalid json line
+{"level": "ERROR", "status": 500}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json", 
+        "--on-error", "skip"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully with skip error handling");
+    
+    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(lines.len(), 2, "Should skip invalid line and output 2 valid lines");
+}
 
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "syslog"], input);
+#[test]
+fn test_error_handling_emit_errors() {
+    let input = r#"{"level": "INFO", "status": 200}
+invalid json line
+{"level": "ERROR", "status": 500}"#;
+    
+    let (stdout, stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json", 
+        "--on-error", "emit-errors"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully with emit-errors");
+    
+    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(lines.len(), 2, "Should output 2 valid lines");
+    assert!(stderr.contains("Parse error"), "Should emit parse error to stderr");
+}
 
-    assert_eq!(exit_code, 0, "kelora should exit successfully");
-    assert!(
-        stdout.contains("hostname=\"mymachine\""),
-        "Should extract hostname"
-    );
-    assert!(
-        stdout.contains("process=\"su\""),
-        "Should extract process name"
-    );
-    assert!(
-        stdout.contains("process=\"myapp\""),
-        "Should extract app name"
-    );
-    assert!(stdout.contains("pid=1234"), "Should extract PID");
+#[test]
+fn test_parallel_mode() {
+    let input = r#"{"level": "INFO", "status": 200}
+{"level": "ERROR", "status": 500}
+{"level": "DEBUG", "status": 404}
+{"level": "WARN", "status": 403}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json", 
+        "--parallel",
+        "--threads", "2",
+        "--filter", "status >= 400"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully in parallel mode");
+    
+    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(lines.len(), 3, "Should filter to 3 lines in parallel mode");
+    
+    // Verify all results have status >= 400
+    for line in lines {
+        let parsed: serde_json::Value = serde_json::from_str(line).expect("Line should be valid JSON");
+        let status = parsed["status"].as_i64().expect("Status should be a number");
+        assert!(status >= 400, "Parallel filtered results should have status >= 400");
+    }
 }
 
 #[test]
 fn test_file_input() {
-    let content = r#"{"timestamp":"2023-07-18T15:04:23.456Z","level":"INFO","message":"File test"}
-{"timestamp":"2023-07-18T15:04:24.456Z","level":"ERROR","message":"File error"}"#;
-
-    let (stdout, stderr, exit_code) = run_kelora_with_file(&["-f", "jsonl"], content);
-
-    assert_eq!(exit_code, 0, "kelora should exit successfully");
-    assert!(stdout.contains("File test"), "Should contain first message");
-    assert!(
-        stdout.contains("File error"),
-        "Should contain second message"
-    );
+    let file_content = r#"{"level": "INFO", "message": "File input test"}
+{"level": "ERROR", "message": "Another line"}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_file(&["-f", "json"], file_content);
+    assert_eq!(exit_code, 0, "kelora should exit successfully with file input");
+    
+    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(lines.len(), 2, "Should output 2 lines from file");
 }
 
 #[test]
 fn test_empty_input() {
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl"], "");
-
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json"], "");
     assert_eq!(exit_code, 0, "kelora should handle empty input gracefully");
-    assert!(stdout.is_empty(), "No output expected for empty input");
+    assert_eq!(stdout.trim(), "", "Empty input should produce no output");
 }
 
 #[test]
-fn test_malformed_json() {
-    let input = r#"{"timestamp":"2023-07-18T15:04:23.456Z","level":"INFO","message":"Good line"}
-{"malformed": json line}
-{"timestamp":"2023-07-18T15:04:25.456Z","level":"INFO","message":"Another good line"}"#;
-
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl"], input);
-
-    assert_eq!(exit_code, 0, "kelora should handle parse errors gracefully");
-    assert!(stdout.contains("Good line"), "Should contain valid lines");
-    assert!(
-        stdout.contains("Another good line"),
-        "Should continue after errors"
-    );
-    // Note: parse errors are ignored by default, but we could test with --debug flag
-}
-
-#[test]
-fn test_debug_mode_with_errors() {
-    let input = r#"{"timestamp":"2023-07-18T15:04:23.456Z","level":"INFO","message":"Good line"}
-{"malformed": json line}"#;
-
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl", "--debug"], input);
-
-    assert_eq!(
-        exit_code, 0,
-        "kelora should handle parse errors gracefully even in debug mode"
-    );
-    assert!(stdout.contains("Good line"), "Should contain valid lines");
-    assert!(
-        stderr.contains("Parse error"),
-        "Should show parse error in debug mode"
-    );
-}
-
-#[test]
-fn test_mixed_formats_logfmt() {
-    let input = r#"level=info msg="Simple message"
-timestamp="2023-07-18T15:04:23.456Z" level=error message="Complex message" count=42 flag=true
-empty_value= quoted_empty="" null_value=null"#;
-
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "logfmt"], input);
-
-    assert_eq!(exit_code, 0, "kelora should handle various logfmt patterns");
-    assert!(
-        stdout.contains("level=\"info\""),
-        "Should handle simple logfmt"
-    );
-    assert!(stdout.contains("count=42"), "Should handle numbers");
-    assert!(stdout.contains("flag=true"), "Should handle booleans");
-    assert!(
-        stdout.contains("null_value=null"),
-        "Should handle null values"
-    );
-}
-
-#[test]
-fn test_case_insensitive_level_filtering() {
-    let input = r#"{"level":"error","message":"Lowercase error"}
-{"level":"ERROR","message":"Uppercase error"}
-{"level":"Error","message":"Mixed case error"}
-{"level":"info","message":"Info message"}"#;
-
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl", "-l", "error"], input);
-
+fn test_string_functions() {
+    let input = r#"{"message": "Error: Something failed", "code": "123"}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--eval", "let has_error = message.contains(\"Error\"); let code_num = code.to_int();"
+    ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
-    // All error variants should be included (case insensitive matching)
-    assert!(stdout.contains("Lowercase error"), "Should match lowercase");
-    assert!(stdout.contains("Uppercase error"), "Should match uppercase");
-    assert!(
-        stdout.contains("Mixed case error"),
-        "Should match mixed case"
-    );
-    assert!(!stdout.contains("Info message"), "Should not match info");
+    
+    let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).expect("Output should be valid JSON");
+    assert_eq!(parsed["has_error"], true, "contains() function should work");
+    assert_eq!(parsed["code_num"], 123, "to_int() function should work");
 }
 
 #[test]
-fn test_timestamp_parsing_and_display() {
-    let input = r#"{"timestamp":"2023-07-18T15:04:23.456Z","level":"INFO","message":"Test with timestamp"}
-{"ts":"2023-07-18 15:04:24","level":"INFO","message":"Test with ts field"}
-{"time":"Jul 18 15:04:25","level":"INFO","message":"Test with time field"}"#;
-
-    let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "-k", "timestamp,message"], input);
-
+fn test_multiple_filters() {
+    let input = r#"{"level": "INFO", "status": 200, "response_time": 50}
+{"level": "ERROR", "status": 500, "response_time": 100}
+{"level": "WARN", "status": 404, "response_time": 200}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--filter", "status >= 400",
+        "--filter", "response_time > 150"
+    ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
-    assert!(
-        stdout.contains("timestamp=\"2023-07-18T15:04:23.456Z\""),
-        "Should preserve ISO timestamp"
-    );
-    // Note: timestamp parsing and normalization might be implementation dependent
+    
+    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(lines.len(), 1, "Should filter to 1 line matching both conditions");
+    
+    let parsed: serde_json::Value = serde_json::from_str(lines[0]).expect("Line should be valid JSON");
+    assert_eq!(parsed["level"], "WARN");
+    assert_eq!(parsed["status"], 404);
+    assert_eq!(parsed["response_time"], 200);
 }
 
 #[test]
-fn test_help_flag() {
-    let mut cmd = Command::new("cargo")
-        .arg("run")
-        .arg("--")
-        .arg("--help")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("Failed to start kelora");
-
-    let output = cmd.wait_with_output().expect("Failed to read output");
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    assert_eq!(
-        output.status.code().unwrap_or(-1),
-        0,
-        "Help should exit successfully"
-    );
-    assert!(stdout.contains("kelora"), "Help should mention kelora");
-    assert!(
-        stdout.contains("log parser"),
-        "Help should mention log parser"
-    );
+fn test_status_class_function() {
+    let input = r#"{"status": 200}
+{"status": 404}
+{"status": 500}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--eval", "let class = status.status_class();"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    
+    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(lines.len(), 3, "Should output 3 lines");
+    
+    let first: serde_json::Value = serde_json::from_str(lines[0]).expect("First line should be valid JSON");
+    assert_eq!(first["class"], "2xx");
+    
+    let second: serde_json::Value = serde_json::from_str(lines[1]).expect("Second line should be valid JSON");
+    assert_eq!(second["class"], "4xx");
+    
+    let third: serde_json::Value = serde_json::from_str(lines[2]).expect("Third line should be valid JSON");
+    assert_eq!(third["class"], "5xx");
 }
 
 #[test]
-fn test_version_flag() {
-    let mut cmd = Command::new("cargo")
-        .arg("run")
-        .arg("--")
-        .arg("--version")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("Failed to start kelora");
-
-    let output = cmd.wait_with_output().expect("Failed to read output");
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    assert_eq!(
-        output.status.code().unwrap_or(-1),
-        0,
-        "Version should exit successfully"
-    );
-    assert!(
-        stdout.contains(env!("CARGO_PKG_VERSION")),
-        "Should show version number {}",
-        env!("CARGO_PKG_VERSION")
-    );
-}
-
-// Performance and edge case tests
-
-#[test]
-fn test_large_input_handling() {
-    // Generate a reasonably large input to test memory handling
-    let mut input = String::new();
-    for i in 0..1000 {
-        input.push_str(&format!(
-            r#"{{"timestamp":"2023-07-18T15:04:{:02}.456Z","level":"INFO","message":"Message {}","id":{}}}"#,
-            i % 60, i, i
-        ));
-        input.push('\n');
+fn test_complex_rhai_expressions() {
+    let input = r#"{"user": "alice", "status": 404}
+{"user": "bob", "status": 500}
+{"user": "charlie", "status": 200}
+{"user": "alice", "status": 403}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--filter", "status >= 400 && user.contains(\"a\")"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    
+    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(lines.len(), 2, "Should filter to 2 lines (alice with status >= 400)");
+    
+    // Verify both results are alice with status >= 400
+    for line in lines {
+        let parsed: serde_json::Value = serde_json::from_str(line).expect("Line should be valid JSON");
+        assert_eq!(parsed["user"], "alice");
+        let status = parsed["status"].as_i64().unwrap();
+        assert!(status >= 400);
     }
-
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl", "-S"], &input);
-
-    assert_eq!(exit_code, 0, "kelora should handle large input");
-    assert!(
-        stderr.contains("Events shown: 1000"),
-        "Should process all 1000 events"
-    );
 }
 
 #[test]
-fn test_very_long_lines() {
-    let long_message = "a".repeat(10000);
-    let input = format!(
-        r#"{{"timestamp":"2023-07-18T15:04:23.456Z","level":"INFO","message":"{}"}}"#,
-        long_message
-    );
-
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl"], &input);
-
-    assert_eq!(exit_code, 0, "kelora should handle very long lines");
-    assert!(
-        stdout.contains(&long_message[..100]),
-        "Should contain part of long message"
-    );
+fn test_print_function_output() {
+    let input = r#"{"user": "alice", "level": "INFO"}
+{"user": "bob", "level": "ERROR"}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--eval", "print(\"Processing user: \" + user);"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    
+    assert!(stdout.contains("Processing user: alice"), "Should print alice debug message");
+    assert!(stdout.contains("Processing user: bob"), "Should print bob debug message");
+    assert!(stdout.contains("\"user\":\"alice\""), "Should also output JSON data");
 }
 
 #[test]
-fn test_unicode_handling() {
-    let input = r#"{"timestamp":"2023-07-18T15:04:23.456Z","level":"INFO","message":"Unicode test: 你好世界 🚀 café naïve résumé"}"#;
+fn test_stdin_large_input_performance() {
+    // Generate 1000 log entries to test performance
+    let mut large_input = String::new();
+    for i in 1..=1000 {
+        large_input.push_str(&format!(
+            "{{\"user\":\"user{}\",\"status\":{},\"message\":\"Message {}\",\"id\":{}}}\n",
+            i,
+            200 + (i % 300),
+            i,
+            i
+        ));
+    }
+    
+    let start_time = std::time::Instant::now();
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--filter", "status >= 400",
+        "--eval", "track_count(tracked, \"errors\");",
+        "--end", "print(`Errors: ${tracked[\"errors\"]}`);"
+    ], &large_input);
+    let duration = start_time.elapsed();
+    
+    assert_eq!(exit_code, 0, "kelora should handle large input successfully");
+    assert!(stdout.contains("Errors:"), "Should count errors in large dataset");
+    
+    // Performance check: should process 1000 lines in reasonable time
+    assert!(duration.as_millis() < 5000, "Should process 1000 lines in less than 5 seconds, took {}ms", duration.as_millis());
+}
 
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl"], input);
+#[test]
+fn test_error_handling_mixed_valid_invalid() {
+    let input = r#"{"valid": "json", "status": 200}
+{malformed json line}
+{"another": "valid", "status": 404}
+not json at all
+{"final": "entry", "status": 500}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--on-error", "skip"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully with skip error handling");
+    
+    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(lines.len(), 3, "Should output 3 valid JSON lines, skipping malformed ones");
+    
+    // Verify all output lines are valid JSON
+    for line in lines {
+        serde_json::from_str::<serde_json::Value>(line).expect("All output lines should be valid JSON");
+    }
+}
 
-    assert_eq!(exit_code, 0, "kelora should handle unicode");
-    assert!(
-        stdout.contains("你好世界"),
-        "Should preserve Chinese characters"
-    );
-    assert!(stdout.contains("🚀"), "Should preserve emoji");
-    assert!(
-        stdout.contains("café"),
-        "Should preserve accented characters"
-    );
+#[test]
+fn test_tracking_with_min_max() {
+    let input = r#"{"response_time": 150, "status": 200}
+{"response_time": 500, "status": 404}
+{"response_time": 75, "status": 200}
+{"response_time": 800, "status": 500}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--eval", "track_min(tracked, \"min_time\", response_time); track_max(tracked, \"max_time\", response_time);",
+        "--end", "print(`Min: ${tracked[\"min_time\"]}, Max: ${tracked[\"max_time\"]}`);"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    
+    assert!(stdout.contains("Min: 75"), "Should track minimum response time");
+    assert!(stdout.contains("Max: 800"), "Should track maximum response time");
+}
+
+#[test]
+fn test_field_modification_and_addition() {
+    let input = r#"{"user": "alice", "score": 85}
+{"user": "bob", "score": 92}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--eval", "let grade = if score >= 90 { \"A\" } else { \"B\" }; let bonus_points = score * 0.1;"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    
+    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(lines.len(), 2, "Should output 2 lines");
+    
+    let first: serde_json::Value = serde_json::from_str(lines[0]).expect("First line should be valid JSON");
+    assert_eq!(first["grade"], "B");
+    assert_eq!(first["bonus_points"], 8.5);
+    
+    let second: serde_json::Value = serde_json::from_str(lines[1]).expect("Second line should be valid JSON");
+    assert_eq!(second["grade"], "A");
+    assert_eq!(second["bonus_points"], 9.2);
+}
+
+#[test]
+fn test_multiline_real_world_scenario() {
+    let input = r#"{"timestamp": "2023-07-18T15:04:23.456Z", "user": "alice", "status": 200, "message": "login successful", "response_time": 45}
+{"timestamp": "2023-07-18T15:04:25.789Z", "user": "bob", "status": 404, "message": "page not found", "response_time": 12}
+{"timestamp": "2023-07-18T15:06:41.210Z", "user": "charlie", "status": 500, "message": "internal error", "response_time": 234}
+{"timestamp": "2023-07-18T15:07:12.345Z", "user": "alice", "status": 403, "message": "forbidden", "response_time": 18}
+{"timestamp": "2023-07-18T15:08:30.678Z", "user": "dave", "status": 200, "message": "success", "response_time": 67}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "json",
+        "--filter", "status >= 400",
+        "--eval", "let alert_level = if status >= 500 { \"critical\" } else { \"warning\" }; track_count(tracked, \"total_errors\");",
+        "--end", "print(`Total errors processed: ${tracked[\"total_errors\"]}`);"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    
+    let lines: Vec<&str> = stdout.trim().lines().filter(|line| line.starts_with('{')).collect();
+    assert_eq!(lines.len(), 3, "Should filter to 3 error lines");
+    
+    assert!(stdout.contains("Total errors processed: 3"), "Should count all error lines");
+    
+    // Verify alert levels are correctly assigned
+    for line in lines {
+        let parsed: serde_json::Value = serde_json::from_str(line).expect("Line should be valid JSON");
+        let status = parsed["status"].as_i64().unwrap();
+        let alert_level = parsed["alert_level"].as_str().unwrap();
+        
+        if status >= 500 {
+            assert_eq!(alert_level, "critical");
+        } else {
+            assert_eq!(alert_level, "warning");
+        }
+    }
 }

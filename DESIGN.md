@@ -32,32 +32,43 @@ kelora -f csv --eval 'total = price * quantity'
 
 ### CLI Arguments
 
-| Flag | Purpose | Example |
-|------|---------|---------|
-| `-f, --format` | Input format (line, csv, json, apache) | `-f apache` |
-| `-F, --output-format` | Output format (json, csv, text) | `-F json` |
-| `--begin` | Run once before processing | `--begin 'print("Starting...")'` |
-| `--filter` | Boolean filter (can repeat) | `--filter 'status >= 400'` |
-| `--eval` | Transform/process (can repeat) | `--eval 'alert = "high"'` |
-| `--end` | Run once after processing | `--end 'print("Done")'` |
-| `--no-inject-fields` | Disable field auto-injection | Access via `event["field"]` only |
-| `--inject-prefix` | Prefix for injected variables | `--inject-prefix "log_"` |
-| `--on-error` | Error handling (skip, fail-fast, emit-errors, default-value) | `--on-error skip` |
-| `--keys` | Output only specific fields | `--keys "ip,status,timestamp"` |
+| Flag | Status | Purpose | Example |
+|------|--------|---------|---------|
+| `-f, --format` | ✅ JSON only | Input format | `-f json` |
+| `-F, --output-format` | ✅ JSON/Text | Output format | `-F text` |
+| `--begin` | ✅ | Run once before processing | `--begin 'print("Starting...")'` |
+| `--filter` | ✅ | Boolean filter (can repeat) | `--filter 'status >= 400'` |
+| `--eval` | ✅ | Transform/process (can repeat) | `--eval 'alert = "high"'` |
+| `--end` | ✅ | Run once after processing | `--end 'print("Done")'` |
+| `--on-error` | ✅ | Error handling strategies | `--on-error skip` |
+| `--keys` | ✅ | Output only specific fields | `--keys "ip,status,timestamp"` |
+| `--parallel` | ✅ | Enable parallel processing | `--parallel` |
+| `--threads` | ✅ | Worker thread count | `--threads 4` |
+| `--batch-size` | ✅ | Lines per batch | `--batch-size 1000` |
+| `--no-preserve-order` | ✅ | Unordered output | `--no-preserve-order` |
 
 ## Processing Modes
 
-Kelora supports different processing modes that affect performance and output behavior:
+Kelora supports two processing modes optimized for different use cases:
 
-### Default Mode (Recommended)
+### Default Mode (Sequential) - ✅ Implemented
 ```bash
 kelora --filter 'status >= 400'  # Default behavior
 ```
-- **Parallel processing** with **ordered output**
-- Events processed concurrently but output maintains input order
-- `tracked` state only available in `--end` stage
-- Best balance of speed and correctness
-- Use for most log analysis tasks
+- **Sequential processing** with **immediate output**
+- Perfect for streaming/interactive use cases (`kubectl logs -f | kelora`)
+- Real-time output as data arrives
+- Best for monitoring and live log analysis
+
+### Parallel Mode - ✅ Implemented  
+```bash
+kelora --parallel --filter 'status >= 400'  # High-throughput batch processing
+```
+- **Parallel processing** with **batched execution**
+- Optimized for high-throughput analysis of large datasets
+- Configurable worker threads (default: CPU count)
+- Order preservation by default (`--no-preserve-order` for speed)
+- Best for bulk log analysis and data processing
 
 ## Data Model
 
@@ -179,22 +190,22 @@ grade = if total_score >= 90 { "A" } else { "B" }
 
 ### Input Formats
 
-| Format | Description | Available Fields | Example Fields |
-|--------|-------------|------------------|----------------|
-| `line` | Raw text | `line` only | `line` |
-| `csv` | Comma-separated | Column headers + `line` | `name`, `age`, `status`, `line` |
-| `json` | JSON objects | All JSON keys + `line` | `user`, `timestamp`, `level`, `line` |
-| `apache` | Apache/Nginx logs | Parsed fields + `line` | `ip`, `method`, `path`, `status`, `bytes`, `line` |
+| Format | Status | Description | Available Fields | Example Fields |
+|--------|--------|-------------|------------------|----------------|
+| `json` | ✅ | JSON objects | All JSON keys + `line` | `user`, `timestamp`, `level`, `line` |
+| `line` | ❌ | Raw text | `line` only | `line` |
+| `csv` | ❌ | Comma-separated | Column headers + `line` | `name`, `age`, `status`, `line` |
+| `apache` | ❌ | Apache/Nginx logs | Parsed fields + `line` | `ip`, `method`, `path`, `status`, `bytes`, `line` |
 
 **Field Availability**: Only fields provided by the input format can be used as direct variables. Always available: `line` (raw text), `event` (field map), `meta` (metadata), `tracked` (global state).
 
 ### Output Formats
 
-| Format | Description |
-|--------|-------------|
-| `json` | JSON objects |
-| `csv` | Comma-separated values |
-| `text` | Original lines or key=value pairs |
+| Format | Status | Description |
+|--------|--------|-------------|
+| `json` | ✅ | JSON objects |
+| `text` | ✅ | Key=value pairs (logfmt style) |
+| `csv` | ❌ | Comma-separated values |
 
 ## Implementation Architecture
 
