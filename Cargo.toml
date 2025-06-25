@@ -1,9 +1,9 @@
 [package]
 name = "kelora"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 authors = ["Dirk Loss <mail@dirk-loss.de>"]
-description = "A fast, extensible log parser"
+description = "A command-line log analysis tool with embedded Rhai scripting"
 license = "MIT"
 repository = "https://github.com/dloss/kelora"
 keywords = ["logging", "parser", "cli", "logfmt", "json"]
@@ -16,6 +16,7 @@ serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1.10"
 anyhow = "1.0"
+rhai = "1.17"
 
 [dev-dependencies]
 tempfile = "3.8"

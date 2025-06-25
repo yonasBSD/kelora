@@ -7,7 +7,10 @@ pub struct Event {
     pub timestamp: Option<DateTime<Utc>>,
     pub level: Option<String>,
     pub message: Option<String>,
-    pub fields: HashMap<String, FieldValue>,
+    pub fields: HashMap<String, serde_json::Value>,
+    pub original_line: String,
+    pub line_number: Option<usize>,
+    pub filename: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,8 +27,20 @@ impl Event {
         Self::default()
     }
 
-    pub fn set_field(&mut self, key: String, value: FieldValue) {
+    pub fn default_with_line(line: String) -> Self {
+        Self {
+            original_line: line,
+            ..Default::default()
+        }
+    }
+
+    pub fn set_field(&mut self, key: String, value: serde_json::Value) {
         self.fields.insert(key, value);
+    }
+
+    pub fn set_metadata(&mut self, line_number: usize, filename: Option<String>) {
+        self.line_number = Some(line_number);
+        self.filename = filename;
     }
 
     /// Filter to only show specified keys, keeping only fields that actually exist
@@ -81,7 +96,7 @@ impl Event {
     pub fn extract_core_fields(&mut self) {
         // Extract timestamp
         for ts_key in &["timestamp", "ts", "time", "at", "_t", "@t", "t"] {
-            if let Some(FieldValue::String(ts_str)) = self.fields.get(*ts_key) {
+            if let Some(serde_json::Value::String(ts_str)) = self.fields.get(*ts_key) {
                 if let Ok(ts) = parse_timestamp(ts_str) {
                     self.timestamp = Some(ts);
                     break;
@@ -92,8 +107,8 @@ impl Event {
         // Extract level
         for level_key in &["level", "log_level", "loglevel", "lvl", "severity", "@l"] {
             if let Some(value) = self.fields.get(*level_key) {
-                if let Some(level_str) = value.as_string() {
-                    self.level = Some(level_str.clone());
+                if let Some(level_str) = value.as_str() {
+                    self.level = Some(level_str.to_string());
                     break;
                 }
             }
@@ -102,8 +117,8 @@ impl Event {
         // Extract message
         for msg_key in &["message", "msg", "@m"] {
             if let Some(value) = self.fields.get(*msg_key) {
-                if let Some(msg_str) = value.as_string() {
-                    self.message = Some(msg_str.clone());
+                if let Some(msg_str) = value.as_str() {
+                    self.message = Some(msg_str.to_string());
                     break;
                 }
             }

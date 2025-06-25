@@ -1,19 +1,64 @@
-use crate::event::{Event, FieldValue};
+use crate::event::Event;
 
 pub trait Formatter {
     fn format(&self, event: &Event) -> String;
 }
 
-// Default logfmt-style formatter
-pub struct DefaultFormatter;
+// JSON formatter
+pub struct JsonFormatter;
 
-impl DefaultFormatter {
+impl JsonFormatter {
     pub fn new() -> Self {
         Self
     }
 }
 
-impl Formatter for DefaultFormatter {
+impl Formatter for JsonFormatter {
+    fn format(&self, event: &Event) -> String {
+        let mut json_obj = serde_json::Map::new();
+
+        // Add core fields if they exist
+        if let Some(timestamp) = &event.timestamp {
+            json_obj.insert(
+                "timestamp".to_string(),
+                serde_json::Value::String(timestamp.to_rfc3339()),
+            );
+        }
+
+        if let Some(level) = &event.level {
+            json_obj.insert(
+                "level".to_string(),
+                serde_json::Value::String(level.clone()),
+            );
+        }
+
+        if let Some(message) = &event.message {
+            json_obj.insert(
+                "message".to_string(),
+                serde_json::Value::String(message.clone()),
+            );
+        }
+
+        // Add all other fields
+        for (key, value) in &event.fields {
+            json_obj.insert(key.clone(), value.clone());
+        }
+
+        serde_json::to_string(&serde_json::Value::Object(json_obj))
+            .unwrap_or_else(|_| "{}".to_string())
+    }
+}
+
+// Text formatter (logfmt-style)
+pub struct TextFormatter;
+
+impl TextFormatter {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Formatter for TextFormatter {
     fn format(&self, event: &Event) -> String {
         let mut parts = Vec::new();
 
@@ -39,19 +84,7 @@ impl Formatter for DefaultFormatter {
 
         for key in field_keys {
             if let Some(value) = event.fields.get(key) {
-                let formatted_value = match value {
-                    FieldValue::String(s) => format!("\"{}\"", escape_quotes(s)),
-                    FieldValue::Number(n) => {
-                        // Format numbers nicely - avoid unnecessary decimal places for integers
-                        if n.fract() == 0.0 {
-                            format!("{}", *n as i64)
-                        } else {
-                            format!("{}", n)
-                        }
-                    }
-                    FieldValue::Boolean(b) => b.to_string(),
-                    FieldValue::Null => "null".to_string(),
-                };
+                let formatted_value = format_json_value(value);
                 parts.push(format!("{}={}", key, formatted_value));
             }
         }
@@ -60,56 +93,21 @@ impl Formatter for DefaultFormatter {
     }
 }
 
-// JSONL formatter
-pub struct JsonlFormatter;
-
-impl JsonlFormatter {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Formatter for JsonlFormatter {
-    fn format(&self, event: &Event) -> String {
-        let mut json_obj = serde_json::Map::new();
-
-        // Add core fields
-        if let Some(timestamp) = &event.timestamp {
-            json_obj.insert(
-                "timestamp".to_string(),
-                serde_json::Value::String(timestamp.to_rfc3339()),
-            );
+fn format_json_value(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::String(s) => format!("\"{}\"", escape_quotes(s)),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                i.to_string()
+            } else if let Some(f) = n.as_f64() {
+                f.to_string()
+            } else {
+                n.to_string()
+            }
         }
-
-        if let Some(level) = &event.level {
-            json_obj.insert(
-                "level".to_string(),
-                serde_json::Value::String(level.clone()),
-            );
-        }
-
-        if let Some(message) = &event.message {
-            json_obj.insert(
-                "message".to_string(),
-                serde_json::Value::String(message.clone()),
-            );
-        }
-
-        // Add other fields
-        for (key, value) in &event.fields {
-            let json_value = match value {
-                FieldValue::String(s) => serde_json::Value::String(s.clone()),
-                FieldValue::Number(n) => serde_json::Value::Number(
-                    serde_json::Number::from_f64(*n).unwrap_or_else(|| serde_json::Number::from(0)),
-                ),
-                FieldValue::Boolean(b) => serde_json::Value::Bool(*b),
-                FieldValue::Null => serde_json::Value::Null,
-            };
-            json_obj.insert(key.clone(), json_value);
-        }
-
-        serde_json::to_string(&serde_json::Value::Object(json_obj))
-            .unwrap_or_else(|_| "{}".to_string())
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Null => "null".to_string(),
+        _ => format!("\"{}\"", escape_quotes(&value.to_string())),
     }
 }
 
@@ -120,44 +118,46 @@ fn escape_quotes(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
     use std::collections::HashMap;
 
     #[test]
-    fn test_default_formatter_empty_event() {
-        let event = Event::new();
-        let formatter = DefaultFormatter::new();
-        assert_eq!(formatter.format(&event), "");
+    fn test_json_formatter_empty_event() {
+        let event = Event::default();
+        let formatter = JsonFormatter::new();
+        let result = formatter.format(&event);
+        assert!(result.starts_with('{') && result.ends_with('}'));
     }
 
     #[test]
-    fn test_default_formatter_with_fields() {
-        let mut event = Event::new();
+    fn test_json_formatter_with_fields() {
+        let mut event = Event::default();
         event.level = Some("INFO".to_string());
         event.message = Some("Test message".to_string());
-        event.set_field("key1".to_string(), FieldValue::String("value1".to_string()));
-        event.set_field("key2".to_string(), FieldValue::Number(42.0));
+        event.set_field("user".to_string(), serde_json::json!("alice"));
+        event.set_field("status".to_string(), serde_json::json!(200));
 
-        let formatter = DefaultFormatter::new();
+        let formatter = JsonFormatter::new();
+        let result = formatter.format(&event);
+
+        assert!(result.contains("\"level\":\"INFO\""));
+        assert!(result.contains("\"message\":\"Test message\""));
+        assert!(result.contains("\"user\":\"alice\""));
+        assert!(result.contains("\"status\":200"));
+    }
+
+    #[test]
+    fn test_text_formatter() {
+        let mut event = Event::default();
+        event.level = Some("INFO".to_string());
+        event.set_field("user".to_string(), serde_json::json!("alice"));
+        event.set_field("count".to_string(), serde_json::json!(42));
+
+        let formatter = TextFormatter::new();
         let result = formatter.format(&event);
 
         assert!(result.contains("level=\"INFO\""));
-        assert!(result.contains("message=\"Test message\""));
-        assert!(result.contains("key1=\"value1\""));
-        assert!(result.contains("key2=42"));
-    }
-
-    #[test]
-    fn test_number_formatting() {
-        let mut event = Event::new();
-        event.set_field("int".to_string(), FieldValue::Number(42.0));
-        event.set_field("float".to_string(), FieldValue::Number(42.5));
-
-        let formatter = DefaultFormatter::new();
-        let result = formatter.format(&event);
-
-        assert!(result.contains("int=42"));
-        assert!(result.contains("float=42.5"));
+        assert!(result.contains("user=\"alice\""));
+        assert!(result.contains("count=42"));
     }
 
     #[test]
