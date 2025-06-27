@@ -16,6 +16,11 @@ cargo build --release
 # Run performance tests
 time ./target/release/kelora -f json <logfile> --filter "expression" --on-error skip > /dev/null
 
+# Run benchmark suite to detect performance regressions
+make bench-quick              # Quick benchmarks (10k dataset)
+make bench                    # Full benchmark suite (10k + 50k datasets)
+make bench-baseline           # Update performance baseline
+
 # Run lint and type checking
 cargo clippy
 cargo fmt --check

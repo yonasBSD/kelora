@@ -1,0 +1,8 @@
+# Generated benchmark datasets (too large for repo)
+bench_50k.jsonl
+bench_100k.jsonl
+bench_500k.jsonl
+
+# Benchmark results (local only)
+benchmark_results.json
+baseline_results.json

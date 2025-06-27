@@ -1,6 +1,6 @@
 # Makefile for kelora
 
-.PHONY: all build test test-unit test-integration test-full clean help install
+.PHONY: all build test test-unit test-integration test-full clean help install bench bench-quick bench-baseline
 
 # Default target
 all: build test
@@ -58,6 +58,24 @@ demo:
 	@echo '{"timestamp":"2023-07-18T15:04:23.456Z","level":"ERROR","message":"Demo error","component":"test"}' | cargo run -- -f jsonl -c
 	@echo '{"timestamp":"2023-07-18T15:04:24.456Z","level":"INFO","message":"Demo info","component":"test"}' | cargo run -- -f jsonl -c
 
+# Run performance benchmarks
+bench: build
+	@echo "⚡ Running performance benchmarks..."
+	@chmod +x benchmarks/run_benchmarks.sh
+	./benchmarks/run_benchmarks.sh
+
+# Run quick performance benchmarks
+bench-quick: build
+	@echo "⚡ Running quick benchmarks..."
+	@chmod +x benchmarks/run_benchmarks.sh
+	./benchmarks/run_benchmarks.sh --quick
+
+# Update performance baseline
+bench-baseline: build
+	@echo "📊 Updating performance baseline..."
+	@chmod +x benchmarks/run_benchmarks.sh
+	./benchmarks/run_benchmarks.sh --update-baseline
+
 # Show help
 help:
 	@echo "Kelora Makefile Commands:"
@@ -71,6 +89,9 @@ help:
 	@echo "  make fmt            - Format code"
 	@echo "  make check          - Run format, lint, and test"
 	@echo "  make demo           - Run a quick demo"
+	@echo "  make bench          - Run performance benchmarks"
+	@echo "  make bench-quick    - Run quick benchmarks (10k dataset)"
+	@echo "  make bench-baseline - Update performance baseline"
 	@echo "  make clean          - Clean build artifacts"
 	@echo "  make install        - Install dependencies"
 	@echo "  make help           - Show this help"
