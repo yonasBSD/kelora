@@ -3,15 +3,17 @@ use clap::Parser;
 use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader, Read, Write};
 
+mod colors;
 mod engine;
 mod event;
 mod formatters;
 mod parallel;
 mod parsers;
+mod tty;
 
 use engine::RhaiEngine;
 use event::Event;
-use formatters::{Formatter, JsonFormatter, TextFormatter};
+use formatters::{Formatter, JsonFormatter, DefaultFormatter};
 use parallel::{ParallelConfig, ParallelProcessor, ProcessRequest};
 use parsers::{JsonlParser, LineParser, Parser as LogParser};
 
@@ -34,7 +36,7 @@ pub struct Cli {
         short = 'F',
         long = "output-format",
         value_enum,
-        default_value = "json"
+        default_value = "default"
     )]
     pub output_format: OutputFormat,
 
@@ -70,6 +72,10 @@ pub struct Cli {
     #[arg(long = "keys", value_delimiter = ',')]
     pub keys: Vec<String>,
 
+    /// Output only field values (no keys), space-separated
+    #[arg(long = "plain")]
+    pub plain: bool,
+
     /// Number of worker threads for parallel processing
     #[arg(long = "threads", default_value_t = 0)]
     pub threads: usize,
@@ -99,10 +105,11 @@ pub enum InputFormat {
     Apache,
 }
 
-#[derive(clap::ValueEnum, Clone, Debug)]
+#[derive(clap::ValueEnum, Clone, Debug, Default)]
 pub enum OutputFormat {
     Json,
-    Text,
+    #[default]
+    Default,
     Csv,
 }
 
@@ -276,7 +283,7 @@ fn create_parser(format: &InputFormat) -> Box<dyn LogParser> {
 fn create_formatter(format: &OutputFormat) -> Box<dyn Formatter> {
     match format {
         OutputFormat::Json => Box::new(JsonFormatter::new()),
-        OutputFormat::Text => Box::new(TextFormatter::new()),
+        OutputFormat::Default => Box::new(DefaultFormatter::new()),
         OutputFormat::Csv => todo!("CSV formatter not implemented yet"),
     }
 }

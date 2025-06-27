@@ -8,7 +8,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::event::Event;
-use crate::formatters::{Formatter, JsonFormatter, TextFormatter};
+use crate::formatters::{Formatter, JsonFormatter, DefaultFormatter};
 use crate::parsers::{JsonlParser, LineParser, Parser};
 
 /// Configuration for worker threads
@@ -570,7 +570,7 @@ impl ParallelProcessor {
     fn create_formatter(format: &crate::OutputFormat) -> Box<dyn Formatter> {
         match format {
             crate::OutputFormat::Json => Box::new(JsonFormatter::new()),
-            crate::OutputFormat::Text => Box::new(TextFormatter::new()),
+            crate::OutputFormat::Default => Box::new(DefaultFormatter::new()),
             crate::OutputFormat::Csv => todo!("CSV formatter not implemented yet"),
         }
     }

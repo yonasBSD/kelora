@@ -22,16 +22,16 @@ impl Formatter for JsonFormatter {
     }
 }
 
-// Text formatter (logfmt-style)
-pub struct TextFormatter;
+// Default formatter (logfmt-style with colors and plain mode)
+pub struct DefaultFormatter;
 
-impl TextFormatter {
+impl DefaultFormatter {
     pub fn new() -> Self {
         Self
     }
 }
 
-impl Formatter for TextFormatter {
+impl Formatter for DefaultFormatter {
     fn format(&self, event: &Event) -> String {
         let mut parts = Vec::with_capacity(event.fields.len());
 
@@ -103,13 +103,13 @@ mod tests {
     }
 
     #[test]
-    fn test_text_formatter() {
+    fn test_default_formatter() {
         let mut event = Event::default();
         event.set_field("level".to_string(), serde_json::json!("INFO"));
         event.set_field("user".to_string(), serde_json::json!("alice"));
         event.set_field("count".to_string(), serde_json::json!(42));
 
-        let formatter = TextFormatter::new();
+        let formatter = DefaultFormatter::new();
         let result = formatter.format(&event);
 
         assert!(result.contains("level=\"INFO\""));
