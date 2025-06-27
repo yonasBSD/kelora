@@ -580,8 +580,7 @@ impl ParallelProcessor {
                 Box::new(DefaultFormatter::new(use_colors, plain))
             },
             crate::OutputFormat::Logfmt => {
-                let use_colors = crate::tty::should_use_colors();
-                Box::new(LogfmtFormatter::new(use_colors, plain))
+                Box::new(LogfmtFormatter::new())
             },
             crate::OutputFormat::Csv => todo!("CSV formatter not implemented yet"),
         }

@@ -293,8 +293,7 @@ fn create_formatter(format: &OutputFormat, plain: bool) -> Box<dyn Formatter> {
             Box::new(DefaultFormatter::new(use_colors, plain))
         },
         OutputFormat::Logfmt => {
-            let use_colors = should_use_colors();
-            Box::new(LogfmtFormatter::new(use_colors, plain))
+            Box::new(LogfmtFormatter::new())
         },
         OutputFormat::Csv => todo!("CSV formatter not implemented yet"),
     }
