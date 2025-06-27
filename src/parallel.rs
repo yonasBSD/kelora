@@ -8,8 +8,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::event::Event;
-use crate::formatters::{Formatter, JsonFormatter, DefaultFormatter};
-use crate::parsers::{JsonlParser, LineParser, Parser};
+use crate::formatters::{Formatter, JsonFormatter, DefaultFormatter, LogfmtFormatter};
+use crate::parsers::{JsonlParser, LineParser, LogfmtParser, Parser};
 
 /// Configuration for worker threads
 #[derive(Debug, Clone)]
@@ -566,6 +566,7 @@ impl ParallelProcessor {
         match format {
             crate::InputFormat::Jsonl => Box::new(JsonlParser::new()),
             crate::InputFormat::Line => Box::new(LineParser::new()),
+            crate::InputFormat::Logfmt => Box::new(LogfmtParser::new()),
             crate::InputFormat::Csv => todo!("CSV parser not implemented yet"),
             crate::InputFormat::Apache => todo!("Apache parser not implemented yet"),
         }
@@ -577,6 +578,10 @@ impl ParallelProcessor {
             crate::OutputFormat::Default => {
                 let use_colors = crate::tty::should_use_colors();
                 Box::new(DefaultFormatter::new(use_colors, plain))
+            },
+            crate::OutputFormat::Logfmt => {
+                let use_colors = crate::tty::should_use_colors();
+                Box::new(LogfmtFormatter::new(use_colors, plain))
             },
             crate::OutputFormat::Csv => todo!("CSV formatter not implemented yet"),
         }

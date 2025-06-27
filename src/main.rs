@@ -13,10 +13,10 @@ mod tty;
 
 use engine::RhaiEngine;
 use event::Event;
-use formatters::{Formatter, JsonFormatter, DefaultFormatter};
+use formatters::{Formatter, JsonFormatter, DefaultFormatter, LogfmtFormatter};
 use tty::should_use_colors;
 use parallel::{ParallelConfig, ParallelProcessor, ProcessRequest};
-use parsers::{JsonlParser, LineParser, Parser as LogParser};
+use parsers::{JsonlParser, LineParser, LogfmtParser, Parser as LogParser};
 
 #[derive(Parser)]
 #[command(name = "kelora")]
@@ -102,6 +102,7 @@ pub struct Cli {
 pub enum InputFormat {
     Jsonl,
     Line,
+    Logfmt,
     Csv,
     Apache,
 }
@@ -111,6 +112,7 @@ pub enum OutputFormat {
     Jsonl,
     #[default]
     Default,
+    Logfmt,
     Csv,
 }
 
@@ -277,6 +279,7 @@ fn create_parser(format: &InputFormat) -> Box<dyn LogParser> {
     match format {
         InputFormat::Jsonl => Box::new(JsonlParser::new()),
         InputFormat::Line => Box::new(LineParser::new()),
+        InputFormat::Logfmt => Box::new(LogfmtParser::new()),
         InputFormat::Csv => todo!("CSV parser not implemented yet"),
         InputFormat::Apache => todo!("Apache parser not implemented yet"),
     }
@@ -288,6 +291,10 @@ fn create_formatter(format: &OutputFormat, plain: bool) -> Box<dyn Formatter> {
         OutputFormat::Default => {
             let use_colors = should_use_colors();
             Box::new(DefaultFormatter::new(use_colors, plain))
+        },
+        OutputFormat::Logfmt => {
+            let use_colors = should_use_colors();
+            Box::new(LogfmtFormatter::new(use_colors, plain))
         },
         OutputFormat::Csv => todo!("CSV formatter not implemented yet"),
     }
