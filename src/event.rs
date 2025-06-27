@@ -23,6 +23,17 @@ pub enum FieldValue {
 }
 
 impl Event {
+    pub fn with_capacity(original_line: String, capacity: usize) -> Self {
+        Self {
+            timestamp: None,
+            level: None,
+            message: None,
+            fields: HashMap::with_capacity(capacity),
+            original_line,
+            line_number: None,
+            filename: None,
+        }
+    }
 
     pub fn default_with_line(line: String) -> Self {
         Self {
@@ -42,7 +53,7 @@ impl Event {
 
     /// Filter to only show specified keys, keeping only fields that actually exist
     pub fn filter_keys(&mut self, keys: &[String]) {
-        let mut new_fields = HashMap::new();
+        let mut new_fields = HashMap::with_capacity(keys.len());
 
         // Only include fields that are both requested and exist
         for key in keys {

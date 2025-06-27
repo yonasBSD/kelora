@@ -212,7 +212,7 @@ impl ParallelProcessor {
         };
 
         let (result_sender, result_receiver) = if self.config.preserve_order {
-            bounded(self.config.num_workers * 2)
+            bounded(self.config.num_workers * 4)  // Increased from 2x to 4x workers
         } else {
             unbounded()
         };
@@ -229,7 +229,7 @@ impl ParallelProcessor {
         };
 
         // Start worker threads
-        let mut worker_handles = Vec::new();
+        let mut worker_handles = Vec::with_capacity(self.config.num_workers);
         
         for worker_id in 0..self.config.num_workers {
             let batch_receiver = batch_receiver.clone();
@@ -296,7 +296,7 @@ impl ParallelProcessor {
         batch_timeout: Duration,
     ) -> Result<()> {
         let mut batch_id = 0u64;
-        let mut current_batch = Vec::new();
+        let mut current_batch = Vec::with_capacity(batch_size);
         let mut line_num = 0usize;
         let mut batch_start_line = 1usize;
         let mut last_batch_time = Instant::now();
@@ -395,7 +395,7 @@ impl ParallelProcessor {
             // Reset thread-local tracking state for this batch
             crate::engine::RhaiEngine::clear_thread_tracking_state();
             
-            let mut batch_results = Vec::new();
+            let mut batch_results = Vec::with_capacity(batch.lines.len());
             
             for (line_idx, line) in batch.lines.iter().enumerate() {
                 let current_line_num = batch.start_line_num + line_idx;

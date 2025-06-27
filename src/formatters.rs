@@ -33,10 +33,11 @@ impl TextFormatter {
 
 impl Formatter for TextFormatter {
     fn format(&self, event: &Event) -> String {
-        let mut parts = Vec::new();
+        let mut parts = Vec::with_capacity(event.fields.len());
 
         // Add all fields in sorted order (using original field names)
-        let mut field_keys: Vec<_> = event.fields.keys().collect();
+        let mut field_keys: Vec<_> = Vec::with_capacity(event.fields.len());
+        field_keys.extend(event.fields.keys());
         field_keys.sort();
 
         for key in field_keys {
