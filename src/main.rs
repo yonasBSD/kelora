@@ -13,7 +13,7 @@ use engine::RhaiEngine;
 use event::Event;
 use formatters::{Formatter, JsonFormatter, TextFormatter};
 use parallel::{ParallelConfig, ParallelProcessor, ProcessRequest};
-use parsers::{JsonlParser, Parser as LogParser};
+use parsers::{JsonlParser, LineParser, Parser as LogParser};
 
 #[derive(Parser)]
 #[command(name = "kelora")]
@@ -267,7 +267,7 @@ fn main() -> Result<()> {
 fn create_parser(format: &InputFormat) -> Box<dyn LogParser> {
     match format {
         InputFormat::Json => Box::new(JsonlParser::new()),
-        InputFormat::Line => todo!("Line parser not implemented yet"),
+        InputFormat::Line => Box::new(LineParser::new()),
         InputFormat::Csv => todo!("CSV parser not implemented yet"),
         InputFormat::Apache => todo!("Apache parser not implemented yet"),
     }

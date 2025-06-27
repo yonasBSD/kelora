@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use crate::event::Event;
 use crate::formatters::{Formatter, JsonFormatter, TextFormatter};
-use crate::parsers::{JsonlParser, Parser};
+use crate::parsers::{JsonlParser, LineParser, Parser};
 
 /// Configuration for worker threads
 #[derive(Debug, Clone)]
@@ -561,7 +561,7 @@ impl ParallelProcessor {
     fn create_parser(format: &crate::InputFormat) -> Box<dyn Parser> {
         match format {
             crate::InputFormat::Json => Box::new(JsonlParser::new()),
-            crate::InputFormat::Line => todo!("Line parser not implemented yet"),
+            crate::InputFormat::Line => Box::new(LineParser::new()),
             crate::InputFormat::Csv => todo!("CSV parser not implemented yet"),
             crate::InputFormat::Apache => todo!("Apache parser not implemented yet"),
         }

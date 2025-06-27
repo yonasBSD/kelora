@@ -35,6 +35,27 @@ impl Parser for JsonlParser {
     }
 }
 
+// Line Parser
+pub struct LineParser;
+
+impl LineParser {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Parser for LineParser {
+    fn parse(&self, line: &str) -> Result<Event, anyhow::Error> {
+        // Create event with minimal capacity (just the line field)
+        let mut event = Event::with_capacity(line.to_string(), 1);
+        
+        // Set the line as a field so it's available as event["line"]
+        event.set_field("line".to_string(), serde_json::Value::String(line.to_string()));
+        
+        Ok(event)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -61,5 +82,40 @@ mod tests {
         assert_eq!(result.level, Some("error".to_string()));
         assert_eq!(result.fields.get("user"), Some(&serde_json::json!("alice")));
         assert_eq!(result.fields.get("status"), Some(&serde_json::json!(404)));
+    }
+
+    #[test]
+    fn test_line_parser_basic() {
+        let parser = LineParser::new();
+        let test_line = "This is a simple log line";
+        let result = parser.parse(test_line).unwrap();
+
+        // Should have the line available as a field
+        assert_eq!(result.fields.get("line"), Some(&serde_json::Value::String(test_line.to_string())));
+        
+        // Original line should also be preserved
+        assert_eq!(result.original_line, test_line);
+        
+        // No core fields should be extracted from plain text
+        assert_eq!(result.level, None);
+        assert_eq!(result.message, None);
+        assert_eq!(result.timestamp, None);
+    }
+
+    #[test]
+    fn test_line_parser_with_structure() {
+        let parser = LineParser::new();
+        let test_line = "2023-01-01 ERROR Failed to connect";
+        let result = parser.parse(test_line).unwrap();
+
+        // Should have the line available as a field
+        assert_eq!(result.fields.get("line"), Some(&serde_json::Value::String(test_line.to_string())));
+        
+        // Original line should be preserved
+        assert_eq!(result.original_line, test_line);
+        
+        // Line parser doesn't extract core fields
+        assert_eq!(result.level, None);
+        assert_eq!(result.message, None);
     }
 }
