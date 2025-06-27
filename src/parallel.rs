@@ -564,7 +564,7 @@ impl ParallelProcessor {
 
     fn create_parser(format: &crate::InputFormat) -> Box<dyn Parser> {
         match format {
-            crate::InputFormat::Json => Box::new(JsonlParser::new()),
+            crate::InputFormat::Jsonl => Box::new(JsonlParser::new()),
             crate::InputFormat::Line => Box::new(LineParser::new()),
             crate::InputFormat::Csv => todo!("CSV parser not implemented yet"),
             crate::InputFormat::Apache => todo!("Apache parser not implemented yet"),
@@ -573,7 +573,7 @@ impl ParallelProcessor {
 
     fn create_formatter(format: &crate::OutputFormat, plain: bool) -> Box<dyn Formatter> {
         match format {
-            crate::OutputFormat::Json => Box::new(JsonFormatter::new()),
+            crate::OutputFormat::Jsonl => Box::new(JsonFormatter::new()),
             crate::OutputFormat::Default => {
                 let use_colors = crate::tty::should_use_colors();
                 Box::new(DefaultFormatter::new(use_colors, plain))

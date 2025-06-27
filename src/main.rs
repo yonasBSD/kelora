@@ -29,7 +29,7 @@ pub struct Cli {
     pub files: Vec<String>,
 
     /// Input format
-    #[arg(short = 'f', long = "format", value_enum, default_value = "json")]
+    #[arg(short = 'f', long = "format", value_enum, default_value = "jsonl")]
     pub format: InputFormat,
 
     /// Output format
@@ -100,7 +100,7 @@ pub struct Cli {
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum InputFormat {
-    Json,
+    Jsonl,
     Line,
     Csv,
     Apache,
@@ -108,7 +108,7 @@ pub enum InputFormat {
 
 #[derive(clap::ValueEnum, Clone, Debug, Default)]
 pub enum OutputFormat {
-    Json,
+    Jsonl,
     #[default]
     Default,
     Csv,
@@ -275,7 +275,7 @@ fn main() -> Result<()> {
 
 fn create_parser(format: &InputFormat) -> Box<dyn LogParser> {
     match format {
-        InputFormat::Json => Box::new(JsonlParser::new()),
+        InputFormat::Jsonl => Box::new(JsonlParser::new()),
         InputFormat::Line => Box::new(LineParser::new()),
         InputFormat::Csv => todo!("CSV parser not implemented yet"),
         InputFormat::Apache => todo!("Apache parser not implemented yet"),
@@ -284,7 +284,7 @@ fn create_parser(format: &InputFormat) -> Box<dyn LogParser> {
 
 fn create_formatter(format: &OutputFormat, plain: bool) -> Box<dyn Formatter> {
     match format {
-        OutputFormat::Json => Box::new(JsonFormatter::new()),
+        OutputFormat::Jsonl => Box::new(JsonFormatter::new()),
         OutputFormat::Default => {
             let use_colors = should_use_colors();
             Box::new(DefaultFormatter::new(use_colors, plain))

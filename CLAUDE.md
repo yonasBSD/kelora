@@ -35,10 +35,10 @@ make test-full          # Comprehensive test suite
 ### Example Usage
 ```bash
 # Filter high response times from JSON logs
-./target/release/kelora -f json logs.jsonl --filter "response_time.sub_string(0,2).to_int() > 98"
+./target/release/kelora -f jsonl logs.jsonl --filter "response_time.sub_string(0,2).to_int() > 98"
 
 # Count status codes and track metrics
-./target/release/kelora -f json access.log --eval "track_count(status_class(status))" --end "print(tracked)"
+./target/release/kelora -f jsonl access.log --eval "track_count(status_class(status))" --end "print(tracked)"
 ```
 
 ## Architecture
@@ -73,7 +73,7 @@ Kelora follows a "compile once, evaluate repeatedly" model:
 **Sequential Mode (default)**: Real-time streaming output, perfect for monitoring
 ```bash
 kelora --filter 'status >= 400'  # Live log analysis
-kubectl logs -f my-app | kelora -f json --filter 'level == "error"'
+kubectl logs -f my-app | kelora -f jsonl --filter 'level == "error"'
 ```
 
 **Parallel Mode**: Batch processing for high-throughput analysis
@@ -148,7 +148,7 @@ time ./target/release/kelora -f json large_file.jsonl \
 Fields are automatically injected as Rhai variables based on input format:
 ```bash
 # JSON input: {"user": "alice", "status": 404}
-kelora -f json --filter 'user == "alice" && status >= 400'
+kelora -f jsonl --filter 'user == "alice" && status >= 400'
 
 # Invalid identifiers use event map
 kelora --filter 'event["user-name"] == "admin"'
@@ -194,14 +194,14 @@ Four strategies via `--on-error`:
 
 | Input Format | Status | Available Fields |
 |-------------|--------|------------------|
-| `json` | ✅ | All JSON keys + `line` |
+| `jsonl` | ✅ | All JSON keys + `line` |
 | `line` | ❌ | `line` only |
 | `csv` | ❌ | Column headers + `line` |
 | `apache` | ❌ | `ip`, `method`, `path`, `status`, `bytes`, `line` |
 
 | Output Format | Status | Description |
 |--------------|--------|-------------|
-| `json` | ✅ | JSON objects |
+| `jsonl` | ✅ | JSON objects |
 | `text` | ✅ | Key=value pairs (logfmt style) |
 | `csv` | ❌ | Comma-separated values |
 
@@ -209,7 +209,7 @@ Four strategies via `--on-error`:
 
 ### Error Analysis
 ```bash
-kelora -f json \
+kelora -f jsonl \
   --filter 'status >= 400' \
   --eval 'track_count(status.status_class())' \
   --end 'print(`4xx: ${tracked["4xx"] ?? 0}, 5xx: ${tracked["5xx"] ?? 0}`)'
@@ -217,16 +217,16 @@ kelora -f json \
 
 ### Performance Monitoring  
 ```bash
-kelora -f json \
+kelora -f jsonl \
   --eval 'track_min("min_time", response_time); track_max("max_time", response_time)' \
   --end 'print(`Response time range: ${tracked["min_time"]}-${tracked["max_time"]}ms`)'
 ```
 
 ### Data Transformation
 ```bash
-kelora -f json \
+kelora -f jsonl \
   --eval 'severity = if level == "ERROR" { "high" } else { "low" }; processed_at = "2024-01-01"' \
-  -F json
+  -F jsonl
 ```
 
 ## Documentation
@@ -238,8 +238,8 @@ kelora -f json \
 
 ### 🚀 Completed Features
 - ✅ **Core Architecture**: Rhai engine integration with AST compilation and reuse
-- ✅ **JSON Input Format**: Full support for JSON log processing
-- ✅ **JSON/Text Output**: JSON objects and logfmt-style key=value output
+- ✅ **JSONL Input Format**: Full support for JSON Lines log processing
+- ✅ **JSONL/Text Output**: JSON objects and logfmt-style key=value output
 - ✅ **Expression Stages**: `--begin`, `--filter`, `--eval`, `--end` pipeline
 - ✅ **Global State Tracking**: `track_count()`, `track_min()`, `track_max()` functions
 - ✅ **Error Handling**: Four strategies (skip, fail-fast, emit-errors, default-value)

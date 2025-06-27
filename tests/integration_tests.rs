@@ -74,11 +74,11 @@ fn test_help_flag() {
 }
 
 #[test]
-fn test_basic_json_parsing() {
+fn test_basic_jsonl_parsing() {
     let input = r#"{"level": "INFO", "message": "Hello world", "status": 200}
 {"level": "ERROR", "message": "Something failed", "status": 500}"#;
     
-    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json", "-F", "json"], input);
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl", "-F", "jsonl"], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
     
     let lines: Vec<&str> = stdout.trim().split('\n').collect();
@@ -96,7 +96,7 @@ fn test_filter_expression() {
 {"level": "ERROR", "status": 500}
 {"level": "DEBUG", "status": 404}"#;
     
-    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json", "-F", "json", "--filter", "status >= 400"], input);
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl", "-F", "jsonl", "--filter", "status >= 400"], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
     
     let lines: Vec<&str> = stdout.trim().split('\n').collect();
@@ -116,8 +116,8 @@ fn test_eval_expression() {
 {"level": "ERROR", "status": 500}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json", 
-        "-F", "json",
+        "-f", "jsonl", 
+        "-F", "jsonl",
         "--eval", "let alert_level = if status >= 400 { \"high\" } else { \"low\" };"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -137,7 +137,7 @@ fn test_eval_expression() {
 fn test_text_output_format() {
     let input = r#"{"level": "INFO", "message": "Hello world", "status": 200}"#;
     
-    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json", "-F", "default"], input);
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl", "-F", "default"], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
     
     // Text format should be key=value pairs
@@ -151,8 +151,8 @@ fn test_keys_filtering() {
     let input = r#"{"level": "INFO", "message": "Hello world", "status": 200, "timestamp": "2023-01-01T00:00:00Z"}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json", 
-        "-F", "json",
+        "-f", "jsonl", 
+        "-F", "jsonl",
         "--keys", "level,status"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -173,7 +173,7 @@ fn test_global_tracking() {
 {"level": "ERROR", "status": 404}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
+        "-f", "jsonl",
         "--filter", "status >= 400",
         "--eval", "track_count(\"errors\")",
         "--end", "print(`Errors: ${tracked[\"errors\"]}`)"
@@ -190,7 +190,7 @@ fn test_begin_and_end_stages() {
 {"level": "ERROR"}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
+        "-f", "jsonl",
         "--begin", "print(\"Starting analysis...\")",
         "--end", "print(\"Analysis complete\")"
     ], input);
@@ -203,11 +203,11 @@ fn test_begin_and_end_stages() {
 #[test]
 fn test_error_handling_skip() {
     let input = r#"{"level": "INFO", "status": 200}
-invalid json line
+invalid jsonl line
 {"level": "ERROR", "status": 500}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json", 
+        "-f", "jsonl", 
         "--on-error", "skip"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully with skip error handling");
@@ -219,11 +219,11 @@ invalid json line
 #[test]
 fn test_error_handling_emit_errors() {
     let input = r#"{"level": "INFO", "status": 200}
-invalid json line
+invalid jsonl line
 {"level": "ERROR", "status": 500}"#;
     
     let (stdout, stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json", 
+        "-f", "jsonl", 
         "--on-error", "emit-errors"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully with emit-errors");
@@ -241,8 +241,8 @@ fn test_parallel_mode() {
 {"level": "WARN", "status": 403}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json", 
-        "-F", "json",
+        "-f", "jsonl", 
+        "-F", "jsonl",
         "--parallel",
         "--threads", "2",
         "--filter", "status >= 400"
@@ -265,7 +265,7 @@ fn test_file_input() {
     let file_content = r#"{"level": "INFO", "message": "File input test"}
 {"level": "ERROR", "message": "Another line"}"#;
     
-    let (stdout, _stderr, exit_code) = run_kelora_with_file(&["-f", "json"], file_content);
+    let (stdout, _stderr, exit_code) = run_kelora_with_file(&["-f", "jsonl"], file_content);
     assert_eq!(exit_code, 0, "kelora should exit successfully with file input");
     
     let lines: Vec<&str> = stdout.trim().split('\n').collect();
@@ -274,7 +274,7 @@ fn test_file_input() {
 
 #[test]
 fn test_empty_input() {
-    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json"], "");
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl"], "");
     assert_eq!(exit_code, 0, "kelora should handle empty input gracefully");
     assert_eq!(stdout.trim(), "", "Empty input should produce no output");
 }
@@ -284,8 +284,8 @@ fn test_string_functions() {
     let input = r#"{"message": "Error: Something failed", "code": "123"}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
-        "-F", "json",
+        "-f", "jsonl",
+        "-F", "jsonl",
         "--eval", "let has_error = message.contains(\"Error\"); let code_num = code.to_int();"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -302,8 +302,8 @@ fn test_multiple_filters() {
 {"level": "WARN", "status": 404, "response_time": 200}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
-        "-F", "json",
+        "-f", "jsonl",
+        "-F", "jsonl",
         "--filter", "status >= 400",
         "--filter", "response_time > 150"
     ], input);
@@ -325,8 +325,8 @@ fn test_status_class_function() {
 {"status": 500}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
-        "-F", "json",
+        "-f", "jsonl",
+        "-F", "jsonl",
         "--eval", "let class = status.status_class();"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -352,8 +352,8 @@ fn test_complex_rhai_expressions() {
 {"user": "alice", "status": 403}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
-        "-F", "json",
+        "-f", "jsonl",
+        "-F", "jsonl",
         "--filter", "status >= 400 && user.contains(\"a\")"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -376,8 +376,8 @@ fn test_print_function_output() {
 {"user": "bob", "level": "ERROR"}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
-        "-F", "json",
+        "-f", "jsonl",
+        "-F", "jsonl",
         "--eval", "print(\"Processing user: \" + user);"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -403,7 +403,7 @@ fn test_stdin_large_input_performance() {
     
     let start_time = std::time::Instant::now();
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
+        "-f", "jsonl",
         "--filter", "status >= 400",
         "--eval", "track_count(\"errors\");",
         "--end", "print(`Errors: ${tracked[\"errors\"]}`);"
@@ -422,12 +422,12 @@ fn test_error_handling_mixed_valid_invalid() {
     let input = r#"{"valid": "json", "status": 200}
 {malformed json line}
 {"another": "valid", "status": 404}
-not json at all
+not jsonl at all
 {"final": "entry", "status": 500}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
-        "-F", "json",
+        "-f", "jsonl",
+        "-F", "jsonl",
         "--on-error", "skip"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully with skip error handling");
@@ -449,7 +449,7 @@ fn test_tracking_with_min_max() {
 {"response_time": 800, "status": 500}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
+        "-f", "jsonl",
         "--eval", "track_min(\"min_time\", response_time); track_max(\"max_time\", response_time);",
         "--end", "print(`Min: ${tracked[\"min_time\"]}, Max: ${tracked[\"max_time\"]}`);"
     ], input);
@@ -465,8 +465,8 @@ fn test_field_modification_and_addition() {
 {"user": "bob", "score": 92}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
-        "-F", "json",
+        "-f", "jsonl",
+        "-F", "jsonl",
         "--eval", "let grade = if score >= 90 { \"A\" } else { \"B\" }; let bonus_points = score * 0.1;"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -492,7 +492,7 @@ fn test_track_unique_function() {
 {"ip": "2.2.2.2", "user": "dave"}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
+        "-f", "jsonl",
         "--eval", "track_unique(\"unique_ips\", ip); track_unique(\"unique_users\", user);",
         "--end", "print(`IPs: ${tracked[\"unique_ips\"].len()}, Users: ${tracked[\"unique_users\"].len()}`);"
     ], input);
@@ -512,7 +512,7 @@ fn test_track_bucket_function() {
 {"status": "404", "method": "GET"}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
+        "-f", "jsonl",
         "--eval", "track_bucket(\"status_counts\", status); track_bucket(\"method_counts\", method);",
         "--end", "print(`Status 200: ${tracked[\"status_counts\"].get(\"200\") ?? 0}, GET requests: ${tracked[\"method_counts\"].get(\"GET\") ?? 0}`);"
     ], input);
@@ -533,7 +533,7 @@ fn test_track_unique_parallel_mode() {
 {"ip": "4.4.4.4"}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
+        "-f", "jsonl",
         "--parallel",
         "--batch-size", "2",
         "--eval", "track_unique(\"ips\", ip);",
@@ -555,7 +555,7 @@ fn test_track_bucket_parallel_mode() {
 {"status": "200"}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
+        "-f", "jsonl",
         "--parallel",
         "--batch-size", "2",
         "--eval", "track_bucket(\"status_counts\", status);",
@@ -577,7 +577,7 @@ fn test_mixed_tracking_functions() {
 {"user": "charlie", "response_time": 50, "status": "500"}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
+        "-f", "jsonl",
         "--eval", "track_count(\"total\"); track_unique(\"users\", user); track_bucket(\"status_dist\", status); track_min(\"min_time\", response_time); track_max(\"max_time\", response_time);",
         "--end", "print(`Total: ${tracked[\"total\"]}, Users: ${tracked[\"users\"].len()}, Min: ${tracked[\"min_time\"]}, Max: ${tracked[\"max_time\"]}`);"
     ], input);
@@ -598,8 +598,8 @@ fn test_multiline_real_world_scenario() {
 {"timestamp": "2023-07-18T15:08:30.678Z", "user": "dave", "status": 200, "message": "success", "response_time": 67}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "json",
-        "-F", "json",
+        "-f", "jsonl",
+        "-F", "jsonl",
         "--filter", "status >= 400",
         "--eval", "let alert_level = if status >= 500 { \"critical\" } else { \"warning\" }; track_count(\"total_errors\");",
         "--end", "print(`Total errors processed: ${tracked[\"total_errors\"]}`);"
