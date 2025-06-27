@@ -63,6 +63,24 @@ Kelora follows a "compile once, evaluate repeatedly" model:
 **Sequential**: Input → Parser → Event → Filter (Rhai) → Eval (Rhai) → Field Filter → Formatter → Output
 **Parallel**: Input → Batching → Worker Threads (Filter/Eval) → State Merging → Output
 
+### Processing Pipeline
+1. **Parse**: Convert input line to Event structure
+2. **Inject**: Make fields available as Rhai variables  
+3. **Execute Stages**: Run begin → filters → evals → end
+4. **Format**: Convert result to output format
+
+### Processing Modes
+**Sequential Mode (default)**: Real-time streaming output, perfect for monitoring
+```bash
+kelora --filter 'status >= 400'  # Live log analysis
+kubectl logs -f my-app | kelora -f json --filter 'level == "error"'
+```
+
+**Parallel Mode**: Batch processing for high-throughput analysis
+```bash
+kelora --parallel --filter 'status >= 400'  # Large dataset processing
+```
+
 ## Development Guidelines
 
 ### Performance Considerations
@@ -124,11 +142,97 @@ time ./target/release/kelora -f json large_file.jsonl \
 - **Benchmark datasets**: `benchmarks/bench_10k.jsonl`, `benchmarks/bench_50k.jsonl`, etc.
 - **Create test samples**: `head -n 1000 large_file.jsonl > /tmp/test_sample.jsonl`
 
+## Rhai Scripting Reference
+
+### Variable Injection and Access
+Fields are automatically injected as Rhai variables based on input format:
+```bash
+# JSON input: {"user": "alice", "status": 404}
+kelora -f json --filter 'user == "alice" && status >= 400'
+
+# Invalid identifiers use event map
+kelora --filter 'event["user-name"] == "admin"'
+```
+
+**Always available**: `line` (raw text), `event` (field map), `meta` (metadata), `tracked` (global state)
+
+### Built-in Functions
+
+#### String Methods
+```rhai
+text.matches("ERROR|WARN")        // Regex match
+text.replace("\\d+", "XXX")       // Regex replace  
+text.extract("https?://([^/]+)")  // Extract capture group
+text.to_int()                     // Parse integer
+text.to_float()                   // Parse float
+```
+
+#### Global Tracking
+```rhai
+track_count("errors")                   // Increment counter
+track_min("min_response_time", ms)      // Track minimum
+track_max("max_response_time", ms)      // Track maximum (different key!)
+
+// Access in --end stage (read-only)
+tracked["errors"]
+```
+
+### String Interpolation
+```rhai
+print(`User ${user} failed with ${status}`)
+alert_msg = `Error at ${meta.linenum}: ${message}`
+```
+
+### Error Handling Strategies
+Four strategies via `--on-error`:
+- `skip`: Continue processing, ignore failed lines
+- `fail-fast`: Stop on first error  
+- `emit-errors`: Print errors to stderr, continue
+- `default-value`: Use empty/default values for failed lines
+
+### Input/Output Format Status
+
+| Input Format | Status | Available Fields |
+|-------------|--------|------------------|
+| `json` | ✅ | All JSON keys + `line` |
+| `line` | ❌ | `line` only |
+| `csv` | ❌ | Column headers + `line` |
+| `apache` | ❌ | `ip`, `method`, `path`, `status`, `bytes`, `line` |
+
+| Output Format | Status | Description |
+|--------------|--------|-------------|
+| `json` | ✅ | JSON objects |
+| `text` | ✅ | Key=value pairs (logfmt style) |
+| `csv` | ❌ | Comma-separated values |
+
+## Example Use Cases
+
+### Error Analysis
+```bash
+kelora -f json \
+  --filter 'status >= 400' \
+  --eval 'track_count(status.status_class())' \
+  --end 'print(`4xx: ${tracked["4xx"] ?? 0}, 5xx: ${tracked["5xx"] ?? 0}`)'
+```
+
+### Performance Monitoring  
+```bash
+kelora -f json \
+  --eval 'track_min("min_time", response_time); track_max("max_time", response_time)' \
+  --end 'print(`Response time range: ${tracked["min_time"]}-${tracked["max_time"]}ms`)'
+```
+
+### Data Transformation
+```bash
+kelora -f json \
+  --eval 'severity = if level == "ERROR" { "high" } else { "low" }; processed_at = "2024-01-01"' \
+  -F json
+```
+
 ## Documentation
 
-- Main design document: `DESIGN.md`
-- Rhai syntax and features documented here: https://rhai.rs/book/
-- Rhai integration patterns and best practices documented
+- Rhai syntax and features: https://rhai.rs/book/
+- Rhai integration patterns and best practices documented in source code
 
 ## Development Roadmap
 
@@ -186,7 +290,7 @@ track_bucket(tracked, "status", code)    // Count by value
 ### 📋 TODO: Development Tasks
 - ❌ **Unit Tests**: Comprehensive test suite for all components
 - ✅ **Integration Tests**: Complete test suite covering current CLI interface and functionality
-- ❌ **Performance Benchmarks**: Baseline measurements and regression testing
+- ✅ **Performance Benchmarks**: Baseline measurements and regression testing with comprehensive benchmark suite
 - ❌ **Documentation**: User guide and API documentation
 
 ### 📋 TODO: Advanced Features
