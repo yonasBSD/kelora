@@ -19,6 +19,8 @@ anyhow = "1.0"
 rhai = { version = "1.22", features = ["sync"] }
 crossbeam-channel = "0.5"
 num_cpus = "1.16"
+is-terminal = "0.4"
+indexmap = "2.0"
 
 [dev-dependencies]
 tempfile = "3.8"

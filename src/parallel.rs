@@ -29,6 +29,7 @@ pub struct ProcessRequest {
     pub output_format: crate::OutputFormat,
     pub on_error: crate::ErrorStrategy,
     pub keys: Vec<String>,
+    pub plain: bool,
 }
 
 /// Configuration for parallel processing
@@ -258,6 +259,7 @@ impl ParallelProcessor {
             let global_tracker = self.global_tracker.clone();
             let output_format = request.output_format.clone();
             let keys = request.keys;
+            let plain = request.plain;
             
             thread::spawn(move || {
                 Self::result_sink_thread(
@@ -266,6 +268,7 @@ impl ParallelProcessor {
                     preserve_order,
                     keys,
                     global_tracker,
+                    plain,
                 )
             })
         };
@@ -479,8 +482,9 @@ impl ParallelProcessor {
         preserve_order: bool,
         keys: Vec<String>,
         global_tracker: GlobalTracker,
+        plain: bool,
     ) -> Result<()> {
-        let formatter = Self::create_formatter(&output_format);
+        let formatter = Self::create_formatter(&output_format, plain);
         if preserve_order {
             Self::ordered_result_sink(result_receiver, formatter, keys, global_tracker)
         } else {
@@ -567,10 +571,13 @@ impl ParallelProcessor {
         }
     }
 
-    fn create_formatter(format: &crate::OutputFormat) -> Box<dyn Formatter> {
+    fn create_formatter(format: &crate::OutputFormat, plain: bool) -> Box<dyn Formatter> {
         match format {
             crate::OutputFormat::Json => Box::new(JsonFormatter::new()),
-            crate::OutputFormat::Default => Box::new(DefaultFormatter::new()),
+            crate::OutputFormat::Default => {
+                let use_colors = crate::tty::should_use_colors();
+                Box::new(DefaultFormatter::new(use_colors, plain))
+            },
             crate::OutputFormat::Csv => todo!("CSV formatter not implemented yet"),
         }
     }

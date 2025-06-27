@@ -78,7 +78,7 @@ fn test_basic_json_parsing() {
     let input = r#"{"level": "INFO", "message": "Hello world", "status": 200}
 {"level": "ERROR", "message": "Something failed", "status": 500}"#;
     
-    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json"], input);
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json", "-F", "json"], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
     
     let lines: Vec<&str> = stdout.trim().split('\n').collect();
@@ -96,7 +96,7 @@ fn test_filter_expression() {
 {"level": "ERROR", "status": 500}
 {"level": "DEBUG", "status": 404}"#;
     
-    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--filter", "status >= 400"], input);
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json", "-F", "json", "--filter", "status >= 400"], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
     
     let lines: Vec<&str> = stdout.trim().split('\n').collect();
@@ -117,6 +117,7 @@ fn test_eval_expression() {
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json", 
+        "-F", "json",
         "--eval", "let alert_level = if status >= 400 { \"high\" } else { \"low\" };"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -136,7 +137,7 @@ fn test_eval_expression() {
 fn test_text_output_format() {
     let input = r#"{"level": "INFO", "message": "Hello world", "status": 200}"#;
     
-    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json", "-F", "text"], input);
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json", "-F", "default"], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
     
     // Text format should be key=value pairs
@@ -151,6 +152,7 @@ fn test_keys_filtering() {
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json", 
+        "-F", "json",
         "--keys", "level,status"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -240,6 +242,7 @@ fn test_parallel_mode() {
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json", 
+        "-F", "json",
         "--parallel",
         "--threads", "2",
         "--filter", "status >= 400"
@@ -282,6 +285,7 @@ fn test_string_functions() {
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json",
+        "-F", "json",
         "--eval", "let has_error = message.contains(\"Error\"); let code_num = code.to_int();"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -299,6 +303,7 @@ fn test_multiple_filters() {
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json",
+        "-F", "json",
         "--filter", "status >= 400",
         "--filter", "response_time > 150"
     ], input);
@@ -321,6 +326,7 @@ fn test_status_class_function() {
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json",
+        "-F", "json",
         "--eval", "let class = status.status_class();"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -347,6 +353,7 @@ fn test_complex_rhai_expressions() {
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json",
+        "-F", "json",
         "--filter", "status >= 400 && user.contains(\"a\")"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -370,6 +377,7 @@ fn test_print_function_output() {
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json",
+        "-F", "json",
         "--eval", "print(\"Processing user: \" + user);"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -419,6 +427,7 @@ not json at all
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json",
+        "-F", "json",
         "--on-error", "skip"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully with skip error handling");
@@ -457,6 +466,7 @@ fn test_field_modification_and_addition() {
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json",
+        "-F", "json",
         "--eval", "let grade = if score >= 90 { \"A\" } else { \"B\" }; let bonus_points = score * 0.1;"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -589,6 +599,7 @@ fn test_multiline_real_world_scenario() {
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json",
+        "-F", "json",
         "--filter", "status >= 400",
         "--eval", "let alert_level = if status >= 500 { \"critical\" } else { \"warning\" }; track_count(\"total_errors\");",
         "--end", "print(`Total errors processed: ${tracked[\"total_errors\"]}`);"

@@ -1,13 +1,14 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use indexmap::IndexMap;
+use rhai::Dynamic;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Event {
     pub timestamp: Option<DateTime<Utc>>,
     pub level: Option<String>,
     pub message: Option<String>,
-    pub fields: HashMap<String, serde_json::Value>,
+    pub fields: IndexMap<String, Dynamic>,
     pub original_line: String,
     pub line_number: Option<usize>,
     pub filename: Option<String>,
@@ -28,7 +29,7 @@ impl Event {
             timestamp: None,
             level: None,
             message: None,
-            fields: HashMap::with_capacity(capacity),
+            fields: IndexMap::with_capacity(capacity),
             original_line,
             line_number: None,
             filename: None,
@@ -42,7 +43,7 @@ impl Event {
         }
     }
 
-    pub fn set_field(&mut self, key: String, value: serde_json::Value) {
+    pub fn set_field(&mut self, key: String, value: Dynamic) {
         self.fields.insert(key, value);
     }
 
@@ -53,7 +54,7 @@ impl Event {
 
     /// Filter to only show specified keys, keeping only fields that actually exist
     pub fn filter_keys(&mut self, keys: &[String]) {
-        let mut new_fields = HashMap::with_capacity(keys.len());
+        let mut new_fields = IndexMap::with_capacity(keys.len());
 
         // Only include fields that are both requested and exist
         for key in keys {
@@ -69,10 +70,12 @@ impl Event {
     pub fn extract_core_fields(&mut self) {
         // Extract timestamp
         for ts_key in &["timestamp", "ts", "time", "at", "_t", "@t", "t"] {
-            if let Some(serde_json::Value::String(ts_str)) = self.fields.get(*ts_key) {
-                if let Ok(ts) = parse_timestamp(ts_str) {
-                    self.timestamp = Some(ts);
-                    break;
+            if let Some(value) = self.fields.get(*ts_key) {
+                if let Ok(ts_str) = value.clone().into_string() {
+                    if let Ok(ts) = parse_timestamp(&ts_str) {
+                        self.timestamp = Some(ts);
+                        break;
+                    }
                 }
             }
         }
@@ -80,8 +83,8 @@ impl Event {
         // Extract level
         for level_key in &["level", "log_level", "loglevel", "lvl", "severity", "@l"] {
             if let Some(value) = self.fields.get(*level_key) {
-                if let Some(level_str) = value.as_str() {
-                    self.level = Some(level_str.to_string());
+                if let Ok(level_str) = value.clone().into_string() {
+                    self.level = Some(level_str);
                     break;
                 }
             }
@@ -90,8 +93,8 @@ impl Event {
         // Extract message
         for msg_key in &["message", "msg", "@m"] {
             if let Some(value) = self.fields.get(*msg_key) {
-                if let Some(msg_str) = value.as_str() {
-                    self.message = Some(msg_str.to_string());
+                if let Ok(msg_str) = value.clone().into_string() {
+                    self.message = Some(msg_str);
                     break;
                 }
             }

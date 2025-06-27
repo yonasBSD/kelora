@@ -1,8 +1,28 @@
 use crate::event::Event;
 use anyhow::{Context, Result};
+use rhai::Dynamic;
 
 pub trait Parser {
     fn parse(&self, line: &str) -> Result<Event, anyhow::Error>;
+}
+
+/// Convert serde_json::Value to rhai::Dynamic
+fn json_to_dynamic(value: &serde_json::Value) -> Dynamic {
+    match value {
+        serde_json::Value::String(s) => Dynamic::from(s.clone()),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Dynamic::from(i)
+            } else if let Some(f) = n.as_f64() {
+                Dynamic::from(f)
+            } else {
+                Dynamic::from(n.to_string())
+            }
+        },
+        serde_json::Value::Bool(b) => Dynamic::from(*b),
+        serde_json::Value::Null => Dynamic::UNIT,
+        _ => Dynamic::from(value.to_string()), // Complex types as strings
+    }
 }
 
 // JSONL Parser
@@ -24,7 +44,9 @@ impl Parser for JsonlParser {
             let mut event = Event::with_capacity(line.to_string(), map.len());
             
             for (key, value) in map {
-                event.set_field(key.clone(), value.clone());
+                // Convert serde_json::Value to rhai::Dynamic
+                let dynamic_value = json_to_dynamic(value);
+                event.set_field(key.clone(), dynamic_value);
             }
             
             event.extract_core_fields();
@@ -50,7 +72,7 @@ impl Parser for LineParser {
         let mut event = Event::with_capacity(line.to_string(), 1);
         
         // Set the line as a field so it's available as event["line"]
-        event.set_field("line".to_string(), serde_json::Value::String(line.to_string()));
+        event.set_field("line".to_string(), Dynamic::from(line.to_string()));
         
         Ok(event)
     }
@@ -69,7 +91,8 @@ mod tests {
 
         assert_eq!(result.level, Some("info".to_string()));
         assert_eq!(result.message, Some("test".to_string()));
-        assert_eq!(result.fields.get("count"), Some(&serde_json::json!(42)));
+        assert!(result.fields.get("count").is_some());
+        assert_eq!(result.fields.get("count").unwrap().as_int().unwrap(), 42);
     }
 
     #[test]
@@ -80,8 +103,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.level, Some("error".to_string()));
-        assert_eq!(result.fields.get("user"), Some(&serde_json::json!("alice")));
-        assert_eq!(result.fields.get("status"), Some(&serde_json::json!(404)));
+        assert!(result.fields.get("user").is_some());
+        assert_eq!(result.fields.get("user").unwrap().clone().into_string().unwrap(), "alice");
+        assert!(result.fields.get("status").is_some()); 
+        assert_eq!(result.fields.get("status").unwrap().as_int().unwrap(), 404);
     }
 
     #[test]
@@ -91,7 +116,8 @@ mod tests {
         let result = parser.parse(test_line).unwrap();
 
         // Should have the line available as a field
-        assert_eq!(result.fields.get("line"), Some(&serde_json::Value::String(test_line.to_string())));
+        assert!(result.fields.get("line").is_some());
+        assert_eq!(result.fields.get("line").unwrap().clone().into_string().unwrap(), test_line);
         
         // Original line should also be preserved
         assert_eq!(result.original_line, test_line);
@@ -109,7 +135,8 @@ mod tests {
         let result = parser.parse(test_line).unwrap();
 
         // Should have the line available as a field
-        assert_eq!(result.fields.get("line"), Some(&serde_json::Value::String(test_line.to_string())));
+        assert!(result.fields.get("line").is_some());
+        assert_eq!(result.fields.get("line").unwrap().clone().into_string().unwrap(), test_line);
         
         // Original line should be preserved
         assert_eq!(result.original_line, test_line);

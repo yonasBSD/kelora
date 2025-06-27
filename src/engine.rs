@@ -357,7 +357,7 @@ impl RhaiEngine {
         // Inject event fields as variables
         for (key, value) in &event.fields {
             if self.is_valid_identifier(key) {
-                scope.push(key, self.convert_value_to_dynamic(value));
+                scope.push(key, value.clone());
             }
         }
         
@@ -367,7 +367,7 @@ impl RhaiEngine {
         // Update event map for fields with invalid identifiers
         let mut event_map = rhai::Map::new();
         for (k, v) in &event.fields {
-            event_map.insert(k.clone().into(), self.convert_value_to_dynamic(v));
+            event_map.insert(k.clone().into(), v.clone());
         }
         scope.set_value("event", event_map);
         
@@ -387,9 +387,7 @@ impl RhaiEngine {
     fn update_event_from_scope(&self, event: &mut Event, scope: &Scope) {
         for (name, _constant, value) in scope.iter() {
             if name != "line" && name != "event" && name != "meta" {
-                if let Some(json_value) = self.convert_dynamic_to_json_value(&value) {
-                    event.fields.insert(name.to_string(), json_value);
-                }
+                event.fields.insert(name.to_string(), value.clone());
             }
         }
     }
@@ -399,39 +397,4 @@ impl RhaiEngine {
         name.chars().all(|c| c.is_alphanumeric() || c == '_')
     }
 
-    fn convert_value_to_dynamic(&self, value: &serde_json::Value) -> Dynamic {
-        match value {
-            serde_json::Value::Null => Dynamic::UNIT,
-            serde_json::Value::Bool(b) => Dynamic::from(*b),
-            serde_json::Value::Number(n) => {
-                if let Some(i) = n.as_i64() {
-                    Dynamic::from(i)
-                } else if let Some(f) = n.as_f64() {
-                    Dynamic::from(f)
-                } else {
-                    Dynamic::from(n.to_string())
-                }
-            }
-            serde_json::Value::String(s) => Dynamic::from(s.clone()),
-            serde_json::Value::Array(_) | serde_json::Value::Object(_) => {
-                Dynamic::from(value.to_string())
-            }
-        }
-    }
-
-    fn convert_dynamic_to_json_value(&self, value: &Dynamic) -> Option<serde_json::Value> {
-        if value.is_unit() {
-            Some(serde_json::Value::Null)
-        } else if value.is_bool() {
-            Some(serde_json::Value::Bool(value.as_bool().unwrap_or(false)))
-        } else if value.is_int() {
-            Some(serde_json::Value::Number(serde_json::Number::from(value.as_int().unwrap_or(0))))
-        } else if value.is_float() {
-            serde_json::Number::from_f64(value.as_float().unwrap_or(0.0)).map(serde_json::Value::Number)
-        } else if value.is_string() {
-            Some(serde_json::Value::String(value.clone().into_string().unwrap_or_default()))
-        } else {
-            Some(serde_json::Value::String(value.to_string()))
-        }
-    }
 }

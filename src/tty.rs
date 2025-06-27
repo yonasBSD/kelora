@@ -1,13 +1,11 @@
 use std::io::IsTerminal;
 
 /// Check if stdout is connected to a TTY
-#[allow(dead_code)]
 pub fn is_stdout_tty() -> bool {
     std::io::stdout().is_terminal()
 }
 
 /// Determine if colors should be used based on environment
-#[allow(dead_code)]
 pub fn should_use_colors() -> bool {
     // Don't use colors if not on TTY
     if !is_stdout_tty() {

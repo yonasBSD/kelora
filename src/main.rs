@@ -14,6 +14,7 @@ mod tty;
 use engine::RhaiEngine;
 use event::Event;
 use formatters::{Formatter, JsonFormatter, DefaultFormatter};
+use tty::should_use_colors;
 use parallel::{ParallelConfig, ParallelProcessor, ProcessRequest};
 use parsers::{JsonlParser, LineParser, Parser as LogParser};
 
@@ -128,7 +129,7 @@ fn main() -> Result<()> {
     let parser = create_parser(&cli.format);
 
     // Create formatter based on output format
-    let formatter = create_formatter(&cli.output_format);
+    let formatter = create_formatter(&cli.output_format, cli.plain);
 
     // Create Rhai engine with custom functions
     let mut engine = RhaiEngine::new();
@@ -180,6 +181,7 @@ fn main() -> Result<()> {
             output_format: cli.output_format,
             on_error: cli.on_error,
             keys: cli.keys,
+            plain: cli.plain,
         };
         
         processor.process(reader, request)?;
@@ -280,10 +282,13 @@ fn create_parser(format: &InputFormat) -> Box<dyn LogParser> {
     }
 }
 
-fn create_formatter(format: &OutputFormat) -> Box<dyn Formatter> {
+fn create_formatter(format: &OutputFormat, plain: bool) -> Box<dyn Formatter> {
     match format {
         OutputFormat::Json => Box::new(JsonFormatter::new()),
-        OutputFormat::Default => Box::new(DefaultFormatter::new()),
+        OutputFormat::Default => {
+            let use_colors = should_use_colors();
+            Box::new(DefaultFormatter::new(use_colors, plain))
+        },
         OutputFormat::Csv => todo!("CSV formatter not implemented yet"),
     }
 }
