@@ -1,10 +1,10 @@
-# Claude Code Context for Kelora
+# CLAUDE.md
 
-This file provides context for Claude Code when working on the Kelora log analysis tool.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-Kelora is a high-performance command-line log analysis tool written in Rust that uses the Rhai scripting engine for flexible log processing. It processes structured logs (JSON, CSV, etc.) and allows users to filter, transform, and analyze log data using embedded Rhai scripts.
+Kelora is a command-line log analysis tool written in Rust that uses the Rhai scripting engine for flexible log processing. It processes structured logs (JSON, CSV, etc.) and allows users to filter, transform, and analyze log data using embedded Rhai scripts.
 
 ## Key Commands
 
@@ -24,6 +24,12 @@ make bench-baseline           # Update performance baseline
 # Run lint and type checking
 cargo clippy
 cargo fmt --check
+
+# Run tests
+cargo test               # Unit and integration tests
+cargo test --lib         # Unit tests only
+cargo test --test integration_tests  # Integration tests only
+make test-full          # Comprehensive test suite
 ```
 
 ### Example Usage
@@ -38,18 +44,24 @@ cargo fmt --check
 ## Architecture
 
 ### Core Components
-- **`src/main.rs`** - CLI interface, argument parsing, main processing loop
-- **`src/engine.rs`** - Rhai scripting engine wrapper with performance optimizations
-- **`src/event.rs`** - Log event data structure and field management
-- **`src/parsers/`** - Log format parsers (JSON, CSV, Apache, etc.)
-- **`src/formatters/`** - Output formatters (JSON, text, CSV)
+- **`src/main.rs`** - CLI interface, argument parsing, orchestrates sequential vs parallel processing
+- **`src/engine.rs`** - Rhai scripting engine with AST compilation, scope templates, and custom functions
+- **`src/event.rs`** - Log event data structure with smart field extraction and metadata tracking
+- **`src/parsers.rs`** - Input parsers with trait-based design (currently JSON only)
+- **`src/formatters.rs`** - Output formatters with trait-based design (JSON and logfmt text)
+- **`src/parallel.rs`** - High-throughput parallel processing with producer-consumer architecture
 
 ### Performance Design
 Kelora follows a "compile once, evaluate repeatedly" model:
-1. **Engine** - Built once at startup with registered functions
-2. **AST compilation** - Expressions compiled to ASTs at startup
-3. **Scope templates** - Reused and populated per log line
-4. **Map pooling** - Reduces memory allocations for frequently used data structures
+1. **Engine Creation** - Built once at startup with all custom functions registered
+2. **AST Compilation** - All user expressions (--filter, --eval, etc.) compiled to ASTs at startup
+3. **Scope Templates** - Single scope template cloned and reused for each log line
+4. **Variable Injection** - Log fields auto-injected as Rhai variables with fallback to event map
+5. **Parallel Architecture** - Producer-consumer model with batching and thread-local state tracking
+
+### Data Flow
+**Sequential**: Input → Parser → Event → Filter (Rhai) → Eval (Rhai) → Field Filter → Formatter → Output
+**Parallel**: Input → Batching → Worker Threads (Filter/Eval) → State Merging → Output
 
 ## Development Guidelines
 
@@ -81,29 +93,36 @@ Kelora is designed to leverage Rhai's built-in optimizations:
 **Key Design Principle**: Trust Rhai's optimizations rather than implementing custom caching or offset management. Rhai is specifically designed for "compile once, evaluate repeatedly" scenarios.
 
 ### Testing
-- Test with sample log files in `/tmp/` for development
-- Use the 75k line test dataset for performance benchmarking
+- Test with sample log files in `test_data/` directory or create in `/tmp/` for development
+- Use benchmark datasets in `benchmarks/` directory for performance testing
 - Verify both correctness and performance impact of changes
-- Test error handling with `--on-error` strategies
+- Test error handling with all four `--on-error` strategies (skip, fail-fast, emit-errors, default-value)
+- Use `make test-full` for comprehensive testing including manual test scenarios
 
 ### Git Guidelines
 - **NEVER use `git add .`** - Always add files explicitly by name
 - Use `git add src/main.rs src/parallel.rs Cargo.toml` etc.
-- Review each file individually before staging
 - This prevents accidental inclusion of temporary files, editor backups, or unintended changes
 
-## Testing Data
+## Testing and Performance
 
-### Performance Test Command
+### Benchmark Commands
 ```bash
-time ./target/release/kelora -f json /Users/dloss/git/klp/myexamples/incident75k.jsonl \
-  --filter "response_time.sub_string(0,2).to_int() > 98" --on-error skip > /dev/null
+# Quick benchmarks using built-in test data
+make bench-quick              # Uses benchmarks/bench_10k.jsonl
+
+# Full benchmark suite
+make bench                    # Uses 10k and 50k datasets
+
+# Performance testing with manual datasets
+time ./target/release/kelora -f json large_file.jsonl \
+  --filter "status >= 400" --on-error skip > /dev/null
 ```
 
-### Sample Test Data
-- Create smaller samples: `head -n 1000 large_file.jsonl > /tmp/test_sample.jsonl`
-- Use realistic filter expressions that exercise string operations
-- Test various error handling strategies
+### Test Data Location
+- **Built-in test data**: `test_data/sample.jsonl`, `test_data/sample.logfmt`
+- **Benchmark datasets**: `benchmarks/bench_10k.jsonl`, `benchmarks/bench_50k.jsonl`, etc.
+- **Create test samples**: `head -n 1000 large_file.jsonl > /tmp/test_sample.jsonl`
 
 ## Documentation
 
@@ -152,15 +171,6 @@ text.replace("\\d+", "XXX")       // Regex replace
 text.extract("https?://([^/]+)")  // Extract capture group
 text.extract_pattern("email")     // Built-in patterns
 text.to_ts()                      // Parse timestamp
-```
-
-#### Log Analysis Functions
-```rhai
-status.status_class()             // "4xx", "5xx", etc. (partially implemented)
-level.normalize_level()           // "DEBUG", "INFO", etc.
-ip.is_private_ip()               // Boolean
-url.domain()                     // Extract domain
-user_agent.is_bot()              // Detect bots
 ```
 
 #### Advanced Tracking Functions
