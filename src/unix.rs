@@ -107,7 +107,7 @@ impl SafeStdout {
             }
             Err(e) => {
                 // Other I/O errors should be reported
-                return Err(anyhow::anyhow!("Failed to write to stdout: {}", e));
+                Err(anyhow::anyhow!("Failed to write to stdout: {}", e))
             }
         }
     }
@@ -122,7 +122,7 @@ impl SafeStdout {
             }
             Err(e) => {
                 // Other flush errors should be reported
-                return Err(anyhow::anyhow!("Failed to flush stdout: {}", e));
+                Err(anyhow::anyhow!("Failed to flush stdout: {}", e))
             }
         }
     }
