@@ -1,17 +1,86 @@
 # Kelora
 
-A command-line log analysis tool with embedded Rhai scripting for flexible log processing and transformation.
+Kelora is a programmable, scriptable CLI tool for turning messy, real-world logs into structured, analyzable data. It’s designed for fast pipelines, complete control, and logic you own — not a log viewer, not a dashboard, not a black box.
 
-## Features
+---
 
-- **Rhai Scripting**: Filter, transform, and analyze logs with embedded Rhai expressions
-- **Parallel Processing**: Batch processing with configurable worker threads for large datasets
-- **Global State Tracking**: Track counters, min/max values, and statistics across all log entries
-- **Multiple I/O Formats**: JSON input/output, text (logfmt) output
-- **Error Strategies**: Skip, fail-fast, emit-errors, or use default values for malformed data
-- **Built in Rust**: Memory-efficient processing with good error handling
+## 🚀 Try It in One Line
 
-## Installation
+```bash
+# Filter logs with Rhai
+cat logs.jsonl | kelora -f json --filter 'status >= 400'
+
+# Enrich and transform fields
+kelora -f json --eval 'let sev = if status >= 500 { "crit" } else { "warn" };' logs.jsonl
+
+# Track max value across the stream
+kelora -f json \
+  --eval 'track_max("max", duration_ms)' \
+  --end 'print(`Max: ${tracked["max"]}`)' logs.jsonl
+
+# Real-time Kubernetes logs
+kubectl logs app | kelora -f json --filter 'level == "error"' -F text
+```
+
+---
+
+## ⚙️ What It Is
+
+* A CLI tool for structured log transformation
+* Designed for UNIX-style pipelines — stdin in, stdout out
+* Supports JSON, logfmt, and raw lines
+* Uses [Rhai](https://rhai.rs/), a simple JavaScript-like language, to filter, mutate, and analyze logs
+* Includes built-in global state tracking (`track_*`)
+* Supports parallel and streaming modes
+
+---
+
+## 📃 Rhai Primer
+
+Rhai is a tiny, embeddable scripting language built for Rust. Kelora uses it to let you embed logic directly into log pipelines — with no external runtime.
+
+```rhai
+// Conditional tagging
+let sev = if status >= 500 { "crit" } else { "warn" };
+
+// Global counters or stats
+track_count("errors");
+track_max("max_duration", duration_ms);
+```
+
+Available variables:
+
+* `event` — parsed field map
+* `line` — original line text
+* `tracked` — global metrics state
+* `meta.linenum` — current line number
+
+---
+
+## 📊 What It’s Great For
+
+* Filtering and enriching logs in CI pipelines
+* Transforming logfmt ⇄ JSON
+* Real-time `kubectl logs` processing
+* Streaming one-liner data pipelines
+* Field selection, tagging, and global stats
+
+---
+
+## 🕵️ What It’s Not
+
+| Task                     | Use Instead                                                               |
+| ------------------------ | ------------------------------------------------------------------------- |
+| Browsing logs            | [lnav](https://lnav.org/)                                                 |
+| Multi-host log ingestion | [Loki](https://grafana.com/oss/loki/), [fluentbit](https://fluentbit.io/) |
+| Full-text search         | [ripgrep](https://github.com/BurntSushi/ripgrep)                          |
+| JSON-only transformation | [jq](https://jqlang.org/)                                                 |
+| Regex-heavy pipelines    | [angle-grinder](https://github.com/rcoh/angle-grinder)                    |
+| Dashboards and alerting  | [Grafana](https://grafana.com/), [Kibana](https://www.elastic.co/kibana/) |
+
+---
+
+## ✏️ Installation
 
 ```bash
 git clone https://github.com/dloss/kelora.git
@@ -19,155 +88,33 @@ cd kelora
 cargo build --release
 ```
 
-## Usage
+---
 
-### Basic Processing
-```bash
-# Process JSON logs
-echo '{"user":"alice","status":404}' | kelora -f json
+## ✈️ CLI Overview
 
-# Filter with Rhai expressions  
-kelora -f json --filter 'status >= 400' logs.jsonl
+| Flag            | Purpose                                |
+| --------------- | -------------------------------------- |
+| `-f`            | Input format: `json`, `logfmt`, `line` |
+| `-F`            | Output format: `json`, `text`, `csv`   |
+| `--filter`      | Rhai filter expression (repeatable)    |
+| `--eval`        | Rhai transformation (repeatable)       |
+| `--begin/--end` | Logic before/after stream              |
+| `--on-error`    | Strategy: skip, emit-errors, fail-fast |
+| `--parallel`    | Enable parallel batch mode             |
+| `--unordered`   | Drop output order for performance      |
 
-# Transform data
-kelora -f json --eval 'let alert = if status >= 500 { "critical" } else { "warning" };' logs.jsonl
+---
 
-# Text output format
-kelora -f json -F text logs.jsonl
-```
+## 🔖 Philosophy
 
-### Advanced Analysis
-```bash
-# Multi-stage processing with global tracking
-kelora -f json \
-  --begin 'print("Starting analysis...")' \
-  --filter 'status >= 400' \
-  --eval 'track_count("errors"); track_max("max_response", response_time)' \
-  --end 'print(`Found ${tracked["errors"]} errors, max response: ${tracked["max_response"]}ms`)' \
-  logs.jsonl
+* Logs are **data**, not text
+* Be **explicit** — no guessing
+* Fail **visibly** — don’t drop data silently
+* CLI-first. Scriptable. Composable.
+* One format per stream. One job per flag.
 
-# Parallel processing for larger datasets
-kelora --parallel --threads 8 --batch-size 2000 -f json --filter 'level == "error"' large.jsonl
-```
+---
 
-### Pipeline Integration
-```bash
-# Real-time log monitoring
-kubectl logs -f my-app | kelora -f json --filter 'level == "error"' --eval 'print("ERROR: " + message);'
+## ✍️ License
 
-# Convert and analyze
-cat access.log | kelora -f json --keys user,status,response_time -F text
-```
-
-## CLI Reference
-
-### Core Arguments
-- `-f, --format json|line|csv|apache` - Input format (default: json)
-- `-F, --output-format json|text|csv` - Output format (default: json)
-- `--keys field1,field2` - Output only specified fields
-
-### Rhai Stages
-- `--begin 'expression'` - Run once before processing
-- `--filter 'expression'` - Boolean filter (can repeat)
-- `--eval 'expression'` - Transform/process (can repeat)  
-- `--end 'expression'` - Run once after processing
-
-### Error Handling
-- `--on-error skip|fail-fast|emit-errors|default-value` (default: emit-errors)
-
-### Parallel Processing
-- `--parallel` - Enable parallel processing
-- `--threads N` - Worker thread count (default: CPU cores)
-- `--batch-size N` - Lines per batch (default: 1000)
-- `--unordered` - Faster unordered output
-
-## Rhai Scripting
-
-### Built-in Variables
-- `line` - Original log line text
-- `event` - Field map for invalid identifiers
-- `meta.linenum` - Line number
-- `tracked` - Global state map
-
-### Available Functions
-
-#### String Analysis
-```rhai
-text.contains("pattern")     // String search
-text.to_int()               // Parse integer
-text.to_float()             // Parse float
-```
-
-#### Log Analysis  
-```rhai
-status.status_class()       // "2xx", "4xx", "5xx", etc.
-```
-
-#### Global Tracking
-```rhai
-track_count("errors")                      // Increment counter
-track_min("min_time", response)            // Track minimum  
-track_max("max_time", response)            // Track maximum (use different key!)
-```
-
-⚠️ **Important**: `track_min()` and `track_max()` operations on the same key will overwrite each other. Always use different keys for min/max tracking of the same data.
-
-### Variable Declaration
-Use `let` for new variables:
-```rhai
-let alert_level = if status >= 500 { "critical" } else { "warning" };
-```
-
-## Processing Modes
-
-**Sequential (default)**: Real-time streaming output, ideal for monitoring
-```bash
-kelora --filter 'status >= 400'
-```
-
-**Parallel**: Batch processing for larger datasets
-```bash  
-kelora --parallel --filter 'status >= 400'
-```
-
-## Examples
-
-### Error Analysis
-```bash
-kelora -f json \
-  --filter 'status >= 400' \
-  --eval 'track_count(status.status_class())' \
-  --end 'print(`4xx: ${tracked["4xx"] ?? 0}, 5xx: ${tracked["5xx"] ?? 0}`)' \
-  access.log
-```
-
-### Performance Monitoring
-```bash
-kelora -f json \
-  --eval 'track_min(tracked, "min", response_time); track_max(tracked, "max", response_time)' \
-  --end 'print(`Response time range: ${tracked["min"]}-${tracked["max"]}ms`)' \
-  api.log
-```
-
-### Data Enrichment
-```bash
-kelora -f json \
-  --eval 'let risk_score = if ip.contains("10.") { 1 } else { 5 }; let processed_at = "2024-01-01";' \
-  -F json logs.jsonl
-```
-
-## Development
-
-```bash
-# Build and test
-cargo build --release
-cargo test
-cargo clippy
-
-# Performance test
-time ./target/release/kelora -f json large.jsonl --filter "status >= 400" --on-error skip > /dev/null
-```
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file.
+MIT License — see [LICENSE](LICENSE)
