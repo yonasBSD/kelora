@@ -11,11 +11,11 @@ Kelora is a programmable, scriptable CLI tool for turning messy, real-world logs
 cat logs.jsonl | kelora -f json --filter 'status >= 400'
 
 # Enrich and transform fields
-kelora -f json --eval 'let sev = if status >= 500 { "crit" } else { "warn" };' logs.jsonl
+kelora -f json --exec 'let sev = if status >= 500 { "crit" } else { "warn" };' logs.jsonl
 
 # Track max value across the stream
 kelora -f json \
-  --eval 'track_max("max", duration_ms)' \
+  --exec 'track_max("max", duration_ms)' \
   --end 'print(`Max: ${tracked["max"]}`)' logs.jsonl
 
 # Real-time Kubernetes logs
@@ -97,7 +97,7 @@ cargo build --release
 | `-f`            | Input format: `json`, `logfmt`, `line` |
 | `-F`            | Output format: `json`, `text`, `csv`   |
 | `--filter`      | Rhai filter expression (repeatable)    |
-| `--eval`        | Rhai transformation (repeatable)       |
+| `--exec`        | Rhai exec scripts (repeatable)         |
 | `--begin/--end` | Logic before/after stream              |
 | `--on-error`    | Strategy: skip, emit-errors, fail-fast |
 | `--parallel`    | Enable parallel batch mode             |

@@ -111,21 +111,21 @@ fn test_filter_expression() {
 }
 
 #[test]
-fn test_eval_expression() {
+fn test_exec_script() {
     let input = r#"{"level": "INFO", "status": 200}
 {"level": "ERROR", "status": 500}"#;
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "jsonl", 
         "-F", "jsonl",
-        "--eval", "let alert_level = if status >= 400 { \"high\" } else { \"low\" };"
+        "--exec", "let alert_level = if status >= 400 { \"high\" } else { \"low\" };"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
     
     let lines: Vec<&str> = stdout.trim().split('\n').collect();
     assert_eq!(lines.len(), 2, "Should output 2 lines");
     
-    // Check that eval expression added alert_level field
+    // Check that exec script added alert_level field
     let first_line: serde_json::Value = serde_json::from_str(lines[0]).expect("First line should be valid JSON");
     assert_eq!(first_line["alert_level"], "low");
     
@@ -175,7 +175,7 @@ fn test_global_tracking() {
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "jsonl",
         "--filter", "status >= 400",
-        "--eval", "track_count(\"errors\")",
+        "--exec", "track_count(\"errors\")",
         "--end", "print(`Errors: ${tracked[\"errors\"]}`)"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -286,7 +286,7 @@ fn test_string_functions() {
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "jsonl",
         "-F", "jsonl",
-        "--eval", "let has_error = message.contains(\"Error\"); let code_num = code.to_int();"
+        "--exec", "let has_error = message.contains(\"Error\"); let code_num = code.to_int();"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
     
@@ -327,7 +327,7 @@ fn test_status_class_function() {
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "jsonl",
         "-F", "jsonl",
-        "--eval", "let class = status.status_class();"
+        "--exec", "let class = status.status_class();"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
     
@@ -378,7 +378,7 @@ fn test_print_function_output() {
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "jsonl",
         "-F", "jsonl",
-        "--eval", "print(\"Processing user: \" + user);"
+        "--exec", "print(\"Processing user: \" + user);"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
     
@@ -405,7 +405,7 @@ fn test_stdin_large_input_performance() {
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "jsonl",
         "--filter", "status >= 400",
-        "--eval", "track_count(\"errors\");",
+        "--exec", "track_count(\"errors\");",
         "--end", "print(`Errors: ${tracked[\"errors\"]}`);"
     ], &large_input);
     let duration = start_time.elapsed();
@@ -450,7 +450,7 @@ fn test_tracking_with_min_max() {
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "jsonl",
-        "--eval", "track_min(\"min_time\", response_time); track_max(\"max_time\", response_time);",
+        "--exec", "track_min(\"min_time\", response_time); track_max(\"max_time\", response_time);",
         "--end", "print(`Min: ${tracked[\"min_time\"]}, Max: ${tracked[\"max_time\"]}`);"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -467,7 +467,7 @@ fn test_field_modification_and_addition() {
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "jsonl",
         "-F", "jsonl",
-        "--eval", "let grade = if score >= 90 { \"A\" } else { \"B\" }; let bonus_points = score * 0.1;"
+        "--exec", "let grade = if score >= 90 { \"A\" } else { \"B\" }; let bonus_points = score * 0.1;"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
     
@@ -493,7 +493,7 @@ fn test_track_unique_function() {
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "jsonl",
-        "--eval", "track_unique(\"unique_ips\", ip); track_unique(\"unique_users\", user);",
+        "--exec", "track_unique(\"unique_ips\", ip); track_unique(\"unique_users\", user);",
         "--end", "print(`IPs: ${tracked[\"unique_ips\"].len()}, Users: ${tracked[\"unique_users\"].len()}`);"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -513,7 +513,7 @@ fn test_track_bucket_function() {
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "jsonl",
-        "--eval", "track_bucket(\"status_counts\", status); track_bucket(\"method_counts\", method);",
+        "--exec", "track_bucket(\"status_counts\", status); track_bucket(\"method_counts\", method);",
         "--end", "print(`Status 200: ${tracked[\"status_counts\"].get(\"200\") ?? 0}, GET requests: ${tracked[\"method_counts\"].get(\"GET\") ?? 0}`);"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -536,7 +536,7 @@ fn test_track_unique_parallel_mode() {
         "-f", "jsonl",
         "--parallel",
         "--batch-size", "2",
-        "--eval", "track_unique(\"ips\", ip);",
+        "--exec", "track_unique(\"ips\", ip);",
         "--end", "print(`Unique IPs: ${tracked[\"ips\"].len()}`);"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully in parallel mode");
@@ -558,7 +558,7 @@ fn test_track_bucket_parallel_mode() {
         "-f", "jsonl",
         "--parallel",
         "--batch-size", "2",
-        "--eval", "track_bucket(\"status_counts\", status);",
+        "--exec", "track_bucket(\"status_counts\", status);",
         "--end", "let counts = tracked[\"status_counts\"]; print(`200: ${counts.get(\"200\") ?? 0}, 404: ${counts.get(\"404\") ?? 0}, 500: ${counts.get(\"500\") ?? 0}`);"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully in parallel mode");
@@ -578,7 +578,7 @@ fn test_mixed_tracking_functions() {
     
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "jsonl",
-        "--eval", "track_count(\"total\"); track_unique(\"users\", user); track_bucket(\"status_dist\", status); track_min(\"min_time\", response_time); track_max(\"max_time\", response_time);",
+        "--exec", "track_count(\"total\"); track_unique(\"users\", user); track_bucket(\"status_dist\", status); track_min(\"min_time\", response_time); track_max(\"max_time\", response_time);",
         "--end", "print(`Total: ${tracked[\"total\"]}, Users: ${tracked[\"users\"].len()}, Min: ${tracked[\"min_time\"]}, Max: ${tracked[\"max_time\"]}`);"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -601,7 +601,7 @@ fn test_multiline_real_world_scenario() {
         "-f", "jsonl",
         "-F", "jsonl",
         "--filter", "status >= 400",
-        "--eval", "let alert_level = if status >= 500 { \"critical\" } else { \"warning\" }; track_count(\"total_errors\");",
+        "--exec", "let alert_level = if status >= 500 { \"critical\" } else { \"warning\" }; track_count(\"total_errors\");",
         "--end", "print(`Total errors processed: ${tracked[\"total_errors\"]}`);"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");

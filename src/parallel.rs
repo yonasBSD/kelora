@@ -16,7 +16,7 @@ use crate::unix::SafeStdout;
 struct WorkerConfig {
     input_format: crate::InputFormat,
     filters: Vec<String>,
-    evals: Vec<String>,
+    execs: Vec<String>,
     on_error: crate::ErrorStrategy,
 }
 
@@ -25,7 +25,7 @@ struct WorkerConfig {
 pub struct ProcessRequest {
     pub input_format: crate::InputFormat,
     pub filters: Vec<String>,
-    pub evals: Vec<String>,
+    pub execs: Vec<String>,
     pub output_format: crate::OutputFormat,
     pub on_error: crate::ErrorStrategy,
     pub keys: Vec<String>,
@@ -193,7 +193,7 @@ impl ParallelProcessor {
     }
 
     /// Process input using the parallel pipeline
-    /// Only parallelizes --filter and --eval stages, --begin and --end run sequentially
+    /// Only parallelizes --filter and --exec stages, --begin and --end run sequentially
     pub fn process<R: std::io::BufRead + Send + 'static>(
         &self,
         reader: R,
@@ -202,7 +202,7 @@ impl ParallelProcessor {
         let worker_config = WorkerConfig {
             input_format: request.input_format.clone(),
             filters: request.filters,
-            evals: request.evals,
+            execs: request.execs,
             on_error: request.on_error.clone(),
         };
         // Create channels
@@ -387,7 +387,7 @@ impl ParallelProcessor {
         // Create thread-local parser and engine
         let parser = Self::create_parser(&config.input_format);
         let mut engine = crate::engine::RhaiEngine::new();
-        engine.compile_expressions(&config.filters, &config.evals, None, None)?;
+        engine.compile_expressions(&config.filters, &config.execs, None, None)?;
         
         // Thread-local tracking state will be initialized automatically
         
@@ -438,8 +438,8 @@ impl ParallelProcessor {
                     continue;
                 }
 
-                // Apply eval expressions
-                if let Err(e) = engine.execute_evals(&mut event, &mut worker_tracked) {
+                // Apply exec scripts
+                if let Err(e) = engine.execute_execs(&mut event, &mut worker_tracked) {
                     match config.on_error {
                         crate::ErrorStrategy::Skip => continue,
                         crate::ErrorStrategy::FailFast => return Err(e),

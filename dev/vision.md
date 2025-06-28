@@ -39,7 +39,7 @@ This document defines what Kelora is, what it is not, and how to keep it lean, f
 ### ❌ ABSOLUTE NOs
 
 * No UI: This is a CLI tool. No TUI, no terminal browser.
-* No plugin system: No dynamic plugins, no `.so`, no WASM. Use `--eval`.
+* No plugin system: No dynamic plugins, no `.so`, no WASM. Use `--exec`.
 * No multiline parsers: Use a chunking preprocessor. Kelora won’t understand stacktraces — it will pass them whole.
 * No context-aware input formats: No YAML, XML, GELF, etc.
 * No magic behavior: No format guessing unless explicitly requested.

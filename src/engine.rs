@@ -19,7 +19,7 @@ pub struct CompiledExpression {
 pub struct RhaiEngine {
     engine: Engine,
     compiled_filters: Vec<CompiledExpression>,
-    compiled_evals: Vec<CompiledExpression>,
+    compiled_execs: Vec<CompiledExpression>,
     compiled_begin: Option<CompiledExpression>,
     compiled_end: Option<CompiledExpression>,
     scope_template: Scope<'static>,
@@ -34,7 +34,7 @@ impl Clone for RhaiEngine {
         Self {
             engine,
             compiled_filters: self.compiled_filters.clone(),
-            compiled_evals: self.compiled_evals.clone(),
+            compiled_execs: self.compiled_execs.clone(),
             compiled_begin: self.compiled_begin.clone(),
             compiled_end: self.compiled_end.clone(),
             scope_template: self.scope_template.clone(),
@@ -85,7 +85,7 @@ impl RhaiEngine {
         Self {
             engine,
             compiled_filters: Vec::new(),
-            compiled_evals: Vec::new(),
+            compiled_execs: Vec::new(),
             compiled_begin: None,
             compiled_end: None,
             scope_template,
@@ -94,7 +94,7 @@ impl RhaiEngine {
 
     pub fn compile_expressions(&mut self, 
         filters: &[String], 
-        evals: &[String], 
+        execs: &[String], 
         begin: Option<&String>, 
         end: Option<&String>
     ) -> Result<()> {
@@ -107,12 +107,12 @@ impl RhaiEngine {
             });
         }
 
-        for eval in evals {
-            let ast = self.engine.compile(eval)
-                .with_context(|| format!("Failed to compile eval expression: {}", eval))?;
-            self.compiled_evals.push(CompiledExpression {
+        for exec in execs {
+            let ast = self.engine.compile(exec)
+                .with_context(|| format!("Failed to compile exec script: {}", exec))?;
+            self.compiled_execs.push(CompiledExpression {
                 ast,
-                expr: eval.clone(),
+                expr: exec.clone(),
             });
         }
 
@@ -309,8 +309,8 @@ impl RhaiEngine {
         Ok(true)
     }
 
-    pub fn execute_evals(&mut self, event: &mut Event, tracked: &mut HashMap<String, Dynamic>) -> Result<()> {
-        if self.compiled_evals.is_empty() {
+    pub fn execute_execs(&mut self, event: &mut Event, tracked: &mut HashMap<String, Dynamic>) -> Result<()> {
+        if self.compiled_execs.is_empty() {
             return Ok(());
         }
 
@@ -319,9 +319,9 @@ impl RhaiEngine {
         
         let mut scope = self.create_scope_for_event(event);
         
-        for compiled_eval in &self.compiled_evals {
-            let _ = self.engine.eval_ast_with_scope::<Dynamic>(&mut scope, &compiled_eval.ast)
-                .map_err(|e| anyhow::anyhow!("Failed to execute eval expression '{}': {}", compiled_eval.expr, e))?;
+        for compiled_exec in &self.compiled_execs {
+            let _ = self.engine.eval_ast_with_scope::<Dynamic>(&mut scope, &compiled_exec.ast)
+                .map_err(|e| anyhow::anyhow!("Failed to execute exec script '{}': {}", compiled_exec.expr, e))?;
         }
 
         // Update event fields from scope

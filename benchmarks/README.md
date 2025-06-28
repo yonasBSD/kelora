@@ -20,7 +20,7 @@ make bench-baseline
 | Test | Dataset | Description |
 |------|---------|-------------|
 | **small_filter** | 100k lines | Filter ERROR level logs - tests basic filtering performance |
-| **medium_processing** | 500k lines | Filter + tracking - tests evaluation and state management |
+| **medium_processing** | 500k lines | Filter + tracking - tests exec scripts and state management |
 | **large_parallel** | 500k lines | Parallel processing with 4 threads - tests concurrency |
 | **sequential_throughput** | 500k lines | Raw sequential processing - tests baseline throughput |
 

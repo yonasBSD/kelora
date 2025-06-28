@@ -38,7 +38,7 @@ make test-full          # Comprehensive test suite
 ./target/release/kelora -f jsonl logs.jsonl --filter "response_time.sub_string(0,2).to_int() > 98"
 
 # Count status codes and track metrics
-./target/release/kelora -f jsonl access.log --eval "track_count(status_class(status))" --end "print(tracked)"
+./target/release/kelora -f jsonl access.log --exec "track_count(status_class(status))" --end "print(tracked)"
 ```
 
 ## Architecture
@@ -54,7 +54,7 @@ make test-full          # Comprehensive test suite
 ### Performance Design
 Kelora follows a "compile once, evaluate repeatedly" model:
 1. **Engine Creation** - Built once at startup with all custom functions registered
-2. **AST Compilation** - All user expressions (--filter, --eval, etc.) compiled to ASTs at startup
+2. **AST Compilation** - All user expressions (--filter, --exec, etc.) compiled to ASTs at startup
 3. **Scope Templates** - Single scope template cloned and reused for each log line
 4. **Variable Injection** - Log fields auto-injected as Rhai variables with fallback to event map
 5. **Parallel Architecture** - Producer-consumer model with batching and thread-local state tracking
@@ -66,7 +66,7 @@ Kelora follows a "compile once, evaluate repeatedly" model:
 ### Processing Pipeline
 1. **Parse**: Convert input line to Event structure
 2. **Inject**: Make fields available as Rhai variables  
-3. **Execute Stages**: Run begin → filters → evals → end
+3. **Execute Stages**: Run begin → filters → execs → end
 4. **Format**: Convert result to output format
 
 ### Processing Modes
@@ -211,21 +211,21 @@ Four strategies via `--on-error`:
 ```bash
 kelora -f jsonl \
   --filter 'status >= 400' \
-  --eval 'track_count(status.status_class())' \
+  --exec 'track_count(status.status_class())' \
   --end 'print(`4xx: ${tracked["4xx"] ?? 0}, 5xx: ${tracked["5xx"] ?? 0}`)'
 ```
 
 ### Performance Monitoring  
 ```bash
 kelora -f jsonl \
-  --eval 'track_min("min_time", response_time); track_max("max_time", response_time)' \
+  --exec 'track_min("min_time", response_time); track_max("max_time", response_time)' \
   --end 'print(`Response time range: ${tracked["min_time"]}-${tracked["max_time"]}ms`)'
 ```
 
 ### Data Transformation
 ```bash
 kelora -f jsonl \
-  --eval 'severity = if level == "ERROR" { "high" } else { "low" }; processed_at = "2024-01-01"' \
+  --exec 'severity = if level == "ERROR" { "high" } else { "low" }; processed_at = "2024-01-01"' \
   -F jsonl
 ```
 
@@ -240,7 +240,7 @@ kelora -f jsonl \
 - ✅ **Core Architecture**: Rhai engine integration with AST compilation and reuse
 - ✅ **JSONL Input Format**: Full support for JSON Lines log processing
 - ✅ **JSONL/Text Output**: JSON objects and logfmt-style key=value output
-- ✅ **Expression Stages**: `--begin`, `--filter`, `--eval`, `--end` pipeline
+- ✅ **Expression Stages**: `--begin`, `--filter`, `--exec`, `--end` pipeline
 - ✅ **Global State Tracking**: `track_count()`, `track_min()`, `track_max()` functions
 - ✅ **Error Handling**: Four strategies (skip, fail-fast, emit-errors, default-value)
 - ✅ **Field Filtering**: `--keys` for selecting specific output fields

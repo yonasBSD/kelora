@@ -51,9 +51,9 @@ pub struct Cli {
     #[arg(long = "filter")]
     pub filters: Vec<String>,
 
-    /// Transform/process expressions (can be repeated)
-    #[arg(long = "eval")]
-    pub evals: Vec<String>,
+    /// Transform/process exec scripts (can be repeated)
+    #[arg(short = 'e', long = "exec")]
+    pub execs: Vec<String>,
 
     /// Run once after processing
     #[arg(long = "end")]
@@ -158,7 +158,7 @@ fn main() -> Result<()> {
     let mut engine = RhaiEngine::new();
     
     // Compile all expressions at startup
-    if let Err(e) = engine.compile_expressions(&cli.filters, &cli.evals, cli.begin.as_ref(), cli.end.as_ref()) {
+    if let Err(e) = engine.compile_expressions(&cli.filters, &cli.execs, cli.begin.as_ref(), cli.end.as_ref()) {
         stderr.writeln(&format!("Expression compilation error: {}", e)).unwrap_or(());
         ExitCode::GeneralError.exit();
     }
@@ -208,11 +208,11 @@ fn main() -> Result<()> {
             Box::new(BufReader::new(file))
         };
 
-        // Process filter and eval stages in parallel
+        // Process filter and exec stages in parallel
         let request = ProcessRequest {
             input_format: cli.format,
             filters: cli.filters.clone(),
-            evals: cli.evals.clone(),
+            execs: cli.execs.clone(),
             output_format: cli.output_format,
             on_error: cli.on_error,
             keys: cli.keys,
@@ -315,7 +315,7 @@ fn main() -> Result<()> {
                 continue;
             }
 
-            if let Err(e) = engine.execute_evals(&mut event, &mut tracked) {
+            if let Err(e) = engine.execute_execs(&mut event, &mut tracked) {
                 match cli.on_error {
                     ErrorStrategy::Skip => continue,
                     ErrorStrategy::FailFast => {
