@@ -1,7 +1,7 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::Parser;
 use std::collections::HashMap;
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::io::{self, BufRead, BufReader, Read};
 
 mod colors;
 mod engine;
@@ -10,6 +10,7 @@ mod formatters;
 mod parallel;
 mod parsers;
 mod tty;
+mod unix;
 
 use engine::RhaiEngine;
 use event::Event;
@@ -17,6 +18,7 @@ use formatters::{Formatter, JsonFormatter, DefaultFormatter, LogfmtFormatter};
 use tty::should_use_colors;
 use parallel::{ParallelConfig, ParallelProcessor, ProcessRequest};
 use parsers::{JsonlParser, LineParser, LogfmtParser, Parser as LogParser};
+use unix::{ExitCode, SignalHandler, SafeStdout, SafeStderr, ProcessCleanup, check_termination};
 
 #[derive(Parser)]
 #[command(name = "kelora")]
@@ -125,7 +127,26 @@ pub enum ErrorStrategy {
 }
 
 fn main() -> Result<()> {
+    // Initialize signal handling early
+    let _signal_handler = SignalHandler::new().map_err(|e| {
+        eprintln!("Failed to initialize signal handling: {}", e);
+        ExitCode::GeneralError.exit();
+    }).unwrap();
+
+    // Initialize process cleanup
+    let _cleanup = ProcessCleanup::new();
+
+    // Initialize safe I/O wrappers
+    let mut stdout = SafeStdout::new();
+    let mut stderr = SafeStderr::new();
+
     let cli = Cli::parse();
+
+    // Validate arguments early
+    if let Err(e) = validate_cli_args(&cli) {
+        stderr.writeln(&format!("Error: {}", e)).unwrap_or(());
+        ExitCode::InvalidUsage.exit();
+    }
 
     // Create parser based on input format
     let parser = create_parser(&cli.format);
@@ -137,7 +158,10 @@ fn main() -> Result<()> {
     let mut engine = RhaiEngine::new();
     
     // Compile all expressions at startup
-    engine.compile_expressions(&cli.filters, &cli.evals, cli.begin.as_ref(), cli.end.as_ref())?;
+    if let Err(e) = engine.compile_expressions(&cli.filters, &cli.evals, cli.begin.as_ref(), cli.end.as_ref()) {
+        stderr.writeln(&format!("Expression compilation error: {}", e)).unwrap_or(());
+        ExitCode::GeneralError.exit();
+    }
 
     // Global tracking state
     let mut tracked: HashMap<String, rhai::Dynamic> = HashMap::new();
@@ -149,7 +173,7 @@ fn main() -> Result<()> {
     let batch_size = cli.batch_size.unwrap_or(1000);
 
     if use_parallel {
-        // Parallel processing mode
+        // Parallel processing mode with proper Unix behavior
         let config = ParallelConfig {
             num_workers: if cli.threads == 0 { num_cpus::get() } else { cli.threads },
             batch_size,
@@ -161,17 +185,26 @@ fn main() -> Result<()> {
         let processor = ParallelProcessor::new(config);
         
         // Execute begin stage sequentially if provided
-        engine.execute_begin(&mut tracked)?;
+        if let Err(e) = engine.execute_begin(&mut tracked) {
+            stderr.writeln(&format!("Begin stage error: {}", e)).unwrap_or(());
+            ExitCode::GeneralError.exit();
+        }
 
         // Get reader
         let reader: Box<dyn BufRead + Send> = if cli.files.is_empty() {
             // For stdin, we need to read all into memory first since stdin lock isn't Send
             let mut buffer = Vec::new();
-            io::stdin().read_to_end(&mut buffer)?;
+            if let Err(e) = io::stdin().read_to_end(&mut buffer) {
+                stderr.writeln(&format!("Failed to read from stdin: {}", e)).unwrap_or(());
+                ExitCode::GeneralError.exit();
+            }
             Box::new(std::io::Cursor::new(buffer))
         } else {
-            let file = std::fs::File::open(&cli.files[0])
-                .with_context(|| format!("Failed to open file: {}", cli.files[0]))?;
+            let file = std::fs::File::open(&cli.files[0]).map_err(|e| {
+                stderr.writeln(&format!("Failed to open file '{}': {}", cli.files[0], e)).unwrap_or(());
+                
+                ExitCode::GeneralError.exit();
+            }).unwrap();
             Box::new(BufReader::new(file))
         };
 
@@ -186,7 +219,11 @@ fn main() -> Result<()> {
             plain: cli.plain,
         };
         
-        processor.process(reader, request)?;
+        if let Err(e) = processor.process(reader, request) {
+            stderr.writeln(&format!("Parallel processing error: {}", e)).unwrap_or(());
+            
+            ExitCode::GeneralError.exit();
+        }
 
         // Merge the parallel tracked state with our sequential tracked state
         let parallel_tracked = processor.get_final_tracked_state();
@@ -195,22 +232,43 @@ fn main() -> Result<()> {
         }
 
         // Execute end stage sequentially with merged state
-        engine.execute_end(&tracked)?;
+        if let Err(e) = engine.execute_end(&tracked) {
+            stderr.writeln(&format!("End stage error: {}", e)).unwrap_or(());
+            
+            ExitCode::GeneralError.exit();
+        }
     } else {
-        // Original sequential processing mode
-        engine.execute_begin(&mut tracked)?;
+        // Sequential processing mode with proper Unix behavior
+        if let Err(e) = engine.execute_begin(&mut tracked) {
+            stderr.writeln(&format!("Begin stage error: {}", e)).unwrap_or(());
+            
+            ExitCode::GeneralError.exit();
+        }
 
         let reader: Box<dyn BufRead> = if cli.files.is_empty() {
             Box::new(io::stdin().lock())
         } else {
-            let file = std::fs::File::open(&cli.files[0])
-                .with_context(|| format!("Failed to open file: {}", cli.files[0]))?;
+            let file = std::fs::File::open(&cli.files[0]).map_err(|e| {
+                stderr.writeln(&format!("Failed to open file '{}': {}", cli.files[0], e)).unwrap_or(());
+                
+                ExitCode::GeneralError.exit();
+            }).unwrap();
             Box::new(BufReader::new(file))
         };
 
         let mut line_num = 0;
         for line_result in reader.lines() {
-            let line = line_result?;
+            // Check for termination signal between lines
+            check_termination().unwrap_or_else(|_| {
+                
+                ExitCode::SignalInt.exit();
+            });
+
+            let line = line_result.map_err(|e| {
+                stderr.writeln(&format!("Failed to read input line: {}", e)).unwrap_or(());
+                
+                ExitCode::GeneralError.exit();
+            }).unwrap();
             line_num += 1;
 
             if line.trim().is_empty() {
@@ -221,9 +279,13 @@ fn main() -> Result<()> {
                 Ok(event) => event,
                 Err(e) => match cli.on_error {
                     ErrorStrategy::Skip => continue,
-                    ErrorStrategy::FailFast => return Err(e),
+                    ErrorStrategy::FailFast => {
+                        stderr.writeln(&format!("Parse error on line {}: {}", line_num, e)).unwrap_or(());
+                        
+                        ExitCode::GeneralError.exit();
+                    }
                     ErrorStrategy::EmitErrors => {
-                        eprintln!("Parse error on line {}: {}", line_num, e);
+                        stderr.writeln(&format!("Parse error on line {}: {}", line_num, e)).unwrap_or(());
                         continue;
                     }
                     ErrorStrategy::DefaultValue => Event::default_with_line(line),
@@ -236,9 +298,13 @@ fn main() -> Result<()> {
                 Ok(result) => result,
                 Err(e) => match cli.on_error {
                     ErrorStrategy::Skip => false,
-                    ErrorStrategy::FailFast => return Err(e),
+                    ErrorStrategy::FailFast => {
+                        stderr.writeln(&format!("Filter error on line {}: {}", line_num, e)).unwrap_or(());
+                        
+                        ExitCode::GeneralError.exit();
+                    }
                     ErrorStrategy::EmitErrors => {
-                        eprintln!("Filter error on line {}: {}", line_num, e);
+                        stderr.writeln(&format!("Filter error on line {}: {}", line_num, e)).unwrap_or(());
                         false
                     }
                     ErrorStrategy::DefaultValue => true,
@@ -252,9 +318,13 @@ fn main() -> Result<()> {
             if let Err(e) = engine.execute_evals(&mut event, &mut tracked) {
                 match cli.on_error {
                     ErrorStrategy::Skip => continue,
-                    ErrorStrategy::FailFast => return Err(e),
+                    ErrorStrategy::FailFast => {
+                        stderr.writeln(&format!("Eval error on line {}: {}", line_num, e)).unwrap_or(());
+                        
+                        ExitCode::GeneralError.exit();
+                    }
                     ErrorStrategy::EmitErrors => {
-                        eprintln!("Eval error on line {}: {}", line_num, e);
+                        stderr.writeln(&format!("Eval error on line {}: {}", line_num, e)).unwrap_or(());
                         continue;
                     }
                     ErrorStrategy::DefaultValue => {}
@@ -265,13 +335,53 @@ fn main() -> Result<()> {
                 event.filter_keys(&cli.keys);
             }
 
-            println!("{}", formatter.format(&event));
-            io::stdout().flush().unwrap_or(());
+            // Safe output that handles broken pipes
+            stdout.writeln(&formatter.format(&event)).unwrap_or_else(|e| {
+                stderr.writeln(&format!("Output error: {}", e)).unwrap_or(());
+                
+                ExitCode::GeneralError.exit();
+            });
+            
+            stdout.flush().unwrap_or_else(|e| {
+                stderr.writeln(&format!("Flush error: {}", e)).unwrap_or(());
+                
+                ExitCode::GeneralError.exit();
+            });
         }
 
-        engine.execute_end(&tracked)?;
+        if let Err(e) = engine.execute_end(&tracked) {
+            stderr.writeln(&format!("End stage error: {}", e)).unwrap_or(());
+            
+            ExitCode::GeneralError.exit();
+        }
     }
 
+    // Clean shutdown
+    
+    ExitCode::Success.exit();
+}
+
+/// Validate CLI arguments for early error detection
+fn validate_cli_args(cli: &Cli) -> Result<()> {
+    // Check if files exist (if specified)
+    for file_path in &cli.files {
+        if !std::path::Path::new(file_path).exists() {
+            return Err(anyhow::anyhow!("File not found: {}", file_path));
+        }
+    }
+    
+    // Validate batch size
+    if let Some(batch_size) = cli.batch_size {
+        if batch_size == 0 {
+            return Err(anyhow::anyhow!("Batch size must be greater than 0"));
+        }
+    }
+    
+    // Validate thread count
+    if cli.threads > 1000 {
+        return Err(anyhow::anyhow!("Thread count too high (max 1000)"));
+    }
+    
     Ok(())
 }
 

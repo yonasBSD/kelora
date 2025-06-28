@@ -21,6 +21,7 @@ crossbeam-channel = "0.5"
 num_cpus = "1.16"
 is-terminal = "0.4"
 indexmap = "2.0"
+signal-hook = "0.3"
 
 [dev-dependencies]
 tempfile = "3.8"

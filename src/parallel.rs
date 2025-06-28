@@ -2,7 +2,6 @@ use anyhow::Result;
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use rhai::Dynamic;
 use std::collections::HashMap;
-use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -10,6 +9,7 @@ use std::time::{Duration, Instant};
 use crate::event::Event;
 use crate::formatters::{Formatter, JsonFormatter, DefaultFormatter, LogfmtFormatter};
 use crate::parsers::{JsonlParser, LineParser, LogfmtParser, Parser};
+use crate::unix::SafeStdout;
 
 /// Configuration for worker threads
 #[derive(Debug, Clone)]
@@ -556,8 +556,9 @@ impl ParallelProcessor {
                 event.filter_keys(keys);
             }
 
-            println!("{}", formatter.format(&event));
-            io::stdout().flush().unwrap_or(());
+            let mut stdout = SafeStdout::new();
+            stdout.writeln(&formatter.format(&event)).unwrap_or(());
+            stdout.flush().unwrap_or(());
         }
         Ok(())
     }
