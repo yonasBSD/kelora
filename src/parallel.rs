@@ -7,30 +7,10 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::event::Event;
-use crate::formatters::{Formatter, JsonFormatter, DefaultFormatter, LogfmtFormatter};
-use crate::parsers::{JsonlParser, LineParser, LogfmtParser, Parser};
+use crate::pipeline::PipelineBuilder;
 use crate::unix::SafeStdout;
 
-/// Configuration for worker threads
-#[derive(Debug, Clone)]
-struct WorkerConfig {
-    input_format: crate::InputFormat,
-    filters: Vec<String>,
-    execs: Vec<String>,
-    on_error: crate::ErrorStrategy,
-}
 
-/// Request parameters for parallel processing
-#[derive(Debug)]
-pub struct ProcessRequest {
-    pub input_format: crate::InputFormat,
-    pub filters: Vec<String>,
-    pub execs: Vec<String>,
-    pub output_format: crate::OutputFormat,
-    pub on_error: crate::ErrorStrategy,
-    pub keys: Vec<String>,
-    pub plain: bool,
-}
 
 /// Configuration for parallel processing
 #[derive(Debug, Clone)]
@@ -192,19 +172,12 @@ impl ParallelProcessor {
         }
     }
 
-    /// Process input using the parallel pipeline
-    /// Only parallelizes --filter and --exec stages, --begin and --end run sequentially
-    pub fn process<R: std::io::BufRead + Send + 'static>(
+    /// Process input using the parallel pipeline with new pipeline architecture
+    pub fn process_with_pipeline<R: std::io::BufRead + Send + 'static>(
         &self,
         reader: R,
-        request: ProcessRequest,
+        pipeline_builder: PipelineBuilder,
     ) -> Result<()> {
-        let worker_config = WorkerConfig {
-            input_format: request.input_format.clone(),
-            filters: request.filters,
-            execs: request.execs,
-            on_error: request.on_error.clone(),
-        };
         // Create channels
         let (batch_sender, batch_receiver) = if let Some(size) = self.config.buffer_size {
             bounded(size)
@@ -235,14 +208,14 @@ impl ParallelProcessor {
         for worker_id in 0..self.config.num_workers {
             let batch_receiver = batch_receiver.clone();
             let result_sender = result_sender.clone();
-            let worker_config = worker_config.clone();
+            let worker_pipeline_builder = pipeline_builder.clone();
             
             let handle = thread::spawn(move || {
                 Self::worker_thread(
                     worker_id,
                     batch_receiver,
                     result_sender,
-                    worker_config,
+                    worker_pipeline_builder,
                 )
             });
             worker_handles.push(handle);
@@ -257,18 +230,12 @@ impl ParallelProcessor {
             let result_receiver = result_receiver;
             let preserve_order = self.config.preserve_order;
             let global_tracker = self.global_tracker.clone();
-            let output_format = request.output_format.clone();
-            let keys = request.keys;
-            let plain = request.plain;
             
             thread::spawn(move || {
-                Self::result_sink_thread(
+                Self::pipeline_result_sink_thread(
                     result_receiver,
-                    output_format,
                     preserve_order,
-                    keys,
                     global_tracker,
-                    plain,
                 )
             })
         };
@@ -377,93 +344,60 @@ impl ParallelProcessor {
         Ok(())
     }
 
-    /// Worker thread: processes batches in parallel
+    /// Worker thread: processes batches in parallel using new pipeline architecture
     fn worker_thread(
         _worker_id: usize,
         batch_receiver: Receiver<Batch>,
         result_sender: Sender<BatchResult>,
-        config: WorkerConfig,
+        pipeline_builder: PipelineBuilder,
     ) -> Result<()> {
-        // Create thread-local parser and engine
-        let parser = Self::create_parser(&config.input_format);
-        let mut engine = crate::engine::RhaiEngine::new();
-        engine.compile_expressions(&config.filters, &config.execs, None, None)?;
-        
-        // Thread-local tracking state will be initialized automatically
-        
-        // Worker tracking state - syncs with thread-local storage
-        let mut worker_tracked: HashMap<String, Dynamic> = HashMap::new();
+        // Create worker pipeline and context
+        let (mut pipeline, mut ctx) = pipeline_builder.build_worker()?;
 
         while let Ok(batch) = batch_receiver.recv() {
-            // Reset thread-local tracking state for this batch
-            crate::engine::RhaiEngine::clear_thread_tracking_state();
+            // Reset tracking state for this batch
+            ctx.tracker.clear();
             
             let mut batch_results = Vec::with_capacity(batch.lines.len());
             
             for (line_idx, line) in batch.lines.iter().enumerate() {
                 let current_line_num = batch.start_line_num + line_idx;
                 
-                // Parse the line
-                let mut event = match parser.parse(line) {
-                    Ok(event) => event,
-                    Err(e) => match config.on_error {
-                        crate::ErrorStrategy::Skip => continue,
-                        crate::ErrorStrategy::FailFast => return Err(e),
-                        crate::ErrorStrategy::EmitErrors => {
-                            eprintln!("Parse error on line {}: {}", current_line_num, e);
-                            continue;
+                // Update metadata
+                ctx.meta.line_number = Some(current_line_num);
+                
+                // Process line through pipeline
+                match pipeline.process_line(line.clone(), &mut ctx) {
+                    Ok(formatted_results) => {
+                        // Convert formatted strings back to events for the result sink
+                        // Note: This is a temporary approach during the transition
+                        for formatted_result in formatted_results {
+                            // For now, we'll need to create a dummy event since the result sink expects events
+                            // In a full refactor, we'd change the result sink to handle formatted strings
+                            let mut dummy_event = Event::default_with_line(formatted_result.clone());
+                            dummy_event.set_metadata(current_line_num, None);
+                            
+                            batch_results.push(ProcessedEvent {
+                                event: dummy_event,
+                            });
                         }
-                        crate::ErrorStrategy::DefaultValue => Event::default_with_line(line.clone()),
-                    },
-                };
-
-                // Set metadata
-                event.set_metadata(current_line_num, None);
-
-                // Apply filters
-                let should_output = match engine.execute_filters(&event, &mut worker_tracked) {
-                    Ok(result) => result,
-                    Err(e) => match config.on_error {
-                        crate::ErrorStrategy::Skip => false,
-                        crate::ErrorStrategy::FailFast => return Err(e),
-                        crate::ErrorStrategy::EmitErrors => {
-                            eprintln!("Filter error on line {}: {}", current_line_num, e);
-                            false
+                    }
+                    Err(e) => {
+                        // Error handling is already done in pipeline.process_line()
+                        // based on the ctx.config.on_error strategy
+                        match ctx.config.on_error {
+                            crate::ErrorStrategy::FailFast => return Err(e),
+                            _ => continue, // Skip, EmitErrors, DefaultValue all continue
                         }
-                        crate::ErrorStrategy::DefaultValue => true,
-                    },
-                };
-
-                if !should_output {
-                    continue;
-                }
-
-                // Apply exec scripts
-                if let Err(e) = engine.execute_execs(&mut event, &mut worker_tracked) {
-                    match config.on_error {
-                        crate::ErrorStrategy::Skip => continue,
-                        crate::ErrorStrategy::FailFast => return Err(e),
-                        crate::ErrorStrategy::EmitErrors => {
-                            eprintln!("Eval error on line {}: {}", current_line_num, e);
-                            continue;
-                        }
-                        crate::ErrorStrategy::DefaultValue => {}
                     }
                 }
-
-                batch_results.push(ProcessedEvent {
-                    event,
-                });
             }
 
-            // Get thread-local tracking state directly (no conversion needed with sync feature)
-            let thread_local_state = crate::engine::RhaiEngine::get_thread_tracking_state();
-            
-            // Send batch result
+            // Send batch result with worker's tracking state
             let batch_result = BatchResult {
                 batch_id: batch.id,
                 results: batch_results,
-                internal_tracked_updates: thread_local_state,
+                internal_tracked_updates: ctx.tracker.clone(),
             };
 
             if result_sender.send(batch_result).is_err() {
@@ -475,27 +409,23 @@ impl ParallelProcessor {
         Ok(())
     }
 
-    /// Result sink thread: handles output ordering and merges global state
-    fn result_sink_thread(
+    /// Pipeline result sink thread: handles output ordering and merges global state
+    /// Results are already formatted by the pipeline, so we just need to output them
+    fn pipeline_result_sink_thread(
         result_receiver: Receiver<BatchResult>,
-        output_format: crate::OutputFormat,
         preserve_order: bool,
-        keys: Vec<String>,
         global_tracker: GlobalTracker,
-        plain: bool,
     ) -> Result<()> {
-        let formatter = Self::create_formatter(&output_format, plain);
         if preserve_order {
-            Self::ordered_result_sink(result_receiver, formatter, keys, global_tracker)
+            Self::pipeline_ordered_result_sink(result_receiver, global_tracker)
         } else {
-            Self::unordered_result_sink(result_receiver, formatter, keys, global_tracker)
+            Self::pipeline_unordered_result_sink(result_receiver, global_tracker)
         }
     }
 
-    fn ordered_result_sink(
+
+    fn pipeline_ordered_result_sink(
         result_receiver: Receiver<BatchResult>,
-        formatter: Box<dyn Formatter>,
-        keys: Vec<String>,
         global_tracker: GlobalTracker,
     ) -> Result<()> {
         let mut pending_batches: HashMap<u64, BatchResult> = HashMap::new();
@@ -513,23 +443,21 @@ impl ParallelProcessor {
 
             // Output all consecutive batches starting from next_expected_id
             while let Some(batch) = pending_batches.remove(&next_expected_id) {
-                Self::output_batch_results(&batch.results, formatter.as_ref(), &keys)?;
+                Self::pipeline_output_batch_results(&batch.results)?;
                 next_expected_id += 1;
             }
         }
 
         // Output any remaining batches (shouldn't happen with proper shutdown)
         for (_, batch) in pending_batches {
-            Self::output_batch_results(&batch.results, formatter.as_ref(), &keys)?;
+            Self::pipeline_output_batch_results(&batch.results)?;
         }
 
         Ok(())
     }
 
-    fn unordered_result_sink(
+    fn pipeline_unordered_result_sink(
         result_receiver: Receiver<BatchResult>,
-        formatter: Box<dyn Formatter>,
-        keys: Vec<String>,
         global_tracker: GlobalTracker,
     ) -> Result<()> {
         while let Ok(batch_result) = result_receiver.recv() {
@@ -537,54 +465,25 @@ impl ParallelProcessor {
             global_tracker.merge_worker_state(batch_result.internal_tracked_updates)?;
 
             // Output immediately
-            Self::output_batch_results(&batch_result.results, formatter.as_ref(), &keys)?;
+            Self::pipeline_output_batch_results(&batch_result.results)?;
         }
 
         Ok(())
     }
 
-    fn output_batch_results(
-        results: &[ProcessedEvent],
-        formatter: &dyn Formatter,
-        keys: &[String],
-    ) -> Result<()> {
+    fn pipeline_output_batch_results(results: &[ProcessedEvent]) -> Result<()> {
         for processed in results {
-            let mut event = processed.event.clone();
-            
-            // Filter keys if specified
-            if !keys.is_empty() {
-                event.filter_keys(keys);
-            }
-
+            // In the pipeline version, the event.original_line contains the formatted output
             let mut stdout = SafeStdout::new();
-            stdout.writeln(&formatter.format(&event)).unwrap_or(());
+            stdout.writeln(&processed.event.original_line).unwrap_or(());
             stdout.flush().unwrap_or(());
         }
         Ok(())
     }
 
-    fn create_parser(format: &crate::InputFormat) -> Box<dyn Parser> {
-        match format {
-            crate::InputFormat::Jsonl => Box::new(JsonlParser::new()),
-            crate::InputFormat::Line => Box::new(LineParser::new()),
-            crate::InputFormat::Logfmt => Box::new(LogfmtParser::new()),
-            crate::InputFormat::Csv => todo!("CSV parser not implemented yet"),
-            crate::InputFormat::Apache => todo!("Apache parser not implemented yet"),
-        }
-    }
 
-    fn create_formatter(format: &crate::OutputFormat, plain: bool) -> Box<dyn Formatter> {
-        match format {
-            crate::OutputFormat::Jsonl => Box::new(JsonFormatter::new()),
-            crate::OutputFormat::Default => {
-                let use_colors = crate::tty::should_use_colors();
-                Box::new(DefaultFormatter::new(use_colors, plain))
-            },
-            crate::OutputFormat::Logfmt => {
-                Box::new(LogfmtFormatter::new())
-            },
-            crate::OutputFormat::Csv => todo!("CSV formatter not implemented yet"),
-        }
-    }
+
+
+
 
 }

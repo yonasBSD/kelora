@@ -12,8 +12,8 @@ mod pipeline;
 mod tty;
 mod unix;
 
-use parallel::{ParallelConfig, ParallelProcessor, ProcessRequest};
-use pipeline::create_pipeline_from_cli;
+use parallel::{ParallelConfig, ParallelProcessor};
+use pipeline::{create_pipeline_from_cli, create_pipeline_builder_from_cli};
 use unix::{ExitCode, SignalHandler, SafeStdout, SafeStderr, ProcessCleanup, check_termination};
 
 #[derive(Parser)]
@@ -163,8 +163,9 @@ fn main() -> Result<()> {
 
         let processor = ParallelProcessor::new(config);
         
-        // Create pipeline components for begin/end stages
-        let (_pipeline, begin_stage, end_stage, mut ctx) = match create_pipeline_from_cli(&cli) {
+        // Create pipeline builder and components for begin/end stages
+        let pipeline_builder = create_pipeline_builder_from_cli(&cli);
+        let (_pipeline, begin_stage, end_stage, mut ctx) = match pipeline_builder.clone().build() {
             Ok(pipeline_components) => pipeline_components,
             Err(e) => {
                 stderr.writeln(&format!("Failed to create pipeline: {}", e)).unwrap_or(());
@@ -195,18 +196,8 @@ fn main() -> Result<()> {
             Box::new(BufReader::new(file))
         };
 
-        // Process filter and exec stages in parallel (using legacy interface for now)
-        let request = ProcessRequest {
-            input_format: cli.format,
-            filters: cli.filters.clone(),
-            execs: cli.execs.clone(),
-            output_format: cli.output_format,
-            on_error: cli.on_error,
-            keys: cli.keys,
-            plain: cli.plain,
-        };
-        
-        if let Err(e) = processor.process(reader, request) {
+        // Process filter and exec stages in parallel using new pipeline architecture
+        if let Err(e) = processor.process_with_pipeline(reader, pipeline_builder) {
             stderr.writeln(&format!("Parallel processing error: {}", e)).unwrap_or(());
             ExitCode::GeneralError.exit();
         }
