@@ -144,12 +144,12 @@ impl Pipeline {
                 Err(err) => {
                     return match ctx.config.on_error {
                         crate::ErrorStrategy::Skip => Ok(results),
-                        crate::ErrorStrategy::FailFast => Err(err),
-                        crate::ErrorStrategy::EmitErrors => {
+                        crate::ErrorStrategy::Abort => Err(err),
+                        crate::ErrorStrategy::Print => {
                             eprintln!("Parse error: {}", err);
                             Ok(results)
                         }
-                        crate::ErrorStrategy::DefaultValue => {
+                        crate::ErrorStrategy::Stub => {
                             Ok(vec![self.formatter.format(&Event::default_with_line(chunk))])
                         }
                     };
@@ -177,12 +177,12 @@ impl Pipeline {
                                 ScriptResult::Error(msg) => {
                                     return match ctx.config.on_error {
                                         crate::ErrorStrategy::Skip => Ok(results),
-                                        crate::ErrorStrategy::FailFast => Err(anyhow::anyhow!(msg)),
-                                        crate::ErrorStrategy::EmitErrors => {
+                                        crate::ErrorStrategy::Abort => Err(anyhow::anyhow!(msg)),
+                                        crate::ErrorStrategy::Print => {
                                             eprintln!("Script error: {}", msg);
                                             Ok(results)
                                         }
-                                        crate::ErrorStrategy::DefaultValue => Ok(results),
+                                        crate::ErrorStrategy::Stub => Ok(results),
                                     };
                                 }
                             }
@@ -216,12 +216,12 @@ impl Pipeline {
                 ScriptResult::Error(msg) => {
                     return match ctx.config.on_error {
                         crate::ErrorStrategy::Skip => Ok(results),
-                        crate::ErrorStrategy::FailFast => Err(anyhow::anyhow!(msg)),
-                        crate::ErrorStrategy::EmitErrors => {
+                        crate::ErrorStrategy::Abort => Err(anyhow::anyhow!(msg)),
+                        crate::ErrorStrategy::Print => {
                             eprintln!("Script error: {}", msg);
                             Ok(results)
                         }
-                        crate::ErrorStrategy::DefaultValue => Ok(results),
+                        crate::ErrorStrategy::Stub => Ok(results),
                     };
                 }
             }

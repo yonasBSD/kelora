@@ -105,7 +105,7 @@ cargo build --release
 | `--filter`      | Rhai filter expression (repeatable)    |
 | `--exec`        | Rhai exec scripts (repeatable)         |
 | `--begin/--end` | Logic before/after stream              |
-| `--on-error`    | Strategy: skip, emit-errors, fail-fast |
+| `--on-error`    | Strategy: skip, print, abort, stub |
 | `--parallel`    | Enable parallel batch mode             |
 | `--unordered`   | Drop output order for performance      |
 

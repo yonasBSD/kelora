@@ -28,7 +28,7 @@ impl PipelineBuilder {
     pub fn new() -> Self {
         Self {
             config: PipelineConfig {
-                on_error: crate::ErrorStrategy::EmitErrors,
+                on_error: crate::ErrorStrategy::Print,
                 plain: false,
                 no_inject_fields: false,
                 inject_prefix: None,

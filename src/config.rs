@@ -73,9 +73,9 @@ pub enum OutputFormat {
 #[derive(ValueEnum, Clone, Debug)]
 pub enum ErrorStrategy {
     Skip,
-    FailFast,
-    EmitErrors,
-    DefaultValue,
+    Abort,
+    Print,
+    Stub,
 }
 
 impl KeloraConfig {
@@ -154,7 +154,7 @@ impl Default for KeloraConfig {
                 end: None,
                 no_inject_fields: false,
                 inject_prefix: None,
-                on_error: ErrorStrategy::EmitErrors,
+                on_error: ErrorStrategy::Print,
             },
             performance: PerformanceConfig {
                 parallel: false,
@@ -222,9 +222,9 @@ impl From<crate::ErrorStrategy> for ErrorStrategy {
     fn from(strategy: crate::ErrorStrategy) -> Self {
         match strategy {
             crate::ErrorStrategy::Skip => ErrorStrategy::Skip,
-            crate::ErrorStrategy::FailFast => ErrorStrategy::FailFast,
-            crate::ErrorStrategy::EmitErrors => ErrorStrategy::EmitErrors,
-            crate::ErrorStrategy::DefaultValue => ErrorStrategy::DefaultValue,
+            crate::ErrorStrategy::Abort => ErrorStrategy::Abort,
+            crate::ErrorStrategy::Print => ErrorStrategy::Print,
+            crate::ErrorStrategy::Stub => ErrorStrategy::Stub,
         }
     }
 }
@@ -233,9 +233,9 @@ impl From<ErrorStrategy> for crate::ErrorStrategy {
     fn from(strategy: ErrorStrategy) -> Self {
         match strategy {
             ErrorStrategy::Skip => crate::ErrorStrategy::Skip,
-            ErrorStrategy::FailFast => crate::ErrorStrategy::FailFast,
-            ErrorStrategy::EmitErrors => crate::ErrorStrategy::EmitErrors,
-            ErrorStrategy::DefaultValue => crate::ErrorStrategy::DefaultValue,
+            ErrorStrategy::Abort => crate::ErrorStrategy::Abort,
+            ErrorStrategy::Print => crate::ErrorStrategy::Print,
+            ErrorStrategy::Stub => crate::ErrorStrategy::Stub,
         }
     }
 }

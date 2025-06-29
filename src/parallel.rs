@@ -386,8 +386,8 @@ impl ParallelProcessor {
                         // Error handling is already done in pipeline.process_line()
                         // based on the ctx.config.on_error strategy
                         match ctx.config.on_error {
-                            crate::ErrorStrategy::FailFast => return Err(e),
-                            _ => continue, // Skip, EmitErrors, DefaultValue all continue
+                            crate::ErrorStrategy::Abort => return Err(e),
+                            _ => continue, // Skip, Print, Stub all continue
                         }
                     }
                 }

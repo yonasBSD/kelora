@@ -66,7 +66,7 @@ pub struct Cli {
     pub inject_prefix: Option<String>,
 
     /// Error handling strategy
-    #[arg(long = "on-error", value_enum, default_value = "emit-errors")]
+    #[arg(long = "on-error", value_enum, default_value = "print")]
     pub on_error: ErrorStrategy,
 
     /// Output only specific fields (comma-separated)
@@ -125,9 +125,9 @@ pub enum OutputFormat {
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum ErrorStrategy {
     Skip,
-    FailFast,
-    EmitErrors,
-    DefaultValue,
+    Abort,
+    Print,
+    Stub,
 }
 
 fn main() -> Result<()> {
@@ -274,8 +274,8 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
             Err(e) => {
                 stderr.writeln(&format!("Pipeline error on line {}: {}", line_num, e)).unwrap_or(());
                 match config.processing.on_error {
-                    config::ErrorStrategy::FailFast => ExitCode::GeneralError.exit(),
-                    _ => continue, // Skip, EmitErrors, and DefaultValue all continue processing
+                    config::ErrorStrategy::Abort => ExitCode::GeneralError.exit(),
+                    _ => continue, // Skip, Print, and Stub all continue processing
                 }
             }
         }

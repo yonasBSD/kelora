@@ -152,7 +152,7 @@ Kelora is designed to leverage Rhai's built-in optimizations:
 - Test with sample log files in `test_data/` directory or create in `/tmp/` for development
 - Use benchmark datasets in `benchmarks/` directory for performance testing
 - Verify both correctness and performance impact of changes
-- Test error handling with all four `--on-error` strategies (skip, fail-fast, emit-errors, default-value)
+- Test error handling with all four `--on-error` strategies (skip, abort, print, stub)
 - Use `make test-full` for comprehensive testing including manual test scenarios
 
 ### Git Guidelines
@@ -224,9 +224,9 @@ alert_msg = `Error at ${meta.linenum}: ${message}`
 ### Error Handling Strategies
 Four strategies via `--on-error`:
 - `skip`: Continue processing, ignore failed lines
-- `fail-fast`: Stop on first error  
-- `emit-errors`: Print errors to stderr, continue
-- `default-value`: Use empty/default values for failed lines
+- `abort`: Stop on first error  
+- `print`: Print errors to stderr, continue
+- `stub`: Use empty/default values for failed lines
 
 ### Input/Output Format Status
 
@@ -300,7 +300,7 @@ kelora -f jsonl \
 - ✅ **JSONL/Text Output**: JSON objects and logfmt-style key=value output
 - ✅ **Expression Stages**: `--begin`, `--filter`, `--exec`, `--end` pipeline
 - ✅ **Global State Tracking**: `track_count()`, `track_min()`, `track_max()` functions
-- ✅ **Error Handling**: Four strategies (skip, fail-fast, emit-errors, default-value)
+- ✅ **Error Handling**: Four strategies (skip, abort, print, stub)
 - ✅ **Field Filtering**: `--keys` for selecting specific output fields
 - ✅ **Parallel Processing**: High-throughput batch processing with `--parallel`
 - ✅ **Threading**: Configurable worker threads and batch sizes
