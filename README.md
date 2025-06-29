@@ -10,6 +10,9 @@ Kelora is a programmable, scriptable CLI tool for turning messy, real-world logs
 # Filter any log file (default line format)
 cat /var/log/syslog | kelora --filter 'line.matches("ERROR|WARN")'
 
+# Parse syslog format (RFC3164/RFC5424)
+cat /var/log/syslog | kelora -f syslog --filter 'severity <= 3'
+
 # Filter structured logs with Rhai
 cat logs.jsonl | kelora -f jsonl --filter 'status >= 400'
 
@@ -31,7 +34,7 @@ kubectl logs app | kelora -f jsonl --filter 'level == "error"' -F text
 
 * A CLI tool for structured log transformation
 * Designed for UNIX-style pipelines — stdin in, stdout out
-* Supports JSON, logfmt, and raw lines
+* Supports JSON, logfmt, syslog, and raw lines
 * Uses [Rhai](https://rhai.rs/), a simple JavaScript-like language, to filter, mutate, and analyze logs
 * Includes built-in global state tracking (`track_*`)
 * Supports parallel and streaming modes
@@ -97,7 +100,7 @@ cargo build --release
 
 | Flag            | Purpose                                      |
 | --------------- | ---------------------------------------- |
-| `-f`            | Input format: `jsonl`, `logfmt`, `line` (default) |
+| `-f`            | Input format: `jsonl`, `logfmt`, `syslog`, `line` (default) |
 | `-F`            | Output format: `json`, `text`, `csv`   |
 | `--filter`      | Rhai filter expression (repeatable)    |
 | `--exec`        | Rhai exec scripts (repeatable)         |

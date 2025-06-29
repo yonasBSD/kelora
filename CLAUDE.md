@@ -37,6 +37,9 @@ make test-full          # Comprehensive test suite
 # Filter high response times from JSON logs
 ./target/release/kelora -f jsonl logs.jsonl --filter "response_time.sub_string(0,2).to_int() > 98"
 
+# Parse and filter syslog by severity
+./target/release/kelora -f syslog /var/log/syslog --filter 'severity <= 3'
+
 # Count status codes and track metrics
 ./target/release/kelora -f jsonl access.log --exec "track_count(status_class(status))" --end "print(tracked)"
 
@@ -51,7 +54,7 @@ make test-full          # Comprehensive test suite
 - **`src/pipeline.rs`** - Modular trait-based pipeline architecture with pluggable stages (NEW)
 - **`src/engine.rs`** - Rhai scripting engine with AST compilation, scope templates, and custom functions
 - **`src/event.rs`** - Log event data structure with smart field extraction and metadata tracking
-- **`src/parsers.rs`** - Input parsers implementing EventParser trait (JSON, line, logfmt)
+- **`src/parsers.rs`** - Input parsers implementing EventParser trait (JSON, line, logfmt, syslog)
 - **`src/formatters.rs`** - Output formatters implementing pipeline::Formatter trait (JSON and logfmt text)
 - **`src/parallel.rs`** - High-throughput parallel processing using unified pipeline architecture
 
@@ -230,7 +233,9 @@ Four strategies via `--on-error`:
 | Input Format | Status | Available Fields |
 |-------------|--------|------------------|
 | `jsonl` | ✅ | All JSON keys + `line` |
-| `line` | ❌ | `line` only |
+| `line` | ✅ | `line` only |
+| `logfmt` | ✅ | All parsed keys + `line` |
+| `syslog` | ✅ | `pri`, `facility`, `severity`, `timestamp`, `host`, `prog`, `pid`, `msgid`, `msg`, `line` |
 | `csv` | ❌ | Column headers + `line` |
 | `apache` | ❌ | `ip`, `method`, `path`, `status`, `bytes`, `line` |
 
@@ -257,6 +262,14 @@ kelora -f jsonl \
   --end 'print(`Response time range: ${tracked["min_time"]}-${tracked["max_time"]}ms`)'
 ```
 
+### Syslog Analysis
+```bash
+kelora -f syslog \
+  --filter 'severity <= 3' \
+  --exec 'track_count("errors"); track_unique("hosts", host);' \
+  --end 'print(`Errors: ${tracked["errors"]}, Hosts: ${tracked["hosts"].len()}`)'
+```
+
 ### Data Transformation
 ```bash
 kelora -f jsonl \
@@ -274,6 +287,8 @@ kelora -f jsonl \
 ### 🚀 Completed Features
 - ✅ **Core Architecture**: Rhai engine integration with AST compilation and reuse
 - ✅ **JSONL Input Format**: Full support for JSON Lines log processing
+- ✅ **Logfmt Input Format**: Key=value pair parsing with type conversion
+- ✅ **Syslog Input Format**: RFC3164/RFC5424 parsing with priority, facility, severity extraction
 - ✅ **JSONL/Text Output**: JSON objects and logfmt-style key=value output
 - ✅ **Expression Stages**: `--begin`, `--filter`, `--exec`, `--end` pipeline
 - ✅ **Global State Tracking**: `track_count()`, `track_min()`, `track_max()` functions
@@ -284,7 +299,6 @@ kelora -f jsonl \
 - ✅ **Order Preservation**: Ordered output by default, `--unordered` for speed
 
 ### 📋 TODO: Missing Input Formats
-- ❌ **Line Format Parser**: Raw text line processing
 - ❌ **CSV Format Parser**: Comma-separated values with header support
 - ❌ **Apache Format Parser**: Common Log Format and Combined Log Format
 

@@ -103,6 +103,7 @@ pub enum InputFormat {
     Jsonl,
     Line,
     Logfmt,
+    Syslog,
     Csv,
     Apache,
 }

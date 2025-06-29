@@ -92,6 +92,7 @@ impl PipelineBuilder {
             crate::InputFormat::Jsonl => Box::new(crate::parsers::JsonlParser::new()),
             crate::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
             crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
+            crate::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
             crate::InputFormat::Csv => return Err(anyhow::anyhow!("CSV parser not implemented yet")),
             crate::InputFormat::Apache => return Err(anyhow::anyhow!("Apache parser not implemented yet")),
         };
@@ -165,6 +166,7 @@ impl PipelineBuilder {
             crate::InputFormat::Jsonl => Box::new(crate::parsers::JsonlParser::new()),
             crate::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
             crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
+            crate::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
             crate::InputFormat::Csv => return Err(anyhow::anyhow!("CSV parser not implemented yet")),
             crate::InputFormat::Apache => return Err(anyhow::anyhow!("Apache parser not implemented yet")),
         };

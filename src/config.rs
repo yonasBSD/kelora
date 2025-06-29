@@ -52,6 +52,7 @@ pub enum InputFormat {
     Jsonl,
     Line,
     Logfmt,
+    Syslog,
     Csv,
     Apache,
 }
@@ -168,6 +169,7 @@ impl From<crate::InputFormat> for InputFormat {
             crate::InputFormat::Jsonl => InputFormat::Jsonl,
             crate::InputFormat::Line => InputFormat::Line,
             crate::InputFormat::Logfmt => InputFormat::Logfmt,
+            crate::InputFormat::Syslog => InputFormat::Syslog,
             crate::InputFormat::Csv => InputFormat::Csv,
             crate::InputFormat::Apache => InputFormat::Apache,
         }
@@ -180,6 +182,7 @@ impl From<InputFormat> for crate::InputFormat {
             InputFormat::Jsonl => crate::InputFormat::Jsonl,
             InputFormat::Line => crate::InputFormat::Line,
             InputFormat::Logfmt => crate::InputFormat::Logfmt,
+            InputFormat::Syslog => crate::InputFormat::Syslog,
             InputFormat::Csv => crate::InputFormat::Csv,
             InputFormat::Apache => crate::InputFormat::Apache,
         }

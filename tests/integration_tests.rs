@@ -685,3 +685,130 @@ fn test_multiline_real_world_scenario() {
         }
     }
 }
+
+#[test]
+fn test_syslog_rfc5424_parsing() {
+    let input = r#"<165>1 2023-10-11T22:14:15.003Z server01 sshd 1234 ID47 - Failed password for user alice
+<33>1 2023-10-11T22:14:16.123Z server01 nginx 5678 - - Request processed successfully"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "syslog",
+        "-F", "jsonl"
+    ], input);
+    assert_eq!(exit_code, 0, "syslog parsing should succeed");
+    
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 2, "Should parse 2 syslog lines");
+    
+    // Check first line (SSH failure)
+    let first_line: serde_json::Value = serde_json::from_str(lines[0]).expect("First line should be valid JSON");
+    assert_eq!(first_line["pri"].as_i64().unwrap(), 165);
+    assert_eq!(first_line["facility"].as_i64().unwrap(), 20); // 165 >> 3
+    assert_eq!(first_line["severity"].as_i64().unwrap(), 5);  // 165 & 7
+    assert_eq!(first_line["host"].as_str().unwrap(), "server01");
+    assert_eq!(first_line["prog"].as_str().unwrap(), "sshd");
+    assert_eq!(first_line["pid"].as_i64().unwrap(), 1234);
+    assert_eq!(first_line["msg"].as_str().unwrap(), "Failed password for user alice");
+    
+    // Check second line (nginx success)
+    let second_line: serde_json::Value = serde_json::from_str(lines[1]).expect("Second line should be valid JSON");
+    assert_eq!(second_line["pri"].as_i64().unwrap(), 33);
+    assert_eq!(second_line["facility"].as_i64().unwrap(), 4); // 33 >> 3
+    assert_eq!(second_line["severity"].as_i64().unwrap(), 1); // 33 & 7
+    assert_eq!(second_line["prog"].as_str().unwrap(), "nginx");
+    assert_eq!(second_line["pid"].as_i64().unwrap(), 5678);
+}
+
+#[test]
+fn test_syslog_rfc3164_parsing() {
+    let input = r#"Oct 11 22:14:15 server01 sshd[1234]: Failed password for user bob
+Oct 11 22:14:16 server01 kernel: CPU0: Core temperature above threshold"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "syslog",
+        "-F", "jsonl"
+    ], input);
+    assert_eq!(exit_code, 0, "syslog parsing should succeed");
+    
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 2, "Should parse 2 syslog lines");
+    
+    // Check first line (with PID)
+    let first_line: serde_json::Value = serde_json::from_str(lines[0]).expect("First line should be valid JSON");
+    assert_eq!(first_line["timestamp"].as_str().unwrap(), "Oct 11 22:14:15");
+    assert_eq!(first_line["host"].as_str().unwrap(), "server01");
+    assert_eq!(first_line["prog"].as_str().unwrap(), "sshd");
+    assert_eq!(first_line["pid"].as_i64().unwrap(), 1234);
+    assert_eq!(first_line["msg"].as_str().unwrap(), "Failed password for user bob");
+    
+    // Check second line (no PID)
+    let second_line: serde_json::Value = serde_json::from_str(lines[1]).expect("Second line should be valid JSON");
+    assert_eq!(second_line["timestamp"].as_str().unwrap(), "Oct 11 22:14:16");
+    assert_eq!(second_line["host"].as_str().unwrap(), "server01");
+    assert_eq!(second_line["prog"].as_str().unwrap(), "kernel");
+    assert_eq!(second_line["pid"], serde_json::Value::Null); // No PID for kernel messages
+    assert_eq!(second_line["msg"].as_str().unwrap(), "CPU0: Core temperature above threshold");
+}
+
+#[test]
+fn test_syslog_filtering_and_analysis() {
+    let input = r#"<165>1 2023-10-11T22:14:15.003Z server01 sshd 1234 ID47 - Failed password for user alice
+<86>1 2023-10-11T22:14:16.456Z server01 postfix 9012 - - NOQUEUE: reject: RCPT from unknown
+<33>1 2023-10-11T22:14:17.123Z server01 nginx 5678 - - Request processed successfully
+Oct 11 22:14:18 server01 sshd[1234]: Failed password for user bob
+Oct 11 22:14:19 server01 kernel: CPU0: Core temperature above threshold"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "syslog",
+        "--filter", "msg.matches(\"Failed|reject\")",
+        "--exec", "track_count(\"errors\"); track_unique(\"programs\", prog);",
+        "--end", "print(`Total errors: ${tracked[\"errors\"]}, Programs: ${tracked[\"programs\"].len()}`);"
+    ], input);
+    assert_eq!(exit_code, 0, "syslog filtering should succeed");
+    
+    // Should find 3 error messages (2 failed passwords, 1 postfix reject)
+    assert!(stdout.contains("Total errors: 3"), "Should count 3 error messages");
+    assert!(stdout.contains("Programs: 2"), "Should identify 2 different programs (sshd, postfix)");
+}
+
+#[test]
+fn test_syslog_severity_analysis() {
+    let input = r#"<165>1 2023-10-11T22:14:15.003Z server01 sshd 1234 ID47 - Failed password for user alice
+<30>1 2023-10-11T22:14:16.123Z server01 nginx 5678 - - Request processed successfully
+<11>1 2023-10-11T22:14:17.456Z server01 postgres 2345 - - Database connection established"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "syslog",
+        "--exec", "let sev_name = if severity == 5 { \"notice\" } else if severity == 6 { \"info\" } else if severity == 3 { \"error\" } else { \"other\" }; track_bucket(\"severities\", sev_name);",
+        "--end", "let counts = tracked[\"severities\"]; print(`notice: ${counts.get(\"notice\") ?? 0}, info: ${counts.get(\"info\") ?? 0}, error: ${counts.get(\"error\") ?? 0}`);"
+    ], input);
+    assert_eq!(exit_code, 0, "syslog severity analysis should succeed");
+    
+    // Verify severity distribution
+    // 165 & 7 = 5 (notice), 30 & 7 = 6 (info), 11 & 7 = 3 (error)
+    assert!(stdout.contains("notice: 1"), "Should have 1 notice message");
+    assert!(stdout.contains("info: 1"), "Should have 1 info message");  
+    assert!(stdout.contains("error: 1"), "Should have 1 error message");
+}
+
+#[test]
+fn test_syslog_with_file() {
+    let syslog_content = std::fs::read_to_string("test_data/sample.syslog")
+        .expect("Should be able to read sample syslog file");
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_file(&[
+        "-f", "syslog",
+        "--filter", "host == \"webserver\"",
+        "-F", "jsonl"
+    ], &syslog_content);
+    assert_eq!(exit_code, 0, "syslog file processing should succeed");
+    
+    // Should only show entries from webserver host
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    for line in lines {
+        if line.starts_with('{') {
+            let parsed: serde_json::Value = serde_json::from_str(line).expect("Should be valid JSON");
+            assert_eq!(parsed["host"].as_str().unwrap(), "webserver");
+        }
+    }
+}
