@@ -110,6 +110,7 @@ pub enum InputFormat {
     Syslog,
     Csv,
     Apache,
+    Nginx,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, Default)]

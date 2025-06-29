@@ -98,6 +98,7 @@ impl PipelineBuilder {
             crate::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
             crate::InputFormat::Csv => return Err(anyhow::anyhow!("CSV parser not implemented yet")),
             crate::InputFormat::Apache => Box::new(crate::parsers::ApacheParser::new()?),
+            crate::InputFormat::Nginx => Box::new(crate::parsers::NginxParser::new()?),
         };
 
         // Create formatter
@@ -178,6 +179,7 @@ impl PipelineBuilder {
             crate::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
             crate::InputFormat::Csv => return Err(anyhow::anyhow!("CSV parser not implemented yet")),
             crate::InputFormat::Apache => Box::new(crate::parsers::ApacheParser::new()?),
+            crate::InputFormat::Nginx => Box::new(crate::parsers::NginxParser::new()?),
         };
 
         // Create formatter (workers still need formatters for output)

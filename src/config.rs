@@ -56,6 +56,7 @@ pub enum InputFormat {
     Syslog,
     Csv,
     Apache,
+    Nginx,
 }
 
 /// Output format enumeration
@@ -176,6 +177,7 @@ impl From<crate::InputFormat> for InputFormat {
             crate::InputFormat::Syslog => InputFormat::Syslog,
             crate::InputFormat::Csv => InputFormat::Csv,
             crate::InputFormat::Apache => InputFormat::Apache,
+            crate::InputFormat::Nginx => InputFormat::Nginx,
         }
     }
 }
@@ -189,6 +191,7 @@ impl From<InputFormat> for crate::InputFormat {
             InputFormat::Syslog => crate::InputFormat::Syslog,
             InputFormat::Csv => crate::InputFormat::Csv,
             InputFormat::Apache => crate::InputFormat::Apache,
+            InputFormat::Nginx => crate::InputFormat::Nginx,
         }
     }
 }
