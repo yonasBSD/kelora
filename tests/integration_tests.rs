@@ -261,6 +261,67 @@ fn test_parallel_mode() {
 }
 
 #[test]
+fn test_parallel_sequential_equivalence() {
+    let input = r#"{"level": "INFO", "status": 200, "user": "alice"}
+{"level": "ERROR", "status": 500, "user": "bob"}
+{"level": "DEBUG", "status": 404, "user": "charlie"}
+{"level": "WARN", "status": 403, "user": "david"}
+{"level": "INFO", "status": 201, "user": "eve"}
+{"level": "ERROR", "status": 502, "user": "frank"}"#;
+    
+    // Run sequential mode
+    let (seq_stdout, _seq_stderr, seq_exit_code) = run_kelora_with_input(&[
+        "-f", "jsonl", 
+        "-F", "jsonl",
+        "--filter", "status >= 400",
+        "--exec", "let processed = true"
+    ], input);
+    
+    // Run parallel mode
+    let (par_stdout, _par_stderr, par_exit_code) = run_kelora_with_input(&[
+        "-f", "jsonl", 
+        "-F", "jsonl",
+        "--parallel",
+        "--threads", "2",
+        "--filter", "status >= 400", 
+        "--exec", "let processed = true"
+    ], input);
+    
+    // Both should exit successfully
+    assert_eq!(seq_exit_code, 0, "Sequential mode should exit successfully");
+    assert_eq!(par_exit_code, 0, "Parallel mode should exit successfully");
+    
+    // Parse and sort output lines for comparison (parallel may reorder)
+    let mut seq_lines: Vec<&str> = seq_stdout.trim().split('\n').filter(|l| !l.is_empty() && l.starts_with('{')).collect();
+    let mut par_lines: Vec<&str> = par_stdout.trim().split('\n').filter(|l| !l.is_empty() && l.starts_with('{')).collect();
+    
+    seq_lines.sort();
+    par_lines.sort();
+    
+    // Should have same number of results
+    assert_eq!(seq_lines.len(), par_lines.len(), "Sequential and parallel should produce same number of results");
+    
+    // Results should be functionally equivalent (same filtered and processed records)
+    for (seq_line, par_line) in seq_lines.iter().zip(par_lines.iter()) {
+        let seq_json: serde_json::Value = serde_json::from_str(seq_line).expect("Sequential output should be valid JSON");
+        let par_json: serde_json::Value = serde_json::from_str(par_line).expect("Parallel output should be valid JSON");
+        
+        // Check that key fields match
+        assert_eq!(seq_json["status"], par_json["status"], "Status should match between modes");
+        assert_eq!(seq_json["user"], par_json["user"], "User should match between modes");
+        assert_eq!(seq_json["processed"], par_json["processed"], "Processed field should match between modes");
+        
+        // Verify filtering worked correctly in both modes
+        let status = seq_json["status"].as_i64().expect("Status should be a number");
+        assert!(status >= 400, "Both modes should filter correctly");
+    }
+    
+    // Verify both modes processed the same data successfully
+    assert!(seq_lines.len() > 0, "Sequential mode should produce some output");
+    assert!(par_lines.len() > 0, "Parallel mode should produce some output");
+}
+
+#[test]
 fn test_file_input() {
     let file_content = r#"{"level": "INFO", "message": "File input test"}
 {"level": "ERROR", "message": "Another line"}"#;

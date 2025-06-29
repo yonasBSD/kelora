@@ -88,6 +88,33 @@ kelora --parallel --filter 'status >= 400'  # Large dataset processing
 
 ## Development Guidelines
 
+### Keeping Parallel and Sequential Modes in Sync
+
+Kelora has both `run_parallel()` and `run_sequential()` functions that must remain synchronized. To prevent divergence:
+
+#### Shared Abstractions (Implemented)
+- **`execute_begin_stage()`** - Shared begin stage execution with error handling
+- **`execute_end_stage()`** - Shared end stage execution with error handling  
+- **Reader helpers** - `create_parallel_reader()`, `create_sequential_reader()` for consistent file handling
+- **Common error patterns** - Both modes use identical error handling for pipeline creation and stage execution
+
+#### Testing for Equivalence
+- **`test_parallel_sequential_equivalence()`** - Integration test that verifies both modes produce identical results
+- Run this test after any changes to processing logic: `cargo test test_parallel_sequential_equivalence`
+
+#### Development Best Practices
+1. **Use shared helpers**: Always use the shared helper functions instead of duplicating logic
+2. **Update both modes**: When adding new features, ensure both processing modes support them
+3. **Test equivalence**: Run the equivalence test to verify changes don't break synchronization
+4. **Code reviews**: Check that PR changes maintain mode synchronization
+
+#### Adding New Features
+When adding features that affect log processing:
+1. Implement the feature in the shared pipeline architecture first
+2. Verify both `run_parallel()` and `run_sequential()` use the same pipeline logic
+3. Add test cases to `test_parallel_sequential_equivalence()` if needed
+4. Document any mode-specific behavior differences
+
 ### Performance Considerations
 - Pre-compile all Rhai expressions to ASTs at startup
 - Reuse scope templates instead of creating from scratch

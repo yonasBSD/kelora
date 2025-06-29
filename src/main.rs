@@ -191,10 +191,7 @@ fn run_parallel(config: &KeloraConfig, batch_size: usize, _stdout: &mut SafeStdo
     };
     
     // Execute begin stage sequentially if provided
-    if let Err(e) = begin_stage.execute(&mut ctx) {
-        stderr.writeln(&format!("Begin stage error: {}", e)).unwrap_or(());
-        ExitCode::GeneralError.exit();
-    }
+    execute_begin_stage(&begin_stage, &mut ctx, stderr);
 
     // Get reader
     let reader = create_parallel_reader(config, stderr);
@@ -212,10 +209,7 @@ fn run_parallel(config: &KeloraConfig, batch_size: usize, _stdout: &mut SafeStdo
     }
 
     // Execute end stage sequentially with merged state
-    if let Err(e) = end_stage.execute(&ctx) {
-        stderr.writeln(&format!("End stage error: {}", e)).unwrap_or(());
-        ExitCode::GeneralError.exit();
-    }
+    execute_end_stage(&end_stage, &ctx, stderr);
 }
 
 /// Run sequential processing mode
@@ -230,10 +224,7 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
     };
 
     // Execute begin stage
-    if let Err(e) = begin_stage.execute(&mut ctx) {
-        stderr.writeln(&format!("Begin stage error: {}", e)).unwrap_or(());
-        ExitCode::GeneralError.exit();
-    }
+    execute_begin_stage(&begin_stage, &mut ctx, stderr);
 
     // Get input reader
     let reader = create_sequential_reader(config, stderr);
@@ -300,10 +291,7 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
     }
 
     // Execute end stage
-    if let Err(e) = end_stage.execute(&ctx) {
-        stderr.writeln(&format!("End stage error: {}", e)).unwrap_or(());
-        ExitCode::GeneralError.exit();
-    }
+    execute_end_stage(&end_stage, &ctx, stderr);
 }
 
 /// Create a reader for parallel processing (needs to be Send)
@@ -337,6 +325,24 @@ fn create_sequential_reader(config: &KeloraConfig, stderr: &mut SafeStderr) -> B
         Box::new(BufReader::new(file))
     }
 }
+
+/// Execute begin stage with shared error handling
+fn execute_begin_stage(begin_stage: &pipeline::BeginStage, ctx: &mut pipeline::PipelineContext, stderr: &mut SafeStderr) {
+    if let Err(e) = begin_stage.execute(ctx) {
+        stderr.writeln(&format!("Begin stage error: {}", e)).unwrap_or(());
+        ExitCode::GeneralError.exit();
+    }
+}
+
+/// Execute end stage with shared error handling
+fn execute_end_stage(end_stage: &pipeline::EndStage, ctx: &pipeline::PipelineContext, stderr: &mut SafeStderr) {
+    if let Err(e) = end_stage.execute(ctx) {
+        stderr.writeln(&format!("End stage error: {}", e)).unwrap_or(());
+        ExitCode::GeneralError.exit();
+    }
+}
+
+
 
 /// Validate CLI arguments for early error detection
 fn validate_cli_args(cli: &Cli) -> Result<()> {
