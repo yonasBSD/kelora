@@ -45,11 +45,12 @@ make test-full          # Comprehensive test suite
 
 ### Core Components
 - **`src/main.rs`** - CLI interface, argument parsing, orchestrates sequential vs parallel processing
+- **`src/pipeline.rs`** - Modular trait-based pipeline architecture with pluggable stages (NEW)
 - **`src/engine.rs`** - Rhai scripting engine with AST compilation, scope templates, and custom functions
 - **`src/event.rs`** - Log event data structure with smart field extraction and metadata tracking
-- **`src/parsers.rs`** - Input parsers with trait-based design (currently JSON only)
-- **`src/formatters.rs`** - Output formatters with trait-based design (JSON and logfmt text)
-- **`src/parallel.rs`** - High-throughput parallel processing with producer-consumer architecture
+- **`src/parsers.rs`** - Input parsers implementing EventParser trait (JSON, line, logfmt)
+- **`src/formatters.rs`** - Output formatters implementing pipeline::Formatter trait (JSON and logfmt text)
+- **`src/parallel.rs`** - High-throughput parallel processing using unified pipeline architecture
 
 ### Performance Design
 Kelora follows a "compile once, evaluate repeatedly" model:
@@ -60,14 +61,18 @@ Kelora follows a "compile once, evaluate repeatedly" model:
 5. **Parallel Architecture** - Producer-consumer model with batching and thread-local state tracking
 
 ### Data Flow
-**Sequential**: Input → Parser → Event → Filter (Rhai) → Eval (Rhai) → Field Filter → Formatter → Output
-**Parallel**: Input → Batching → Worker Threads (Filter/Eval) → State Merging → Output
+**Unified Pipeline Architecture**: Both sequential and parallel modes use the same trait-based pipeline:
+- **Sequential**: Input → Pipeline.process_line() → Immediate Output  
+- **Parallel**: Input → Batching → Worker Pipelines → State Merging → Output
 
-### Processing Pipeline
-1. **Parse**: Convert input line to Event structure
-2. **Inject**: Make fields available as Rhai variables  
-3. **Execute Stages**: Run begin → filters → execs → end
-4. **Format**: Convert result to output format
+### Processing Pipeline (Trait-Based)
+The new modular pipeline processes each line through configurable stages:
+1. **LineFilter** (optional): Skip lines before parsing
+2. **Chunker**: Handle multi-line records  
+3. **EventParser**: Convert line to Event structure
+4. **ScriptStages**: Run filters → execs in sequence
+5. **EventLimiter** (optional): Implement --take N
+6. **Formatter**: Convert event to output format
 
 ### Processing Modes
 **Sequential Mode (default)**: Real-time streaming output, perfect for monitoring
