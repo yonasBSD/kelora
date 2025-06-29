@@ -39,6 +39,9 @@ make test-full          # Comprehensive test suite
 
 # Count status codes and track metrics
 ./target/release/kelora -f jsonl access.log --exec "track_count(status_class(status))" --end "print(tracked)"
+
+# Process any log file (default line format)
+./target/release/kelora /var/log/syslog --filter 'line.matches("ERROR|WARN")'
 ```
 
 ## Architecture

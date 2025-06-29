@@ -29,7 +29,7 @@ pub struct Cli {
     pub files: Vec<String>,
 
     /// Input format
-    #[arg(short = 'f', long = "format", value_enum, default_value = "jsonl")]
+    #[arg(short = 'f', long = "format", value_enum, default_value = "line")]
     pub format: InputFormat,
 
     /// Output format

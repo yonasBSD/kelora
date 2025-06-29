@@ -7,19 +7,22 @@ Kelora is a programmable, scriptable CLI tool for turning messy, real-world logs
 ## 🚀 Try It in One Line
 
 ```bash
-# Filter logs with Rhai
-cat logs.jsonl | kelora -f json --filter 'status >= 400'
+# Filter any log file (default line format)
+cat /var/log/syslog | kelora --filter 'line.matches("ERROR|WARN")'
+
+# Filter structured logs with Rhai
+cat logs.jsonl | kelora -f jsonl --filter 'status >= 400'
 
 # Enrich and transform fields
-kelora -f json --exec 'let sev = if status >= 500 { "crit" } else { "warn" };' logs.jsonl
+kelora -f jsonl --exec 'let sev = if status >= 500 { "crit" } else { "warn" };' logs.jsonl
 
 # Track max value across the stream
-kelora -f json \
+kelora -f jsonl \
   --exec 'track_max("max", duration_ms)' \
   --end 'print(`Max: ${tracked["max"]}`)' logs.jsonl
 
 # Real-time Kubernetes logs
-kubectl logs app | kelora -f json --filter 'level == "error"' -F text
+kubectl logs app | kelora -f jsonl --filter 'level == "error"' -F text
 ```
 
 ---
@@ -92,9 +95,9 @@ cargo build --release
 
 ## ✈️ CLI Overview
 
-| Flag            | Purpose                                |
-| --------------- | -------------------------------------- |
-| `-f`            | Input format: `json`, `logfmt`, `line` |
+| Flag            | Purpose                                      |
+| --------------- | ---------------------------------------- |
+| `-f`            | Input format: `jsonl`, `logfmt`, `line` (default) |
 | `-F`            | Output format: `json`, `text`, `csv`   |
 | `--filter`      | Rhai filter expression (repeatable)    |
 | `--exec`        | Rhai exec scripts (repeatable)         |
