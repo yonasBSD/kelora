@@ -229,12 +229,12 @@ impl EventParser for LogfmtParser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pipeline::EventParser;
 
     #[test]
     fn test_jsonl_parser_basic() {
         let parser = JsonlParser::new();
-        let result = parser
-            .parse(r#"{"level":"info","message":"test","count":42}"#)
+        let result = EventParser::parse(&parser, r#"{"level":"info","message":"test","count":42}"#)
             .unwrap();
 
         assert_eq!(result.level, Some("info".to_string()));
@@ -246,8 +246,7 @@ mod tests {
     #[test]
     fn test_jsonl_parser_complex() {
         let parser = JsonlParser::new();
-        let result = parser
-            .parse(r#"{"timestamp":"2023-01-01T12:00:00Z","level":"error","user":"alice","status":404}"#)
+        let result = EventParser::parse(&parser, r#"{"timestamp":"2023-01-01T12:00:00Z","level":"error","user":"alice","status":404}"#)
             .unwrap();
 
         assert_eq!(result.level, Some("error".to_string()));
@@ -261,7 +260,7 @@ mod tests {
     fn test_line_parser_basic() {
         let parser = LineParser::new();
         let test_line = "This is a simple log line";
-        let result = parser.parse(test_line).unwrap();
+        let result = EventParser::parse(&parser, test_line).unwrap();
 
         // Should have the line available as a field
         assert!(result.fields.get("line").is_some());
@@ -280,7 +279,7 @@ mod tests {
     fn test_line_parser_with_structure() {
         let parser = LineParser::new();
         let test_line = "2023-01-01 ERROR Failed to connect";
-        let result = parser.parse(test_line).unwrap();
+        let result = EventParser::parse(&parser, test_line).unwrap();
 
         // Should have the line available as a field
         assert!(result.fields.get("line").is_some());
@@ -297,8 +296,7 @@ mod tests {
     #[test]
     fn test_logfmt_parser_basic() {
         let parser = LogfmtParser::new();
-        let result = parser
-            .parse(r#"level=info message="test message" count=42"#)
+        let result = EventParser::parse(&parser, r#"level=info message="test message" count=42"#)
             .unwrap();
 
         assert_eq!(result.level, Some("info".to_string()));
@@ -310,8 +308,7 @@ mod tests {
     #[test]
     fn test_logfmt_parser_types() {
         let parser = LogfmtParser::new();
-        let result = parser
-            .parse(r#"str="hello" int=123 float=3.14 bool_true=true bool_false=false"#)
+        let result = EventParser::parse(&parser, r#"str="hello" int=123 float=3.14 bool_true=true bool_false=false"#)
             .unwrap();
 
         assert_eq!(result.fields.get("str").unwrap().clone().into_string().unwrap(), "hello");
@@ -324,8 +321,7 @@ mod tests {
     #[test]
     fn test_logfmt_parser_quoted_values() {
         let parser = LogfmtParser::new();
-        let result = parser
-            .parse(r#"key1="value with spaces" key2="value with \"quotes\"" key3=simple"#)
+        let result = EventParser::parse(&parser, r#"key1="value with spaces" key2="value with \"quotes\"" key3=simple"#)
             .unwrap();
 
         assert_eq!(result.fields.get("key1").unwrap().clone().into_string().unwrap(), "value with spaces");
@@ -336,8 +332,7 @@ mod tests {
     #[test]
     fn test_logfmt_parser_escape_sequences() {
         let parser = LogfmtParser::new();
-        let result = parser
-            .parse(r#"newline="line1\nline2" tab="col1\tcol2" backslash="back\\slash""#)
+        let result = EventParser::parse(&parser, r#"newline="line1\nline2" tab="col1\tcol2" backslash="back\\slash""#)
             .unwrap();
 
         assert_eq!(result.fields.get("newline").unwrap().clone().into_string().unwrap(), "line1\nline2");
@@ -348,8 +343,7 @@ mod tests {
     #[test]
     fn test_logfmt_parser_empty_values() {
         let parser = LogfmtParser::new();
-        let result = parser
-            .parse(r#"empty="" quoted_empty="" unquoted_value=value"#)
+        let result = EventParser::parse(&parser, r#"empty="" quoted_empty="" unquoted_value=value"#)
             .unwrap();
 
         assert_eq!(result.fields.get("empty").unwrap().clone().into_string().unwrap(), "");
@@ -360,8 +354,7 @@ mod tests {
     #[test]
     fn test_logfmt_parser_core_fields() {
         let parser = LogfmtParser::new();
-        let result = parser
-            .parse(r#"timestamp=2023-01-01T12:00:00Z level=error message="Connection failed" user=alice"#)
+        let result = EventParser::parse(&parser, r#"timestamp=2023-01-01T12:00:00Z level=error message="Connection failed" user=alice"#)
             .unwrap();
 
         // Core fields should be extracted
@@ -378,12 +371,12 @@ mod tests {
         let parser = LogfmtParser::new();
         
         // Missing equals sign
-        assert!(parser.parse("key value").is_err());
+        assert!(EventParser::parse(&parser, "key value").is_err());
         
         // Empty key
-        assert!(parser.parse("=value").is_err());
+        assert!(EventParser::parse(&parser, "=value").is_err());
         
         // Key with spaces
-        assert!(parser.parse("key with spaces=value").is_err());
+        assert!(EventParser::parse(&parser, "key with spaces=value").is_err());
     }
 }

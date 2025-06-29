@@ -354,6 +354,7 @@ impl RhaiEngine {
         // Variable resolver is not the right tool for function calls
     }
 
+    #[allow(dead_code)]
     pub fn execute_begin(&mut self, tracked: &mut HashMap<String, Dynamic>) -> Result<()> {
         if let Some(compiled) = &self.compiled_begin {
             // Set thread-local state from tracked
@@ -420,6 +421,7 @@ impl RhaiEngine {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn execute_end(&mut self, tracked: &HashMap<String, Dynamic>) -> Result<()> {
         if let Some(compiled) = &self.compiled_end {
             let mut scope = self.scope_template.clone();

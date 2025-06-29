@@ -10,12 +10,14 @@ use crate::engine::RhaiEngine;
 pub enum ScriptResult {
     Skip,
     Emit(Event),
+    #[allow(dead_code)]
     EmitMultiple(Vec<Event>), // For future emit_each() support
     Error(String),
 }
 
 impl ScriptResult {
     /// Unwrap the event from Emit variant, panics if not Emit
+    #[allow(dead_code)]
     pub fn unwrap_emit(self) -> Event {
         match self {
             ScriptResult::Emit(event) => event,
@@ -39,19 +41,22 @@ pub struct PipelineConfig {
     pub on_error: crate::ErrorStrategy,
     pub keys: Vec<String>,
     pub plain: bool,
+    #[allow(dead_code)]
     pub no_inject_fields: bool,
+    #[allow(dead_code)]
     pub inject_prefix: Option<String>,
 }
 
 /// Metadata about current processing context
 #[derive(Debug, Clone, Default)]
 pub struct MetaData {
+    #[allow(dead_code)]
     pub filename: Option<String>,
     pub line_number: Option<usize>,
 }
 
 /// Core pipeline traits
-
+///
 /// Parse raw text lines into structured events
 pub trait EventParser: Send + Sync {
     fn parse(&self, line: &str) -> Result<Event>;
@@ -90,6 +95,7 @@ pub trait Formatter: Send + Sync {
 }
 
 /// Write formatted output
+#[allow(dead_code)]
 pub trait OutputWriter: Send {
     fn write(&mut self, line: &str) -> std::io::Result<()>;
     fn flush(&mut self) -> std::io::Result<()>;
@@ -103,6 +109,7 @@ pub struct Pipeline {
     pub script_stages: Vec<Box<dyn ScriptStage>>,
     pub limiter: Option<Box<dyn EventLimiter>>,
     pub formatter: Box<dyn Formatter>,
+    #[allow(dead_code)]
     pub output: Box<dyn OutputWriter>,
     pub window_manager: Box<dyn WindowManager>,
 }
@@ -232,15 +239,10 @@ impl Pipeline {
         }
     }
 
-    /// Clone pipeline for parallel processing (each worker gets its own instance)
-    pub fn clone_for_worker(&self) -> Result<Pipeline> {
-        // This will be implemented when we refactor the existing components
-        todo!("Pipeline cloning for parallel processing")
-    }
 }
 
 /// Default implementations for pipeline stages
-
+///
 /// Simple pass-through chunker (no multi-line support)
 pub struct SimpleChunker;
 
@@ -441,6 +443,7 @@ impl EventLimiter for TakeNLimiter {
 }
 
 /// Pipeline builder for easy construction from CLI arguments
+#[derive(Clone)]
 pub struct PipelineBuilder {
     config: PipelineConfig,
     filters: Vec<String>,
@@ -507,11 +510,13 @@ impl PipelineBuilder {
         self
     }
 
+    #[allow(dead_code)]
     pub fn with_take_limit(mut self, limit: Option<usize>) -> Self {
         self.take_limit = limit;
         self
     }
 
+    /// Build a complete pipeline with begin/end stages for sequential processing
     pub fn build(self) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
 
@@ -582,6 +587,71 @@ impl PipelineBuilder {
 
         Ok((pipeline, begin_stage, end_stage, ctx))
     }
+
+    /// Build a worker pipeline for parallel processing (no begin/end stages, no output writer)
+    #[allow(dead_code)]
+    pub fn build_worker(self) -> Result<(Pipeline, PipelineContext)> {
+        let mut rhai_engine = RhaiEngine::new();
+
+        // Create parser
+        let parser: Box<dyn EventParser> = match self.input_format {
+            crate::InputFormat::Jsonl => Box::new(crate::parsers::JsonlParser::new()),
+            crate::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
+            crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
+            crate::InputFormat::Csv => return Err(anyhow::anyhow!("CSV parser not implemented yet")),
+            crate::InputFormat::Apache => return Err(anyhow::anyhow!("Apache parser not implemented yet")),
+        };
+
+        // Create formatter (workers still need formatters for output)
+        let formatter: Box<dyn Formatter> = match self.output_format {
+            crate::OutputFormat::Jsonl => Box::new(crate::formatters::JsonFormatter::new()),
+            crate::OutputFormat::Default => {
+                let use_colors = crate::tty::should_use_colors();
+                Box::new(crate::formatters::DefaultFormatter::new(use_colors, self.config.plain))
+            },
+            crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
+            crate::OutputFormat::Csv => return Err(anyhow::anyhow!("CSV formatter not implemented yet")),
+        };
+
+        // Create script stages
+        let mut script_stages: Vec<Box<dyn ScriptStage>> = Vec::new();
+        
+        if !self.filters.is_empty() {
+            let filter_stage = FilterStage::new(self.filters, &mut rhai_engine)?;
+            script_stages.push(Box::new(filter_stage));
+        }
+
+        if !self.execs.is_empty() {
+            let exec_stage = ExecStage::new(self.execs, &mut rhai_engine)?;
+            script_stages.push(Box::new(exec_stage));
+        }
+
+        // No limiter for parallel workers (limiting happens at the result sink level)
+        let limiter: Option<Box<dyn EventLimiter>> = None;
+
+        // Create pipeline context
+        let ctx = PipelineContext {
+            config: self.config,
+            tracker: HashMap::new(),
+            window: Vec::new(),
+            rhai: rhai_engine.clone(),
+            meta: MetaData::default(),
+        };
+
+        // Create worker pipeline (no output writer - results are collected by the processor)
+        let pipeline = Pipeline {
+            line_filter: None,
+            chunker: Box::new(SimpleChunker),
+            parser,
+            script_stages,
+            limiter,
+            formatter,
+            output: Box::new(StdoutWriter), // This won't actually be used in parallel mode
+            window_manager: Box::new(SimpleWindowManager::new()),
+        };
+
+        Ok((pipeline, ctx))
+    }
 }
 
 impl Default for PipelineBuilder {
@@ -592,6 +662,12 @@ impl Default for PipelineBuilder {
 
 /// Create a pipeline from CLI arguments
 pub fn create_pipeline_from_cli(cli: &crate::Cli) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
+    let builder = create_pipeline_builder_from_cli(cli);
+    builder.build()
+}
+
+/// Create a pipeline builder from CLI arguments (useful for parallel processing)
+pub fn create_pipeline_builder_from_cli(cli: &crate::Cli) -> PipelineBuilder {
     let config = PipelineConfig {
         on_error: cli.on_error.clone(),
         keys: cli.keys.clone(),
@@ -608,5 +684,4 @@ pub fn create_pipeline_from_cli(cli: &crate::Cli) -> Result<(Pipeline, BeginStag
         .with_end(cli.end.clone())
         .with_input_format(cli.format.clone())
         .with_output_format(cli.output_format.clone())
-        .build()
 }
