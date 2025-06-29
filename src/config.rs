@@ -21,6 +21,7 @@ pub struct InputConfig {
 pub struct OutputConfig {
     pub format: OutputFormat,
     pub keys: Vec<String>,
+    pub exclude_keys: Vec<String>,
     pub plain: bool,
 }
 
@@ -87,6 +88,7 @@ impl KeloraConfig {
             output: OutputConfig {
                 format: cli.output_format.clone().into(),
                 keys: cli.keys.clone(),
+                exclude_keys: cli.exclude_keys.clone(),
                 plain: cli.plain,
             },
             processing: ProcessingConfig {
@@ -130,6 +132,7 @@ impl KeloraConfig {
     }
 }
 
+
 impl Default for KeloraConfig {
     fn default() -> Self {
         Self {
@@ -140,6 +143,7 @@ impl Default for KeloraConfig {
             output: OutputConfig {
                 format: OutputFormat::Default,
                 keys: Vec::new(),
+                exclude_keys: Vec::new(),
                 plain: false,
             },
             processing: ProcessingConfig {

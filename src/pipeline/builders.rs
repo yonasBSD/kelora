@@ -28,6 +28,7 @@ impl PipelineBuilder {
             config: PipelineConfig {
                 on_error: crate::ErrorStrategy::EmitErrors,
                 keys: Vec::new(),
+                exclude_keys: Vec::new(),
                 plain: false,
                 no_inject_fields: false,
                 inject_prefix: None,
@@ -244,6 +245,7 @@ pub fn create_pipeline_builder_from_cli(cli: &crate::Cli) -> PipelineBuilder {
     let config = PipelineConfig {
         on_error: cli.on_error.clone(),
         keys: cli.keys.clone(),
+        exclude_keys: cli.exclude_keys.clone(),
         plain: cli.plain,
         no_inject_fields: cli.no_inject_fields,
         inject_prefix: cli.inject_prefix.clone(),
@@ -270,6 +272,7 @@ pub fn create_pipeline_builder_from_config(config: &crate::config::KeloraConfig)
     let pipeline_config = PipelineConfig {
         on_error: config.processing.on_error.clone().into(),
         keys: config.output.keys.clone(),
+        exclude_keys: config.output.exclude_keys.clone(),
         plain: config.output.plain,
         no_inject_fields: config.processing.no_inject_fields,
         inject_prefix: config.processing.inject_prefix.clone(),

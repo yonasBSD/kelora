@@ -50,6 +50,7 @@ pub struct PipelineContext {
 pub struct PipelineConfig {
     pub on_error: crate::ErrorStrategy,
     pub keys: Vec<String>,
+    pub exclude_keys: Vec<String>,
     pub plain: bool,
     #[allow(dead_code)]
     pub no_inject_fields: bool,
@@ -233,11 +234,34 @@ impl Pipeline {
         Ok(results)
     }
 
-    /// Apply field filtering based on --keys option
+    /// Apply field filtering based on --keys and --exclude-keys options
     fn apply_field_filtering(&self, event: &mut Event, ctx: &PipelineContext) {
-        if !ctx.config.keys.is_empty() {
-            event.filter_keys(&ctx.config.keys);
-        }
+        // Get available keys from the event
+        let available_keys: Vec<String> = event.fields.keys().cloned().collect();
+        
+        // Calculate effective keys using the same logic as OutputConfig
+        let effective_keys = if ctx.config.keys.is_empty() && ctx.config.exclude_keys.is_empty() {
+            // No filtering needed if neither keys nor exclude_keys are specified
+            return;
+        } else {
+            let mut result_keys = if ctx.config.keys.is_empty() {
+                // If no keys specified, start with all available keys
+                available_keys
+            } else {
+                // If keys specified, filter available keys to only include those
+                available_keys.iter()
+                    .filter(|key| ctx.config.keys.contains(key))
+                    .cloned()
+                    .collect()
+            };
+            
+            // Apply exclusions (higher priority)
+            result_keys.retain(|key| !ctx.config.exclude_keys.contains(key));
+            
+            result_keys
+        };
+        
+        event.filter_keys(&effective_keys);
     }
 
     /// Flush any remaining chunks from the chunker

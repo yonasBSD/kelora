@@ -73,6 +73,10 @@ pub struct Cli {
     #[arg(long = "keys", value_delimiter = ',')]
     pub keys: Vec<String>,
 
+    /// Exclude specific fields from output (comma-separated, higher priority than --keys)
+    #[arg(short = 'K', long = "exclude-keys", value_delimiter = ',')]
+    pub exclude_keys: Vec<String>,
+
     /// Output only field values (no keys), space-separated
     #[arg(long = "plain")]
     pub plain: bool,
