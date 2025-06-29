@@ -137,6 +137,93 @@ impl RhaiEngine {
         Ok(())
     }
 
+    // Individual compilation methods for pipeline stages
+    pub fn compile_filter(&mut self, filter: &str) -> Result<CompiledExpression> {
+        let ast = self.engine.compile(filter)
+            .with_context(|| format!("Failed to compile filter expression: {}", filter))?;
+        Ok(CompiledExpression {
+            ast,
+            expr: filter.to_string(),
+        })
+    }
+
+    pub fn compile_exec(&mut self, exec: &str) -> Result<CompiledExpression> {
+        let ast = self.engine.compile(exec)
+            .with_context(|| format!("Failed to compile exec script: {}", exec))?;
+        Ok(CompiledExpression {
+            ast,
+            expr: exec.to_string(),
+        })
+    }
+
+    pub fn compile_begin(&mut self, begin: &str) -> Result<CompiledExpression> {
+        let ast = self.engine.compile(begin)
+            .with_context(|| format!("Failed to compile begin expression: {}", begin))?;
+        Ok(CompiledExpression {
+            ast,
+            expr: begin.to_string(),
+        })
+    }
+
+    pub fn compile_end(&mut self, end: &str) -> Result<CompiledExpression> {
+        let ast = self.engine.compile(end)
+            .with_context(|| format!("Failed to compile end expression: {}", end))?;
+        Ok(CompiledExpression {
+            ast,
+            expr: end.to_string(),
+        })
+    }
+
+    // Individual execution methods for pipeline stages
+    pub fn execute_compiled_filter(&mut self, compiled: &CompiledExpression, event: &Event, tracked: &mut HashMap<String, Dynamic>) -> Result<bool> {
+        Self::set_thread_tracking_state(tracked);
+        let mut scope = self.create_scope_for_event(event);
+        
+        let result = self.engine.eval_ast_with_scope::<bool>(&mut scope, &compiled.ast)
+            .map_err(|e| anyhow::anyhow!("Failed to execute filter expression '{}': {}", compiled.expr, e))?;
+        
+        *tracked = Self::get_thread_tracking_state();
+        Ok(result)
+    }
+
+    pub fn execute_compiled_exec(&mut self, compiled: &CompiledExpression, event: &mut Event, tracked: &mut HashMap<String, Dynamic>) -> Result<()> {
+        Self::set_thread_tracking_state(tracked);
+        let mut scope = self.create_scope_for_event(event);
+        
+        let _ = self.engine.eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
+            .map_err(|e| anyhow::anyhow!("Failed to execute exec script '{}': {}", compiled.expr, e))?;
+
+        self.update_event_from_scope(event, &scope);
+        *tracked = Self::get_thread_tracking_state();
+        Ok(())
+    }
+
+    pub fn execute_compiled_begin(&mut self, compiled: &CompiledExpression, tracked: &mut HashMap<String, Dynamic>) -> Result<()> {
+        Self::set_thread_tracking_state(tracked);
+        let mut scope = self.scope_template.clone();
+        
+        let _ = self.engine.eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
+            .map_err(|e| anyhow::anyhow!("Failed to execute begin expression '{}': {}", compiled.expr, e))?;
+
+        *tracked = Self::get_thread_tracking_state();
+        Ok(())
+    }
+
+    pub fn execute_compiled_end(&self, compiled: &CompiledExpression, tracked: &HashMap<String, Dynamic>) -> Result<()> {
+        let mut scope = self.scope_template.clone();
+        let mut tracked_map = rhai::Map::new();
+        
+        // Convert HashMap to Rhai Map (read-only)
+        for (k, v) in tracked.iter() {
+            tracked_map.insert(k.clone().into(), v.clone());
+        }
+        scope.set_value("tracked", tracked_map);
+        
+        let _ = self.engine.eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
+            .map_err(|e| anyhow::anyhow!("Failed to execute end expression '{}': {}", compiled.expr, e))?;
+
+        Ok(())
+    }
 
     fn register_functions(engine: &mut Engine) {
         // Track functions using thread-local storage - clean user API

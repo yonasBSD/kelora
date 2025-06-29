@@ -1,9 +1,18 @@
 use crate::event::Event;
+use crate::pipeline::EventParser;
 use anyhow::{Context, Result};
 use rhai::Dynamic;
 
+// Legacy trait for backward compatibility during transition
 pub trait Parser {
     fn parse(&self, line: &str) -> Result<Event, anyhow::Error>;
+}
+
+// Blanket implementation: any EventParser is also a Parser
+impl<T: EventParser> Parser for T {
+    fn parse(&self, line: &str) -> Result<Event, anyhow::Error> {
+        EventParser::parse(self, line)
+    }
 }
 
 /// Convert serde_json::Value to rhai::Dynamic
@@ -34,8 +43,8 @@ impl JsonlParser {
     }
 }
 
-impl Parser for JsonlParser {
-    fn parse(&self, line: &str) -> Result<Event, anyhow::Error> {
+impl EventParser for JsonlParser {
+    fn parse(&self, line: &str) -> Result<Event> {
         let json_value: serde_json::Value = serde_json::from_str(line)
             .with_context(|| format!("Failed to parse JSON: {}", line))?;
 
@@ -66,8 +75,8 @@ impl LineParser {
     }
 }
 
-impl Parser for LineParser {
-    fn parse(&self, line: &str) -> Result<Event, anyhow::Error> {
+impl EventParser for LineParser {
+    fn parse(&self, line: &str) -> Result<Event> {
         // Create event with minimal capacity (just the line field)
         let mut event = Event::with_capacity(line.to_string(), 1);
         
@@ -197,8 +206,8 @@ impl LogfmtParser {
     }
 }
 
-impl Parser for LogfmtParser {
-    fn parse(&self, line: &str) -> Result<Event, anyhow::Error> {
+impl EventParser for LogfmtParser {
+    fn parse(&self, line: &str) -> Result<Event> {
         let pairs = self.parse_logfmt_pairs(line.trim())
             .map_err(|e| anyhow::anyhow!("Failed to parse logfmt: {}", e))?;
 

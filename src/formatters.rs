@@ -1,5 +1,6 @@
 use crate::event::Event;
 use crate::colors::ColorScheme;
+use crate::pipeline;
 use rhai::Dynamic;
 
 /// Utility function for logfmt-compliant string escaping
@@ -99,6 +100,13 @@ pub trait Formatter {
     fn format(&self, event: &Event) -> String;
 }
 
+// Blanket implementation: any pipeline::Formatter is also a legacy Formatter
+impl<T: pipeline::Formatter> Formatter for T {
+    fn format(&self, event: &Event) -> String {
+        pipeline::Formatter::format(self, event)
+    }
+}
+
 // JSON formatter
 pub struct JsonFormatter;
 
@@ -108,7 +116,7 @@ impl JsonFormatter {
     }
 }
 
-impl Formatter for JsonFormatter {
+impl pipeline::Formatter for JsonFormatter {
     fn format(&self, event: &Event) -> String {
         // Convert Dynamic values to JSON manually
         let mut json_obj = serde_json::Map::new();
@@ -240,7 +248,7 @@ impl DefaultFormatter {
 
 }
 
-impl Formatter for DefaultFormatter {
+impl pipeline::Formatter for DefaultFormatter {
     fn format(&self, event: &Event) -> String {
         if event.fields.is_empty() {
             return String::new();
@@ -309,7 +317,7 @@ impl LogfmtFormatter {
 
 }
 
-impl Formatter for LogfmtFormatter {
+impl pipeline::Formatter for LogfmtFormatter {
     fn format(&self, event: &Event) -> String {
         if event.fields.is_empty() {
             return String::new();

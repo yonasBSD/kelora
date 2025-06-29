@@ -1,6 +1,5 @@
 use anyhow::Result;
 use clap::Parser;
-use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader, Read};
 
 mod colors;
@@ -9,15 +8,12 @@ mod event;
 mod formatters;
 mod parallel;
 mod parsers;
+mod pipeline;
 mod tty;
 mod unix;
 
-use engine::RhaiEngine;
-use event::Event;
-use formatters::{Formatter, JsonFormatter, DefaultFormatter, LogfmtFormatter};
-use tty::should_use_colors;
 use parallel::{ParallelConfig, ParallelProcessor, ProcessRequest};
-use parsers::{JsonlParser, LineParser, LogfmtParser, Parser as LogParser};
+use pipeline::create_pipeline_from_cli;
 use unix::{ExitCode, SignalHandler, SafeStdout, SafeStderr, ProcessCleanup, check_termination};
 
 #[derive(Parser)]
@@ -148,23 +144,6 @@ fn main() -> Result<()> {
         ExitCode::InvalidUsage.exit();
     }
 
-    // Create parser based on input format
-    let parser = create_parser(&cli.format);
-
-    // Create formatter based on output format
-    let formatter = create_formatter(&cli.output_format, cli.plain);
-
-    // Create Rhai engine with custom functions
-    let mut engine = RhaiEngine::new();
-    
-    // Compile all expressions at startup
-    if let Err(e) = engine.compile_expressions(&cli.filters, &cli.execs, cli.begin.as_ref(), cli.end.as_ref()) {
-        stderr.writeln(&format!("Expression compilation error: {}", e)).unwrap_or(());
-        ExitCode::GeneralError.exit();
-    }
-
-    // Global tracking state
-    let mut tracked: HashMap<String, rhai::Dynamic> = HashMap::new();
 
     // Determine processing mode and smart defaults
     let use_parallel = cli.parallel || cli.threads > 0 || cli.batch_size.is_some();
@@ -184,8 +163,17 @@ fn main() -> Result<()> {
 
         let processor = ParallelProcessor::new(config);
         
+        // Create pipeline components for begin/end stages
+        let (_pipeline, begin_stage, end_stage, mut ctx) = match create_pipeline_from_cli(&cli) {
+            Ok(pipeline_components) => pipeline_components,
+            Err(e) => {
+                stderr.writeln(&format!("Failed to create pipeline: {}", e)).unwrap_or(());
+                ExitCode::GeneralError.exit();
+            }
+        };
+        
         // Execute begin stage sequentially if provided
-        if let Err(e) = engine.execute_begin(&mut tracked) {
+        if let Err(e) = begin_stage.execute(&mut ctx) {
             stderr.writeln(&format!("Begin stage error: {}", e)).unwrap_or(());
             ExitCode::GeneralError.exit();
         }
@@ -202,13 +190,12 @@ fn main() -> Result<()> {
         } else {
             let file = std::fs::File::open(&cli.files[0]).map_err(|e| {
                 stderr.writeln(&format!("Failed to open file '{}': {}", cli.files[0], e)).unwrap_or(());
-                
                 ExitCode::GeneralError.exit();
             }).unwrap();
             Box::new(BufReader::new(file))
         };
 
-        // Process filter and exec stages in parallel
+        // Process filter and exec stages in parallel (using legacy interface for now)
         let request = ProcessRequest {
             input_format: cli.format,
             filters: cli.filters.clone(),
@@ -221,52 +208,57 @@ fn main() -> Result<()> {
         
         if let Err(e) = processor.process(reader, request) {
             stderr.writeln(&format!("Parallel processing error: {}", e)).unwrap_or(());
-            
             ExitCode::GeneralError.exit();
         }
 
-        // Merge the parallel tracked state with our sequential tracked state
+        // Merge the parallel tracked state with our pipeline context
         let parallel_tracked = processor.get_final_tracked_state();
         for (key, dynamic_value) in parallel_tracked {
-            tracked.insert(key, dynamic_value);
+            ctx.tracker.insert(key, dynamic_value);
         }
 
         // Execute end stage sequentially with merged state
-        if let Err(e) = engine.execute_end(&tracked) {
+        if let Err(e) = end_stage.execute(&ctx) {
             stderr.writeln(&format!("End stage error: {}", e)).unwrap_or(());
-            
             ExitCode::GeneralError.exit();
         }
     } else {
-        // Sequential processing mode with proper Unix behavior
-        if let Err(e) = engine.execute_begin(&mut tracked) {
+        // Sequential processing mode using new pipeline architecture
+        let (mut pipeline, begin_stage, end_stage, mut ctx) = match create_pipeline_from_cli(&cli) {
+            Ok(pipeline_components) => pipeline_components,
+            Err(e) => {
+                stderr.writeln(&format!("Failed to create pipeline: {}", e)).unwrap_or(());
+                ExitCode::GeneralError.exit();
+            }
+        };
+
+        // Execute begin stage
+        if let Err(e) = begin_stage.execute(&mut ctx) {
             stderr.writeln(&format!("Begin stage error: {}", e)).unwrap_or(());
-            
             ExitCode::GeneralError.exit();
         }
 
+        // Get input reader
         let reader: Box<dyn BufRead> = if cli.files.is_empty() {
             Box::new(io::stdin().lock())
         } else {
             let file = std::fs::File::open(&cli.files[0]).map_err(|e| {
                 stderr.writeln(&format!("Failed to open file '{}': {}", cli.files[0], e)).unwrap_or(());
-                
                 ExitCode::GeneralError.exit();
             }).unwrap();
             Box::new(BufReader::new(file))
         };
 
+        // Process lines using pipeline
         let mut line_num = 0;
         for line_result in reader.lines() {
             // Check for termination signal between lines
             check_termination().unwrap_or_else(|_| {
-                
                 ExitCode::SignalInt.exit();
             });
 
             let line = line_result.map_err(|e| {
                 stderr.writeln(&format!("Failed to read input line: {}", e)).unwrap_or(());
-                
                 ExitCode::GeneralError.exit();
             }).unwrap();
             line_num += 1;
@@ -275,83 +267,52 @@ fn main() -> Result<()> {
                 continue;
             }
 
-            let mut event = match parser.parse(&line) {
-                Ok(event) => event,
-                Err(e) => match cli.on_error {
-                    ErrorStrategy::Skip => continue,
-                    ErrorStrategy::FailFast => {
-                        stderr.writeln(&format!("Parse error on line {}: {}", line_num, e)).unwrap_or(());
-                        
+            // Update metadata
+            ctx.meta.line_number = Some(line_num);
+            
+            // Process line through pipeline
+            match pipeline.process_line(line, &mut ctx) {
+                Ok(results) => {
+                    // Output all results (usually just one)
+                    for result in results {
+                        stdout.writeln(&result).unwrap_or_else(|e| {
+                            stderr.writeln(&format!("Output error: {}", e)).unwrap_or(());
+                            ExitCode::GeneralError.exit();
+                        });
+                    }
+                    stdout.flush().unwrap_or_else(|e| {
+                        stderr.writeln(&format!("Flush error: {}", e)).unwrap_or(());
                         ExitCode::GeneralError.exit();
+                    });
+                }
+                Err(e) => {
+                    stderr.writeln(&format!("Pipeline error on line {}: {}", line_num, e)).unwrap_or(());
+                    match cli.on_error {
+                        ErrorStrategy::FailFast => ExitCode::GeneralError.exit(),
+                        _ => continue, // Skip, EmitErrors, and DefaultValue all continue processing
                     }
-                    ErrorStrategy::EmitErrors => {
-                        stderr.writeln(&format!("Parse error on line {}: {}", line_num, e)).unwrap_or(());
-                        continue;
-                    }
-                    ErrorStrategy::DefaultValue => Event::default_with_line(line),
-                },
-            };
-
-            event.set_metadata(line_num, None);
-
-            let should_output = match engine.execute_filters(&event, &mut tracked) {
-                Ok(result) => result,
-                Err(e) => match cli.on_error {
-                    ErrorStrategy::Skip => false,
-                    ErrorStrategy::FailFast => {
-                        stderr.writeln(&format!("Filter error on line {}: {}", line_num, e)).unwrap_or(());
-                        
-                        ExitCode::GeneralError.exit();
-                    }
-                    ErrorStrategy::EmitErrors => {
-                        stderr.writeln(&format!("Filter error on line {}: {}", line_num, e)).unwrap_or(());
-                        false
-                    }
-                    ErrorStrategy::DefaultValue => true,
-                },
-            };
-
-            if !should_output {
-                continue;
-            }
-
-            if let Err(e) = engine.execute_execs(&mut event, &mut tracked) {
-                match cli.on_error {
-                    ErrorStrategy::Skip => continue,
-                    ErrorStrategy::FailFast => {
-                        stderr.writeln(&format!("Eval error on line {}: {}", line_num, e)).unwrap_or(());
-                        
-                        ExitCode::GeneralError.exit();
-                    }
-                    ErrorStrategy::EmitErrors => {
-                        stderr.writeln(&format!("Eval error on line {}: {}", line_num, e)).unwrap_or(());
-                        continue;
-                    }
-                    ErrorStrategy::DefaultValue => {}
                 }
             }
-
-            if !cli.keys.is_empty() {
-                event.filter_keys(&cli.keys);
-            }
-
-            // Safe output that handles broken pipes
-            stdout.writeln(&formatter.format(&event)).unwrap_or_else(|e| {
-                stderr.writeln(&format!("Output error: {}", e)).unwrap_or(());
-                
-                ExitCode::GeneralError.exit();
-            });
-            
-            stdout.flush().unwrap_or_else(|e| {
-                stderr.writeln(&format!("Flush error: {}", e)).unwrap_or(());
-                
-                ExitCode::GeneralError.exit();
-            });
         }
 
-        if let Err(e) = engine.execute_end(&tracked) {
+        // Flush any remaining chunks
+        match pipeline.flush(&mut ctx) {
+            Ok(results) => {
+                for result in results {
+                    stdout.writeln(&result).unwrap_or_else(|e| {
+                        stderr.writeln(&format!("Output error: {}", e)).unwrap_or(());
+                        ExitCode::GeneralError.exit();
+                    });
+                }
+            }
+            Err(e) => {
+                stderr.writeln(&format!("Pipeline flush error: {}", e)).unwrap_or(());
+            }
+        }
+
+        // Execute end stage
+        if let Err(e) = end_stage.execute(&ctx) {
             stderr.writeln(&format!("End stage error: {}", e)).unwrap_or(());
-            
             ExitCode::GeneralError.exit();
         }
     }
@@ -385,27 +346,4 @@ fn validate_cli_args(cli: &Cli) -> Result<()> {
     Ok(())
 }
 
-fn create_parser(format: &InputFormat) -> Box<dyn LogParser> {
-    match format {
-        InputFormat::Jsonl => Box::new(JsonlParser::new()),
-        InputFormat::Line => Box::new(LineParser::new()),
-        InputFormat::Logfmt => Box::new(LogfmtParser::new()),
-        InputFormat::Csv => todo!("CSV parser not implemented yet"),
-        InputFormat::Apache => todo!("Apache parser not implemented yet"),
-    }
-}
-
-fn create_formatter(format: &OutputFormat, plain: bool) -> Box<dyn Formatter> {
-    match format {
-        OutputFormat::Jsonl => Box::new(JsonFormatter::new()),
-        OutputFormat::Default => {
-            let use_colors = should_use_colors();
-            Box::new(DefaultFormatter::new(use_colors, plain))
-        },
-        OutputFormat::Logfmt => {
-            Box::new(LogfmtFormatter::new())
-        },
-        OutputFormat::Csv => todo!("CSV formatter not implemented yet"),
-    }
-}
 
