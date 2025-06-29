@@ -3,6 +3,9 @@ use crate::colors::ColorScheme;
 use crate::pipeline;
 use rhai::Dynamic;
 
+#[cfg(test)]
+use crate::pipeline::Formatter;
+
 /// Utility function for logfmt-compliant string escaping
 /// Escapes quotes, backslashes, newlines, tabs, and carriage returns
 fn escape_logfmt_string(input: &str) -> String {
@@ -96,16 +99,6 @@ fn dynamic_to_json(value: &Dynamic) -> serde_json::Value {
     }
 }
 
-pub trait Formatter {
-    fn format(&self, event: &Event) -> String;
-}
-
-// Blanket implementation: any pipeline::Formatter is also a legacy Formatter
-impl<T: pipeline::Formatter> Formatter for T {
-    fn format(&self, event: &Event) -> String {
-        pipeline::Formatter::format(self, event)
-    }
-}
 
 // JSON formatter
 pub struct JsonFormatter;

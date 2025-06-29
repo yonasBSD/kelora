@@ -60,11 +60,6 @@ impl RhaiEngine {
         })
     }
 
-    pub fn clear_thread_tracking_state() {
-        THREAD_TRACKING_STATE.with(|state| {
-            state.borrow_mut().clear();
-        });
-    }
     pub fn new() -> Self {
         let mut engine = Engine::new();
         
@@ -92,50 +87,6 @@ impl RhaiEngine {
         }
     }
 
-    pub fn compile_expressions(&mut self, 
-        filters: &[String], 
-        execs: &[String], 
-        begin: Option<&String>, 
-        end: Option<&String>
-    ) -> Result<()> {
-        for filter in filters {
-            let ast = self.engine.compile(filter)
-                .with_context(|| format!("Failed to compile filter expression: {}", filter))?;
-            self.compiled_filters.push(CompiledExpression {
-                ast,
-                expr: filter.clone(),
-            });
-        }
-
-        for exec in execs {
-            let ast = self.engine.compile(exec)
-                .with_context(|| format!("Failed to compile exec script: {}", exec))?;
-            self.compiled_execs.push(CompiledExpression {
-                ast,
-                expr: exec.clone(),
-            });
-        }
-
-        if let Some(begin_expr) = begin {
-            let ast = self.engine.compile(begin_expr)
-                .with_context(|| format!("Failed to compile begin expression: {}", begin_expr))?;
-            self.compiled_begin = Some(CompiledExpression {
-                ast,
-                expr: begin_expr.clone(),
-            });
-        }
-
-        if let Some(end_expr) = end {
-            let ast = self.engine.compile(end_expr)
-                .with_context(|| format!("Failed to compile end expression: {}", end_expr))?;
-            self.compiled_end = Some(CompiledExpression {
-                ast,
-                expr: end_expr.clone(),
-            });
-        }
-
-        Ok(())
-    }
 
     // Individual compilation methods for pipeline stages
     pub fn compile_filter(&mut self, filter: &str) -> Result<CompiledExpression> {
@@ -372,54 +323,7 @@ impl RhaiEngine {
         Ok(())
     }
 
-    pub fn execute_filters(&mut self, event: &Event, tracked: &mut HashMap<String, Dynamic>) -> Result<bool> {
-        if self.compiled_filters.is_empty() {
-            return Ok(true);
-        }
 
-        // Set thread-local state (filters don't usually modify it, but just in case)
-        Self::set_thread_tracking_state(tracked);
-        
-        let mut scope = self.create_scope_for_event(event);
-        
-        for compiled_filter in &self.compiled_filters {
-            let result = self.engine.eval_ast_with_scope::<bool>(&mut scope, &compiled_filter.ast)
-                .map_err(|e| anyhow::anyhow!("Failed to execute filter expression '{}': {}", compiled_filter.expr, e))?;
-            
-            if !result {
-                return Ok(false);
-            }
-        }
-
-        // Update tracked from thread-local state (in case filter modified it)
-        *tracked = Self::get_thread_tracking_state();
-
-        Ok(true)
-    }
-
-    pub fn execute_execs(&mut self, event: &mut Event, tracked: &mut HashMap<String, Dynamic>) -> Result<()> {
-        if self.compiled_execs.is_empty() {
-            return Ok(());
-        }
-
-        // Set thread-local state for tracking functions
-        Self::set_thread_tracking_state(tracked);
-        
-        let mut scope = self.create_scope_for_event(event);
-        
-        for compiled_exec in &self.compiled_execs {
-            let _ = self.engine.eval_ast_with_scope::<Dynamic>(&mut scope, &compiled_exec.ast)
-                .map_err(|e| anyhow::anyhow!("Failed to execute exec script '{}': {}", compiled_exec.expr, e))?;
-        }
-
-        // Update event fields from scope
-        self.update_event_from_scope(event, &scope);
-
-        // Update tracked state from thread-local storage
-        *tracked = Self::get_thread_tracking_state();
-
-        Ok(())
-    }
 
     #[allow(dead_code)]
     pub fn execute_end(&mut self, tracked: &HashMap<String, Dynamic>) -> Result<()> {

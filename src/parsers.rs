@@ -3,17 +3,6 @@ use crate::pipeline::EventParser;
 use anyhow::{Context, Result};
 use rhai::Dynamic;
 
-// Legacy trait for backward compatibility during transition
-pub trait Parser {
-    fn parse(&self, line: &str) -> Result<Event, anyhow::Error>;
-}
-
-// Blanket implementation: any EventParser is also a Parser
-impl<T: EventParser> Parser for T {
-    fn parse(&self, line: &str) -> Result<Event, anyhow::Error> {
-        EventParser::parse(self, line)
-    }
-}
 
 /// Convert serde_json::Value to rhai::Dynamic
 fn json_to_dynamic(value: &serde_json::Value) -> Dynamic {
