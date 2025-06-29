@@ -228,12 +228,16 @@ impl Default for PipelineBuilder {
 }
 
 /// Create a pipeline from CLI arguments
+/// Deprecated: Use create_pipeline_from_config instead
+#[allow(dead_code)]
 pub fn create_pipeline_from_cli(cli: &crate::Cli) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
     let builder = create_pipeline_builder_from_cli(cli);
     builder.build()
 }
 
 /// Create a pipeline builder from CLI arguments (useful for parallel processing)
+/// Deprecated: Use create_pipeline_builder_from_config instead
+#[allow(dead_code)]
 pub fn create_pipeline_builder_from_cli(cli: &crate::Cli) -> PipelineBuilder {
     let config = PipelineConfig {
         on_error: cli.on_error.clone(),
@@ -251,4 +255,30 @@ pub fn create_pipeline_builder_from_cli(cli: &crate::Cli) -> PipelineBuilder {
         .with_end(cli.end.clone())
         .with_input_format(cli.format.clone())
         .with_output_format(cli.output_format.clone())
+}
+
+/// Create a pipeline from configuration
+pub fn create_pipeline_from_config(config: &crate::config::KeloraConfig) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
+    let builder = create_pipeline_builder_from_config(config);
+    builder.build()
+}
+
+/// Create a pipeline builder from configuration (useful for parallel processing)
+pub fn create_pipeline_builder_from_config(config: &crate::config::KeloraConfig) -> PipelineBuilder {
+    let pipeline_config = PipelineConfig {
+        on_error: config.processing.on_error.clone().into(),
+        keys: config.output.keys.clone(),
+        plain: config.output.plain,
+        no_inject_fields: config.processing.no_inject_fields,
+        inject_prefix: config.processing.inject_prefix.clone(),
+    };
+
+    PipelineBuilder::new()
+        .with_config(pipeline_config)
+        .with_filters(config.processing.filters.clone())
+        .with_execs(config.processing.execs.clone())
+        .with_begin(config.processing.begin.clone())
+        .with_end(config.processing.end.clone())
+        .with_input_format(config.input.format.clone().into())
+        .with_output_format(config.output.format.clone().into())
 }

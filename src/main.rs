@@ -3,6 +3,7 @@ use clap::Parser;
 use std::io::{self, BufRead, BufReader, Read};
 
 mod colors;
+mod config;
 mod engine;
 mod event;
 mod formatters;
@@ -12,8 +13,9 @@ mod pipeline;
 mod tty;
 mod unix;
 
+use config::KeloraConfig;
 use parallel::{ParallelConfig, ParallelProcessor};
-use pipeline::{create_pipeline_from_cli, create_pipeline_builder_from_cli};
+use pipeline::{create_pipeline_from_config, create_pipeline_builder_from_config};
 use unix::{ExitCode, SignalHandler, SafeStdout, SafeStderr, ProcessCleanup, check_termination};
 
 #[derive(Parser)]
@@ -144,27 +146,29 @@ fn main() -> Result<()> {
         ExitCode::InvalidUsage.exit();
     }
 
+    // Create configuration from CLI
+    let config = KeloraConfig::from_cli(&cli);
 
-    // Determine processing mode and smart defaults
-    let use_parallel = cli.parallel || cli.threads > 0 || cli.batch_size.is_some();
+    // Determine processing mode using config
+    let use_parallel = config.should_use_parallel();
     
-    // Smart defaults based on mode
-    let batch_size = cli.batch_size.unwrap_or(1000);
+    // Get effective values from config
+    let batch_size = config.effective_batch_size();
 
     if use_parallel {
         // Parallel processing mode with proper Unix behavior
-        let config = ParallelConfig {
-            num_workers: if cli.threads == 0 { num_cpus::get() } else { cli.threads },
+        let parallel_config = ParallelConfig {
+            num_workers: config.effective_threads(),
             batch_size,
-            batch_timeout_ms: cli.batch_timeout,
-            preserve_order: !cli.no_preserve_order,
+            batch_timeout_ms: config.performance.batch_timeout,
+            preserve_order: !config.performance.no_preserve_order,
             buffer_size: Some(10000),
         };
 
-        let processor = ParallelProcessor::new(config);
+        let processor = ParallelProcessor::new(parallel_config);
         
         // Create pipeline builder and components for begin/end stages
-        let pipeline_builder = create_pipeline_builder_from_cli(&cli);
+        let pipeline_builder = create_pipeline_builder_from_config(&config);
         let (_pipeline, begin_stage, end_stage, mut ctx) = match pipeline_builder.clone().build() {
             Ok(pipeline_components) => pipeline_components,
             Err(e) => {
@@ -180,7 +184,7 @@ fn main() -> Result<()> {
         }
 
         // Get reader
-        let reader: Box<dyn BufRead + Send> = if cli.files.is_empty() {
+        let reader: Box<dyn BufRead + Send> = if config.input.files.is_empty() {
             // For stdin, we need to read all into memory first since stdin lock isn't Send
             let mut buffer = Vec::new();
             if let Err(e) = io::stdin().read_to_end(&mut buffer) {
@@ -189,8 +193,8 @@ fn main() -> Result<()> {
             }
             Box::new(std::io::Cursor::new(buffer))
         } else {
-            let file = std::fs::File::open(&cli.files[0]).map_err(|e| {
-                stderr.writeln(&format!("Failed to open file '{}': {}", cli.files[0], e)).unwrap_or(());
+            let file = std::fs::File::open(&config.input.files[0]).map_err(|e| {
+                stderr.writeln(&format!("Failed to open file '{}': {}", config.input.files[0], e)).unwrap_or(());
                 ExitCode::GeneralError.exit();
             }).unwrap();
             Box::new(BufReader::new(file))
@@ -215,7 +219,7 @@ fn main() -> Result<()> {
         }
     } else {
         // Sequential processing mode using new pipeline architecture
-        let (mut pipeline, begin_stage, end_stage, mut ctx) = match create_pipeline_from_cli(&cli) {
+        let (mut pipeline, begin_stage, end_stage, mut ctx) = match create_pipeline_from_config(&config) {
             Ok(pipeline_components) => pipeline_components,
             Err(e) => {
                 stderr.writeln(&format!("Failed to create pipeline: {}", e)).unwrap_or(());
@@ -230,11 +234,11 @@ fn main() -> Result<()> {
         }
 
         // Get input reader
-        let reader: Box<dyn BufRead> = if cli.files.is_empty() {
+        let reader: Box<dyn BufRead> = if config.input.files.is_empty() {
             Box::new(io::stdin().lock())
         } else {
-            let file = std::fs::File::open(&cli.files[0]).map_err(|e| {
-                stderr.writeln(&format!("Failed to open file '{}': {}", cli.files[0], e)).unwrap_or(());
+            let file = std::fs::File::open(&config.input.files[0]).map_err(|e| {
+                stderr.writeln(&format!("Failed to open file '{}': {}", config.input.files[0], e)).unwrap_or(());
                 ExitCode::GeneralError.exit();
             }).unwrap();
             Box::new(BufReader::new(file))
@@ -278,8 +282,8 @@ fn main() -> Result<()> {
                 }
                 Err(e) => {
                     stderr.writeln(&format!("Pipeline error on line {}: {}", line_num, e)).unwrap_or(());
-                    match cli.on_error {
-                        ErrorStrategy::FailFast => ExitCode::GeneralError.exit(),
+                    match config.processing.on_error {
+                        config::ErrorStrategy::FailFast => ExitCode::GeneralError.exit(),
                         _ => continue, // Skip, EmitErrors, and DefaultValue all continue processing
                     }
                 }
@@ -331,6 +335,31 @@ fn validate_cli_args(cli: &Cli) -> Result<()> {
     
     // Validate thread count
     if cli.threads > 1000 {
+        return Err(anyhow::anyhow!("Thread count too high (max 1000)"));
+    }
+    
+    Ok(())
+}
+
+/// Validate configuration for consistency
+#[allow(dead_code)]
+fn validate_config(config: &KeloraConfig) -> Result<()> {
+    // Check if files exist (if specified)
+    for file_path in &config.input.files {
+        if !std::path::Path::new(file_path).exists() {
+            return Err(anyhow::anyhow!("File not found: {}", file_path));
+        }
+    }
+    
+    // Validate batch size
+    if let Some(batch_size) = config.performance.batch_size {
+        if batch_size == 0 {
+            return Err(anyhow::anyhow!("Batch size must be greater than 0"));
+        }
+    }
+    
+    // Validate thread count
+    if config.performance.threads > 1000 {
         return Err(anyhow::anyhow!("Thread count too high (max 1000)"));
     }
     
