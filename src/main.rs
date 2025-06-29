@@ -151,170 +151,191 @@ fn main() -> Result<()> {
 
     // Determine processing mode using config
     let use_parallel = config.should_use_parallel();
-    
-    // Get effective values from config
-    let batch_size = config.effective_batch_size();
 
     if use_parallel {
-        // Parallel processing mode with proper Unix behavior
-        let parallel_config = ParallelConfig {
-            num_workers: config.effective_threads(),
-            batch_size,
-            batch_timeout_ms: config.performance.batch_timeout,
-            preserve_order: !config.performance.no_preserve_order,
-            buffer_size: Some(10000),
-        };
-
-        let processor = ParallelProcessor::new(parallel_config);
-        
-        // Create pipeline builder and components for begin/end stages
-        let pipeline_builder = create_pipeline_builder_from_config(&config);
-        let (_pipeline, begin_stage, end_stage, mut ctx) = match pipeline_builder.clone().build() {
-            Ok(pipeline_components) => pipeline_components,
-            Err(e) => {
-                stderr.writeln(&format!("Failed to create pipeline: {}", e)).unwrap_or(());
-                ExitCode::GeneralError.exit();
-            }
-        };
-        
-        // Execute begin stage sequentially if provided
-        if let Err(e) = begin_stage.execute(&mut ctx) {
-            stderr.writeln(&format!("Begin stage error: {}", e)).unwrap_or(());
-            ExitCode::GeneralError.exit();
-        }
-
-        // Get reader
-        let reader: Box<dyn BufRead + Send> = if config.input.files.is_empty() {
-            // For stdin, we need to read all into memory first since stdin lock isn't Send
-            let mut buffer = Vec::new();
-            if let Err(e) = io::stdin().read_to_end(&mut buffer) {
-                stderr.writeln(&format!("Failed to read from stdin: {}", e)).unwrap_or(());
-                ExitCode::GeneralError.exit();
-            }
-            Box::new(std::io::Cursor::new(buffer))
-        } else {
-            let file = std::fs::File::open(&config.input.files[0]).map_err(|e| {
-                stderr.writeln(&format!("Failed to open file '{}': {}", config.input.files[0], e)).unwrap_or(());
-                ExitCode::GeneralError.exit();
-            }).unwrap();
-            Box::new(BufReader::new(file))
-        };
-
-        // Process filter and exec stages in parallel using new pipeline architecture
-        if let Err(e) = processor.process_with_pipeline(reader, pipeline_builder) {
-            stderr.writeln(&format!("Parallel processing error: {}", e)).unwrap_or(());
-            ExitCode::GeneralError.exit();
-        }
-
-        // Merge the parallel tracked state with our pipeline context
-        let parallel_tracked = processor.get_final_tracked_state();
-        for (key, dynamic_value) in parallel_tracked {
-            ctx.tracker.insert(key, dynamic_value);
-        }
-
-        // Execute end stage sequentially with merged state
-        if let Err(e) = end_stage.execute(&ctx) {
-            stderr.writeln(&format!("End stage error: {}", e)).unwrap_or(());
-            ExitCode::GeneralError.exit();
-        }
+        // Get effective values from config for parallel mode
+        let batch_size = config.effective_batch_size();
+        run_parallel(&config, batch_size, &mut stdout, &mut stderr);
     } else {
-        // Sequential processing mode using new pipeline architecture
-        let (mut pipeline, begin_stage, end_stage, mut ctx) = match create_pipeline_from_config(&config) {
-            Ok(pipeline_components) => pipeline_components,
-            Err(e) => {
-                stderr.writeln(&format!("Failed to create pipeline: {}", e)).unwrap_or(());
-                ExitCode::GeneralError.exit();
-            }
-        };
+        run_sequential(&config, &mut stdout, &mut stderr);
+    }
 
-        // Execute begin stage
-        if let Err(e) = begin_stage.execute(&mut ctx) {
-            stderr.writeln(&format!("Begin stage error: {}", e)).unwrap_or(());
+    // Clean shutdown
+    
+    ExitCode::Success.exit();
+}
+
+/// Run parallel processing mode
+/// Note: stdout parameter is currently unused as ParallelProcessor creates its own SafeStdout,
+/// but kept for consistency with run_sequential and future flexibility
+fn run_parallel(config: &KeloraConfig, batch_size: usize, _stdout: &mut SafeStdout, stderr: &mut SafeStderr) {
+    // Parallel processing mode with proper Unix behavior
+    let parallel_config = ParallelConfig {
+        num_workers: config.effective_threads(),
+        batch_size,
+        batch_timeout_ms: config.performance.batch_timeout,
+        preserve_order: !config.performance.no_preserve_order,
+        buffer_size: Some(10000),
+    };
+
+    let processor = ParallelProcessor::new(parallel_config);
+    
+    // Create pipeline builder and components for begin/end stages
+    let pipeline_builder = create_pipeline_builder_from_config(config);
+    let (_pipeline, begin_stage, end_stage, mut ctx) = match pipeline_builder.clone().build() {
+        Ok(pipeline_components) => pipeline_components,
+        Err(e) => {
+            stderr.writeln(&format!("Failed to create pipeline: {}", e)).unwrap_or(());
             ExitCode::GeneralError.exit();
         }
+    };
+    
+    // Execute begin stage sequentially if provided
+    if let Err(e) = begin_stage.execute(&mut ctx) {
+        stderr.writeln(&format!("Begin stage error: {}", e)).unwrap_or(());
+        ExitCode::GeneralError.exit();
+    }
 
-        // Get input reader
-        let reader: Box<dyn BufRead> = if config.input.files.is_empty() {
-            Box::new(io::stdin().lock())
-        } else {
-            let file = std::fs::File::open(&config.input.files[0]).map_err(|e| {
-                stderr.writeln(&format!("Failed to open file '{}': {}", config.input.files[0], e)).unwrap_or(());
-                ExitCode::GeneralError.exit();
-            }).unwrap();
-            Box::new(BufReader::new(file))
-        };
+    // Get reader
+    let reader = create_parallel_reader(config, stderr);
 
-        // Process lines using pipeline
-        let mut line_num = 0;
-        for line_result in reader.lines() {
-            // Check for termination signal between lines
-            check_termination().unwrap_or_else(|_| {
-                ExitCode::SignalInt.exit();
-            });
+    // Process filter and exec stages in parallel using new pipeline architecture
+    if let Err(e) = processor.process_with_pipeline(reader, pipeline_builder) {
+        stderr.writeln(&format!("Parallel processing error: {}", e)).unwrap_or(());
+        ExitCode::GeneralError.exit();
+    }
 
-            let line = line_result.map_err(|e| {
-                stderr.writeln(&format!("Failed to read input line: {}", e)).unwrap_or(());
-                ExitCode::GeneralError.exit();
-            }).unwrap();
-            line_num += 1;
+    // Merge the parallel tracked state with our pipeline context
+    let parallel_tracked = processor.get_final_tracked_state();
+    for (key, dynamic_value) in parallel_tracked {
+        ctx.tracker.insert(key, dynamic_value);
+    }
 
-            if line.trim().is_empty() {
-                continue;
-            }
+    // Execute end stage sequentially with merged state
+    if let Err(e) = end_stage.execute(&ctx) {
+        stderr.writeln(&format!("End stage error: {}", e)).unwrap_or(());
+        ExitCode::GeneralError.exit();
+    }
+}
 
-            // Update metadata
-            ctx.meta.line_number = Some(line_num);
-            
-            // Process line through pipeline
-            match pipeline.process_line(line, &mut ctx) {
-                Ok(results) => {
-                    // Output all results (usually just one)
-                    for result in results {
-                        stdout.writeln(&result).unwrap_or_else(|e| {
-                            stderr.writeln(&format!("Output error: {}", e)).unwrap_or(());
-                            ExitCode::GeneralError.exit();
-                        });
-                    }
-                    stdout.flush().unwrap_or_else(|e| {
-                        stderr.writeln(&format!("Flush error: {}", e)).unwrap_or(());
-                        ExitCode::GeneralError.exit();
-                    });
-                }
-                Err(e) => {
-                    stderr.writeln(&format!("Pipeline error on line {}: {}", line_num, e)).unwrap_or(());
-                    match config.processing.on_error {
-                        config::ErrorStrategy::FailFast => ExitCode::GeneralError.exit(),
-                        _ => continue, // Skip, EmitErrors, and DefaultValue all continue processing
-                    }
-                }
-            }
+/// Run sequential processing mode
+fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut SafeStderr) {
+    // Sequential processing mode using new pipeline architecture
+    let (mut pipeline, begin_stage, end_stage, mut ctx) = match create_pipeline_from_config(config) {
+        Ok(pipeline_components) => pipeline_components,
+        Err(e) => {
+            stderr.writeln(&format!("Failed to create pipeline: {}", e)).unwrap_or(());
+            ExitCode::GeneralError.exit();
+        }
+    };
+
+    // Execute begin stage
+    if let Err(e) = begin_stage.execute(&mut ctx) {
+        stderr.writeln(&format!("Begin stage error: {}", e)).unwrap_or(());
+        ExitCode::GeneralError.exit();
+    }
+
+    // Get input reader
+    let reader = create_sequential_reader(config, stderr);
+
+    // Process lines using pipeline
+    let mut line_num = 0;
+    for line_result in reader.lines() {
+        // Check for termination signal between lines
+        check_termination().unwrap_or_else(|_| {
+            ExitCode::SignalInt.exit();
+        });
+
+        let line = line_result.map_err(|e| {
+            stderr.writeln(&format!("Failed to read input line: {}", e)).unwrap_or(());
+            ExitCode::GeneralError.exit();
+        }).unwrap();
+        line_num += 1;
+
+        if line.trim().is_empty() {
+            continue;
         }
 
-        // Flush any remaining chunks
-        match pipeline.flush(&mut ctx) {
+        // Update metadata
+        ctx.meta.line_number = Some(line_num);
+        
+        // Process line through pipeline
+        match pipeline.process_line(line, &mut ctx) {
             Ok(results) => {
+                // Output all results (usually just one)
                 for result in results {
                     stdout.writeln(&result).unwrap_or_else(|e| {
                         stderr.writeln(&format!("Output error: {}", e)).unwrap_or(());
                         ExitCode::GeneralError.exit();
                     });
                 }
+                stdout.flush().unwrap_or_else(|e| {
+                    stderr.writeln(&format!("Flush error: {}", e)).unwrap_or(());
+                    ExitCode::GeneralError.exit();
+                });
             }
             Err(e) => {
-                stderr.writeln(&format!("Pipeline flush error: {}", e)).unwrap_or(());
+                stderr.writeln(&format!("Pipeline error on line {}: {}", line_num, e)).unwrap_or(());
+                match config.processing.on_error {
+                    config::ErrorStrategy::FailFast => ExitCode::GeneralError.exit(),
+                    _ => continue, // Skip, EmitErrors, and DefaultValue all continue processing
+                }
             }
-        }
-
-        // Execute end stage
-        if let Err(e) = end_stage.execute(&ctx) {
-            stderr.writeln(&format!("End stage error: {}", e)).unwrap_or(());
-            ExitCode::GeneralError.exit();
         }
     }
 
-    // Clean shutdown
-    
-    ExitCode::Success.exit();
+    // Flush any remaining chunks
+    match pipeline.flush(&mut ctx) {
+        Ok(results) => {
+            for result in results {
+                stdout.writeln(&result).unwrap_or_else(|e| {
+                    stderr.writeln(&format!("Output error: {}", e)).unwrap_or(());
+                    ExitCode::GeneralError.exit();
+                });
+            }
+        }
+        Err(e) => {
+            stderr.writeln(&format!("Pipeline flush error: {}", e)).unwrap_or(());
+        }
+    }
+
+    // Execute end stage
+    if let Err(e) = end_stage.execute(&ctx) {
+        stderr.writeln(&format!("End stage error: {}", e)).unwrap_or(());
+        ExitCode::GeneralError.exit();
+    }
+}
+
+/// Create a reader for parallel processing (needs to be Send)
+fn create_parallel_reader(config: &KeloraConfig, stderr: &mut SafeStderr) -> Box<dyn BufRead + Send> {
+    if config.input.files.is_empty() {
+        // For stdin, we need to read all into memory first since stdin lock isn't Send
+        let mut buffer = Vec::new();
+        if let Err(e) = io::stdin().read_to_end(&mut buffer) {
+            stderr.writeln(&format!("Failed to read from stdin: {}", e)).unwrap_or(());
+            ExitCode::GeneralError.exit();
+        }
+        Box::new(std::io::Cursor::new(buffer))
+    } else {
+        let file = std::fs::File::open(&config.input.files[0]).map_err(|e| {
+            stderr.writeln(&format!("Failed to open file '{}': {}", config.input.files[0], e)).unwrap_or(());
+            ExitCode::GeneralError.exit();
+        }).unwrap();
+        Box::new(BufReader::new(file))
+    }
+}
+
+/// Create a reader for sequential processing
+fn create_sequential_reader(config: &KeloraConfig, stderr: &mut SafeStderr) -> Box<dyn BufRead> {
+    if config.input.files.is_empty() {
+        Box::new(io::stdin().lock())
+    } else {
+        let file = std::fs::File::open(&config.input.files[0]).map_err(|e| {
+            stderr.writeln(&format!("Failed to open file '{}': {}", config.input.files[0], e)).unwrap_or(());
+            ExitCode::GeneralError.exit();
+        }).unwrap();
+        Box::new(BufReader::new(file))
+    }
 }
 
 /// Validate CLI arguments for early error detection
