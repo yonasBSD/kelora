@@ -42,13 +42,15 @@ src/pipeline/
 - ✅ 100% API compatibility maintained
 - ✅ All 51 tests passing, zero clippy warnings
 
-### 2. Centralized Error Handling (Medium Priority)
+### 2. Centralized Error Handling ❌ NOT WORTH IT
 
 **Problem**: Error handling scattered across modules
 **Solution**: Centralized error hierarchy
 
+**Decision**: Not worth implementing for a CLI tool like Kelora. The current `anyhow`-based error handling is simpler and more appropriate for command-line applications where users need readable error messages, not structured error hierarchies.
+
 ```rust
-// src/errors.rs
+// src/errors.rs - NOT IMPLEMENTING
 #[derive(thiserror::Error, Debug)]
 pub enum KeloraError {
     #[error("Parse error: {0}")]
@@ -91,7 +93,7 @@ These modules are well-sized and focused:
 ## Implementation Priority
 
 1. ✅ **COMPLETED**: Split `pipeline.rs` module
-2. **Medium**: Add centralized error handling
+2. ❌ **NOT IMPLEMENTING**: Centralized error handling (not worth it for CLI tools)
 3. **Medium**: Add configuration module
 4. **Low**: Split `formatters.rs` and `parallel.rs`
 
