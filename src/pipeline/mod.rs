@@ -49,8 +49,6 @@ pub struct PipelineContext {
 #[derive(Debug, Clone)]
 pub struct PipelineConfig {
     pub on_error: crate::ErrorStrategy,
-    pub keys: Vec<String>,
-    pub exclude_keys: Vec<String>,
     pub plain: bool,
     #[allow(dead_code)]
     pub no_inject_fields: bool,
@@ -202,16 +200,14 @@ impl Pipeline {
 
             // Handle final result
             match result {
-                ScriptResult::Emit(mut event) => {
+                ScriptResult::Emit(event) => {
                     if self.limiter.as_mut().map_or(true, |l| l.allow()) {
-                        self.apply_field_filtering(&mut event, ctx);
                         results.push(self.formatter.format(&event));
                     }
                 }
                 ScriptResult::EmitMultiple(events) => {
-                    for mut event in events {
+                    for event in events {
                         if self.limiter.as_mut().map_or(true, |l| l.allow()) {
-                            self.apply_field_filtering(&mut event, ctx);
                             results.push(self.formatter.format(&event));
                         }
                     }
@@ -234,35 +230,6 @@ impl Pipeline {
         Ok(results)
     }
 
-    /// Apply field filtering based on --keys and --exclude-keys options
-    fn apply_field_filtering(&self, event: &mut Event, ctx: &PipelineContext) {
-        // Get available keys from the event
-        let available_keys: Vec<String> = event.fields.keys().cloned().collect();
-        
-        // Calculate effective keys using the same logic as OutputConfig
-        let effective_keys = if ctx.config.keys.is_empty() && ctx.config.exclude_keys.is_empty() {
-            // No filtering needed if neither keys nor exclude_keys are specified
-            return;
-        } else {
-            let mut result_keys = if ctx.config.keys.is_empty() {
-                // If no keys specified, start with all available keys
-                available_keys
-            } else {
-                // If keys specified, filter available keys to only include those
-                available_keys.iter()
-                    .filter(|key| ctx.config.keys.contains(key))
-                    .cloned()
-                    .collect()
-            };
-            
-            // Apply exclusions (higher priority)
-            result_keys.retain(|key| !ctx.config.exclude_keys.contains(key));
-            
-            result_keys
-        };
-        
-        event.filter_keys(&effective_keys);
-    }
 
     /// Flush any remaining chunks from the chunker
     pub fn flush(&mut self, ctx: &mut PipelineContext) -> Result<Vec<String>> {

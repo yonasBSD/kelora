@@ -5,7 +5,7 @@ use crate::engine::RhaiEngine;
 use super::{
     EventParser, Formatter, ScriptStage, EventLimiter, 
     Pipeline, PipelineContext, PipelineConfig, MetaData,
-    FilterStage, ExecStage, BeginStage, EndStage,
+    FilterStage, ExecStage, BeginStage, EndStage, KeyFilterStage,
     SimpleChunker, SimpleWindowManager, StdoutWriter, TakeNLimiter
 };
 
@@ -20,6 +20,8 @@ pub struct PipelineBuilder {
     input_format: crate::InputFormat,
     output_format: crate::OutputFormat,
     take_limit: Option<usize>,
+    keys: Vec<String>,
+    exclude_keys: Vec<String>,
 }
 
 impl PipelineBuilder {
@@ -27,8 +29,6 @@ impl PipelineBuilder {
         Self {
             config: PipelineConfig {
                 on_error: crate::ErrorStrategy::EmitErrors,
-                keys: Vec::new(),
-                exclude_keys: Vec::new(),
                 plain: false,
                 no_inject_fields: false,
                 inject_prefix: None,
@@ -40,6 +40,8 @@ impl PipelineBuilder {
             input_format: crate::InputFormat::Jsonl,
             output_format: crate::OutputFormat::Default,
             take_limit: None,
+            keys: Vec::new(),
+            exclude_keys: Vec::new(),
         }
     }
 
@@ -122,6 +124,12 @@ impl PipelineBuilder {
             script_stages.push(Box::new(exec_stage));
         }
 
+        // Add key filtering stage (runs after filters and execs, before formatting)
+        let key_filter_stage = KeyFilterStage::new(self.keys.clone(), self.exclude_keys.clone());
+        if key_filter_stage.is_active() {
+            script_stages.push(Box::new(key_filter_stage));
+        }
+
         // Create limiter if specified
         let limiter: Option<Box<dyn EventLimiter>> = if let Some(limit) = self.take_limit {
             Some(Box::new(TakeNLimiter::new(limit)))
@@ -196,6 +204,12 @@ impl PipelineBuilder {
             script_stages.push(Box::new(exec_stage));
         }
 
+        // Add key filtering stage (runs after filters and execs, before formatting)
+        let key_filter_stage = KeyFilterStage::new(self.keys.clone(), self.exclude_keys.clone());
+        if key_filter_stage.is_active() {
+            script_stages.push(Box::new(key_filter_stage));
+        }
+
         // No limiter for parallel workers (limiting happens at the result sink level)
         let limiter: Option<Box<dyn EventLimiter>> = None;
 
@@ -244,21 +258,22 @@ pub fn create_pipeline_from_cli(cli: &crate::Cli) -> Result<(Pipeline, BeginStag
 pub fn create_pipeline_builder_from_cli(cli: &crate::Cli) -> PipelineBuilder {
     let config = PipelineConfig {
         on_error: cli.on_error.clone(),
-        keys: cli.keys.clone(),
-        exclude_keys: cli.exclude_keys.clone(),
         plain: cli.plain,
         no_inject_fields: cli.no_inject_fields,
         inject_prefix: cli.inject_prefix.clone(),
     };
 
-    PipelineBuilder::new()
+    let mut builder = PipelineBuilder::new()
         .with_config(config)
         .with_filters(cli.filters.clone())
         .with_execs(cli.execs.clone())
         .with_begin(cli.begin.clone())
         .with_end(cli.end.clone())
         .with_input_format(cli.format.clone())
-        .with_output_format(cli.output_format.clone())
+        .with_output_format(cli.output_format.clone());
+    builder.keys = cli.keys.clone();
+    builder.exclude_keys = cli.exclude_keys.clone();
+    builder
 }
 
 /// Create a pipeline from configuration
@@ -271,19 +286,20 @@ pub fn create_pipeline_from_config(config: &crate::config::KeloraConfig) -> Resu
 pub fn create_pipeline_builder_from_config(config: &crate::config::KeloraConfig) -> PipelineBuilder {
     let pipeline_config = PipelineConfig {
         on_error: config.processing.on_error.clone().into(),
-        keys: config.output.keys.clone(),
-        exclude_keys: config.output.exclude_keys.clone(),
         plain: config.output.plain,
         no_inject_fields: config.processing.no_inject_fields,
         inject_prefix: config.processing.inject_prefix.clone(),
     };
 
-    PipelineBuilder::new()
+    let mut builder = PipelineBuilder::new()
         .with_config(pipeline_config)
         .with_filters(config.processing.filters.clone())
         .with_execs(config.processing.execs.clone())
         .with_begin(config.processing.begin.clone())
         .with_end(config.processing.end.clone())
         .with_input_format(config.input.format.clone().into())
-        .with_output_format(config.output.format.clone().into())
+        .with_output_format(config.output.format.clone().into());
+    builder.keys = config.output.keys.clone();
+    builder.exclude_keys = config.output.exclude_keys.clone();
+    builder
 }
