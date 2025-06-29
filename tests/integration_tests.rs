@@ -812,3 +812,111 @@ fn test_syslog_with_file() {
         }
     }
 }
+
+#[test]
+fn test_apache_combined_format_parsing() {
+    let input = r#"192.168.1.1 - user [25/Dec/1995:10:00:00 +0000] "GET /index.html HTTP/1.0" 200 1234 "http://www.example.com/" "Mozilla/4.08"
+127.0.0.1 - - [25/Dec/1995:10:00:01 +0000] "POST /api/data HTTP/1.1" 201 456 "-" "curl/7.68.0"
+10.0.0.1 - admin [25/Dec/1995:10:00:02 +0000] "GET /admin/dashboard HTTP/1.1" 403 - "https://admin.example.com/" "Mozilla/5.0""#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "apache",
+        "-F", "jsonl"
+    ], input);
+    assert_eq!(exit_code, 0, "Apache parsing should succeed");
+    
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 3, "Should parse 3 Apache log lines");
+    
+    // Check first line (Combined format with all fields)
+    let first_line: serde_json::Value = serde_json::from_str(lines[0]).expect("First line should be valid JSON");
+    assert_eq!(first_line["ip"].as_str().unwrap(), "192.168.1.1");
+    assert_eq!(first_line["user"].as_str().unwrap(), "user");
+    assert_eq!(first_line["method"].as_str().unwrap(), "GET");
+    assert_eq!(first_line["path"].as_str().unwrap(), "/index.html");
+    assert_eq!(first_line["protocol"].as_str().unwrap(), "HTTP/1.0");
+    assert_eq!(first_line["status"].as_i64().unwrap(), 200);
+    assert_eq!(first_line["bytes"].as_i64().unwrap(), 1234);
+    assert_eq!(first_line["referer"].as_str().unwrap(), "http://www.example.com/");
+    assert_eq!(first_line["user_agent"].as_str().unwrap(), "Mozilla/4.08");
+    
+    // Check second line (POST with dashes for user)
+    let second_line: serde_json::Value = serde_json::from_str(lines[1]).expect("Second line should be valid JSON");
+    assert_eq!(second_line["ip"].as_str().unwrap(), "127.0.0.1");
+    assert!(second_line.get("user").is_none()); // Should be null for "-"
+    assert_eq!(second_line["method"].as_str().unwrap(), "POST");
+    assert_eq!(second_line["path"].as_str().unwrap(), "/api/data");
+    assert_eq!(second_line["status"].as_i64().unwrap(), 201);
+    assert_eq!(second_line["user_agent"].as_str().unwrap(), "curl/7.68.0");
+    
+    // Check third line (403 error with no bytes)
+    let third_line: serde_json::Value = serde_json::from_str(lines[2]).expect("Third line should be valid JSON");
+    assert_eq!(third_line["status"].as_i64().unwrap(), 403);
+    assert!(third_line.get("bytes").is_none()); // Should be null for "-"
+}
+
+#[test]
+fn test_apache_common_format_parsing() {
+    let input = r#"192.168.1.1 - user [25/Dec/1995:10:00:00 +0000] "GET /index.html HTTP/1.0" 200 1234
+127.0.0.1 - - [25/Dec/1995:10:00:01 +0000] "POST /api/data HTTP/1.1" 201 456"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "apache",
+        "-F", "jsonl"
+    ], input);
+    assert_eq!(exit_code, 0, "Apache common format parsing should succeed");
+    
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 2, "Should parse 2 Apache common log lines");
+    
+    // Check that referer and user_agent fields are not present (common format)
+    for line in lines {
+        let parsed: serde_json::Value = serde_json::from_str(line).expect("Should be valid JSON");
+        assert!(parsed.get("referer").is_none(), "Common format should not have referer");
+        assert!(parsed.get("user_agent").is_none(), "Common format should not have user_agent");
+        assert!(parsed.get("ip").is_some(), "Should have IP address");
+        assert!(parsed.get("method").is_some(), "Should have HTTP method");
+        assert!(parsed.get("status").is_some(), "Should have status code");
+    }
+}
+
+#[test]
+fn test_apache_filtering_and_analysis() {
+    let input = r#"192.168.1.1 - user [25/Dec/1995:10:00:00 +0000] "GET /index.html HTTP/1.0" 200 1234 "http://www.example.com/" "Mozilla/4.08"
+127.0.0.1 - - [25/Dec/1995:10:00:01 +0000] "POST /api/data HTTP/1.1" 404 0 "-" "curl/7.68.0"
+10.0.0.1 - admin [25/Dec/1995:10:00:02 +0000] "GET /admin/dashboard HTTP/1.1" 403 - "https://admin.example.com/" "Mozilla/5.0"
+192.168.1.50 - - [25/Dec/1995:10:00:03 +0000] "GET /favicon.ico HTTP/1.1" 500 1024 "http://www.site.com/" "Safari/537.36""#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "apache",
+        "--filter", "status >= 400",
+        "--exec", "track_count(\"errors\"); track_bucket(\"methods\", method);",
+        "--end", "let methods = tracked[\"methods\"]; print(`Total errors: ${tracked[\"errors\"]}, GET: ${methods.get(\"GET\") ?? 0}, POST: ${methods.get(\"POST\") ?? 0}`);"
+    ], input);
+    assert_eq!(exit_code, 0, "Apache filtering should succeed");
+    
+    // Should find 3 error responses (404, 403, 500)
+    assert!(stdout.contains("Total errors: 3"), "Should count 3 error responses");
+    assert!(stdout.contains("GET: 2"), "Should have 2 GET errors");
+    assert!(stdout.contains("POST: 1"), "Should have 1 POST error");
+}
+
+#[test]
+fn test_apache_status_code_analysis() {
+    let input = r#"192.168.1.1 - user [25/Dec/1995:10:00:00 +0000] "GET /index.html HTTP/1.0" 200 1234 "http://www.example.com/" "Mozilla/4.08"
+127.0.0.1 - - [25/Dec/1995:10:00:01 +0000] "POST /api/data HTTP/1.1" 201 456 "-" "curl/7.68.0"
+10.0.0.1 - admin [25/Dec/1995:10:00:02 +0000] "GET /admin/dashboard HTTP/1.1" 403 - "https://admin.example.com/" "Mozilla/5.0"
+192.168.1.50 - - [25/Dec/1995:10:00:03 +0000] "GET /favicon.ico HTTP/1.1" 500 1024 "http://www.site.com/" "Safari/537.36""#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "apache",
+        "--exec", "let class = if status < 300 { \"2xx\" } else if status < 400 { \"3xx\" } else if status < 500 { \"4xx\" } else { \"5xx\" }; track_bucket(\"status_classes\", class);",
+        "--end", "let classes = tracked[\"status_classes\"]; print(`2xx: ${classes.get(\"2xx\") ?? 0}, 4xx: ${classes.get(\"4xx\") ?? 0}, 5xx: ${classes.get(\"5xx\") ?? 0}`);"
+    ], input);
+    assert_eq!(exit_code, 0, "Apache status code analysis should succeed");
+    
+    // Verify status code distribution: 200, 201 (2xx), 403 (4xx), 500 (5xx)
+    assert!(stdout.contains("2xx: 2"), "Should have 2 success responses");
+    assert!(stdout.contains("4xx: 1"), "Should have 1 client error");
+    assert!(stdout.contains("5xx: 1"), "Should have 1 server error");
+}

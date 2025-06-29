@@ -237,7 +237,7 @@ Four strategies via `--on-error`:
 | `logfmt` | ✅ | All parsed keys + `line` |
 | `syslog` | ✅ | `pri`, `facility`, `severity`, `timestamp`, `host`, `prog`, `pid`, `msgid`, `msg`, `line` |
 | `csv` | ❌ | Column headers + `line` |
-| `apache` | ❌ | `ip`, `method`, `path`, `status`, `bytes`, `line` |
+| `apache` | ✅ | `ip`, `identity`, `user`, `timestamp`, `request`, `method`, `path`, `protocol`, `status`, `bytes`, `referer`, `user_agent`, `line` |
 
 | Output Format | Status | Description |
 |--------------|--------|-------------|
@@ -270,6 +270,14 @@ kelora -f syslog \
   --end 'print(`Errors: ${tracked["errors"]}, Hosts: ${tracked["hosts"].len()}`)'
 ```
 
+### Apache Log Analysis
+```bash
+kelora -f apache access.log \
+  --filter 'status >= 400' \
+  --exec 'track_count("errors"); track_bucket("methods", method)' \
+  --end 'print(`Errors: ${tracked["errors"]}, by method: ${tracked["methods"]}`)'
+```
+
 ### Data Transformation
 ```bash
 kelora -f jsonl \
@@ -297,10 +305,10 @@ kelora -f jsonl \
 - ✅ **Parallel Processing**: High-throughput batch processing with `--parallel`
 - ✅ **Threading**: Configurable worker threads and batch sizes
 - ✅ **Order Preservation**: Ordered output by default, `--unordered` for speed
+- ✅ **Apache Format Parser**: Common Log Format and Combined Log Format with method/path/protocol extraction
 
 ### 📋 TODO: Missing Input Formats
 - ❌ **CSV Format Parser**: Comma-separated values with header support
-- ❌ **Apache Format Parser**: Common Log Format and Combined Log Format
 
 ### 📋 TODO: Missing Output Formats  
 - ❌ **CSV Output Formatter**: Comma-separated values output
