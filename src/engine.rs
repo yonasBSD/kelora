@@ -287,6 +287,82 @@ impl RhaiEngine {
             text.parse::<f64>().map(Dynamic::from).unwrap_or(Dynamic::UNIT)
         });
 
+        engine.register_fn("slice", |s: &str, spec: &str| -> String {
+            let chars: Vec<char> = s.chars().collect();
+            let len = chars.len() as i32;
+            
+            if len == 0 {
+                return String::new();
+            }
+
+            let parts: Vec<&str> = spec.split(':').collect();
+            
+            // Parse step first
+            let step = if parts.len() > 2 && !parts[2].trim().is_empty() {
+                parts[2].trim().parse::<i32>().unwrap_or(1)
+            } else {
+                1
+            };
+            
+            if step == 0 {
+                return String::new();
+            }
+            
+            // Determine defaults based on step direction
+            let (default_start, default_end) = if step > 0 {
+                (0, len)
+            } else {
+                (len - 1, -1)
+            };
+            
+            // Parse start
+            let start = if !parts.is_empty() && !parts[0].trim().is_empty() {
+                let mut s = parts[0].trim().parse::<i32>().unwrap_or(default_start);
+                if s < 0 { s += len; }
+                if step > 0 {
+                    s.clamp(0, len)
+                } else {
+                    s.clamp(0, len - 1)
+                }
+            } else {
+                default_start
+            };
+            
+            // Parse end
+            let end = if parts.len() > 1 && !parts[1].trim().is_empty() {
+                let mut e = parts[1].trim().parse::<i32>().unwrap_or(default_end);
+                if e < 0 { e += len; }
+                if step > 0 {
+                    e.clamp(0, len)
+                } else {
+                    e.clamp(-1, len - 1)
+                }
+            } else {
+                default_end
+            };
+            
+            let mut result = String::new();
+            let mut i = start;
+            
+            if step > 0 {
+                while i < end {
+                    if i >= 0 && i < len {
+                        result.push(chars[i as usize]);
+                    }
+                    i += step;
+                }
+            } else {
+                while i > end {
+                    if i >= 0 && i < len {
+                        result.push(chars[i as usize]);
+                    }
+                    i += step;
+                }
+            }
+            
+            result
+        });
+
         // Log analysis functions
         engine.register_fn("status_class", |status: i64| -> String {
             match status {
@@ -390,4 +466,195 @@ impl RhaiEngine {
         name.chars().all(|c| c.is_alphanumeric() || c == '_')
     }
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper function to test slice functionality
+    fn test_slice(input: &str, spec: &str) -> String {
+        let mut engine = Engine::new();
+        engine.register_fn("slice", |s: &str, spec: &str| -> String {
+            let chars: Vec<char> = s.chars().collect();
+            let len = chars.len() as i32;
+            
+            if len == 0 {
+                return String::new();
+            }
+
+            let parts: Vec<&str> = spec.split(':').collect();
+            
+            // Parse step first
+            let step = if parts.len() > 2 && !parts[2].trim().is_empty() {
+                parts[2].trim().parse::<i32>().unwrap_or(1)
+            } else {
+                1
+            };
+            
+            if step == 0 {
+                return String::new();
+            }
+            
+            // Determine defaults based on step direction
+            let (default_start, default_end) = if step > 0 {
+                (0, len)
+            } else {
+                (len - 1, -1)
+            };
+            
+            // Parse start
+            let start = if !parts.is_empty() && !parts[0].trim().is_empty() {
+                let mut s = parts[0].trim().parse::<i32>().unwrap_or(default_start);
+                if s < 0 { s += len; }
+                if step > 0 {
+                    s.clamp(0, len)
+                } else {
+                    s.clamp(0, len - 1)
+                }
+            } else {
+                default_start
+            };
+            
+            // Parse end
+            let end = if parts.len() > 1 && !parts[1].trim().is_empty() {
+                let mut e = parts[1].trim().parse::<i32>().unwrap_or(default_end);
+                if e < 0 { e += len; }
+                if step > 0 {
+                    e.clamp(0, len)
+                } else {
+                    e.clamp(-1, len - 1)
+                }
+            } else {
+                default_end
+            };
+            
+            let mut result = String::new();
+            let mut i = start;
+            
+            if step > 0 {
+                while i < end {
+                    if i >= 0 && i < len {
+                        result.push(chars[i as usize]);
+                    }
+                    i += step;
+                }
+            } else {
+                while i > end {
+                    if i >= 0 && i < len {
+                        result.push(chars[i as usize]);
+                    }
+                    i += step;
+                }
+            }
+            
+            result
+        });
+
+        let mut scope = rhai::Scope::new();
+        scope.push("text", input.to_string());
+        
+        engine.eval_with_scope::<String>(&mut scope, &format!("text.slice(\"{}\")", spec)).unwrap()
+    }
+
+    #[test]
+    fn test_slice_basic_forward() {
+        assert_eq!(test_slice("hello", "0:3"), "hel");
+        assert_eq!(test_slice("hello", "1:4"), "ell");
+        assert_eq!(test_slice("hello", "2:5"), "llo");
+    }
+
+    #[test]
+    fn test_slice_from_start() {
+        assert_eq!(test_slice("hello", ":3"), "hel");
+        assert_eq!(test_slice("hello", ":0"), "");
+        assert_eq!(test_slice("hello", ":5"), "hello");
+    }
+
+    #[test]
+    fn test_slice_to_end() {
+        assert_eq!(test_slice("hello", "2:"), "llo");
+        assert_eq!(test_slice("hello", "0:"), "hello");
+        assert_eq!(test_slice("hello", "5:"), "");
+    }
+
+    #[test]
+    fn test_slice_negative_indices() {
+        assert_eq!(test_slice("hello", "-3:"), "llo");
+        assert_eq!(test_slice("hello", ":-2"), "hel");
+        assert_eq!(test_slice("hello", "-3:-1"), "ll");
+        assert_eq!(test_slice("hello", "-1:"), "o");
+    }
+
+    #[test]
+    fn test_slice_step() {
+        assert_eq!(test_slice("hello", "::2"), "hlo");
+        assert_eq!(test_slice("hello", "1::2"), "el");
+        assert_eq!(test_slice("hello", "::3"), "hl");
+        assert_eq!(test_slice("abcdefg", "1:6:2"), "bdf");
+    }
+
+    #[test]
+    fn test_slice_reverse() {
+        assert_eq!(test_slice("hello", "::-1"), "olleh");
+        assert_eq!(test_slice("abc", "::-1"), "cba");
+        assert_eq!(test_slice("a", "::-1"), "a");
+    }
+
+    #[test]
+    fn test_slice_reverse_with_bounds() {
+        assert_eq!(test_slice("hello", "4:1:-1"), "oll");
+        assert_eq!(test_slice("hello", "3::-1"), "lleh");
+        assert_eq!(test_slice("hello", ":2:-1"), "ol");
+    }
+
+    #[test]
+    fn test_slice_edge_cases() {
+        // Empty string
+        assert_eq!(test_slice("", "0:1"), "");
+        assert_eq!(test_slice("", "::-1"), "");
+        
+        // Single character
+        assert_eq!(test_slice("a", "0:1"), "a");
+        assert_eq!(test_slice("a", "::-1"), "a");
+        
+        // Out of bounds indices
+        assert_eq!(test_slice("hello", "10:20"), "");
+        assert_eq!(test_slice("hello", "-10:2"), "he");
+        assert_eq!(test_slice("hello", "2:10"), "llo");
+        
+        // Same start and end
+        assert_eq!(test_slice("hello", "2:2"), "");
+        
+        // Start greater than end (forward step)
+        assert_eq!(test_slice("hello", "4:2"), "");
+    }
+
+    #[test]
+    fn test_slice_unicode() {
+        // Test with Unicode characters
+        assert_eq!(test_slice("héllo", "0:2"), "hé");
+        assert_eq!(test_slice("héllo", "::-1"), "olléh");
+        assert_eq!(test_slice("🌟⭐✨", "1:3"), "⭐✨");
+        assert_eq!(test_slice("🌟⭐✨", "::-1"), "✨⭐🌟");
+    }
+
+    #[test]
+    fn test_slice_zero_step() {
+        // Zero step should return empty string
+        assert_eq!(test_slice("hello", "::0"), "");
+    }
+
+    #[test]
+    fn test_slice_large_step() {
+        assert_eq!(test_slice("hello", "::10"), "h");
+        assert_eq!(test_slice("hello", "1::10"), "e");
+    }
+
+    #[test]
+    fn test_slice_negative_step_edge_cases() {
+        assert_eq!(test_slice("hello", "1::-2"), "e");
+        assert_eq!(test_slice("hello", ":1:-2"), "ol");
+        assert_eq!(test_slice("hello", "3:0:-2"), "le");
+    }
 }

@@ -213,6 +213,12 @@ kelora --filter 'event["user-name"] == "admin"'
 text.matches("ERROR|WARN")        // Regex match
 text.replace("\\d+", "XXX")       // Regex replace  
 text.extract("https?://([^/]+)")  // Extract capture group
+text.slice("0:5")                 // Python-style slicing: first 5 chars
+text.slice("6:")                  // From index 6 to end
+text.slice(":-5")                 // All but last 5 chars
+text.slice("::2")                 // Every 2nd character
+text.slice("-5:-1")               // Last 5 chars except the very last
+text.slice("::-1")                // Full reverse
 text.to_int()                     // Parse integer
 text.to_float()                   // Parse float
 ```
