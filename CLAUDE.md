@@ -48,6 +48,11 @@ make test-full          # Comprehensive test suite
 
 # Process gzip compressed log files (useful for log rotation)
 ./target/release/kelora --decompress -f jsonl logs.jsonl.gz --filter "status >= 400"
+
+# Process multiple files with different ordering
+./target/release/kelora -f jsonl file1.jsonl file2.jsonl file3.jsonl  # CLI order (default)
+./target/release/kelora -f jsonl --file-order name *.jsonl            # Alphabetical order
+./target/release/kelora -f jsonl --file-order mtime *.jsonl           # Modification time order
 ```
 
 ## Architecture
@@ -324,6 +329,7 @@ unzip logs.zip && kelora -f jsonl extracted_file.log
 - ✅ **Order Preservation**: Ordered output by default, `--unordered` for speed
 - ✅ **Apache Format Parser**: Common Log Format and Combined Log Format with method/path/protocol extraction
 - ✅ **Gzip Decompression**: Streaming decompression of `.gz` files for log rotation scenarios
+- ✅ **Multiple Input Files**: Process multiple files with configurable ordering (CLI order, alphabetical, modification time)
 
 ### 📋 TODO: Missing Input Formats
 - ❌ **CSV Format Parser**: Comma-separated values with header support
@@ -364,6 +370,7 @@ track_bucket(tracked, "status", code)    // Count by value
 
 ### ✅ Implemented CLI Options
 - ✅ **`--decompress`**: Decompress `.gz` files (ZIP files not supported, use manual extraction)
+- ✅ **`--file-order`**: File processing order (none, name, mtime)
 
 ### 📋 TODO: Development Tasks
 - ❌ **Unit Tests**: Comprehensive test suite for all components
@@ -372,7 +379,6 @@ track_bucket(tracked, "status", code)    // Count by value
 - ❌ **Documentation**: User guide and API documentation
 
 ### 📋 TODO: Advanced Features
-- ❌ **Multiple File Support**: Process multiple input files
 - ❌ **Streaming Timeout Logic**: True timeout-based batching for sparse streams
 - ❌ **Memory Management**: Resource limits and cleanup
 - ❌ **Configuration Files**: YAML/TOML config file support

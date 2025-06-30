@@ -15,6 +15,7 @@ pub struct InputConfig {
     pub files: Vec<String>,
     pub format: InputFormat,
     pub decompress: bool,
+    pub file_order: FileOrder,
 }
 
 /// Output configuration
@@ -79,6 +80,14 @@ pub enum ErrorStrategy {
     Stub,
 }
 
+/// File processing order
+#[derive(ValueEnum, Clone, Debug)]
+pub enum FileOrder {
+    None,
+    Name,
+    Mtime,
+}
+
 impl KeloraConfig {
     /// Create configuration from CLI arguments
     pub fn from_cli(cli: &crate::Cli) -> Self {
@@ -87,6 +96,7 @@ impl KeloraConfig {
                 files: cli.files.clone(),
                 format: cli.format.clone().into(),
                 decompress: cli.decompress,
+                file_order: cli.file_order.clone().into(),
             },
             output: OutputConfig {
                 format: cli.output_format.clone().into(),
@@ -143,6 +153,7 @@ impl Default for KeloraConfig {
                 files: Vec::new(),
                 format: InputFormat::Jsonl,
                 decompress: false,
+                file_order: FileOrder::None,
             },
             output: OutputConfig {
                 format: OutputFormat::Default,
@@ -239,6 +250,26 @@ impl From<ErrorStrategy> for crate::ErrorStrategy {
             ErrorStrategy::Abort => crate::ErrorStrategy::Abort,
             ErrorStrategy::Print => crate::ErrorStrategy::Print,
             ErrorStrategy::Stub => crate::ErrorStrategy::Stub,
+        }
+    }
+}
+
+impl From<crate::FileOrder> for FileOrder {
+    fn from(order: crate::FileOrder) -> Self {
+        match order {
+            crate::FileOrder::None => FileOrder::None,
+            crate::FileOrder::Name => FileOrder::Name,
+            crate::FileOrder::Mtime => FileOrder::Mtime,
+        }
+    }
+}
+
+impl From<FileOrder> for crate::FileOrder {
+    fn from(order: FileOrder) -> Self {
+        match order {
+            FileOrder::None => crate::FileOrder::None,
+            FileOrder::Name => crate::FileOrder::Name,
+            FileOrder::Mtime => crate::FileOrder::Mtime,
         }
     }
 }

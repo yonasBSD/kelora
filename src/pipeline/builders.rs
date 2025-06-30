@@ -1,6 +1,7 @@
 use anyhow::Result;
 use std::collections::HashMap;
 use std::io::{self, BufRead};
+use std::fs;
 
 use crate::engine::RhaiEngine;
 use crate::decompression::DecompressionReader;
@@ -308,6 +309,23 @@ pub fn create_pipeline_builder_from_config(config: &crate::config::KeloraConfig)
     builder
 }
 
+/// Create concatenated content from multiple files for parallel processing
+fn read_all_files_to_memory(files: &[String], decompress: bool) -> Result<Vec<u8>> {
+    let mut all_content = Vec::new();
+    
+    for file_path in files {
+        let mut reader = DecompressionReader::new(file_path, decompress)?;
+        io::Read::read_to_end(&mut reader, &mut all_content)?;
+        
+        // Add a newline between files if the last file doesn't end with one
+        if !all_content.is_empty() && all_content[all_content.len() - 1] != b'\n' {
+            all_content.push(b'\n');
+        }
+    }
+    
+    Ok(all_content)
+}
+
 /// Create input reader with optional decompression
 pub fn create_input_reader(config: &crate::config::KeloraConfig) -> Result<Box<dyn BufRead + Send>> {
     if config.input.files.is_empty() {
@@ -316,19 +334,48 @@ pub fn create_input_reader(config: &crate::config::KeloraConfig) -> Result<Box<d
         std::io::Read::read_to_end(&mut io::stdin(), &mut buffer)?;
         Ok(Box::new(std::io::Cursor::new(buffer)))
     } else {
-        let file_path = &config.input.files[0];
-        let reader = DecompressionReader::new(file_path, config.input.decompress)?;
-        Ok(Box::new(reader))
+        let sorted_files = sort_files(&config.input.files, &config.input.file_order)?;
+        let all_content = read_all_files_to_memory(&sorted_files, config.input.decompress)?;
+        Ok(Box::new(std::io::Cursor::new(all_content)))
     }
 }
+
+/// Sort files according to the specified file order
+fn sort_files(files: &[String], order: &crate::config::FileOrder) -> Result<Vec<String>> {
+    let mut sorted_files = files.to_vec();
+    
+    match order {
+        crate::config::FileOrder::None => {
+            // Keep CLI order - no sorting needed
+        }
+        crate::config::FileOrder::Name => {
+            sorted_files.sort();
+        }
+        crate::config::FileOrder::Mtime => {
+            // Sort by modification time (oldest first)
+            sorted_files.sort_by(|a, b| {
+                let mtime_a = fs::metadata(a)
+                    .and_then(|m| m.modified())
+                    .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                let mtime_b = fs::metadata(b)
+                    .and_then(|m| m.modified())
+                    .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                mtime_a.cmp(&mtime_b)
+            });
+        }
+    }
+    
+    Ok(sorted_files)
+}
+
 
 /// Create input reader for sequential processing (doesn't need to be Send)
 pub fn create_sequential_input_reader(config: &crate::config::KeloraConfig) -> Result<Box<dyn BufRead>> {
     if config.input.files.is_empty() {
         Ok(Box::new(io::stdin().lock()))
     } else {
-        let file_path = &config.input.files[0];
-        let reader = DecompressionReader::new(file_path, config.input.decompress)?;
-        Ok(Box::new(reader))
+        let sorted_files = sort_files(&config.input.files, &config.input.file_order)?;
+        let all_content = read_all_files_to_memory(&sorted_files, config.input.decompress)?;
+        Ok(Box::new(std::io::Cursor::new(all_content)))
     }
 }

@@ -29,6 +29,11 @@ kubectl logs app | kelora -f jsonl --filter 'level == "error"' -F text
 
 # Process compressed log files (log rotation)
 kelora --decompress -f jsonl app.log.1.gz --filter 'status >= 400'
+
+# Process multiple files with different ordering
+kelora -f jsonl file1.jsonl file2.jsonl file3.jsonl  # CLI order (default)
+kelora -f jsonl --file-order name *.jsonl            # Alphabetical order
+kelora -f jsonl --file-order mtime *.jsonl           # Modification time order
 ```
 
 ---
@@ -42,6 +47,7 @@ kelora --decompress -f jsonl app.log.1.gz --filter 'status >= 400'
 * Includes built-in global state tracking (`track_*`)
 * Supports parallel and streaming modes
 * Built-in gzip decompression for log rotation scenarios
+* Multiple input file support with flexible ordering options
 
 ---
 
@@ -114,6 +120,7 @@ cargo build --release
 | `--parallel`    | Enable parallel batch mode             |
 | `--unordered`   | Drop output order for performance      |
 | `--decompress`  | Decompress `.gz` files (log rotation)  |
+| `--file-order`  | File processing order: `none`, `name`, `mtime` |
 
 ---
 

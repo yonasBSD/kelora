@@ -105,6 +105,10 @@ pub struct Cli {
     /// Decompress *.gz files before processing
     #[arg(long = "decompress")]
     pub decompress: bool,
+
+    /// File processing order: none (CLI order), name (alphabetical), mtime (modification time, oldest first)
+    #[arg(long = "file-order", value_enum, default_value = "none")]
+    pub file_order: FileOrder,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -133,6 +137,13 @@ pub enum ErrorStrategy {
     Abort,
     Print,
     Stub,
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub enum FileOrder {
+    None,
+    Name,
+    Mtime,
 }
 
 fn main() -> Result<()> {
