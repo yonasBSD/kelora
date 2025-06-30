@@ -309,11 +309,23 @@ pub fn create_pipeline_builder_from_config(config: &crate::config::KeloraConfig)
     builder
 }
 
+/// Determine if a file should be decompressed based on config and filename
+fn should_decompress_file(file_path: &str, config: &crate::config::KeloraConfig) -> bool {
+    if config.input.rotated_logs {
+        // Auto-detect: decompress .gz files, leave others as-is
+        file_path.ends_with(".gz")
+    } else {
+        // Use global decompress setting for all files
+        config.input.decompress
+    }
+}
+
 /// Create concatenated content from multiple files for parallel processing
-fn read_all_files_to_memory(files: &[String], decompress: bool) -> Result<Vec<u8>> {
+fn read_all_files_to_memory(files: &[String], config: &crate::config::KeloraConfig) -> Result<Vec<u8>> {
     let mut all_content = Vec::new();
     
     for file_path in files {
+        let decompress = should_decompress_file(file_path, config);
         let mut reader = DecompressionReader::new(file_path, decompress)?;
         io::Read::read_to_end(&mut reader, &mut all_content)?;
         
@@ -335,7 +347,7 @@ pub fn create_input_reader(config: &crate::config::KeloraConfig) -> Result<Box<d
         Ok(Box::new(std::io::Cursor::new(buffer)))
     } else {
         let sorted_files = sort_files(&config.input.files, &config.input.file_order)?;
-        let all_content = read_all_files_to_memory(&sorted_files, config.input.decompress)?;
+        let all_content = read_all_files_to_memory(&sorted_files, config)?;
         Ok(Box::new(std::io::Cursor::new(all_content)))
     }
 }
@@ -375,7 +387,7 @@ pub fn create_sequential_input_reader(config: &crate::config::KeloraConfig) -> R
         Ok(Box::new(io::stdin().lock()))
     } else {
         let sorted_files = sort_files(&config.input.files, &config.input.file_order)?;
-        let all_content = read_all_files_to_memory(&sorted_files, config.input.decompress)?;
+        let all_content = read_all_files_to_memory(&sorted_files, config)?;
         Ok(Box::new(std::io::Cursor::new(all_content)))
     }
 }

@@ -109,6 +109,10 @@ pub struct Cli {
     /// File processing order: none (CLI order), name (alphabetical), mtime (modification time, oldest first)
     #[arg(long = "file-order", value_enum, default_value = "none")]
     pub file_order: FileOrder,
+
+    /// Handle rotated logs: auto-detect .gz files, decompress them, and process by modification time (oldest first)
+    #[arg(long = "rotated-logs")]
+    pub rotated_logs: bool,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]

@@ -53,6 +53,10 @@ make test-full          # Comprehensive test suite
 ./target/release/kelora -f jsonl file1.jsonl file2.jsonl file3.jsonl  # CLI order (default)
 ./target/release/kelora -f jsonl --file-order name *.jsonl            # Alphabetical order
 ./target/release/kelora -f jsonl --file-order mtime *.jsonl           # Modification time order
+
+# Handle log rotation (mixed compressed/uncompressed, chronological order)
+# Matches: app.log app.log.1 app.log.2.gz app.log.3.gz
+./target/release/kelora -f jsonl --rotated-logs app.log*
 ```
 
 ## Architecture
@@ -298,10 +302,14 @@ kelora -f jsonl \
 # Process single gzip file (streaming decompression)
 kelora --decompress -f jsonl app.log.1.gz --filter 'status >= 400'
 
-# Process log rotation sequence
+# Process log rotation sequence manually
 for log in app.log.*.gz; do
   kelora --decompress -f jsonl "$log" --filter 'level == "ERROR"'
 done
+
+# Handle mixed compressed/uncompressed log rotation automatically
+# Matches: app.log app.log.1 app.log.2.gz app.log.3.gz
+kelora -f jsonl --rotated-logs app.log*
 
 # ZIP files require manual extraction
 unzip logs.zip && kelora -f jsonl extracted_file.log
@@ -330,6 +338,7 @@ unzip logs.zip && kelora -f jsonl extracted_file.log
 - ✅ **Apache Format Parser**: Common Log Format and Combined Log Format with method/path/protocol extraction
 - ✅ **Gzip Decompression**: Streaming decompression of `.gz` files for log rotation scenarios
 - ✅ **Multiple Input Files**: Process multiple files with configurable ordering (CLI order, alphabetical, modification time)
+- ✅ **Log Rotation Support**: `--rotated-logs` option for mixed compressed/uncompressed files with chronological processing
 
 ### 📋 TODO: Missing Input Formats
 - ❌ **CSV Format Parser**: Comma-separated values with header support
@@ -371,6 +380,7 @@ track_bucket(tracked, "status", code)    // Count by value
 ### ✅ Implemented CLI Options
 - ✅ **`--decompress`**: Decompress `.gz` files (ZIP files not supported, use manual extraction)
 - ✅ **`--file-order`**: File processing order (none, name, mtime)
+- ✅ **`--rotated-logs`**: Handle log rotation (auto-decompress .gz files + chronological order)
 
 ### 📋 TODO: Development Tasks
 - ❌ **Unit Tests**: Comprehensive test suite for all components

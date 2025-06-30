@@ -34,6 +34,10 @@ kelora --decompress -f jsonl app.log.1.gz --filter 'status >= 400'
 kelora -f jsonl file1.jsonl file2.jsonl file3.jsonl  # CLI order (default)
 kelora -f jsonl --file-order name *.jsonl            # Alphabetical order
 kelora -f jsonl --file-order mtime *.jsonl           # Modification time order
+
+# Handle log rotation (mixed compressed/uncompressed, chronological order)
+# Matches: app.log app.log.1 app.log.2.gz app.log.3.gz
+kelora -f jsonl --rotated-logs app.log*
 ```
 
 ---
@@ -48,6 +52,7 @@ kelora -f jsonl --file-order mtime *.jsonl           # Modification time order
 * Supports parallel and streaming modes
 * Built-in gzip decompression for log rotation scenarios
 * Multiple input file support with flexible ordering options
+* Smart log rotation handling with `--rotated-logs`
 
 ---
 
@@ -121,6 +126,7 @@ cargo build --release
 | `--unordered`   | Drop output order for performance      |
 | `--decompress`  | Decompress `.gz` files (log rotation)  |
 | `--file-order`  | File processing order: `none`, `name`, `mtime` |
+| `--rotated-logs` | Handle log rotation: auto-decompress `.gz`, chronological order |
 
 ---
 
