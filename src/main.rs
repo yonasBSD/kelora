@@ -1,9 +1,10 @@
 use anyhow::Result;
 use clap::Parser;
-use std::io::{self, BufRead, BufReader, Read};
+use std::io::BufRead;
 
 mod colors;
 mod config;
+mod decompression;
 mod engine;
 mod event;
 mod formatters;
@@ -15,7 +16,7 @@ mod unix;
 
 use config::KeloraConfig;
 use parallel::{ParallelConfig, ParallelProcessor};
-use pipeline::{create_pipeline_from_config, create_pipeline_builder_from_config};
+use pipeline::{create_pipeline_from_config, create_pipeline_builder_from_config, create_input_reader, create_sequential_input_reader};
 use unix::{ExitCode, SignalHandler, SafeStdout, SafeStderr, ProcessCleanup, check_termination};
 
 #[derive(Parser)]
@@ -100,6 +101,10 @@ pub struct Cli {
     /// Enable parallel processing for high-throughput analysis (batch-size=1000 by default)
     #[arg(long = "parallel")]
     pub parallel: bool,
+
+    /// Decompress *.gz files before processing
+    #[arg(long = "decompress")]
+    pub decompress: bool,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -199,8 +204,14 @@ fn run_parallel(config: &KeloraConfig, batch_size: usize, _stdout: &mut SafeStdo
     // Execute begin stage sequentially if provided
     execute_begin_stage(&begin_stage, &mut ctx, stderr);
 
-    // Get reader
-    let reader = create_parallel_reader(config, stderr);
+    // Get reader using pipeline builder
+    let reader = match create_input_reader(config) {
+        Ok(r) => r,
+        Err(e) => {
+            stderr.writeln(&format!("Failed to create input reader: {}", e)).unwrap_or(());
+            ExitCode::GeneralError.exit();
+        }
+    };
 
     // Process filter and exec stages in parallel using new pipeline architecture
     if let Err(e) = processor.process_with_pipeline(reader, pipeline_builder) {
@@ -232,8 +243,14 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
     // Execute begin stage
     execute_begin_stage(&begin_stage, &mut ctx, stderr);
 
-    // Get input reader
-    let reader = create_sequential_reader(config, stderr);
+    // Get input reader using pipeline builder
+    let reader = match create_sequential_input_reader(config) {
+        Ok(r) => r,
+        Err(e) => {
+            stderr.writeln(&format!("Failed to create input reader: {}", e)).unwrap_or(());
+            ExitCode::GeneralError.exit();
+        }
+    };
 
     // Process lines using pipeline
     let mut line_num = 0;
@@ -300,37 +317,6 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
     execute_end_stage(&end_stage, &ctx, stderr);
 }
 
-/// Create a reader for parallel processing (needs to be Send)
-fn create_parallel_reader(config: &KeloraConfig, stderr: &mut SafeStderr) -> Box<dyn BufRead + Send> {
-    if config.input.files.is_empty() {
-        // For stdin, we need to read all into memory first since stdin lock isn't Send
-        let mut buffer = Vec::new();
-        if let Err(e) = io::stdin().read_to_end(&mut buffer) {
-            stderr.writeln(&format!("Failed to read from stdin: {}", e)).unwrap_or(());
-            ExitCode::GeneralError.exit();
-        }
-        Box::new(std::io::Cursor::new(buffer))
-    } else {
-        let file = std::fs::File::open(&config.input.files[0]).map_err(|e| {
-            stderr.writeln(&format!("Failed to open file '{}': {}", config.input.files[0], e)).unwrap_or(());
-            ExitCode::GeneralError.exit();
-        }).unwrap();
-        Box::new(BufReader::new(file))
-    }
-}
-
-/// Create a reader for sequential processing
-fn create_sequential_reader(config: &KeloraConfig, stderr: &mut SafeStderr) -> Box<dyn BufRead> {
-    if config.input.files.is_empty() {
-        Box::new(io::stdin().lock())
-    } else {
-        let file = std::fs::File::open(&config.input.files[0]).map_err(|e| {
-            stderr.writeln(&format!("Failed to open file '{}': {}", config.input.files[0], e)).unwrap_or(());
-            ExitCode::GeneralError.exit();
-        }).unwrap();
-        Box::new(BufReader::new(file))
-    }
-}
 
 /// Execute begin stage with shared error handling
 fn execute_begin_stage(begin_stage: &pipeline::BeginStage, ctx: &mut pipeline::PipelineContext, stderr: &mut SafeStderr) {

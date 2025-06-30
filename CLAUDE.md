@@ -45,6 +45,9 @@ make test-full          # Comprehensive test suite
 
 # Process any log file (default line format)
 ./target/release/kelora /var/log/syslog --filter 'line.matches("ERROR|WARN")'
+
+# Process gzip compressed log files (useful for log rotation)
+./target/release/kelora --decompress -f jsonl logs.jsonl.gz --filter "status >= 400"
 ```
 
 ## Architecture
@@ -285,6 +288,20 @@ kelora -f jsonl \
   -F jsonl
 ```
 
+### Compressed Log Processing
+```bash
+# Process single gzip file (streaming decompression)
+kelora --decompress -f jsonl app.log.1.gz --filter 'status >= 400'
+
+# Process log rotation sequence
+for log in app.log.*.gz; do
+  kelora --decompress -f jsonl "$log" --filter 'level == "ERROR"'
+done
+
+# ZIP files require manual extraction
+unzip logs.zip && kelora -f jsonl extracted_file.log
+```
+
 ## Documentation
 
 - Rhai syntax and features: https://rhai.rs/book/
@@ -306,6 +323,7 @@ kelora -f jsonl \
 - ✅ **Threading**: Configurable worker threads and batch sizes
 - ✅ **Order Preservation**: Ordered output by default, `--unordered` for speed
 - ✅ **Apache Format Parser**: Common Log Format and Combined Log Format with method/path/protocol extraction
+- ✅ **Gzip Decompression**: Streaming decompression of `.gz` files for log rotation scenarios
 
 ### 📋 TODO: Missing Input Formats
 - ❌ **CSV Format Parser**: Comma-separated values with header support
@@ -343,6 +361,9 @@ track_bucket(tracked, "status", code)    // Count by value
 ### 📋 TODO: Missing CLI Options
 - ❌ **`--no-inject`**: Disable field auto-injection
 - ❌ **`--inject-prefix`**: Prefix for injected variables
+
+### ✅ Implemented CLI Options
+- ✅ **`--decompress`**: Decompress `.gz` files (ZIP files not supported, use manual extraction)
 
 ### 📋 TODO: Development Tasks
 - ❌ **Unit Tests**: Comprehensive test suite for all components

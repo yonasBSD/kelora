@@ -26,6 +26,9 @@ kelora -f jsonl \
 
 # Real-time Kubernetes logs
 kubectl logs app | kelora -f jsonl --filter 'level == "error"' -F text
+
+# Process compressed log files (log rotation)
+kelora --decompress -f jsonl app.log.1.gz --filter 'status >= 400'
 ```
 
 ---
@@ -38,6 +41,7 @@ kubectl logs app | kelora -f jsonl --filter 'level == "error"' -F text
 * Uses [Rhai](https://rhai.rs/), a simple JavaScript-like language, to filter, mutate, and analyze logs
 * Includes built-in global state tracking (`track_*`)
 * Supports parallel and streaming modes
+* Built-in gzip decompression for log rotation scenarios
 
 ---
 
@@ -70,6 +74,7 @@ Available variables:
 * Real-time `kubectl logs` processing
 * Streaming one-liner data pipelines
 * Field selection, tagging, and global stats
+* Processing compressed log files from log rotation
 
 ---
 
@@ -108,6 +113,7 @@ cargo build --release
 | `--on-error`    | Strategy: skip, print, abort, stub |
 | `--parallel`    | Enable parallel batch mode             |
 | `--unordered`   | Drop output order for performance      |
+| `--decompress`  | Decompress `.gz` files (log rotation)  |
 
 ---
 

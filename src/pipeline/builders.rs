@@ -1,7 +1,9 @@
 use anyhow::Result;
 use std::collections::HashMap;
+use std::io::{self, BufRead};
 
 use crate::engine::RhaiEngine;
+use crate::decompression::DecompressionReader;
 use super::{
     EventParser, Formatter, ScriptStage, EventLimiter, 
     Pipeline, PipelineContext, PipelineConfig, MetaData,
@@ -304,4 +306,29 @@ pub fn create_pipeline_builder_from_config(config: &crate::config::KeloraConfig)
     builder.keys = config.output.keys.clone();
     builder.exclude_keys = config.output.exclude_keys.clone();
     builder
+}
+
+/// Create input reader with optional decompression
+pub fn create_input_reader(config: &crate::config::KeloraConfig) -> Result<Box<dyn BufRead + Send>> {
+    if config.input.files.is_empty() {
+        // For stdin, read all into memory since stdin lock isn't Send
+        let mut buffer = Vec::new();
+        std::io::Read::read_to_end(&mut io::stdin(), &mut buffer)?;
+        Ok(Box::new(std::io::Cursor::new(buffer)))
+    } else {
+        let file_path = &config.input.files[0];
+        let reader = DecompressionReader::new(file_path, config.input.decompress)?;
+        Ok(Box::new(reader))
+    }
+}
+
+/// Create input reader for sequential processing (doesn't need to be Send)
+pub fn create_sequential_input_reader(config: &crate::config::KeloraConfig) -> Result<Box<dyn BufRead>> {
+    if config.input.files.is_empty() {
+        Ok(Box::new(io::stdin().lock()))
+    } else {
+        let file_path = &config.input.files[0];
+        let reader = DecompressionReader::new(file_path, config.input.decompress)?;
+        Ok(Box::new(reader))
+    }
 }
