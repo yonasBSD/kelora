@@ -11,6 +11,7 @@ mod formatters;
 mod parallel;
 mod parsers;
 mod pipeline;
+mod readers;
 mod tty;
 mod unix;
 

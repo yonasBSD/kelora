@@ -5,6 +5,7 @@ use std::fs;
 
 use crate::engine::RhaiEngine;
 use crate::decompression::DecompressionReader;
+use crate::readers::{ChannelStdinReader, MultiFileReader};
 use super::{
     EventParser, Formatter, ScriptStage, EventLimiter, 
     Pipeline, PipelineContext, PipelineConfig, MetaData,
@@ -311,6 +312,8 @@ pub fn create_pipeline_builder_from_config(config: &crate::config::KeloraConfig)
 
 
 /// Create concatenated content from multiple files for parallel processing
+/// DEPRECATED: Use streaming readers instead
+#[allow(dead_code)]
 fn read_all_files_to_memory(files: &[String], _config: &crate::config::KeloraConfig) -> Result<Vec<u8>> {
     let mut all_content = Vec::new();
     
@@ -327,17 +330,14 @@ fn read_all_files_to_memory(files: &[String], _config: &crate::config::KeloraCon
     Ok(all_content)
 }
 
-/// Create input reader with optional decompression
+/// Create input reader with optional decompression for parallel processing
 pub fn create_input_reader(config: &crate::config::KeloraConfig) -> Result<Box<dyn BufRead + Send>> {
     if config.input.files.is_empty() {
-        // For stdin, read all into memory since stdin lock isn't Send
-        let mut buffer = Vec::new();
-        std::io::Read::read_to_end(&mut io::stdin(), &mut buffer)?;
-        Ok(Box::new(std::io::Cursor::new(buffer)))
+        // Use channel-based stdin reader for Send compatibility
+        Ok(Box::new(ChannelStdinReader::new()?))
     } else {
         let sorted_files = sort_files(&config.input.files, &config.input.file_order)?;
-        let all_content = read_all_files_to_memory(&sorted_files, config)?;
-        Ok(Box::new(std::io::Cursor::new(all_content)))
+        Ok(Box::new(MultiFileReader::new(sorted_files)?))
     }
 }
 
@@ -373,10 +373,11 @@ fn sort_files(files: &[String], order: &crate::config::FileOrder) -> Result<Vec<
 /// Create input reader for sequential processing (doesn't need to be Send)
 pub fn create_sequential_input_reader(config: &crate::config::KeloraConfig) -> Result<Box<dyn BufRead>> {
     if config.input.files.is_empty() {
+        // Use stdin lock directly for sequential processing (most efficient)
         Ok(Box::new(io::stdin().lock()))
     } else {
+        // Use streaming multi-file reader for sequential processing too
         let sorted_files = sort_files(&config.input.files, &config.input.file_order)?;
-        let all_content = read_all_files_to_memory(&sorted_files, config)?;
-        Ok(Box::new(std::io::Cursor::new(all_content)))
+        Ok(Box::new(MultiFileReader::new(sorted_files)?))
     }
 }
