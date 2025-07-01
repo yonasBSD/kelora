@@ -65,10 +65,18 @@ make test-full          # Comprehensive test suite
 - **`src/main.rs`** - CLI interface, argument parsing, orchestrates sequential vs parallel processing
 - **`src/pipeline.rs`** - Modular trait-based pipeline architecture with pluggable stages (NEW)
 - **`src/engine.rs`** - Rhai scripting engine with AST compilation, scope templates, and custom functions
-- **`src/event.rs`** - Log event data structure with smart field extraction and metadata tracking
+- **`src/event.rs`** - Log event data structure with enhanced core field extraction and metadata tracking
 - **`src/parsers.rs`** - Input parsers implementing EventParser trait (JSON, line, logfmt, syslog)
 - **`src/formatters.rs`** - Output formatters implementing pipeline::Formatter trait (JSON and logfmt text)
 - **`src/parallel.rs`** - High-throughput parallel processing using unified pipeline architecture
+
+### Enhanced Event Data Model
+Kelora automatically extracts core fields (timestamp, level, message) from diverse log formats:
+- **Smart Field Recognition**: Finds timestamp from `ts`, `event_time`, `log_timestamp`, `created_at`, etc.
+- **Level Extraction**: Recognizes `level`, `severity`, `log_severity`, `priority`, `error_level`, etc.
+- **Message Fields**: Extracts from `msg`, `message`, `content`, `description`, `event_message`, etc.
+- **Parse-Once Guarantee**: Expensive operations like timestamp parsing only happen once per event
+- **Backward Compatibility**: Original field names remain accessible to Rhai scripts
 
 ### Performance Design
 Kelora follows a "compile once, evaluate repeatedly" model:

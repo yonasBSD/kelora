@@ -30,11 +30,37 @@ fn run_parallel(args: &Config, context: &ExecutionContext) -> Result<()>
 
 ---
 
-## 2. Refine and Formalize the `Event` Data Model
+## 2. Refine and Formalize the `Event` Data Model ✅ COMPLETED
 
 ### Description
 
-Redesign the `Event` struct to establish a robust, extensible foundation for all parsed data and computed state. The new model will distinguish between raw field data, parsed/memoized metadata, and user-created fields from Rhai scripts. It also recognizes special fields like `timestamp`, `level`, and `msg`, regardless of their original names in the input.
+✅ **IMPLEMENTED**: Enhanced the `Event` struct with comprehensive core field extraction that automatically recognizes and parses timestamp, level, and message fields from diverse log formats.
+
+### Completed Implementation
+
+#### ✅ Enhanced Core Field Extraction
+- **Smart Field Recognition**: Automatically finds timestamp from `ts`, `event_time`, `log_timestamp`, `created_at`, etc.
+- **Level Extraction**: Recognizes `level`, `severity`, `log_severity`, `priority`, `error_level`, etc.  
+- **Message Fields**: Extracts from `msg`, `message`, `content`, `description`, `event_message`, etc.
+- **Parse-Once Guarantee**: Expensive timestamp parsing only happens once per event
+- **Existence Checks**: Prevents overwriting already-extracted core fields
+- **Backward Compatibility**: Original field names remain accessible to Rhai scripts
+
+#### ✅ Current Event Structure
+```rust
+pub struct Event {
+    pub timestamp: Option<DateTime<Utc>>,  // Parsed timestamp
+    pub level: Option<String>,             // Extracted level
+    pub message: Option<String>,           // Extracted message
+    pub fields: IndexMap<String, Dynamic>, // Original fields for Rhai
+    pub original_line: String,
+    pub line_number: Option<usize>,
+    pub filename: Option<String>,
+}
+```
+
+### Future Enhancements (Optional)
+The original plan below could still be implemented for additional type safety and memoization:
 
 ### Implementation Plan
 
