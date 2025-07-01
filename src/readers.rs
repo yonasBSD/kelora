@@ -130,14 +130,22 @@ pub struct MultiFileReader {
     files: Vec<String>,
     current_file_idx: usize,
     current_reader: Option<BufReader<DecompressionReader>>,
+    buffer_size: usize,
 }
 
 impl MultiFileReader {
+    /// Create a new MultiFileReader with default buffer size (256KB for better throughput)
     pub fn new(files: Vec<String>) -> Result<Self> {
+        Self::with_buffer_size(files, 256 * 1024)
+    }
+    
+    /// Create a new MultiFileReader with custom buffer size
+    pub fn with_buffer_size(files: Vec<String>, buffer_size: usize) -> Result<Self> {
         Ok(Self {
             files,
             current_file_idx: 0,
             current_reader: None,
+            buffer_size,
         })
     }
     
@@ -147,7 +155,7 @@ impl MultiFileReader {
             
             match DecompressionReader::new(file_path) {
                 Ok(decompressor) => {
-                    self.current_reader = Some(BufReader::new(decompressor));
+                    self.current_reader = Some(BufReader::with_capacity(self.buffer_size, decompressor));
                     return Ok(true);
                 }
                 Err(e) => {
