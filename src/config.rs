@@ -14,9 +14,7 @@ pub struct KeloraConfig {
 pub struct InputConfig {
     pub files: Vec<String>,
     pub format: InputFormat,
-    pub decompress: bool,
     pub file_order: FileOrder,
-    pub rotated_logs: bool,
 }
 
 /// Output configuration
@@ -96,13 +94,7 @@ impl KeloraConfig {
             input: InputConfig {
                 files: cli.files.clone(),
                 format: cli.format.clone().into(),
-                decompress: cli.decompress,
-                file_order: if cli.rotated_logs { 
-                    FileOrder::Mtime 
-                } else { 
-                    cli.file_order.clone().into() 
-                },
-                rotated_logs: cli.rotated_logs,
+                file_order: cli.file_order.clone().into(),
             },
             output: OutputConfig {
                 format: cli.output_format.clone().into(),
@@ -158,9 +150,7 @@ impl Default for KeloraConfig {
             input: InputConfig {
                 files: Vec::new(),
                 format: InputFormat::Jsonl,
-                decompress: false,
                 file_order: FileOrder::None,
-                rotated_logs: false,
             },
             output: OutputConfig {
                 format: OutputFormat::Default,

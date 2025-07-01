@@ -224,9 +224,9 @@ invalid jsonl line
     
     let (stdout, stderr, exit_code) = run_kelora_with_input(&[
         "-f", "jsonl", 
-        "--on-error", "emit-errors"
+        "--on-error", "print"
     ], input);
-    assert_eq!(exit_code, 0, "kelora should exit successfully with emit-errors");
+    assert_eq!(exit_code, 0, "kelora should exit successfully with print errors");
     
     let lines: Vec<&str> = stdout.trim().split('\n').collect();
     assert_eq!(lines.len(), 2, "Should output 2 valid lines");

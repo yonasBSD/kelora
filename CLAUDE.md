@@ -46,8 +46,8 @@ make test-full          # Comprehensive test suite
 # Process any log file (default line format)
 ./target/release/kelora /var/log/syslog --filter 'line.matches("ERROR|WARN")'
 
-# Process gzip compressed log files (useful for log rotation)
-./target/release/kelora --decompress -f jsonl logs.jsonl.gz --filter "status >= 400"
+# Process gzip compressed log files (automatic decompression)
+./target/release/kelora -f jsonl logs.jsonl.gz --filter "status >= 400"
 
 # Process multiple files with different ordering
 ./target/release/kelora -f jsonl file1.jsonl file2.jsonl file3.jsonl  # CLI order (default)
@@ -55,8 +55,8 @@ make test-full          # Comprehensive test suite
 ./target/release/kelora -f jsonl --file-order mtime *.jsonl           # Modification time order
 
 # Handle log rotation (mixed compressed/uncompressed, chronological order)
-# Matches: app.log app.log.1 app.log.2.gz app.log.3.gz
-./target/release/kelora -f jsonl --rotated-logs app.log*
+# Matches: app.log app.log.1 app.log.2.gz app.log.3.gz - .gz files auto-decompressed
+./target/release/kelora -f jsonl --file-order mtime app.log*
 ```
 
 ## Architecture
@@ -305,17 +305,17 @@ kelora -f jsonl \
 
 ### Compressed Log Processing
 ```bash
-# Process single gzip file (streaming decompression)
-kelora --decompress -f jsonl app.log.1.gz --filter 'status >= 400'
+# Process single gzip file (automatic decompression)
+kelora -f jsonl app.log.1.gz --filter 'status >= 400'
 
-# Process log rotation sequence manually
+# Process log rotation sequence
 for log in app.log.*.gz; do
-  kelora --decompress -f jsonl "$log" --filter 'level == "ERROR"'
+  kelora -f jsonl "$log" --filter 'level == "ERROR"'
 done
 
-# Handle mixed compressed/uncompressed log rotation automatically
-# Matches: app.log app.log.1 app.log.2.gz app.log.3.gz
-kelora -f jsonl --rotated-logs app.log*
+# Handle mixed compressed/uncompressed log rotation with chronological order
+# Matches: app.log app.log.1 app.log.2.gz app.log.3.gz (.gz files auto-decompressed)
+kelora -f jsonl --file-order mtime app.log*
 
 # ZIP files require manual extraction
 unzip logs.zip && kelora -f jsonl extracted_file.log
@@ -342,9 +342,9 @@ unzip logs.zip && kelora -f jsonl extracted_file.log
 - ✅ **Threading**: Configurable worker threads and batch sizes
 - ✅ **Order Preservation**: Ordered output by default, `--unordered` for speed
 - ✅ **Apache Format Parser**: Common Log Format and Combined Log Format with method/path/protocol extraction
-- ✅ **Gzip Decompression**: Streaming decompression of `.gz` files for log rotation scenarios
+- ✅ **Automatic Gzip Decompression**: Streaming decompression of `.gz` files detected by extension
 - ✅ **Multiple Input Files**: Process multiple files with configurable ordering (CLI order, alphabetical, modification time)
-- ✅ **Log Rotation Support**: `--rotated-logs` option for mixed compressed/uncompressed files with chronological processing
+- ✅ **Mixed File Support**: Handle compressed and uncompressed files together automatically
 
 ### 📋 TODO: Missing Input Formats
 - ❌ **CSV Format Parser**: Comma-separated values with header support
@@ -384,9 +384,8 @@ track_bucket(tracked, "status", code)    // Count by value
 - ❌ **`--inject-prefix`**: Prefix for injected variables
 
 ### ✅ Implemented CLI Options
-- ✅ **`--decompress`**: Decompress `.gz` files (ZIP files not supported, use manual extraction)
 - ✅ **`--file-order`**: File processing order (none, name, mtime)
-- ✅ **`--rotated-logs`**: Handle log rotation (auto-decompress .gz files + chronological order)
+- ✅ **Automatic decompression**: `.gz` files are automatically decompressed based on extension (ZIP files not supported, use manual extraction)
 
 ### 📋 TODO: Development Tasks
 - ❌ **Unit Tests**: Comprehensive test suite for all components

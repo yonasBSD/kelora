@@ -309,24 +309,13 @@ pub fn create_pipeline_builder_from_config(config: &crate::config::KeloraConfig)
     builder
 }
 
-/// Determine if a file should be decompressed based on config and filename
-fn should_decompress_file(file_path: &str, config: &crate::config::KeloraConfig) -> bool {
-    if config.input.rotated_logs {
-        // Auto-detect: decompress .gz files, leave others as-is
-        file_path.ends_with(".gz")
-    } else {
-        // Use global decompress setting for all files
-        config.input.decompress
-    }
-}
 
 /// Create concatenated content from multiple files for parallel processing
-fn read_all_files_to_memory(files: &[String], config: &crate::config::KeloraConfig) -> Result<Vec<u8>> {
+fn read_all_files_to_memory(files: &[String], _config: &crate::config::KeloraConfig) -> Result<Vec<u8>> {
     let mut all_content = Vec::new();
     
     for file_path in files {
-        let decompress = should_decompress_file(file_path, config);
-        let mut reader = DecompressionReader::new(file_path, decompress)?;
+        let mut reader = DecompressionReader::new(file_path)?;
         io::Read::read_to_end(&mut reader, &mut all_content)?;
         
         // Add a newline between files if the last file doesn't end with one

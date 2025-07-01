@@ -43,15 +43,11 @@ impl Read for DecompressionReader {
 }
 
 impl DecompressionReader {
-    /// Create a new decompression reader based on file extension
-    pub fn new<P: AsRef<Path>>(path: P, decompress: bool) -> Result<Self> {
+    /// Create a new decompression reader with auto-detection based on file extension
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path_ref = path.as_ref();
         let file = File::open(path_ref)?;
         
-        if !decompress {
-            return Ok(DecompressionReader::Plain(BufReader::new(file)));
-        }
-
         let extension = path_ref
             .extension()
             .and_then(|ext| ext.to_str())
@@ -84,7 +80,7 @@ mod tests {
         writeln!(temp_file, "test line 2")?;
         temp_file.flush()?;
 
-        let mut reader = DecompressionReader::new(temp_file.path(), false)?;
+        let mut reader = DecompressionReader::new(temp_file.path())?;
         let mut content = String::new();
         reader.read_to_string(&mut content)?;
         
@@ -105,7 +101,7 @@ mod tests {
         // Create an empty file at the zip path for testing
         std::fs::write(&zip_path, b"fake zip content").unwrap();
         
-        let result = DecompressionReader::new(&zip_path, true);
+        let result = DecompressionReader::new(&zip_path);
         assert!(result.is_err());
         let error_msg = result.unwrap_err().to_string();
         assert!(error_msg.contains("ZIP file decompression is not supported"));
