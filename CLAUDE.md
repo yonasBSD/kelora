@@ -223,6 +223,24 @@ text.to_int()                     // Parse integer
 text.to_float()                   // Parse float
 ```
 
+#### Column Extraction Methods
+```rhai
+// Extract single column or range
+line.col("0")                     // First column
+line.col("-1")                    // Last column
+line.col("1:3")                   // Columns 1-2 (range)
+line.col("0,2,4")                 // Multiple specific columns
+line.col("2:", "|")               // From column 2 to end, pipe-separated input
+line.col("0,1", ",", "-")         // Custom input and output separators
+
+// Extract multiple columns as array
+line.cols(["0"])                  // Single column as array
+line.cols(["0", "2"])             // Multiple columns
+line.cols(["1:3", "-1"])          // Mix of ranges and indices
+line.cols(["0", "2"], "|")        // Custom input separator
+line.cols(["0", "2"], "|", "-")   // Custom input and output separators
+```
+
 #### Global Tracking
 ```rhai
 track_count("errors")                   // Increment counter
@@ -303,6 +321,28 @@ kelora -f jsonl \
   -F jsonl
 ```
 
+### Column Extraction from Delimited Text
+```bash
+# Extract timestamp and message from space-separated log lines
+kelora -f line access.log \
+  --exec 'timestamp = line.col("0,1"); message = line.col("3:")' \
+  -F jsonl
+
+# Parse CSV-like data with custom separators
+kelora -f line data.csv \
+  --exec 'user = line.col("0", ","); status = line.col("2", ",")' \
+  --filter 'status.to_int() >= 400'
+
+# Extract multiple fields as array for processing
+kelora -f line \
+  --exec 'parts = line.cols(["0", "2:4", "-1"], "|"); first = parts[0]; range = parts[1]; last = parts[2]'
+
+# Parse custom delimited format (use -f nginx for standard nginx logs)
+kelora -f line custom.log \
+  --exec 'ip = line.col("0"); user = line.col("1"); timestamp = line.col("2,3"); status = line.col("4").to_int()' \
+  --filter 'status >= 400'
+```
+
 ### Compressed Log Processing
 ```bash
 # Process single gzip file (automatic decompression)
@@ -345,6 +385,7 @@ unzip logs.zip && kelora -f jsonl extracted_file.log
 - ✅ **Automatic Gzip Decompression**: Streaming decompression of `.gz` files detected by extension
 - ✅ **Multiple Input Files**: Process multiple files with configurable ordering (CLI order, alphabetical, modification time)
 - ✅ **Mixed File Support**: Handle compressed and uncompressed files together automatically
+- ✅ **Column Extraction**: `line.col()` and `line.cols()` methods for extracting fields from delimited text
 
 ### 📋 TODO: Missing Input Formats
 - ❌ **CSV Format Parser**: Comma-separated values with header support
@@ -354,15 +395,6 @@ unzip logs.zip && kelora -f jsonl extracted_file.log
 
 ### 📋 TODO: Missing Rhai Functions
 These functions are documented in DESIGN.md but not yet implemented:
-
-#### Column Parsing Functions
-```rhai
-line.cols(0)              // First column
-line.cols(-1)             // Last column  
-line.cols("1:3")          // Columns 1-2 (slice)
-line.cols("2:")           // From column 2 to end
-line.cols(0, 2, 4)        // Multiple columns
-```
 
 #### String Analysis Functions
 ```rhai

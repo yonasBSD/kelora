@@ -24,11 +24,14 @@ kelora -f jsonl \
   --exec 'track_max("max", duration_ms)' \
   --end 'print(`Max: ${tracked["max"]}`)' logs.jsonl
 
+# Extract columns from delimited text
+kelora -f line --exec 'user = line.col("0"); msg = line.col("3:")' access.log
+
 # Real-time Kubernetes logs
 kubectl logs app | kelora -f jsonl --filter 'level == "error"' -F text
 
-# Process compressed log files (log rotation)
-kelora --decompress -f jsonl app.log.1.gz --filter 'status >= 400'
+# Process compressed log files (automatic decompression)
+kelora -f jsonl app.log.1.gz --filter 'status >= 400'
 
 # Process multiple files with different ordering
 kelora -f jsonl file1.jsonl file2.jsonl file3.jsonl  # CLI order (default)
@@ -36,8 +39,8 @@ kelora -f jsonl --file-order name *.jsonl            # Alphabetical order
 kelora -f jsonl --file-order mtime *.jsonl           # Modification time order
 
 # Handle log rotation (mixed compressed/uncompressed, chronological order)
-# Matches: app.log app.log.1 app.log.2.gz app.log.3.gz
-kelora -f jsonl --rotated-logs app.log*
+# Matches: app.log app.log.1 app.log.2.gz app.log.3.gz (auto-decompressed)
+kelora -f jsonl --file-order mtime app.log*
 ```
 
 ---
@@ -50,9 +53,9 @@ kelora -f jsonl --rotated-logs app.log*
 * Uses [Rhai](https://rhai.rs/), a simple JavaScript-like language, to filter, mutate, and analyze logs
 * Includes built-in global state tracking (`track_*`)
 * Supports parallel and streaming modes
-* Built-in gzip decompression for log rotation scenarios
+* Automatic gzip decompression for `.gz` files
 * Multiple input file support with flexible ordering options
-* Smart log rotation handling with `--rotated-logs`
+* Column extraction methods for parsing delimited text
 
 ---
 
@@ -67,6 +70,11 @@ let sev = if status >= 500 { "crit" } else { "warn" };
 // Global counters or stats
 track_count("errors");
 track_max("max_duration", duration_ms);
+
+// Column extraction from delimited text
+let user = line.col("0");
+let msg = line.col("3:");
+let parts = line.cols(["0", "2", "-1"]);
 ```
 
 Available variables:
@@ -85,7 +93,7 @@ Available variables:
 * Real-time `kubectl logs` processing
 * Streaming one-liner data pipelines
 * Field selection, tagging, and global stats
-* Processing compressed log files from log rotation
+* Processing compressed log files with automatic decompression
 
 ---
 
@@ -124,9 +132,7 @@ cargo build --release
 | `--on-error`    | Strategy: skip, print, abort, stub |
 | `--parallel`    | Enable parallel batch mode             |
 | `--unordered`   | Drop output order for performance      |
-| `--decompress`  | Decompress `.gz` files (log rotation)  |
 | `--file-order`  | File processing order: `none`, `name`, `mtime` |
-| `--rotated-logs` | Handle log rotation: auto-decompress `.gz`, chronological order |
 
 ---
 
