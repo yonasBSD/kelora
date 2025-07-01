@@ -246,9 +246,13 @@ line.cols(["0", "2"], "|", "-")   // Custom input and output separators
 track_count("errors")                   // Increment counter
 track_min("min_response_time", ms)      // Track minimum
 track_max("max_response_time", ms)      // Track maximum (different key!)
+track_unique("ips", ip)                 // Collect unique values
+track_bucket("status_counts", status)   // Count by value
 
 // Access in --end stage (read-only)
 tracked["errors"]
+tracked["ips"].len()                    // Number of unique IPs
+tracked["status_counts"]["200"]         // Count of 200 status codes
 ```
 
 ### String Interpolation
@@ -375,7 +379,7 @@ unzip logs.zip && kelora -f jsonl extracted_file.log
 - ✅ **Syslog Input Format**: RFC3164/RFC5424 parsing with priority, facility, severity extraction
 - ✅ **JSONL/Text Output**: JSON objects and logfmt-style key=value output
 - ✅ **Expression Stages**: `--begin`, `--filter`, `--exec`, `--end` pipeline
-- ✅ **Global State Tracking**: `track_count()`, `track_min()`, `track_max()` functions
+- ✅ **Global State Tracking**: `track_count()`, `track_min()`, `track_max()`, `track_unique()`, `track_bucket()` functions
 - ✅ **Error Handling**: Four strategies (skip, abort, print, stub)
 - ✅ **Field Filtering**: `--keys` for selecting specific output fields
 - ✅ **Parallel Processing**: High-throughput batch processing with `--parallel`
@@ -406,10 +410,7 @@ text.to_ts()                      // Parse timestamp
 ```
 
 #### Advanced Tracking Functions
-```rhai
-track_unique(tracked, "ips", ip)         // Collect unique values
-track_bucket(tracked, "status", code)    // Count by value
-```
+These functions are already implemented and available.
 
 ### 📋 TODO: Missing CLI Options
 - ❌ **`--no-inject`**: Disable field auto-injection

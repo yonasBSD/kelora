@@ -246,7 +246,7 @@ impl io::BufRead for MultiFileReader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
+    use std::io::{Read, Write};
     use tempfile::NamedTempFile;
     
     #[test]
