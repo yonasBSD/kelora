@@ -68,34 +68,46 @@ impl Event {
 
     /// Try to parse and extract core fields from the fields map
     pub fn extract_core_fields(&mut self) {
-        // Extract timestamp
-        for ts_key in &["timestamp", "ts", "time", "at", "_t", "@t", "t"] {
-            if let Some(value) = self.fields.get(*ts_key) {
-                if let Ok(ts_str) = value.clone().into_string() {
-                    if let Ok(ts) = parse_timestamp(&ts_str) {
-                        self.timestamp = Some(ts);
+        // Extract and parse timestamp with more comprehensive field recognition
+        if self.timestamp.is_none() {
+            for ts_key in &["ts", "_ts", "timestamp", "at", "time", "@timestamp", 
+                           "log_timestamp", "event_time", "datetime", "date_time", 
+                           "created_at", "logged_at", "_t", "@t", "t"] {
+                if let Some(value) = self.fields.get(*ts_key) {
+                    if let Ok(ts_str) = value.clone().into_string() {
+                        if let Ok(ts) = parse_timestamp(&ts_str) {
+                            self.timestamp = Some(ts);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Extract level with comprehensive field recognition
+        if self.level.is_none() {
+            for level_key in &["level", "lvl", "severity", "log_level", "loglevel", 
+                              "priority", "sev", "@level", "log_severity", "error_level",
+                              "event_level", "_level", "@l"] {
+                if let Some(value) = self.fields.get(*level_key) {
+                    if let Ok(level_str) = value.clone().into_string() {
+                        self.level = Some(level_str);
                         break;
                     }
                 }
             }
         }
 
-        // Extract level
-        for level_key in &["level", "log_level", "loglevel", "lvl", "severity", "@l"] {
-            if let Some(value) = self.fields.get(*level_key) {
-                if let Ok(level_str) = value.clone().into_string() {
-                    self.level = Some(level_str);
-                    break;
-                }
-            }
-        }
-
-        // Extract message
-        for msg_key in &["message", "msg", "@m"] {
-            if let Some(value) = self.fields.get(*msg_key) {
-                if let Ok(msg_str) = value.clone().into_string() {
-                    self.message = Some(msg_str);
-                    break;
+        // Extract message with comprehensive field recognition
+        if self.message.is_none() {
+            for msg_key in &["msg", "message", "content", "data", "log", "text", 
+                            "description", "details", "body", "payload", "event_message",
+                            "log_message", "_message", "@message", "@m"] {
+                if let Some(value) = self.fields.get(*msg_key) {
+                    if let Ok(msg_str) = value.clone().into_string() {
+                        self.message = Some(msg_str);
+                        break;
+                    }
                 }
             }
         }
