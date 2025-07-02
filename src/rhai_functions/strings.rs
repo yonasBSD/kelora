@@ -1,10 +1,77 @@
 use rhai::{Engine, Dynamic};
+use std::cell::RefCell;
+
+thread_local! {
+    static CAPTURED_PRINTS: RefCell<Vec<String>> = RefCell::new(Vec::new());
+    static CAPTURED_EPRINTS: RefCell<Vec<String>> = RefCell::new(Vec::new());
+    static PARALLEL_MODE: RefCell<bool> = RefCell::new(false);
+}
+
+/// Capture a print statement in thread-local storage for parallel processing
+pub fn capture_print(message: String) {
+    CAPTURED_PRINTS.with(|prints| {
+        prints.borrow_mut().push(message);
+    });
+}
+
+/// Capture an eprint statement in thread-local storage for parallel processing
+pub fn capture_eprint(message: String) {
+    CAPTURED_EPRINTS.with(|eprints| {
+        eprints.borrow_mut().push(message);
+    });
+}
+
+/// Get all captured prints and clear the buffer
+pub fn take_captured_prints() -> Vec<String> {
+    CAPTURED_PRINTS.with(|prints| {
+        std::mem::take(&mut *prints.borrow_mut())
+    })
+}
+
+/// Get all captured eprints and clear the buffer
+pub fn take_captured_eprints() -> Vec<String> {
+    CAPTURED_EPRINTS.with(|eprints| {
+        std::mem::take(&mut *eprints.borrow_mut())
+    })
+}
+
+/// Clear captured prints without returning them
+pub fn clear_captured_prints() {
+    CAPTURED_PRINTS.with(|prints| {
+        prints.borrow_mut().clear();
+    });
+}
+
+/// Clear captured eprints without returning them
+pub fn clear_captured_eprints() {
+    CAPTURED_EPRINTS.with(|eprints| {
+        eprints.borrow_mut().clear();
+    });
+}
+
+/// Set whether we're in parallel processing mode
+pub fn set_parallel_mode(enabled: bool) {
+    PARALLEL_MODE.with(|mode| {
+        *mode.borrow_mut() = enabled;
+    });
+}
+
+/// Check if we're in parallel processing mode
+pub fn is_parallel_mode() -> bool {
+    PARALLEL_MODE.with(|mode| *mode.borrow())
+}
 
 pub fn register_functions(engine: &mut Engine) {
-    // Print functions - print() outputs to stdout, eprint() outputs to stderr
-    // eprint() accepts same single argument types as print()
+    // Note: print() function is now handled via engine.on_print() in engine.rs
+    
+    // Custom eprint function that captures output in parallel mode
     engine.register_fn("eprint", |message: rhai::Dynamic| {
-        eprintln!("{}", message);
+        let msg = message.to_string();
+        if is_parallel_mode() {
+            capture_eprint(msg);
+        } else {
+            eprintln!("{}", msg);
+        }
     });
 
     // Existing string functions from engine.rs

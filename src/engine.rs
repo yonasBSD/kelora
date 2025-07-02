@@ -24,6 +24,16 @@ impl Clone for RhaiEngine {
     fn clone(&self) -> Self {
         let mut engine = Engine::new();
         engine.set_optimization_level(rhai::OptimizationLevel::Simple);
+        
+        // Apply the same on_print override as in new()
+        engine.on_print(|text| {
+            if crate::rhai_functions::strings::is_parallel_mode() {
+                crate::rhai_functions::strings::capture_print(text.to_string());
+            } else {
+                println!("{}", text);
+            }
+        });
+        
         rhai_functions::register_all_functions(&mut engine);
         
         Self {
@@ -51,6 +61,15 @@ impl RhaiEngine {
         let mut engine = Engine::new();
         
         engine.set_optimization_level(rhai::OptimizationLevel::Simple);
+        
+        // Override the built-in print function to support capture in parallel mode
+        engine.on_print(|text| {
+            if crate::rhai_functions::strings::is_parallel_mode() {
+                crate::rhai_functions::strings::capture_print(text.to_string());
+            } else {
+                println!("{}", text);
+            }
+        });
         
         // Register custom functions for log analysis (includes eprint() for stderr output)
         rhai_functions::register_all_functions(&mut engine);

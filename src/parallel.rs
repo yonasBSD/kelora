@@ -54,6 +54,8 @@ pub struct BatchResult {
 #[derive(Debug)]
 pub struct ProcessedEvent {
     pub event: Event,
+    pub captured_prints: Vec<String>,
+    pub captured_eprints: Vec<String>,
 }
 
 /// Thread-safe statistics tracker for merging worker states
@@ -355,6 +357,9 @@ impl ParallelProcessor {
         pipeline_builder: PipelineBuilder,
         stages: Vec<crate::config::ScriptStageType>,
     ) -> Result<()> {
+        // Set parallel mode for print capturing
+        crate::rhai_functions::strings::set_parallel_mode(true);
+        
         // Create worker pipeline and context
         let (mut pipeline, mut ctx) = pipeline_builder.build_worker(stages)?;
 
@@ -370,9 +375,17 @@ impl ParallelProcessor {
                 // Update metadata
                 ctx.meta.line_number = Some(current_line_num);
                 
+                // Clear any previous captured prints/eprints before processing this event
+                crate::rhai_functions::strings::clear_captured_prints();
+                crate::rhai_functions::strings::clear_captured_eprints();
+                
                 // Process line through pipeline
                 match pipeline.process_line(line.clone(), &mut ctx) {
                     Ok(formatted_results) => {
+                        // Get any prints/eprints that were captured during processing this specific event
+                        let captured_prints = crate::rhai_functions::strings::take_captured_prints();
+                        let captured_eprints = crate::rhai_functions::strings::take_captured_eprints();
+                        
                         // Convert formatted strings back to events for the result sink
                         // Note: This is a temporary approach during the transition
                         for formatted_result in formatted_results {
@@ -381,8 +394,12 @@ impl ParallelProcessor {
                             let mut dummy_event = Event::default_with_line(formatted_result.clone());
                             dummy_event.set_metadata(current_line_num, None);
                             
+                            // Each formatted result gets its own copy of the captured prints/eprints
+                            // since they all came from processing the same input line
                             batch_results.push(ProcessedEvent {
                                 event: dummy_event,
+                                captured_prints: captured_prints.clone(),
+                                captured_eprints: captured_eprints.clone(),
                             });
                         }
                     }
@@ -476,12 +493,24 @@ impl ParallelProcessor {
     }
 
     fn pipeline_output_batch_results(results: &[ProcessedEvent]) -> Result<()> {
+        let mut stdout = SafeStdout::new();
+        
         for processed in results {
-            // In the pipeline version, the event.original_line contains the formatted output
-            let mut stdout = SafeStdout::new();
+            // First output any captured prints for this specific event (to stdout)
+            for print_msg in &processed.captured_prints {
+                stdout.writeln(print_msg).unwrap_or(());
+            }
+            
+            // Output any captured eprints for this specific event (to stderr)
+            for eprint_msg in &processed.captured_eprints {
+                eprintln!("{}", eprint_msg);
+            }
+            
+            // Then output the event itself
             stdout.writeln(&processed.event.original_line).unwrap_or(());
-            stdout.flush().unwrap_or(());
         }
+        
+        stdout.flush().unwrap_or(());
         Ok(())
     }
 
