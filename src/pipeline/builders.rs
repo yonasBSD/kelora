@@ -9,7 +9,7 @@ use crate::readers::{ChannelStdinReader, MultiFileReader};
 use super::{
     EventParser, Formatter, ScriptStage, EventLimiter, 
     Pipeline, PipelineContext, PipelineConfig, MetaData,
-    FilterStage, ExecStage, BeginStage, EndStage, KeyFilterStage,
+    FilterStage, ExecStage, BeginStage, EndStage, KeyFilterStage, LevelFilterStage,
     SimpleChunker, SimpleWindowManager, StdoutWriter, TakeNLimiter
 };
 
@@ -26,6 +26,8 @@ pub struct PipelineBuilder {
     take_limit: Option<usize>,
     keys: Vec<String>,
     exclude_keys: Vec<String>,
+    levels: Vec<String>,
+    exclude_levels: Vec<String>,
 }
 
 impl PipelineBuilder {
@@ -47,6 +49,8 @@ impl PipelineBuilder {
             take_limit: None,
             keys: Vec::new(),
             exclude_keys: Vec::new(),
+            levels: Vec::new(),
+            exclude_levels: Vec::new(),
         }
     }
 
@@ -130,7 +134,13 @@ impl PipelineBuilder {
             script_stages.push(Box::new(exec_stage));
         }
 
-        // Add key filtering stage (runs after filters and execs, before formatting)
+        // Add level filtering stage (runs after all script stages, before key filtering)
+        let level_filter_stage = LevelFilterStage::new(self.levels.clone(), self.exclude_levels.clone());
+        if level_filter_stage.is_active() {
+            script_stages.push(Box::new(level_filter_stage));
+        }
+
+        // Add key filtering stage (runs after level filtering, before formatting)
         let key_filter_stage = KeyFilterStage::new(self.keys.clone(), self.exclude_keys.clone());
         if key_filter_stage.is_active() {
             script_stages.push(Box::new(key_filter_stage));
@@ -211,7 +221,13 @@ impl PipelineBuilder {
             script_stages.push(Box::new(exec_stage));
         }
 
-        // Add key filtering stage (runs after filters and execs, before formatting)
+        // Add level filtering stage (runs after all script stages, before key filtering)
+        let level_filter_stage = LevelFilterStage::new(self.levels.clone(), self.exclude_levels.clone());
+        if level_filter_stage.is_active() {
+            script_stages.push(Box::new(level_filter_stage));
+        }
+
+        // Add key filtering stage (runs after level filtering, before formatting)
         let key_filter_stage = KeyFilterStage::new(self.keys.clone(), self.exclude_keys.clone());
         if key_filter_stage.is_active() {
             script_stages.push(Box::new(key_filter_stage));
@@ -281,6 +297,8 @@ pub fn create_pipeline_builder_from_cli(cli: &crate::Cli) -> PipelineBuilder {
         .with_output_format(cli.output_format.clone());
     builder.keys = cli.keys.clone();
     builder.exclude_keys = cli.exclude_keys.clone();
+    builder.levels = cli.levels.clone();
+    builder.exclude_levels = cli.exclude_levels.clone();
     builder
 }
 
@@ -310,6 +328,8 @@ pub fn create_pipeline_builder_from_config(config: &crate::config::KeloraConfig)
         .with_output_format(config.output.format.clone().into());
     builder.keys = config.output.get_effective_keys();
     builder.exclude_keys = config.output.exclude_keys.clone();
+    builder.levels = config.processing.levels.clone();
+    builder.exclude_levels = config.processing.exclude_levels.clone();
     builder
 }
 

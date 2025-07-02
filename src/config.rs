@@ -38,6 +38,8 @@ pub struct ProcessingConfig {
     pub no_inject_fields: bool,
     pub inject_prefix: Option<String>,
     pub on_error: ErrorStrategy,
+    pub levels: Vec<String>,
+    pub exclude_levels: Vec<String>,
 }
 
 /// Performance configuration
@@ -150,6 +152,8 @@ impl KeloraConfig {
                 no_inject_fields: cli.no_inject_fields,
                 inject_prefix: cli.inject_prefix.clone(),
                 on_error: cli.on_error.clone().into(),
+                levels: cli.levels.clone(),
+                exclude_levels: cli.exclude_levels.clone(),
             },
             performance: PerformanceConfig {
                 parallel: cli.parallel,
@@ -208,6 +212,8 @@ impl Default for KeloraConfig {
                 no_inject_fields: false,
                 inject_prefix: None,
                 on_error: ErrorStrategy::Print,
+                levels: Vec::new(),
+                exclude_levels: Vec::new(),
             },
             performance: PerformanceConfig {
                 parallel: false,

@@ -115,6 +115,14 @@ pub struct Cli {
     /// Control colored output (auto/always/never)
     #[arg(long = "color", value_enum, default_value = "auto")]
     pub color: ColorMode,
+
+    /// Include only events with these log levels (comma-separated, case-insensitive, e.g. debug,warn,error)
+    #[arg(short = 'l', long = "levels", value_delimiter = ',')]
+    pub levels: Vec<String>,
+
+    /// Exclude events with these log levels (comma-separated, case-insensitive, higher priority than --levels)
+    #[arg(short = 'L', long = "exclude-levels", value_delimiter = ',')]
+    pub exclude_levels: Vec<String>,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]

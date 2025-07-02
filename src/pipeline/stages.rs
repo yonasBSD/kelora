@@ -127,6 +127,83 @@ impl EndStage {
     }
 }
 
+/// Level filtering stage for --levels and --exclude-levels options
+pub struct LevelFilterStage {
+    levels: Vec<String>,
+    exclude_levels: Vec<String>,
+}
+
+impl LevelFilterStage {
+    pub fn new(levels: Vec<String>, exclude_levels: Vec<String>) -> Self {
+        Self { levels, exclude_levels }
+    }
+
+    /// Check if any filtering is needed
+    pub fn is_active(&self) -> bool {
+        !self.levels.is_empty() || !self.exclude_levels.is_empty()
+    }
+}
+
+impl ScriptStage for LevelFilterStage {
+    fn apply(&mut self, event: Event, _ctx: &mut PipelineContext) -> ScriptResult {
+        if !self.is_active() {
+            return ScriptResult::Emit(event);
+        }
+
+        // Get the level from the event fields map - check all possible level field names
+        let event_level = {
+            let mut found_level: Option<String> = None;
+            
+            // Check all known level field names in the event's fields map
+            for level_field_name in crate::event::LEVEL_FIELD_NAMES {
+                if let Some(value) = event.fields.get(*level_field_name) {
+                    if let Ok(level_str) = value.clone().into_string() {
+                        found_level = Some(level_str);
+                        break;
+                    }
+                }
+            }
+            
+            match found_level {
+                Some(level) => level,
+                None => {
+                    // If no level field is found, check if we should include or exclude
+                    if self.levels.is_empty() {
+                        // Only exclude_levels specified, and no level found - include by default
+                        return ScriptResult::Emit(event);
+                    } else {
+                        // levels specified but no level found - exclude
+                        return ScriptResult::Skip;
+                    }
+                }
+            }
+        };
+
+        // Apply exclude_levels first (higher priority) - case-insensitive
+        if !self.exclude_levels.is_empty() {
+            for exclude_level in &self.exclude_levels {
+                if event_level.eq_ignore_ascii_case(exclude_level) {
+                    return ScriptResult::Skip;
+                }
+            }
+        }
+
+        // Apply levels filter - case-insensitive
+        if !self.levels.is_empty() {
+            for level in &self.levels {
+                if event_level.eq_ignore_ascii_case(level) {
+                    return ScriptResult::Emit(event);
+                }
+            }
+            // No match found in levels list - exclude
+            return ScriptResult::Skip;
+        }
+
+        // No levels specified, only exclude_levels - include by default
+        ScriptResult::Emit(event)
+    }
+}
+
 /// Key filtering stage for --keys and --exclude-keys options
 pub struct KeyFilterStage {
     keys: Vec<String>,
