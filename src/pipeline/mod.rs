@@ -49,7 +49,7 @@ pub struct PipelineContext {
 #[derive(Debug, Clone)]
 pub struct PipelineConfig {
     pub on_error: crate::ErrorStrategy,
-    pub plain: bool,
+    pub brief: bool,
     #[allow(dead_code)]
     pub no_inject_fields: bool,
     #[allow(dead_code)]

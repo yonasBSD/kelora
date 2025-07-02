@@ -23,7 +23,7 @@ pub struct OutputConfig {
     pub format: OutputFormat,
     pub keys: Vec<String>,
     pub exclude_keys: Vec<String>,
-    pub plain: bool,
+    pub brief: bool,
     pub color: ColorMode,
 }
 
@@ -109,7 +109,7 @@ impl KeloraConfig {
                 format: cli.output_format.clone().into(),
                 keys: cli.keys.clone(),
                 exclude_keys: cli.exclude_keys.clone(),
-                plain: cli.plain,
+                brief: cli.brief,
                 color: cli.color.clone().into(),
             },
             processing: ProcessingConfig {
@@ -166,7 +166,7 @@ impl Default for KeloraConfig {
                 format: OutputFormat::Default,
                 keys: Vec::new(),
                 exclude_keys: Vec::new(),
-                plain: false,
+                brief: false,
                 color: ColorMode::Auto,
             },
             processing: ProcessingConfig {

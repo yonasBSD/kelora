@@ -124,15 +124,15 @@ impl pipeline::Formatter for JsonFormatter {
     }
 }
 
-// Default formatter (logfmt-style with colors and plain mode)
+// Default formatter (logfmt-style with colors and brief mode)
 pub struct DefaultFormatter {
     colors: ColorScheme,
     level_keys: Vec<&'static str>,
-    plain: bool,
+    brief: bool,
 }
 
 impl DefaultFormatter {
-    pub fn new(use_colors: bool, plain: bool) -> Self {
+    pub fn new(use_colors: bool, brief: bool) -> Self {
         Self {
             colors: ColorScheme::new(use_colors),
             level_keys: vec![
@@ -144,7 +144,7 @@ impl DefaultFormatter {
                 "levelname",
                 "@l",
             ],
-            plain,
+            brief,
         }
     }
 
@@ -189,8 +189,8 @@ impl DefaultFormatter {
         }
     }
 
-    /// Format a Dynamic value for plain mode (no quotes, just the value with colors)
-    fn format_dynamic_value_plain_into(&self, key: &str, value: &Dynamic, output: &mut String) {
+    /// Format a Dynamic value for brief mode (no quotes, just the value with colors)
+    fn format_dynamic_value_brief_into(&self, key: &str, value: &Dynamic, output: &mut String) {
         // Choose color based on field type and value content
         let color = if self.is_level_field(key) {
             if let Ok(level_str) = value.clone().into_string() {
@@ -207,7 +207,7 @@ impl DefaultFormatter {
             output.push_str(color);
         }
 
-        // In plain mode, output raw value (no quotes even for strings)
+        // In brief mode, output raw value (no quotes even for strings)
         if let Ok(s) = value.clone().into_string() {
             output.push_str(&s);
         } else {
@@ -265,9 +265,9 @@ impl pipeline::Formatter for DefaultFormatter {
             }
             first = false;
 
-            if self.plain {
-                // Plain mode: only values (no keys, no quotes)
-                self.format_dynamic_value_plain_into(key, value, &mut output);
+            if self.brief {
+                // Brief mode: only values (no keys, no quotes)
+                self.format_dynamic_value_brief_into(key, value, &mut output);
             } else {
                 // Normal mode: key=value pairs
                 // Format key with color
@@ -297,7 +297,7 @@ impl pipeline::Formatter for DefaultFormatter {
     }
 }
 
-// Logfmt formatter - strict logfmt output formatter (no colors, no plain mode)
+// Logfmt formatter - strict logfmt output formatter (no colors, no brief mode)
 pub struct LogfmtFormatter;
 
 impl LogfmtFormatter {
@@ -381,7 +381,7 @@ mod tests {
         event.set_field("user".to_string(), Dynamic::from("alice".to_string()));
         event.set_field("count".to_string(), Dynamic::from(42i64));
 
-        let formatter = DefaultFormatter::new(false, false); // No colors, no plain mode
+        let formatter = DefaultFormatter::new(false, false); // No colors, no brief mode
         let result = formatter.format(&event);
 
         // Check that all fields are present with proper formatting
@@ -394,15 +394,15 @@ mod tests {
     }
 
     #[test]
-    fn test_default_formatter_plain_mode() {
+    fn test_default_formatter_brief_mode() {
         let mut event = Event::default();
         event.set_field("level".to_string(), Dynamic::from("info".to_string()));
         event.set_field("message".to_string(), Dynamic::from("test message".to_string()));
 
-        let formatter = DefaultFormatter::new(false, true); // No colors, plain mode
+        let formatter = DefaultFormatter::new(false, true); // No colors, brief mode
         let result = formatter.format(&event);
 
-        // Plain mode should output only values, space-separated
+        // Brief mode should output only values, space-separated
         assert_eq!(result, "info test message");
     }
 

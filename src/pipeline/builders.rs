@@ -33,7 +33,7 @@ impl PipelineBuilder {
         Self {
             config: PipelineConfig {
                 on_error: crate::ErrorStrategy::Print,
-                plain: false,
+                brief: false,
                 no_inject_fields: false,
                 inject_prefix: None,
                 color_mode: crate::config::ColorMode::Auto,
@@ -111,7 +111,7 @@ impl PipelineBuilder {
             crate::OutputFormat::Jsonl => Box::new(crate::formatters::JsonFormatter::new()),
             crate::OutputFormat::Default => {
                 let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
-                Box::new(crate::formatters::DefaultFormatter::new(use_colors, self.config.plain))
+                Box::new(crate::formatters::DefaultFormatter::new(use_colors, self.config.brief))
             },
             crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
             crate::OutputFormat::Csv => return Err(anyhow::anyhow!("CSV formatter not implemented yet")),
@@ -192,7 +192,7 @@ impl PipelineBuilder {
             crate::OutputFormat::Jsonl => Box::new(crate::formatters::JsonFormatter::new()),
             crate::OutputFormat::Default => {
                 let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
-                Box::new(crate::formatters::DefaultFormatter::new(use_colors, self.config.plain))
+                Box::new(crate::formatters::DefaultFormatter::new(use_colors, self.config.brief))
             },
             crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
             crate::OutputFormat::Csv => return Err(anyhow::anyhow!("CSV formatter not implemented yet")),
@@ -265,7 +265,7 @@ pub fn create_pipeline_from_cli(cli: &crate::Cli) -> Result<(Pipeline, BeginStag
 pub fn create_pipeline_builder_from_cli(cli: &crate::Cli) -> PipelineBuilder {
     let config = PipelineConfig {
         on_error: cli.on_error.clone(),
-        plain: cli.plain,
+        brief: cli.brief,
         no_inject_fields: cli.no_inject_fields,
         inject_prefix: cli.inject_prefix.clone(),
         color_mode: cli.color.clone().into(),
@@ -294,7 +294,7 @@ pub fn create_pipeline_from_config(config: &crate::config::KeloraConfig) -> Resu
 pub fn create_pipeline_builder_from_config(config: &crate::config::KeloraConfig) -> PipelineBuilder {
     let pipeline_config = PipelineConfig {
         on_error: config.processing.on_error.clone().into(),
-        plain: config.output.plain,
+        brief: config.output.brief,
         no_inject_fields: config.processing.no_inject_fields,
         inject_prefix: config.processing.inject_prefix.clone(),
         color_mode: config.output.color.clone(),

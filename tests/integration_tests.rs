@@ -920,3 +920,42 @@ fn test_apache_status_code_analysis() {
     assert!(stdout.contains("4xx: 1"), "Should have 1 client error");
     assert!(stdout.contains("5xx: 1"), "Should have 1 server error");
 }
+
+#[test]
+fn test_brief_output_mode() {
+    let input = r#"{"level": "INFO", "message": "test message", "user": "alice"}
+{"level": "ERROR", "message": "error occurred", "user": "bob"}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "jsonl", 
+        "--brief"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully with brief mode");
+    
+    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(lines.len(), 2, "Should output 2 lines");
+    
+    // Brief mode should output only values, space-separated, no keys
+    assert_eq!(lines[0], "INFO test message alice");
+    assert_eq!(lines[1], "ERROR error occurred bob");
+    
+    // Verify no key=value format is used
+    assert!(!stdout.contains("level="), "Brief mode should not contain keys");
+    assert!(!stdout.contains("message="), "Brief mode should not contain keys");
+    assert!(!stdout.contains("user="), "Brief mode should not contain keys");
+}
+
+#[test]
+fn test_brief_output_mode_short_form() {
+    let input = r#"{"level": "INFO", "message": "hello world"}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "jsonl", 
+        "-b"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully with -b short form");
+    
+    // Brief mode should output only values, space-separated
+    assert_eq!(stdout.trim(), "INFO hello world");
+    assert!(!stdout.contains("level="), "Brief mode should not contain keys");
+}

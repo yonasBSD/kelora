@@ -81,8 +81,8 @@ pub struct Cli {
     pub exclude_keys: Vec<String>,
 
     /// Output only field values (no keys), space-separated
-    #[arg(long = "plain")]
-    pub plain: bool,
+    #[arg(short = 'b', long = "brief")]
+    pub brief: bool,
 
     /// Number of worker threads for parallel processing
     #[arg(long = "threads", default_value_t = 0)]
