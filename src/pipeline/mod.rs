@@ -147,7 +147,7 @@ impl Pipeline {
                         crate::ErrorStrategy::Skip => Ok(results),
                         crate::ErrorStrategy::Abort => Err(err),
                         crate::ErrorStrategy::Print => {
-                            eprintln!("Parse error: {}", err);
+                            eprintln!("{}", crate::config::format_error_message_auto(&format!("Parse error: {}", err)));
                             Ok(results)
                         }
                         crate::ErrorStrategy::Stub => {
@@ -180,7 +180,7 @@ impl Pipeline {
                                         crate::ErrorStrategy::Skip => Ok(results),
                                         crate::ErrorStrategy::Abort => Err(anyhow::anyhow!(msg)),
                                         crate::ErrorStrategy::Print => {
-                                            eprintln!("Script error: {}", msg);
+                                            eprintln!("{}", crate::config::format_error_message_auto(&format!("Script error: {}", msg)));
                                             Ok(results)
                                         }
                                         crate::ErrorStrategy::Stub => Ok(results),
@@ -219,7 +219,7 @@ impl Pipeline {
                         crate::ErrorStrategy::Skip => Ok(results),
                         crate::ErrorStrategy::Abort => Err(anyhow::anyhow!(msg)),
                         crate::ErrorStrategy::Print => {
-                            eprintln!("Script error: {}", msg);
+                            eprintln!("{}", crate::config::format_error_message_auto(&format!("Script error: {}", msg)));
                             Ok(results)
                         }
                         crate::ErrorStrategy::Stub => Ok(results),

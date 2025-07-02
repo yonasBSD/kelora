@@ -26,6 +26,7 @@ pub struct OutputConfig {
     pub core: bool,
     pub brief: bool,
     pub color: ColorMode,
+    pub no_emoji: bool,
 }
 
 /// Ordered script stages that preserve CLI order
@@ -117,6 +118,32 @@ impl KeloraConfig {
         
         core_fields
     }
+
+    /// Format an error message with appropriate prefix (emoji or "kelora:")
+    pub fn format_error_message(&self, message: &str) -> String {
+        let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
+        let use_emoji = use_colors && !self.output.no_emoji;
+        
+        if use_emoji {
+            format!("🧱 {}", message)
+        } else {
+            format!("kelora: {}", message)
+        }
+    }
+}
+
+/// Format an error message with appropriate prefix when config is not available
+/// Uses auto color detection and allows NO_EMOJI environment variable override
+pub fn format_error_message_auto(message: &str) -> String {
+    let use_colors = crate::tty::should_use_colors_with_mode(&ColorMode::Auto);
+    let no_emoji = std::env::var("NO_EMOJI").is_ok();
+    let use_emoji = use_colors && !no_emoji;
+    
+    if use_emoji {
+        format!("🧱 {}", message)
+    } else {
+        format!("kelora: {}", message)
+    }
 }
 
 impl OutputConfig {
@@ -149,6 +176,7 @@ impl KeloraConfig {
                 core: cli.core,
                 brief: cli.brief,
                 color: cli.color.clone().into(),
+                no_emoji: cli.no_emoji,
             },
             processing: ProcessingConfig {
                 begin: cli.begin.clone(),
@@ -208,6 +236,7 @@ impl Default for KeloraConfig {
                 core: false,
                 brief: false,
                 color: ColorMode::Auto,
+                no_emoji: false,
             },
             processing: ProcessingConfig {
                 begin: None,

@@ -159,7 +159,7 @@ impl MultiFileReader {
                     return Ok(true);
                 }
                 Err(e) => {
-                    eprintln!("Warning: Failed to open file '{}': {}", file_path, e);
+                    eprintln!("{}", crate::config::format_error_message_auto(&format!("Warning: Failed to open file '{}': {}", file_path, e)));
                     self.current_file_idx += 1;
                     continue;
                 }

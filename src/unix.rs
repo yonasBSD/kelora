@@ -51,7 +51,7 @@ impl SignalHandler {
             for sig in signals.forever() {
                 match sig {
                     SIGINT => {
-                        eprintln!("Received SIGINT, shutting down gracefully...");
+                        eprintln!("{}", crate::config::format_error_message_auto("Received SIGINT, shutting down gracefully..."));
                         SHOULD_TERMINATE.store(true, Ordering::Relaxed);
                         // Exit immediately for Ctrl-C to feel responsive
                         ExitCode::SignalInt.exit();
@@ -64,13 +64,13 @@ impl SignalHandler {
                     }
                     #[cfg(unix)]
                     SIGTERM => {
-                        eprintln!("Received SIGTERM, shutting down gracefully...");
+                        eprintln!("{}", crate::config::format_error_message_auto("Received SIGTERM, shutting down gracefully..."));
                         SHOULD_TERMINATE.store(true, Ordering::Relaxed);
                         ExitCode::SignalTerm.exit();
                     }
                     _ => {
                         // Unknown signal - should not happen with our registration
-                        eprintln!("Received unexpected signal: {}", sig);
+                        eprintln!("{}", crate::config::format_error_message_auto(&format!("Received unexpected signal: {}", sig)));
                     }
                 }
             }
@@ -162,7 +162,7 @@ impl SafeStderr {
             Err(e) => {
                 // If we can't write to stderr, there's not much we can do
                 // Just exit with a general error
-                eprintln!("Fatal: Failed to write to stderr: {}", e);
+                eprintln!("{}", crate::config::format_error_message_auto(&format!("Fatal: Failed to write to stderr: {}", e)));
                 ExitCode::GeneralError.exit();
             }
         }

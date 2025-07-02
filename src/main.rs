@@ -18,13 +18,18 @@ mod unix;
 
 use config::{KeloraConfig, ScriptStageType};
 use parallel::{ParallelConfig, ParallelProcessor};
-use pipeline::{create_pipeline_from_config, create_pipeline_builder_from_config, create_input_reader, create_sequential_input_reader};
-use unix::{ExitCode, SignalHandler, SafeStdout, SafeStderr, ProcessCleanup, check_termination};
+use pipeline::{
+    create_input_reader, create_pipeline_builder_from_config, create_pipeline_from_config,
+    create_sequential_input_reader,
+};
+use unix::{check_termination, ExitCode, ProcessCleanup, SafeStderr, SafeStdout, SignalHandler};
 
 #[derive(Parser)]
 #[command(name = "kelora")]
 #[command(about = "A command-line log analysis tool with embedded Rhai scripting")]
-#[command(long_about = "A command-line log analysis tool with embedded Rhai scripting\n\nMODES:\n  (default)   Sequential processing - best for streaming/interactive use\n  --parallel  Parallel processing - best for high-throughput batch analysis")]
+#[command(
+    long_about = "A command-line log analysis tool with embedded Rhai scripting\n\nMODES:\n  (default)   Sequential processing - best for streaming/interactive use\n  --parallel  Parallel processing - best for high-throughput batch analysis"
+)]
 #[command(version = "0.2.0")]
 #[command(author = "Dirk Loss <mail@dirk-loss.de>")]
 pub struct Cli {
@@ -123,6 +128,10 @@ pub struct Cli {
     /// Exclude events with these log levels (comma-separated, case-insensitive, higher priority than --levels)
     #[arg(short = 'L', long = "exclude-levels", value_delimiter = ',')]
     pub exclude_levels: Vec<String>,
+
+    /// Disable emoji prefixes in error messages
+    #[arg(long = "no-emoji")]
+    pub no_emoji: bool,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -174,9 +183,11 @@ impl Cli {
 
         // Get filter stages with their indices
         if let Some(filter_indices) = matches.indices_of("filters") {
-            let filter_values: Vec<&String> = matches.get_many::<String>("filters").unwrap().collect();
+            let filter_values: Vec<&String> =
+                matches.get_many::<String>("filters").unwrap().collect();
             for (pos, index) in filter_indices.enumerate() {
-                stages_with_indices.push((index, ScriptStageType::Filter(filter_values[pos].clone())));
+                stages_with_indices
+                    .push((index, ScriptStageType::Filter(filter_values[pos].clone())));
             }
         }
 
@@ -201,10 +212,12 @@ impl Cli {
 
 fn main() -> Result<()> {
     // Initialize signal handling early
-    let _signal_handler = SignalHandler::new().map_err(|e| {
-        eprintln!("Failed to initialize signal handling: {}", e);
-        ExitCode::GeneralError.exit();
-    }).unwrap();
+    let _signal_handler = SignalHandler::new()
+        .map_err(|e| {
+            eprintln!("Failed to initialize signal handling: {}", e);
+            ExitCode::GeneralError.exit();
+        })
+        .unwrap();
 
     // Initialize process cleanup
     let _cleanup = ProcessCleanup::new();
@@ -215,22 +228,27 @@ fn main() -> Result<()> {
 
     let matches = Cli::command().get_matches();
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| {
-        stderr.writeln(&format!("Error: {}", e)).unwrap_or(());
+        // Can't format with config yet, so use fallback
+        stderr
+            .writeln(&format!("kelora: Error: {}", e))
+            .unwrap_or(());
         ExitCode::InvalidUsage.exit();
     });
 
     // Extract ordered script stages
     let ordered_stages = cli.get_ordered_script_stages(&matches);
 
-    // Validate arguments early
-    if let Err(e) = validate_cli_args(&cli) {
-        stderr.writeln(&format!("Error: {}", e)).unwrap_or(());
-        ExitCode::InvalidUsage.exit();
-    }
-
     // Create configuration from CLI and set stages
     let mut config = KeloraConfig::from_cli(&cli);
     config.processing.stages = ordered_stages;
+
+    // Validate arguments early
+    if let Err(e) = validate_cli_args(&cli) {
+        stderr
+            .writeln(&config.format_error_message(&format!("Error: {}", e)))
+            .unwrap_or(());
+        ExitCode::InvalidUsage.exit();
+    }
 
     // Determine processing mode using config
     let use_parallel = config.should_use_parallel();
@@ -244,14 +262,19 @@ fn main() -> Result<()> {
     }
 
     // Clean shutdown
-    
+
     ExitCode::Success.exit();
 }
 
 /// Run parallel processing mode
 /// Note: stdout parameter is currently unused as ParallelProcessor creates its own SafeStdout,
 /// but kept for consistency with run_sequential and future flexibility
-fn run_parallel(config: &KeloraConfig, batch_size: usize, _stdout: &mut SafeStdout, stderr: &mut SafeStderr) {
+fn run_parallel(
+    config: &KeloraConfig,
+    batch_size: usize,
+    _stdout: &mut SafeStdout,
+    stderr: &mut SafeStderr,
+) {
     // Parallel processing mode with proper Unix behavior
     let parallel_config = ParallelConfig {
         num_workers: config.effective_threads(),
@@ -262,32 +285,45 @@ fn run_parallel(config: &KeloraConfig, batch_size: usize, _stdout: &mut SafeStdo
     };
 
     let processor = ParallelProcessor::new(parallel_config);
-    
+
     // Create pipeline builder and components for begin/end stages
     let pipeline_builder = create_pipeline_builder_from_config(config);
-    let (_pipeline, begin_stage, end_stage, mut ctx) = match pipeline_builder.clone().build(config.processing.stages.clone()) {
+    let (_pipeline, begin_stage, end_stage, mut ctx) = match pipeline_builder
+        .clone()
+        .build(config.processing.stages.clone())
+    {
         Ok(pipeline_components) => pipeline_components,
         Err(e) => {
-            stderr.writeln(&format!("Failed to create pipeline: {}", e)).unwrap_or(());
+            stderr
+                .writeln(&config.format_error_message(&format!("Failed to create pipeline: {}", e)))
+                .unwrap_or(());
             ExitCode::GeneralError.exit();
         }
     };
-    
+
     // Execute begin stage sequentially if provided
-    execute_begin_stage(&begin_stage, &mut ctx, stderr);
+    execute_begin_stage(&begin_stage, &mut ctx, config, stderr);
 
     // Get reader using pipeline builder
     let reader = match create_input_reader(config) {
         Ok(r) => r,
         Err(e) => {
-            stderr.writeln(&format!("Failed to create input reader: {}", e)).unwrap_or(());
+            stderr
+                .writeln(
+                    &config.format_error_message(&format!("Failed to create input reader: {}", e)),
+                )
+                .unwrap_or(());
             ExitCode::GeneralError.exit();
         }
     };
 
     // Process stages in parallel
-    if let Err(e) = processor.process_with_pipeline(reader, pipeline_builder, config.processing.stages.clone()) {
-        stderr.writeln(&format!("Parallel processing error: {}", e)).unwrap_or(());
+    if let Err(e) =
+        processor.process_with_pipeline(reader, pipeline_builder, config.processing.stages.clone())
+    {
+        stderr
+            .writeln(&config.format_error_message(&format!("Parallel processing error: {}", e)))
+            .unwrap_or(());
         ExitCode::GeneralError.exit();
     }
 
@@ -298,28 +334,35 @@ fn run_parallel(config: &KeloraConfig, batch_size: usize, _stdout: &mut SafeStdo
     }
 
     // Execute end stage sequentially with merged state
-    execute_end_stage(&end_stage, &ctx, stderr);
+    execute_end_stage(&end_stage, &ctx, config, stderr);
 }
 
 /// Run sequential processing mode
 fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut SafeStderr) {
     // Sequential processing mode using new pipeline architecture
-    let (mut pipeline, begin_stage, end_stage, mut ctx) = match create_pipeline_from_config(config) {
+    let (mut pipeline, begin_stage, end_stage, mut ctx) = match create_pipeline_from_config(config)
+    {
         Ok(pipeline_components) => pipeline_components,
         Err(e) => {
-            stderr.writeln(&format!("Failed to create pipeline: {}", e)).unwrap_or(());
+            stderr
+                .writeln(&config.format_error_message(&format!("Failed to create pipeline: {}", e)))
+                .unwrap_or(());
             ExitCode::GeneralError.exit();
         }
     };
 
     // Execute begin stage
-    execute_begin_stage(&begin_stage, &mut ctx, stderr);
+    execute_begin_stage(&begin_stage, &mut ctx, config, stderr);
 
     // Get input reader using pipeline builder
     let reader = match create_sequential_input_reader(config) {
         Ok(r) => r,
         Err(e) => {
-            stderr.writeln(&format!("Failed to create input reader: {}", e)).unwrap_or(());
+            stderr
+                .writeln(
+                    &config.format_error_message(&format!("Failed to create input reader: {}", e)),
+                )
+                .unwrap_or(());
             ExitCode::GeneralError.exit();
         }
     };
@@ -332,10 +375,16 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
             ExitCode::SignalInt.exit();
         });
 
-        let line = line_result.map_err(|e| {
-            stderr.writeln(&format!("Failed to read input line: {}", e)).unwrap_or(());
-            ExitCode::GeneralError.exit();
-        }).unwrap();
+        let line = line_result
+            .map_err(|e| {
+                stderr
+                    .writeln(
+                        &config.format_error_message(&format!("Failed to read input line: {}", e)),
+                    )
+                    .unwrap_or(());
+                ExitCode::GeneralError.exit();
+            })
+            .unwrap();
         line_num += 1;
 
         if line.trim().is_empty() {
@@ -344,24 +393,33 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
 
         // Update metadata
         ctx.meta.line_number = Some(line_num);
-        
+
         // Process line through pipeline
         match pipeline.process_line(line, &mut ctx) {
             Ok(results) => {
                 // Output all results (usually just one)
                 for result in results {
                     stdout.writeln(&result).unwrap_or_else(|e| {
-                        stderr.writeln(&format!("Output error: {}", e)).unwrap_or(());
+                        stderr
+                            .writeln(&config.format_error_message(&format!("Output error: {}", e)))
+                            .unwrap_or(());
                         ExitCode::GeneralError.exit();
                     });
                 }
                 stdout.flush().unwrap_or_else(|e| {
-                    stderr.writeln(&format!("Flush error: {}", e)).unwrap_or(());
+                    stderr
+                        .writeln(&config.format_error_message(&format!("Flush error: {}", e)))
+                        .unwrap_or(());
                     ExitCode::GeneralError.exit();
                 });
             }
             Err(e) => {
-                stderr.writeln(&format!("Pipeline error on line {}: {}", line_num, e)).unwrap_or(());
+                stderr
+                    .writeln(&config.format_error_message(&format!(
+                        "Pipeline error on line {}: {}",
+                        line_num, e
+                    )))
+                    .unwrap_or(());
                 match config.processing.on_error {
                     config::ErrorStrategy::Abort => ExitCode::GeneralError.exit(),
                     _ => continue, // Skip, Print, and Stub all continue processing
@@ -375,38 +433,56 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
         Ok(results) => {
             for result in results {
                 stdout.writeln(&result).unwrap_or_else(|e| {
-                    stderr.writeln(&format!("Output error: {}", e)).unwrap_or(());
+                    stderr
+                        .writeln(&config.format_error_message(&format!("Output error: {}", e)))
+                        .unwrap_or(());
                     ExitCode::GeneralError.exit();
                 });
             }
         }
         Err(e) => {
-            stderr.writeln(&format!("Pipeline flush error: {}", e)).unwrap_or(());
+            stderr
+                .writeln(&config.format_error_message(&format!("Pipeline flush error: {}", e)))
+                .unwrap_or(());
         }
     }
 
     // Execute end stage
-    execute_end_stage(&end_stage, &ctx, stderr);
+    execute_end_stage(&end_stage, &ctx, config, stderr);
 }
 
-
 /// Execute begin stage with shared error handling
-fn execute_begin_stage(begin_stage: &pipeline::BeginStage, ctx: &mut pipeline::PipelineContext, stderr: &mut SafeStderr) {
+fn execute_begin_stage(
+    begin_stage: &pipeline::BeginStage,
+    ctx: &mut pipeline::PipelineContext,
+    config: &KeloraConfig,
+    stderr: &mut SafeStderr,
+) {
     if let Err(e) = begin_stage.execute(ctx) {
-        stderr.writeln(&format!("Begin stage error: {}", e)).unwrap_or(());
+        stderr
+            .writeln(&config.format_error_message(&format!(
+                "Begin stage error: {}",
+                e
+            )))
+            .unwrap_or(());
         ExitCode::GeneralError.exit();
     }
 }
 
 /// Execute end stage with shared error handling
-fn execute_end_stage(end_stage: &pipeline::EndStage, ctx: &pipeline::PipelineContext, stderr: &mut SafeStderr) {
+fn execute_end_stage(
+    end_stage: &pipeline::EndStage,
+    ctx: &pipeline::PipelineContext,
+    config: &KeloraConfig,
+    stderr: &mut SafeStderr,
+) {
     if let Err(e) = end_stage.execute(ctx) {
-        stderr.writeln(&format!("End stage error: {}", e)).unwrap_or(());
+        stderr
+            .writeln(&config.format_error_message(&format!("End stage error: {}", e)))
+            .unwrap_or(());
         ExitCode::GeneralError.exit();
     }
 }
-
-
 
 /// Validate CLI arguments for early error detection
 fn validate_cli_args(cli: &Cli) -> Result<()> {
@@ -416,19 +492,19 @@ fn validate_cli_args(cli: &Cli) -> Result<()> {
             return Err(anyhow::anyhow!("File not found: {}", file_path));
         }
     }
-    
+
     // Validate batch size
     if let Some(batch_size) = cli.batch_size {
         if batch_size == 0 {
             return Err(anyhow::anyhow!("Batch size must be greater than 0"));
         }
     }
-    
+
     // Validate thread count
     if cli.threads > 1000 {
         return Err(anyhow::anyhow!("Thread count too high (max 1000)"));
     }
-    
+
     Ok(())
 }
 
@@ -441,20 +517,18 @@ fn validate_config(config: &KeloraConfig) -> Result<()> {
             return Err(anyhow::anyhow!("File not found: {}", file_path));
         }
     }
-    
+
     // Validate batch size
     if let Some(batch_size) = config.performance.batch_size {
         if batch_size == 0 {
             return Err(anyhow::anyhow!("Batch size must be greater than 0"));
         }
     }
-    
+
     // Validate thread count
     if config.performance.threads > 1000 {
         return Err(anyhow::anyhow!("Thread count too high (max 1000)"));
     }
-    
+
     Ok(())
 }
-
-
