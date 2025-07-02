@@ -76,7 +76,7 @@ impl RhaiEngine {
 
     // Individual compilation methods for pipeline stages
     pub fn compile_filter(&mut self, filter: &str) -> Result<CompiledExpression> {
-        let ast = self.engine.compile(filter)
+        let ast = self.engine.compile_expression(filter)
             .with_context(|| format!("Failed to compile filter expression: {}", filter))?;
         Ok(CompiledExpression {
             ast,
@@ -116,7 +116,7 @@ impl RhaiEngine {
         Self::set_thread_tracking_state(tracked);
         let mut scope = self.create_scope_for_event(event);
         
-        let result = self.engine.eval_ast_with_scope::<bool>(&mut scope, &compiled.ast)
+        let result = self.engine.eval_expression_with_scope::<bool>(&mut scope, &compiled.expr)
             .map_err(|e| anyhow::anyhow!("Failed to execute filter expression '{}': {}", compiled.expr, e))?;
         
         *tracked = Self::get_thread_tracking_state();
