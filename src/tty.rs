@@ -11,8 +11,8 @@ pub fn should_use_colors_with_mode(color_mode: &ColorMode) -> bool {
     match color_mode {
         ColorMode::Never => false,
         ColorMode::Always => {
-            // Even with Always, respect NO_COLOR for security/accessibility
-            std::env::var("NO_COLOR").is_err()
+            // --force-color should override NO_COLOR environment variable
+            true
         },
         ColorMode::Auto => should_use_colors_auto(),
     }

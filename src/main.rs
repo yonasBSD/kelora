@@ -117,9 +117,13 @@ pub struct Cli {
     #[arg(long = "file-order", value_enum, default_value = "none")]
     pub file_order: FileOrder,
 
-    /// Control colored output (auto/always/never)
-    #[arg(long = "color", value_enum, default_value = "auto")]
-    pub color: ColorMode,
+    /// Force colored output even when not on TTY (overrides NO_COLOR environment variable)
+    #[arg(long = "force-color")]
+    pub force_color: bool,
+
+    /// Disable colored output (takes precedence over --force-color)
+    #[arg(long = "no-color")]
+    pub no_color: bool,
 
     /// Include only events with these log levels (comma-separated, case-insensitive, e.g. debug,warn,error)
     #[arg(short = 'l', long = "levels", value_delimiter = ',')]
@@ -169,12 +173,6 @@ pub enum FileOrder {
     Mtime,
 }
 
-#[derive(clap::ValueEnum, Clone, Debug)]
-pub enum ColorMode {
-    Auto,
-    Always,
-    Never,
-}
 
 impl Cli {
     /// Extract filter and exec stages in the order they appeared on the command line

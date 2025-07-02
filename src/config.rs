@@ -163,6 +163,15 @@ impl OutputConfig {
 impl KeloraConfig {
     /// Create configuration from CLI arguments
     pub fn from_cli(cli: &crate::Cli) -> Self {
+        // Determine color mode from flags (no-color takes precedence over force-color)
+        let color_mode = if cli.no_color {
+            ColorMode::Never
+        } else if cli.force_color {
+            ColorMode::Always
+        } else {
+            ColorMode::Auto
+        };
+
         Self {
             input: InputConfig {
                 files: cli.files.clone(),
@@ -175,7 +184,7 @@ impl KeloraConfig {
                 exclude_keys: cli.exclude_keys.clone(),
                 core: cli.core,
                 brief: cli.brief,
-                color: cli.color.clone().into(),
+                color: color_mode,
                 no_emoji: cli.no_emoji,
             },
             processing: ProcessingConfig {
@@ -352,22 +361,3 @@ impl From<FileOrder> for crate::FileOrder {
     }
 }
 
-impl From<crate::ColorMode> for ColorMode {
-    fn from(mode: crate::ColorMode) -> Self {
-        match mode {
-            crate::ColorMode::Auto => ColorMode::Auto,
-            crate::ColorMode::Always => ColorMode::Always,
-            crate::ColorMode::Never => ColorMode::Never,
-        }
-    }
-}
-
-impl From<ColorMode> for crate::ColorMode {
-    fn from(mode: ColorMode) -> Self {
-        match mode {
-            ColorMode::Auto => crate::ColorMode::Auto,
-            ColorMode::Always => crate::ColorMode::Always,
-            ColorMode::Never => crate::ColorMode::Never,
-        }
-    }
-}
