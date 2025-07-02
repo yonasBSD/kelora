@@ -5,9 +5,14 @@ use tempfile::NamedTempFile;
 
 /// Helper function to run kelora with given arguments and input via stdin
 fn run_kelora_with_input(args: &[&str], input: &str) -> (String, String, i32) {
-    let mut cmd = Command::new("cargo")
-        .arg("run")
-        .arg("--")
+    // Use the built binary directly instead of cargo run to avoid compilation output
+    let binary_path = if cfg!(debug_assertions) {
+        "./target/debug/kelora"
+    } else {
+        "./target/release/kelora"
+    };
+
+    let mut cmd = Command::new(binary_path)
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -41,9 +46,14 @@ fn run_kelora_with_file(args: &[&str], file_content: &str) -> (String, String, i
     let mut full_args = args.to_vec();
     full_args.push(temp_file.path().to_str().unwrap());
 
-    let cmd = Command::new("cargo")
-        .arg("run")
-        .arg("--")
+    // Use the built binary directly instead of cargo run to avoid compilation output
+    let binary_path = if cfg!(debug_assertions) {
+        "./target/debug/kelora"
+    } else {
+        "./target/release/kelora"
+    };
+
+    let cmd = Command::new(binary_path)
         .args(&full_args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -1110,4 +1120,70 @@ fn test_core_field_multiple_timestamp_variants() {
     assert!(stdout.contains("level="), "Should contain level field");
     assert!(stdout.contains("message="), "Should contain message field");
     assert!(!stdout.contains("other="), "Should not contain non-core other field");
+}
+
+#[test]
+fn test_ordered_filter_exec_stages() {
+    // Test that filter and exec stages execute in the exact CLI order
+    let input = r#"{"status": "200", "message": "OK"}"#;
+    
+    // Test correct order: exec (convert) -> filter -> filter -> exec (add field)
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &["-f", "jsonl", 
+          "--exec", "let status=status.to_int()", 
+          "--filter", "status > 100", 
+          "--filter", "status < 400", 
+          "--exec", "let level=\"info\""],
+        input,
+    );
+    
+    assert_eq!(exit_code, 0);
+    assert_eq!(stderr, "");
+    assert!(stdout.contains("status=200"));
+    assert!(stdout.contains("level=\"info\""));
+    
+    // Test wrong order: filter before conversion should fail
+    let (stdout2, _stderr2, _exit_code2) = run_kelora_with_input(
+        &["-f", "jsonl", 
+          "--filter", "status > 100",  // This will fail on string "200"
+          "--exec", "let status=status.to_int()", 
+          "--filter", "status < 400", 
+          "--exec", "let level=\"info\""],
+        input,
+    );
+    
+    // Should produce no output because string "200" > 100 comparison doesn't work as expected
+    assert!(stdout2.trim().is_empty());
+}
+
+#[test]
+fn test_complex_ordered_pipeline() {
+    // Test a more complex pipeline with transformations and filtering
+    let input = r#"{"value": 5}
+{"value": 15}
+{"value": 25}"#;
+    
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &["-f", "jsonl", 
+          "--exec", "let doubled = value * 2",
+          "--filter", "doubled > 20",
+          "--exec", "let status = if doubled > 30 { \"high\" } else { \"medium\" }"],
+        input,
+    );
+    
+    assert_eq!(exit_code, 0);
+    assert_eq!(stderr, "");
+    
+    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(lines.len(), 2);  // Should filter out value=5 (doubled=10)
+    
+    // Check first line (value=15, doubled=30, status="medium")
+    assert!(lines[0].contains("value=15"));
+    assert!(lines[0].contains("doubled=30"));
+    assert!(lines[0].contains("status=\"medium\""));
+    
+    // Check second line (value=25, doubled=50, status="high")
+    assert!(lines[1].contains("value=25"));
+    assert!(lines[1].contains("doubled=50"));
+    assert!(lines[1].contains("status=\"high\""));
 }

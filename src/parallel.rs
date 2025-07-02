@@ -172,11 +172,12 @@ impl ParallelProcessor {
         }
     }
 
-    /// Process input using the parallel pipeline with new pipeline architecture
+    /// Process input using the parallel pipeline
     pub fn process_with_pipeline<R: std::io::BufRead + Send + 'static>(
         &self,
         reader: R,
         pipeline_builder: PipelineBuilder,
+        stages: Vec<crate::config::ScriptStageType>,
     ) -> Result<()> {
         // Create channels
         let (batch_sender, batch_receiver) = if let Some(size) = self.config.buffer_size {
@@ -209,6 +210,7 @@ impl ParallelProcessor {
             let batch_receiver = batch_receiver.clone();
             let result_sender = result_sender.clone();
             let worker_pipeline_builder = pipeline_builder.clone();
+            let worker_stages = stages.clone();
             
             let handle = thread::spawn(move || {
                 Self::worker_thread(
@@ -216,6 +218,7 @@ impl ParallelProcessor {
                     batch_receiver,
                     result_sender,
                     worker_pipeline_builder,
+                    worker_stages,
                 )
             });
             worker_handles.push(handle);
@@ -344,15 +347,16 @@ impl ParallelProcessor {
         Ok(())
     }
 
-    /// Worker thread: processes batches in parallel using new pipeline architecture
+    /// Worker thread: processes batches in parallel
     fn worker_thread(
         _worker_id: usize,
         batch_receiver: Receiver<Batch>,
         result_sender: Sender<BatchResult>,
         pipeline_builder: PipelineBuilder,
+        stages: Vec<crate::config::ScriptStageType>,
     ) -> Result<()> {
         // Create worker pipeline and context
-        let (mut pipeline, mut ctx) = pipeline_builder.build_worker()?;
+        let (mut pipeline, mut ctx) = pipeline_builder.build_worker(stages)?;
 
         while let Ok(batch) = batch_receiver.recv() {
             // Reset tracking state for this batch

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap::Parser;
+use clap::{ArgMatches, CommandFactory, FromArgMatches, Parser};
 use std::io::BufRead;
 
 mod colors;
@@ -16,7 +16,7 @@ mod rhai_functions;
 mod tty;
 mod unix;
 
-use config::KeloraConfig;
+use config::{KeloraConfig, ScriptStageType};
 use parallel::{ParallelConfig, ParallelProcessor};
 use pipeline::{create_pipeline_from_config, create_pipeline_builder_from_config, create_input_reader, create_sequential_input_reader};
 use unix::{ExitCode, SignalHandler, SafeStdout, SafeStderr, ProcessCleanup, check_termination};
@@ -167,6 +167,38 @@ pub enum ColorMode {
     Never,
 }
 
+impl Cli {
+    /// Extract filter and exec stages in the order they appeared on the command line
+    fn get_ordered_script_stages(&self, matches: &ArgMatches) -> Vec<ScriptStageType> {
+        let mut stages_with_indices = Vec::new();
+
+        // Get filter stages with their indices
+        if let Some(filter_indices) = matches.indices_of("filters") {
+            let filter_values: Vec<&String> = matches.get_many::<String>("filters").unwrap().collect();
+            for (pos, index) in filter_indices.enumerate() {
+                stages_with_indices.push((index, ScriptStageType::Filter(filter_values[pos].clone())));
+            }
+        }
+
+        // Get exec stages with their indices
+        if let Some(exec_indices) = matches.indices_of("execs") {
+            let exec_values: Vec<&String> = matches.get_many::<String>("execs").unwrap().collect();
+            for (pos, index) in exec_indices.enumerate() {
+                stages_with_indices.push((index, ScriptStageType::Exec(exec_values[pos].clone())));
+            }
+        }
+
+        // Sort by original command line position
+        stages_with_indices.sort_by_key(|(index, _)| *index);
+
+        // Extract just the stages
+        stages_with_indices
+            .into_iter()
+            .map(|(_, stage)| stage)
+            .collect()
+    }
+}
+
 fn main() -> Result<()> {
     // Initialize signal handling early
     let _signal_handler = SignalHandler::new().map_err(|e| {
@@ -181,7 +213,14 @@ fn main() -> Result<()> {
     let mut stdout = SafeStdout::new();
     let mut stderr = SafeStderr::new();
 
-    let cli = Cli::parse();
+    let matches = Cli::command().get_matches();
+    let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| {
+        stderr.writeln(&format!("Error: {}", e)).unwrap_or(());
+        ExitCode::InvalidUsage.exit();
+    });
+
+    // Extract ordered script stages
+    let ordered_stages = cli.get_ordered_script_stages(&matches);
 
     // Validate arguments early
     if let Err(e) = validate_cli_args(&cli) {
@@ -189,8 +228,9 @@ fn main() -> Result<()> {
         ExitCode::InvalidUsage.exit();
     }
 
-    // Create configuration from CLI
-    let config = KeloraConfig::from_cli(&cli);
+    // Create configuration from CLI and set stages
+    let mut config = KeloraConfig::from_cli(&cli);
+    config.processing.stages = ordered_stages;
 
     // Determine processing mode using config
     let use_parallel = config.should_use_parallel();
@@ -225,7 +265,7 @@ fn run_parallel(config: &KeloraConfig, batch_size: usize, _stdout: &mut SafeStdo
     
     // Create pipeline builder and components for begin/end stages
     let pipeline_builder = create_pipeline_builder_from_config(config);
-    let (_pipeline, begin_stage, end_stage, mut ctx) = match pipeline_builder.clone().build() {
+    let (_pipeline, begin_stage, end_stage, mut ctx) = match pipeline_builder.clone().build(config.processing.stages.clone()) {
         Ok(pipeline_components) => pipeline_components,
         Err(e) => {
             stderr.writeln(&format!("Failed to create pipeline: {}", e)).unwrap_or(());
@@ -245,8 +285,8 @@ fn run_parallel(config: &KeloraConfig, batch_size: usize, _stdout: &mut SafeStdo
         }
     };
 
-    // Process filter and exec stages in parallel using new pipeline architecture
-    if let Err(e) = processor.process_with_pipeline(reader, pipeline_builder) {
+    // Process stages in parallel
+    if let Err(e) = processor.process_with_pipeline(reader, pipeline_builder, config.processing.stages.clone()) {
         stderr.writeln(&format!("Parallel processing error: {}", e)).unwrap_or(());
         ExitCode::GeneralError.exit();
     }

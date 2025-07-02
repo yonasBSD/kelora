@@ -5,77 +5,51 @@ use super::{ScriptStage, ScriptResult, PipelineContext};
 
 /// Filter stage implementation
 pub struct FilterStage {
-    compiled_filters: Vec<crate::engine::CompiledExpression>,
+    compiled_filter: crate::engine::CompiledExpression,
 }
 
 impl FilterStage {
-    pub fn new(filters: Vec<String>, engine: &mut RhaiEngine) -> Result<Self> {
-        let mut compiled_filters = Vec::new();
-        for filter in filters {
-            let compiled = engine.compile_filter(&filter)?;
-            compiled_filters.push(compiled);
-        }
-        Ok(Self { compiled_filters })
+    pub fn new(filter: String, engine: &mut RhaiEngine) -> Result<Self> {
+        let compiled_filter = engine.compile_filter(&filter)?;
+        Ok(Self { compiled_filter })
     }
 }
 
 impl ScriptStage for FilterStage {
     fn apply(&mut self, event: Event, ctx: &mut PipelineContext) -> ScriptResult {
-        if self.compiled_filters.is_empty() {
-            return ScriptResult::Emit(event);
-        }
-
-        // Execute all filters - if any returns false, skip the event
-        for compiled_filter in &self.compiled_filters {
-            match ctx.rhai.execute_compiled_filter(compiled_filter, &event, &mut ctx.tracker) {
-                Ok(result) => {
-                    if !result {
-                        return ScriptResult::Skip;
-                    }
-                }
-                Err(e) => {
-                    return ScriptResult::Error(format!("Filter error: {}", e));
+        match ctx.rhai.execute_compiled_filter(&self.compiled_filter, &event, &mut ctx.tracker) {
+            Ok(result) => {
+                if result {
+                    ScriptResult::Emit(event)
+                } else {
+                    ScriptResult::Skip
                 }
             }
+            Err(e) => {
+                ScriptResult::Error(format!("Filter error: {}", e))
+            }
         }
-
-        ScriptResult::Emit(event)
     }
 }
 
 /// Exec stage implementation
 pub struct ExecStage {
-    compiled_execs: Vec<crate::engine::CompiledExpression>,
+    compiled_exec: crate::engine::CompiledExpression,
 }
 
 impl ExecStage {
-    pub fn new(execs: Vec<String>, engine: &mut RhaiEngine) -> Result<Self> {
-        let mut compiled_execs = Vec::new();
-        for exec in execs {
-            let compiled = engine.compile_exec(&exec)?;
-            compiled_execs.push(compiled);
-        }
-        Ok(Self { compiled_execs })
+    pub fn new(exec: String, engine: &mut RhaiEngine) -> Result<Self> {
+        let compiled_exec = engine.compile_exec(&exec)?;
+        Ok(Self { compiled_exec })
     }
 }
 
 impl ScriptStage for ExecStage {
     fn apply(&mut self, mut event: Event, ctx: &mut PipelineContext) -> ScriptResult {
-        if self.compiled_execs.is_empty() {
-            return ScriptResult::Emit(event);
+        match ctx.rhai.execute_compiled_exec(&self.compiled_exec, &mut event, &mut ctx.tracker) {
+            Ok(()) => ScriptResult::Emit(event),
+            Err(e) => ScriptResult::Error(format!("Exec error: {}", e)),
         }
-
-        // Execute all exec scripts in sequence
-        for compiled_exec in &self.compiled_execs {
-            match ctx.rhai.execute_compiled_exec(compiled_exec, &mut event, &mut ctx.tracker) {
-                Ok(()) => {}
-                Err(e) => {
-                    return ScriptResult::Error(format!("Exec error: {}", e));
-                }
-            }
-        }
-
-        ScriptResult::Emit(event)
     }
 }
 

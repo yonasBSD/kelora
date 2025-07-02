@@ -28,12 +28,18 @@ pub struct OutputConfig {
     pub color: ColorMode,
 }
 
+/// Ordered script stages that preserve CLI order
+#[derive(Debug, Clone)]
+pub enum ScriptStageType {
+    Filter(String),
+    Exec(String),
+}
+
 /// Processing configuration
 #[derive(Debug, Clone)]
 pub struct ProcessingConfig {
     pub begin: Option<String>,
-    pub filters: Vec<String>,
-    pub execs: Vec<String>,
+    pub stages: Vec<ScriptStageType>,
     pub end: Option<String>,
     pub no_inject_fields: bool,
     pub inject_prefix: Option<String>,
@@ -146,8 +152,7 @@ impl KeloraConfig {
             },
             processing: ProcessingConfig {
                 begin: cli.begin.clone(),
-                filters: cli.filters.clone(),
-                execs: cli.execs.clone(),
+                stages: Vec::new(), // Will be set by main() after CLI parsing
                 end: cli.end.clone(),
                 no_inject_fields: cli.no_inject_fields,
                 inject_prefix: cli.inject_prefix.clone(),
@@ -206,8 +211,7 @@ impl Default for KeloraConfig {
             },
             processing: ProcessingConfig {
                 begin: None,
-                filters: Vec::new(),
-                execs: Vec::new(),
+                stages: Vec::new(),
                 end: None,
                 no_inject_fields: false,
                 inject_prefix: None,

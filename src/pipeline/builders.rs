@@ -17,8 +17,6 @@ use super::{
 #[derive(Clone)]
 pub struct PipelineBuilder {
     config: PipelineConfig,
-    filters: Vec<String>,
-    execs: Vec<String>,
     begin: Option<String>,
     end: Option<String>,
     input_format: crate::InputFormat,
@@ -40,8 +38,6 @@ impl PipelineBuilder {
                 inject_prefix: None,
                 color_mode: crate::config::ColorMode::Auto,
             },
-            filters: Vec::new(),
-            execs: Vec::new(),
             begin: None,
             end: None,
             input_format: crate::InputFormat::Jsonl,
@@ -59,44 +55,8 @@ impl PipelineBuilder {
         self
     }
 
-    pub fn with_filters(mut self, filters: Vec<String>) -> Self {
-        self.filters = filters;
-        self
-    }
-
-    pub fn with_execs(mut self, execs: Vec<String>) -> Self {
-        self.execs = execs;
-        self
-    }
-
-    pub fn with_begin(mut self, begin: Option<String>) -> Self {
-        self.begin = begin;
-        self
-    }
-
-    pub fn with_end(mut self, end: Option<String>) -> Self {
-        self.end = end;
-        self
-    }
-
-    pub fn with_input_format(mut self, format: crate::InputFormat) -> Self {
-        self.input_format = format;
-        self
-    }
-
-    pub fn with_output_format(mut self, format: crate::OutputFormat) -> Self {
-        self.output_format = format;
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn with_take_limit(mut self, limit: Option<usize>) -> Self {
-        self.take_limit = limit;
-        self
-    }
-
-    /// Build a complete pipeline with begin/end stages for sequential processing
-    pub fn build(self) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
+    /// Build pipeline with stages
+    pub fn build(self, stages: Vec<crate::config::ScriptStageType>) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
 
         // Create parser
@@ -124,14 +84,17 @@ impl PipelineBuilder {
         // Create script stages
         let mut script_stages: Vec<Box<dyn ScriptStage>> = Vec::new();
         
-        if !self.filters.is_empty() {
-            let filter_stage = FilterStage::new(self.filters, &mut rhai_engine)?;
-            script_stages.push(Box::new(filter_stage));
-        }
-
-        if !self.execs.is_empty() {
-            let exec_stage = ExecStage::new(self.execs, &mut rhai_engine)?;
-            script_stages.push(Box::new(exec_stage));
+        for stage in stages {
+            match stage {
+                crate::config::ScriptStageType::Filter(filter) => {
+                    let filter_stage = FilterStage::new(filter, &mut rhai_engine)?;
+                    script_stages.push(Box::new(filter_stage));
+                }
+                crate::config::ScriptStageType::Exec(exec) => {
+                    let exec_stage = ExecStage::new(exec, &mut rhai_engine)?;
+                    script_stages.push(Box::new(exec_stage));
+                }
+            }
         }
 
         // Add level filtering stage (runs after all script stages, before key filtering)
@@ -181,9 +144,36 @@ impl PipelineBuilder {
         Ok((pipeline, begin_stage, end_stage, ctx))
     }
 
-    /// Build a worker pipeline for parallel processing (no begin/end stages, no output writer)
+    pub fn with_begin(mut self, begin: Option<String>) -> Self {
+        self.begin = begin;
+        self
+    }
+
+    pub fn with_end(mut self, end: Option<String>) -> Self {
+        self.end = end;
+        self
+    }
+
+    pub fn with_input_format(mut self, format: crate::InputFormat) -> Self {
+        self.input_format = format;
+        self
+    }
+
+    pub fn with_output_format(mut self, format: crate::OutputFormat) -> Self {
+        self.output_format = format;
+        self
+    }
+
     #[allow(dead_code)]
-    pub fn build_worker(self) -> Result<(Pipeline, PipelineContext)> {
+    pub fn with_take_limit(mut self, limit: Option<usize>) -> Self {
+        self.take_limit = limit;
+        self
+    }
+
+
+
+    /// Build a worker pipeline for parallel processing
+    pub fn build_worker(self, stages: Vec<crate::config::ScriptStageType>) -> Result<(Pipeline, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
 
         // Create parser
@@ -211,14 +201,17 @@ impl PipelineBuilder {
         // Create script stages
         let mut script_stages: Vec<Box<dyn ScriptStage>> = Vec::new();
         
-        if !self.filters.is_empty() {
-            let filter_stage = FilterStage::new(self.filters, &mut rhai_engine)?;
-            script_stages.push(Box::new(filter_stage));
-        }
-
-        if !self.execs.is_empty() {
-            let exec_stage = ExecStage::new(self.execs, &mut rhai_engine)?;
-            script_stages.push(Box::new(exec_stage));
+        for stage in stages {
+            match stage {
+                crate::config::ScriptStageType::Filter(filter) => {
+                    let filter_stage = FilterStage::new(filter, &mut rhai_engine)?;
+                    script_stages.push(Box::new(filter_stage));
+                }
+                crate::config::ScriptStageType::Exec(exec) => {
+                    let exec_stage = ExecStage::new(exec, &mut rhai_engine)?;
+                    script_stages.push(Box::new(exec_stage));
+                }
+            }
         }
 
         // Add level filtering stage (runs after all script stages, before key filtering)
@@ -267,45 +260,11 @@ impl Default for PipelineBuilder {
     }
 }
 
-/// Create a pipeline from CLI arguments
-/// Deprecated: Use create_pipeline_from_config instead
-#[allow(dead_code)]
-pub fn create_pipeline_from_cli(cli: &crate::Cli) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
-    let builder = create_pipeline_builder_from_cli(cli);
-    builder.build()
-}
-
-/// Create a pipeline builder from CLI arguments (useful for parallel processing)
-/// Deprecated: Use create_pipeline_builder_from_config instead
-#[allow(dead_code)]
-pub fn create_pipeline_builder_from_cli(cli: &crate::Cli) -> PipelineBuilder {
-    let config = PipelineConfig {
-        on_error: cli.on_error.clone(),
-        brief: cli.brief,
-        no_inject_fields: cli.no_inject_fields,
-        inject_prefix: cli.inject_prefix.clone(),
-        color_mode: cli.color.clone().into(),
-    };
-
-    let mut builder = PipelineBuilder::new()
-        .with_config(config)
-        .with_filters(cli.filters.clone())
-        .with_execs(cli.execs.clone())
-        .with_begin(cli.begin.clone())
-        .with_end(cli.end.clone())
-        .with_input_format(cli.format.clone())
-        .with_output_format(cli.output_format.clone());
-    builder.keys = cli.keys.clone();
-    builder.exclude_keys = cli.exclude_keys.clone();
-    builder.levels = cli.levels.clone();
-    builder.exclude_levels = cli.exclude_levels.clone();
-    builder
-}
 
 /// Create a pipeline from configuration
 pub fn create_pipeline_from_config(config: &crate::config::KeloraConfig) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
     let builder = create_pipeline_builder_from_config(config);
-    builder.build()
+    builder.build(config.processing.stages.clone())
 }
 
 /// Create a pipeline builder from configuration (useful for parallel processing)
@@ -320,8 +279,6 @@ pub fn create_pipeline_builder_from_config(config: &crate::config::KeloraConfig)
 
     let mut builder = PipelineBuilder::new()
         .with_config(pipeline_config)
-        .with_filters(config.processing.filters.clone())
-        .with_execs(config.processing.execs.clone())
         .with_begin(config.processing.begin.clone())
         .with_end(config.processing.end.clone())
         .with_input_format(config.input.format.clone().into())
