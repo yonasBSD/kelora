@@ -2,9 +2,9 @@ use rhai::{Engine, Dynamic};
 use std::cell::RefCell;
 
 thread_local! {
-    static CAPTURED_PRINTS: RefCell<Vec<String>> = RefCell::new(Vec::new());
-    static CAPTURED_EPRINTS: RefCell<Vec<String>> = RefCell::new(Vec::new());
-    static PARALLEL_MODE: RefCell<bool> = RefCell::new(false);
+    static CAPTURED_PRINTS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    static CAPTURED_EPRINTS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    static PARALLEL_MODE: RefCell<bool> = const { RefCell::new(false) };
 }
 
 /// Capture a print statement in thread-local storage for parallel processing

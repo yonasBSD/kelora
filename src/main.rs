@@ -425,7 +425,7 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
     let mut line_num = 0;
     for line_result in reader.lines() {
         // Check for termination signal between lines
-        if let Err(_) = check_termination() {
+        if check_termination().is_err() {
             // Return early to allow graceful shutdown with stats
             return;
         }

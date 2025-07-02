@@ -38,17 +38,6 @@ pub fn stats_add_line_filtered() {
     });
 }
 
-pub fn stats_add_file_processed() {
-    THREAD_STATS.with(|stats| {
-        stats.borrow_mut().files_processed += 1;
-    });
-}
-
-pub fn stats_add_script_execution() {
-    THREAD_STATS.with(|stats| {
-        stats.borrow_mut().script_executions += 1;
-    });
-}
 
 pub fn stats_add_error() {
     THREAD_STATS.with(|stats| {
