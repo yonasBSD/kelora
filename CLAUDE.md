@@ -229,6 +229,15 @@ text.slice("-5:-1")               // Last 5 chars except the very last
 text.slice("::-1")                // Full reverse
 text.to_int()                     // Parse integer
 text.to_float()                   // Parse float
+
+// String extraction methods (return empty string if substring not found)
+text.after("prefix")              // Text after first occurrence of substring
+text.before("suffix")             // Text before first occurrence of substring
+text.between("start", "end")      // Text between start and end substrings
+text.between("start", "")         // Everything after start substring (to end)
+text.between("", "end")           // Everything before end substring (from start)
+text.starting_with("prefix")     // Full string if starts with prefix, else empty
+text.ending_with("suffix")       // Full string if ends with suffix, else empty
 ```
 
 #### Column Extraction Methods
@@ -333,6 +342,34 @@ kelora -f jsonl \
   -F jsonl
 ```
 
+### String Processing and Text Extraction
+```bash
+# Extract user information from log messages
+kelora -f jsonl app.log \
+  --exec 'let user = message.after("user:").before(" "); let action = message.between("action:", " ")' \
+  --filter 'user != ""' \
+  -F jsonl
+
+# Parse structured log prefixes
+kelora -f jsonl \
+  --exec 'let level = line.between("[", "]"); let component = line.between("(", ")"); let msg = line.after(": ")' \
+  --filter 'level == "ERROR"'
+
+# Extract file extensions and paths
+kelora -f jsonl \
+  --exec 'let ext = filename.after("."); let dir = path.before(filename); let is_log = filename.ending_with(".log")' \
+  --filter 'ext == "gz" || ext == "log"'
+
+# Process URLs and extract components
+kelora -f jsonl access.log \
+  --exec 'let domain = url.after("://").before("/"); let path = url.after(domain); let has_api = path.starting_with("/api")' \
+  --filter 'has_api != ""'
+
+# Error message extraction with fallback
+kelora -f jsonl error.log \
+  --exec 'let error_type = message.before(":"); let error_detail = message.after(": "); let full_error = if error_detail == "" { message } else { error_detail }'
+```
+
 ### Column Extraction from Delimited Text
 ```bash
 # Extract timestamp and message from space-separated log lines
@@ -398,6 +435,7 @@ unzip logs.zip && kelora -f jsonl extracted_file.log
 - ✅ **Multiple Input Files**: Process multiple files with configurable ordering (CLI order, alphabetical, modification time)
 - ✅ **Mixed File Support**: Handle compressed and uncompressed files together automatically
 - ✅ **Column Extraction**: `line.col()` and `line.cols()` methods for extracting fields from delimited text
+- ✅ **String Processing Functions**: `after()`, `before()`, `between()`, `starting_with()`, `ending_with()` methods for text extraction
 
 ### 📋 TODO: Missing Input Formats
 - ❌ **CSV Format Parser**: Comma-separated values with header support
