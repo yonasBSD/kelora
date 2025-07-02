@@ -107,6 +107,10 @@ pub struct Cli {
     /// File processing order: none (CLI order), name (alphabetical), mtime (modification time, oldest first)
     #[arg(long = "file-order", value_enum, default_value = "none")]
     pub file_order: FileOrder,
+
+    /// Control colored output (auto/always/never)
+    #[arg(long = "color", value_enum, default_value = "auto")]
+    pub color: ColorMode,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -142,6 +146,13 @@ pub enum FileOrder {
     None,
     Name,
     Mtime,
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub enum ColorMode {
+    Auto,
+    Always,
+    Never,
 }
 
 fn main() -> Result<()> {

@@ -36,6 +36,7 @@ impl PipelineBuilder {
                 plain: false,
                 no_inject_fields: false,
                 inject_prefix: None,
+                color_mode: crate::config::ColorMode::Auto,
             },
             filters: Vec::new(),
             execs: Vec::new(),
@@ -109,7 +110,7 @@ impl PipelineBuilder {
         let formatter: Box<dyn Formatter> = match self.output_format {
             crate::OutputFormat::Jsonl => Box::new(crate::formatters::JsonFormatter::new()),
             crate::OutputFormat::Default => {
-                let use_colors = crate::tty::should_use_colors();
+                let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
                 Box::new(crate::formatters::DefaultFormatter::new(use_colors, self.config.plain))
             },
             crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
@@ -190,7 +191,7 @@ impl PipelineBuilder {
         let formatter: Box<dyn Formatter> = match self.output_format {
             crate::OutputFormat::Jsonl => Box::new(crate::formatters::JsonFormatter::new()),
             crate::OutputFormat::Default => {
-                let use_colors = crate::tty::should_use_colors();
+                let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
                 Box::new(crate::formatters::DefaultFormatter::new(use_colors, self.config.plain))
             },
             crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
@@ -267,6 +268,7 @@ pub fn create_pipeline_builder_from_cli(cli: &crate::Cli) -> PipelineBuilder {
         plain: cli.plain,
         no_inject_fields: cli.no_inject_fields,
         inject_prefix: cli.inject_prefix.clone(),
+        color_mode: cli.color.clone().into(),
     };
 
     let mut builder = PipelineBuilder::new()
@@ -295,6 +297,7 @@ pub fn create_pipeline_builder_from_config(config: &crate::config::KeloraConfig)
         plain: config.output.plain,
         no_inject_fields: config.processing.no_inject_fields,
         inject_prefix: config.processing.inject_prefix.clone(),
+        color_mode: config.output.color.clone(),
     };
 
     let mut builder = PipelineBuilder::new()

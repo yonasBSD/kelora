@@ -54,6 +54,7 @@ pub struct PipelineConfig {
     pub no_inject_fields: bool,
     #[allow(dead_code)]
     pub inject_prefix: Option<String>,
+    pub color_mode: crate::config::ColorMode,
 }
 
 /// Metadata about current processing context

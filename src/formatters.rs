@@ -161,24 +161,31 @@ impl DefaultFormatter {
             self.colors.string
         };
 
-        // Apply color
-        if !color.is_empty() {
-            output.push_str(color);
-        }
-
         // Format value based on type - always quote strings for default formatter
         let (string_val, is_string) = format_dynamic_value(value);
         if is_string {
+            // Add opening quote (uncolored)
             output.push('"');
+            // Apply color to content only
+            if !color.is_empty() {
+                output.push_str(color);
+            }
             output.push_str(&escape_logfmt_string(&string_val));
+            // Reset color before closing quote
+            if !color.is_empty() {
+                output.push_str(self.colors.reset);
+            }
+            // Add closing quote (uncolored)
             output.push('"');
         } else {
+            // For non-strings, color the entire value
+            if !color.is_empty() {
+                output.push_str(color);
+            }
             output.push_str(&string_val);
-        }
-
-        // Reset color
-        if !color.is_empty() {
-            output.push_str(self.colors.reset);
+            if !color.is_empty() {
+                output.push_str(self.colors.reset);
+            }
         }
     }
 

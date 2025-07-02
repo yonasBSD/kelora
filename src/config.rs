@@ -24,6 +24,7 @@ pub struct OutputConfig {
     pub keys: Vec<String>,
     pub exclude_keys: Vec<String>,
     pub plain: bool,
+    pub color: ColorMode,
 }
 
 /// Processing configuration
@@ -87,6 +88,14 @@ pub enum FileOrder {
     Mtime,
 }
 
+/// Color output mode
+#[derive(ValueEnum, Clone, Debug)]
+pub enum ColorMode {
+    Auto,
+    Always,
+    Never,
+}
+
 impl KeloraConfig {
     /// Create configuration from CLI arguments
     pub fn from_cli(cli: &crate::Cli) -> Self {
@@ -101,6 +110,7 @@ impl KeloraConfig {
                 keys: cli.keys.clone(),
                 exclude_keys: cli.exclude_keys.clone(),
                 plain: cli.plain,
+                color: cli.color.clone().into(),
             },
             processing: ProcessingConfig {
                 begin: cli.begin.clone(),
@@ -157,6 +167,7 @@ impl Default for KeloraConfig {
                 keys: Vec::new(),
                 exclude_keys: Vec::new(),
                 plain: false,
+                color: ColorMode::Auto,
             },
             processing: ProcessingConfig {
                 begin: None,
@@ -267,6 +278,26 @@ impl From<FileOrder> for crate::FileOrder {
             FileOrder::None => crate::FileOrder::None,
             FileOrder::Name => crate::FileOrder::Name,
             FileOrder::Mtime => crate::FileOrder::Mtime,
+        }
+    }
+}
+
+impl From<crate::ColorMode> for ColorMode {
+    fn from(mode: crate::ColorMode) -> Self {
+        match mode {
+            crate::ColorMode::Auto => ColorMode::Auto,
+            crate::ColorMode::Always => ColorMode::Always,
+            crate::ColorMode::Never => ColorMode::Never,
+        }
+    }
+}
+
+impl From<ColorMode> for crate::ColorMode {
+    fn from(mode: ColorMode) -> Self {
+        match mode {
+            ColorMode::Auto => crate::ColorMode::Auto,
+            ColorMode::Always => crate::ColorMode::Always,
+            ColorMode::Never => crate::ColorMode::Never,
         }
     }
 }
