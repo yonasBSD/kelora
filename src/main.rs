@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::{ArgMatches, CommandFactory, FromArgMatches, Parser};
 use std::io::BufRead;
+use std::sync::atomic::Ordering;
 
 mod colors;
 mod config;
@@ -13,6 +14,7 @@ mod parsers;
 mod pipeline;
 mod readers;
 mod rhai_functions;
+mod stats;
 mod tty;
 mod unix;
 
@@ -22,7 +24,8 @@ use pipeline::{
     create_input_reader, create_pipeline_builder_from_config, create_pipeline_from_config,
     create_sequential_input_reader,
 };
-use unix::{check_termination, ExitCode, ProcessCleanup, SafeStderr, SafeStdout, SignalHandler};
+use stats::{get_thread_stats, ProcessingStats, stats_start_timer, stats_finish_processing, stats_add_line_read, stats_add_line_output, stats_add_line_filtered, stats_add_error};
+use unix::{check_termination, ExitCode, ProcessCleanup, SafeStderr, SafeStdout, SignalHandler, SHOULD_TERMINATE};
 
 #[derive(Parser)]
 #[command(name = "kelora")]
@@ -136,6 +139,10 @@ pub struct Cli {
     /// Disable emoji prefixes in error messages
     #[arg(long = "no-emoji")]
     pub no_emoji: bool,
+
+    /// Show processing statistics
+    #[arg(long = "stats")]
+    pub stats: bool,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -251,16 +258,56 @@ fn main() -> Result<()> {
     // Determine processing mode using config
     let use_parallel = config.should_use_parallel();
 
-    if use_parallel {
+    // Start statistics collection if enabled
+    if config.output.stats {
+        stats_start_timer();
+    }
+
+    let final_stats = if use_parallel {
         // Get effective values from config for parallel mode
         let batch_size = config.effective_batch_size();
-        run_parallel(&config, batch_size, &mut stdout, &mut stderr);
+        let stats = run_parallel(&config, batch_size, &mut stdout, &mut stderr);
+        
+        // Print parallel stats if enabled (only if not terminated, will be handled later)
+        if config.output.stats && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+            if let Some(ref s) = stats {
+                stderr.writeln(&config.format_stats_message(&s.format_stats())).unwrap_or(());
+            }
+        }
+        stats
     } else {
         run_sequential(&config, &mut stdout, &mut stderr);
+        
+        // Finish statistics collection and print stats if enabled (only if not terminated)
+        if config.output.stats && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+            stats_finish_processing();
+            let stats = get_thread_stats();
+            stderr.writeln(&config.format_stats_message(&stats.format_stats())).unwrap_or(());
+        }
+        None
+    };
+
+    // Check if we were terminated by a signal and print stats
+    if SHOULD_TERMINATE.load(Ordering::Relaxed) {
+        if config.output.stats {
+            if use_parallel {
+                // For parallel mode, try to get stats from the processor if available
+                if let Some(stats) = final_stats {
+                    stderr.writeln(&config.format_stats_message(&stats.format_stats())).unwrap_or(());
+                } else {
+                    stderr.writeln(&config.format_stats_message("Processing interrupted")).unwrap_or(());
+                }
+            } else {
+                // For sequential mode, we can still get stats from the current thread
+                stats_finish_processing();
+                let stats = get_thread_stats();
+                stderr.writeln(&config.format_stats_message(&stats.format_stats())).unwrap_or(());
+            }
+        }
+        ExitCode::SignalInt.exit();
     }
 
     // Clean shutdown
-
     ExitCode::Success.exit();
 }
 
@@ -272,7 +319,7 @@ fn run_parallel(
     batch_size: usize,
     _stdout: &mut SafeStdout,
     stderr: &mut SafeStderr,
-) {
+) -> Option<ProcessingStats> {
     // Parallel processing mode with proper Unix behavior
     let parallel_config = ParallelConfig {
         num_workers: config.effective_threads(),
@@ -331,8 +378,17 @@ fn run_parallel(
         ctx.tracker.insert(key, dynamic_value);
     }
 
+    // Get final stats if enabled (even if terminated)
+    let final_stats = if config.output.stats {
+        Some(processor.get_final_stats())
+    } else {
+        None
+    };
+
     // Execute end stage sequentially with merged state
     execute_end_stage(&end_stage, &ctx, config, stderr);
+    
+    final_stats
 }
 
 /// Run sequential processing mode
@@ -369,9 +425,10 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
     let mut line_num = 0;
     for line_result in reader.lines() {
         // Check for termination signal between lines
-        check_termination().unwrap_or_else(|_| {
-            ExitCode::SignalInt.exit();
-        });
+        if let Err(_) = check_termination() {
+            // Return early to allow graceful shutdown with stats
+            return;
+        }
 
         let line = line_result
             .map_err(|e| {
@@ -385,6 +442,11 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
             .unwrap();
         line_num += 1;
 
+        // Count line read for stats
+        if config.output.stats {
+            stats_add_line_read();
+        }
+
         if line.trim().is_empty() {
             continue;
         }
@@ -395,6 +457,13 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
         // Process line through pipeline
         match pipeline.process_line(line, &mut ctx) {
             Ok(results) => {
+                // Count output lines for stats
+                if config.output.stats && !results.is_empty() {
+                    stats_add_line_output();
+                } else if config.output.stats && results.is_empty() {
+                    stats_add_line_filtered();
+                }
+                
                 // Output all results (usually just one)
                 for result in results {
                     stdout.writeln(&result).unwrap_or_else(|e| {
@@ -412,6 +481,11 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
                 });
             }
             Err(e) => {
+                // Count errors for stats
+                if config.output.stats {
+                    stats_add_error();
+                }
+                
                 stderr
                     .writeln(&config.format_error_message(&format!(
                         "Pipeline error on line {}: {}",

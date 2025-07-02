@@ -3,12 +3,14 @@ use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use rhai::Dynamic;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::Ordering;
 use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::event::Event;
 use crate::pipeline::PipelineBuilder;
-use crate::unix::SafeStdout;
+use crate::stats::{ProcessingStats, get_thread_stats, stats_add_line_read, stats_add_line_output, stats_add_line_filtered, stats_add_error, stats_start_timer};
+use crate::unix::{SafeStdout, SHOULD_TERMINATE};
 
 
 
@@ -48,6 +50,7 @@ pub struct BatchResult {
     pub batch_id: u64,
     pub results: Vec<ProcessedEvent>,
     pub internal_tracked_updates: HashMap<String, Dynamic>,
+    pub worker_stats: ProcessingStats,
 }
 
 /// An event that has been processed and is ready for output
@@ -62,13 +65,25 @@ pub struct ProcessedEvent {
 #[derive(Debug, Default, Clone)]
 pub struct GlobalTracker {
     internal_tracked: Arc<Mutex<HashMap<String, Dynamic>>>,
+    processing_stats: Arc<Mutex<ProcessingStats>>,
 }
 
 impl GlobalTracker {
     pub fn new() -> Self {
         Self {
             internal_tracked: Arc::new(Mutex::new(HashMap::new())),
+            processing_stats: Arc::new(Mutex::new(ProcessingStats::new())),
         }
+    }
+
+    pub fn merge_worker_stats(&self, worker_stats: &ProcessingStats) -> Result<()> {
+        let mut global_stats = self.processing_stats.lock().unwrap();
+        global_stats.merge(worker_stats);
+        Ok(())
+    }
+
+    pub fn get_final_stats(&self) -> ProcessingStats {
+        self.processing_stats.lock().unwrap().clone()
     }
 
     pub fn merge_worker_state(&self, worker_state: HashMap<String, Dynamic>) -> Result<()> {
@@ -263,6 +278,11 @@ impl ParallelProcessor {
         self.global_tracker.get_final_state()
     }
 
+    /// Get the final merged statistics from all workers
+    pub fn get_final_stats(&self) -> ProcessingStats {
+        self.global_tracker.get_final_stats()
+    }
+
     /// Reader thread: batches input lines with timeout - simpler approach
     fn reader_thread<R: std::io::BufRead>(
         mut reader: R,
@@ -360,10 +380,18 @@ impl ParallelProcessor {
         // Set parallel mode for print capturing
         crate::rhai_functions::strings::set_parallel_mode(true);
         
+        // Start stats collection for this worker
+        stats_start_timer();
+        
         // Create worker pipeline and context
         let (mut pipeline, mut ctx) = pipeline_builder.build_worker(stages)?;
 
         while let Ok(batch) = batch_receiver.recv() {
+            // Check for termination signal
+            if SHOULD_TERMINATE.load(Ordering::Relaxed) {
+                break;
+            }
+            
             // Reset tracking state for this batch
             ctx.tracker.clear();
             
@@ -371,6 +399,9 @@ impl ParallelProcessor {
             
             for (line_idx, line) in batch.lines.iter().enumerate() {
                 let current_line_num = batch.start_line_num + line_idx;
+                
+                // Count line read for stats
+                stats_add_line_read();
                 
                 // Update metadata
                 ctx.meta.line_number = Some(current_line_num);
@@ -382,6 +413,12 @@ impl ParallelProcessor {
                 // Process line through pipeline
                 match pipeline.process_line(line.clone(), &mut ctx) {
                     Ok(formatted_results) => {
+                        // Count output/filtered lines for stats
+                        if !formatted_results.is_empty() {
+                            stats_add_line_output();
+                        } else {
+                            stats_add_line_filtered();
+                        }
                         // Get any prints/eprints that were captured during processing this specific event
                         let captured_prints = crate::rhai_functions::strings::take_captured_prints();
                         let captured_eprints = crate::rhai_functions::strings::take_captured_eprints();
@@ -404,6 +441,9 @@ impl ParallelProcessor {
                         }
                     }
                     Err(e) => {
+                        // Count error for stats
+                        stats_add_error();
+                        
                         // Error handling is already done in pipeline.process_line()
                         // based on the ctx.config.on_error strategy
                         match ctx.config.on_error {
@@ -414,11 +454,12 @@ impl ParallelProcessor {
                 }
             }
 
-            // Send batch result with worker's tracking state
+            // Send batch result with worker's tracking state and stats
             let batch_result = BatchResult {
                 batch_id: batch.id,
                 results: batch_results,
                 internal_tracked_updates: ctx.tracker.clone(),
+                worker_stats: get_thread_stats(),
             };
 
             if result_sender.send(batch_result).is_err() {
@@ -426,6 +467,15 @@ impl ParallelProcessor {
                 break;
             }
         }
+
+        // Send final stats when worker exits (for CTRL-C case)
+        let final_stats_result = BatchResult {
+            batch_id: u64::MAX, // Special ID to indicate final stats
+            results: Vec::new(),
+            internal_tracked_updates: HashMap::new(),
+            worker_stats: get_thread_stats(),
+        };
+        let _ = result_sender.send(final_stats_result);
 
         Ok(())
     }
@@ -453,11 +503,22 @@ impl ParallelProcessor {
         let mut next_expected_id = 0u64;
 
         while let Ok(mut batch_result) = result_receiver.recv() {
+            // Check for termination signal
+            if SHOULD_TERMINATE.load(Ordering::Relaxed) {
+                break;
+            }
+            
             let batch_id = batch_result.batch_id;
             let internal_tracked_updates = std::mem::take(&mut batch_result.internal_tracked_updates);
             
-            // Merge global state
+            // Merge global state and stats
             global_tracker.merge_worker_state(internal_tracked_updates)?;
+            global_tracker.merge_worker_stats(&batch_result.worker_stats)?;
+
+            // Handle special final stats batch (don't store for ordering)
+            if batch_id == u64::MAX {
+                continue;
+            }
 
             // Store batch for ordering
             pending_batches.insert(batch_id, batch_result);
@@ -482,8 +543,19 @@ impl ParallelProcessor {
         global_tracker: GlobalTracker,
     ) -> Result<()> {
         while let Ok(batch_result) = result_receiver.recv() {
-            // Merge global state
+            // Check for termination signal
+            if SHOULD_TERMINATE.load(Ordering::Relaxed) {
+                break;
+            }
+            
+            // Merge global state and stats
             global_tracker.merge_worker_state(batch_result.internal_tracked_updates)?;
+            global_tracker.merge_worker_stats(&batch_result.worker_stats)?;
+
+            // Handle special final stats batch (don't output)
+            if batch_result.batch_id == u64::MAX {
+                continue;
+            }
 
             // Output immediately
             Self::pipeline_output_batch_results(&batch_result.results)?;

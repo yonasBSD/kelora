@@ -53,7 +53,9 @@ impl SignalHandler {
                     SIGINT => {
                         eprintln!("{}", crate::config::format_error_message_auto("Received SIGINT, shutting down gracefully..."));
                         SHOULD_TERMINATE.store(true, Ordering::Relaxed);
-                        // Exit immediately for Ctrl-C to feel responsive
+                        // Give main thread a moment to handle graceful shutdown
+                        thread::sleep(std::time::Duration::from_millis(100));
+                        // If still running after grace period, exit immediately
                         ExitCode::SignalInt.exit();
                     }
                     #[cfg(unix)]

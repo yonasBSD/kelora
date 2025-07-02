@@ -27,6 +27,7 @@ pub struct OutputConfig {
     pub brief: bool,
     pub color: ColorMode,
     pub no_emoji: bool,
+    pub stats: bool,
 }
 
 /// Ordered script stages that preserve CLI order
@@ -130,6 +131,18 @@ impl KeloraConfig {
             format!("kelora: {}", message)
         }
     }
+
+    /// Format a stats message with appropriate prefix (emoji or "Stats:")
+    pub fn format_stats_message(&self, message: &str) -> String {
+        let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
+        let use_emoji = use_colors && !self.output.no_emoji;
+        
+        if use_emoji {
+            format!("🧱 {}", message)
+        } else {
+            format!("Stats: {}", message)
+        }
+    }
 }
 
 /// Format an error message with appropriate prefix when config is not available
@@ -186,6 +199,7 @@ impl KeloraConfig {
                 brief: cli.brief,
                 color: color_mode,
                 no_emoji: cli.no_emoji,
+                stats: cli.stats,
             },
             processing: ProcessingConfig {
                 begin: cli.begin.clone(),
@@ -246,6 +260,7 @@ impl Default for KeloraConfig {
                 brief: false,
                 color: ColorMode::Auto,
                 no_emoji: false,
+                stats: false,
             },
             processing: ProcessingConfig {
                 begin: None,

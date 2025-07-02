@@ -76,6 +76,15 @@ make test-full          # Comprehensive test suite
 # Extract columns using integer syntax (cleaner than string selectors)
 ./target/release/kelora -f line access.log --exec "let user_name=line.col(1,2)" --filter "user_name != ''"
 ./target/release/kelora -f csv access.csv --exec "let fields=line.cols(0,2,4)" --filter "fields[1] != ''"
+
+# Show processing statistics (lines processed, filtered, timing, performance)
+./target/release/kelora -f jsonl app.log --filter "status >= 400" --stats
+
+# Statistics work in both sequential and parallel modes
+./target/release/kelora -f jsonl large.log --filter "level == 'ERROR'" --parallel --stats
+
+# Statistics are displayed even when interrupted with CTRL-C
+seq 1 1000000 | ./target/release/kelora --filter "line.to_int() % 1000 == 0" --stats
 ```
 
 ## Development Guidelines

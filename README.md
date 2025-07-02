@@ -41,6 +41,12 @@ kelora -f jsonl --file-order mtime *.jsonl           # Modification time order
 # Handle log rotation (mixed compressed/uncompressed, chronological order)
 # Matches: app.log app.log.1 app.log.2.gz app.log.3.gz (auto-decompressed)
 kelora -f jsonl --file-order mtime app.log*
+
+# Show processing statistics (lines processed, filtered, timing, performance)
+kelora -f jsonl --filter 'status >= 400' --stats logs.jsonl
+
+# Statistics work in both sequential and parallel modes, and survive CTRL-C
+kelora -f jsonl --filter 'level == "error"' --parallel --stats large.log
 ```
 
 ---
