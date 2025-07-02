@@ -50,10 +50,9 @@ impl RhaiEngine {
     pub fn new() -> Self {
         let mut engine = Engine::new();
         
-        // Enable print statements (they output to stderr by default in Rhai)
         engine.set_optimization_level(rhai::OptimizationLevel::Simple);
         
-        // Register custom functions for log analysis
+        // Register custom functions for log analysis (includes eprint() for stderr output)
         rhai_functions::register_all_functions(&mut engine);
         
         // Register variable access callback for tracking functions

@@ -1,6 +1,12 @@
 use rhai::{Engine, Dynamic};
 
 pub fn register_functions(engine: &mut Engine) {
+    // Print functions - print() outputs to stdout, eprint() outputs to stderr
+    // eprint() accepts same single argument types as print()
+    engine.register_fn("eprint", |message: rhai::Dynamic| {
+        eprintln!("{}", message);
+    });
+
     // Existing string functions from engine.rs
     engine.register_fn("contains", |text: &str, pattern: &str| {
         text.contains(pattern)
