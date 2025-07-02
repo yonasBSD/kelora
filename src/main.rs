@@ -378,17 +378,16 @@ fn run_parallel(
         ctx.tracker.insert(key, dynamic_value);
     }
 
-    // Get final stats if enabled (even if terminated)
-    let final_stats = if config.output.stats {
-        Some(processor.get_final_stats())
-    } else {
-        None
-    };
-
     // Execute end stage sequentially with merged state
     execute_end_stage(&end_stage, &ctx, config, stderr);
     
-    final_stats
+    // Get final stats if enabled (even if terminated) - do this after end stage
+    // to ensure we capture all worker statistics that may have been accumulated
+    if config.output.stats {
+        Some(processor.get_final_stats())
+    } else {
+        None
+    }
 }
 
 /// Run sequential processing mode

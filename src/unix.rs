@@ -53,7 +53,7 @@ impl SignalHandler {
                     SIGINT => {
                         SHOULD_TERMINATE.store(true, Ordering::Relaxed);
                         // Give main thread a moment to handle graceful shutdown
-                        thread::sleep(std::time::Duration::from_millis(100));
+                        thread::sleep(std::time::Duration::from_millis(200));
                         // If still running after grace period, exit immediately
                         ExitCode::SignalInt.exit();
                     }

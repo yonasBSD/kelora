@@ -502,10 +502,12 @@ impl ParallelProcessor {
         let mut pending_batches: HashMap<u64, BatchResult> = HashMap::new();
         let mut next_expected_id = 0u64;
 
+        let mut termination_detected = false;
         while let Ok(mut batch_result) = result_receiver.recv() {
-            // Check for termination signal
+            // Check for termination signal, but don't break immediately
+            // Continue processing to collect final stats from workers
             if SHOULD_TERMINATE.load(Ordering::Relaxed) {
-                break;
+                termination_detected = true;
             }
             
             let batch_id = batch_result.batch_id;
@@ -517,6 +519,17 @@ impl ParallelProcessor {
 
             // Handle special final stats batch (don't store for ordering)
             if batch_id == u64::MAX {
+                // This is a final stats batch from a terminated worker
+                // If we're terminating, we might want to exit soon after collecting these
+                if termination_detected {
+                    // Continue processing a bit more to collect other final stats
+                    continue;
+                }
+                continue;
+            }
+
+            // If terminating, skip output processing but continue stats collection
+            if termination_detected {
                 continue;
             }
 
@@ -542,10 +555,12 @@ impl ParallelProcessor {
         result_receiver: Receiver<BatchResult>,
         global_tracker: GlobalTracker,
     ) -> Result<()> {
+        let mut termination_detected = false;
         while let Ok(batch_result) = result_receiver.recv() {
-            // Check for termination signal
+            // Check for termination signal, but don't break immediately
+            // Continue processing to collect final stats from workers
             if SHOULD_TERMINATE.load(Ordering::Relaxed) {
-                break;
+                termination_detected = true;
             }
             
             // Merge global state and stats
@@ -554,6 +569,16 @@ impl ParallelProcessor {
 
             // Handle special final stats batch (don't output)
             if batch_result.batch_id == u64::MAX {
+                // This is a final stats batch from a terminated worker
+                if termination_detected {
+                    // Continue processing a bit more to collect other final stats
+                    continue;
+                }
+                continue;
+            }
+
+            // If terminating, skip output processing but continue stats collection
+            if termination_detected {
                 continue;
             }
 
