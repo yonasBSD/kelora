@@ -72,12 +72,16 @@ make test-full          # Comprehensive test suite
 
 # Create custom level field and filter by it
 ./target/release/kelora -f line app.log --exec 'let level = line.before(":")' --levels ERROR,WARN
+
+# Extract columns using integer syntax (cleaner than string selectors)
+./target/release/kelora -f line access.log --exec "let user_name=line.col(1,2)" --filter "user_name != ''"
+./target/release/kelora -f csv access.csv --exec "let fields=line.cols(0,2,4)" --filter "fields[1] != ''"
 ```
 
 ## Development Guidelines
 
 ### Rhai Scripting Best Practices
 
-- **Variable Declaration**: Always use "let" when using new Rhai variables (e.g. 'let myfield=line.col("1,2")'.
+- **Variable Declaration**: Always use "let" when using new Rhai variables (e.g. 'let myfield=line.col("1,2")' or 'let myfield=line.col(1,2)').
 
 [... rest of the existing content remains unchanged ...]

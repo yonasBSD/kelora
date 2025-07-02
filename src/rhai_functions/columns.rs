@@ -14,6 +14,67 @@ pub fn register_functions(engine: &mut Engine) {
         extract_columns(text, selector, sep, outsep)
     });
 
+    // Integer column functions (up to 6 columns)
+    engine.register_fn("col", |text: &str, col: i64| -> String {
+        let selector = col.to_string();
+        extract_columns(text, &selector, " ", " ")
+    });
+
+    engine.register_fn("col", |text: &str, col: i64, sep: &str| -> String {
+        let selector = col.to_string();
+        extract_columns(text, &selector, sep, " ")
+    });
+
+    engine.register_fn("col", |text: &str, col1: i64, col2: i64| -> String {
+        let selector = format!("{},{}", col1, col2);
+        extract_columns(text, &selector, " ", " ")
+    });
+
+    engine.register_fn("col", |text: &str, col1: i64, col2: i64, sep: &str| -> String {
+        let selector = format!("{},{}", col1, col2);
+        extract_columns(text, &selector, sep, " ")
+    });
+
+    engine.register_fn("col", |text: &str, col1: i64, col2: i64, col3: i64| -> String {
+        let selector = format!("{},{},{}", col1, col2, col3);
+        extract_columns(text, &selector, " ", " ")
+    });
+
+    engine.register_fn("col", |text: &str, col1: i64, col2: i64, col3: i64, sep: &str| -> String {
+        let selector = format!("{},{},{}", col1, col2, col3);
+        extract_columns(text, &selector, sep, " ")
+    });
+
+    engine.register_fn("col", |text: &str, col1: i64, col2: i64, col3: i64, col4: i64| -> String {
+        let selector = format!("{},{},{},{}", col1, col2, col3, col4);
+        extract_columns(text, &selector, " ", " ")
+    });
+
+    engine.register_fn("col", |text: &str, col1: i64, col2: i64, col3: i64, col4: i64, sep: &str| -> String {
+        let selector = format!("{},{},{},{}", col1, col2, col3, col4);
+        extract_columns(text, &selector, sep, " ")
+    });
+
+    engine.register_fn("col", |text: &str, col1: i64, col2: i64, col3: i64, col4: i64, col5: i64| -> String {
+        let selector = format!("{},{},{},{},{}", col1, col2, col3, col4, col5);
+        extract_columns(text, &selector, " ", " ")
+    });
+
+    engine.register_fn("col", |text: &str, col1: i64, col2: i64, col3: i64, col4: i64, col5: i64, sep: &str| -> String {
+        let selector = format!("{},{},{},{},{}", col1, col2, col3, col4, col5);
+        extract_columns(text, &selector, sep, " ")
+    });
+
+    engine.register_fn("col", |text: &str, col1: i64, col2: i64, col3: i64, col4: i64, col5: i64, col6: i64| -> String {
+        let selector = format!("{},{},{},{},{},{}", col1, col2, col3, col4, col5, col6);
+        extract_columns(text, &selector, " ", " ")
+    });
+
+    engine.register_fn("col", |text: &str, col1: i64, col2: i64, col3: i64, col4: i64, col5: i64, col6: i64, sep: &str| -> String {
+        let selector = format!("{},{},{},{},{},{}", col1, col2, col3, col4, col5, col6);
+        extract_columns(text, &selector, sep, " ")
+    });
+
     engine.register_fn("cols", |text: &str, selectors: rhai::Array| -> rhai::Array {
         selectors.into_iter()
             .filter_map(|s| s.into_string().ok())
@@ -33,6 +94,107 @@ pub fn register_functions(engine: &mut Engine) {
             .filter_map(|s| s.into_string().ok())
             .map(|selector| Dynamic::from(extract_columns(text, &selector, sep, outsep)))
             .collect()
+    });
+
+    // Integer cols functions (up to 6 columns)
+    engine.register_fn("cols", |text: &str, col: i64| -> rhai::Array {
+        let selector = col.to_string();
+        vec![Dynamic::from(extract_columns(text, &selector, " ", " "))]
+    });
+
+    engine.register_fn("cols", |text: &str, col: i64, sep: &str| -> rhai::Array {
+        let selector = col.to_string();
+        vec![Dynamic::from(extract_columns(text, &selector, sep, " "))]
+    });
+
+    engine.register_fn("cols", |text: &str, col1: i64, col2: i64| -> rhai::Array {
+        vec![
+            Dynamic::from(extract_columns(text, &col1.to_string(), " ", " ")),
+            Dynamic::from(extract_columns(text, &col2.to_string(), " ", " "))
+        ]
+    });
+
+    engine.register_fn("cols", |text: &str, col1: i64, col2: i64, sep: &str| -> rhai::Array {
+        vec![
+            Dynamic::from(extract_columns(text, &col1.to_string(), sep, " ")),
+            Dynamic::from(extract_columns(text, &col2.to_string(), sep, " "))
+        ]
+    });
+
+    engine.register_fn("cols", |text: &str, col1: i64, col2: i64, col3: i64| -> rhai::Array {
+        vec![
+            Dynamic::from(extract_columns(text, &col1.to_string(), " ", " ")),
+            Dynamic::from(extract_columns(text, &col2.to_string(), " ", " ")),
+            Dynamic::from(extract_columns(text, &col3.to_string(), " ", " "))
+        ]
+    });
+
+    engine.register_fn("cols", |text: &str, col1: i64, col2: i64, col3: i64, sep: &str| -> rhai::Array {
+        vec![
+            Dynamic::from(extract_columns(text, &col1.to_string(), sep, " ")),
+            Dynamic::from(extract_columns(text, &col2.to_string(), sep, " ")),
+            Dynamic::from(extract_columns(text, &col3.to_string(), sep, " "))
+        ]
+    });
+
+    engine.register_fn("cols", |text: &str, col1: i64, col2: i64, col3: i64, col4: i64| -> rhai::Array {
+        vec![
+            Dynamic::from(extract_columns(text, &col1.to_string(), " ", " ")),
+            Dynamic::from(extract_columns(text, &col2.to_string(), " ", " ")),
+            Dynamic::from(extract_columns(text, &col3.to_string(), " ", " ")),
+            Dynamic::from(extract_columns(text, &col4.to_string(), " ", " "))
+        ]
+    });
+
+    engine.register_fn("cols", |text: &str, col1: i64, col2: i64, col3: i64, col4: i64, sep: &str| -> rhai::Array {
+        vec![
+            Dynamic::from(extract_columns(text, &col1.to_string(), sep, " ")),
+            Dynamic::from(extract_columns(text, &col2.to_string(), sep, " ")),
+            Dynamic::from(extract_columns(text, &col3.to_string(), sep, " ")),
+            Dynamic::from(extract_columns(text, &col4.to_string(), sep, " "))
+        ]
+    });
+
+    engine.register_fn("cols", |text: &str, col1: i64, col2: i64, col3: i64, col4: i64, col5: i64| -> rhai::Array {
+        vec![
+            Dynamic::from(extract_columns(text, &col1.to_string(), " ", " ")),
+            Dynamic::from(extract_columns(text, &col2.to_string(), " ", " ")),
+            Dynamic::from(extract_columns(text, &col3.to_string(), " ", " ")),
+            Dynamic::from(extract_columns(text, &col4.to_string(), " ", " ")),
+            Dynamic::from(extract_columns(text, &col5.to_string(), " ", " "))
+        ]
+    });
+
+    engine.register_fn("cols", |text: &str, col1: i64, col2: i64, col3: i64, col4: i64, col5: i64, sep: &str| -> rhai::Array {
+        vec![
+            Dynamic::from(extract_columns(text, &col1.to_string(), sep, " ")),
+            Dynamic::from(extract_columns(text, &col2.to_string(), sep, " ")),
+            Dynamic::from(extract_columns(text, &col3.to_string(), sep, " ")),
+            Dynamic::from(extract_columns(text, &col4.to_string(), sep, " ")),
+            Dynamic::from(extract_columns(text, &col5.to_string(), sep, " "))
+        ]
+    });
+
+    engine.register_fn("cols", |text: &str, col1: i64, col2: i64, col3: i64, col4: i64, col5: i64, col6: i64| -> rhai::Array {
+        vec![
+            Dynamic::from(extract_columns(text, &col1.to_string(), " ", " ")),
+            Dynamic::from(extract_columns(text, &col2.to_string(), " ", " ")),
+            Dynamic::from(extract_columns(text, &col3.to_string(), " ", " ")),
+            Dynamic::from(extract_columns(text, &col4.to_string(), " ", " ")),
+            Dynamic::from(extract_columns(text, &col5.to_string(), " ", " ")),
+            Dynamic::from(extract_columns(text, &col6.to_string(), " ", " "))
+        ]
+    });
+
+    engine.register_fn("cols", |text: &str, col1: i64, col2: i64, col3: i64, col4: i64, col5: i64, col6: i64, sep: &str| -> rhai::Array {
+        vec![
+            Dynamic::from(extract_columns(text, &col1.to_string(), sep, " ")),
+            Dynamic::from(extract_columns(text, &col2.to_string(), sep, " ")),
+            Dynamic::from(extract_columns(text, &col3.to_string(), sep, " ")),
+            Dynamic::from(extract_columns(text, &col4.to_string(), sep, " ")),
+            Dynamic::from(extract_columns(text, &col5.to_string(), sep, " ")),
+            Dynamic::from(extract_columns(text, &col6.to_string(), sep, " "))
+        ]
     });
 
     // Log analysis functions
@@ -279,5 +441,66 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].clone().into_string().unwrap(), "beta gamma");
         assert_eq!(result[1].clone().into_string().unwrap(), "delta");
+    }
+
+    #[test]
+    fn test_col_integer_functions() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        
+        let mut scope = rhai::Scope::new();
+        scope.push("line", "alpha beta gamma delta");
+        
+        // Single integer
+        let result: String = engine.eval_with_scope(&mut scope, r#"line.col(0)"#).unwrap();
+        assert_eq!(result, "alpha");
+        
+        let result: String = engine.eval_with_scope(&mut scope, r#"line.col(2)"#).unwrap();
+        assert_eq!(result, "gamma");
+        
+        // Multiple integers
+        let result: String = engine.eval_with_scope(&mut scope, r#"line.col(0, 2)"#).unwrap();
+        assert_eq!(result, "alpha gamma");
+        
+        let result: String = engine.eval_with_scope(&mut scope, r#"line.col(1, 2, 3)"#).unwrap();
+        assert_eq!(result, "beta gamma delta");
+        
+        // With custom separator
+        scope.push("csv_line", "alpha,beta,gamma,delta");
+        let result: String = engine.eval_with_scope(&mut scope, r#"csv_line.col(0, 2, ",")"#).unwrap();
+        assert_eq!(result, "alpha gamma");
+    }
+
+    #[test]
+    fn test_cols_integer_functions() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        
+        let mut scope = rhai::Scope::new();
+        scope.push("line", "alpha beta gamma delta");
+        
+        // Single integer
+        let result: rhai::Array = engine.eval_with_scope(&mut scope, r#"line.cols(0)"#).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].clone().into_string().unwrap(), "alpha");
+        
+        // Multiple integers
+        let result: rhai::Array = engine.eval_with_scope(&mut scope, r#"line.cols(0, 2)"#).unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].clone().into_string().unwrap(), "alpha");
+        assert_eq!(result[1].clone().into_string().unwrap(), "gamma");
+        
+        let result: rhai::Array = engine.eval_with_scope(&mut scope, r#"line.cols(1, 2, 3)"#).unwrap();
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].clone().into_string().unwrap(), "beta");
+        assert_eq!(result[1].clone().into_string().unwrap(), "gamma");
+        assert_eq!(result[2].clone().into_string().unwrap(), "delta");
+        
+        // With custom separator
+        scope.push("csv_line", "alpha,beta,gamma,delta");
+        let result: rhai::Array = engine.eval_with_scope(&mut scope, r#"csv_line.cols(0, 2, ",")"#).unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].clone().into_string().unwrap(), "alpha");
+        assert_eq!(result[1].clone().into_string().unwrap(), "gamma");
     }
 }
