@@ -308,7 +308,7 @@ pub fn create_pipeline_builder_from_config(config: &crate::config::KeloraConfig)
         .with_end(config.processing.end.clone())
         .with_input_format(config.input.format.clone().into())
         .with_output_format(config.output.format.clone().into());
-    builder.keys = config.output.keys.clone();
+    builder.keys = config.output.get_effective_keys();
     builder.exclude_keys = config.output.exclude_keys.clone();
     builder
 }

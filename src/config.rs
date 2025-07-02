@@ -23,6 +23,7 @@ pub struct OutputConfig {
     pub format: OutputFormat,
     pub keys: Vec<String>,
     pub exclude_keys: Vec<String>,
+    pub core: bool,
     pub brief: bool,
     pub color: ColorMode,
 }
@@ -97,6 +98,34 @@ pub enum ColorMode {
 }
 
 impl KeloraConfig {
+    /// Get the list of core field names (timestamp, level, message variants)
+    pub fn get_core_field_names() -> Vec<String> {
+        let mut core_fields = Vec::new();
+        
+        // Use constants from event.rs to ensure consistency
+        core_fields.extend(crate::event::TIMESTAMP_FIELD_NAMES.iter().map(|s| s.to_string()));
+        core_fields.extend(crate::event::LEVEL_FIELD_NAMES.iter().map(|s| s.to_string()));
+        core_fields.extend(crate::event::MESSAGE_FIELD_NAMES.iter().map(|s| s.to_string()));
+        
+        core_fields
+    }
+}
+
+impl OutputConfig {
+    /// Get the effective keys for filtering, combining core fields with user-specified keys
+    pub fn get_effective_keys(&self) -> Vec<String> {
+        if self.core {
+            let mut keys = KeloraConfig::get_core_field_names();
+            // Add user-specified keys to the core fields
+            keys.extend(self.keys.clone());
+            keys
+        } else {
+            self.keys.clone()
+        }
+    }
+}
+
+impl KeloraConfig {
     /// Create configuration from CLI arguments
     pub fn from_cli(cli: &crate::Cli) -> Self {
         Self {
@@ -109,6 +138,7 @@ impl KeloraConfig {
                 format: cli.output_format.clone().into(),
                 keys: cli.keys.clone(),
                 exclude_keys: cli.exclude_keys.clone(),
+                core: cli.core,
                 brief: cli.brief,
                 color: cli.color.clone().into(),
             },
@@ -166,6 +196,7 @@ impl Default for KeloraConfig {
                 format: OutputFormat::Default,
                 keys: Vec::new(),
                 exclude_keys: Vec::new(),
+                core: false,
                 brief: false,
                 color: ColorMode::Auto,
             },

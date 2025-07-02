@@ -3,6 +3,25 @@ use serde::{Deserialize, Serialize};
 use indexmap::IndexMap;
 use rhai::Dynamic;
 
+/// Core field name constants to ensure consistency across the codebase
+pub const TIMESTAMP_FIELD_NAMES: &[&str] = &[
+    "ts", "_ts", "timestamp", "at", "time", "@timestamp",
+    "log_timestamp", "event_time", "datetime", "date_time",
+    "created_at", "logged_at", "_t", "@t", "t"
+];
+
+pub const LEVEL_FIELD_NAMES: &[&str] = &[
+    "level", "lvl", "severity", "log_level", "loglevel",
+    "priority", "sev", "@level", "log_severity", "error_level",
+    "event_level", "_level", "@l"
+];
+
+pub const MESSAGE_FIELD_NAMES: &[&str] = &[
+    "msg", "message", "content", "data", "log", "text",
+    "description", "details", "body", "payload", "event_message",
+    "log_message", "_message", "@message", "@m"
+];
+
 #[derive(Debug, Clone, Default)]
 pub struct Event {
     pub timestamp: Option<DateTime<Utc>>,
@@ -70,9 +89,7 @@ impl Event {
     pub fn extract_core_fields(&mut self) {
         // Extract and parse timestamp with more comprehensive field recognition
         if self.timestamp.is_none() {
-            for ts_key in &["ts", "_ts", "timestamp", "at", "time", "@timestamp", 
-                           "log_timestamp", "event_time", "datetime", "date_time", 
-                           "created_at", "logged_at", "_t", "@t", "t"] {
+            for ts_key in TIMESTAMP_FIELD_NAMES {
                 if let Some(value) = self.fields.get(*ts_key) {
                     if let Ok(ts_str) = value.clone().into_string() {
                         if let Ok(ts) = parse_timestamp(&ts_str) {
@@ -86,9 +103,7 @@ impl Event {
 
         // Extract level with comprehensive field recognition
         if self.level.is_none() {
-            for level_key in &["level", "lvl", "severity", "log_level", "loglevel", 
-                              "priority", "sev", "@level", "log_severity", "error_level",
-                              "event_level", "_level", "@l"] {
+            for level_key in LEVEL_FIELD_NAMES {
                 if let Some(value) = self.fields.get(*level_key) {
                     if let Ok(level_str) = value.clone().into_string() {
                         self.level = Some(level_str);
@@ -100,9 +115,7 @@ impl Event {
 
         // Extract message with comprehensive field recognition
         if self.message.is_none() {
-            for msg_key in &["msg", "message", "content", "data", "log", "text", 
-                            "description", "details", "body", "payload", "event_message",
-                            "log_message", "_message", "@message", "@m"] {
+            for msg_key in MESSAGE_FIELD_NAMES {
                 if let Some(value) = self.fields.get(*msg_key) {
                     if let Ok(msg_str) = value.clone().into_string() {
                         self.message = Some(msg_str);

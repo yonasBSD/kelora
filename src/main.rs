@@ -80,6 +80,10 @@ pub struct Cli {
     #[arg(short = 'K', long = "exclude-keys", value_delimiter = ',')]
     pub exclude_keys: Vec<String>,
 
+    /// Output only core fields (timestamp, level, message) plus any explicitly specified --keys
+    #[arg(short = 'm', long = "core")]
+    pub core: bool,
+
     /// Output only field values (no keys), space-separated
     #[arg(short = 'b', long = "brief")]
     pub brief: bool,

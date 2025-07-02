@@ -57,6 +57,12 @@ make test-full          # Comprehensive test suite
 # Handle log rotation (mixed compressed/uncompressed, chronological order)
 # Matches: app.log app.log.1 app.log.2.gz app.log.3.gz - .gz files auto-decompressed
 ./target/release/kelora -f jsonl --file-order mtime app.log*
+
+# Output only core fields (timestamp, level, message)
+./target/release/kelora -f jsonl app.log --core
+
+# Output core fields plus specific additional fields
+./target/release/kelora -f jsonl app.log --core --keys user,status
 ```
 
 ## Architecture
@@ -77,6 +83,7 @@ Kelora automatically extracts core fields (timestamp, level, message) from diver
 - **Message Fields**: Extracts from `msg`, `message`, `content`, `description`, `event_message`, etc.
 - **Parse-Once Guarantee**: Expensive operations like timestamp parsing only happen once per event
 - **Backward Compatibility**: Original field names remain accessible to Rhai scripts
+- **Core Field Filtering**: Use `--core/-m` to output only core fields, or combine with `--keys` for core fields plus additional fields
 
 ### Performance Design
 Kelora follows a "compile once, evaluate repeatedly" model:
@@ -436,6 +443,7 @@ unzip logs.zip && kelora -f jsonl extracted_file.log
 - ✅ **Mixed File Support**: Handle compressed and uncompressed files together automatically
 - ✅ **Column Extraction**: `line.col()` and `line.cols()` methods for extracting fields from delimited text
 - ✅ **String Processing Functions**: `after()`, `before()`, `between()`, `starting_with()`, `ending_with()` methods for text extraction
+- ✅ **Core Field Filtering**: `--core/-m` flag to limit output to core fields (timestamp, level, message) with optional additional keys
 
 ### 📋 TODO: Missing Input Formats
 - ❌ **CSV Format Parser**: Comma-separated values with header support
