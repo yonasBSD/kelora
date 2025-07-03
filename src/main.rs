@@ -382,7 +382,7 @@ fn run_parallel(
     
     // Filter out internal stats from user-visible context and merge the rest
     for (key, dynamic_value) in parallel_tracked {
-        if !key.starts_with("__internal_") {
+        if !key.starts_with("__internal_") && !key.starts_with("__kelora_stats_") && !key.starts_with("__op___kelora_stats_") {
             ctx.tracker.insert(key, dynamic_value);
         }
     }

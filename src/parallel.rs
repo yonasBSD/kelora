@@ -92,27 +92,20 @@ impl GlobalTracker {
 
     pub fn extract_final_stats_from_tracking(&self, final_tracked: &HashMap<String, Dynamic>) -> Result<()> {
         let mut global_stats = self.processing_stats.lock().unwrap();
-        
-        // Extract internal stats from tracking system
-        let output = final_tracked.get("__internal_stats_output")
+        // Extract stats from user tracking system (which works correctly)
+        let output = final_tracked.get("__kelora_stats_output")
             .and_then(|v| v.as_int().ok())
             .unwrap_or(0) as usize;
-        let filtered = final_tracked.get("__internal_stats_filtered")
+        let filtered = final_tracked.get("__kelora_stats_filtered")
             .and_then(|v| v.as_int().ok())
             .unwrap_or(0) as usize;
-        let errors = final_tracked.get("__internal_stats_errors")
-            .and_then(|v| v.as_int().ok())
-            .unwrap_or(0) as usize;
-        let processed = final_tracked.get("__internal_stats_processed")
+        let errors = final_tracked.get("__kelora_stats_errors")
             .and_then(|v| v.as_int().ok())
             .unwrap_or(0) as usize;
 
         global_stats.lines_output = output;
         global_stats.lines_filtered = filtered;
         global_stats.errors = errors;
-        
-        // Temporary debug: check if processed = output + filtered
-        eprintln!("Debug: processed={}, output={}, filtered={}, sum={}", processed, output, filtered, output + filtered);
         
         Ok(())
     }
@@ -148,7 +141,8 @@ impl GlobalTracker {
                     "count" => {
                         // Sum counts
                         if let (Ok(a), Ok(b)) = (existing.as_int(), value.as_int()) {
-                            global.insert(key.clone(), Dynamic::from(a + b));
+                            let new_total = a + b;
+                            global.insert(key.clone(), Dynamic::from(new_total));
                             continue;
                         }
                     }
@@ -434,6 +428,8 @@ impl ParallelProcessor {
         // Start stats collection for this worker
         stats_start_timer();
         
+        // Use the proven tracking system for stats (it works correctly)
+        
         // Create worker pipeline and context
         let (mut pipeline, mut ctx) = pipeline_builder.build_worker(stages)?;
 
@@ -443,16 +439,18 @@ impl ParallelProcessor {
                 break;
             }
             
-            // Reset tracking state for this batch
-            ctx.tracker.clear();
+            
+            // Track stats before this batch to calculate deltas
+            let stats_before = (
+                ctx.tracker.get("__kelora_stats_output").and_then(|v| v.as_int().ok()).unwrap_or(0),
+                ctx.tracker.get("__kelora_stats_filtered").and_then(|v| v.as_int().ok()).unwrap_or(0),
+                ctx.tracker.get("__kelora_stats_errors").and_then(|v| v.as_int().ok()).unwrap_or(0),
+            );
             
             let mut batch_results = Vec::with_capacity(batch.lines.len());
             
             for (line_idx, line) in batch.lines.iter().enumerate() {
                 let current_line_num = batch.start_line_num + line_idx;
-                
-                // Count lines processed by workers for debugging
-                crate::rhai_functions::tracking::track_count_internal("__internal_stats_processed");
                 
                 // Update metadata
                 ctx.meta.line_number = Some(current_line_num);
@@ -464,11 +462,18 @@ impl ParallelProcessor {
                 // Process line through pipeline
                 match pipeline.process_line(line.clone(), &mut ctx) {
                     Ok(formatted_results) => {
-                        // Count output/filtered lines using internal tracking (parallel-safe)
+                        // Count output/filtered lines using user tracking system (proven to work)
                         if !formatted_results.is_empty() {
-                            crate::rhai_functions::tracking::track_count_internal("__internal_stats_output");
+                            // Use the working user tracking mechanism instead of broken internal tracking
+                            ctx.tracker.entry("__kelora_stats_output".to_string())
+                                .and_modify(|v| *v = Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                                .or_insert(Dynamic::from(1i64));
+                            ctx.tracker.insert("__op___kelora_stats_output".to_string(), Dynamic::from("count"));
                         } else {
-                            crate::rhai_functions::tracking::track_count_internal("__internal_stats_filtered");
+                            ctx.tracker.entry("__kelora_stats_filtered".to_string())
+                                .and_modify(|v| *v = Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                                .or_insert(Dynamic::from(1i64));
+                            ctx.tracker.insert("__op___kelora_stats_filtered".to_string(), Dynamic::from("count"));
                         }
                         // Get any prints/eprints that were captured during processing this specific event
                         let captured_prints = crate::rhai_functions::strings::take_captured_prints();
@@ -492,8 +497,11 @@ impl ParallelProcessor {
                         }
                     }
                     Err(e) => {
-                        // Count error using internal tracking (parallel-safe)
-                        crate::rhai_functions::tracking::track_count_internal("__internal_stats_errors");
+                        // Count error using user tracking system
+                        ctx.tracker.entry("__kelora_stats_errors".to_string())
+                            .and_modify(|v| *v = Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                            .or_insert(Dynamic::from(1i64));
+                        ctx.tracker.insert("__op___kelora_stats_errors".to_string(), Dynamic::from("count"));
                         
                         // Error handling is already done in pipeline.process_line()
                         // based on the ctx.config.on_error strategy
@@ -505,18 +513,39 @@ impl ParallelProcessor {
                 }
             }
 
-            // Merge thread-local tracking state (including internal stats) with context tracker
-            let thread_tracking_state = crate::rhai_functions::tracking::get_thread_tracking_state();
-            let mut combined_tracking = ctx.tracker.clone();
-            for (key, value) in thread_tracking_state {
-                combined_tracking.insert(key, value);
+            // Calculate deltas (increments) for this batch only
+            let stats_after = (
+                ctx.tracker.get("__kelora_stats_output").and_then(|v| v.as_int().ok()).unwrap_or(0),
+                ctx.tracker.get("__kelora_stats_filtered").and_then(|v| v.as_int().ok()).unwrap_or(0),
+                ctx.tracker.get("__kelora_stats_errors").and_then(|v| v.as_int().ok()).unwrap_or(0),
+            );
+            
+            let mut batch_deltas = std::collections::HashMap::new();
+            if stats_after.0 > stats_before.0 {
+                batch_deltas.insert("__kelora_stats_output".to_string(), Dynamic::from(stats_after.0 - stats_before.0));
+                batch_deltas.insert("__op___kelora_stats_output".to_string(), Dynamic::from("count"));
             }
-
-            // Send batch result with combined tracking state and stats
+            if stats_after.1 > stats_before.1 {
+                batch_deltas.insert("__kelora_stats_filtered".to_string(), Dynamic::from(stats_after.1 - stats_before.1));
+                batch_deltas.insert("__op___kelora_stats_filtered".to_string(), Dynamic::from("count"));
+            }
+            if stats_after.2 > stats_before.2 {
+                batch_deltas.insert("__kelora_stats_errors".to_string(), Dynamic::from(stats_after.2 - stats_before.2));
+                batch_deltas.insert("__op___kelora_stats_errors".to_string(), Dynamic::from("count"));
+            }
+            
+            // Also include any user tracking (non-stats)
+            for (key, value) in &ctx.tracker {
+                if !key.starts_with("__kelora_stats_") && !key.starts_with("__op___kelora_stats_") {
+                    batch_deltas.insert(key.clone(), value.clone());
+                }
+            }
+            
+            // Send batch result with deltas only
             let batch_result = BatchResult {
                 batch_id: batch.id,
                 results: batch_results,
-                internal_tracked_updates: combined_tracking,
+                internal_tracked_updates: batch_deltas,
                 worker_stats: get_thread_stats(),
             };
 
@@ -524,21 +553,16 @@ impl ParallelProcessor {
                 // Channel closed, worker should exit
                 break;
             }
+            
+            // Reset user tracking for next batch, but keep our internal stats
+            ctx.tracker.retain(|k, _| k.starts_with("__kelora_stats_") || k.starts_with("__op___kelora_stats_"));
         }
 
         // Send final stats when worker exits (for CTRL-C case)
         stats_finish_processing();
         
-        // Include final thread-local tracking state (including internal stats)
-        let final_thread_tracking = crate::rhai_functions::tracking::get_thread_tracking_state();
-        
-        let final_stats_result = BatchResult {
-            batch_id: u64::MAX, // Special ID to indicate final stats
-            results: Vec::new(),
-            internal_tracked_updates: final_thread_tracking,
-            worker_stats: get_thread_stats(),
-        };
-        let _ = result_sender.send(final_stats_result);
+        // Don't send final tracking state as it would duplicate the counts already sent in batches
+        // The global tracker already has all the accumulated counts from the batch deltas
 
         Ok(())
     }
