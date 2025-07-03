@@ -123,13 +123,16 @@ impl RhaiEngine {
         if Self::is_likely_type_mismatch(&func_signature, func_name) {
             let expected_types = Self::get_expected_function_signature(func_name);
             if !expected_types.is_empty() {
+                let called_types = Self::extract_called_types(&func_signature);
                 return format!(
-                    "Function '{}' called with wrong argument types in {} at {}. You called it with ({}), but it expects ({})",
+                    "Wrong argument types for '{}' in {} at {}: got {}, expected {}. Note: x.{}() = {}(x)",
                     func_name,
                     script_name, 
                     pos,
-                    Self::extract_called_types(&func_signature),
-                    expected_types
+                    called_types,
+                    expected_types,
+                    func_name,
+                    func_name
                 );
             }
         }
