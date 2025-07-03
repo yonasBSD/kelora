@@ -98,6 +98,13 @@ let user = line.extract_re("user=(\\w+)");                    // Extract first g
 let users = logs.extract_all_re("user=(\\w+)", 1);           // All usernames
 let parts = line.split_re("[,;:]");                          // Split by delimiters
 let clean = text.replace_re("\\d{4}", "YEAR");               // Replace years
+
+// Network/IP analysis for security logs
+let ip = line.extract_ip();                      // Extract first IP address
+let all_ips = line.extract_ips();                // Extract all IP addresses
+let masked = ip.mask_ip(2);                      // Privacy: "192.168.X.X"
+let is_internal = ip.is_private_ip();            // Check private ranges
+let domain = line.extract_domain();              // Extract domain from URLs/emails
 ```
 
 Available variables:

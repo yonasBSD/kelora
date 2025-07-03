@@ -209,3 +209,41 @@ let emails = "Contact alice@example.com or bob@test.org";
 let masked = emails.replace_re("(\\w+)@(\\w+\\.\\w+)", "[$1 at $2]");
 // Result: "Contact [alice at example.com] or [bob at test.org]"
 ```
+
+**Network/IP Methods:**
+- `extract_ip()` - Extract first IP address from text
+- `extract_ips()` - Extract all IP addresses from text as array
+- `mask_ip()` - Mask IP address (default: last octet)
+- `mask_ip(octets)` - Mask specified number of octets (1-4)
+- `is_private_ip()` - Check if IP is in private ranges
+- `extract_url()` - Extract first URL from text
+- `extract_domain()` - Extract domain from URLs or emails
+
+Examples:
+```rhai
+// IP extraction and analysis
+let log = "Connection from 192.168.1.100 to 10.0.0.1";
+let first_ip = log.extract_ip();           // "192.168.1.100"
+let all_ips = log.extract_ips();           // ["192.168.1.100", "10.0.0.1"]
+
+// IP privacy masking (configurable)
+let ip = "192.168.1.100";
+let masked1 = ip.mask_ip();                // "192.168.1.X" (default: 1 octet)
+let masked2 = ip.mask_ip(2);               // "192.168.X.X" (2 octets)
+let masked3 = ip.mask_ip(3);               // "192.X.X.X" (3 octets)
+
+// Private IP detection
+let private1 = "192.168.1.1".is_private_ip();    // true (RFC 1918)
+let private2 = "10.0.0.1".is_private_ip();       // true (RFC 1918)
+let private3 = "172.16.0.1".is_private_ip();     // true (RFC 1918)
+let public = "8.8.8.8".is_private_ip();          // false (public)
+
+// URL and domain extraction
+let text = "Visit https://api.example.com/v1/users for API docs";
+let url = text.extract_url();              // "https://api.example.com/v1/users"
+let domain = text.extract_domain();        // "api.example.com"
+
+// Email domain extraction (URLs take priority)
+let contact = "Email support@test.org for help";
+let email_domain = contact.extract_domain(); // "test.org"
+```
