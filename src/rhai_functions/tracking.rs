@@ -1,6 +1,6 @@
-use rhai::{Engine, Dynamic};
-use std::collections::HashMap;
+use rhai::{Dynamic, Engine};
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 // Thread-local storage for tracking state
 thread_local! {
@@ -66,11 +66,14 @@ pub fn register_functions(engine: &mut Engine) {
                 // Create a new array to store unique values
                 Dynamic::from(rhai::Array::new())
             });
-            
+
             if let Ok(mut arr) = current.into_array() {
                 let value_dynamic = Dynamic::from(value.to_string());
                 // Check if value already exists in array
-                if !arr.iter().any(|v| v.clone().into_string().unwrap_or_default() == value) {
+                if !arr
+                    .iter()
+                    .any(|v| v.clone().into_string().unwrap_or_default() == value)
+                {
                     arr.push(value_dynamic);
                 }
                 state.insert(key.to_string(), Dynamic::from(arr));
@@ -84,10 +87,11 @@ pub fn register_functions(engine: &mut Engine) {
         THREAD_TRACKING_STATE.with(|state| {
             let mut state = state.borrow_mut();
             // Get existing map or create new one
-            let current = state.get(key).cloned().unwrap_or_else(|| {
-                Dynamic::from(rhai::Map::new())
-            });
-            
+            let current = state
+                .get(key)
+                .cloned()
+                .unwrap_or_else(|| Dynamic::from(rhai::Map::new()));
+
             if let Some(mut map) = current.try_cast::<rhai::Map>() {
                 let count = map.get(bucket).cloned().unwrap_or(Dynamic::from(0i64));
                 let new_count = count.as_int().unwrap_or(0) + 1;
@@ -112,8 +116,5 @@ pub fn set_thread_tracking_state(tracked: &HashMap<String, Dynamic>) {
 }
 
 pub fn get_thread_tracking_state() -> HashMap<String, Dynamic> {
-    THREAD_TRACKING_STATE.with(|state| {
-        state.borrow().clone()
-    })
+    THREAD_TRACKING_STATE.with(|state| state.borrow().clone())
 }
-

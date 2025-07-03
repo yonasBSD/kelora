@@ -15,10 +15,10 @@ impl EventParser for LineParser {
     fn parse(&self, line: &str) -> Result<Event> {
         // Create event with minimal capacity (just the line field)
         let mut event = Event::with_capacity(line.to_string(), 1);
-        
+
         // Set the line as a field so it's available as event["line"]
         event.set_field("line".to_string(), Dynamic::from(line.to_string()));
-        
+
         Ok(event)
     }
 }
@@ -36,11 +36,20 @@ mod tests {
 
         // Should have the line available as a field
         assert!(result.fields.get("line").is_some());
-        assert_eq!(result.fields.get("line").unwrap().clone().into_string().unwrap(), test_line);
-        
+        assert_eq!(
+            result
+                .fields
+                .get("line")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            test_line
+        );
+
         // Original line should also be preserved
         assert_eq!(result.original_line, test_line);
-        
+
         // No core fields should be extracted from plain text
         assert_eq!(result.level, None);
         assert_eq!(result.message, None);
@@ -55,11 +64,20 @@ mod tests {
 
         // Should have the line available as a field
         assert!(result.fields.get("line").is_some());
-        assert_eq!(result.fields.get("line").unwrap().clone().into_string().unwrap(), test_line);
-        
+        assert_eq!(
+            result
+                .fields
+                .get("line")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            test_line
+        );
+
         // Original line should be preserved
         assert_eq!(result.original_line, test_line);
-        
+
         // Line parser doesn't extract core fields
         assert_eq!(result.level, None);
         assert_eq!(result.message, None);

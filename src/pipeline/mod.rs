@@ -2,8 +2,8 @@ use anyhow::Result;
 use rhai::Dynamic;
 use std::collections::HashMap;
 
-use crate::event::Event;
 use crate::engine::RhaiEngine;
+use crate::event::Event;
 
 // Re-export submodules
 pub mod builders;
@@ -129,7 +129,7 @@ impl Pipeline {
     /// This is the core method used by both sequential and parallel processing
     pub fn process_line(&mut self, line: String, ctx: &mut PipelineContext) -> Result<Vec<String>> {
         let mut results = Vec::new();
-        
+
         // Line filter stage
         if let Some(filter) = &self.line_filter {
             if !filter.should_keep(&line) {
@@ -147,12 +147,18 @@ impl Pipeline {
                         crate::ErrorStrategy::Skip => Ok(results),
                         crate::ErrorStrategy::Abort => Err(err),
                         crate::ErrorStrategy::Print => {
-                            eprintln!("{}", crate::config::format_error_message_auto(&format!("Parse error: {}", err)));
+                            eprintln!(
+                                "{}",
+                                crate::config::format_error_message_auto(&format!(
+                                    "Parse error: {}",
+                                    err
+                                ))
+                            );
                             Ok(results)
                         }
-                        crate::ErrorStrategy::Stub => {
-                            Ok(vec![self.formatter.format(&Event::default_with_line(chunk))])
-                        }
+                        crate::ErrorStrategy::Stub => Ok(vec![self
+                            .formatter
+                            .format(&Event::default_with_line(chunk))]),
                     };
                 }
             };
@@ -163,7 +169,7 @@ impl Pipeline {
 
             // Apply script stages (filters, execs, etc.)
             let mut result = ScriptResult::Emit(event);
-            
+
             for stage in &mut self.script_stages {
                 result = match result {
                     ScriptResult::Emit(event) => stage.apply(event, ctx),
@@ -180,7 +186,13 @@ impl Pipeline {
                                         crate::ErrorStrategy::Skip => Ok(results),
                                         crate::ErrorStrategy::Abort => Err(anyhow::anyhow!(msg)),
                                         crate::ErrorStrategy::Print => {
-                                            eprintln!("{}", crate::config::format_error_message_auto(&format!("Script error: {}", msg)));
+                                            eprintln!(
+                                                "{}",
+                                                crate::config::format_error_message_auto(&format!(
+                                                    "Script error: {}",
+                                                    msg
+                                                ))
+                                            );
                                             Ok(results)
                                         }
                                         crate::ErrorStrategy::Stub => Ok(results),
@@ -219,7 +231,13 @@ impl Pipeline {
                         crate::ErrorStrategy::Skip => Ok(results),
                         crate::ErrorStrategy::Abort => Err(anyhow::anyhow!(msg)),
                         crate::ErrorStrategy::Print => {
-                            eprintln!("{}", crate::config::format_error_message_auto(&format!("Script error: {}", msg)));
+                            eprintln!(
+                                "{}",
+                                crate::config::format_error_message_auto(&format!(
+                                    "Script error: {}",
+                                    msg
+                                ))
+                            );
                             Ok(results)
                         }
                         crate::ErrorStrategy::Stub => Ok(results),
@@ -230,7 +248,6 @@ impl Pipeline {
 
         Ok(results)
     }
-
 
     /// Flush any remaining chunks from the chunker
     pub fn flush(&mut self, ctx: &mut PipelineContext) -> Result<Vec<String>> {

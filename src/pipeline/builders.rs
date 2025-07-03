@@ -1,17 +1,16 @@
 use anyhow::Result;
 use std::collections::HashMap;
-use std::io::{self, BufRead};
 use std::fs;
+use std::io::{self, BufRead};
 
-use crate::engine::RhaiEngine;
-use crate::decompression::DecompressionReader;
-use crate::readers::{ChannelStdinReader, MultiFileReader};
 use super::{
-    EventParser, Formatter, ScriptStage, EventLimiter, 
-    Pipeline, PipelineContext, PipelineConfig, MetaData,
-    FilterStage, ExecStage, BeginStage, EndStage, KeyFilterStage, LevelFilterStage,
-    SimpleChunker, SimpleWindowManager, StdoutWriter, TakeNLimiter
+    BeginStage, EndStage, EventLimiter, EventParser, ExecStage, FilterStage, Formatter,
+    KeyFilterStage, LevelFilterStage, MetaData, Pipeline, PipelineConfig, PipelineContext,
+    ScriptStage, SimpleChunker, SimpleWindowManager, StdoutWriter, TakeNLimiter,
 };
+use crate::decompression::DecompressionReader;
+use crate::engine::RhaiEngine;
+use crate::readers::{ChannelStdinReader, MultiFileReader};
 
 /// Pipeline builder for easy construction from CLI arguments
 #[derive(Clone)]
@@ -56,7 +55,10 @@ impl PipelineBuilder {
     }
 
     /// Build pipeline with stages
-    pub fn build(self, stages: Vec<crate::config::ScriptStageType>) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
+    pub fn build(
+        self,
+        stages: Vec<crate::config::ScriptStageType>,
+    ) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
 
         // Create parser
@@ -65,7 +67,9 @@ impl PipelineBuilder {
             crate::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
             crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
             crate::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
-            crate::InputFormat::Csv => return Err(anyhow::anyhow!("CSV parser not implemented yet")),
+            crate::InputFormat::Csv => {
+                return Err(anyhow::anyhow!("CSV parser not implemented yet"))
+            }
             crate::InputFormat::Apache => Box::new(crate::parsers::ApacheParser::new()?),
             crate::InputFormat::Nginx => Box::new(crate::parsers::NginxParser::new()?),
         };
@@ -75,15 +79,20 @@ impl PipelineBuilder {
             crate::OutputFormat::Jsonl => Box::new(crate::formatters::JsonFormatter::new()),
             crate::OutputFormat::Default => {
                 let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
-                Box::new(crate::formatters::DefaultFormatter::new(use_colors, self.config.brief))
-            },
+                Box::new(crate::formatters::DefaultFormatter::new(
+                    use_colors,
+                    self.config.brief,
+                ))
+            }
             crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
-            crate::OutputFormat::Csv => return Err(anyhow::anyhow!("CSV formatter not implemented yet")),
+            crate::OutputFormat::Csv => {
+                return Err(anyhow::anyhow!("CSV formatter not implemented yet"))
+            }
         };
 
         // Create script stages
         let mut script_stages: Vec<Box<dyn ScriptStage>> = Vec::new();
-        
+
         for stage in stages {
             match stage {
                 crate::config::ScriptStageType::Filter(filter) => {
@@ -98,7 +107,8 @@ impl PipelineBuilder {
         }
 
         // Add level filtering stage (runs after all script stages, before key filtering)
-        let level_filter_stage = LevelFilterStage::new(self.levels.clone(), self.exclude_levels.clone());
+        let level_filter_stage =
+            LevelFilterStage::new(self.levels.clone(), self.exclude_levels.clone());
         if level_filter_stage.is_active() {
             script_stages.push(Box::new(level_filter_stage));
         }
@@ -170,10 +180,11 @@ impl PipelineBuilder {
         self
     }
 
-
-
     /// Build a worker pipeline for parallel processing
-    pub fn build_worker(self, stages: Vec<crate::config::ScriptStageType>) -> Result<(Pipeline, PipelineContext)> {
+    pub fn build_worker(
+        self,
+        stages: Vec<crate::config::ScriptStageType>,
+    ) -> Result<(Pipeline, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
 
         // Create parser
@@ -182,7 +193,9 @@ impl PipelineBuilder {
             crate::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
             crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
             crate::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
-            crate::InputFormat::Csv => return Err(anyhow::anyhow!("CSV parser not implemented yet")),
+            crate::InputFormat::Csv => {
+                return Err(anyhow::anyhow!("CSV parser not implemented yet"))
+            }
             crate::InputFormat::Apache => Box::new(crate::parsers::ApacheParser::new()?),
             crate::InputFormat::Nginx => Box::new(crate::parsers::NginxParser::new()?),
         };
@@ -192,15 +205,20 @@ impl PipelineBuilder {
             crate::OutputFormat::Jsonl => Box::new(crate::formatters::JsonFormatter::new()),
             crate::OutputFormat::Default => {
                 let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
-                Box::new(crate::formatters::DefaultFormatter::new(use_colors, self.config.brief))
-            },
+                Box::new(crate::formatters::DefaultFormatter::new(
+                    use_colors,
+                    self.config.brief,
+                ))
+            }
             crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
-            crate::OutputFormat::Csv => return Err(anyhow::anyhow!("CSV formatter not implemented yet")),
+            crate::OutputFormat::Csv => {
+                return Err(anyhow::anyhow!("CSV formatter not implemented yet"))
+            }
         };
 
         // Create script stages
         let mut script_stages: Vec<Box<dyn ScriptStage>> = Vec::new();
-        
+
         for stage in stages {
             match stage {
                 crate::config::ScriptStageType::Filter(filter) => {
@@ -215,7 +233,8 @@ impl PipelineBuilder {
         }
 
         // Add level filtering stage (runs after all script stages, before key filtering)
-        let level_filter_stage = LevelFilterStage::new(self.levels.clone(), self.exclude_levels.clone());
+        let level_filter_stage =
+            LevelFilterStage::new(self.levels.clone(), self.exclude_levels.clone());
         if level_filter_stage.is_active() {
             script_stages.push(Box::new(level_filter_stage));
         }
@@ -260,15 +279,18 @@ impl Default for PipelineBuilder {
     }
 }
 
-
 /// Create a pipeline from configuration
-pub fn create_pipeline_from_config(config: &crate::config::KeloraConfig) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
+pub fn create_pipeline_from_config(
+    config: &crate::config::KeloraConfig,
+) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
     let builder = create_pipeline_builder_from_config(config);
     builder.build(config.processing.stages.clone())
 }
 
 /// Create a pipeline builder from configuration (useful for parallel processing)
-pub fn create_pipeline_builder_from_config(config: &crate::config::KeloraConfig) -> PipelineBuilder {
+pub fn create_pipeline_builder_from_config(
+    config: &crate::config::KeloraConfig,
+) -> PipelineBuilder {
     let pipeline_config = PipelineConfig {
         on_error: config.processing.on_error.clone().into(),
         brief: config.output.brief,
@@ -290,28 +312,32 @@ pub fn create_pipeline_builder_from_config(config: &crate::config::KeloraConfig)
     builder
 }
 
-
 /// Create concatenated content from multiple files for parallel processing
 /// DEPRECATED: Use streaming readers instead
 #[allow(dead_code)]
-fn read_all_files_to_memory(files: &[String], _config: &crate::config::KeloraConfig) -> Result<Vec<u8>> {
+fn read_all_files_to_memory(
+    files: &[String],
+    _config: &crate::config::KeloraConfig,
+) -> Result<Vec<u8>> {
     let mut all_content = Vec::new();
-    
+
     for file_path in files {
         let mut reader = DecompressionReader::new(file_path)?;
         io::Read::read_to_end(&mut reader, &mut all_content)?;
-        
+
         // Add a newline between files if the last file doesn't end with one
         if !all_content.is_empty() && all_content[all_content.len() - 1] != b'\n' {
             all_content.push(b'\n');
         }
     }
-    
+
     Ok(all_content)
 }
 
 /// Create input reader with optional decompression for parallel processing
-pub fn create_input_reader(config: &crate::config::KeloraConfig) -> Result<Box<dyn BufRead + Send>> {
+pub fn create_input_reader(
+    config: &crate::config::KeloraConfig,
+) -> Result<Box<dyn BufRead + Send>> {
     if config.input.files.is_empty() {
         // Use channel-based stdin reader for Send compatibility
         Ok(Box::new(ChannelStdinReader::new()?))
@@ -324,7 +350,7 @@ pub fn create_input_reader(config: &crate::config::KeloraConfig) -> Result<Box<d
 /// Sort files according to the specified file order
 fn sort_files(files: &[String], order: &crate::config::FileOrder) -> Result<Vec<String>> {
     let mut sorted_files = files.to_vec();
-    
+
     match order {
         crate::config::FileOrder::None => {
             // Keep CLI order - no sorting needed
@@ -345,13 +371,14 @@ fn sort_files(files: &[String], order: &crate::config::FileOrder) -> Result<Vec<
             });
         }
     }
-    
+
     Ok(sorted_files)
 }
 
-
 /// Create input reader for sequential processing (doesn't need to be Send)
-pub fn create_sequential_input_reader(config: &crate::config::KeloraConfig) -> Result<Box<dyn BufRead>> {
+pub fn create_sequential_input_reader(
+    config: &crate::config::KeloraConfig,
+) -> Result<Box<dyn BufRead>> {
     if config.input.files.is_empty() {
         // Use stdin lock directly for sequential processing (most efficient)
         Ok(Box::new(io::stdin().lock()))

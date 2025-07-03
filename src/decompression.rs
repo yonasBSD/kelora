@@ -47,7 +47,7 @@ impl DecompressionReader {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path_ref = path.as_ref();
         let file = File::open(path_ref)?;
-        
+
         let extension = path_ref
             .extension()
             .and_then(|ext| ext.to_str())
@@ -64,7 +64,6 @@ impl DecompressionReader {
             _ => Ok(DecompressionReader::Plain(BufReader::new(file))),
         }
     }
-
 }
 
 #[cfg(test)]
@@ -83,7 +82,7 @@ mod tests {
         let mut reader = DecompressionReader::new(temp_file.path())?;
         let mut content = String::new();
         reader.read_to_string(&mut content)?;
-        
+
         assert!(content.contains("test line 1"));
         assert!(content.contains("test line 2"));
         Ok(())
@@ -94,19 +93,19 @@ mod tests {
         // Create a temporary file with .zip extension
         let temp_file = NamedTempFile::new().unwrap();
         let temp_path = temp_file.path();
-        
+
         // Create a new path with .zip extension
         let zip_path = temp_path.with_extension("zip");
-        
+
         // Create an empty file at the zip path for testing
         std::fs::write(&zip_path, b"fake zip content").unwrap();
-        
+
         let result = DecompressionReader::new(&zip_path);
         assert!(result.is_err());
         let error_msg = result.unwrap_err().to_string();
         assert!(error_msg.contains("ZIP file decompression is not supported"));
         assert!(error_msg.contains("Only gzip (.gz) files are supported"));
-        
+
         // Clean up
         let _ = std::fs::remove_file(&zip_path);
     }
@@ -116,11 +115,11 @@ mod tests {
         // Create a simple gzip file for testing
         let temp_file = NamedTempFile::new()?;
         let _gz_path = temp_file.path().with_extension("gz");
-        
+
         // This test just verifies the path is handled correctly
         // (we don't actually create a valid gzip file here as that's complex)
         // In practice, this would work with real gzip files
-        
+
         Ok(())
     }
 }

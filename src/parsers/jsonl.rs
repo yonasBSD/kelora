@@ -15,7 +15,7 @@ fn json_to_dynamic(value: &serde_json::Value) -> Dynamic {
             } else {
                 Dynamic::from(n.to_string())
             }
-        },
+        }
         serde_json::Value::Bool(b) => Dynamic::from(*b),
         serde_json::Value::Null => Dynamic::UNIT,
         _ => Dynamic::from(value.to_string()), // Complex types as strings
@@ -38,13 +38,13 @@ impl EventParser for JsonlParser {
         if let serde_json::Value::Object(ref map) = json_value {
             // Pre-allocate HashMap with capacity based on JSON object size
             let mut event = Event::with_capacity(line.to_string(), map.len());
-            
+
             for (key, value) in map {
                 // Convert serde_json::Value to rhai::Dynamic
                 let dynamic_value = json_to_dynamic(value);
                 event.set_field(key.clone(), dynamic_value);
             }
-            
+
             event.extract_core_fields();
             Ok(event)
         } else {
@@ -61,8 +61,8 @@ mod tests {
     #[test]
     fn test_jsonl_parser_basic() {
         let parser = JsonlParser::new();
-        let result = EventParser::parse(&parser, r#"{"level":"info","message":"test","count":42}"#)
-            .unwrap();
+        let result =
+            EventParser::parse(&parser, r#"{"level":"info","message":"test","count":42}"#).unwrap();
 
         assert_eq!(result.level, Some("info".to_string()));
         assert_eq!(result.message, Some("test".to_string()));
@@ -73,13 +73,25 @@ mod tests {
     #[test]
     fn test_jsonl_parser_complex() {
         let parser = JsonlParser::new();
-        let result = EventParser::parse(&parser, r#"{"timestamp":"2023-01-01T12:00:00Z","level":"error","user":"alice","status":404}"#)
-            .unwrap();
+        let result = EventParser::parse(
+            &parser,
+            r#"{"timestamp":"2023-01-01T12:00:00Z","level":"error","user":"alice","status":404}"#,
+        )
+        .unwrap();
 
         assert_eq!(result.level, Some("error".to_string()));
         assert!(result.fields.get("user").is_some());
-        assert_eq!(result.fields.get("user").unwrap().clone().into_string().unwrap(), "alice");
-        assert!(result.fields.get("status").is_some()); 
+        assert_eq!(
+            result
+                .fields
+                .get("user")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "alice"
+        );
+        assert!(result.fields.get("status").is_some());
         assert_eq!(result.fields.get("status").unwrap().as_int().unwrap(), 404);
     }
 }

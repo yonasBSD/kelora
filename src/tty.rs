@@ -1,5 +1,5 @@
-use std::io::IsTerminal;
 use crate::config::ColorMode;
+use std::io::IsTerminal;
 
 /// Check if stdout is connected to a TTY
 pub fn is_stdout_tty() -> bool {
@@ -13,11 +13,10 @@ pub fn should_use_colors_with_mode(color_mode: &ColorMode) -> bool {
         ColorMode::Always => {
             // --force-color should override NO_COLOR environment variable
             true
-        },
+        }
         ColorMode::Auto => should_use_colors_auto(),
     }
 }
-
 
 /// Auto color detection logic
 fn should_use_colors_auto() -> bool {

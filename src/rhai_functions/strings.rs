@@ -64,22 +64,22 @@ fn mask_ip_impl(ip: &str, octets_to_mask: usize) -> String {
     if parts.len() != 4 {
         return ip.to_string(); // Return unchanged if not valid IPv4
     }
-    
+
     // Validate each octet is numeric
     for part in &parts {
         if part.parse::<u8>().is_err() {
             return ip.to_string(); // Return unchanged if not numeric
         }
     }
-    
+
     let mut result = parts.clone();
     let mask_count = octets_to_mask.clamp(1, 4);
-    
+
     // Replace last N octets with 'X'
     for item in result.iter_mut().skip(4 - mask_count) {
         *item = "X";
     }
-    
+
     result.join(".")
 }
 
@@ -89,20 +89,20 @@ fn is_private_ip_impl(ip: &str) -> bool {
     if parts.len() != 4 {
         return false; // Not valid IPv4
     }
-    
+
     // Parse octets
     let octets: Result<Vec<u8>, _> = parts.iter().map(|s| s.parse::<u8>()).collect();
     let octets = match octets {
         Ok(o) => o,
         Err(_) => return false,
     };
-    
+
     // Check private ranges
     match octets[0] {
-        10 => true,                                    // 10.0.0.0/8
-        172 => octets[1] >= 16 && octets[1] <= 31,     // 172.16.0.0/12
-        192 => octets[1] == 168,                       // 192.168.0.0/16
-        127 => true,                                   // 127.0.0.0/8 (loopback)
+        10 => true,                                // 10.0.0.0/8
+        172 => octets[1] >= 16 && octets[1] <= 31, // 172.16.0.0/12
+        192 => octets[1] == 168,                   // 192.168.0.0/16
+        127 => true,                               // 127.0.0.0/8 (loopback)
         _ => false,
     }
 }
@@ -379,9 +379,17 @@ pub fn register_functions(engine: &mut Engine) {
                 if let Some(captures) = re.captures(text) {
                     // Return first captured group, or whole match if no groups
                     if captures.len() > 1 {
-                        captures.get(1).map(|m| m.as_str()).unwrap_or("").to_string()
+                        captures
+                            .get(1)
+                            .map(|m| m.as_str())
+                            .unwrap_or("")
+                            .to_string()
                     } else {
-                        captures.get(0).map(|m| m.as_str()).unwrap_or("").to_string()
+                        captures
+                            .get(0)
+                            .map(|m| m.as_str())
+                            .unwrap_or("")
+                            .to_string()
                     }
                 } else {
                     String::new()
@@ -391,72 +399,87 @@ pub fn register_functions(engine: &mut Engine) {
         }
     });
 
-    engine.register_fn("extract_re", |text: &str, pattern: &str, group: i64| -> String {
-        match regex::Regex::new(pattern) {
-            Ok(re) => {
-                if let Some(captures) = re.captures(text) {
+    engine.register_fn(
+        "extract_re",
+        |text: &str, pattern: &str, group: i64| -> String {
+            match regex::Regex::new(pattern) {
+                Ok(re) => {
+                    if let Some(captures) = re.captures(text) {
+                        let group_idx = if group < 0 {
+                            // Negative indices not supported, default to 0
+                            0
+                        } else {
+                            group as usize
+                        };
+                        captures
+                            .get(group_idx)
+                            .map(|m| m.as_str())
+                            .unwrap_or("")
+                            .to_string()
+                    } else {
+                        String::new()
+                    }
+                }
+                Err(_) => String::new(), // Invalid regex returns empty string
+            }
+        },
+    );
+
+    engine.register_fn(
+        "extract_all_re",
+        |text: &str, pattern: &str| -> rhai::Array {
+            match regex::Regex::new(pattern) {
+                Ok(re) => {
+                    let mut results = rhai::Array::new();
+                    for captures in re.captures_iter(text) {
+                        if captures.len() > 1 {
+                            // Multiple capture groups - return array of groups
+                            let groups: rhai::Array = captures
+                                .iter()
+                                .skip(1) // Skip full match (index 0)
+                                .filter_map(|m| {
+                                    m.map(|match_| Dynamic::from(match_.as_str().to_string()))
+                                })
+                                .collect();
+                            results.push(Dynamic::from(groups));
+                        } else {
+                            // No capture groups - return the full match
+                            if let Some(full_match) = captures.get(0) {
+                                results.push(Dynamic::from(full_match.as_str().to_string()));
+                            }
+                        }
+                    }
+                    results
+                }
+                Err(_) => rhai::Array::new(), // Invalid regex returns empty array
+            }
+        },
+    );
+
+    engine.register_fn(
+        "extract_all_re",
+        |text: &str, pattern: &str, group: i64| -> rhai::Array {
+            match regex::Regex::new(pattern) {
+                Ok(re) => {
+                    let mut results = rhai::Array::new();
                     let group_idx = if group < 0 {
                         // Negative indices not supported, default to 0
                         0
                     } else {
                         group as usize
                     };
-                    captures.get(group_idx).map(|m| m.as_str()).unwrap_or("").to_string()
-                } else {
-                    String::new()
-                }
-            }
-            Err(_) => String::new(), // Invalid regex returns empty string
-        }
-    });
 
-    engine.register_fn("extract_all_re", |text: &str, pattern: &str| -> rhai::Array {
-        match regex::Regex::new(pattern) {
-            Ok(re) => {
-                let mut results = rhai::Array::new();
-                for captures in re.captures_iter(text) {
-                    if captures.len() > 1 {
-                        // Multiple capture groups - return array of groups
-                        let groups: rhai::Array = captures
-                            .iter()
-                            .skip(1) // Skip full match (index 0)
-                            .filter_map(|m| m.map(|match_| Dynamic::from(match_.as_str().to_string())))
-                            .collect();
-                        results.push(Dynamic::from(groups));
-                    } else {
-                        // No capture groups - return the full match
-                        if let Some(full_match) = captures.get(0) {
-                            results.push(Dynamic::from(full_match.as_str().to_string()));
+                    for captures in re.captures_iter(text) {
+                        if let Some(group_match) = captures.get(group_idx) {
+                            results.push(Dynamic::from(group_match.as_str().to_string()));
                         }
                     }
+                    results
                 }
-                results
+                Err(_) => rhai::Array::new(), // Invalid regex returns empty array
             }
-            Err(_) => rhai::Array::new(), // Invalid regex returns empty array
-        }
-    });
-
-    engine.register_fn("extract_all_re", |text: &str, pattern: &str, group: i64| -> rhai::Array {
-        match regex::Regex::new(pattern) {
-            Ok(re) => {
-                let mut results = rhai::Array::new();
-                let group_idx = if group < 0 {
-                    // Negative indices not supported, default to 0
-                    0
-                } else {
-                    group as usize
-                };
-                
-                for captures in re.captures_iter(text) {
-                    if let Some(group_match) = captures.get(group_idx) {
-                        results.push(Dynamic::from(group_match.as_str().to_string()));
-                    }
-                }
-                results
-            }
-            Err(_) => rhai::Array::new(), // Invalid regex returns empty array
-        }
-    });
+        },
+    );
 
     engine.register_fn("split_re", |text: &str, pattern: &str| -> rhai::Array {
         match regex::Regex::new(pattern) {
@@ -468,12 +491,15 @@ pub fn register_functions(engine: &mut Engine) {
         }
     });
 
-    engine.register_fn("replace_re", |text: &str, pattern: &str, replacement: &str| -> String {
-        match regex::Regex::new(pattern) {
-            Ok(re) => re.replace_all(text, replacement).to_string(),
-            Err(_) => text.to_string(), // Invalid regex returns original string
-        }
-    });
+    engine.register_fn(
+        "replace_re",
+        |text: &str, pattern: &str, replacement: &str| -> String {
+            match regex::Regex::new(pattern) {
+                Ok(re) => re.replace_all(text, replacement).to_string(),
+                Err(_) => text.to_string(), // Invalid regex returns original string
+            }
+        },
+    );
 
     // Network/IP methods
     engine.register_fn("extract_ip", |text: &str| -> String {
@@ -514,11 +540,10 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("extract_url", |text: &str| -> String {
         let url_pattern = r##"https?://[^\s<>"]+[^\s<>".,;!?]"##;
         match regex::Regex::new(url_pattern) {
-            Ok(re) => {
-                re.find(text)
-                    .map(|m| m.as_str().to_string())
-                    .unwrap_or_else(String::new)
-            }
+            Ok(re) => re
+                .find(text)
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_else(String::new),
             Err(_) => String::new(),
         }
     });
@@ -527,7 +552,7 @@ pub fn register_functions(engine: &mut Engine) {
         // Try URL first, then email domain
         let url_pattern = r##"https?://([^/\s<>"]+)"##;
         let email_pattern = r##"[a-zA-Z0-9._%+-]+@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})"##;
-        
+
         if let Ok(re) = regex::Regex::new(url_pattern) {
             if let Some(caps) = re.captures(text) {
                 if let Some(domain) = caps.get(1) {
@@ -535,7 +560,7 @@ pub fn register_functions(engine: &mut Engine) {
                 }
             }
         }
-        
+
         if let Ok(re) = regex::Regex::new(email_pattern) {
             if let Some(caps) = re.captures(text) {
                 if let Some(domain) = caps.get(1) {
@@ -543,7 +568,7 @@ pub fn register_functions(engine: &mut Engine) {
                 }
             }
         }
-        
+
         String::new()
     });
 }
@@ -923,29 +948,29 @@ mod tests {
     fn test_join_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
-        
+
         let result: String = engine
             .eval_with_scope(&mut scope, r#"",".join(["a", "b", "c"])"#)
             .unwrap();
         assert_eq!(result, "a,b,c");
-        
+
         let result: String = engine
             .eval_with_scope(&mut scope, r#"" ".join(["hello", "world"])"#)
             .unwrap();
         assert_eq!(result, "hello world");
-        
+
         let result: String = engine
             .eval_with_scope(&mut scope, r#""-".join(["one"])"#)
             .unwrap();
         assert_eq!(result, "one");
-        
+
         let result: String = engine
             .eval_with_scope(&mut scope, r#"",".join([])"#)
             .unwrap();
         assert_eq!(result, "");
-        
+
         // Test with mixed types (non-strings filtered out)
         let result: String = engine
             .eval_with_scope(&mut scope, r#"",".join(["a", 123, "b"])"#)
@@ -957,28 +982,28 @@ mod tests {
     fn test_extract_re_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
         scope.push("text", "user=alice status=200");
-        
+
         // Extract with capture group
         let result: String = engine
             .eval_with_scope(&mut scope, r##"text.extract_re("user=(\\w+)")"##)
             .unwrap();
         assert_eq!(result, "alice");
-        
+
         // Extract without capture group (returns full match)
         let result: String = engine
             .eval_with_scope(&mut scope, r##"text.extract_re("\\d+")"##)
             .unwrap();
         assert_eq!(result, "200");
-        
+
         // No match
         let result: String = engine
             .eval_with_scope(&mut scope, r##"text.extract_re("missing")"##)
             .unwrap();
         assert_eq!(result, "");
-        
+
         // Invalid regex
         let result: String = engine
             .eval_with_scope(&mut scope, r##"text.extract_re("[")"##)
@@ -990,32 +1015,41 @@ mod tests {
     fn test_extract_re_with_group_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
         scope.push("text", "user=alice status=200 level=info");
-        
+
         // Extract specific groups from complex pattern
         let result: String = engine
-            .eval_with_scope(&mut scope, r##"text.extract_re("user=(\\w+).*status=(\\d+)", 0)"##)
+            .eval_with_scope(
+                &mut scope,
+                r##"text.extract_re("user=(\\w+).*status=(\\d+)", 0)"##,
+            )
             .unwrap();
         assert_eq!(result, "user=alice status=200"); // Full match (group 0)
-        
+
         let result: String = engine
-            .eval_with_scope(&mut scope, r##"text.extract_re("user=(\\w+).*status=(\\d+)", 1)"##)
+            .eval_with_scope(
+                &mut scope,
+                r##"text.extract_re("user=(\\w+).*status=(\\d+)", 1)"##,
+            )
             .unwrap();
         assert_eq!(result, "alice"); // First capture group
-        
+
         let result: String = engine
-            .eval_with_scope(&mut scope, r##"text.extract_re("user=(\\w+).*status=(\\d+)", 2)"##)
+            .eval_with_scope(
+                &mut scope,
+                r##"text.extract_re("user=(\\w+).*status=(\\d+)", 2)"##,
+            )
             .unwrap();
         assert_eq!(result, "200"); // Second capture group
-        
+
         // Out of bounds group (returns empty)
         let result: String = engine
             .eval_with_scope(&mut scope, r##"text.extract_re("user=(\\w+)", 5)"##)
             .unwrap();
         assert_eq!(result, "");
-        
+
         // Negative group index (defaults to 0)
         let result: String = engine
             .eval_with_scope(&mut scope, r##"text.extract_re("user=(\\w+)", -1)"##)
@@ -1027,21 +1061,21 @@ mod tests {
     fn test_extract_all_re_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
         scope.push("text", "a=1 b=2 c=3");
-        
+
         // Extract all with capture groups
         let result: rhai::Array = engine
             .eval_with_scope(&mut scope, r##"text.extract_all_re("(\\w+)=(\\d+)")"##)
             .unwrap();
         assert_eq!(result.len(), 3);
-        
+
         // Check first match groups
         let first_match = result[0].clone().into_array().unwrap();
         assert_eq!(first_match[0].clone().into_string().unwrap(), "a");
         assert_eq!(first_match[1].clone().into_string().unwrap(), "1");
-        
+
         // Extract all without capture groups (just matches)
         scope.push("numbers", "10 20 30 40");
         let result: rhai::Array = engine
@@ -1050,7 +1084,7 @@ mod tests {
         assert_eq!(result.len(), 4);
         assert_eq!(result[0].clone().into_string().unwrap(), "10");
         assert_eq!(result[3].clone().into_string().unwrap(), "40");
-        
+
         // No matches
         let result: rhai::Array = engine
             .eval_with_scope(&mut scope, r##"text.extract_all_re("missing")"##)
@@ -1062,28 +1096,37 @@ mod tests {
     fn test_extract_all_re_with_group_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
-        scope.push("text", "user=alice status=200 user=bob status=404 user=charlie status=500");
-        
+        scope.push(
+            "text",
+            "user=alice status=200 user=bob status=404 user=charlie status=500",
+        );
+
         // Extract all values from first capture group (usernames)
         let result: rhai::Array = engine
-            .eval_with_scope(&mut scope, r##"text.extract_all_re("user=(\\w+).*?status=(\\d+)", 1)"##)
+            .eval_with_scope(
+                &mut scope,
+                r##"text.extract_all_re("user=(\\w+).*?status=(\\d+)", 1)"##,
+            )
             .unwrap();
         assert_eq!(result.len(), 3);
         assert_eq!(result[0].clone().into_string().unwrap(), "alice");
         assert_eq!(result[1].clone().into_string().unwrap(), "bob");
         assert_eq!(result[2].clone().into_string().unwrap(), "charlie");
-        
+
         // Extract all values from second capture group (status codes)
         let result: rhai::Array = engine
-            .eval_with_scope(&mut scope, r##"text.extract_all_re("user=(\\w+).*?status=(\\d+)", 2)"##)
+            .eval_with_scope(
+                &mut scope,
+                r##"text.extract_all_re("user=(\\w+).*?status=(\\d+)", 2)"##,
+            )
             .unwrap();
         assert_eq!(result.len(), 3);
         assert_eq!(result[0].clone().into_string().unwrap(), "200");
         assert_eq!(result[1].clone().into_string().unwrap(), "404");
         assert_eq!(result[2].clone().into_string().unwrap(), "500");
-        
+
         // Extract all full matches (group 0)
         let result: rhai::Array = engine
             .eval_with_scope(&mut scope, r##"text.extract_all_re("user=(\\w+)", 0)"##)
@@ -1092,7 +1135,7 @@ mod tests {
         assert_eq!(result[0].clone().into_string().unwrap(), "user=alice");
         assert_eq!(result[1].clone().into_string().unwrap(), "user=bob");
         assert_eq!(result[2].clone().into_string().unwrap(), "user=charlie");
-        
+
         // Out of bounds group (returns empty array)
         let result: rhai::Array = engine
             .eval_with_scope(&mut scope, r##"text.extract_all_re("user=(\\w+)", 5)"##)
@@ -1104,10 +1147,10 @@ mod tests {
     fn test_split_re_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
         scope.push("text", "one,two;three:four");
-        
+
         // Split by multiple delimiters
         let result: rhai::Array = engine
             .eval_with_scope(&mut scope, r##"text.split_re("[,;:]")"##)
@@ -1117,7 +1160,7 @@ mod tests {
         assert_eq!(result[1].clone().into_string().unwrap(), "two");
         assert_eq!(result[2].clone().into_string().unwrap(), "three");
         assert_eq!(result[3].clone().into_string().unwrap(), "four");
-        
+
         // Split by whitespace
         scope.push("spaced", "hello    world\ttab\nnewline");
         let result: rhai::Array = engine
@@ -1126,42 +1169,51 @@ mod tests {
         assert_eq!(result.len(), 4);
         assert_eq!(result[0].clone().into_string().unwrap(), "hello");
         assert_eq!(result[1].clone().into_string().unwrap(), "world");
-        
+
         // Invalid regex (returns original string)
         let result: rhai::Array = engine
             .eval_with_scope(&mut scope, r##"text.split_re("[")"##)
             .unwrap();
         assert_eq!(result.len(), 1);
-        assert_eq!(result[0].clone().into_string().unwrap(), "one,two;three:four");
+        assert_eq!(
+            result[0].clone().into_string().unwrap(),
+            "one,two;three:four"
+        );
     }
 
     #[test]
     fn test_replace_re_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
         scope.push("text", "The year 2023 and 2024 are here");
-        
+
         // Replace all years with "YEAR"
         let result: String = engine
             .eval_with_scope(&mut scope, r##"text.replace_re("\\d{4}", "YEAR")"##)
             .unwrap();
         assert_eq!(result, "The year YEAR and YEAR are here");
-        
+
         // Replace with capture groups
         scope.push("emails", "Contact alice@example.com or bob@test.org");
         let result: String = engine
-            .eval_with_scope(&mut scope, r##"emails.replace_re("(\\w+)@(\\w+\\.\\w+)", "[$1 at $2]")"##)
+            .eval_with_scope(
+                &mut scope,
+                r##"emails.replace_re("(\\w+)@(\\w+\\.\\w+)", "[$1 at $2]")"##,
+            )
             .unwrap();
-        assert_eq!(result, "Contact [alice at example.com] or [bob at test.org]");
-        
+        assert_eq!(
+            result,
+            "Contact [alice at example.com] or [bob at test.org]"
+        );
+
         // No matches (returns original)
         let result: String = engine
             .eval_with_scope(&mut scope, r##"text.replace_re("nomatch", "replacement")"##)
             .unwrap();
         assert_eq!(result, "The year 2023 and 2024 are here");
-        
+
         // Invalid regex (returns original)
         let result: String = engine
             .eval_with_scope(&mut scope, r##"text.replace_re("[", "replacement")"##)
@@ -1173,23 +1225,23 @@ mod tests {
     fn test_extract_ip_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
         scope.push("text", "Server 192.168.1.100 responded");
-        
+
         // Extract single IP
         let result: String = engine
             .eval_with_scope(&mut scope, r##"text.extract_ip()"##)
             .unwrap();
         assert_eq!(result, "192.168.1.100");
-        
+
         // No IP found
         scope.push("no_ip", "No IP address here");
         let result: String = engine
             .eval_with_scope(&mut scope, r##"no_ip.extract_ip()"##)
             .unwrap();
         assert_eq!(result, "");
-        
+
         // Multiple IPs, returns first
         scope.push("multi", "From 10.0.0.1 to 172.16.0.1");
         let result: String = engine
@@ -1202,10 +1254,10 @@ mod tests {
     fn test_extract_ips_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
         scope.push("text", "From 10.0.0.1 to 172.16.0.1 via 192.168.1.1");
-        
+
         // Extract all IPs
         let result: rhai::Array = engine
             .eval_with_scope(&mut scope, r##"text.extract_ips()"##)
@@ -1214,14 +1266,14 @@ mod tests {
         assert_eq!(result[0].clone().into_string().unwrap(), "10.0.0.1");
         assert_eq!(result[1].clone().into_string().unwrap(), "172.16.0.1");
         assert_eq!(result[2].clone().into_string().unwrap(), "192.168.1.1");
-        
+
         // No IPs found
         scope.push("no_ips", "No IP addresses here");
         let result: rhai::Array = engine
             .eval_with_scope(&mut scope, r##"no_ips.extract_ips()"##)
             .unwrap();
         assert_eq!(result.len(), 0);
-        
+
         // Invalid IP-like patterns should be excluded
         scope.push("invalid", "300.400.500.600 and 192.168.1.1");
         let result: rhai::Array = engine
@@ -1235,47 +1287,47 @@ mod tests {
     fn test_mask_ip_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
         scope.push("ip", "192.168.1.100");
-        
+
         // Default masking (last octet)
         let result: String = engine
             .eval_with_scope(&mut scope, r##"ip.mask_ip()"##)
             .unwrap();
         assert_eq!(result, "192.168.1.X");
-        
+
         // Mask 2 octets
         let result: String = engine
             .eval_with_scope(&mut scope, r##"ip.mask_ip(2)"##)
             .unwrap();
         assert_eq!(result, "192.168.X.X");
-        
+
         // Mask 3 octets
         let result: String = engine
             .eval_with_scope(&mut scope, r##"ip.mask_ip(3)"##)
             .unwrap();
         assert_eq!(result, "192.X.X.X");
-        
+
         // Mask all 4 octets
         let result: String = engine
             .eval_with_scope(&mut scope, r##"ip.mask_ip(4)"##)
             .unwrap();
         assert_eq!(result, "X.X.X.X");
-        
+
         // Invalid input (returns unchanged)
         scope.push("invalid", "not.an.ip.address");
         let result: String = engine
             .eval_with_scope(&mut scope, r##"invalid.mask_ip()"##)
             .unwrap();
         assert_eq!(result, "not.an.ip.address");
-        
+
         // Out of range values get clamped
         let result: String = engine
             .eval_with_scope(&mut scope, r##"ip.mask_ip(0)"##)
             .unwrap();
         assert_eq!(result, "192.168.1.X"); // Clamped to minimum 1
-        
+
         let result: String = engine
             .eval_with_scope(&mut scope, r##"ip.mask_ip(10)"##)
             .unwrap();
@@ -1286,60 +1338,60 @@ mod tests {
     fn test_is_private_ip_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
-        
+
         // Private IP ranges
         scope.push("private1", "10.0.0.1");
         let result: bool = engine
             .eval_with_scope(&mut scope, r##"private1.is_private_ip()"##)
             .unwrap();
         assert!(result);
-        
+
         scope.push("private2", "172.16.0.1");
         let result: bool = engine
             .eval_with_scope(&mut scope, r##"private2.is_private_ip()"##)
             .unwrap();
         assert!(result);
-        
+
         scope.push("private3", "192.168.1.1");
         let result: bool = engine
             .eval_with_scope(&mut scope, r##"private3.is_private_ip()"##)
             .unwrap();
         assert!(result);
-        
+
         scope.push("loopback", "127.0.0.1");
         let result: bool = engine
             .eval_with_scope(&mut scope, r##"loopback.is_private_ip()"##)
             .unwrap();
         assert!(result);
-        
+
         // Public IP addresses
         scope.push("public1", "8.8.8.8");
         let result: bool = engine
             .eval_with_scope(&mut scope, r##"public1.is_private_ip()"##)
             .unwrap();
         assert!(!result);
-        
+
         scope.push("public2", "1.1.1.1");
         let result: bool = engine
             .eval_with_scope(&mut scope, r##"public2.is_private_ip()"##)
             .unwrap();
         assert!(!result);
-        
+
         // Edge cases for 172.x.x.x range
         scope.push("edge1", "172.15.0.1");
         let result: bool = engine
             .eval_with_scope(&mut scope, r##"edge1.is_private_ip()"##)
             .unwrap();
         assert!(!result); // 172.15.x.x is not in private range
-        
+
         scope.push("edge2", "172.32.0.1");
         let result: bool = engine
             .eval_with_scope(&mut scope, r##"edge2.is_private_ip()"##)
             .unwrap();
         assert!(!result); // 172.32.x.x is not in private range
-        
+
         // Invalid IP addresses
         scope.push("invalid", "not.an.ip");
         let result: bool = engine
@@ -1352,37 +1404,40 @@ mod tests {
     fn test_extract_url_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
         scope.push("text", "Visit https://example.com/path for more info");
-        
+
         // Extract URL
         let result: String = engine
             .eval_with_scope(&mut scope, r##"text.extract_url()"##)
             .unwrap();
         assert_eq!(result, "https://example.com/path");
-        
+
         // HTTP URL
         scope.push("http", "Go to http://test.org/page.html");
         let result: String = engine
             .eval_with_scope(&mut scope, r##"http.extract_url()"##)
             .unwrap();
         assert_eq!(result, "http://test.org/page.html");
-        
+
         // No URL found
         scope.push("no_url", "No URL in this text");
         let result: String = engine
             .eval_with_scope(&mut scope, r##"no_url.extract_url()"##)
             .unwrap();
         assert_eq!(result, "");
-        
+
         // Complex URL with parameters
-        scope.push("complex", "API endpoint: https://api.example.com/v1/users?page=2&limit=10");
+        scope.push(
+            "complex",
+            "API endpoint: https://api.example.com/v1/users?page=2&limit=10",
+        );
         let result: String = engine
             .eval_with_scope(&mut scope, r##"complex.extract_url()"##)
             .unwrap();
         assert_eq!(result, "https://api.example.com/v1/users?page=2&limit=10");
-        
+
         // Multiple URLs (returns first)
         scope.push("multi", "Visit https://first.com or https://second.com");
         let result: String = engine
@@ -1395,44 +1450,44 @@ mod tests {
     fn test_extract_domain_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
         scope.push("text", "Visit https://example.com/path for more info");
-        
+
         // Extract domain from URL
         let result: String = engine
             .eval_with_scope(&mut scope, r##"text.extract_domain()"##)
             .unwrap();
         assert_eq!(result, "example.com");
-        
+
         // Extract domain from email
         scope.push("email", "Contact us at support@test.org");
         let result: String = engine
             .eval_with_scope(&mut scope, r##"email.extract_domain()"##)
             .unwrap();
         assert_eq!(result, "test.org");
-        
+
         // URL takes precedence over email
         scope.push("both", "Visit https://example.com or email admin@test.org");
         let result: String = engine
             .eval_with_scope(&mut scope, r##"both.extract_domain()"##)
             .unwrap();
         assert_eq!(result, "example.com");
-        
+
         // No domain found
         scope.push("no_domain", "No domain in this text");
         let result: String = engine
             .eval_with_scope(&mut scope, r##"no_domain.extract_domain()"##)
             .unwrap();
         assert_eq!(result, "");
-        
+
         // Complex domain with subdomains
         scope.push("subdomain", "API: https://api.v2.example.com/endpoint");
         let result: String = engine
             .eval_with_scope(&mut scope, r##"subdomain.extract_domain()"##)
             .unwrap();
         assert_eq!(result, "api.v2.example.com");
-        
+
         // Domain with port (should be excluded)
         scope.push("port", "Connect to http://localhost:8080/api");
         let result: String = engine

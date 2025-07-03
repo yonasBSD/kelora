@@ -1,5 +1,5 @@
-use crate::event::Event;
 use crate::colors::ColorScheme;
+use crate::event::Event;
 use crate::pipeline;
 use rhai::Dynamic;
 
@@ -10,7 +10,7 @@ use crate::pipeline::Formatter;
 /// Escapes quotes, backslashes, newlines, tabs, and carriage returns
 fn escape_logfmt_string(input: &str) -> String {
     let mut output = String::with_capacity(input.len() + 10); // Some extra space for escapes
-    
+
     for ch in input.chars() {
         match ch {
             '"' => output.push_str("\\\""),
@@ -21,7 +21,7 @@ fn escape_logfmt_string(input: &str) -> String {
             _ => output.push(ch),
         }
     }
-    
+
     output
 }
 
@@ -99,7 +99,6 @@ fn dynamic_to_json(value: &Dynamic) -> serde_json::Value {
     }
 }
 
-
 // JSON formatter
 pub struct JsonFormatter;
 
@@ -113,12 +112,12 @@ impl pipeline::Formatter for JsonFormatter {
     fn format(&self, event: &Event) -> String {
         // Convert Dynamic values to JSON manually
         let mut json_obj = serde_json::Map::new();
-        
+
         for (key, value) in &event.fields {
             let json_value = dynamic_to_json(value);
             json_obj.insert(key.clone(), json_value);
         }
-        
+
         serde_json::to_string(&serde_json::Value::Object(json_obj))
             .unwrap_or_else(|_| "{}".to_string())
     }
@@ -137,7 +136,7 @@ impl DefaultFormatter {
             colors: ColorScheme::new(use_colors),
             level_keys: vec![
                 "level",
-                "loglevel", 
+                "loglevel",
                 "log_level",
                 "lvl",
                 "severity",
@@ -220,8 +219,6 @@ impl DefaultFormatter {
         }
     }
 
-
-
     /// Get appropriate color for log level values
     fn level_color(&self, level: &str) -> &str {
         match level.to_lowercase().as_str() {
@@ -245,7 +242,6 @@ impl DefaultFormatter {
     fn is_level_field(&self, key: &str) -> bool {
         self.level_keys.iter().any(|&lk| lk == key)
     }
-
 }
 
 impl pipeline::Formatter for DefaultFormatter {
@@ -314,7 +310,6 @@ impl LogfmtFormatter {
             output.push_str(&string_val);
         }
     }
-
 }
 
 impl pipeline::Formatter for LogfmtFormatter {
@@ -344,7 +339,6 @@ impl pipeline::Formatter for LogfmtFormatter {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -361,7 +355,10 @@ mod tests {
     fn test_json_formatter_with_fields() {
         let mut event = Event::default();
         event.set_field("level".to_string(), Dynamic::from("INFO".to_string()));
-        event.set_field("message".to_string(), Dynamic::from("Test message".to_string()));
+        event.set_field(
+            "message".to_string(),
+            Dynamic::from("Test message".to_string()),
+        );
         event.set_field("user".to_string(), Dynamic::from("alice".to_string()));
         event.set_field("status".to_string(), Dynamic::from(200i64));
 
@@ -397,7 +394,10 @@ mod tests {
     fn test_default_formatter_brief_mode() {
         let mut event = Event::default();
         event.set_field("level".to_string(), Dynamic::from("info".to_string()));
-        event.set_field("message".to_string(), Dynamic::from("test message".to_string()));
+        event.set_field(
+            "message".to_string(),
+            Dynamic::from("test message".to_string()),
+        );
 
         let formatter = DefaultFormatter::new(false, true); // No colors, brief mode
         let result = formatter.format(&event);
@@ -410,7 +410,10 @@ mod tests {
     fn test_logfmt_formatter_basic() {
         let mut event = Event::default();
         event.set_field("level".to_string(), Dynamic::from("INFO".to_string()));
-        event.set_field("message".to_string(), Dynamic::from("Test message".to_string()));
+        event.set_field(
+            "message".to_string(),
+            Dynamic::from("Test message".to_string()),
+        );
         event.set_field("user".to_string(), Dynamic::from("alice".to_string()));
         event.set_field("status".to_string(), Dynamic::from(200i64));
 
@@ -430,9 +433,15 @@ mod tests {
     fn test_logfmt_formatter_quoting() {
         let mut event = Event::default();
         event.set_field("simple".to_string(), Dynamic::from("value".to_string()));
-        event.set_field("spaced".to_string(), Dynamic::from("has spaces".to_string()));
+        event.set_field(
+            "spaced".to_string(),
+            Dynamic::from("has spaces".to_string()),
+        );
         event.set_field("empty".to_string(), Dynamic::from("".to_string()));
-        event.set_field("quoted".to_string(), Dynamic::from("has\"quotes".to_string()));
+        event.set_field(
+            "quoted".to_string(),
+            Dynamic::from("has\"quotes".to_string()),
+        );
         event.set_field("equals".to_string(), Dynamic::from("has=sign".to_string()));
 
         let formatter = LogfmtFormatter::new();
@@ -481,7 +490,7 @@ mod tests {
         assert_eq!(escape_logfmt_string("with\nnewline"), "with\\nnewline");
         assert_eq!(escape_logfmt_string("with\ttab"), "with\\ttab");
         assert_eq!(escape_logfmt_string("with\\backslash"), "with\\\\backslash");
-        
+
         // Test needs_logfmt_quoting
         assert!(!needs_logfmt_quoting("simple"));
         assert!(needs_logfmt_quoting("with spaces"));
@@ -489,11 +498,19 @@ mod tests {
         assert!(needs_logfmt_quoting("with=equals"));
         assert!(needs_logfmt_quoting("with\"quotes"));
         assert!(needs_logfmt_quoting("with\ttab"));
-        
-        // Test format_dynamic_value
-        assert_eq!(format_dynamic_value(&Dynamic::from("test")), ("test".to_string(), true));
-        assert_eq!(format_dynamic_value(&Dynamic::from(42i64)), ("42".to_string(), false));
-        assert_eq!(format_dynamic_value(&Dynamic::from(true)), ("true".to_string(), false));
-    }
 
+        // Test format_dynamic_value
+        assert_eq!(
+            format_dynamic_value(&Dynamic::from("test")),
+            ("test".to_string(), true)
+        );
+        assert_eq!(
+            format_dynamic_value(&Dynamic::from(42i64)),
+            ("42".to_string(), false)
+        );
+        assert_eq!(
+            format_dynamic_value(&Dynamic::from(true)),
+            ("true".to_string(), false)
+        );
+    }
 }

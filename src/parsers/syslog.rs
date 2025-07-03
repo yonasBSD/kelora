@@ -1,8 +1,8 @@
 use crate::event::Event;
 use crate::pipeline::EventParser;
 use anyhow::{Context, Result};
-use rhai::Dynamic;
 use regex::Regex;
+use rhai::Dynamic;
 
 pub struct SyslogParser {
     rfc5424_regex: Regex,
@@ -13,7 +13,8 @@ impl SyslogParser {
     pub fn new() -> Result<Self> {
         let rfc5424_regex = Regex::new(
             r"^<(\d{1,3})>(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)(?:\s+(.*))?$",
-        ).context("Failed to compile RFC5424 regex")?;
+        )
+        .context("Failed to compile RFC5424 regex")?;
 
         let rfc3164_regex = Regex::new(
             r"^(?:<(\d{1,3})>)?(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+([^:\[\s]+)(?:\[(\d+)\])?\s*:\s*(.*)$"
@@ -37,29 +38,29 @@ impl SyslogParser {
         if let Some(captures) = self.rfc5424_regex.captures(line) {
             let priority_str = captures.get(1)?.as_str();
             let priority: u32 = priority_str.parse().ok()?;
-            
+
             // Validate priority range (0-191)
             if priority > 191 {
                 return None;
             }
 
             let (facility, severity) = Self::parse_priority(priority);
-            
+
             // Pre-allocate with expected field count
             let mut event = Event::with_capacity(line.to_string(), 10);
-            
+
             // Set priority fields
             event.set_field("pri".to_string(), Dynamic::from(priority as i64));
             event.set_field("facility".to_string(), Dynamic::from(facility as i64));
             event.set_field("severity".to_string(), Dynamic::from(severity as i64));
-            
+
             // Set version
             if let Some(version) = captures.get(2) {
                 if let Ok(v) = version.as_str().parse::<i64>() {
                     event.set_field("version".to_string(), Dynamic::from(v));
                 }
             }
-            
+
             // Set timestamp
             if let Some(ts) = captures.get(3) {
                 let ts_str = ts.as_str();
@@ -67,7 +68,7 @@ impl SyslogParser {
                     event.set_field("timestamp".to_string(), Dynamic::from(ts_str.to_string()));
                 }
             }
-            
+
             // Set hostname
             if let Some(host) = captures.get(4) {
                 let host_str = host.as_str();
@@ -75,7 +76,7 @@ impl SyslogParser {
                     event.set_field("host".to_string(), Dynamic::from(host_str.to_string()));
                 }
             }
-            
+
             // Set program name
             if let Some(prog) = captures.get(5) {
                 let prog_str = prog.as_str();
@@ -83,7 +84,7 @@ impl SyslogParser {
                     event.set_field("prog".to_string(), Dynamic::from(prog_str.to_string()));
                 }
             }
-            
+
             // Set process ID
             if let Some(pid) = captures.get(6) {
                 let pid_str = pid.as_str();
@@ -95,7 +96,7 @@ impl SyslogParser {
                     }
                 }
             }
-            
+
             // Set message ID
             if let Some(msgid) = captures.get(7) {
                 let msgid_str = msgid.as_str();
@@ -103,7 +104,7 @@ impl SyslogParser {
                     event.set_field("msgid".to_string(), Dynamic::from(msgid_str.to_string()));
                 }
             }
-            
+
             // Set structured data (skip for now, treat as part of message)
             // if let Some(sd) = captures.get(8) {
             //     let sd_str = sd.as_str();
@@ -111,12 +112,12 @@ impl SyslogParser {
             //         event.set_field("sd".to_string(), Dynamic::from(sd_str.to_string()));
             //     }
             // }
-            
+
             // Set message
             if let Some(msg) = captures.get(9) {
                 event.set_field("msg".to_string(), Dynamic::from(msg.as_str().to_string()));
             }
-            
+
             event.extract_core_fields();
             Some(event)
         } else {
@@ -129,38 +130,41 @@ impl SyslogParser {
         if let Some(captures) = self.rfc3164_regex.captures(line) {
             // Pre-allocate with expected field count
             let mut event = Event::with_capacity(line.to_string(), 8);
-            
+
             // Set priority fields if present
             if let Some(priority_match) = captures.get(1) {
                 let priority: u32 = priority_match.as_str().parse().ok()?;
-                
+
                 // Validate priority range (0-191)
                 if priority > 191 {
                     return None;
                 }
 
                 let (facility, severity) = Self::parse_priority(priority);
-                
+
                 event.set_field("pri".to_string(), Dynamic::from(priority as i64));
                 event.set_field("facility".to_string(), Dynamic::from(facility as i64));
                 event.set_field("severity".to_string(), Dynamic::from(severity as i64));
             }
-            
+
             // Set timestamp (group 2 now since priority is group 1)
             if let Some(ts) = captures.get(2) {
-                event.set_field("timestamp".to_string(), Dynamic::from(ts.as_str().to_string()));
+                event.set_field(
+                    "timestamp".to_string(),
+                    Dynamic::from(ts.as_str().to_string()),
+                );
             }
-            
+
             // Set hostname (group 3)
             if let Some(host) = captures.get(3) {
                 event.set_field("host".to_string(), Dynamic::from(host.as_str().to_string()));
             }
-            
+
             // Set program name (group 4)
             if let Some(prog) = captures.get(4) {
                 event.set_field("prog".to_string(), Dynamic::from(prog.as_str().to_string()));
             }
-            
+
             // Set process ID (optional, group 5)
             if let Some(pid) = captures.get(5) {
                 if let Ok(pid_num) = pid.as_str().parse::<i64>() {
@@ -169,12 +173,12 @@ impl SyslogParser {
                     event.set_field("pid".to_string(), Dynamic::from(pid.as_str().to_string()));
                 }
             }
-            
+
             // Set message (group 6)
             if let Some(msg) = captures.get(6) {
                 event.set_field("msg".to_string(), Dynamic::from(msg.as_str().to_string()));
             }
-            
+
             event.extract_core_fields();
             Some(event)
         } else {
@@ -204,36 +208,119 @@ mod tests {
     #[test]
     fn test_syslog_parser_rfc5424() {
         let parser = SyslogParser::new().unwrap();
-        let line = "<165>1 2023-10-11T22:14:15.003Z server01 sshd 1234 ID47 - Failed password for user";
+        let line =
+            "<165>1 2023-10-11T22:14:15.003Z server01 sshd 1234 ID47 - Failed password for user";
         let result = EventParser::parse(&parser, line).unwrap();
 
         // Check priority parsing
         assert_eq!(result.fields.get("pri").unwrap().as_int().unwrap(), 165);
         assert_eq!(result.fields.get("facility").unwrap().as_int().unwrap(), 20); // 165 >> 3 = 20
-        assert_eq!(result.fields.get("severity").unwrap().as_int().unwrap(), 5);  // 165 & 7 = 5
-        
+        assert_eq!(result.fields.get("severity").unwrap().as_int().unwrap(), 5); // 165 & 7 = 5
+
         // Check other fields
         assert_eq!(result.fields.get("version").unwrap().as_int().unwrap(), 1);
-        assert_eq!(result.fields.get("timestamp").unwrap().clone().into_string().unwrap(), "2023-10-11T22:14:15.003Z");
-        assert_eq!(result.fields.get("host").unwrap().clone().into_string().unwrap(), "server01");
-        assert_eq!(result.fields.get("prog").unwrap().clone().into_string().unwrap(), "sshd");
+        assert_eq!(
+            result
+                .fields
+                .get("timestamp")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "2023-10-11T22:14:15.003Z"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("host")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "server01"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("prog")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "sshd"
+        );
         assert_eq!(result.fields.get("pid").unwrap().as_int().unwrap(), 1234);
-        assert_eq!(result.fields.get("msgid").unwrap().clone().into_string().unwrap(), "ID47");
-        assert_eq!(result.fields.get("msg").unwrap().clone().into_string().unwrap(), "Failed password for user");
+        assert_eq!(
+            result
+                .fields
+                .get("msgid")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "ID47"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("msg")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "Failed password for user"
+        );
     }
 
     #[test]
     fn test_syslog_parser_rfc3164() {
         let parser = SyslogParser::new().unwrap();
-        let line = "Oct 11 22:14:15 server01 sshd[1234]: Failed password for user from 192.168.1.100";
+        let line =
+            "Oct 11 22:14:15 server01 sshd[1234]: Failed password for user from 192.168.1.100";
         let result = EventParser::parse(&parser, line).unwrap();
 
         // Check fields
-        assert_eq!(result.fields.get("timestamp").unwrap().clone().into_string().unwrap(), "Oct 11 22:14:15");
-        assert_eq!(result.fields.get("host").unwrap().clone().into_string().unwrap(), "server01");
-        assert_eq!(result.fields.get("prog").unwrap().clone().into_string().unwrap(), "sshd");
+        assert_eq!(
+            result
+                .fields
+                .get("timestamp")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "Oct 11 22:14:15"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("host")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "server01"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("prog")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "sshd"
+        );
         assert_eq!(result.fields.get("pid").unwrap().as_int().unwrap(), 1234);
-        assert_eq!(result.fields.get("msg").unwrap().clone().into_string().unwrap(), "Failed password for user from 192.168.1.100");
+        assert_eq!(
+            result
+                .fields
+                .get("msg")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "Failed password for user from 192.168.1.100"
+        );
     }
 
     #[test]
@@ -243,11 +330,47 @@ mod tests {
         let result = EventParser::parse(&parser, line).unwrap();
 
         // Check fields
-        assert_eq!(result.fields.get("timestamp").unwrap().clone().into_string().unwrap(), "Oct 11 22:14:15");
-        assert_eq!(result.fields.get("host").unwrap().clone().into_string().unwrap(), "server01");
-        assert_eq!(result.fields.get("prog").unwrap().clone().into_string().unwrap(), "kernel");
+        assert_eq!(
+            result
+                .fields
+                .get("timestamp")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "Oct 11 22:14:15"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("host")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "server01"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("prog")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "kernel"
+        );
         assert!(result.fields.get("pid").is_none()); // No PID in this format
-        assert_eq!(result.fields.get("msg").unwrap().clone().into_string().unwrap(), "CPU0: Core temperature above threshold");
+        assert_eq!(
+            result
+                .fields
+                .get("msg")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "CPU0: Core temperature above threshold"
+        );
     }
 
     #[test]
@@ -260,34 +383,82 @@ mod tests {
         assert_eq!(result.fields.get("pri").unwrap().as_int().unwrap(), 34);
         assert_eq!(result.fields.get("facility").unwrap().as_int().unwrap(), 4); // 34 >> 3
         assert_eq!(result.fields.get("severity").unwrap().as_int().unwrap(), 2); // 34 & 7
-        
+
         // Check other fields
-        assert_eq!(result.fields.get("timestamp").unwrap().clone().into_string().unwrap(), "Oct 11 22:14:15");
-        assert_eq!(result.fields.get("host").unwrap().clone().into_string().unwrap(), "webserver");
-        assert_eq!(result.fields.get("prog").unwrap().clone().into_string().unwrap(), "nginx");
+        assert_eq!(
+            result
+                .fields
+                .get("timestamp")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "Oct 11 22:14:15"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("host")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "webserver"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("prog")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "nginx"
+        );
         assert!(result.fields.get("pid").is_none()); // No PID in this format
-        assert_eq!(result.fields.get("msg").unwrap().clone().into_string().unwrap(), "192.168.1.10 - - [11/Oct/2023:22:14:15 +0000] \"GET /index.html HTTP/1.1\" 200 612");
+        assert_eq!(
+            result
+                .fields
+                .get("msg")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "192.168.1.10 - - [11/Oct/2023:22:14:15 +0000] \"GET /index.html HTTP/1.1\" 200 612"
+        );
     }
 
     #[test]
     fn test_syslog_parser_priority_calculation() {
         let parser = SyslogParser::new().unwrap();
-        
+
         // Test different priority values
         let test_cases = [
             (0, 0, 0),    // kern.emerg
-            (33, 4, 1),   // auth.alert  
+            (33, 4, 1),   // auth.alert
             (165, 20, 5), // local4.notice
             (191, 23, 7), // local7.debug
         ];
-        
+
         for (priority, expected_facility, expected_severity) in test_cases {
-            let line = format!("<{}>1 2023-10-11T22:14:15.003Z server01 test - - - Test message", priority);
+            let line = format!(
+                "<{}>1 2023-10-11T22:14:15.003Z server01 test - - - Test message",
+                priority
+            );
             let result = EventParser::parse(&parser, &line).unwrap();
-            
-            assert_eq!(result.fields.get("pri").unwrap().as_int().unwrap(), priority as i64);
-            assert_eq!(result.fields.get("facility").unwrap().as_int().unwrap(), expected_facility);
-            assert_eq!(result.fields.get("severity").unwrap().as_int().unwrap(), expected_severity);
+
+            assert_eq!(
+                result.fields.get("pri").unwrap().as_int().unwrap(),
+                priority as i64
+            );
+            assert_eq!(
+                result.fields.get("facility").unwrap().as_int().unwrap(),
+                expected_facility
+            );
+            assert_eq!(
+                result.fields.get("severity").unwrap().as_int().unwrap(),
+                expected_severity
+            );
         }
     }
 
@@ -308,14 +479,50 @@ mod tests {
     #[test]
     fn test_syslog_parser_fallback_to_rfc3164() {
         let parser = SyslogParser::new().unwrap();
-        
+
         // This should fail RFC5424 parsing and fall back to RFC3164
         let line = "Dec 25 14:09:07 server01 httpd: GET /index.html HTTP/1.1";
         let result = EventParser::parse(&parser, line).unwrap();
 
-        assert_eq!(result.fields.get("timestamp").unwrap().clone().into_string().unwrap(), "Dec 25 14:09:07");
-        assert_eq!(result.fields.get("host").unwrap().clone().into_string().unwrap(), "server01");
-        assert_eq!(result.fields.get("prog").unwrap().clone().into_string().unwrap(), "httpd");
-        assert_eq!(result.fields.get("msg").unwrap().clone().into_string().unwrap(), "GET /index.html HTTP/1.1");
+        assert_eq!(
+            result
+                .fields
+                .get("timestamp")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "Dec 25 14:09:07"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("host")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "server01"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("prog")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "httpd"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("msg")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "GET /index.html HTTP/1.1"
+        );
     }
 }

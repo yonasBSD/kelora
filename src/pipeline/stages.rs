@@ -1,7 +1,7 @@
-use anyhow::Result;
-use crate::event::Event;
+use super::{PipelineContext, ScriptResult, ScriptStage};
 use crate::engine::RhaiEngine;
-use super::{ScriptStage, ScriptResult, PipelineContext};
+use crate::event::Event;
+use anyhow::Result;
 
 /// Filter stage implementation
 pub struct FilterStage {
@@ -17,7 +17,10 @@ impl FilterStage {
 
 impl ScriptStage for FilterStage {
     fn apply(&mut self, event: Event, ctx: &mut PipelineContext) -> ScriptResult {
-        match ctx.rhai.execute_compiled_filter(&self.compiled_filter, &event, &mut ctx.tracker) {
+        match ctx
+            .rhai
+            .execute_compiled_filter(&self.compiled_filter, &event, &mut ctx.tracker)
+        {
             Ok(result) => {
                 if result {
                     ScriptResult::Emit(event)
@@ -25,9 +28,7 @@ impl ScriptStage for FilterStage {
                     ScriptResult::Skip
                 }
             }
-            Err(e) => {
-                ScriptResult::Error(format!("Filter error: {}", e))
-            }
+            Err(e) => ScriptResult::Error(format!("Filter error: {}", e)),
         }
     }
 }
@@ -46,7 +47,10 @@ impl ExecStage {
 
 impl ScriptStage for ExecStage {
     fn apply(&mut self, mut event: Event, ctx: &mut PipelineContext) -> ScriptResult {
-        match ctx.rhai.execute_compiled_exec(&self.compiled_exec, &mut event, &mut ctx.tracker) {
+        match ctx
+            .rhai
+            .execute_compiled_exec(&self.compiled_exec, &mut event, &mut ctx.tracker)
+        {
             Ok(()) => ScriptResult::Emit(event),
             Err(e) => ScriptResult::Error(format!("Exec error: {}", e)),
         }
@@ -109,7 +113,10 @@ pub struct LevelFilterStage {
 
 impl LevelFilterStage {
     pub fn new(levels: Vec<String>, exclude_levels: Vec<String>) -> Self {
-        Self { levels, exclude_levels }
+        Self {
+            levels,
+            exclude_levels,
+        }
     }
 
     /// Check if any filtering is needed
@@ -127,7 +134,7 @@ impl ScriptStage for LevelFilterStage {
         // Get the level from the event fields map - check all possible level field names
         let event_level = {
             let mut found_level: Option<String> = None;
-            
+
             // Check all known level field names in the event's fields map
             for level_field_name in crate::event::LEVEL_FIELD_NAMES {
                 if let Some(value) = event.fields.get(*level_field_name) {
@@ -137,7 +144,7 @@ impl ScriptStage for LevelFilterStage {
                     }
                 }
             }
-            
+
             match found_level {
                 Some(level) => level,
                 None => {
@@ -203,7 +210,7 @@ impl ScriptStage for KeyFilterStage {
 
         // Get available keys from the event
         let available_keys: Vec<String> = event.fields.keys().cloned().collect();
-        
+
         // Calculate effective keys using the same logic as before
         let effective_keys = {
             let mut result_keys = if self.keys.is_empty() {
@@ -211,21 +218,22 @@ impl ScriptStage for KeyFilterStage {
                 available_keys
             } else {
                 // If keys specified, filter available keys to only include those
-                available_keys.iter()
+                available_keys
+                    .iter()
                     .filter(|key| self.keys.contains(key))
                     .cloned()
                     .collect()
             };
-            
+
             // Apply exclusions (higher priority)
             result_keys.retain(|key| !self.exclude_keys.contains(key));
-            
+
             result_keys
         };
-        
+
         // Apply the filtering
         event.filter_keys(&effective_keys);
-        
+
         ScriptResult::Emit(event)
     }
 }

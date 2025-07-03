@@ -1,5 +1,5 @@
+use super::{Chunker, EventLimiter, OutputWriter, WindowManager};
 use crate::event::Event;
-use super::{Chunker, WindowManager, OutputWriter, EventLimiter};
 
 /// Default implementations for pipeline stages
 ///

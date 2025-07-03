@@ -112,12 +112,24 @@ impl KeloraConfig {
     /// Get the list of core field names (timestamp, level, message variants)
     pub fn get_core_field_names() -> Vec<String> {
         let mut core_fields = Vec::new();
-        
+
         // Use constants from event.rs to ensure consistency
-        core_fields.extend(crate::event::TIMESTAMP_FIELD_NAMES.iter().map(|s| s.to_string()));
-        core_fields.extend(crate::event::LEVEL_FIELD_NAMES.iter().map(|s| s.to_string()));
-        core_fields.extend(crate::event::MESSAGE_FIELD_NAMES.iter().map(|s| s.to_string()));
-        
+        core_fields.extend(
+            crate::event::TIMESTAMP_FIELD_NAMES
+                .iter()
+                .map(|s| s.to_string()),
+        );
+        core_fields.extend(
+            crate::event::LEVEL_FIELD_NAMES
+                .iter()
+                .map(|s| s.to_string()),
+        );
+        core_fields.extend(
+            crate::event::MESSAGE_FIELD_NAMES
+                .iter()
+                .map(|s| s.to_string()),
+        );
+
         core_fields
     }
 
@@ -125,7 +137,7 @@ impl KeloraConfig {
     pub fn format_error_message(&self, message: &str) -> String {
         let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
         let use_emoji = use_colors && !self.output.no_emoji;
-        
+
         if use_emoji {
             format!("🧱 {}", message)
         } else {
@@ -137,7 +149,7 @@ impl KeloraConfig {
     pub fn format_stats_message(&self, message: &str) -> String {
         let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
         let use_emoji = use_colors && !self.output.no_emoji;
-        
+
         if use_emoji {
             format!("🧱 {}", message)
         } else {
@@ -152,7 +164,7 @@ pub fn format_error_message_auto(message: &str) -> String {
     let use_colors = crate::tty::should_use_colors_with_mode(&ColorMode::Auto);
     let no_emoji = std::env::var("NO_EMOJI").is_ok();
     let use_emoji = use_colors && !no_emoji;
-    
+
     if use_emoji {
         format!("🧱 {}", message)
     } else {
@@ -225,8 +237,8 @@ impl KeloraConfig {
 
     /// Check if parallel processing should be used
     pub fn should_use_parallel(&self) -> bool {
-        self.performance.parallel 
-            || self.performance.threads > 0 
+        self.performance.parallel
+            || self.performance.threads > 0
             || self.performance.batch_size.is_some()
     }
 
@@ -244,7 +256,6 @@ impl KeloraConfig {
         }
     }
 }
-
 
 impl Default for KeloraConfig {
     fn default() -> Self {
@@ -378,4 +389,3 @@ impl From<FileOrder> for crate::FileOrder {
         }
     }
 }
-

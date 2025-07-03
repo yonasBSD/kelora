@@ -1,5 +1,5 @@
-use std::time::{Duration, Instant};
 use std::cell::RefCell;
+use std::time::{Duration, Instant};
 
 /// Statistics collected during log processing
 #[derive(Debug, Clone, Default)]
@@ -38,7 +38,6 @@ pub fn stats_add_line_filtered() {
     });
 }
 
-
 pub fn stats_add_error() {
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().errors += 1;
@@ -61,9 +60,7 @@ pub fn stats_finish_processing() {
 }
 
 pub fn get_thread_stats() -> ProcessingStats {
-    THREAD_STATS.with(|stats| {
-        stats.borrow().clone()
-    })
+    THREAD_STATS.with(|stats| stats.borrow().clone())
 }
 
 impl ProcessingStats {
@@ -74,10 +71,9 @@ impl ProcessingStats {
         }
     }
 
-
     pub fn format_stats(&self) -> String {
         let mut output = String::new();
-        
+
         output.push_str(&format!(
             "Lines processed: {} total, {} output, {} filtered",
             self.lines_read, self.lines_output, self.lines_filtered

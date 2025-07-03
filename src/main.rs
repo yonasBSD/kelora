@@ -24,8 +24,14 @@ use pipeline::{
     create_input_reader, create_pipeline_builder_from_config, create_pipeline_from_config,
     create_sequential_input_reader,
 };
-use stats::{get_thread_stats, ProcessingStats, stats_start_timer, stats_finish_processing, stats_add_line_read, stats_add_line_output, stats_add_line_filtered, stats_add_error};
-use unix::{check_termination, ExitCode, ProcessCleanup, SafeStderr, SafeStdout, SignalHandler, SHOULD_TERMINATE};
+use stats::{
+    get_thread_stats, stats_add_error, stats_add_line_filtered, stats_add_line_output,
+    stats_add_line_read, stats_finish_processing, stats_start_timer, ProcessingStats,
+};
+use unix::{
+    check_termination, ExitCode, ProcessCleanup, SafeStderr, SafeStdout, SignalHandler,
+    SHOULD_TERMINATE,
+};
 
 #[derive(Parser)]
 #[command(name = "kelora")]
@@ -40,11 +46,22 @@ pub struct Cli {
     pub files: Vec<String>,
 
     /// Input format
-    #[arg(short = 'f', long = "format", value_enum, default_value = "line", help_heading = "Input Options")]
+    #[arg(
+        short = 'f',
+        long = "format",
+        value_enum,
+        default_value = "line",
+        help_heading = "Input Options"
+    )]
     pub format: InputFormat,
 
     /// File processing order: none (CLI order), name (alphabetical), mtime (modification time, oldest first)
-    #[arg(long = "file-order", value_enum, default_value = "none", help_heading = "Input Options")]
+    #[arg(
+        long = "file-order",
+        value_enum,
+        default_value = "none",
+        help_heading = "Input Options"
+    )]
     pub file_order: FileOrder,
 
     /// Ignore input lines matching this regex pattern (applied before parsing)
@@ -68,7 +85,12 @@ pub struct Cli {
     pub end: Option<String>,
 
     /// Error handling strategy
-    #[arg(long = "on-error", value_enum, default_value = "print", help_heading = "Processing Options")]
+    #[arg(
+        long = "on-error",
+        value_enum,
+        default_value = "print",
+        help_heading = "Processing Options"
+    )]
     pub on_error: ErrorStrategy,
 
     /// Disable field auto-injection
@@ -80,19 +102,39 @@ pub struct Cli {
     pub inject_prefix: Option<String>,
 
     /// Include only events with these log levels (comma-separated, case-insensitive, e.g. debug,warn,error)
-    #[arg(short = 'l', long = "levels", value_delimiter = ',', help_heading = "Filtering Options")]
+    #[arg(
+        short = 'l',
+        long = "levels",
+        value_delimiter = ',',
+        help_heading = "Filtering Options"
+    )]
     pub levels: Vec<String>,
 
     /// Exclude events with these log levels (comma-separated, case-insensitive, higher priority than --levels)
-    #[arg(short = 'L', long = "exclude-levels", value_delimiter = ',', help_heading = "Filtering Options")]
+    #[arg(
+        short = 'L',
+        long = "exclude-levels",
+        value_delimiter = ',',
+        help_heading = "Filtering Options"
+    )]
     pub exclude_levels: Vec<String>,
 
     /// Output only specific fields (comma-separated)
-    #[arg(short = 'k', long = "keys", value_delimiter = ',', help_heading = "Filtering Options")]
+    #[arg(
+        short = 'k',
+        long = "keys",
+        value_delimiter = ',',
+        help_heading = "Filtering Options"
+    )]
     pub keys: Vec<String>,
 
     /// Exclude specific fields from output (comma-separated, higher priority than --keys)
-    #[arg(short = 'K', long = "exclude-keys", value_delimiter = ',', help_heading = "Filtering Options")]
+    #[arg(
+        short = 'K',
+        long = "exclude-keys",
+        value_delimiter = ',',
+        help_heading = "Filtering Options"
+    )]
     pub exclude_keys: Vec<String>,
 
     /// Output format
@@ -118,7 +160,11 @@ pub struct Cli {
     pub parallel: bool,
 
     /// Number of worker threads for parallel processing
-    #[arg(long = "threads", default_value_t = 0, help_heading = "Performance Options")]
+    #[arg(
+        long = "threads",
+        default_value_t = 0,
+        help_heading = "Performance Options"
+    )]
     pub threads: usize,
 
     /// Batch size for parallel processing (default: 1000)
@@ -126,7 +172,11 @@ pub struct Cli {
     pub batch_size: Option<usize>,
 
     /// Batch timeout in milliseconds
-    #[arg(long = "batch-timeout", default_value_t = 200, help_heading = "Performance Options")]
+    #[arg(
+        long = "batch-timeout",
+        default_value_t = 200,
+        help_heading = "Performance Options"
+    )]
     pub batch_timeout: u64,
 
     /// Disable ordered output (faster but may reorder results)
@@ -184,7 +234,6 @@ pub enum FileOrder {
     Name,
     Mtime,
 }
-
 
 impl Cli {
     /// Extract filter and exec stages in the order they appeared on the command line
@@ -260,7 +309,10 @@ fn main() -> Result<()> {
             }
             Err(e) => {
                 stderr
-                    .writeln(&config.format_error_message(&format!("Invalid ignore-lines regex pattern '{}': {}", ignore_pattern, e)))
+                    .writeln(&config.format_error_message(&format!(
+                        "Invalid ignore-lines regex pattern '{}': {}",
+                        ignore_pattern, e
+                    )))
                     .unwrap_or(());
                 ExitCode::InvalidUsage.exit();
             }
@@ -287,22 +339,26 @@ fn main() -> Result<()> {
         // Get effective values from config for parallel mode
         let batch_size = config.effective_batch_size();
         let stats = run_parallel(&config, batch_size, &mut stdout, &mut stderr);
-        
+
         // Print parallel stats if enabled (only if not terminated, will be handled later)
         if config.output.stats && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
             if let Some(ref s) = stats {
-                stderr.writeln(&config.format_stats_message(&s.format_stats())).unwrap_or(());
+                stderr
+                    .writeln(&config.format_stats_message(&s.format_stats()))
+                    .unwrap_or(());
             }
         }
         stats
     } else {
         run_sequential(&config, &mut stdout, &mut stderr);
-        
+
         // Finish statistics collection and print stats if enabled (only if not terminated)
         if config.output.stats && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
             stats_finish_processing();
             let stats = get_thread_stats();
-            stderr.writeln(&config.format_stats_message(&stats.format_stats())).unwrap_or(());
+            stderr
+                .writeln(&config.format_stats_message(&stats.format_stats()))
+                .unwrap_or(());
         }
         None
     };
@@ -313,15 +369,21 @@ fn main() -> Result<()> {
             if use_parallel {
                 // For parallel mode, try to get stats from the processor if available
                 if let Some(stats) = final_stats {
-                    stderr.writeln(&config.format_stats_message(&stats.format_stats())).unwrap_or(());
+                    stderr
+                        .writeln(&config.format_stats_message(&stats.format_stats()))
+                        .unwrap_or(());
                 } else {
-                    stderr.writeln(&config.format_stats_message("Processing interrupted")).unwrap_or(());
+                    stderr
+                        .writeln(&config.format_stats_message("Processing interrupted"))
+                        .unwrap_or(());
                 }
             } else {
                 // For sequential mode, we can still get stats from the current thread
                 stats_finish_processing();
                 let stats = get_thread_stats();
-                stderr.writeln(&config.format_stats_message(&stats.format_stats())).unwrap_or(());
+                stderr
+                    .writeln(&config.format_stats_message(&stats.format_stats()))
+                    .unwrap_or(());
             }
         }
         ExitCode::SignalInt.exit();
@@ -383,9 +445,12 @@ fn run_parallel(
     };
 
     // Process stages in parallel
-    if let Err(e) =
-        processor.process_with_pipeline(reader, pipeline_builder, config.processing.stages.clone(), config)
-    {
+    if let Err(e) = processor.process_with_pipeline(
+        reader,
+        pipeline_builder,
+        config.processing.stages.clone(),
+        config,
+    ) {
         stderr
             .writeln(&config.format_error_message(&format!("Parallel processing error: {}", e)))
             .unwrap_or(());
@@ -394,22 +459,27 @@ fn run_parallel(
 
     // Merge the parallel tracked state with our pipeline context
     let parallel_tracked = processor.get_final_tracked_state();
-    
+
     // Extract internal stats from tracking system before merging (if stats enabled)
     if config.output.stats {
-        processor.extract_final_stats_from_tracking(&parallel_tracked).unwrap_or(());
+        processor
+            .extract_final_stats_from_tracking(&parallel_tracked)
+            .unwrap_or(());
     }
-    
+
     // Filter out stats from user-visible context and merge the rest
     for (key, dynamic_value) in parallel_tracked {
-        if !key.starts_with("__internal_") && !key.starts_with("__kelora_stats_") && !key.starts_with("__op___kelora_stats_") {
+        if !key.starts_with("__internal_")
+            && !key.starts_with("__kelora_stats_")
+            && !key.starts_with("__op___kelora_stats_")
+        {
             ctx.tracker.insert(key, dynamic_value);
         }
     }
 
     // Execute end stage sequentially with merged state
     execute_end_stage(&end_stage, &ctx, config, stderr);
-    
+
     // Get final stats if enabled (even if terminated) - do this after end stage
     // to ensure we capture all worker statistics that may have been accumulated
     if config.output.stats {
@@ -502,7 +572,7 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
                 } else if config.output.stats && results.is_empty() {
                     stats_add_line_filtered();
                 }
-                
+
                 // Output all results (usually just one)
                 for result in results {
                     stdout.writeln(&result).unwrap_or_else(|e| {
@@ -524,7 +594,7 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
                 if config.output.stats {
                     stats_add_error();
                 }
-                
+
                 stderr
                     .writeln(&config.format_error_message(&format!(
                         "Pipeline error on line {}: {}",
@@ -571,10 +641,7 @@ fn execute_begin_stage(
 ) {
     if let Err(e) = begin_stage.execute(ctx) {
         stderr
-            .writeln(&config.format_error_message(&format!(
-                "Begin stage error: {}",
-                e
-            )))
+            .writeln(&config.format_error_message(&format!("Begin stage error: {}", e)))
             .unwrap_or(());
         ExitCode::GeneralError.exit();
     }

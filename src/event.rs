@@ -1,25 +1,59 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use indexmap::IndexMap;
 use rhai::Dynamic;
+use serde::{Deserialize, Serialize};
 
 /// Core field name constants to ensure consistency across the codebase
 pub const TIMESTAMP_FIELD_NAMES: &[&str] = &[
-    "ts", "_ts", "timestamp", "at", "time", "@timestamp",
-    "log_timestamp", "event_time", "datetime", "date_time",
-    "created_at", "logged_at", "_t", "@t", "t"
+    "ts",
+    "_ts",
+    "timestamp",
+    "at",
+    "time",
+    "@timestamp",
+    "log_timestamp",
+    "event_time",
+    "datetime",
+    "date_time",
+    "created_at",
+    "logged_at",
+    "_t",
+    "@t",
+    "t",
 ];
 
 pub const LEVEL_FIELD_NAMES: &[&str] = &[
-    "level", "lvl", "severity", "log_level", "loglevel",
-    "priority", "sev", "@level", "log_severity", "error_level",
-    "event_level", "_level", "@l"
+    "level",
+    "lvl",
+    "severity",
+    "log_level",
+    "loglevel",
+    "priority",
+    "sev",
+    "@level",
+    "log_severity",
+    "error_level",
+    "event_level",
+    "_level",
+    "@l",
 ];
 
 pub const MESSAGE_FIELD_NAMES: &[&str] = &[
-    "msg", "message", "content", "data", "log", "text",
-    "description", "details", "body", "payload", "event_message",
-    "log_message", "_message", "@message", "@m"
+    "msg",
+    "message",
+    "content",
+    "data",
+    "log",
+    "text",
+    "description",
+    "details",
+    "body",
+    "payload",
+    "event_message",
+    "log_message",
+    "_message",
+    "@message",
+    "@m",
 ];
 
 #[derive(Debug, Clone, Default)]
@@ -125,7 +159,6 @@ impl Event {
             }
         }
     }
-
 }
 
 impl std::fmt::Display for FieldValue {

@@ -2,17 +2,15 @@ use anyhow::Result;
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use rhai::Dynamic;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::Ordering;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::event::Event;
 use crate::pipeline::PipelineBuilder;
-use crate::stats::{ProcessingStats, get_thread_stats, stats_start_timer, stats_finish_processing};
+use crate::stats::{get_thread_stats, stats_finish_processing, stats_start_timer, ProcessingStats};
 use crate::unix::{SafeStdout, SHOULD_TERMINATE};
-
-
 
 /// Configuration for parallel processing
 #[derive(Debug, Clone)]
@@ -90,23 +88,29 @@ impl GlobalTracker {
         Ok(())
     }
 
-    pub fn extract_final_stats_from_tracking(&self, tracked: &HashMap<String, Dynamic>) -> Result<()> {
+    pub fn extract_final_stats_from_tracking(
+        &self,
+        tracked: &HashMap<String, Dynamic>,
+    ) -> Result<()> {
         let mut stats = self.processing_stats.lock().unwrap();
-        
-        let output = tracked.get("__kelora_stats_output")
+
+        let output = tracked
+            .get("__kelora_stats_output")
             .and_then(|v| v.as_int().ok())
             .unwrap_or(0) as usize;
-        let filtered = tracked.get("__kelora_stats_filtered")
+        let filtered = tracked
+            .get("__kelora_stats_filtered")
             .and_then(|v| v.as_int().ok())
             .unwrap_or(0) as usize;
-        let errors = tracked.get("__kelora_stats_errors")
+        let errors = tracked
+            .get("__kelora_stats_errors")
             .and_then(|v| v.as_int().ok())
             .unwrap_or(0) as usize;
 
         stats.lines_output = output;
         stats.lines_filtered = filtered;
         stats.errors = errors;
-        
+
         Ok(())
     }
 
@@ -122,19 +126,20 @@ impl GlobalTracker {
 
     pub fn merge_worker_state(&self, worker_state: HashMap<String, Dynamic>) -> Result<()> {
         let mut global = self.internal_tracked.lock().unwrap();
-        
+
         for (key, value) in &worker_state {
             if key.starts_with("__op_") {
                 global.insert(key.clone(), value.clone());
                 continue;
             }
-            
+
             if let Some(existing) = global.get(key) {
                 let op_key = format!("__op_{}", key);
-                let operation = worker_state.get(&op_key)
+                let operation = worker_state
+                    .get(&op_key)
                     .and_then(|v| v.clone().into_string().ok())
                     .unwrap_or_else(|| "replace".to_string());
-                
+
                 match operation.as_str() {
                     "count" => {
                         if let (Ok(a), Ok(b)) = (existing.as_int(), value.as_int()) {
@@ -158,7 +163,9 @@ impl GlobalTracker {
                     }
                     "unique" => {
                         // Merge unique arrays
-                        if let (Ok(existing_arr), Ok(new_arr)) = (existing.clone().into_array(), value.clone().into_array()) {
+                        if let (Ok(existing_arr), Ok(new_arr)) =
+                            (existing.clone().into_array(), value.clone().into_array())
+                        {
                             let mut merged = existing_arr;
                             for item in new_arr {
                                 if !merged.iter().any(|v| {
@@ -174,14 +181,21 @@ impl GlobalTracker {
                     }
                     "bucket" => {
                         // Merge bucket maps by summing counts
-                        if let (Some(existing_map), Some(new_map)) = (existing.clone().try_cast::<rhai::Map>(), value.clone().try_cast::<rhai::Map>()) {
+                        if let (Some(existing_map), Some(new_map)) = (
+                            existing.clone().try_cast::<rhai::Map>(),
+                            value.clone().try_cast::<rhai::Map>(),
+                        ) {
                             let mut merged = existing_map;
                             for (bucket_key, bucket_value) in new_map {
                                 if let Ok(bucket_count) = bucket_value.as_int() {
-                                    let existing_count = merged.get(&bucket_key)
+                                    let existing_count = merged
+                                        .get(&bucket_key)
                                         .and_then(|v| v.as_int().ok())
                                         .unwrap_or(0);
-                                    merged.insert(bucket_key, Dynamic::from(existing_count + bucket_count));
+                                    merged.insert(
+                                        bucket_key,
+                                        Dynamic::from(existing_count + bucket_count),
+                                    );
                                 }
                             }
                             global.insert(key.clone(), Dynamic::from(merged));
@@ -197,7 +211,7 @@ impl GlobalTracker {
                 global.insert(key.clone(), value.clone());
             }
         }
-        
+
         Ok(())
     }
 
@@ -236,7 +250,7 @@ impl ParallelProcessor {
         };
 
         let (result_sender, result_receiver) = if self.config.preserve_order {
-            bounded(self.config.num_workers * 4)  // Increased from 2x to 4x workers
+            bounded(self.config.num_workers * 4) // Increased from 2x to 4x workers
         } else {
             unbounded()
         };
@@ -247,22 +261,29 @@ impl ParallelProcessor {
             let batch_size = self.config.batch_size;
             let batch_timeout = Duration::from_millis(self.config.batch_timeout_ms);
             let ignore_lines = config.input.ignore_lines.clone();
-            
+
             let global_tracker_clone = self.global_tracker.clone();
             thread::spawn(move || {
-                Self::reader_thread(reader, batch_sender, batch_size, batch_timeout, global_tracker_clone, ignore_lines)
+                Self::reader_thread(
+                    reader,
+                    batch_sender,
+                    batch_size,
+                    batch_timeout,
+                    global_tracker_clone,
+                    ignore_lines,
+                )
             })
         };
 
         // Start worker threads
         let mut worker_handles = Vec::with_capacity(self.config.num_workers);
-        
+
         for worker_id in 0..self.config.num_workers {
             let batch_receiver = batch_receiver.clone();
             let result_sender = result_sender.clone();
             let worker_pipeline_builder = pipeline_builder.clone();
             let worker_stages = stages.clone();
-            
+
             let handle = thread::spawn(move || {
                 Self::worker_thread(
                     worker_id,
@@ -284,23 +305,19 @@ impl ParallelProcessor {
             let result_receiver = result_receiver;
             let preserve_order = self.config.preserve_order;
             let global_tracker = self.global_tracker.clone();
-            
+
             thread::spawn(move || {
-                Self::pipeline_result_sink_thread(
-                    result_receiver,
-                    preserve_order,
-                    global_tracker,
-                )
+                Self::pipeline_result_sink_thread(result_receiver, preserve_order, global_tracker)
             })
         };
 
         // Wait for all threads to complete
         reader_handle.join().unwrap()?;
-        
+
         for handle in worker_handles {
             handle.join().unwrap()?;
         }
-        
+
         sink_handle.join().unwrap()?;
 
         Ok(())
@@ -318,8 +335,12 @@ impl ParallelProcessor {
     }
 
     /// Extract stats from tracking system into global stats
-    pub fn extract_final_stats_from_tracking(&self, final_tracked: &HashMap<String, Dynamic>) -> Result<()> {
-        self.global_tracker.extract_final_stats_from_tracking(final_tracked)
+    pub fn extract_final_stats_from_tracking(
+        &self,
+        final_tracked: &HashMap<String, Dynamic>,
+    ) -> Result<()> {
+        self.global_tracker
+            .extract_final_stats_from_tracking(final_tracked)
     }
 
     /// Reader thread: batches input lines with timeout - simpler approach
@@ -346,7 +367,12 @@ impl ParallelProcessor {
         loop {
             // Check if we should send current batch due to timeout
             if !current_batch.is_empty() && last_batch_time.elapsed() >= batch_timeout {
-                Self::send_batch(&batch_sender, &mut current_batch, batch_id, batch_start_line)?;
+                Self::send_batch(
+                    &batch_sender,
+                    &mut current_batch,
+                    batch_id,
+                    batch_start_line,
+                )?;
                 batch_id += 1;
                 batch_start_line = line_num + 1;
                 last_batch_time = Instant::now();
@@ -357,31 +383,41 @@ impl ParallelProcessor {
                 Ok(0) => {
                     // EOF reached
                     if !current_batch.is_empty() {
-                        Self::send_batch(&batch_sender, &mut current_batch, batch_id, batch_start_line)?;
+                        Self::send_batch(
+                            &batch_sender,
+                            &mut current_batch,
+                            batch_id,
+                            batch_start_line,
+                        )?;
                     }
                     break;
                 }
                 Ok(_) => {
                     line_num += 1;
                     let line = line_buffer.trim_end().to_string();
-                    
+
                     // Skip empty lines
                     if line.is_empty() {
                         continue;
                     }
-                    
+
                     // Apply ignore-lines filter if configured (early filtering before parsing)
                     if let Some(ref ignore_regex) = ignore_lines {
                         if ignore_regex.is_match(&line) {
                             continue;
                         }
                     }
-                    
+
                     current_batch.push(line);
-                    
+
                     // For true streaming: send immediately for batch_size=1 or when batch is full
                     if current_batch.len() >= batch_size {
-                        Self::send_batch(&batch_sender, &mut current_batch, batch_id, batch_start_line)?;
+                        Self::send_batch(
+                            &batch_sender,
+                            &mut current_batch,
+                            batch_id,
+                            batch_start_line,
+                        )?;
                         batch_id += 1;
                         batch_start_line = line_num + 1;
                         last_batch_time = Instant::now();
@@ -406,17 +442,17 @@ impl ParallelProcessor {
         if current_batch.is_empty() {
             return Ok(());
         }
-        
+
         let batch = Batch {
             id: batch_id,
             lines: std::mem::take(current_batch),
             start_line_num: batch_start_line,
         };
-        
+
         if batch_sender.send(batch).is_err() {
             return Err(anyhow::anyhow!("Channel closed"));
         }
-        
+
         Ok(())
     }
 
@@ -430,9 +466,9 @@ impl ParallelProcessor {
     ) -> Result<()> {
         // Set parallel mode for print capturing
         crate::rhai_functions::strings::set_parallel_mode(true);
-        
+
         stats_start_timer();
-        
+
         // Create worker pipeline and context
         let (mut pipeline, mut ctx) = pipeline_builder.build_worker(stages)?;
 
@@ -441,53 +477,73 @@ impl ParallelProcessor {
             if SHOULD_TERMINATE.load(Ordering::Relaxed) {
                 break;
             }
-            
+
             // Track stats before batch to calculate deltas
             let before = (
-                ctx.tracker.get("__kelora_stats_output").and_then(|v| v.as_int().ok()).unwrap_or(0),
-                ctx.tracker.get("__kelora_stats_filtered").and_then(|v| v.as_int().ok()).unwrap_or(0),
-                ctx.tracker.get("__kelora_stats_errors").and_then(|v| v.as_int().ok()).unwrap_or(0),
+                ctx.tracker
+                    .get("__kelora_stats_output")
+                    .and_then(|v| v.as_int().ok())
+                    .unwrap_or(0),
+                ctx.tracker
+                    .get("__kelora_stats_filtered")
+                    .and_then(|v| v.as_int().ok())
+                    .unwrap_or(0),
+                ctx.tracker
+                    .get("__kelora_stats_errors")
+                    .and_then(|v| v.as_int().ok())
+                    .unwrap_or(0),
             );
-            
+
             let mut batch_results = Vec::with_capacity(batch.lines.len());
-            
+
             for (line_idx, line) in batch.lines.iter().enumerate() {
                 let current_line_num = batch.start_line_num + line_idx;
-                
+
                 // Update metadata
                 ctx.meta.line_number = Some(current_line_num);
-                
+
                 // Clear any previous captured prints/eprints before processing this event
                 crate::rhai_functions::strings::clear_captured_prints();
                 crate::rhai_functions::strings::clear_captured_eprints();
-                
+
                 // Process line through pipeline
                 match pipeline.process_line(line.clone(), &mut ctx) {
                     Ok(formatted_results) => {
                         // Count output/filtered lines
                         if !formatted_results.is_empty() {
-                            ctx.tracker.entry("__kelora_stats_output".to_string())
+                            ctx.tracker
+                                .entry("__kelora_stats_output".to_string())
                                 .and_modify(|v| *v = Dynamic::from(v.as_int().unwrap_or(0) + 1))
                                 .or_insert(Dynamic::from(1i64));
-                            ctx.tracker.insert("__op___kelora_stats_output".to_string(), Dynamic::from("count"));
+                            ctx.tracker.insert(
+                                "__op___kelora_stats_output".to_string(),
+                                Dynamic::from("count"),
+                            );
                         } else {
-                            ctx.tracker.entry("__kelora_stats_filtered".to_string())
+                            ctx.tracker
+                                .entry("__kelora_stats_filtered".to_string())
                                 .and_modify(|v| *v = Dynamic::from(v.as_int().unwrap_or(0) + 1))
                                 .or_insert(Dynamic::from(1i64));
-                            ctx.tracker.insert("__op___kelora_stats_filtered".to_string(), Dynamic::from("count"));
+                            ctx.tracker.insert(
+                                "__op___kelora_stats_filtered".to_string(),
+                                Dynamic::from("count"),
+                            );
                         }
                         // Get any prints/eprints that were captured during processing this specific event
-                        let captured_prints = crate::rhai_functions::strings::take_captured_prints();
-                        let captured_eprints = crate::rhai_functions::strings::take_captured_eprints();
-                        
+                        let captured_prints =
+                            crate::rhai_functions::strings::take_captured_prints();
+                        let captured_eprints =
+                            crate::rhai_functions::strings::take_captured_eprints();
+
                         // Convert formatted strings back to events for the result sink
                         // Note: This is a temporary approach during the transition
                         for formatted_result in formatted_results {
                             // For now, we'll need to create a dummy event since the result sink expects events
                             // In a full refactor, we'd change the result sink to handle formatted strings
-                            let mut dummy_event = Event::default_with_line(formatted_result.clone());
+                            let mut dummy_event =
+                                Event::default_with_line(formatted_result.clone());
                             dummy_event.set_metadata(current_line_num, None);
-                            
+
                             // Each formatted result gets its own copy of the captured prints/eprints
                             // since they all came from processing the same input line
                             batch_results.push(ProcessedEvent {
@@ -499,11 +555,15 @@ impl ParallelProcessor {
                     }
                     Err(e) => {
                         // Count errors
-                        ctx.tracker.entry("__kelora_stats_errors".to_string())
+                        ctx.tracker
+                            .entry("__kelora_stats_errors".to_string())
                             .and_modify(|v| *v = Dynamic::from(v.as_int().unwrap_or(0) + 1))
                             .or_insert(Dynamic::from(1i64));
-                        ctx.tracker.insert("__op___kelora_stats_errors".to_string(), Dynamic::from("count"));
-                        
+                        ctx.tracker.insert(
+                            "__op___kelora_stats_errors".to_string(),
+                            Dynamic::from("count"),
+                        );
+
                         // Error handling is already done in pipeline.process_line()
                         // based on the ctx.config.on_error strategy
                         match ctx.config.on_error {
@@ -516,32 +576,59 @@ impl ParallelProcessor {
 
             // Calculate deltas for this batch
             let after = (
-                ctx.tracker.get("__kelora_stats_output").and_then(|v| v.as_int().ok()).unwrap_or(0),
-                ctx.tracker.get("__kelora_stats_filtered").and_then(|v| v.as_int().ok()).unwrap_or(0),
-                ctx.tracker.get("__kelora_stats_errors").and_then(|v| v.as_int().ok()).unwrap_or(0),
+                ctx.tracker
+                    .get("__kelora_stats_output")
+                    .and_then(|v| v.as_int().ok())
+                    .unwrap_or(0),
+                ctx.tracker
+                    .get("__kelora_stats_filtered")
+                    .and_then(|v| v.as_int().ok())
+                    .unwrap_or(0),
+                ctx.tracker
+                    .get("__kelora_stats_errors")
+                    .and_then(|v| v.as_int().ok())
+                    .unwrap_or(0),
             );
-            
+
             let mut deltas = std::collections::HashMap::new();
             if after.0 > before.0 {
-                deltas.insert("__kelora_stats_output".to_string(), Dynamic::from(after.0 - before.0));
-                deltas.insert("__op___kelora_stats_output".to_string(), Dynamic::from("count"));
+                deltas.insert(
+                    "__kelora_stats_output".to_string(),
+                    Dynamic::from(after.0 - before.0),
+                );
+                deltas.insert(
+                    "__op___kelora_stats_output".to_string(),
+                    Dynamic::from("count"),
+                );
             }
             if after.1 > before.1 {
-                deltas.insert("__kelora_stats_filtered".to_string(), Dynamic::from(after.1 - before.1));
-                deltas.insert("__op___kelora_stats_filtered".to_string(), Dynamic::from("count"));
+                deltas.insert(
+                    "__kelora_stats_filtered".to_string(),
+                    Dynamic::from(after.1 - before.1),
+                );
+                deltas.insert(
+                    "__op___kelora_stats_filtered".to_string(),
+                    Dynamic::from("count"),
+                );
             }
             if after.2 > before.2 {
-                deltas.insert("__kelora_stats_errors".to_string(), Dynamic::from(after.2 - before.2));
-                deltas.insert("__op___kelora_stats_errors".to_string(), Dynamic::from("count"));
+                deltas.insert(
+                    "__kelora_stats_errors".to_string(),
+                    Dynamic::from(after.2 - before.2),
+                );
+                deltas.insert(
+                    "__op___kelora_stats_errors".to_string(),
+                    Dynamic::from("count"),
+                );
             }
-            
+
             // Include user tracking (non-stats)
             for (key, value) in &ctx.tracker {
                 if !key.starts_with("__kelora_stats_") && !key.starts_with("__op___kelora_stats_") {
                     deltas.insert(key.clone(), value.clone());
                 }
             }
-            
+
             // Send deltas only
             let batch_result = BatchResult {
                 batch_id: batch.id,
@@ -554,9 +641,11 @@ impl ParallelProcessor {
                 // Channel closed, worker should exit
                 break;
             }
-            
+
             // Keep stats, clear user tracking for next batch
-            ctx.tracker.retain(|k, _| k.starts_with("__kelora_stats_") || k.starts_with("__op___kelora_stats_"));
+            ctx.tracker.retain(|k, _| {
+                k.starts_with("__kelora_stats_") || k.starts_with("__op___kelora_stats_")
+            });
         }
 
         stats_finish_processing();
@@ -578,7 +667,6 @@ impl ParallelProcessor {
         }
     }
 
-
     fn pipeline_ordered_result_sink(
         result_receiver: Receiver<BatchResult>,
         global_tracker: GlobalTracker,
@@ -593,10 +681,11 @@ impl ParallelProcessor {
             if SHOULD_TERMINATE.load(Ordering::Relaxed) {
                 termination_detected = true;
             }
-            
+
             let batch_id = batch_result.batch_id;
-            let internal_tracked_updates = std::mem::take(&mut batch_result.internal_tracked_updates);
-            
+            let internal_tracked_updates =
+                std::mem::take(&mut batch_result.internal_tracked_updates);
+
             // Merge global state and stats
             global_tracker.merge_worker_state(internal_tracked_updates)?;
             global_tracker.merge_worker_stats(&batch_result.worker_stats)?;
@@ -646,7 +735,7 @@ impl ParallelProcessor {
             if SHOULD_TERMINATE.load(Ordering::Relaxed) {
                 termination_detected = true;
             }
-            
+
             // Merge global state and stats
             global_tracker.merge_worker_state(batch_result.internal_tracked_updates)?;
             global_tracker.merge_worker_stats(&batch_result.worker_stats)?;
@@ -675,29 +764,23 @@ impl ParallelProcessor {
 
     fn pipeline_output_batch_results(results: &[ProcessedEvent]) -> Result<()> {
         let mut stdout = SafeStdout::new();
-        
+
         for processed in results {
             // First output any captured prints for this specific event (to stdout)
             for print_msg in &processed.captured_prints {
                 stdout.writeln(print_msg).unwrap_or(());
             }
-            
+
             // Output any captured eprints for this specific event (to stderr)
             for eprint_msg in &processed.captured_eprints {
                 eprintln!("{}", eprint_msg);
             }
-            
+
             // Then output the event itself
             stdout.writeln(&processed.event.original_line).unwrap_or(());
         }
-        
+
         stdout.flush().unwrap_or(());
         Ok(())
     }
-
-
-
-
-
-
 }
