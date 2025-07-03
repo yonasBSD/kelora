@@ -86,6 +86,18 @@ let parts = line.cols(["0", "2", "-1"]);
 let json_data = parse_json(line);
 let kv_data = parse_kv("level=info method=GET status=200");
 let custom_kv = parse_kv("user:alice,role:admin", ",", ":");
+
+// String processing with built-in methods
+let clean = text.strip();                    // Remove whitespace
+let upper = text.upper();                    // Convert to uppercase
+let is_num = field.is_digit();               // Check if all digits
+let count = message.count("error");          // Count occurrences
+
+// Advanced regex extraction for complex logs
+let user = line.extract_re("user=(\\w+)");                    // Extract first group
+let users = logs.extract_all_re("user=(\\w+)", 1);           // All usernames
+let parts = line.split_re("[,;:]");                          // Split by delimiters
+let clean = text.replace_re("\\d{4}", "YEAR");               // Replace years
 ```
 
 Available variables:

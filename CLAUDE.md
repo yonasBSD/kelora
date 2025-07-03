@@ -150,3 +150,62 @@ let method = kv.method;  // "GET"
 let data = parse_kv("key1:value1,key2:value2", ",", ":");
 let key1 = data.key1;  // "value1"
 ```
+
+#### String Processing Functions
+
+**Basic String Methods:**
+- `lower()` - Convert string to lowercase
+- `upper()` - Convert string to uppercase
+- `is_digit()` - Check if string contains only ASCII digits
+- `count(pattern)` - Count non-overlapping occurrences of substring
+- `strip()` - Remove whitespace from both ends
+- `strip(chars)` - Remove specific characters from both ends
+- `join(array)` - Join array elements with separator string
+
+**Advanced Regex Methods:**
+- `extract_re(pattern)` - Extract first capture group (or full match if no groups)
+- `extract_re(pattern, group)` - Extract specific capture group by index
+- `extract_all_re(pattern)` - Extract all matches with capture groups as arrays
+- `extract_all_re(pattern, group)` - Extract specific group from all matches
+- `split_re(pattern)` - Split string using regex pattern
+- `replace_re(pattern, replacement)` - Replace using regex with capture group support
+
+**Regex Group Indexing:**
+- Group 0: Full match (entire matched portion)
+- Group 1+: Capture groups (content within parentheses)
+- Out-of-bounds groups return empty strings/arrays
+
+Examples:
+```rhai
+// Basic string operations
+let text = "  Hello World  ";
+let clean = text.strip();              // "Hello World"
+let upper = clean.upper();             // "HELLO WORLD"
+let count = upper.count("L");          // 3
+let parts = ["a", "b", "c"];
+let joined = ",".join(parts);          // "a,b,c"
+
+// Simple regex extraction
+let log = "user=alice status=200 level=info";
+let user = log.extract_re("user=(\\w+)");              // "alice"
+let status = log.extract_re("status=(\\d+)");          // "200"
+
+// Multi-group regex extraction
+let pattern = "user=(\\w+).*status=(\\d+)";
+let full_match = log.extract_re(pattern, 0);   // "user=alice status=200"
+let username = log.extract_re(pattern, 1);     // "alice" 
+let status_code = log.extract_re(pattern, 2);  // "200"
+
+// Extract all matches
+let logs = "user=alice status=200 user=bob status=404 user=charlie status=500";
+let users = logs.extract_all_re("user=(\\w+)", 1);     // ["alice", "bob", "charlie"]
+let statuses = logs.extract_all_re("status=(\\d+)", 1); // ["200", "404", "500"]
+
+// Advanced text processing
+let csv = "one,two;three:four";
+let fields = csv.split_re("[,;:]");     // ["one", "two", "three", "four"]
+
+let emails = "Contact alice@example.com or bob@test.org";
+let masked = emails.replace_re("(\\w+)@(\\w+\\.\\w+)", "[$1 at $2]");
+// Result: "Contact [alice at example.com] or [bob at test.org]"
+```
