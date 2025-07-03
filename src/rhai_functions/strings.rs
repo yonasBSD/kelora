@@ -321,6 +321,68 @@ pub fn register_functions(engine: &mut Engine) {
             .collect::<Vec<String>>()
             .join(separator)
     });
+
+    // Regex string methods
+    engine.register_fn("extract_re", |text: &str, pattern: &str| -> String {
+        match regex::Regex::new(pattern) {
+            Ok(re) => {
+                if let Some(captures) = re.captures(text) {
+                    // Return first captured group, or whole match if no groups
+                    if captures.len() > 1 {
+                        captures.get(1).map(|m| m.as_str()).unwrap_or("").to_string()
+                    } else {
+                        captures.get(0).map(|m| m.as_str()).unwrap_or("").to_string()
+                    }
+                } else {
+                    String::new()
+                }
+            }
+            Err(_) => String::new(), // Invalid regex returns empty string
+        }
+    });
+
+    engine.register_fn("extract_all_re", |text: &str, pattern: &str| -> rhai::Array {
+        match regex::Regex::new(pattern) {
+            Ok(re) => {
+                let mut results = rhai::Array::new();
+                for captures in re.captures_iter(text) {
+                    if captures.len() > 1 {
+                        // Multiple capture groups - return array of groups
+                        let groups: rhai::Array = captures
+                            .iter()
+                            .skip(1) // Skip full match (index 0)
+                            .filter_map(|m| m.map(|match_| Dynamic::from(match_.as_str().to_string())))
+                            .collect();
+                        results.push(Dynamic::from(groups));
+                    } else {
+                        // No capture groups - return the full match
+                        if let Some(full_match) = captures.get(0) {
+                            results.push(Dynamic::from(full_match.as_str().to_string()));
+                        }
+                    }
+                }
+                results
+            }
+            Err(_) => rhai::Array::new(), // Invalid regex returns empty array
+        }
+    });
+
+    engine.register_fn("split_re", |text: &str, pattern: &str| -> rhai::Array {
+        match regex::Regex::new(pattern) {
+            Ok(re) => re
+                .split(text)
+                .map(|s| Dynamic::from(s.to_string()))
+                .collect(),
+            Err(_) => vec![Dynamic::from(text.to_string())], // Invalid regex returns original string
+        }
+    });
+
+    engine.register_fn("replace_re", |text: &str, pattern: &str, replacement: &str| -> String {
+        match regex::Regex::new(pattern) {
+            Ok(re) => re.replace_all(text, replacement).to_string(),
+            Err(_) => text.to_string(), // Invalid regex returns original string
+        }
+    });
 }
 
 #[cfg(test)]
@@ -726,5 +788,142 @@ mod tests {
             .eval_with_scope(&mut scope, r#"",".join(["a", 123, "b"])"#)
             .unwrap();
         assert_eq!(result, "a,b");
+    }
+
+    #[test]
+    fn test_extract_re_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        
+        let mut scope = Scope::new();
+        scope.push("text", "user=alice status=200");
+        
+        // Extract with capture group
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_re("user=(\\w+)")"##)
+            .unwrap();
+        assert_eq!(result, "alice");
+        
+        // Extract without capture group (returns full match)
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_re("\\d+")"##)
+            .unwrap();
+        assert_eq!(result, "200");
+        
+        // No match
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_re("missing")"##)
+            .unwrap();
+        assert_eq!(result, "");
+        
+        // Invalid regex
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_re("[")"##)
+            .unwrap();
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_extract_all_re_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        
+        let mut scope = Scope::new();
+        scope.push("text", "a=1 b=2 c=3");
+        
+        // Extract all with capture groups
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"text.extract_all_re("(\\w+)=(\\d+)")"##)
+            .unwrap();
+        assert_eq!(result.len(), 3);
+        
+        // Check first match groups
+        let first_match = result[0].clone().into_array().unwrap();
+        assert_eq!(first_match[0].clone().into_string().unwrap(), "a");
+        assert_eq!(first_match[1].clone().into_string().unwrap(), "1");
+        
+        // Extract all without capture groups (just matches)
+        scope.push("numbers", "10 20 30 40");
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"numbers.extract_all_re("\\d+")"##)
+            .unwrap();
+        assert_eq!(result.len(), 4);
+        assert_eq!(result[0].clone().into_string().unwrap(), "10");
+        assert_eq!(result[3].clone().into_string().unwrap(), "40");
+        
+        // No matches
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"text.extract_all_re("missing")"##)
+            .unwrap();
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_split_re_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        
+        let mut scope = Scope::new();
+        scope.push("text", "one,two;three:four");
+        
+        // Split by multiple delimiters
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"text.split_re("[,;:]")"##)
+            .unwrap();
+        assert_eq!(result.len(), 4);
+        assert_eq!(result[0].clone().into_string().unwrap(), "one");
+        assert_eq!(result[1].clone().into_string().unwrap(), "two");
+        assert_eq!(result[2].clone().into_string().unwrap(), "three");
+        assert_eq!(result[3].clone().into_string().unwrap(), "four");
+        
+        // Split by whitespace
+        scope.push("spaced", "hello    world\ttab\nnewline");
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"spaced.split_re("\\s+")"##)
+            .unwrap();
+        assert_eq!(result.len(), 4);
+        assert_eq!(result[0].clone().into_string().unwrap(), "hello");
+        assert_eq!(result[1].clone().into_string().unwrap(), "world");
+        
+        // Invalid regex (returns original string)
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"text.split_re("[")"##)
+            .unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].clone().into_string().unwrap(), "one,two;three:four");
+    }
+
+    #[test]
+    fn test_replace_re_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        
+        let mut scope = Scope::new();
+        scope.push("text", "The year 2023 and 2024 are here");
+        
+        // Replace all years with "YEAR"
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.replace_re("\\d{4}", "YEAR")"##)
+            .unwrap();
+        assert_eq!(result, "The year YEAR and YEAR are here");
+        
+        // Replace with capture groups
+        scope.push("emails", "Contact alice@example.com or bob@test.org");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"emails.replace_re("(\\w+)@(\\w+\\.\\w+)", "[$1 at $2]")"##)
+            .unwrap();
+        assert_eq!(result, "Contact [alice at example.com] or [bob at test.org]");
+        
+        // No matches (returns original)
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.replace_re("nomatch", "replacement")"##)
+            .unwrap();
+        assert_eq!(result, "The year 2023 and 2024 are here");
+        
+        // Invalid regex (returns original)
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.replace_re("[", "replacement")"##)
+            .unwrap();
+        assert_eq!(result, "The year 2023 and 2024 are here");
     }
 }
