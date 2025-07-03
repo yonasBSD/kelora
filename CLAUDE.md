@@ -247,3 +247,38 @@ let domain = text.extract_domain();        // "api.example.com"
 let contact = "Email support@test.org for help";
 let email_domain = contact.extract_domain(); // "test.org"
 ```
+
+**Nested Data Access Functions:**
+- `get_path(map, path)` - Extract value from nested path with null default
+- `get_path(map, path, default)` - Extract value from nested path with custom default
+- `get_path(json_string, path)` - Parse JSON string then extract value with null default
+- `get_path(json_string, path, default)` - Parse JSON string then extract value with custom default
+
+**Path Syntax:**
+- Use dot notation for object keys: `"user.name"`
+- Use bracket notation for array indices: `"scores[0]"`
+- Combine both for complex paths: `"user.details.items[1].name"`
+- Negative array indexing supported: `"scores[-1]"` (last element)
+
+Examples:
+```rhai
+// Direct map access
+let user_map = parse_json('{"name": "alice", "scores": [10, 20, 30]}');
+let name = get_path(user_map, "name");           // "alice"
+let first_score = get_path(user_map, "scores[0]"); // 10
+let last_score = get_path(user_map, "scores[-1]"); // 30
+
+// JSON string parsing (automatic)
+let json_str = '{"user": {"name": "bob", "details": {"age": 25, "items": [{"id": 1, "name": "item1"}]}}}';
+let user_name = get_path(json_str, "user.name");                    // "bob"
+let user_age = get_path(json_str, "user.details.age");             // 25
+let item_name = get_path(json_str, "user.details.items[0].name");  // "item1"
+
+// With default values
+let missing = get_path(json_str, "user.nonexistent", "default");   // "default"
+let missing_num = get_path(json_str, "user.invalid[99]", 0);       // 0
+
+// Common use case with log events
+let user_data = get_path(user, "profile.settings.theme", "light"); // Extract theme with fallback
+let error_count = get_path(metrics, "errors.count", 0);            // Extract error count with 0 default
+```
