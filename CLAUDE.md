@@ -49,6 +49,10 @@ make test-full          # Comprehensive test suite
 # Process gzip compressed log files (automatic decompression)
 ./target/release/kelora -f jsonl logs.jsonl.gz --filter "status >= 400"
 
+# Ignore lines matching a regex pattern (applied before parsing for efficiency)
+./target/release/kelora -f jsonl app.log --ignore-lines "^#.*|^$"  # Skip comments and empty lines
+./target/release/kelora -f line /var/log/syslog --ignore-lines "systemd.*"  # Skip systemd messages
+
 # Process multiple files with different ordering
 ./target/release/kelora -f jsonl file1.jsonl file2.jsonl file3.jsonl  # CLI order (default)
 ./target/release/kelora -f jsonl --file-order name *.jsonl            # Alphabetical order
@@ -85,6 +89,11 @@ make test-full          # Comprehensive test suite
 
 # Statistics are displayed even when interrupted with CTRL-C
 seq 1 1000000 | ./target/release/kelora --filter "line.to_int() % 1000 == 0" --stats
+
+# Ignore input lines matching regex patterns (pre-parsing filter for efficiency)
+./target/release/kelora -f jsonl app.log --ignore-lines "^#.*|^$"           # Skip comments and empty lines
+./target/release/kelora -f line /var/log/syslog --ignore-lines "systemd.*"  # Skip systemd messages
+./target/release/kelora -f csv data.csv --ignore-lines "^\"?Date"          # Skip CSV header lines
 ```
 
 ## Development Guidelines

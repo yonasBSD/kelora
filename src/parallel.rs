@@ -226,6 +226,7 @@ impl ParallelProcessor {
         reader: R,
         pipeline_builder: PipelineBuilder,
         stages: Vec<crate::config::ScriptStageType>,
+        config: &crate::config::KeloraConfig,
     ) -> Result<()> {
         // Create channels
         let (batch_sender, batch_receiver) = if let Some(size) = self.config.buffer_size {
@@ -245,10 +246,11 @@ impl ParallelProcessor {
             let batch_sender = batch_sender.clone();
             let batch_size = self.config.batch_size;
             let batch_timeout = Duration::from_millis(self.config.batch_timeout_ms);
+            let ignore_lines = config.input.ignore_lines.clone();
             
             let global_tracker_clone = self.global_tracker.clone();
             thread::spawn(move || {
-                Self::reader_thread(reader, batch_sender, batch_size, batch_timeout, global_tracker_clone)
+                Self::reader_thread(reader, batch_sender, batch_size, batch_timeout, global_tracker_clone, ignore_lines)
             })
         };
 
@@ -327,6 +329,7 @@ impl ParallelProcessor {
         batch_size: usize,
         batch_timeout: Duration,
         global_tracker: GlobalTracker,
+        ignore_lines: Option<regex::Regex>,
     ) -> Result<()> {
         let mut batch_id = 0u64;
         let mut current_batch = Vec::with_capacity(batch_size);
@@ -365,6 +368,13 @@ impl ParallelProcessor {
                     // Skip empty lines
                     if line.is_empty() {
                         continue;
+                    }
+                    
+                    // Apply ignore-lines filter if configured (early filtering before parsing)
+                    if let Some(ref ignore_regex) = ignore_lines {
+                        if ignore_regex.is_match(&line) {
+                            continue;
+                        }
                     }
                     
                     current_batch.push(line);

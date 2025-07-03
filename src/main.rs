@@ -143,6 +143,10 @@ pub struct Cli {
     /// Show processing statistics
     #[arg(long = "stats")]
     pub stats: bool,
+
+    /// Ignore input lines matching this regex pattern (applied before parsing)
+    #[arg(long = "ignore-lines")]
+    pub ignore_lines: Option<String>,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -246,6 +250,21 @@ fn main() -> Result<()> {
     // Create configuration from CLI and set stages
     let mut config = KeloraConfig::from_cli(&cli);
     config.processing.stages = ordered_stages;
+
+    // Compile ignore-lines regex if provided
+    if let Some(ignore_pattern) = &cli.ignore_lines {
+        match regex::Regex::new(ignore_pattern) {
+            Ok(regex) => {
+                config.input.ignore_lines = Some(regex);
+            }
+            Err(e) => {
+                stderr
+                    .writeln(&config.format_error_message(&format!("Invalid ignore-lines regex pattern '{}': {}", ignore_pattern, e)))
+                    .unwrap_or(());
+                ExitCode::InvalidUsage.exit();
+            }
+        }
+    }
 
     // Validate arguments early
     if let Err(e) = validate_cli_args(&cli) {
@@ -364,7 +383,7 @@ fn run_parallel(
 
     // Process stages in parallel
     if let Err(e) =
-        processor.process_with_pipeline(reader, pipeline_builder, config.processing.stages.clone())
+        processor.process_with_pipeline(reader, pipeline_builder, config.processing.stages.clone(), config)
     {
         stderr
             .writeln(&config.format_error_message(&format!("Parallel processing error: {}", e)))
@@ -453,6 +472,17 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
         // Count line read for stats
         if config.output.stats {
             stats_add_line_read();
+        }
+
+        // Apply ignore-lines filter if configured (early filtering before parsing)
+        if let Some(ref ignore_regex) = config.input.ignore_lines {
+            if ignore_regex.is_match(&line) {
+                // Count filtered line for stats
+                if config.output.stats {
+                    stats_add_line_filtered();
+                }
+                continue;
+            }
         }
 
         if line.trim().is_empty() {

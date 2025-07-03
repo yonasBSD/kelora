@@ -1333,3 +1333,79 @@ fn test_parallel_stats_with_different_batch_sizes() {
         }
     }
 }
+
+#[test]
+fn test_ignore_lines_functionality() {
+    let input = r#"{"level": "INFO", "message": "This is an info message"}
+# This is a comment line
+{"level": "ERROR", "message": "This is an error message"}
+
+{"level": "DEBUG", "message": "This is a debug message"}
+# Another comment
+{"level": "WARN", "message": "This is a warning"}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "jsonl",
+        "-F", "jsonl",
+        "--ignore-lines", "^#.*|^$"  // Ignore comments and empty lines
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully with ignore-lines");
+    
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 4, "Should output 4 lines (comments and empty lines ignored)");
+    
+    // Verify all lines are valid JSON (no comments or empty lines)
+    for line in lines {
+        let parsed: serde_json::Value = serde_json::from_str(line).expect("Line should be valid JSON");
+        assert!(parsed.is_object(), "Each line should be a JSON object");
+    }
+}
+
+#[test]
+fn test_ignore_lines_with_specific_pattern() {
+    let input = r#"{"level": "INFO", "message": "User login successful"}
+{"level": "DEBUG", "message": "systemd startup complete"}
+{"level": "ERROR", "message": "Failed to connect to database"}
+{"level": "DEBUG", "message": "systemd service started"}
+{"level": "WARN", "message": "High memory usage detected"}"#;
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "jsonl",
+        "-F", "jsonl",
+        "--ignore-lines", "systemd"  // Ignore lines containing "systemd"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully with ignore-lines pattern");
+    
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 3, "Should output 3 lines (systemd lines ignored)");
+    
+    // Verify systemd lines are not present
+    for line in lines {
+        assert!(!line.contains("systemd"), "Output should not contain systemd lines");
+    }
+}
+
+#[test]
+fn test_ignore_lines_with_stats() {
+    let input = r#"{"level": "INFO", "message": "Valid message 1"}
+# Comment to ignore
+{"level": "ERROR", "message": "Valid message 2"}
+# Another comment
+{"level": "WARN", "message": "Valid message 3"}"#;
+    
+    let (stdout, stderr, exit_code) = run_kelora_with_input(&[
+        "-f", "jsonl",
+        "-F", "jsonl",
+        "--ignore-lines", "^#",  // Ignore comment lines
+        "--stats"
+    ], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully with ignore-lines and stats");
+    
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 3, "Should output 3 lines (comments ignored)");
+    
+    // Check stats show filtered lines
+    assert!(stderr.contains("5 total"), "Should show 5 total lines read");
+    assert!(stderr.contains("2 filtered"), "Should show 2 lines filtered by ignore-lines");
+    assert!(stderr.contains("3 output"), "Should show 3 lines output");
+}
