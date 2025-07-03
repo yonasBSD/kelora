@@ -40,6 +40,12 @@ make test-full          # Comprehensive test suite
 # Parse and filter syslog by severity
 ./target/release/kelora -f syslog /var/log/syslog --filter 'severity <= 3'
 
+# Parse CEF (Common Event Format) logs with syslog prefix
+./target/release/kelora -f cef security.log --filter 'severity.to_int() >= 7'
+
+# Parse CEF logs and extract specific fields
+./target/release/kelora -f cef firewall.cef --filter 'src.extract_ip() != ""' --keys timestamp,host,vendor,product,event,src,dst
+
 # Count status codes and track metrics
 ./target/release/kelora -f jsonl access.log --exec "track_count(status_class(status))" --end "print(tracked)"
 

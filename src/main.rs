@@ -210,6 +210,7 @@ pub enum InputFormat {
     Line,
     Logfmt,
     Syslog,
+    Cef,
     Csv,
     Apache,
     Nginx,
