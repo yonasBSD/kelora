@@ -17,9 +17,9 @@ pub enum ExitCode {
     Success = 0,
     GeneralError = 1,
     InvalidUsage = 2,
-    SignalInt = 130,    // 128 + SIGINT (2)
-    SignalPipe = 141,   // 128 + SIGPIPE (13)  
-    SignalTerm = 143,   // 128 + SIGTERM (15)
+    SignalInt = 130,  // 128 + SIGINT (2)
+    SignalPipe = 141, // 128 + SIGPIPE (13)
+    SignalTerm = 143, // 128 + SIGTERM (15)
 }
 
 impl ExitCode {
@@ -41,12 +41,12 @@ impl SignalHandler {
     pub fn new() -> Result<Self> {
         #[cfg(unix)]
         let signals_to_handle = vec![SIGINT, SIGPIPE, SIGTERM];
-        
+
         #[cfg(windows)]
         let signals_to_handle = vec![SIGINT]; // Windows only supports SIGINT reliably
-        
+
         let mut signals = Signals::new(&signals_to_handle)?;
-        
+
         let handle = thread::spawn(move || {
             for sig in signals.forever() {
                 match sig {
@@ -65,13 +65,24 @@ impl SignalHandler {
                     }
                     #[cfg(unix)]
                     SIGTERM => {
-                        eprintln!("{}", crate::config::format_error_message_auto("Received SIGTERM, shutting down gracefully..."));
+                        eprintln!(
+                            "{}",
+                            crate::config::format_error_message_auto(
+                                "Received SIGTERM, shutting down gracefully..."
+                            )
+                        );
                         SHOULD_TERMINATE.store(true, Ordering::Relaxed);
                         ExitCode::SignalTerm.exit();
                     }
                     _ => {
                         // Unknown signal - should not happen with our registration
-                        eprintln!("{}", crate::config::format_error_message_auto(&format!("Received unexpected signal: {}", sig)));
+                        eprintln!(
+                            "{}",
+                            crate::config::format_error_message_auto(&format!(
+                                "Received unexpected signal: {}",
+                                sig
+                            ))
+                        );
                     }
                 }
             }
@@ -137,7 +148,7 @@ impl SafeStdout {
         #[cfg(windows)]
         {
             // On Windows, broken pipe manifests as different error codes
-            e.kind() == io::ErrorKind::BrokenPipe 
+            e.kind() == io::ErrorKind::BrokenPipe
                 || e.raw_os_error() == Some(232) // ERROR_NO_DATA "The pipe is being closed"
                 || e.raw_os_error() == Some(109) // ERROR_BROKEN_PIPE "The pipe has been ended"
         }
@@ -163,7 +174,13 @@ impl SafeStderr {
             Err(e) => {
                 // If we can't write to stderr, there's not much we can do
                 // Just exit with a general error
-                eprintln!("{}", crate::config::format_error_message_auto(&format!("Fatal: Failed to write to stderr: {}", e)));
+                eprintln!(
+                    "{}",
+                    crate::config::format_error_message_auto(&format!(
+                        "Fatal: Failed to write to stderr: {}",
+                        e
+                    ))
+                );
                 ExitCode::GeneralError.exit();
             }
         }

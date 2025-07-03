@@ -1,4 +1,4 @@
-use rhai::{Engine, Dynamic};
+use rhai::{Dynamic, Engine};
 use std::cell::RefCell;
 
 thread_local! {
@@ -23,16 +23,12 @@ pub fn capture_eprint(message: String) {
 
 /// Get all captured prints and clear the buffer
 pub fn take_captured_prints() -> Vec<String> {
-    CAPTURED_PRINTS.with(|prints| {
-        std::mem::take(&mut *prints.borrow_mut())
-    })
+    CAPTURED_PRINTS.with(|prints| std::mem::take(&mut *prints.borrow_mut()))
 }
 
 /// Get all captured eprints and clear the buffer
 pub fn take_captured_eprints() -> Vec<String> {
-    CAPTURED_EPRINTS.with(|eprints| {
-        std::mem::take(&mut *eprints.borrow_mut())
-    })
+    CAPTURED_EPRINTS.with(|eprints| std::mem::take(&mut *eprints.borrow_mut()))
 }
 
 /// Clear captured prints without returning them
@@ -62,17 +58,17 @@ pub fn is_parallel_mode() -> bool {
 }
 
 /// Parse key-value pairs from a string (like logfmt format)
-/// 
+///
 /// # Arguments
 /// * `text` - The input string to parse
 /// * `sep` - Optional separator between key-value pairs (default: whitespace)
 /// * `kv_sep` - Separator between key and value (default: "=")
-/// 
+///
 /// # Returns
 /// A Rhai Map containing the parsed key-value pairs
 fn parse_kv_impl(text: &str, sep: Option<&str>, kv_sep: &str) -> rhai::Map {
     let mut map = rhai::Map::new();
-    
+
     // Split by separator or whitespace
     let pairs: Vec<&str> = if let Some(separator) = sep {
         text.split(separator).collect()
@@ -80,18 +76,18 @@ fn parse_kv_impl(text: &str, sep: Option<&str>, kv_sep: &str) -> rhai::Map {
         // Split by any whitespace
         text.split_whitespace().collect()
     };
-    
+
     for pair in pairs {
         let pair = pair.trim();
         if pair.is_empty() {
             continue;
         }
-        
+
         // Find the key-value separator
         if let Some(kv_pos) = pair.find(kv_sep) {
             let key = pair[..kv_pos].trim();
             let value = pair[kv_pos + kv_sep.len()..].trim();
-            
+
             if !key.is_empty() {
                 map.insert(key.into(), rhai::Dynamic::from(value.to_string()));
             }
@@ -101,13 +97,13 @@ fn parse_kv_impl(text: &str, sep: Option<&str>, kv_sep: &str) -> rhai::Map {
             map.insert(pair.into(), rhai::Dynamic::from(String::new()));
         }
     }
-    
+
     map
 }
 
 pub fn register_functions(engine: &mut Engine) {
     // Note: print() function is now handled via engine.on_print() in engine.rs
-    
+
     // Custom eprint function that captures output in parallel mode
     engine.register_fn("eprint", |message: rhai::Dynamic| {
         let msg = message.to_string();
@@ -130,45 +126,47 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("to_int", |text: &str| -> rhai::Dynamic {
-        text.parse::<i64>().map(Dynamic::from).unwrap_or(Dynamic::from(0i64))
+        text.parse::<i64>()
+            .map(Dynamic::from)
+            .unwrap_or(Dynamic::from(0i64))
     });
 
     engine.register_fn("to_float", |text: &str| -> rhai::Dynamic {
-        text.parse::<f64>().map(Dynamic::from).unwrap_or(Dynamic::UNIT)
+        text.parse::<f64>()
+            .map(Dynamic::from)
+            .unwrap_or(Dynamic::UNIT)
     });
 
     engine.register_fn("slice", |s: &str, spec: &str| -> String {
         let chars: Vec<char> = s.chars().collect();
         let len = chars.len() as i32;
-        
+
         if len == 0 {
             return String::new();
         }
 
         let parts: Vec<&str> = spec.split(':').collect();
-        
+
         // Parse step first
         let step = if parts.len() > 2 && !parts[2].trim().is_empty() {
             parts[2].trim().parse::<i32>().unwrap_or(1)
         } else {
             1
         };
-        
+
         if step == 0 {
             return String::new();
         }
-        
+
         // Determine defaults based on step direction
-        let (default_start, default_end) = if step > 0 {
-            (0, len)
-        } else {
-            (len - 1, -1)
-        };
-        
+        let (default_start, default_end) = if step > 0 { (0, len) } else { (len - 1, -1) };
+
         // Parse start
         let start = if !parts.is_empty() && !parts[0].trim().is_empty() {
             let mut s = parts[0].trim().parse::<i32>().unwrap_or(default_start);
-            if s < 0 { s += len; }
+            if s < 0 {
+                s += len;
+            }
             if step > 0 {
                 s.clamp(0, len)
             } else {
@@ -177,11 +175,13 @@ pub fn register_functions(engine: &mut Engine) {
         } else {
             default_start
         };
-        
+
         // Parse end
         let end = if parts.len() > 1 && !parts[1].trim().is_empty() {
             let mut e = parts[1].trim().parse::<i32>().unwrap_or(default_end);
-            if e < 0 { e += len; }
+            if e < 0 {
+                e += len;
+            }
             if step > 0 {
                 e.clamp(0, len)
             } else {
@@ -190,10 +190,10 @@ pub fn register_functions(engine: &mut Engine) {
         } else {
             default_end
         };
-        
+
         let mut result = String::new();
         let mut i = start;
-        
+
         if step > 0 {
             while i < end {
                 if i >= 0 && i < len {
@@ -209,7 +209,7 @@ pub fn register_functions(engine: &mut Engine) {
                 i += step;
             }
         }
-        
+
         result
     });
 
@@ -230,23 +230,26 @@ pub fn register_functions(engine: &mut Engine) {
         }
     });
 
-    engine.register_fn("between", |text: &str, start_substring: &str, end_substring: &str| -> String {
-        if let Some(start_pos) = text.find(start_substring) {
-            let start_idx = start_pos + start_substring.len();
-            let remainder = &text[start_idx..];
-            
-            if end_substring.is_empty() {
-                // Empty end substring means "to end of string"
-                remainder.to_string()
-            } else if let Some(end_pos) = remainder.find(end_substring) {
-                remainder[..end_pos].to_string()
+    engine.register_fn(
+        "between",
+        |text: &str, start_substring: &str, end_substring: &str| -> String {
+            if let Some(start_pos) = text.find(start_substring) {
+                let start_idx = start_pos + start_substring.len();
+                let remainder = &text[start_idx..];
+
+                if end_substring.is_empty() {
+                    // Empty end substring means "to end of string"
+                    remainder.to_string()
+                } else if let Some(end_pos) = remainder.find(end_substring) {
+                    remainder[..end_pos].to_string()
+                } else {
+                    String::new()
+                }
             } else {
                 String::new()
             }
-        } else {
-            String::new()
-        }
-    });
+        },
+    );
 
     engine.register_fn("starting_with", |text: &str, prefix: &str| -> String {
         if text.starts_with(prefix) {
@@ -273,13 +276,42 @@ pub fn register_functions(engine: &mut Engine) {
         parse_kv_impl(text, Some(sep), "=")
     });
 
-    engine.register_fn("parse_kv", |text: &str, sep: &str, kv_sep: &str| -> rhai::Map {
-        parse_kv_impl(text, Some(sep), kv_sep)
-    });
+    engine.register_fn(
+        "parse_kv",
+        |text: &str, sep: &str, kv_sep: &str| -> rhai::Map {
+            parse_kv_impl(text, Some(sep), kv_sep)
+        },
+    );
 
     // Allow unit type for null separator
-    engine.register_fn("parse_kv", |text: &str, _sep: (), kv_sep: &str| -> rhai::Map {
-        parse_kv_impl(text, None, kv_sep)
+    engine.register_fn(
+        "parse_kv",
+        |text: &str, _sep: (), kv_sep: &str| -> rhai::Map { parse_kv_impl(text, None, kv_sep) },
+    );
+
+    // String case conversion functions
+    engine.register_fn("lower", |text: &str| -> String { text.to_lowercase() });
+
+    engine.register_fn("upper", |text: &str| -> String { text.to_uppercase() });
+
+    // Python-style string methods
+    engine.register_fn("is_digit", |text: &str| -> bool {
+        !text.is_empty() && text.chars().all(|c| c.is_ascii_digit())
+    });
+
+    engine.register_fn("count", |text: &str, pattern: &str| -> i64 {
+        if pattern.is_empty() {
+            return 0;
+        }
+        text.matches(pattern).count() as i64
+    });
+
+    engine.register_fn("strip", |text: &str| -> String { text.trim().to_string() });
+
+    engine.register_fn("strip", |text: &str, chars: &str| -> String {
+        let chars_to_remove: std::collections::HashSet<char> = chars.chars().collect();
+        text.trim_matches(|c: char| chars_to_remove.contains(&c))
+            .to_string()
     });
 }
 
@@ -292,14 +324,18 @@ mod tests {
     fn test_after_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
         scope.push("text", "hello world test");
-        
-        let result: String = engine.eval_with_scope(&mut scope, r#"text.after("world")"#).unwrap();
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.after("world")"#)
+            .unwrap();
         assert_eq!(result, " test");
-        
-        let result: String = engine.eval_with_scope(&mut scope, r#"text.after("missing")"#).unwrap();
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.after("missing")"#)
+            .unwrap();
         assert_eq!(result, "");
     }
 
@@ -307,14 +343,18 @@ mod tests {
     fn test_before_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
         scope.push("text", "hello world test");
-        
-        let result: String = engine.eval_with_scope(&mut scope, r#"text.before("world")"#).unwrap();
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.before("world")"#)
+            .unwrap();
         assert_eq!(result, "hello ");
-        
-        let result: String = engine.eval_with_scope(&mut scope, r#"text.before("missing")"#).unwrap();
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.before("missing")"#)
+            .unwrap();
         assert_eq!(result, "");
     }
 
@@ -322,25 +362,35 @@ mod tests {
     fn test_between_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
         scope.push("text", "start[content]end");
-        
-        let result: String = engine.eval_with_scope(&mut scope, r#"text.between("[", "]")"#).unwrap();
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.between("[", "]")"#)
+            .unwrap();
         assert_eq!(result, "content");
-        
-        let result: String = engine.eval_with_scope(&mut scope, r#"text.between("missing", "]")"#).unwrap();
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.between("missing", "]")"#)
+            .unwrap();
         assert_eq!(result, "");
-        
-        let result: String = engine.eval_with_scope(&mut scope, r#"text.between("[", "missing")"#).unwrap();
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.between("[", "missing")"#)
+            .unwrap();
         assert_eq!(result, "");
-        
+
         // Test empty end substring - should return everything after start
-        let result: String = engine.eval_with_scope(&mut scope, r#"text.between("[", "")"#).unwrap();
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.between("[", "")"#)
+            .unwrap();
         assert_eq!(result, "content]end");
-        
+
         scope.push("log", "ERROR: connection failed");
-        let result: String = engine.eval_with_scope(&mut scope, r#"log.between("ERROR: ", "")"#).unwrap();
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"log.between("ERROR: ", "")"#)
+            .unwrap();
         assert_eq!(result, "connection failed");
     }
 
@@ -348,14 +398,18 @@ mod tests {
     fn test_starting_with_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
         scope.push("text", "hello world");
-        
-        let result: String = engine.eval_with_scope(&mut scope, r#"text.starting_with("hello")"#).unwrap();
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.starting_with("hello")"#)
+            .unwrap();
         assert_eq!(result, "hello world");
-        
-        let result: String = engine.eval_with_scope(&mut scope, r#"text.starting_with("world")"#).unwrap();
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.starting_with("world")"#)
+            .unwrap();
         assert_eq!(result, "");
     }
 
@@ -363,14 +417,18 @@ mod tests {
     fn test_ending_with_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
         scope.push("text", "hello world");
-        
-        let result: String = engine.eval_with_scope(&mut scope, r#"text.ending_with("world")"#).unwrap();
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.ending_with("world")"#)
+            .unwrap();
         assert_eq!(result, "hello world");
-        
-        let result: String = engine.eval_with_scope(&mut scope, r#"text.ending_with("hello")"#).unwrap();
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.ending_with("hello")"#)
+            .unwrap();
         assert_eq!(result, "");
     }
 
@@ -378,54 +436,253 @@ mod tests {
     fn test_parse_kv_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
-        
+
         let mut scope = Scope::new();
-        
+
         // Test basic key=value parsing
         scope.push("text", "key1=value1 key2=value2");
-        let result: rhai::Map = engine.eval_with_scope(&mut scope, r#"parse_kv(text)"#).unwrap();
-        assert_eq!(result.get("key1").unwrap().clone().into_string().unwrap(), "value1");
-        assert_eq!(result.get("key2").unwrap().clone().into_string().unwrap(), "value2");
-        
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_kv(text)"#)
+            .unwrap();
+        assert_eq!(
+            result.get("key1").unwrap().clone().into_string().unwrap(),
+            "value1"
+        );
+        assert_eq!(
+            result.get("key2").unwrap().clone().into_string().unwrap(),
+            "value2"
+        );
+
         // Test with custom separator
         scope.push("text2", "key1=value1,key2=value2");
-        let result: rhai::Map = engine.eval_with_scope(&mut scope, r#"parse_kv(text2, ",")"#).unwrap();
-        assert_eq!(result.get("key1").unwrap().clone().into_string().unwrap(), "value1");
-        assert_eq!(result.get("key2").unwrap().clone().into_string().unwrap(), "value2");
-        
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_kv(text2, ",")"#)
+            .unwrap();
+        assert_eq!(
+            result.get("key1").unwrap().clone().into_string().unwrap(),
+            "value1"
+        );
+        assert_eq!(
+            result.get("key2").unwrap().clone().into_string().unwrap(),
+            "value2"
+        );
+
         // Test with custom key-value separator
         scope.push("text3", "key1:value1 key2:value2");
-        let result: rhai::Map = engine.eval_with_scope(&mut scope, r#"parse_kv(text3, (), ":")"#).unwrap();
-        assert_eq!(result.get("key1").unwrap().clone().into_string().unwrap(), "value1");
-        assert_eq!(result.get("key2").unwrap().clone().into_string().unwrap(), "value2");
-        
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_kv(text3, (), ":")"#)
+            .unwrap();
+        assert_eq!(
+            result.get("key1").unwrap().clone().into_string().unwrap(),
+            "value1"
+        );
+        assert_eq!(
+            result.get("key2").unwrap().clone().into_string().unwrap(),
+            "value2"
+        );
+
         // Test with quoted values (simple - no space handling inside quotes)
         scope.push("text4", r#"key1="quoted" key2=simple"#);
-        let result: rhai::Map = engine.eval_with_scope(&mut scope, r#"parse_kv(text4)"#).unwrap();
-        assert_eq!(result.get("key1").unwrap().clone().into_string().unwrap(), "\"quoted\"");
-        assert_eq!(result.get("key2").unwrap().clone().into_string().unwrap(), "simple");
-        
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_kv(text4)"#)
+            .unwrap();
+        assert_eq!(
+            result.get("key1").unwrap().clone().into_string().unwrap(),
+            "\"quoted\""
+        );
+        assert_eq!(
+            result.get("key2").unwrap().clone().into_string().unwrap(),
+            "simple"
+        );
+
         // Test with key without value
         scope.push("text5", "key1=value1 standalone key2=value2");
-        let result: rhai::Map = engine.eval_with_scope(&mut scope, r#"parse_kv(text5)"#).unwrap();
-        assert_eq!(result.get("key1").unwrap().clone().into_string().unwrap(), "value1");
-        assert_eq!(result.get("standalone").unwrap().clone().into_string().unwrap(), "");
-        assert_eq!(result.get("key2").unwrap().clone().into_string().unwrap(), "value2");
-        
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_kv(text5)"#)
+            .unwrap();
+        assert_eq!(
+            result.get("key1").unwrap().clone().into_string().unwrap(),
+            "value1"
+        );
+        assert_eq!(
+            result
+                .get("standalone")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            ""
+        );
+        assert_eq!(
+            result.get("key2").unwrap().clone().into_string().unwrap(),
+            "value2"
+        );
+
         // Test edge cases
         scope.push("empty", "");
-        let result: rhai::Map = engine.eval_with_scope(&mut scope, r#"parse_kv(empty)"#).unwrap();
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_kv(empty)"#)
+            .unwrap();
         assert!(result.is_empty());
-        
+
         scope.push("spaces", "  key1=value1   key2=value2  ");
-        let result: rhai::Map = engine.eval_with_scope(&mut scope, r#"parse_kv(spaces)"#).unwrap();
-        assert_eq!(result.get("key1").unwrap().clone().into_string().unwrap(), "value1");
-        assert_eq!(result.get("key2").unwrap().clone().into_string().unwrap(), "value2");
-        
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_kv(spaces)"#)
+            .unwrap();
+        assert_eq!(
+            result.get("key1").unwrap().clone().into_string().unwrap(),
+            "value1"
+        );
+        assert_eq!(
+            result.get("key2").unwrap().clone().into_string().unwrap(),
+            "value2"
+        );
+
         // Test with empty values
         scope.push("empty_vals", "key1= key2=value2");
-        let result: rhai::Map = engine.eval_with_scope(&mut scope, r#"parse_kv(empty_vals)"#).unwrap();
-        assert_eq!(result.get("key1").unwrap().clone().into_string().unwrap(), "");
-        assert_eq!(result.get("key2").unwrap().clone().into_string().unwrap(), "value2");
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_kv(empty_vals)"#)
+            .unwrap();
+        assert_eq!(
+            result.get("key1").unwrap().clone().into_string().unwrap(),
+            ""
+        );
+        assert_eq!(
+            result.get("key2").unwrap().clone().into_string().unwrap(),
+            "value2"
+        );
+    }
+
+    #[test]
+    fn test_lower_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push("text", "Hello World");
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.lower()"#)
+            .unwrap();
+        assert_eq!(result, "hello world");
+
+        scope.push("mixed", "MiXeD cAsE");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"mixed.lower()"#)
+            .unwrap();
+        assert_eq!(result, "mixed case");
+    }
+
+    #[test]
+    fn test_upper_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push("text", "Hello World");
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.upper()"#)
+            .unwrap();
+        assert_eq!(result, "HELLO WORLD");
+
+        scope.push("mixed", "MiXeD cAsE");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"mixed.upper()"#)
+            .unwrap();
+        assert_eq!(result, "MIXED CASE");
+    }
+
+    #[test]
+    fn test_is_digit_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push("digits", "12345");
+        scope.push("mixed", "123abc");
+        scope.push("empty", "");
+        scope.push("letters", "abcde");
+
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r#"digits.is_digit()"#)
+            .unwrap();
+        assert_eq!(result, true);
+
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r#"mixed.is_digit()"#)
+            .unwrap();
+        assert_eq!(result, false);
+
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r#"empty.is_digit()"#)
+            .unwrap();
+        assert_eq!(result, false);
+
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r#"letters.is_digit()"#)
+            .unwrap();
+        assert_eq!(result, false);
+    }
+
+    #[test]
+    fn test_count_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push("text", "hello world hello");
+        scope.push("empty", "");
+
+        let result: i64 = engine
+            .eval_with_scope(&mut scope, r#"text.count("hello")"#)
+            .unwrap();
+        assert_eq!(result, 2);
+
+        let result: i64 = engine
+            .eval_with_scope(&mut scope, r#"text.count("l")"#)
+            .unwrap();
+        assert_eq!(result, 5);
+
+        let result: i64 = engine
+            .eval_with_scope(&mut scope, r#"text.count("missing")"#)
+            .unwrap();
+        assert_eq!(result, 0);
+
+        let result: i64 = engine
+            .eval_with_scope(&mut scope, r#"empty.count("x")"#)
+            .unwrap();
+        assert_eq!(result, 0);
+
+        let result: i64 = engine
+            .eval_with_scope(&mut scope, r#"text.count("")"#)
+            .unwrap();
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_strip_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push("text", "  hello world  ");
+        scope.push("custom", "###hello world###");
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.strip()"#)
+            .unwrap();
+        assert_eq!(result, "hello world");
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"custom.strip("#")"##)
+            .unwrap();
+        assert_eq!(result, "hello world");
+
+        scope.push("mixed", "  ##hello world##  ");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"mixed.strip(" #")"##)
+            .unwrap();
+        assert_eq!(result, "hello world");
     }
 }
