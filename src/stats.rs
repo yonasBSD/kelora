@@ -74,18 +74,6 @@ impl ProcessingStats {
         }
     }
 
-    pub fn merge(&mut self, other: &ProcessingStats) {
-        self.lines_read += other.lines_read;
-        self.lines_output += other.lines_output;
-        self.lines_filtered += other.lines_filtered;
-        self.files_processed += other.files_processed;
-        self.script_executions += other.script_executions;
-        self.errors += other.errors;
-        // Keep the longest processing time for total duration
-        if other.processing_time > self.processing_time {
-            self.processing_time = other.processing_time;
-        }
-    }
 
     pub fn format_stats(&self) -> String {
         let mut output = String::new();
