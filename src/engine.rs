@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use rhai::{Dynamic, Engine, Scope, AST};
+use rhai::{Dynamic, Engine, Scope, AST, EvalAltResult};
 use std::collections::HashMap;
 
 use crate::event::Event;
@@ -57,6 +57,48 @@ impl RhaiEngine {
 
     pub fn get_thread_tracking_state() -> HashMap<String, Dynamic> {
         rhai_functions::tracking::get_thread_tracking_state()
+    }
+
+    fn format_rhai_error(err: Box<EvalAltResult>, script_name: &str, _script_text: &str) -> String {
+        match *err {
+            EvalAltResult::ErrorParsing(parse_err, pos) => {
+                format!("Syntax error in {} at {}: {}", script_name, pos, parse_err)
+            }
+            EvalAltResult::ErrorRuntime(runtime_err, pos) => {
+                format!("Runtime error in {} at {}: {}", script_name, pos, runtime_err)
+            }
+            EvalAltResult::ErrorVariableNotFound(var, pos) => {
+                format!("Variable '{}' not found in {} at {}", var, script_name, pos)
+            }
+            EvalAltResult::ErrorFunctionNotFound(func, pos) => {
+                format!("Function '{}' not found in {} at {}", func, script_name, pos)
+            }
+            EvalAltResult::ErrorPropertyNotFound(prop, pos) => {
+                format!("Property '{}' not found in {} at {}", prop, script_name, pos)
+            }
+            EvalAltResult::ErrorIndexNotFound(index, pos) => {
+                format!("Index '{}' not found in {} at {}", index, script_name, pos)
+            }
+            EvalAltResult::ErrorDotExpr(msg, pos) => {
+                format!("Property access error in {} at {}: {}", script_name, pos, msg)
+            }
+            EvalAltResult::ErrorArithmetic(msg, pos) => {
+                format!("Arithmetic error in {} at {}: {}", script_name, pos, msg)
+            }
+            EvalAltResult::ErrorTooManyOperations(pos) => {
+                format!("Too many operations in {} at {}", script_name, pos)
+            }
+            EvalAltResult::ErrorStackOverflow(pos) => {
+                format!("Stack overflow in {} at {}", script_name, pos)
+            }
+            EvalAltResult::ErrorDataTooLarge(msg, pos) => {
+                format!("Data too large in {} at {}: {}", script_name, pos, msg)
+            }
+            EvalAltResult::ErrorTerminated(val, pos) => {
+                format!("Script terminated in {} at {}: {}", script_name, pos, val)
+            }
+            _ => format!("Error in {}: {}", script_name, err)
+        }
     }
 
     pub fn new() -> Self {
@@ -153,11 +195,8 @@ impl RhaiEngine {
             .engine
             .eval_expression_with_scope::<bool>(&mut scope, &compiled.expr)
             .map_err(|e| {
-                anyhow::anyhow!(
-                    "Failed to execute filter expression '{}': {}",
-                    compiled.expr,
-                    e
-                )
+                let detailed_msg = Self::format_rhai_error(e, "filter expression", &compiled.expr);
+                anyhow::anyhow!("{}", detailed_msg)
             })?;
 
         *tracked = Self::get_thread_tracking_state();
@@ -177,7 +216,8 @@ impl RhaiEngine {
             .engine
             .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
             .map_err(|e| {
-                anyhow::anyhow!("Failed to execute exec script '{}': {}", compiled.expr, e)
+                let detailed_msg = Self::format_rhai_error(e, "exec script", &compiled.expr);
+                anyhow::anyhow!("{}", detailed_msg)
             })?;
 
         self.update_event_from_scope(event, &scope);
@@ -197,11 +237,8 @@ impl RhaiEngine {
             .engine
             .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
             .map_err(|e| {
-                anyhow::anyhow!(
-                    "Failed to execute begin expression '{}': {}",
-                    compiled.expr,
-                    e
-                )
+                let detailed_msg = Self::format_rhai_error(e, "begin expression", &compiled.expr);
+                anyhow::anyhow!("{}", detailed_msg)
             })?;
 
         *tracked = Self::get_thread_tracking_state();
@@ -226,11 +263,8 @@ impl RhaiEngine {
             .engine
             .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
             .map_err(|e| {
-                anyhow::anyhow!(
-                    "Failed to execute end expression '{}': {}",
-                    compiled.expr,
-                    e
-                )
+                let detailed_msg = Self::format_rhai_error(e, "end expression", &compiled.expr);
+                anyhow::anyhow!("{}", detailed_msg)
             })?;
 
         Ok(())
@@ -253,11 +287,8 @@ impl RhaiEngine {
                 .engine
                 .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
                 .map_err(|e| {
-                    anyhow::anyhow!(
-                        "Failed to execute begin expression '{}': {}",
-                        compiled.expr,
-                        e
-                    )
+                    let detailed_msg = Self::format_rhai_error(e, "begin expression", &compiled.expr);
+                    anyhow::anyhow!("{}", detailed_msg)
                 })?;
 
             // Update tracked from thread-local state
@@ -283,11 +314,8 @@ impl RhaiEngine {
                 .engine
                 .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
                 .map_err(|e| {
-                    anyhow::anyhow!(
-                        "Failed to execute end expression '{}': {}",
-                        compiled.expr,
-                        e
-                    )
+                    let detailed_msg = Self::format_rhai_error(e, "end expression", &compiled.expr);
+                    anyhow::anyhow!("{}", detailed_msg)
                 })?;
         }
 
