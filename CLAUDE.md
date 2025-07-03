@@ -67,6 +67,7 @@ make test-full          # Comprehensive test suite
 
 # Output core fields plus specific additional fields
 ./target/release/kelora -f jsonl app.log --core --keys user,status
+./target/release/kelora -f jsonl app.log --core -k user,status  # Short option
 
 # Filter events by log level (case-insensitive)
 ./target/release/kelora -f jsonl app.log --levels debug,error,warn
@@ -80,6 +81,9 @@ make test-full          # Comprehensive test suite
 # Extract columns using integer syntax (cleaner than string selectors)
 ./target/release/kelora -f line access.log --exec "let user_name=line.col(1,2)" --filter "user_name != ''"
 ./target/release/kelora -f csv access.csv --exec "let fields=line.cols(0,2,4)" --filter "fields[1] != ''"
+
+# Select specific fields using short option
+./target/release/kelora -f jsonl app.log -k timestamp,level,message,user_id
 
 # Show processing statistics (lines processed, filtered, timing, performance)
 ./target/release/kelora -f jsonl app.log --filter "status >= 400" --stats
@@ -95,6 +99,28 @@ seq 1 1000000 | ./target/release/kelora --filter "line.to_int() % 1000 == 0" --s
 ./target/release/kelora -f line /var/log/syslog --ignore-lines "systemd.*"  # Skip systemd messages
 ./target/release/kelora -f csv data.csv --ignore-lines "^\"?Date"          # Skip CSV header lines
 ```
+
+## CLI Help Organization
+
+The `--help` output is organized into logical sections that follow the data processing pipeline:
+
+1. **Input Options**: File handling and input format (`-f`, `--file-order`, `--ignore-lines`)
+2. **Processing Options**: Script execution and processing control (`--begin`, `--filter`, `--exec`, `--end`, `--on-error`, `--no-inject`, `--inject-prefix`)
+3. **Filtering Options**: Data filtering in the pipeline (`--levels`, `--exclude-levels`, `--keys`/`-k`, `--exclude-keys`/`-K`)
+4. **Output Options**: Output formatting (`--output-format`, `--core`, `--brief`)
+5. **Performance Options**: Processing optimizations (`--parallel`, `--threads`, `--batch-size`, `--batch-timeout`, `--unordered`)
+6. **Display Options**: Visual presentation (`--force-color`, `--no-color`, `--no-emoji`, `--stats`)
+
+### Key Short Options
+- `-f` = `--format` (input format)
+- `-F` = `--output-format` (output format)  
+- `-e` = `--exec` (execute script)
+- `-k` = `--keys` (select fields)
+- `-K` = `--exclude-keys` (exclude fields)
+- `-l` = `--levels` (include log levels)
+- `-L` = `--exclude-levels` (exclude log levels)
+- `-m` = `--core` (core fields only)
+- `-b` = `--brief` (brief output)
 
 ## Development Guidelines
 

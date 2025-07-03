@@ -40,113 +40,114 @@ pub struct Cli {
     pub files: Vec<String>,
 
     /// Input format
-    #[arg(short = 'f', long = "format", value_enum, default_value = "line")]
+    #[arg(short = 'f', long = "format", value_enum, default_value = "line", help_heading = "Input Options")]
     pub format: InputFormat,
+
+    /// File processing order: none (CLI order), name (alphabetical), mtime (modification time, oldest first)
+    #[arg(long = "file-order", value_enum, default_value = "none", help_heading = "Input Options")]
+    pub file_order: FileOrder,
+
+    /// Ignore input lines matching this regex pattern (applied before parsing)
+    #[arg(long = "ignore-lines", help_heading = "Input Options")]
+    pub ignore_lines: Option<String>,
+
+    /// Run once before processing
+    #[arg(long = "begin", help_heading = "Processing Options")]
+    pub begin: Option<String>,
+
+    /// Boolean filter expressions (can be repeated)
+    #[arg(long = "filter", help_heading = "Processing Options")]
+    pub filters: Vec<String>,
+
+    /// Transform/process exec scripts (can be repeated)
+    #[arg(short = 'e', long = "exec", help_heading = "Processing Options")]
+    pub execs: Vec<String>,
+
+    /// Run once after processing
+    #[arg(long = "end", help_heading = "Processing Options")]
+    pub end: Option<String>,
+
+    /// Error handling strategy
+    #[arg(long = "on-error", value_enum, default_value = "print", help_heading = "Processing Options")]
+    pub on_error: ErrorStrategy,
+
+    /// Disable field auto-injection
+    #[arg(long = "no-inject", help_heading = "Processing Options")]
+    pub no_inject_fields: bool,
+
+    /// Prefix for injected variables
+    #[arg(long = "inject-prefix", help_heading = "Processing Options")]
+    pub inject_prefix: Option<String>,
+
+    /// Include only events with these log levels (comma-separated, case-insensitive, e.g. debug,warn,error)
+    #[arg(short = 'l', long = "levels", value_delimiter = ',', help_heading = "Filtering Options")]
+    pub levels: Vec<String>,
+
+    /// Exclude events with these log levels (comma-separated, case-insensitive, higher priority than --levels)
+    #[arg(short = 'L', long = "exclude-levels", value_delimiter = ',', help_heading = "Filtering Options")]
+    pub exclude_levels: Vec<String>,
+
+    /// Output only specific fields (comma-separated)
+    #[arg(short = 'k', long = "keys", value_delimiter = ',', help_heading = "Filtering Options")]
+    pub keys: Vec<String>,
+
+    /// Exclude specific fields from output (comma-separated, higher priority than --keys)
+    #[arg(short = 'K', long = "exclude-keys", value_delimiter = ',', help_heading = "Filtering Options")]
+    pub exclude_keys: Vec<String>,
 
     /// Output format
     #[arg(
         short = 'F',
         long = "output-format",
         value_enum,
-        default_value = "default"
+        default_value = "default",
+        help_heading = "Output Options"
     )]
     pub output_format: OutputFormat,
 
-    /// Run once before processing
-    #[arg(long = "begin")]
-    pub begin: Option<String>,
-
-    /// Boolean filter expressions (can be repeated)
-    #[arg(long = "filter")]
-    pub filters: Vec<String>,
-
-    /// Transform/process exec scripts (can be repeated)
-    #[arg(short = 'e', long = "exec")]
-    pub execs: Vec<String>,
-
-    /// Run once after processing
-    #[arg(long = "end")]
-    pub end: Option<String>,
-
-    /// Disable field auto-injection
-    #[arg(long = "no-inject")]
-    pub no_inject_fields: bool,
-
-    /// Prefix for injected variables
-    #[arg(long = "inject-prefix")]
-    pub inject_prefix: Option<String>,
-
-    /// Error handling strategy
-    #[arg(long = "on-error", value_enum, default_value = "print")]
-    pub on_error: ErrorStrategy,
-
-    /// Output only specific fields (comma-separated)
-    #[arg(long = "keys", value_delimiter = ',')]
-    pub keys: Vec<String>,
-
-    /// Exclude specific fields from output (comma-separated, higher priority than --keys)
-    #[arg(short = 'K', long = "exclude-keys", value_delimiter = ',')]
-    pub exclude_keys: Vec<String>,
-
     /// Output only core fields (timestamp, level, message) plus any explicitly specified --keys
-    #[arg(short = 'm', long = "core")]
+    #[arg(short = 'm', long = "core", help_heading = "Output Options")]
     pub core: bool,
 
     /// Output only field values (no keys), space-separated
-    #[arg(short = 'b', long = "brief")]
+    #[arg(short = 'b', long = "brief", help_heading = "Output Options")]
     pub brief: bool,
 
+    /// Enable parallel processing for high-throughput analysis (batch-size=1000 by default)
+    #[arg(long = "parallel", help_heading = "Performance Options")]
+    pub parallel: bool,
+
     /// Number of worker threads for parallel processing
-    #[arg(long = "threads", default_value_t = 0)]
+    #[arg(long = "threads", default_value_t = 0, help_heading = "Performance Options")]
     pub threads: usize,
 
     /// Batch size for parallel processing (default: 1000)
-    #[arg(long = "batch-size")]
+    #[arg(long = "batch-size", help_heading = "Performance Options")]
     pub batch_size: Option<usize>,
 
     /// Batch timeout in milliseconds
-    #[arg(long = "batch-timeout", default_value_t = 200)]
+    #[arg(long = "batch-timeout", default_value_t = 200, help_heading = "Performance Options")]
     pub batch_timeout: u64,
 
     /// Disable ordered output (faster but may reorder results)
-    #[arg(long = "unordered")]
+    #[arg(long = "unordered", help_heading = "Performance Options")]
     pub no_preserve_order: bool,
 
-    /// Enable parallel processing for high-throughput analysis (batch-size=1000 by default)
-    #[arg(long = "parallel")]
-    pub parallel: bool,
-
-    /// File processing order: none (CLI order), name (alphabetical), mtime (modification time, oldest first)
-    #[arg(long = "file-order", value_enum, default_value = "none")]
-    pub file_order: FileOrder,
-
     /// Force colored output even when not on TTY (overrides NO_COLOR environment variable)
-    #[arg(long = "force-color")]
+    #[arg(long = "force-color", help_heading = "Display Options")]
     pub force_color: bool,
 
     /// Disable colored output (takes precedence over --force-color)
-    #[arg(long = "no-color")]
+    #[arg(long = "no-color", help_heading = "Display Options")]
     pub no_color: bool,
 
-    /// Include only events with these log levels (comma-separated, case-insensitive, e.g. debug,warn,error)
-    #[arg(short = 'l', long = "levels", value_delimiter = ',')]
-    pub levels: Vec<String>,
-
-    /// Exclude events with these log levels (comma-separated, case-insensitive, higher priority than --levels)
-    #[arg(short = 'L', long = "exclude-levels", value_delimiter = ',')]
-    pub exclude_levels: Vec<String>,
-
     /// Disable emoji prefixes in error messages
-    #[arg(long = "no-emoji")]
+    #[arg(long = "no-emoji", help_heading = "Display Options")]
     pub no_emoji: bool,
 
     /// Show processing statistics
-    #[arg(long = "stats")]
+    #[arg(long = "stats", help_heading = "Display Options")]
     pub stats: bool,
-
-    /// Ignore input lines matching this regex pattern (applied before parsing)
-    #[arg(long = "ignore-lines")]
-    pub ignore_lines: Option<String>,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
