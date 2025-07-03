@@ -19,6 +19,9 @@ cat logs.jsonl | kelora -f jsonl --filter 'status >= 400'
 # Enrich and transform fields
 kelora -f jsonl --exec 'let sev = if status >= 500 { "crit" } else { "warn" };' logs.jsonl
 
+# Execute Rhai script from file
+kelora -f jsonl --exec-file transform.rhai logs.jsonl
+
 # Track max value across the stream
 kelora -f jsonl \
   --exec 'track_max("max", duration_ms)' \
@@ -158,6 +161,7 @@ cargo build --release
 | `-F`            | Output format: `json`, `text`, `csv`   |
 | `--filter`      | Rhai filter expression (repeatable)    |
 | `--exec`        | Rhai exec scripts (repeatable)         |
+| `--exec-file`   | Execute Rhai script from file (repeatable) |
 | `--begin/--end` | Logic before/after stream              |
 | `--on-error`    | Strategy: skip, print, abort, stub |
 | `--parallel`    | Enable parallel batch mode             |

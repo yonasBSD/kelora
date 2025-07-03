@@ -80,6 +80,10 @@ pub struct Cli {
     #[arg(short = 'e', long = "exec", help_heading = "Processing Options")]
     pub execs: Vec<String>,
 
+    /// Execute script from file (can be repeated)
+    #[arg(short = 'E', long = "exec-file", help_heading = "Processing Options")]
+    pub exec_files: Vec<String>,
+
     /// Run once after processing
     #[arg(long = "end", help_heading = "Processing Options")]
     pub end: Option<String>,
@@ -237,7 +241,7 @@ pub enum FileOrder {
 
 impl Cli {
     /// Extract filter and exec stages in the order they appeared on the command line
-    fn get_ordered_script_stages(&self, matches: &ArgMatches) -> Vec<ScriptStageType> {
+    fn get_ordered_script_stages(&self, matches: &ArgMatches) -> Result<Vec<ScriptStageType>> {
         let mut stages_with_indices = Vec::new();
 
         // Get filter stages with their indices
@@ -258,14 +262,27 @@ impl Cli {
             }
         }
 
+        // Get exec-file stages with their indices
+        if let Some(exec_file_indices) = matches.indices_of("exec_files") {
+            let exec_file_values: Vec<&String> =
+                matches.get_many::<String>("exec_files").unwrap().collect();
+            for (pos, index) in exec_file_indices.enumerate() {
+                let file_path = &exec_file_values[pos];
+                let script_content = std::fs::read_to_string(file_path).map_err(|e| {
+                    anyhow::anyhow!("Failed to read exec file '{}': {}", file_path, e)
+                })?;
+                stages_with_indices.push((index, ScriptStageType::Exec(script_content)));
+            }
+        }
+
         // Sort by original command line position
         stages_with_indices.sort_by_key(|(index, _)| *index);
 
         // Extract just the stages
-        stages_with_indices
+        Ok(stages_with_indices
             .into_iter()
             .map(|(_, stage)| stage)
-            .collect()
+            .collect())
     }
 }
 
@@ -295,7 +312,15 @@ fn main() -> Result<()> {
     });
 
     // Extract ordered script stages
-    let ordered_stages = cli.get_ordered_script_stages(&matches);
+    let ordered_stages = match cli.get_ordered_script_stages(&matches) {
+        Ok(stages) => stages,
+        Err(e) => {
+            stderr
+                .writeln(&format!("kelora: Error: {}", e))
+                .unwrap_or(());
+            ExitCode::InvalidUsage.exit();
+        }
+    };
 
     // Create configuration from CLI and set stages
     let mut config = KeloraConfig::from_cli(&cli);
@@ -664,10 +689,17 @@ fn execute_end_stage(
 
 /// Validate CLI arguments for early error detection
 fn validate_cli_args(cli: &Cli) -> Result<()> {
-    // Check if files exist (if specified)
+    // Check if input files exist (if specified)
     for file_path in &cli.files {
         if !std::path::Path::new(file_path).exists() {
             return Err(anyhow::anyhow!("File not found: {}", file_path));
+        }
+    }
+
+    // Check if exec files exist (if specified)
+    for exec_file in &cli.exec_files {
+        if !std::path::Path::new(exec_file).exists() {
+            return Err(anyhow::anyhow!("Exec file not found: {}", exec_file));
         }
     }
 

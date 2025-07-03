@@ -43,6 +43,9 @@ make test-full          # Comprehensive test suite
 # Count status codes and track metrics
 ./target/release/kelora -f jsonl access.log --exec "track_count(status_class(status))" --end "print(tracked)"
 
+# Execute script from file
+./target/release/kelora -f jsonl access.log --exec-file transform.rhai
+
 # Process any log file (default line format)
 ./target/release/kelora /var/log/syslog --filter 'line.matches("ERROR|WARN")'
 
@@ -105,7 +108,7 @@ seq 1 1000000 | ./target/release/kelora --filter "line.to_int() % 1000 == 0" --s
 The `--help` output is organized into logical sections that follow the data processing pipeline:
 
 1. **Input Options**: File handling and input format (`-f`, `--file-order`, `--ignore-lines`)
-2. **Processing Options**: Script execution and processing control (`--begin`, `--filter`, `--exec`, `--end`, `--on-error`, `--no-inject`, `--inject-prefix`)
+2. **Processing Options**: Script execution and processing control (`--begin`, `--filter`, `--exec`, `--exec-file`, `--end`, `--on-error`, `--no-inject`, `--inject-prefix`)
 3. **Filtering Options**: Data filtering in the pipeline (`--levels`, `--exclude-levels`, `--keys`/`-k`, `--exclude-keys`/`-K`)
 4. **Output Options**: Output formatting (`--output-format`, `--core`, `--brief`)
 5. **Performance Options**: Processing optimizations (`--parallel`, `--threads`, `--batch-size`, `--batch-timeout`, `--unordered`)
@@ -115,6 +118,7 @@ The `--help` output is organized into logical sections that follow the data proc
 - `-f` = `--format` (input format)
 - `-F` = `--output-format` (output format)  
 - `-e` = `--exec` (execute script)
+- `-E` = `--exec-file` (execute script from file)
 - `-k` = `--keys` (select fields)
 - `-K` = `--exclude-keys` (exclude fields)
 - `-l` = `--levels` (include log levels)

@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use rhai::{Dynamic, Engine, Scope, AST, EvalAltResult};
+use rhai::{Dynamic, Engine, EvalAltResult, Scope, AST};
 use std::collections::HashMap;
 
 use crate::event::Event;
@@ -65,7 +65,10 @@ impl RhaiEngine {
                 format!("Syntax error in {} at {}: {}", script_name, pos, parse_err)
             }
             EvalAltResult::ErrorRuntime(runtime_err, pos) => {
-                format!("Runtime error in {} at {}: {}", script_name, pos, runtime_err)
+                format!(
+                    "Runtime error in {} at {}: {}",
+                    script_name, pos, runtime_err
+                )
             }
             EvalAltResult::ErrorVariableNotFound(var, pos) => {
                 format!("Variable '{}' not found in {} at {}", var, script_name, pos)
@@ -79,16 +82,25 @@ impl RhaiEngine {
             }
             EvalAltResult::ErrorInFunctionCall(func, _source, inner_err, pos) => {
                 let inner_msg = Self::format_rhai_error(inner_err, "function", "");
-                format!("Error in function '{}' in {} at {}: {}", func, script_name, pos, inner_msg)
+                format!(
+                    "Error in function '{}' in {} at {}: {}",
+                    func, script_name, pos, inner_msg
+                )
             }
             EvalAltResult::ErrorPropertyNotFound(prop, pos) => {
-                format!("Property '{}' not found in {} at {}", prop, script_name, pos)
+                format!(
+                    "Property '{}' not found in {} at {}",
+                    prop, script_name, pos
+                )
             }
             EvalAltResult::ErrorIndexNotFound(index, pos) => {
                 format!("Index '{}' not found in {} at {}", index, script_name, pos)
             }
             EvalAltResult::ErrorDotExpr(msg, pos) => {
-                format!("Property access error in {} at {}: {}", script_name, pos, msg)
+                format!(
+                    "Property access error in {} at {}: {}",
+                    script_name, pos, msg
+                )
             }
             EvalAltResult::ErrorArithmetic(msg, pos) => {
                 format!("Arithmetic error in {} at {}: {}", script_name, pos, msg)
@@ -105,11 +117,15 @@ impl RhaiEngine {
             EvalAltResult::ErrorTerminated(val, pos) => {
                 format!("Script terminated in {} at {}: {}", script_name, pos, val)
             }
-            _ => format!("Error in {}: {}", script_name, err)
+            _ => format!("Error in {}: {}", script_name, err),
         }
     }
 
-    fn format_function_not_found_error(func_signature: String, script_name: &str, pos: rhai::Position) -> String {
+    fn format_function_not_found_error(
+        func_signature: String,
+        script_name: &str,
+        pos: rhai::Position,
+    ) -> String {
         // Extract function name from signature (before the first '(' or space)
         let func_name = if let Some(paren_pos) = func_signature.find('(') {
             &func_signature[..paren_pos]
@@ -117,8 +133,9 @@ impl RhaiEngine {
             &func_signature[..space_pos]
         } else {
             &func_signature
-        }.trim();
-        
+        }
+        .trim();
+
         // Check if this looks like a type mismatch rather than a missing function
         if Self::is_likely_type_mismatch(&func_signature, func_name) {
             let expected_types = Self::get_expected_function_signature(func_name);
@@ -127,7 +144,7 @@ impl RhaiEngine {
                 return format!(
                     "Wrong argument types for '{}' in {} at {}: got {}, expected {}. Note: x.{}() = {}(x)",
                     func_name,
-                    script_name, 
+                    script_name,
                     pos,
                     called_types,
                     expected_types,
@@ -136,11 +153,14 @@ impl RhaiEngine {
                 );
             }
         }
-        
+
         // Fall back to "function not found" with suggestions
-        let base_msg = format!("Function '{}' not found in {} at {}", func_signature, script_name, pos);
+        let base_msg = format!(
+            "Function '{}' not found in {} at {}",
+            func_signature, script_name, pos
+        );
         let suggestions = Self::get_function_suggestions(func_name);
-        
+
         if suggestions.is_empty() {
             base_msg
         } else {
@@ -151,23 +171,55 @@ impl RhaiEngine {
     fn is_likely_type_mismatch(func_signature: &str, func_name: &str) -> bool {
         // Check if the function name is one we know exists
         let known_functions = vec![
-            "extract_re", "extract_all_re", "split_re", "replace_re", "count", "strip",
-            "before", "after", "between", "starting_with", "ending_with", "is_digit",
-            "join", "extract_ip", "extract_ips", "mask_ip", "is_private_ip", 
-            "extract_url", "extract_domain", "parse_json", "parse_kv", "get_path", 
-            "col", "cols", "status_class", "track_count", "track_sum", "track_min", 
-            "track_max", "track_avg", "track_unique", "track_bucket",
+            "extract_re",
+            "extract_all_re",
+            "split_re",
+            "replace_re",
+            "count",
+            "strip",
+            "before",
+            "after",
+            "between",
+            "starting_with",
+            "ending_with",
+            "is_digit",
+            "join",
+            "extract_ip",
+            "extract_ips",
+            "mask_ip",
+            "is_private_ip",
+            "extract_url",
+            "extract_domain",
+            "parse_json",
+            "parse_kv",
+            "get_path",
+            "col",
+            "cols",
+            "status_class",
+            "track_count",
+            "track_sum",
+            "track_min",
+            "track_max",
+            "track_avg",
+            "track_unique",
+            "track_bucket",
             // Common Rhai built-ins that work on strings
-            "len", "contains", "starts_with", "ends_with", "split", "replace", "trim"
+            "len",
+            "contains",
+            "starts_with",
+            "ends_with",
+            "split",
+            "replace",
+            "trim",
         ];
-        
+
         known_functions.contains(&func_name) && func_signature.contains('(')
     }
 
     fn extract_called_types(func_signature: &str) -> String {
         if let Some(start) = func_signature.find('(') {
             if let Some(end) = func_signature.find(')') {
-                return func_signature[start+1..end].to_string();
+                return func_signature[start + 1..end].to_string();
             }
         }
         "unknown types".to_string()
@@ -193,7 +245,9 @@ impl RhaiEngine {
             "col" => "string, column_selector".to_string(),
             "cols" => "string, column_selectors...".to_string(),
             "status_class" => "status_code_number".to_string(),
-            "track_count" | "track_sum" | "track_min" | "track_max" | "track_avg" => "key, optional_value".to_string(),
+            "track_count" | "track_sum" | "track_min" | "track_max" | "track_avg" => {
+                "key, optional_value".to_string()
+            }
             "track_unique" => "key, value".to_string(),
             "track_bucket" => "key, value, bucket_size".to_string(),
             "count" => "string, substring".to_string(),
@@ -209,50 +263,111 @@ impl RhaiEngine {
         // List of common Rhai built-in functions and our custom functions
         let available_functions = vec![
             // String functions
-            "lower", "upper", "trim", "len", "contains", "starts_with", "ends_with",
-            "split", "replace", "substring", "to_string", "parse", 
+            "lower",
+            "upper",
+            "trim",
+            "len",
+            "contains",
+            "starts_with",
+            "ends_with",
+            "split",
+            "replace",
+            "substring",
+            "to_string",
+            "parse",
             // Our custom string functions
-            "extract_re", "extract_all_re", "split_re", "replace_re", "count", "strip",
-            "before", "after", "between", "starting_with", "ending_with", "is_digit",
-            "join", "extract_ip", "extract_ips", "mask_ip", "is_private_ip", 
-            "extract_url", "extract_domain",
+            "extract_re",
+            "extract_all_re",
+            "split_re",
+            "replace_re",
+            "count",
+            "strip",
+            "before",
+            "after",
+            "between",
+            "starting_with",
+            "ending_with",
+            "is_digit",
+            "join",
+            "extract_ip",
+            "extract_ips",
+            "mask_ip",
+            "is_private_ip",
+            "extract_url",
+            "extract_domain",
             // Math functions
-            "abs", "floor", "ceil", "round", "min", "max", "pow", "sqrt",
+            "abs",
+            "floor",
+            "ceil",
+            "round",
+            "min",
+            "max",
+            "pow",
+            "sqrt",
             // Array functions
-            "push", "pop", "shift", "unshift", "reverse", "sort", "clear",
-            // Map functions  
-            "keys", "values", "remove", "contains",
+            "push",
+            "pop",
+            "shift",
+            "unshift",
+            "reverse",
+            "sort",
+            "clear",
+            // Map functions
+            "keys",
+            "values",
+            "remove",
+            "contains",
             // Our custom functions
-            "parse_json", "parse_kv", "get_path", "col", "cols", "status_class",
-            "track_count", "track_sum", "track_min", "track_max", "track_avg", 
-            "track_unique", "track_bucket",
+            "parse_json",
+            "parse_kv",
+            "get_path",
+            "col",
+            "cols",
+            "status_class",
+            "track_count",
+            "track_sum",
+            "track_min",
+            "track_max",
+            "track_avg",
+            "track_unique",
+            "track_bucket",
             // Utility functions
-            "print", "debug", "type_of", "is_def_fn",
+            "print",
+            "debug",
+            "type_of",
+            "is_def_fn",
         ];
-        
+
         // Find functions that are similar to the requested one
         let suggestions: Vec<String> = available_functions
             .iter()
             .filter(|&f| {
                 // Check for starts with or contains
-                f.starts_with(func_name) || 
-                (func_name.len() > 1 && f.contains(func_name))
+                f.starts_with(func_name) || (func_name.len() > 1 && f.contains(func_name))
             })
             .take(3) // Limit to 3 suggestions
             .map(|s| s.to_string())
             .collect();
-            
+
         // For debugging: always include at least one suggestion if the function name contains common patterns
         if suggestions.is_empty() && func_name.len() > 2 {
             if func_name.contains("extract") {
-                return vec!["extract_re".to_string(), "extract_ip".to_string(), "extract_url".to_string()];
+                return vec![
+                    "extract_re".to_string(),
+                    "extract_ip".to_string(),
+                    "extract_url".to_string(),
+                ];
             } else if func_name.contains("track") {
-                return vec!["track_count".to_string(), "track_sum".to_string(), "track_unique".to_string()];
+                return vec![
+                    "track_count".to_string(),
+                    "track_sum".to_string(),
+                    "track_unique".to_string(),
+                ];
             } else if func_name.contains("pars") {
                 return vec!["parse_json".to_string(), "parse_kv".to_string()];
             }
         }
-        
+
         suggestions
     }
 
@@ -442,7 +557,8 @@ impl RhaiEngine {
                 .engine
                 .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
                 .map_err(|e| {
-                    let detailed_msg = Self::format_rhai_error(e, "begin expression", &compiled.expr);
+                    let detailed_msg =
+                        Self::format_rhai_error(e, "begin expression", &compiled.expr);
                     anyhow::anyhow!("{}", detailed_msg)
                 })?;
 
