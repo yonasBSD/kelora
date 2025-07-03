@@ -313,6 +313,14 @@ pub fn register_functions(engine: &mut Engine) {
         text.trim_matches(|c: char| chars_to_remove.contains(&c))
             .to_string()
     });
+
+    engine.register_fn("join", |separator: &str, items: rhai::Array| -> String {
+        items
+            .into_iter()
+            .filter_map(|item| item.into_string().ok())
+            .collect::<Vec<String>>()
+            .join(separator)
+    });
 }
 
 #[cfg(test)]
@@ -684,5 +692,39 @@ mod tests {
             .eval_with_scope(&mut scope, r##"mixed.strip(" #")"##)
             .unwrap();
         assert_eq!(result, "hello world");
+    }
+
+    #[test]
+    fn test_join_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        
+        let mut scope = Scope::new();
+        
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"",".join(["a", "b", "c"])"#)
+            .unwrap();
+        assert_eq!(result, "a,b,c");
+        
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"" ".join(["hello", "world"])"#)
+            .unwrap();
+        assert_eq!(result, "hello world");
+        
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#""-".join(["one"])"#)
+            .unwrap();
+        assert_eq!(result, "one");
+        
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"",".join([])"#)
+            .unwrap();
+        assert_eq!(result, "");
+        
+        // Test with mixed types (non-strings filtered out)
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"",".join(["a", 123, "b"])"#)
+            .unwrap();
+        assert_eq!(result, "a,b");
     }
 }
