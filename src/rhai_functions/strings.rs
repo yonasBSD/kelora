@@ -57,6 +57,56 @@ pub fn is_parallel_mode() -> bool {
     PARALLEL_MODE.with(|mode| *mode.borrow())
 }
 
+/// Mask IP address for privacy (replace last N octets with 'X')
+fn mask_ip_impl(ip: &str, octets_to_mask: usize) -> String {
+    // IPv4 pattern validation
+    let parts: Vec<&str> = ip.split('.').collect();
+    if parts.len() != 4 {
+        return ip.to_string(); // Return unchanged if not valid IPv4
+    }
+    
+    // Validate each octet is numeric
+    for part in &parts {
+        if part.parse::<u8>().is_err() {
+            return ip.to_string(); // Return unchanged if not numeric
+        }
+    }
+    
+    let mut result = parts.clone();
+    let mask_count = octets_to_mask.clamp(1, 4);
+    
+    // Replace last N octets with 'X'
+    for item in result.iter_mut().skip(4 - mask_count) {
+        *item = "X";
+    }
+    
+    result.join(".")
+}
+
+/// Check if IP address is in private range
+fn is_private_ip_impl(ip: &str) -> bool {
+    let parts: Vec<&str> = ip.split('.').collect();
+    if parts.len() != 4 {
+        return false; // Not valid IPv4
+    }
+    
+    // Parse octets
+    let octets: Result<Vec<u8>, _> = parts.iter().map(|s| s.parse::<u8>()).collect();
+    let octets = match octets {
+        Ok(o) => o,
+        Err(_) => return false,
+    };
+    
+    // Check private ranges
+    match octets[0] {
+        10 => true,                                    // 10.0.0.0/8
+        172 => octets[1] >= 16 && octets[1] <= 31,     // 172.16.0.0/12
+        192 => octets[1] == 168,                       // 192.168.0.0/16
+        127 => true,                                   // 127.0.0.0/8 (loopback)
+        _ => false,
+    }
+}
+
 /// Parse key-value pairs from a string (like logfmt format)
 ///
 /// # Arguments
@@ -423,6 +473,78 @@ pub fn register_functions(engine: &mut Engine) {
             Ok(re) => re.replace_all(text, replacement).to_string(),
             Err(_) => text.to_string(), // Invalid regex returns original string
         }
+    });
+
+    // Network/IP methods
+    engine.register_fn("extract_ip", |text: &str| -> String {
+        let ip_pattern = r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b";
+        match regex::Regex::new(ip_pattern) {
+            Ok(re) => {
+                re.find(text)
+                    .map(|m| m.as_str().to_string())
+                    .unwrap_or_else(String::new)
+            }
+            Err(_) => String::new(),
+        }
+    });
+
+    engine.register_fn("extract_ips", |text: &str| -> rhai::Array {
+        let ip_pattern = r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b";
+        match regex::Regex::new(ip_pattern) {
+            Ok(re) => re
+                .find_iter(text)
+                .map(|m| Dynamic::from(m.as_str().to_string()))
+                .collect(),
+            Err(_) => rhai::Array::new(),
+        }
+    });
+
+    engine.register_fn("mask_ip", |ip: &str| -> String {
+        mask_ip_impl(ip, 1) // Default: mask last octet
+    });
+
+    engine.register_fn("mask_ip", |ip: &str, octets: i64| -> String {
+        mask_ip_impl(ip, octets.clamp(1, 4) as usize) // Clamp between 1-4
+    });
+
+    engine.register_fn("is_private_ip", |ip: &str| -> bool {
+        is_private_ip_impl(ip)
+    });
+
+    engine.register_fn("extract_url", |text: &str| -> String {
+        let url_pattern = r##"https?://[^\s<>"]+[^\s<>".,;!?]"##;
+        match regex::Regex::new(url_pattern) {
+            Ok(re) => {
+                re.find(text)
+                    .map(|m| m.as_str().to_string())
+                    .unwrap_or_else(String::new)
+            }
+            Err(_) => String::new(),
+        }
+    });
+
+    engine.register_fn("extract_domain", |text: &str| -> String {
+        // Try URL first, then email domain
+        let url_pattern = r##"https?://([^/\s<>"]+)"##;
+        let email_pattern = r##"[a-zA-Z0-9._%+-]+@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})"##;
+        
+        if let Ok(re) = regex::Regex::new(url_pattern) {
+            if let Some(caps) = re.captures(text) {
+                if let Some(domain) = caps.get(1) {
+                    return domain.as_str().to_string();
+                }
+            }
+        }
+        
+        if let Ok(re) = regex::Regex::new(email_pattern) {
+            if let Some(caps) = re.captures(text) {
+                if let Some(domain) = caps.get(1) {
+                    return domain.as_str().to_string();
+                }
+            }
+        }
+        
+        String::new()
     });
 }
 
@@ -1045,5 +1167,277 @@ mod tests {
             .eval_with_scope(&mut scope, r##"text.replace_re("[", "replacement")"##)
             .unwrap();
         assert_eq!(result, "The year 2023 and 2024 are here");
+    }
+
+    #[test]
+    fn test_extract_ip_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        
+        let mut scope = Scope::new();
+        scope.push("text", "Server 192.168.1.100 responded");
+        
+        // Extract single IP
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_ip()"##)
+            .unwrap();
+        assert_eq!(result, "192.168.1.100");
+        
+        // No IP found
+        scope.push("no_ip", "No IP address here");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"no_ip.extract_ip()"##)
+            .unwrap();
+        assert_eq!(result, "");
+        
+        // Multiple IPs, returns first
+        scope.push("multi", "From 10.0.0.1 to 172.16.0.1");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"multi.extract_ip()"##)
+            .unwrap();
+        assert_eq!(result, "10.0.0.1");
+    }
+
+    #[test]
+    fn test_extract_ips_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        
+        let mut scope = Scope::new();
+        scope.push("text", "From 10.0.0.1 to 172.16.0.1 via 192.168.1.1");
+        
+        // Extract all IPs
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"text.extract_ips()"##)
+            .unwrap();
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].clone().into_string().unwrap(), "10.0.0.1");
+        assert_eq!(result[1].clone().into_string().unwrap(), "172.16.0.1");
+        assert_eq!(result[2].clone().into_string().unwrap(), "192.168.1.1");
+        
+        // No IPs found
+        scope.push("no_ips", "No IP addresses here");
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"no_ips.extract_ips()"##)
+            .unwrap();
+        assert_eq!(result.len(), 0);
+        
+        // Invalid IP-like patterns should be excluded
+        scope.push("invalid", "300.400.500.600 and 192.168.1.1");
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"invalid.extract_ips()"##)
+            .unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].clone().into_string().unwrap(), "192.168.1.1");
+    }
+
+    #[test]
+    fn test_mask_ip_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        
+        let mut scope = Scope::new();
+        scope.push("ip", "192.168.1.100");
+        
+        // Default masking (last octet)
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"ip.mask_ip()"##)
+            .unwrap();
+        assert_eq!(result, "192.168.1.X");
+        
+        // Mask 2 octets
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"ip.mask_ip(2)"##)
+            .unwrap();
+        assert_eq!(result, "192.168.X.X");
+        
+        // Mask 3 octets
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"ip.mask_ip(3)"##)
+            .unwrap();
+        assert_eq!(result, "192.X.X.X");
+        
+        // Mask all 4 octets
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"ip.mask_ip(4)"##)
+            .unwrap();
+        assert_eq!(result, "X.X.X.X");
+        
+        // Invalid input (returns unchanged)
+        scope.push("invalid", "not.an.ip.address");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"invalid.mask_ip()"##)
+            .unwrap();
+        assert_eq!(result, "not.an.ip.address");
+        
+        // Out of range values get clamped
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"ip.mask_ip(0)"##)
+            .unwrap();
+        assert_eq!(result, "192.168.1.X"); // Clamped to minimum 1
+        
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"ip.mask_ip(10)"##)
+            .unwrap();
+        assert_eq!(result, "X.X.X.X"); // Clamped to maximum 4
+    }
+
+    #[test]
+    fn test_is_private_ip_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        
+        let mut scope = Scope::new();
+        
+        // Private IP ranges
+        scope.push("private1", "10.0.0.1");
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r##"private1.is_private_ip()"##)
+            .unwrap();
+        assert!(result);
+        
+        scope.push("private2", "172.16.0.1");
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r##"private2.is_private_ip()"##)
+            .unwrap();
+        assert!(result);
+        
+        scope.push("private3", "192.168.1.1");
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r##"private3.is_private_ip()"##)
+            .unwrap();
+        assert!(result);
+        
+        scope.push("loopback", "127.0.0.1");
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r##"loopback.is_private_ip()"##)
+            .unwrap();
+        assert!(result);
+        
+        // Public IP addresses
+        scope.push("public1", "8.8.8.8");
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r##"public1.is_private_ip()"##)
+            .unwrap();
+        assert!(!result);
+        
+        scope.push("public2", "1.1.1.1");
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r##"public2.is_private_ip()"##)
+            .unwrap();
+        assert!(!result);
+        
+        // Edge cases for 172.x.x.x range
+        scope.push("edge1", "172.15.0.1");
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r##"edge1.is_private_ip()"##)
+            .unwrap();
+        assert!(!result); // 172.15.x.x is not in private range
+        
+        scope.push("edge2", "172.32.0.1");
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r##"edge2.is_private_ip()"##)
+            .unwrap();
+        assert!(!result); // 172.32.x.x is not in private range
+        
+        // Invalid IP addresses
+        scope.push("invalid", "not.an.ip");
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r##"invalid.is_private_ip()"##)
+            .unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_extract_url_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        
+        let mut scope = Scope::new();
+        scope.push("text", "Visit https://example.com/path for more info");
+        
+        // Extract URL
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_url()"##)
+            .unwrap();
+        assert_eq!(result, "https://example.com/path");
+        
+        // HTTP URL
+        scope.push("http", "Go to http://test.org/page.html");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"http.extract_url()"##)
+            .unwrap();
+        assert_eq!(result, "http://test.org/page.html");
+        
+        // No URL found
+        scope.push("no_url", "No URL in this text");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"no_url.extract_url()"##)
+            .unwrap();
+        assert_eq!(result, "");
+        
+        // Complex URL with parameters
+        scope.push("complex", "API endpoint: https://api.example.com/v1/users?page=2&limit=10");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"complex.extract_url()"##)
+            .unwrap();
+        assert_eq!(result, "https://api.example.com/v1/users?page=2&limit=10");
+        
+        // Multiple URLs (returns first)
+        scope.push("multi", "Visit https://first.com or https://second.com");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"multi.extract_url()"##)
+            .unwrap();
+        assert_eq!(result, "https://first.com");
+    }
+
+    #[test]
+    fn test_extract_domain_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        
+        let mut scope = Scope::new();
+        scope.push("text", "Visit https://example.com/path for more info");
+        
+        // Extract domain from URL
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_domain()"##)
+            .unwrap();
+        assert_eq!(result, "example.com");
+        
+        // Extract domain from email
+        scope.push("email", "Contact us at support@test.org");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"email.extract_domain()"##)
+            .unwrap();
+        assert_eq!(result, "test.org");
+        
+        // URL takes precedence over email
+        scope.push("both", "Visit https://example.com or email admin@test.org");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"both.extract_domain()"##)
+            .unwrap();
+        assert_eq!(result, "example.com");
+        
+        // No domain found
+        scope.push("no_domain", "No domain in this text");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"no_domain.extract_domain()"##)
+            .unwrap();
+        assert_eq!(result, "");
+        
+        // Complex domain with subdomains
+        scope.push("subdomain", "API: https://api.v2.example.com/endpoint");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"subdomain.extract_domain()"##)
+            .unwrap();
+        assert_eq!(result, "api.v2.example.com");
+        
+        // Domain with port (should be excluded)
+        scope.push("port", "Connect to http://localhost:8080/api");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"port.extract_domain()"##)
+            .unwrap();
+        assert_eq!(result, "localhost:8080");
     }
 }
