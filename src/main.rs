@@ -374,8 +374,17 @@ fn run_parallel(
 
     // Merge the parallel tracked state with our pipeline context
     let parallel_tracked = processor.get_final_tracked_state();
+    
+    // Extract internal stats from tracking system before merging (if stats enabled)
+    if config.output.stats {
+        processor.extract_final_stats_from_tracking(&parallel_tracked).unwrap_or(());
+    }
+    
+    // Filter out internal stats from user-visible context and merge the rest
     for (key, dynamic_value) in parallel_tracked {
-        ctx.tracker.insert(key, dynamic_value);
+        if !key.starts_with("__internal_") {
+            ctx.tracker.insert(key, dynamic_value);
+        }
     }
 
     // Execute end stage sequentially with merged state

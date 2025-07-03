@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use crate::event::Event;
 use crate::pipeline::PipelineBuilder;
-use crate::stats::{ProcessingStats, get_thread_stats, stats_add_line_read, stats_add_line_output, stats_add_line_filtered, stats_add_error, stats_start_timer};
+use crate::stats::{ProcessingStats, get_thread_stats, stats_start_timer, stats_finish_processing};
 use crate::unix::{SafeStdout, SHOULD_TERMINATE};
 
 
@@ -78,12 +78,53 @@ impl GlobalTracker {
 
     pub fn merge_worker_stats(&self, worker_stats: &ProcessingStats) -> Result<()> {
         let mut global_stats = self.processing_stats.lock().unwrap();
-        global_stats.merge(worker_stats);
+        // Don't merge lines_read - that's handled by reader thread
+        // Don't merge output/filtered/errors - these are now handled by tracking system
+        // Only merge timing and other safe stats
+        global_stats.files_processed += worker_stats.files_processed;
+        global_stats.script_executions += worker_stats.script_executions;
+        // Keep the longest processing time for total duration
+        if worker_stats.processing_time > global_stats.processing_time {
+            global_stats.processing_time = worker_stats.processing_time;
+        }
+        Ok(())
+    }
+
+    pub fn extract_final_stats_from_tracking(&self, final_tracked: &HashMap<String, Dynamic>) -> Result<()> {
+        let mut global_stats = self.processing_stats.lock().unwrap();
+        
+        // Extract internal stats from tracking system
+        let output = final_tracked.get("__internal_stats_output")
+            .and_then(|v| v.as_int().ok())
+            .unwrap_or(0) as usize;
+        let filtered = final_tracked.get("__internal_stats_filtered")
+            .and_then(|v| v.as_int().ok())
+            .unwrap_or(0) as usize;
+        let errors = final_tracked.get("__internal_stats_errors")
+            .and_then(|v| v.as_int().ok())
+            .unwrap_or(0) as usize;
+        let processed = final_tracked.get("__internal_stats_processed")
+            .and_then(|v| v.as_int().ok())
+            .unwrap_or(0) as usize;
+
+        global_stats.lines_output = output;
+        global_stats.lines_filtered = filtered;
+        global_stats.errors = errors;
+        
+        // Temporary debug: check if processed = output + filtered
+        eprintln!("Debug: processed={}, output={}, filtered={}, sum={}", processed, output, filtered, output + filtered);
+        
         Ok(())
     }
 
     pub fn get_final_stats(&self) -> ProcessingStats {
         self.processing_stats.lock().unwrap().clone()
+    }
+
+    pub fn set_total_lines_read(&self, total_lines: usize) -> Result<()> {
+        let mut global_stats = self.processing_stats.lock().unwrap();
+        global_stats.lines_read = total_lines;
+        Ok(())
     }
 
     pub fn merge_worker_state(&self, worker_state: HashMap<String, Dynamic>) -> Result<()> {
@@ -215,8 +256,9 @@ impl ParallelProcessor {
             let batch_size = self.config.batch_size;
             let batch_timeout = Duration::from_millis(self.config.batch_timeout_ms);
             
+            let global_tracker_clone = self.global_tracker.clone();
             thread::spawn(move || {
-                Self::reader_thread(reader, batch_sender, batch_size, batch_timeout)
+                Self::reader_thread(reader, batch_sender, batch_size, batch_timeout, global_tracker_clone)
             })
         };
 
@@ -283,12 +325,18 @@ impl ParallelProcessor {
         self.global_tracker.get_final_stats()
     }
 
+    /// Extract stats from tracking system into global stats
+    pub fn extract_final_stats_from_tracking(&self, final_tracked: &HashMap<String, Dynamic>) -> Result<()> {
+        self.global_tracker.extract_final_stats_from_tracking(final_tracked)
+    }
+
     /// Reader thread: batches input lines with timeout - simpler approach
     fn reader_thread<R: std::io::BufRead>(
         mut reader: R,
         batch_sender: Sender<Batch>,
         batch_size: usize,
         batch_timeout: Duration,
+        global_tracker: GlobalTracker,
     ) -> Result<()> {
         let mut batch_id = 0u64;
         let mut current_batch = Vec::with_capacity(batch_size);
@@ -342,6 +390,9 @@ impl ParallelProcessor {
                 Err(e) => return Err(e.into()),
             }
         }
+
+        // Report final line count to global tracker
+        global_tracker.set_total_lines_read(line_num)?;
 
         Ok(())
     }
@@ -400,8 +451,8 @@ impl ParallelProcessor {
             for (line_idx, line) in batch.lines.iter().enumerate() {
                 let current_line_num = batch.start_line_num + line_idx;
                 
-                // Count line read for stats
-                stats_add_line_read();
+                // Count lines processed by workers for debugging
+                crate::rhai_functions::tracking::track_count_internal("__internal_stats_processed");
                 
                 // Update metadata
                 ctx.meta.line_number = Some(current_line_num);
@@ -413,11 +464,11 @@ impl ParallelProcessor {
                 // Process line through pipeline
                 match pipeline.process_line(line.clone(), &mut ctx) {
                     Ok(formatted_results) => {
-                        // Count output/filtered lines for stats
+                        // Count output/filtered lines using internal tracking (parallel-safe)
                         if !formatted_results.is_empty() {
-                            stats_add_line_output();
+                            crate::rhai_functions::tracking::track_count_internal("__internal_stats_output");
                         } else {
-                            stats_add_line_filtered();
+                            crate::rhai_functions::tracking::track_count_internal("__internal_stats_filtered");
                         }
                         // Get any prints/eprints that were captured during processing this specific event
                         let captured_prints = crate::rhai_functions::strings::take_captured_prints();
@@ -441,8 +492,8 @@ impl ParallelProcessor {
                         }
                     }
                     Err(e) => {
-                        // Count error for stats
-                        stats_add_error();
+                        // Count error using internal tracking (parallel-safe)
+                        crate::rhai_functions::tracking::track_count_internal("__internal_stats_errors");
                         
                         // Error handling is already done in pipeline.process_line()
                         // based on the ctx.config.on_error strategy
@@ -454,11 +505,18 @@ impl ParallelProcessor {
                 }
             }
 
-            // Send batch result with worker's tracking state and stats
+            // Merge thread-local tracking state (including internal stats) with context tracker
+            let thread_tracking_state = crate::rhai_functions::tracking::get_thread_tracking_state();
+            let mut combined_tracking = ctx.tracker.clone();
+            for (key, value) in thread_tracking_state {
+                combined_tracking.insert(key, value);
+            }
+
+            // Send batch result with combined tracking state and stats
             let batch_result = BatchResult {
                 batch_id: batch.id,
                 results: batch_results,
-                internal_tracked_updates: ctx.tracker.clone(),
+                internal_tracked_updates: combined_tracking,
                 worker_stats: get_thread_stats(),
             };
 
@@ -469,10 +527,15 @@ impl ParallelProcessor {
         }
 
         // Send final stats when worker exits (for CTRL-C case)
+        stats_finish_processing();
+        
+        // Include final thread-local tracking state (including internal stats)
+        let final_thread_tracking = crate::rhai_functions::tracking::get_thread_tracking_state();
+        
         let final_stats_result = BatchResult {
             batch_id: u64::MAX, // Special ID to indicate final stats
             results: Vec::new(),
-            internal_tracked_updates: HashMap::new(),
+            internal_tracked_updates: final_thread_tracking,
             worker_stats: get_thread_stats(),
         };
         let _ = result_sender.send(final_stats_result);

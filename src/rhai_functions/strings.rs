@@ -86,7 +86,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("to_int", |text: &str| -> rhai::Dynamic {
-        text.parse::<i64>().map(Dynamic::from).unwrap_or(Dynamic::UNIT)
+        text.parse::<i64>().map(Dynamic::from).unwrap_or(Dynamic::from(0i64))
     });
 
     engine.register_fn("to_float", |text: &str| -> rhai::Dynamic {

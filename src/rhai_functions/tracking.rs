@@ -116,3 +116,42 @@ pub fn get_thread_tracking_state() -> HashMap<String, Dynamic> {
         state.borrow().clone()
     })
 }
+
+// Direct tracking functions for internal stats (not exposed to user scripts)
+pub fn track_count_internal(key: &str) {
+    THREAD_TRACKING_STATE.with(|state| {
+        let mut state = state.borrow_mut();
+        let count = state.get(key).cloned().unwrap_or(Dynamic::from(0i64));
+        let new_count = count.as_int().unwrap_or(0) + 1;
+        state.insert(key.to_string(), Dynamic::from(new_count));
+        // Store operation type metadata for parallel merging
+        state.insert(format!("__op_{}", key), Dynamic::from("count"));
+    });
+}
+
+// Get internal stats and filter them out from user-visible state
+pub fn get_user_tracking_state() -> HashMap<String, Dynamic> {
+    THREAD_TRACKING_STATE.with(|state| {
+        state.borrow()
+            .iter()
+            .filter(|(k, _)| !k.starts_with("__internal_"))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    })
+}
+
+pub fn extract_internal_stats() -> (i64, i64, i64) {
+    THREAD_TRACKING_STATE.with(|state| {
+        let state = state.borrow();
+        let output = state.get("__internal_stats_output")
+            .and_then(|v| v.as_int().ok())
+            .unwrap_or(0);
+        let filtered = state.get("__internal_stats_filtered")
+            .and_then(|v| v.as_int().ok())
+            .unwrap_or(0);
+        let errors = state.get("__internal_stats_errors")
+            .and_then(|v| v.as_int().ok())
+            .unwrap_or(0);
+        (output, filtered, errors)
+    })
+}
