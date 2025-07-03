@@ -61,6 +61,50 @@ pub fn is_parallel_mode() -> bool {
     PARALLEL_MODE.with(|mode| *mode.borrow())
 }
 
+/// Parse key-value pairs from a string (like logfmt format)
+/// 
+/// # Arguments
+/// * `text` - The input string to parse
+/// * `sep` - Optional separator between key-value pairs (default: whitespace)
+/// * `kv_sep` - Separator between key and value (default: "=")
+/// 
+/// # Returns
+/// A Rhai Map containing the parsed key-value pairs
+fn parse_kv_impl(text: &str, sep: Option<&str>, kv_sep: &str) -> rhai::Map {
+    let mut map = rhai::Map::new();
+    
+    // Split by separator or whitespace
+    let pairs: Vec<&str> = if let Some(separator) = sep {
+        text.split(separator).collect()
+    } else {
+        // Split by any whitespace
+        text.split_whitespace().collect()
+    };
+    
+    for pair in pairs {
+        let pair = pair.trim();
+        if pair.is_empty() {
+            continue;
+        }
+        
+        // Find the key-value separator
+        if let Some(kv_pos) = pair.find(kv_sep) {
+            let key = pair[..kv_pos].trim();
+            let value = pair[kv_pos + kv_sep.len()..].trim();
+            
+            if !key.is_empty() {
+                map.insert(key.into(), rhai::Dynamic::from(value.to_string()));
+            }
+        }
+        // If no separator found, treat as key with empty value
+        else if !pair.is_empty() {
+            map.insert(pair.into(), rhai::Dynamic::from(String::new()));
+        }
+    }
+    
+    map
+}
+
 pub fn register_functions(engine: &mut Engine) {
     // Note: print() function is now handled via engine.on_print() in engine.rs
     
@@ -219,6 +263,24 @@ pub fn register_functions(engine: &mut Engine) {
             String::new()
         }
     });
+
+    // Parse key-value pairs from a string (like logfmt)
+    engine.register_fn("parse_kv", |text: &str| -> rhai::Map {
+        parse_kv_impl(text, None, "=")
+    });
+
+    engine.register_fn("parse_kv", |text: &str, sep: &str| -> rhai::Map {
+        parse_kv_impl(text, Some(sep), "=")
+    });
+
+    engine.register_fn("parse_kv", |text: &str, sep: &str, kv_sep: &str| -> rhai::Map {
+        parse_kv_impl(text, Some(sep), kv_sep)
+    });
+
+    // Allow unit type for null separator
+    engine.register_fn("parse_kv", |text: &str, _sep: (), kv_sep: &str| -> rhai::Map {
+        parse_kv_impl(text, None, kv_sep)
+    });
 }
 
 #[cfg(test)]
@@ -310,5 +372,60 @@ mod tests {
         
         let result: String = engine.eval_with_scope(&mut scope, r#"text.ending_with("hello")"#).unwrap();
         assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_parse_kv_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        
+        let mut scope = Scope::new();
+        
+        // Test basic key=value parsing
+        scope.push("text", "key1=value1 key2=value2");
+        let result: rhai::Map = engine.eval_with_scope(&mut scope, r#"parse_kv(text)"#).unwrap();
+        assert_eq!(result.get("key1").unwrap().clone().into_string().unwrap(), "value1");
+        assert_eq!(result.get("key2").unwrap().clone().into_string().unwrap(), "value2");
+        
+        // Test with custom separator
+        scope.push("text2", "key1=value1,key2=value2");
+        let result: rhai::Map = engine.eval_with_scope(&mut scope, r#"parse_kv(text2, ",")"#).unwrap();
+        assert_eq!(result.get("key1").unwrap().clone().into_string().unwrap(), "value1");
+        assert_eq!(result.get("key2").unwrap().clone().into_string().unwrap(), "value2");
+        
+        // Test with custom key-value separator
+        scope.push("text3", "key1:value1 key2:value2");
+        let result: rhai::Map = engine.eval_with_scope(&mut scope, r#"parse_kv(text3, (), ":")"#).unwrap();
+        assert_eq!(result.get("key1").unwrap().clone().into_string().unwrap(), "value1");
+        assert_eq!(result.get("key2").unwrap().clone().into_string().unwrap(), "value2");
+        
+        // Test with quoted values (simple - no space handling inside quotes)
+        scope.push("text4", r#"key1="quoted" key2=simple"#);
+        let result: rhai::Map = engine.eval_with_scope(&mut scope, r#"parse_kv(text4)"#).unwrap();
+        assert_eq!(result.get("key1").unwrap().clone().into_string().unwrap(), "\"quoted\"");
+        assert_eq!(result.get("key2").unwrap().clone().into_string().unwrap(), "simple");
+        
+        // Test with key without value
+        scope.push("text5", "key1=value1 standalone key2=value2");
+        let result: rhai::Map = engine.eval_with_scope(&mut scope, r#"parse_kv(text5)"#).unwrap();
+        assert_eq!(result.get("key1").unwrap().clone().into_string().unwrap(), "value1");
+        assert_eq!(result.get("standalone").unwrap().clone().into_string().unwrap(), "");
+        assert_eq!(result.get("key2").unwrap().clone().into_string().unwrap(), "value2");
+        
+        // Test edge cases
+        scope.push("empty", "");
+        let result: rhai::Map = engine.eval_with_scope(&mut scope, r#"parse_kv(empty)"#).unwrap();
+        assert!(result.is_empty());
+        
+        scope.push("spaces", "  key1=value1   key2=value2  ");
+        let result: rhai::Map = engine.eval_with_scope(&mut scope, r#"parse_kv(spaces)"#).unwrap();
+        assert_eq!(result.get("key1").unwrap().clone().into_string().unwrap(), "value1");
+        assert_eq!(result.get("key2").unwrap().clone().into_string().unwrap(), "value2");
+        
+        // Test with empty values
+        scope.push("empty_vals", "key1= key2=value2");
+        let result: rhai::Map = engine.eval_with_scope(&mut scope, r#"parse_kv(empty_vals)"#).unwrap();
+        assert_eq!(result.get("key1").unwrap().clone().into_string().unwrap(), "");
+        assert_eq!(result.get("key2").unwrap().clone().into_string().unwrap(), "value2");
     }
 }

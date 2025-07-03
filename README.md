@@ -81,6 +81,11 @@ track_max("max_duration", duration_ms);
 let user = line.col("0");
 let msg = line.col("3:");
 let parts = line.cols(["0", "2", "-1"]);
+
+// Parse structured data
+let json_data = parse_json(line);
+let kv_data = parse_kv("level=info method=GET status=200");
+let custom_kv = parse_kv("user:alice,role:admin", ",", ":");
 ```
 
 Available variables:

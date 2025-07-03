@@ -128,4 +128,25 @@ The `--help` output is organized into logical sections that follow the data proc
 
 - **Variable Declaration**: Always use "let" when using new Rhai variables (e.g. 'let myfield=line.col("1,2")' or 'let myfield=line.col(1,2)').
 
-[... rest of the existing content remains unchanged ...]
+### Built-in Rhai Functions
+
+#### Data Parsing Functions
+- `parse_json(string)` - Parse JSON string into Map
+- `parse_kv(string)` - Parse key=value pairs separated by whitespace
+- `parse_kv(string, separator)` - Parse key=value pairs with custom separator  
+- `parse_kv(string, separator, kv_separator)` - Parse pairs with custom separators
+
+Examples:
+```rhai
+// Parse JSON
+let data = parse_json('{"level": "error", "code": 500}');
+let level = data.level;  // "error"
+
+// Parse logfmt-style key=value pairs
+let kv = parse_kv("level=info method=GET status=200");
+let method = kv.method;  // "GET"
+
+// Parse with custom separators
+let data = parse_kv("key1:value1,key2:value2", ",", ":");
+let key1 = data.key1;  // "value1"
+```
