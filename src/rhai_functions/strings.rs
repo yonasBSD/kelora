@@ -341,6 +341,25 @@ pub fn register_functions(engine: &mut Engine) {
         }
     });
 
+    engine.register_fn("extract_re", |text: &str, pattern: &str, group: i64| -> String {
+        match regex::Regex::new(pattern) {
+            Ok(re) => {
+                if let Some(captures) = re.captures(text) {
+                    let group_idx = if group < 0 {
+                        // Negative indices not supported, default to 0
+                        0
+                    } else {
+                        group as usize
+                    };
+                    captures.get(group_idx).map(|m| m.as_str()).unwrap_or("").to_string()
+                } else {
+                    String::new()
+                }
+            }
+            Err(_) => String::new(), // Invalid regex returns empty string
+        }
+    });
+
     engine.register_fn("extract_all_re", |text: &str, pattern: &str| -> rhai::Array {
         match regex::Regex::new(pattern) {
             Ok(re) => {
@@ -359,6 +378,28 @@ pub fn register_functions(engine: &mut Engine) {
                         if let Some(full_match) = captures.get(0) {
                             results.push(Dynamic::from(full_match.as_str().to_string()));
                         }
+                    }
+                }
+                results
+            }
+            Err(_) => rhai::Array::new(), // Invalid regex returns empty array
+        }
+    });
+
+    engine.register_fn("extract_all_re", |text: &str, pattern: &str, group: i64| -> rhai::Array {
+        match regex::Regex::new(pattern) {
+            Ok(re) => {
+                let mut results = rhai::Array::new();
+                let group_idx = if group < 0 {
+                    // Negative indices not supported, default to 0
+                    0
+                } else {
+                    group as usize
+                };
+                
+                for captures in re.captures_iter(text) {
+                    if let Some(group_match) = captures.get(group_idx) {
+                        results.push(Dynamic::from(group_match.as_str().to_string()));
                     }
                 }
                 results
@@ -824,6 +865,43 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_re_with_group_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        
+        let mut scope = Scope::new();
+        scope.push("text", "user=alice status=200 level=info");
+        
+        // Extract specific groups from complex pattern
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_re("user=(\\w+).*status=(\\d+)", 0)"##)
+            .unwrap();
+        assert_eq!(result, "user=alice status=200"); // Full match (group 0)
+        
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_re("user=(\\w+).*status=(\\d+)", 1)"##)
+            .unwrap();
+        assert_eq!(result, "alice"); // First capture group
+        
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_re("user=(\\w+).*status=(\\d+)", 2)"##)
+            .unwrap();
+        assert_eq!(result, "200"); // Second capture group
+        
+        // Out of bounds group (returns empty)
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_re("user=(\\w+)", 5)"##)
+            .unwrap();
+        assert_eq!(result, "");
+        
+        // Negative group index (defaults to 0)
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_re("user=(\\w+)", -1)"##)
+            .unwrap();
+        assert_eq!(result, "user=alice");
+    }
+
+    #[test]
     fn test_extract_all_re_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
@@ -854,6 +932,48 @@ mod tests {
         // No matches
         let result: rhai::Array = engine
             .eval_with_scope(&mut scope, r##"text.extract_all_re("missing")"##)
+            .unwrap();
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_extract_all_re_with_group_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        
+        let mut scope = Scope::new();
+        scope.push("text", "user=alice status=200 user=bob status=404 user=charlie status=500");
+        
+        // Extract all values from first capture group (usernames)
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"text.extract_all_re("user=(\\w+).*?status=(\\d+)", 1)"##)
+            .unwrap();
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].clone().into_string().unwrap(), "alice");
+        assert_eq!(result[1].clone().into_string().unwrap(), "bob");
+        assert_eq!(result[2].clone().into_string().unwrap(), "charlie");
+        
+        // Extract all values from second capture group (status codes)
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"text.extract_all_re("user=(\\w+).*?status=(\\d+)", 2)"##)
+            .unwrap();
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].clone().into_string().unwrap(), "200");
+        assert_eq!(result[1].clone().into_string().unwrap(), "404");
+        assert_eq!(result[2].clone().into_string().unwrap(), "500");
+        
+        // Extract all full matches (group 0)
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"text.extract_all_re("user=(\\w+)", 0)"##)
+            .unwrap();
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].clone().into_string().unwrap(), "user=alice");
+        assert_eq!(result[1].clone().into_string().unwrap(), "user=bob");
+        assert_eq!(result[2].clone().into_string().unwrap(), "user=charlie");
+        
+        // Out of bounds group (returns empty array)
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"text.extract_all_re("user=(\\w+)", 5)"##)
             .unwrap();
         assert_eq!(result.len(), 0);
     }
