@@ -94,11 +94,20 @@ make test-full          # Comprehensive test suite
 # Select specific fields using short option
 ./target/release/kelora -f jsonl app.log -k timestamp,level,message,user_id
 
+# Show summary of tracked values in a table format
+./target/release/kelora -f jsonl app.log --exec "track_count('total'); track_bucket('status_codes', status.to_string())" --summary
+
 # Show processing statistics (lines processed, filtered, timing, performance)
 ./target/release/kelora -f jsonl app.log --filter "status >= 400" --stats
 
+# Combined summary and statistics output (summary appears first)
+./target/release/kelora -f jsonl app.log --exec "track_count('errors')" --summary --stats
+
 # Statistics work in both sequential and parallel modes
 ./target/release/kelora -f jsonl large.log --filter "level == 'ERROR'" --parallel --stats
+
+# Summary also works in parallel mode with different batch sizes
+./target/release/kelora -f jsonl large.log --exec "track_unique('users', user)" --summary --parallel --batch-size 10
 
 # Statistics are displayed even when interrupted with CTRL-C
 seq 1 1000000 | ./target/release/kelora --filter "line.to_int() % 1000 == 0" --stats
@@ -118,7 +127,7 @@ The `--help` output is organized into logical sections that follow the data proc
 3. **Filtering Options**: Data filtering in the pipeline (`--levels`, `--exclude-levels`, `--keys`/`-k`, `--exclude-keys`/`-K`)
 4. **Output Options**: Output formatting (`--output-format`, `--core`, `--brief`)
 5. **Performance Options**: Processing optimizations (`--parallel`, `--threads`, `--batch-size`, `--batch-timeout`, `--unordered`)
-6. **Display Options**: Visual presentation (`--force-color`, `--no-color`, `--no-emoji`, `--stats`)
+6. **Display Options**: Visual presentation (`--force-color`, `--no-color`, `--no-emoji`, `--summary`, `--stats`)
 
 ### Key Short Options
 - `-f` = `--format` (input format)

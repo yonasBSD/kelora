@@ -199,6 +199,10 @@ pub struct Cli {
     #[arg(long = "no-emoji", help_heading = "Display Options")]
     pub no_emoji: bool,
 
+    /// Show summary of tracked values in a table format
+    #[arg(long = "summary", help_heading = "Display Options")]
+    pub summary: bool,
+
     /// Show processing statistics
     #[arg(long = "stats", help_heading = "Display Options")]
     pub stats: bool,
@@ -378,6 +382,20 @@ fn main() -> Result<()> {
     } else {
         run_sequential(&config, &mut stdout, &mut stderr);
 
+        // Print summary if enabled (only if not terminated)
+        if config.output.summary && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+            let tracked = crate::rhai_functions::tracking::get_thread_tracking_state();
+            let summary_lines = config.format_tracked_summary(&tracked);
+            stderr
+                .writeln(&config.format_summary_message(""))
+                .unwrap_or(());
+            for line in summary_lines.lines() {
+                stderr
+                    .writeln(line)
+                    .unwrap_or(());
+            }
+        }
+
         // Finish statistics collection and print stats if enabled (only if not terminated)
         if config.output.stats && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
             stats_finish_processing();
@@ -500,6 +518,19 @@ fn run_parallel(
             && !key.starts_with("__op___kelora_stats_")
         {
             ctx.tracker.insert(key, dynamic_value);
+        }
+    }
+
+    // Print summary if enabled (only if not terminated)
+    if config.output.summary && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+        let summary_lines = config.format_tracked_summary(&ctx.tracker);
+        stderr
+            .writeln(&config.format_summary_message(""))
+            .unwrap_or(());
+        for line in summary_lines.lines() {
+            stderr
+                .writeln(line)
+                .unwrap_or(());
         }
     }
 

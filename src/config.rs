@@ -1,4 +1,5 @@
 use clap::ValueEnum;
+use rhai::Dynamic;
 
 /// Main configuration struct for Kelora
 #[derive(Debug, Clone)]
@@ -28,6 +29,7 @@ pub struct OutputConfig {
     pub brief: bool,
     pub color: ColorMode,
     pub no_emoji: bool,
+    pub summary: bool,
     pub stats: bool,
 }
 
@@ -152,10 +154,68 @@ impl KeloraConfig {
         let use_emoji = use_colors && !self.output.no_emoji;
 
         if use_emoji {
-            format!("🧱 {}", message)
+            format!("📊 {}", message)
         } else {
             format!("Stats: {}", message)
         }
+    }
+
+    /// Format a summary message with appropriate prefix (emoji or "Summary:")
+    pub fn format_summary_message(&self, _message: &str) -> String {
+        let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
+        let use_emoji = use_colors && !self.output.no_emoji;
+
+        if use_emoji {
+            "🧱 Summary (tracked keys and values):".to_string()
+        } else {
+            "kelora: Summary (tracked keys and values):".to_string()
+        }
+    }
+
+    /// Format a summary line with appropriate prefix (emoji or "kelora:")  
+    pub fn format_summary_line(&self, message: &str) -> String {
+        message.to_string()
+    }
+
+    /// Format tracked values as a table
+    pub fn format_tracked_summary(
+        &self,
+        tracked: &std::collections::HashMap<String, rhai::Dynamic>,
+    ) -> String {
+        if tracked.is_empty() {
+            return "No tracked values".to_string();
+        }
+
+        // Filter out internal keys (operation metadata and stats)
+        let mut user_values: Vec<_> = tracked
+            .iter()
+            .filter(|(k, _)| !k.starts_with("__op_") && !k.starts_with("__kelora_stats_"))
+            .collect();
+
+        if user_values.is_empty() {
+            return "No tracked values".to_string();
+        }
+
+        // Sort by key for consistent output
+        user_values.sort_by_key(|(k, _)| k.as_str());
+
+        // Calculate column widths
+        let key_width = user_values
+            .iter()
+            .map(|(k, _)| k.len())
+            .max()
+            .unwrap_or(3)
+            .max(3);
+
+        let mut result = String::new();
+
+        // Rows (no header)
+        for (key, value) in user_values {
+            result.push_str(&self.format_summary_line(&format!("{:<key_width$} {}", key, format_tracked_value(value))));
+            result.push('\n');
+        }
+
+        result.trim_end().to_string()
     }
 }
 
@@ -214,6 +274,7 @@ impl KeloraConfig {
                 brief: cli.brief,
                 color: color_mode,
                 no_emoji: cli.no_emoji,
+                summary: cli.summary,
                 stats: cli.stats,
             },
             processing: ProcessingConfig {
@@ -275,6 +336,7 @@ impl Default for KeloraConfig {
                 brief: false,
                 color: ColorMode::Auto,
                 no_emoji: false,
+                summary: false,
                 stats: false,
             },
             processing: ProcessingConfig {
@@ -392,3 +454,55 @@ impl From<FileOrder> for crate::FileOrder {
         }
     }
 }
+
+/// Format a tracked value for display
+fn format_tracked_value(value: &Dynamic) -> String {
+    if value.is_int() {
+        value.as_int().unwrap_or(0).to_string()
+    } else if value.is_float() {
+        format!("{:.2}", value.as_float().unwrap_or(0.0))
+    } else if value.is_string() {
+        value
+            .clone()
+            .into_string()
+            .unwrap_or_else(|_| "".to_string())
+    } else if value.is_bool() {
+        value.as_bool().unwrap_or(false).to_string()
+    } else if value.is_array() {
+        if let Ok(array) = value.clone().into_array() {
+            if array.is_empty() {
+                "[]".to_string()
+            } else {
+                format!("[{} items]", array.len())
+            }
+        } else {
+            "[]".to_string()
+        }
+    } else if value.is::<rhai::Map>() {
+        if let Some(map) = value.clone().try_cast::<rhai::Map>() {
+            if map.is_empty() {
+                "{}".to_string()
+            } else {
+                // Format as key:value pairs for bucket tracking
+                let mut pairs: Vec<String> = map
+                    .iter()
+                    .map(|(k, v)| format!("{}:{}", k, format_tracked_value(v)))
+                    .collect();
+                pairs.sort();
+                let result = format!("{{{}}}", pairs.join(", "));
+                
+                // Truncate very long maps to keep output readable
+                if result.len() > 120 {
+                    format!("{}...}}", &result[..117])
+                } else {
+                    result
+                }
+            }
+        } else {
+            "{}".to_string()
+        }
+    } else {
+        value.to_string()
+    }
+}
+
