@@ -206,7 +206,7 @@ fn json_to_dynamic(value: serde_json::Value) -> Dynamic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rhai::{Dynamic, Engine, Map, Array};
+    use rhai::{Array, Dynamic, Engine, Map};
 
     fn create_test_engine() -> Engine {
         let mut engine = Engine::new();
@@ -218,31 +218,31 @@ mod tests {
         let mut map = Map::new();
         map.insert("name".into(), Dynamic::from("alice"));
         map.insert("age".into(), Dynamic::from(25i64));
-        
+
         let mut scores = Array::new();
         scores.push(Dynamic::from(10i64));
         scores.push(Dynamic::from(20i64));
         scores.push(Dynamic::from(30i64));
         map.insert("scores".into(), Dynamic::from(scores));
-        
+
         let mut details = Map::new();
         details.insert("city".into(), Dynamic::from("Boston"));
         details.insert("active".into(), Dynamic::from(true));
-        
+
         let mut items = Array::new();
         let mut item1 = Map::new();
         item1.insert("id".into(), Dynamic::from(1i64));
         item1.insert("name".into(), Dynamic::from("item1"));
         items.push(Dynamic::from(item1));
-        
+
         let mut item2 = Map::new();
         item2.insert("id".into(), Dynamic::from(2i64));
         item2.insert("name".into(), Dynamic::from("item2"));
         items.push(Dynamic::from(item2));
-        
+
         details.insert("items".into(), Dynamic::from(items));
         map.insert("details".into(), Dynamic::from(details));
-        
+
         map
     }
 
@@ -250,12 +250,14 @@ mod tests {
     fn test_get_path_basic_key_access() {
         let engine = create_test_engine();
         let map = create_test_map();
-        
-        let result: String = engine.eval_with_scope(&mut rhai::Scope::new(), &format!(
-            "get_path(#{:?}, \"name\")",
-            map
-        )).unwrap();
-        
+
+        let result: String = engine
+            .eval_with_scope(
+                &mut rhai::Scope::new(),
+                &format!("get_path(#{:?}, \"name\")", map),
+            )
+            .unwrap();
+
         assert_eq!(result, "alice");
     }
 
@@ -263,12 +265,14 @@ mod tests {
     fn test_get_path_array_access() {
         let engine = create_test_engine();
         let map = create_test_map();
-        
-        let result: i64 = engine.eval_with_scope(&mut rhai::Scope::new(), &format!(
-            "get_path(#{:?}, \"scores[1]\")",
-            map
-        )).unwrap();
-        
+
+        let result: i64 = engine
+            .eval_with_scope(
+                &mut rhai::Scope::new(),
+                &format!("get_path(#{:?}, \"scores[1]\")", map),
+            )
+            .unwrap();
+
         assert_eq!(result, 20);
     }
 
@@ -276,12 +280,14 @@ mod tests {
     fn test_get_path_negative_array_access() {
         let engine = create_test_engine();
         let map = create_test_map();
-        
-        let result: i64 = engine.eval_with_scope(&mut rhai::Scope::new(), &format!(
-            "get_path(#{:?}, \"scores[-1]\")",
-            map
-        )).unwrap();
-        
+
+        let result: i64 = engine
+            .eval_with_scope(
+                &mut rhai::Scope::new(),
+                &format!("get_path(#{:?}, \"scores[-1]\")", map),
+            )
+            .unwrap();
+
         assert_eq!(result, 30);
     }
 
@@ -289,12 +295,14 @@ mod tests {
     fn test_get_path_nested_object_access() {
         let engine = create_test_engine();
         let map = create_test_map();
-        
-        let result: String = engine.eval_with_scope(&mut rhai::Scope::new(), &format!(
-            "get_path(#{:?}, \"details.city\")",
-            map
-        )).unwrap();
-        
+
+        let result: String = engine
+            .eval_with_scope(
+                &mut rhai::Scope::new(),
+                &format!("get_path(#{:?}, \"details.city\")", map),
+            )
+            .unwrap();
+
         assert_eq!(result, "Boston");
     }
 
@@ -302,12 +310,14 @@ mod tests {
     fn test_get_path_deeply_nested_access() {
         let engine = create_test_engine();
         let map = create_test_map();
-        
-        let result: String = engine.eval_with_scope(&mut rhai::Scope::new(), &format!(
-            "get_path(#{:?}, \"details.items[1].name\")",
-            map
-        )).unwrap();
-        
+
+        let result: String = engine
+            .eval_with_scope(
+                &mut rhai::Scope::new(),
+                &format!("get_path(#{:?}, \"details.items[1].name\")", map),
+            )
+            .unwrap();
+
         assert_eq!(result, "item2");
     }
 
@@ -315,12 +325,14 @@ mod tests {
     fn test_get_path_missing_key_with_default() {
         let engine = create_test_engine();
         let map = create_test_map();
-        
-        let result: String = engine.eval_with_scope(&mut rhai::Scope::new(), &format!(
-            "get_path(#{:?}, \"nonexistent\", \"default\")",
-            map
-        )).unwrap();
-        
+
+        let result: String = engine
+            .eval_with_scope(
+                &mut rhai::Scope::new(),
+                &format!("get_path(#{:?}, \"nonexistent\", \"default\")", map),
+            )
+            .unwrap();
+
         assert_eq!(result, "default");
     }
 
@@ -328,12 +340,14 @@ mod tests {
     fn test_get_path_missing_key_without_default() {
         let engine = create_test_engine();
         let map = create_test_map();
-        
-        let result: Dynamic = engine.eval_with_scope(&mut rhai::Scope::new(), &format!(
-            "get_path(#{:?}, \"nonexistent\")",
-            map
-        )).unwrap();
-        
+
+        let result: Dynamic = engine
+            .eval_with_scope(
+                &mut rhai::Scope::new(),
+                &format!("get_path(#{:?}, \"nonexistent\")", map),
+            )
+            .unwrap();
+
         assert!(result.is_unit());
     }
 
@@ -341,12 +355,14 @@ mod tests {
     fn test_get_path_invalid_array_index() {
         let engine = create_test_engine();
         let map = create_test_map();
-        
-        let result: i64 = engine.eval_with_scope(&mut rhai::Scope::new(), &format!(
-            "get_path(#{:?}, \"scores[99]\", 0)",
-            map
-        )).unwrap();
-        
+
+        let result: i64 = engine
+            .eval_with_scope(
+                &mut rhai::Scope::new(),
+                &format!("get_path(#{:?}, \"scores[99]\", 0)", map),
+            )
+            .unwrap();
+
         assert_eq!(result, 0);
     }
 
@@ -354,12 +370,14 @@ mod tests {
     fn test_get_path_json_string_parsing() {
         let engine = create_test_engine();
         let json_str = r#"{"user": {"name": "bob", "scores": [100, 200, 300]}}"#;
-        
-        let result: String = engine.eval(&format!(
-            "get_path(\"{}\", \"user.name\")",
-            json_str.replace("\"", "\\\"")
-        )).unwrap();
-        
+
+        let result: String = engine
+            .eval(&format!(
+                "get_path(\"{}\", \"user.name\")",
+                json_str.replace("\"", "\\\"")
+            ))
+            .unwrap();
+
         assert_eq!(result, "bob");
     }
 
@@ -367,12 +385,14 @@ mod tests {
     fn test_get_path_json_string_with_array() {
         let engine = create_test_engine();
         let json_str = r#"{"user": {"name": "bob", "scores": [100, 200, 300]}}"#;
-        
-        let result: i64 = engine.eval(&format!(
-            "get_path(\"{}\", \"user.scores[0]\")",
-            json_str.replace("\"", "\\\"")
-        )).unwrap();
-        
+
+        let result: i64 = engine
+            .eval(&format!(
+                "get_path(\"{}\", \"user.scores[0]\")",
+                json_str.replace("\"", "\\\"")
+            ))
+            .unwrap();
+
         assert_eq!(result, 100);
     }
 
@@ -380,12 +400,14 @@ mod tests {
     fn test_get_path_json_string_with_default() {
         let engine = create_test_engine();
         let json_str = r#"{"user": {"name": "bob"}}"#;
-        
-        let result: String = engine.eval(&format!(
-            "get_path(\"{}\", \"user.missing\", \"fallback\")",
-            json_str.replace("\"", "\\\"")
-        )).unwrap();
-        
+
+        let result: String = engine
+            .eval(&format!(
+                "get_path(\"{}\", \"user.missing\", \"fallback\")",
+                json_str.replace("\"", "\\\"")
+            ))
+            .unwrap();
+
         assert_eq!(result, "fallback");
     }
 
@@ -393,12 +415,14 @@ mod tests {
     fn test_get_path_invalid_json_string() {
         let engine = create_test_engine();
         let invalid_json = "invalid json";
-        
-        let result: String = engine.eval(&format!(
-            "get_path(\"{}\", \"any.path\", \"default\")",
-            invalid_json
-        )).unwrap();
-        
+
+        let result: String = engine
+            .eval(&format!(
+                "get_path(\"{}\", \"any.path\", \"default\")",
+                invalid_json
+            ))
+            .unwrap();
+
         assert_eq!(result, "default");
     }
 
@@ -406,17 +430,17 @@ mod tests {
     fn test_parse_path_components() {
         let components = parse_path("user.scores[0]");
         assert_eq!(components.len(), 3);
-        
+
         match &components[0] {
             PathComponent::Key(key) => assert_eq!(key, "user"),
             _ => panic!("Expected key component"),
         }
-        
+
         match &components[1] {
             PathComponent::Key(key) => assert_eq!(key, "scores"),
             _ => panic!("Expected key component"),
         }
-        
+
         match &components[2] {
             PathComponent::Index(index) => assert_eq!(*index, 0),
             _ => panic!("Expected index component"),
@@ -427,12 +451,12 @@ mod tests {
     fn test_parse_path_negative_index() {
         let components = parse_path("items[-1]");
         assert_eq!(components.len(), 2);
-        
+
         match &components[0] {
             PathComponent::Key(key) => assert_eq!(key, "items"),
             _ => panic!("Expected key component"),
         }
-        
+
         match &components[1] {
             PathComponent::Index(index) => assert_eq!(*index, -1),
             _ => panic!("Expected index component"),
@@ -443,7 +467,7 @@ mod tests {
     fn test_parse_path_complex() {
         let components = parse_path("data.items[2].metadata.tags[0]");
         assert_eq!(components.len(), 6);
-        
+
         let expected = vec![
             PathComponent::Key("data".to_string()),
             PathComponent::Key("items".to_string()),
@@ -452,7 +476,7 @@ mod tests {
             PathComponent::Key("tags".to_string()),
             PathComponent::Index(0),
         ];
-        
+
         for (i, expected_component) in expected.iter().enumerate() {
             match (expected_component, &components[i]) {
                 (PathComponent::Key(expected_key), PathComponent::Key(actual_key)) => {
@@ -476,9 +500,9 @@ mod tests {
             "array": [1, 2, 3],
             "object": {"nested": "value"}
         });
-        
+
         let dynamic = json_to_dynamic(json_val);
-        
+
         {
             let map = dynamic.read_lock::<Map>().unwrap();
             assert_eq!(map.get("string").unwrap().clone().cast::<String>(), "hello");
@@ -486,18 +510,21 @@ mod tests {
             assert_eq!(map.get("boolean").unwrap().clone().cast::<bool>(), true);
             assert!(map.get("null").unwrap().is_unit());
         }
-        
+
         {
             let map = dynamic.read_lock::<Map>().unwrap();
             let array = map.get("array").unwrap().read_lock::<Array>().unwrap();
             assert_eq!(array.len(), 3);
             assert_eq!(array[0].clone().cast::<i64>(), 1);
         }
-        
+
         {
             let map = dynamic.read_lock::<Map>().unwrap();
             let nested_map = map.get("object").unwrap().read_lock::<Map>().unwrap();
-            assert_eq!(nested_map.get("nested").unwrap().clone().cast::<String>(), "value");
+            assert_eq!(
+                nested_map.get("nested").unwrap().clone().cast::<String>(),
+                "value"
+            );
         }
     }
 }

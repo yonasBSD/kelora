@@ -23,11 +23,11 @@ impl CefParser {
     fn parse_syslog_prefix(input: &str) -> IResult<&str, (Option<&str>, Option<&str>)> {
         let (input, prefix) = take_until("CEF:")(input)?;
         let prefix = prefix.trim();
-        
+
         if prefix.is_empty() {
             return Ok((input, (None, None)));
         }
-        
+
         let tokens: Vec<&str> = prefix.split_whitespace().collect();
         let result = match tokens.len() {
             0 => (None, None),
@@ -39,7 +39,7 @@ impl CefParser {
                 (Some(timestamp), Some(hostname))
             }
         };
-        
+
         Ok((input, result))
     }
 
@@ -55,10 +55,8 @@ impl CefParser {
 
     /// Parse a CEF header field (handles escaping)
     fn parse_cef_header_field(input: &str) -> IResult<&str, String> {
-        let (input, chars) = many0(alt((
-            Self::parse_escaped_char,
-            Self::parse_unescaped_char,
-        )))(input)?;
+        let (input, chars) =
+            many0(alt((Self::parse_escaped_char, Self::parse_unescaped_char)))(input)?;
         Ok((input, chars.into_iter().collect()))
     }
 
@@ -81,40 +79,48 @@ impl CefParser {
 
         Ok((
             input,
-            vec![version, vendor, product, device_version, signature_id, name, severity],
+            vec![
+                version,
+                vendor,
+                product,
+                device_version,
+                signature_id,
+                name,
+                severity,
+            ],
         ))
     }
-
 
     /// Parse all extension key=value pairs using simple approach
     fn parse_cef_extension(input: &str) -> IResult<&str, HashMap<String, String>> {
         let mut pairs = HashMap::new();
         let input = input.trim();
-        
+
         if input.is_empty() {
             return Ok(("", pairs));
         }
-        
+
         // Split by spaces first, then handle key=value pairs
         let parts: Vec<&str> = input.split_whitespace().collect();
-        
+
         for part in parts {
             if let Some(eq_pos) = part.find('=') {
                 let key = part[..eq_pos].to_string();
                 let value = part[eq_pos + 1..].to_string();
                 if !key.is_empty() {
                     // Handle escape sequences in value
-                    let unescaped_value = value.replace("\\=", "=")
-                                              .replace("\\|", "|")
-                                              .replace("\\\\", "\\")
-                                              .replace("\\n", "\n")
-                                              .replace("\\r", "\r")
-                                              .replace("\\t", "\t");
+                    let unescaped_value = value
+                        .replace("\\=", "=")
+                        .replace("\\|", "|")
+                        .replace("\\\\", "\\")
+                        .replace("\\n", "\n")
+                        .replace("\\r", "\r")
+                        .replace("\\t", "\t");
                     pairs.insert(key, unescaped_value);
                 }
             }
         }
-        
+
         Ok(("", pairs))
     }
 
@@ -142,7 +148,7 @@ impl CefParser {
 impl EventParser for CefParser {
     fn parse(&self, line: &str) -> Result<Event> {
         let line = line.trim();
-        
+
         // Parse syslog prefix if present
         let (remaining, (timestamp, hostname)) = Self::parse_syslog_prefix(line)
             .map_err(|e| anyhow::anyhow!("Failed to parse syslog prefix: {}", e))?;
@@ -155,7 +161,7 @@ impl EventParser for CefParser {
             return Err(anyhow::anyhow!("CEF header must have exactly 7 fields"));
         }
 
-        // Parse extension if present 
+        // Parse extension if present
         let extension_pairs = if remaining.trim().is_empty() {
             HashMap::new()
         } else {
@@ -171,7 +177,10 @@ impl EventParser for CefParser {
         };
 
         // Create event with appropriate capacity
-        let capacity = 7 + extension_pairs.len() + if timestamp.is_some() { 1 } else { 0 } + if hostname.is_some() { 1 } else { 0 };
+        let capacity = 7
+            + extension_pairs.len()
+            + if timestamp.is_some() { 1 } else { 0 }
+            + if hostname.is_some() { 1 } else { 0 };
         let mut event = Event::with_capacity(line.to_string(), capacity);
 
         // Set syslog fields
@@ -183,13 +192,31 @@ impl EventParser for CefParser {
         }
 
         // Set CEF header fields
-        event.set_field("cefver".to_string(), Dynamic::from(header_fields[0].clone()));
-        event.set_field("vendor".to_string(), Dynamic::from(header_fields[1].clone()));
-        event.set_field("product".to_string(), Dynamic::from(header_fields[2].clone()));
-        event.set_field("version".to_string(), Dynamic::from(header_fields[3].clone()));
-        event.set_field("eventid".to_string(), Dynamic::from(header_fields[4].clone()));
+        event.set_field(
+            "cefver".to_string(),
+            Dynamic::from(header_fields[0].clone()),
+        );
+        event.set_field(
+            "vendor".to_string(),
+            Dynamic::from(header_fields[1].clone()),
+        );
+        event.set_field(
+            "product".to_string(),
+            Dynamic::from(header_fields[2].clone()),
+        );
+        event.set_field(
+            "version".to_string(),
+            Dynamic::from(header_fields[3].clone()),
+        );
+        event.set_field(
+            "eventid".to_string(),
+            Dynamic::from(header_fields[4].clone()),
+        );
         event.set_field("event".to_string(), Dynamic::from(header_fields[5].clone()));
-        event.set_field("severity".to_string(), Dynamic::from(header_fields[6].clone()));
+        event.set_field(
+            "severity".to_string(),
+            Dynamic::from(header_fields[6].clone()),
+        );
 
         // Set extension fields with type conversion
         for (key, value) in extension_pairs {
@@ -215,11 +242,46 @@ mod tests {
         let line = "CEF:0|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232";
         let result = EventParser::parse(&parser, line).unwrap();
 
-
-        assert_eq!(result.fields.get("cefver").unwrap().clone().into_string().unwrap(), "0");
-        assert_eq!(result.fields.get("vendor").unwrap().clone().into_string().unwrap(), "Security");
-        assert_eq!(result.fields.get("product").unwrap().clone().into_string().unwrap(), "threatmanager");
-        assert_eq!(result.fields.get("src").unwrap().clone().into_string().unwrap(), "10.0.0.1");
+        assert_eq!(
+            result
+                .fields
+                .get("cefver")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "0"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("vendor")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "Security"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("product")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "threatmanager"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("src")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "10.0.0.1"
+        );
         assert_eq!(result.fields.get("spt").unwrap().as_int().unwrap(), 1232);
     }
 
@@ -229,9 +291,36 @@ mod tests {
         let line = "Sep 19 08:26:10 host CEF:0|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1";
         let result = EventParser::parse(&parser, line).unwrap();
 
-        assert_eq!(result.fields.get("timestamp").unwrap().clone().into_string().unwrap(), "Sep 19 08:26:10");
-        assert_eq!(result.fields.get("host").unwrap().clone().into_string().unwrap(), "host");
-        assert_eq!(result.fields.get("vendor").unwrap().clone().into_string().unwrap(), "Security");
+        assert_eq!(
+            result
+                .fields
+                .get("timestamp")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "Sep 19 08:26:10"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("host")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "host"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("vendor")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "Security"
+        );
     }
 
     #[test]
@@ -240,17 +329,45 @@ mod tests {
         let line = r"CEF:0|security|threatmanager|1.0|100|detected a \| in message|10|src=10.0.0.1";
         let result = EventParser::parse(&parser, line).unwrap();
 
-        assert_eq!(result.fields.get("event").unwrap().clone().into_string().unwrap(), "detected a | in message");
+        assert_eq!(
+            result
+                .fields
+                .get("event")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "detected a | in message"
+        );
     }
 
     #[test]
     fn test_cef_escaped_extension() {
         let parser = CefParser::new();
-        let line = r"CEF:0|vendor|product|1.0|100|event|10|key=value\=with\=equals msg=test\nmultiline";
+        let line =
+            r"CEF:0|vendor|product|1.0|100|event|10|key=value\=with\=equals msg=test\nmultiline";
         let result = EventParser::parse(&parser, line).unwrap();
 
-        assert_eq!(result.fields.get("key").unwrap().clone().into_string().unwrap(), "value=with=equals");
-        assert_eq!(result.fields.get("msg").unwrap().clone().into_string().unwrap(), "test\nmultiline");
+        assert_eq!(
+            result
+                .fields
+                .get("key")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "value=with=equals"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("msg")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "test\nmultiline"
+        );
     }
 
     #[test]
@@ -259,20 +376,45 @@ mod tests {
         let line = "CEF:0|vendor|product|1.0|100|event|10";
         let result = EventParser::parse(&parser, line).unwrap();
 
-        assert_eq!(result.fields.get("cefver").unwrap().clone().into_string().unwrap(), "0");
-        assert_eq!(result.fields.get("severity").unwrap().clone().into_string().unwrap(), "10");
+        assert_eq!(
+            result
+                .fields
+                .get("cefver")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "0"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("severity")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "10"
+        );
         assert!(result.fields.get("src").is_none());
     }
 
     #[test]
     fn test_cef_type_conversion() {
         let parser = CefParser::new();
-        let line = "CEF:0|vendor|product|1.0|100|event|10|count=42 rate=3.14 enabled=true disabled=false";
+        let line =
+            "CEF:0|vendor|product|1.0|100|event|10|count=42 rate=3.14 enabled=true disabled=false";
         let result = EventParser::parse(&parser, line).unwrap();
 
         assert_eq!(result.fields.get("count").unwrap().as_int().unwrap(), 42);
         assert_eq!(result.fields.get("rate").unwrap().as_float().unwrap(), 3.14);
-        assert_eq!(result.fields.get("enabled").unwrap().as_bool().unwrap(), true);
-        assert_eq!(result.fields.get("disabled").unwrap().as_bool().unwrap(), false);
+        assert_eq!(
+            result.fields.get("enabled").unwrap().as_bool().unwrap(),
+            true
+        );
+        assert_eq!(
+            result.fields.get("disabled").unwrap().as_bool().unwrap(),
+            false
+        );
     }
 }

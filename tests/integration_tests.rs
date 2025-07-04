@@ -1972,79 +1972,123 @@ fn test_ignore_lines_with_stats() {
 #[test]
 fn test_get_path_function_basic_usage() {
     let input = r#"{"user": {"name": "alice", "age": 25, "scores": [100, 200, 300]}}"#;
-    
+
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--exec", "let name = get_path(user, \"name\", \"unknown\"); print(\"Name: \" + name)"],
+        &[
+            "-f",
+            "jsonl",
+            "--exec",
+            "let name = get_path(user, \"name\", \"unknown\"); print(\"Name: \" + name)",
+        ],
         input,
     );
-    
+
     assert_eq!(exit_code, 0, "Should exit successfully");
-    assert!(stdout.contains("Name: alice"), "Should extract nested value: {}", stdout);
+    assert!(
+        stdout.contains("Name: alice"),
+        "Should extract nested value: {}",
+        stdout
+    );
 }
 
 #[test]
 fn test_get_path_function_array_access() {
     let input = r#"{"user": {"name": "bob", "scores": [100, 200, 300]}}"#;
-    
+
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--exec", "let score = get_path(user, \"scores[1]\", 0); print(\"Second score: \" + score)"],
+        &[
+            "-f",
+            "jsonl",
+            "--exec",
+            "let score = get_path(user, \"scores[1]\", 0); print(\"Second score: \" + score)",
+        ],
         input,
     );
-    
+
     assert_eq!(exit_code, 0, "Should exit successfully");
-    assert!(stdout.contains("Second score: 200"), "Should access array element: {}", stdout);
+    assert!(
+        stdout.contains("Second score: 200"),
+        "Should access array element: {}",
+        stdout
+    );
 }
 
 #[test]
 fn test_get_path_function_negative_indexing() {
     let input = r#"{"user": {"name": "charlie", "scores": [100, 200, 300]}}"#;
-    
+
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
         &["-f", "jsonl", "--exec", "let last_score = get_path(user, \"scores[-1]\", 0); print(\"Last score: \" + last_score)"],
         input,
     );
-    
+
     assert_eq!(exit_code, 0, "Should exit successfully");
-    assert!(stdout.contains("Last score: 300"), "Should access last array element: {}", stdout);
+    assert!(
+        stdout.contains("Last score: 300"),
+        "Should access last array element: {}",
+        stdout
+    );
 }
 
 #[test]
 fn test_get_path_function_deeply_nested() {
     let input = r#"{"data": {"items": [{"id": 1, "meta": {"tags": ["urgent", "review"]}}]}}"#;
-    
+
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
         &["-f", "jsonl", "--exec", "let tag = get_path(data, \"items[0].meta.tags[0]\", \"none\"); print(\"First tag: \" + tag)"],
         input,
     );
-    
+
     assert_eq!(exit_code, 0, "Should exit successfully");
-    assert!(stdout.contains("First tag: urgent"), "Should extract deeply nested value: {}", stdout);
+    assert!(
+        stdout.contains("First tag: urgent"),
+        "Should extract deeply nested value: {}",
+        stdout
+    );
 }
 
 #[test]
 fn test_get_path_function_with_default() {
     let input = r#"{"user": {"name": "david"}}"#;
-    
+
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--exec", "let age = get_path(user, \"age\", \"unknown\"); print(\"Age: \" + age)"],
+        &[
+            "-f",
+            "jsonl",
+            "--exec",
+            "let age = get_path(user, \"age\", \"unknown\"); print(\"Age: \" + age)",
+        ],
         input,
     );
-    
+
     assert_eq!(exit_code, 0, "Should exit successfully");
-    assert!(stdout.contains("Age: unknown"), "Should use default for missing key: {}", stdout);
+    assert!(
+        stdout.contains("Age: unknown"),
+        "Should use default for missing key: {}",
+        stdout
+    );
 }
 
 #[test]
 fn test_get_path_function_invalid_array_index() {
     let input = r#"{"user": {"scores": [100, 200]}}"#;
-    
+
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--exec", "let score = get_path(user, \"scores[99]\", \"not_found\"); print(\"Score: \" + score)"],
+        &[
+            "-f",
+            "jsonl",
+            "--exec",
+            "let score = get_path(user, \"scores[99]\", \"not_found\"); print(\"Score: \" + score)",
+        ],
         input,
     );
-    
+
     assert_eq!(exit_code, 0, "Should exit successfully");
-    assert!(stdout.contains("Score: not_found"), "Should use default for invalid index: {}", stdout);
+    assert!(
+        stdout.contains("Score: not_found"),
+        "Should use default for invalid index: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -2052,31 +2096,53 @@ fn test_get_path_function_filtering() {
     let input = r#"{"level": "error", "user": {"role": "admin"}}
 {"level": "info", "user": {"role": "user"}}
 {"level": "error", "user": {"role": "user"}}"#;
-    
+
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--filter", "get_path(user, \"role\") == \"admin\""],
+        &[
+            "-f",
+            "jsonl",
+            "--filter",
+            "get_path(user, \"role\") == \"admin\"",
+        ],
         input,
     );
-    
+
     assert_eq!(exit_code, 0, "Should exit successfully");
     let lines: Vec<&str> = stdout.trim().split('\n').collect();
-    assert_eq!(lines.len(), 1, "Should filter to one admin entry: {}", stdout);
-    assert!(lines[0].contains("admin"), "Should contain admin role: {}", stdout);
+    assert_eq!(
+        lines.len(),
+        1,
+        "Should filter to one admin entry: {}",
+        stdout
+    );
+    assert!(
+        lines[0].contains("admin"),
+        "Should contain admin role: {}",
+        stdout
+    );
 }
 
 #[test]
 fn test_get_path_function_with_real_world_log() {
     let input = r#"{"timestamp": "2023-01-01T10:00:00Z", "request": {"method": "GET", "url": "/api/users", "headers": {"user-agent": "Mozilla/5.0"}}, "response": {"status": 200, "size": 1024}}"#;
-    
+
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--exec", 
-          "let method = get_path(request, \"method\", \"unknown\"); \
+        &[
+            "-f",
+            "jsonl",
+            "--exec",
+            "let method = get_path(request, \"method\", \"unknown\"); \
            let status = get_path(response, \"status\", 0); \
            let user_agent = get_path(request, \"headers.user-agent\", \"unknown\"); \
-           print(method + \" \" + status + \" \" + user_agent)"],
+           print(method + \" \" + status + \" \" + user_agent)",
+        ],
         input,
     );
-    
+
     assert_eq!(exit_code, 0, "Should exit successfully");
-    assert!(stdout.contains("GET 200 Mozilla/5.0"), "Should extract multiple nested values: {}", stdout);
+    assert!(
+        stdout.contains("GET 200 Mozilla/5.0"),
+        "Should extract multiple nested values: {}",
+        stdout
+    );
 }
