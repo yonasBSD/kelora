@@ -28,11 +28,13 @@ output-format = jsonl
 on-error = skip
 parallel = true
 stats = true
+window_size = 5
 
 [aliases]
 errors = --filter 'level == "error"' --stats
 json-errors = --format jsonl --filter 'level == "error"' --output-format jsonl
 slow-requests = --filter 'response_time.to_int() > 1000' --keys timestamp,method,path,response_time
+windowed-errors = --window 3 --filter 'level == "error"' --exec 'let prev_levels = window_values(window, "level"); print("Previous levels: " + prev_levels.join(","))'
 ```
 
 ### Configuration Commands
@@ -139,17 +141,117 @@ seq 1 1000000 | ./target/release/kelora --filter "line.to_int() % 1000 == 0" --s
 ./target/release/kelora -f jsonl requests.log --exec "let start = parse_timestamp(start_time); let end = parse_timestamp(end_time); let duration = end - start; print('Duration: ' + duration.as_milliseconds() + 'ms')"
 ./target/release/kelora -f jsonl global.log --exec "let utc_time = parse_timestamp(timestamp).to_utc(); print('UTC: ' + utc_time.format('%Y-%m-%d %H:%M:%S %Z'))"
 
-# Real-time and streaming scenarios
-kubectl logs app | ./target/release/kelora -f jsonl --filter 'level == "error"' -F text
-tail -f /var/log/app.log | ./target/release/kelora -f jsonl --filter 'status >= 400'
+# Window functionality for event correlation and analysis
+# Enable sliding window of recent events for pattern detection and correlation
+./target/release/kelora -f jsonl app.log --window 3 --exec "let curr_status = status; let prev_statuses = window_values(window, 'status'); print('Current: ' + curr_status + ', Previous: [' + prev_statuses.join(',') + ']')"
+./target/release/kelora -f jsonl api.log --window 5 --filter 'status >= 400' --exec "let response_times = window_numbers(window, 'response_time'); if response_times.len() > 2 { let avg = response_times.iter().sum() / response_times.len(); print('Error after avg response time: ' + avg) }"
+./target/release/kelora -f jsonl metrics.log --window 2 --exec "if window.len() > 1 { let curr = cpu_usage.to_float(); let prev = window[1].cpu_usage.to_float(); let change = curr - prev; if change > 20.0 { print('CPU spike: +' + change + '%') } }"
+./target/release/kelora -f jsonl security.log --window 10 --filter 'event_type == "login_failed"' --exec "let failed_users = window_values(window, 'username'); let unique_users = []; for user in failed_users { if !unique_users.contains(user) { unique_users.push(user) } }; if unique_users.len() > 3 { print('Multiple users failed: ' + unique_users.join(',')) }"
+./target/release/kelora -f jsonl trade.log --window 4 --exec "let prices = window_numbers(window, 'price'); if prices.len() >= 3 { let trend = prices[0] > prices[1] && prices[1] > prices[2]; if trend { print('Price trending up: ' + prices.join(' -> ')) } }"
+
+# Real-time and streaming scenarios with window
+kubectl logs app | ./target/release/kelora -f jsonl --window 5 --filter 'level == "error"' --exec "let error_freq = window_values(window, 'level').len(); if error_freq > 3 { print('High error rate detected') }" -F text
+tail -f /var/log/app.log | ./target/release/kelora -f jsonl --window 2 --filter 'status >= 500' --exec "if window.len() > 1 { print('Consecutive server errors detected') }"
 ```
+
+## Window Functionality
+
+### Overview
+
+The `--window N` option enables access to a sliding window of N+1 recent events in Rhai scripts. This allows for:
+- Event correlation and pattern detection
+- Trend analysis across multiple log entries
+- Change detection between consecutive events  
+- Aggregate calculations over recent events
+
+### Window Access
+
+Events are accessible as an array where:
+- `window[0]` = current event (most recent)
+- `window[1]` = previous event  
+- `window[2]` = event before that, etc.
+
+The window maintains up to N+1 events total (current + N previous).
+
+### Window Functions
+
+**`window_values(window, field_name)`** - Extract field values across all window events
+- Returns array of string values from events that have the specified field
+- Events without the field are skipped (not included in results)
+- Maintains window order: [current_value, previous_value, older_value, ...]
+
+**`window_numbers(window, field_name)`** - Extract numeric field values across all window events  
+- Returns array of numeric values (as floats) from events with parseable numeric fields
+- String values are parsed as numbers, booleans become 1.0/0.0
+- Non-parseable values are skipped
+- Maintains window order: [current_value, previous_value, older_value, ...]
+
+### Window Examples
+
+```rhai
+// Access current and previous events directly
+let current_status = window[0].status;
+if window.len() > 1 {
+    let previous_status = window[1].status;
+    if current_status != previous_status {
+        print("Status changed: " + previous_status + " -> " + current_status);
+    }
+}
+
+// Extract all status codes from window
+let statuses = window_values(window, "status");  // ["200", "404", "200"]
+let unique_statuses = []; 
+for status in statuses {
+    if !unique_statuses.contains(status) {
+        unique_statuses.push(status);
+    }
+}
+
+// Calculate average response time over window
+let response_times = window_numbers(window, "response_time");  // [0.15, 0.23, 0.89]
+if response_times.len() > 0 {
+    let avg_time = response_times.iter().sum() / response_times.len();
+    if avg_time > 1.0 {
+        print("High average response time: " + avg_time + "s");
+    }
+}
+
+// Detect trends in numeric data
+let cpu_values = window_numbers(window, "cpu_usage");
+if cpu_values.len() >= 3 {
+    let increasing = cpu_values[0] > cpu_values[1] && cpu_values[1] > cpu_values[2];
+    if increasing {
+        print("CPU usage trending up: " + cpu_values.join(" -> "));
+    }
+}
+
+// Count recent error events
+let error_levels = window_values(window, "level");
+let error_count = 0;
+for level in error_levels {
+    if level == "error" {
+        error_count += 1;
+    }
+}
+if error_count > 2 {
+    print("Multiple errors in recent events: " + error_count);
+}
+```
+
+### Window Performance Considerations
+
+- Window maintains N+1 event objects in memory per processing thread
+- Each event is cloned when added to the window buffer
+- Use smaller window sizes for high-volume log processing
+- Window size of 0 disables windowing (default behavior)
+- Window works in both sequential and parallel processing modes
 
 ## CLI Help Organization
 
 The `--help` output is organized into logical sections that follow the data processing pipeline:
 
 1. **Input Options**: File handling and input format (`-f`, `--file-order`, `--ignore-lines`)
-2. **Processing Options**: Script execution and processing control (`--begin`, `--filter`, `--exec`, `--exec-file`, `--end`, `--on-error`, `--no-inject`, `--inject-prefix`)
+2. **Processing Options**: Script execution and processing control (`--begin`, `--filter`, `--exec`, `--exec-file`, `--end`, `--window`, `--on-error`, `--no-inject`, `--inject-prefix`)
 3. **Filtering Options**: Data filtering in the pipeline (`--levels`, `--exclude-levels`, `--keys`/`-k`, `--exclude-keys`/`-K`)
 4. **Output Options**: Output formatting (`--output-format`, `--core`, `--brief`)
 5. **Performance Options**: Processing optimizations (`--parallel`, `--threads`, `--batch-size`, `--batch-timeout`, `--unordered`)
@@ -214,6 +316,7 @@ Kelora is built around a streaming pipeline architecture:
 - Multi-line mode buffers complete events in memory
 - Large batch sizes increase memory usage
 - Consider `--stats` overhead for high-volume processing
+- Window functionality increases memory usage proportionally to window size
 
 ### Testing Approach
 
@@ -391,6 +494,49 @@ let user_data = get_path(user, "profile.settings.theme", "light"); // Extract th
 let error_count = get_path(metrics, "errors.count", 0);            // Extract error count with 0 default
 ```
 
+#### Window Functions
+
+**`window_values(window, field_name)`** - Extract field values from all events in the window
+- Returns array of string values from events that have the specified field
+- Events without the field are skipped (not included in results)
+- Maintains window order: [current_value, previous_value, older_value, ...]
+
+**`window_numbers(window, field_name)`** - Extract numeric field values from all events in the window
+- Returns array of numeric values (as floats) from events with parseable numeric fields
+- String values are parsed as numbers, booleans become 1.0/0.0
+- Non-parseable values are skipped
+- Maintains window order: [current_value, previous_value, older_value, ...]
+
+Examples:
+```rhai
+// Extract field values across window events
+let statuses = window_values(window, "status");      // ["200", "404", "200"]
+let users = window_values(window, "user");           // ["alice", "bob"]
+
+// Extract numeric values for calculations
+let response_times = window_numbers(window, "response_time");  // [0.15, 0.23, 0.89]
+let error_counts = window_numbers(window, "error_count");      // [0, 2, 1]
+
+// Use with window array access
+if window.len() > 1 {
+    let current_status = window[0].status;
+    let previous_status = window[1].status;
+    
+    // Compare with historical data
+    let all_statuses = window_values(window, "status");
+    let error_rate = 0;
+    for status in all_statuses {
+        if status.starts_with("4") || status.starts_with("5") {
+            error_rate += 1;
+        }
+    }
+    
+    if error_rate > window.len() / 2 {
+        print("High error rate in recent events");
+    }
+}
+```
+
 #### DateTime and Duration Functions
 
 **Timestamp Parsing:**
@@ -484,3 +630,11 @@ if process_duration > duration_from_seconds(5) {
 let hour_bucket = request_time.format("%Y-%m-%d %H:00:00");
 track_count("requests_by_hour_" + hour_bucket);
 ```
+
+### Code Quality Practices
+
+- Always run `cargo clippy` before committing.
+- Always run `cargo fmt` before committing anything
+- Write unit tests for new functionality
+- Document public APIs with examples
+- Use descriptive variable names and comments for complex logic

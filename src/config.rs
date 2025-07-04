@@ -52,6 +52,8 @@ pub struct ProcessingConfig {
     pub on_error: ErrorStrategy,
     pub levels: Vec<String>,
     pub exclude_levels: Vec<String>,
+    /// Window size for sliding window functionality (0 = disabled)
+    pub window_size: usize,
 }
 
 /// Performance configuration
@@ -471,6 +473,7 @@ impl KeloraConfig {
                 on_error: cli.on_error.clone().into(),
                 levels: cli.levels.clone(),
                 exclude_levels: cli.exclude_levels.clone(),
+                window_size: cli.window_size.unwrap_or(0),
             },
             performance: PerformanceConfig {
                 parallel: cli.parallel,
@@ -534,6 +537,7 @@ impl Default for KeloraConfig {
                 on_error: ErrorStrategy::Print,
                 levels: Vec::new(),
                 exclude_levels: Vec::new(),
+                window_size: 0,
             },
             performance: PerformanceConfig {
                 parallel: false,

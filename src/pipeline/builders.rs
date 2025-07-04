@@ -6,7 +6,8 @@ use std::io::{self, BufRead};
 use super::{
     create_multiline_chunker, BeginStage, EndStage, EventLimiter, EventParser, ExecStage,
     FilterStage, Formatter, KeyFilterStage, LevelFilterStage, MetaData, Pipeline, PipelineConfig,
-    PipelineContext, ScriptStage, SimpleChunker, SimpleWindowManager, StdoutWriter, TakeNLimiter,
+    PipelineContext, ScriptStage, SimpleChunker, SimpleWindowManager, SlidingWindowManager,
+    StdoutWriter, TakeNLimiter,
 };
 use crate::decompression::DecompressionReader;
 use crate::engine::RhaiEngine;
@@ -26,6 +27,7 @@ pub struct PipelineBuilder {
     levels: Vec<String>,
     exclude_levels: Vec<String>,
     multiline: Option<crate::config::MultilineConfig>,
+    window_size: usize,
 }
 
 impl PipelineBuilder {
@@ -48,6 +50,7 @@ impl PipelineBuilder {
             levels: Vec::new(),
             exclude_levels: Vec::new(),
             multiline: None,
+            window_size: 0,
         }
     }
 
@@ -150,6 +153,13 @@ impl PipelineBuilder {
             Box::new(SimpleChunker) as Box<dyn super::Chunker>
         };
 
+        // Create window manager based on window_size configuration
+        let window_manager: Box<dyn super::WindowManager> = if self.window_size > 0 {
+            Box::new(SlidingWindowManager::new(self.window_size))
+        } else {
+            Box::new(SimpleWindowManager::new())
+        };
+
         // Create pipeline
         let pipeline = Pipeline {
             line_filter: None, // No line filter implementation yet
@@ -159,7 +169,7 @@ impl PipelineBuilder {
             limiter,
             formatter,
             output: Box::new(StdoutWriter),
-            window_manager: Box::new(SimpleWindowManager::new()),
+            window_manager,
         };
 
         Ok((pipeline, begin_stage, end_stage, ctx))
@@ -277,6 +287,13 @@ impl PipelineBuilder {
             Box::new(SimpleChunker) as Box<dyn super::Chunker>
         };
 
+        // Create window manager based on window_size configuration
+        let window_manager: Box<dyn super::WindowManager> = if self.window_size > 0 {
+            Box::new(SlidingWindowManager::new(self.window_size))
+        } else {
+            Box::new(SimpleWindowManager::new())
+        };
+
         // Create worker pipeline (no output writer - results are collected by the processor)
         let pipeline = Pipeline {
             line_filter: None,
@@ -286,7 +303,7 @@ impl PipelineBuilder {
             limiter,
             formatter,
             output: Box::new(StdoutWriter), // This won't actually be used in parallel mode
-            window_manager: Box::new(SimpleWindowManager::new()),
+            window_manager,
         };
 
         Ok((pipeline, ctx))
@@ -330,6 +347,7 @@ pub fn create_pipeline_builder_from_config(
     builder.levels = config.processing.levels.clone();
     builder.exclude_levels = config.processing.exclude_levels.clone();
     builder.multiline = config.input.multiline.clone();
+    builder.window_size = config.processing.window_size;
     builder
 }
 

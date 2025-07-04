@@ -17,10 +17,21 @@ impl FilterStage {
 
 impl ScriptStage for FilterStage {
     fn apply(&mut self, event: Event, ctx: &mut PipelineContext) -> ScriptResult {
-        match ctx
-            .rhai
-            .execute_compiled_filter(&self.compiled_filter, &event, &mut ctx.tracker)
-        {
+        let result = if ctx.window.is_empty() {
+            // No window context - use standard method
+            ctx.rhai
+                .execute_compiled_filter(&self.compiled_filter, &event, &mut ctx.tracker)
+        } else {
+            // Window context available - use window-aware method
+            ctx.rhai.execute_compiled_filter_with_window(
+                &self.compiled_filter,
+                &event,
+                &ctx.window,
+                &mut ctx.tracker,
+            )
+        };
+
+        match result {
             Ok(result) => {
                 if result {
                     ScriptResult::Emit(event)
@@ -47,10 +58,21 @@ impl ExecStage {
 
 impl ScriptStage for ExecStage {
     fn apply(&mut self, mut event: Event, ctx: &mut PipelineContext) -> ScriptResult {
-        match ctx
-            .rhai
-            .execute_compiled_exec(&self.compiled_exec, &mut event, &mut ctx.tracker)
-        {
+        let result = if ctx.window.is_empty() {
+            // No window context - use standard method
+            ctx.rhai
+                .execute_compiled_exec(&self.compiled_exec, &mut event, &mut ctx.tracker)
+        } else {
+            // Window context available - use window-aware method
+            ctx.rhai.execute_compiled_exec_with_window(
+                &self.compiled_exec,
+                &mut event,
+                &ctx.window,
+                &mut ctx.tracker,
+            )
+        };
+
+        match result {
             Ok(()) => ScriptResult::Emit(event),
             Err(e) => ScriptResult::Error(format!("Exec error: {}", e)),
         }

@@ -37,9 +37,9 @@ impl ConfigFile {
                         .map(|h| PathBuf::from(h).join(".config"))
                         .unwrap_or_else(|_| PathBuf::from(".config"))
                 });
-            
+
             paths.push(xdg_config.join("kelora").join("config.ini"));
-            
+
             if let Ok(home) = env::var("HOME") {
                 paths.push(PathBuf::from(home).join(".kelorarc"));
             }
@@ -50,15 +50,13 @@ impl ConfigFile {
 
     /// Find the first existing configuration file
     pub fn find_config_path() -> Option<PathBuf> {
-        Self::get_config_paths()
-            .into_iter()
-            .find(|p| p.exists())
+        Self::get_config_paths().into_iter().find(|p| p.exists())
     }
 
     /// Load configuration from file
     pub fn load() -> Result<Self> {
         let config_file = Self::find_config_path();
-        
+
         if let Some(path) = config_file {
             Self::load_from_path(&path)
         } else {
@@ -69,42 +67,42 @@ impl ConfigFile {
     /// Load configuration from a specific path
     pub fn load_from_path(path: &PathBuf) -> Result<Self> {
         use std::fs;
-        
+
         // Read the file content first
         let content = fs::read_to_string(path)
             .with_context(|| format!("Failed to read config file: {}", path.display()))?;
-        
+
         // Parse the INI content
         let config = Self::parse_ini_content(&content)?;
-        
+
         Ok(config)
     }
-    
+
     /// Parse INI content from string
     fn parse_ini_content(content: &str) -> Result<Self> {
         let mut defaults = HashMap::new();
         let mut aliases = HashMap::new();
         let mut current_section = String::new();
-        
+
         for line in content.lines() {
             let line = line.trim();
-            
+
             // Skip empty lines and comments
             if line.is_empty() || line.starts_with(';') || line.starts_with('#') {
                 continue;
             }
-            
+
             // Check for section headers
             if line.starts_with('[') && line.ends_with(']') {
-                current_section = line[1..line.len()-1].to_string();
+                current_section = line[1..line.len() - 1].to_string();
                 continue;
             }
-            
+
             // Parse key=value pairs
             if let Some(eq_pos) = line.find('=') {
                 let key = line[..eq_pos].trim();
-                let value = line[eq_pos+1..].trim();
-                
+                let value = line[eq_pos + 1..].trim();
+
                 match current_section.as_str() {
                     "defaults" => {
                         // Convert kebab-case to underscore for internal consistency
@@ -120,19 +118,19 @@ impl ConfigFile {
                 }
             }
         }
-        
+
         Ok(Self { defaults, aliases })
     }
 
     /// Show configuration information
     pub fn show_config() {
         let config_file = Self::find_config_path();
-        
+
         if let Some(path) = config_file {
             match Self::load_from_path(&path) {
                 Ok(config) => {
                     println!("Configuration loaded from: {}", path.display());
-                    
+
                     if !config.defaults.is_empty() {
                         println!("\nDefaults:");
                         let mut sorted_defaults: Vec<_> = config.defaults.iter().collect();
@@ -141,7 +139,7 @@ impl ConfigFile {
                             println!("  {} = {}", key, value);
                         }
                     }
-                    
+
                     if !config.aliases.is_empty() {
                         println!("\nAliases:");
                         let mut sorted_aliases: Vec<_> = config.aliases.iter().collect();
@@ -169,15 +167,22 @@ impl ConfigFile {
             println!();
             println!("[aliases]");
             println!("errors = --filter 'level == \"error\"' --stats");
-            println!("json-errors = --format jsonl --filter 'level == \"error\"' --output-format jsonl");
+            println!(
+                "json-errors = --format jsonl --filter 'level == \"error\"' --output-format jsonl"
+            );
             println!("slow-requests = --filter 'response_time.to_int() > 1000' --keys timestamp,method,path,response_time");
         }
     }
 
     /// Resolve a single alias, handling recursive references
-    pub fn resolve_alias(&self, name: &str, seen: &mut std::collections::HashSet<String>, depth: usize) -> Result<Vec<String>> {
+    pub fn resolve_alias(
+        &self,
+        name: &str,
+        seen: &mut std::collections::HashSet<String>,
+        depth: usize,
+    ) -> Result<Vec<String>> {
         const MAX_DEPTH: usize = 10;
-        
+
         if depth > MAX_DEPTH {
             return Err(anyhow!("Alias chain too deep: {} levels", depth));
         }
@@ -186,7 +191,9 @@ impl ConfigFile {
             return Err(anyhow!("Circular dependency detected in alias: {}", name));
         }
 
-        let alias_value = self.aliases.get(name)
+        let alias_value = self
+            .aliases
+            .get(name)
             .ok_or_else(|| anyhow!("Unknown alias: {}", name))?;
 
         seen.insert(name.to_string());
@@ -238,12 +245,11 @@ impl ConfigFile {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
     use std::io::Write;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_load_config_file() {
@@ -258,43 +264,71 @@ mod tests {
         file.flush().unwrap();
 
         let config = ConfigFile::load_from_path(&file.path().to_path_buf()).unwrap();
-        
+
         assert_eq!(config.defaults.get("format"), Some(&"jsonl".to_string()));
-        assert_eq!(config.defaults.get("output_format"), Some(&"csv".to_string()));
-        assert_eq!(config.aliases.get("errors"), Some(&"--filter 'level == \"error\"'".to_string()));
-        assert_eq!(config.aliases.get("json-logs"), Some(&"--format jsonl --output-format jsonl".to_string()));
+        assert_eq!(
+            config.defaults.get("output_format"),
+            Some(&"csv".to_string())
+        );
+        assert_eq!(
+            config.aliases.get("errors"),
+            Some(&"--filter 'level == \"error\"'".to_string())
+        );
+        assert_eq!(
+            config.aliases.get("json-logs"),
+            Some(&"--format jsonl --output-format jsonl".to_string())
+        );
     }
 
     #[test]
     fn test_resolve_alias() {
         let mut config = ConfigFile::default();
-        config.aliases.insert("errors".to_string(), "--filter 'level == \"error\"'".to_string());
-        config.aliases.insert("json-errors".to_string(), "--format jsonl -a errors".to_string());
-        
+        config.aliases.insert(
+            "errors".to_string(),
+            "--filter 'level == \"error\"'".to_string(),
+        );
+        config.aliases.insert(
+            "json-errors".to_string(),
+            "--format jsonl -a errors".to_string(),
+        );
+
         let mut seen = std::collections::HashSet::new();
         let resolved = config.resolve_alias("json-errors", &mut seen, 0).unwrap();
-        
-        assert_eq!(resolved, vec!["--format", "jsonl", "--filter", "level == \"error\""]);
+
+        assert_eq!(
+            resolved,
+            vec!["--format", "jsonl", "--filter", "level == \"error\""]
+        );
     }
 
     #[test]
     fn test_circular_alias_detection() {
         let mut config = ConfigFile::default();
-        config.aliases.insert("alias1".to_string(), "-a alias2".to_string());
-        config.aliases.insert("alias2".to_string(), "-a alias1".to_string());
-        
+        config
+            .aliases
+            .insert("alias1".to_string(), "-a alias2".to_string());
+        config
+            .aliases
+            .insert("alias2".to_string(), "-a alias1".to_string());
+
         let mut seen = std::collections::HashSet::new();
         let result = config.resolve_alias("alias1", &mut seen, 0);
-        
+
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Circular dependency"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Circular dependency"));
     }
 
     #[test]
     fn test_process_args() {
         let mut config = ConfigFile::default();
-        config.aliases.insert("errors".to_string(), "--filter 'level == \"error\"' --stats".to_string());
-        
+        config.aliases.insert(
+            "errors".to_string(),
+            "--filter 'level == \"error\"' --stats".to_string(),
+        );
+
         let args = vec![
             "kelora".to_string(),
             "-a".to_string(),
@@ -302,13 +336,19 @@ mod tests {
             "--format".to_string(),
             "jsonl".to_string(),
         ];
-        
+
         let processed = config.process_args(args).unwrap();
-        
-        assert_eq!(processed, vec![
-            "kelora",
-            "--filter", "level == \"error\"", "--stats",
-            "--format", "jsonl"
-        ]);
+
+        assert_eq!(
+            processed,
+            vec![
+                "kelora",
+                "--filter",
+                "level == \"error\"",
+                "--stats",
+                "--format",
+                "jsonl"
+            ]
+        );
     }
 }

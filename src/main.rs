@@ -99,6 +99,12 @@ pub struct Cli {
     #[arg(long = "end", help_heading = "Processing Options")]
     pub end: Option<String>,
 
+    /// Enable access to a sliding window of N+1 recent events.
+    /// Scripts can use `window[0]` (current event), `window[1]` (previous), etc.
+    /// Window functions: `window_values(field)`, `window_numbers(field)`
+    #[arg(long = "window", help_heading = "Processing Options")]
+    pub window_size: Option<usize>,
+
     /// Error handling strategy
     #[arg(
         long = "on-error",
@@ -822,33 +828,31 @@ fn validate_config(config: &KeloraConfig) -> Result<()> {
 fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
     // Get raw command line arguments
     let raw_args: Vec<String> = std::env::args().collect();
-    
+
     // Check for --show-config first, before any other processing
     if raw_args.iter().any(|arg| arg == "--show-config") {
         ConfigFile::show_config();
         std::process::exit(0);
     }
-    
+
     // Check for --ignore-config
     let ignore_config = raw_args.iter().any(|arg| arg == "--ignore-config");
-    
+
     let processed_args = if ignore_config {
         // Skip config file processing
         raw_args
     } else {
         // Load config file and process aliases
         match ConfigFile::load() {
-            Ok(config_file) => {
-                match config_file.process_args(raw_args) {
-                    Ok(processed) => processed,
-                    Err(e) => {
-                        stderr
-                            .writeln(&format!("kelora: Config error: {}", e))
-                            .unwrap_or(());
-                        std::process::exit(1);
-                    }
+            Ok(config_file) => match config_file.process_args(raw_args) {
+                Ok(processed) => processed,
+                Err(e) => {
+                    stderr
+                        .writeln(&format!("kelora: Config error: {}", e))
+                        .unwrap_or(());
+                    std::process::exit(1);
                 }
-            }
+            },
             Err(e) => {
                 stderr
                     .writeln(&format!("kelora: Config file error: {}", e))
@@ -857,7 +861,7 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
             }
         }
     };
-    
+
     // Parse with potentially modified arguments
     let matches = Cli::command().get_matches_from(processed_args);
     let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| {
@@ -866,7 +870,7 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
             .unwrap_or(());
         std::process::exit(1);
     });
-    
+
     // Apply config file defaults to CLI if not ignoring config
     let cli = if ignore_config {
         cli
@@ -876,7 +880,7 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
             Err(_) => cli, // Already handled error above
         }
     };
-    
+
     (matches, cli)
 }
 
@@ -884,7 +888,7 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
 fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
     // Apply defaults only if the CLI value is still at its default
     // This ensures CLI arguments take precedence over config file
-    
+
     if let Some(format) = config_file.defaults.get("input_format") {
         // Only apply if format is still at default ("line")
         if matches!(cli.format, crate::InputFormat::Line) {
@@ -901,7 +905,7 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
             };
         }
     }
-    
+
     if let Some(output_format) = config_file.defaults.get("output_format") {
         if matches!(cli.output_format, crate::OutputFormat::Default) {
             cli.output_format = match output_format.as_str() {
@@ -913,7 +917,7 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
             };
         }
     }
-    
+
     if let Some(on_error) = config_file.defaults.get("on_error") {
         if matches!(cli.on_error, crate::ErrorStrategy::Print) {
             cli.on_error = match on_error.as_str() {
@@ -925,7 +929,7 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
             };
         }
     }
-    
+
     if let Some(file_order) = config_file.defaults.get("file_order") {
         if matches!(cli.file_order, crate::FileOrder::None) {
             cli.file_order = match file_order.as_str() {
@@ -936,56 +940,56 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
             };
         }
     }
-    
+
     // Apply boolean flags from config if they weren't explicitly set
     if let Some(parallel) = config_file.defaults.get("parallel") {
         if !cli.parallel && parallel.parse::<bool>().unwrap_or(false) {
             cli.parallel = true;
         }
     }
-    
+
     if let Some(core) = config_file.defaults.get("core") {
         if !cli.core && core.parse::<bool>().unwrap_or(false) {
             cli.core = true;
         }
     }
-    
+
     if let Some(brief) = config_file.defaults.get("brief") {
         if !cli.brief && brief.parse::<bool>().unwrap_or(false) {
             cli.brief = true;
         }
     }
-    
+
     if let Some(summary) = config_file.defaults.get("summary") {
         if !cli.summary && summary.parse::<bool>().unwrap_or(false) {
             cli.summary = true;
         }
     }
-    
+
     if let Some(stats) = config_file.defaults.get("stats") {
         if !cli.stats && stats.parse::<bool>().unwrap_or(false) {
             cli.stats = true;
         }
     }
-    
+
     if let Some(no_emoji) = config_file.defaults.get("no_emoji") {
         if !cli.no_emoji && no_emoji.parse::<bool>().unwrap_or(false) {
             cli.no_emoji = true;
         }
     }
-    
+
     if let Some(force_color) = config_file.defaults.get("force_color") {
         if !cli.force_color && force_color.parse::<bool>().unwrap_or(false) {
             cli.force_color = true;
         }
     }
-    
+
     if let Some(no_color) = config_file.defaults.get("no_color") {
         if !cli.no_color && no_color.parse::<bool>().unwrap_or(false) {
             cli.no_color = true;
         }
     }
-    
+
     // Apply numeric values
     if let Some(threads) = config_file.defaults.get("threads") {
         if cli.threads == 0 {
@@ -994,7 +998,7 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
             }
         }
     }
-    
+
     if let Some(batch_size) = config_file.defaults.get("batch_size") {
         if cli.batch_size.is_none() {
             if let Ok(size) = batch_size.parse::<usize>() {
@@ -1002,82 +1006,98 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
             }
         }
     }
-    
+
     if let Some(batch_timeout) = config_file.defaults.get("batch_timeout") {
-        if cli.batch_timeout == 200 { // default value
+        if cli.batch_timeout == 200 {
+            // default value
             if let Ok(timeout) = batch_timeout.parse::<u64>() {
                 cli.batch_timeout = timeout;
             }
         }
     }
-    
+
     // Apply string values
     if let Some(ignore_lines) = config_file.defaults.get("ignore_lines") {
         if cli.ignore_lines.is_none() {
             cli.ignore_lines = Some(ignore_lines.clone());
         }
     }
-    
+
     if let Some(multiline) = config_file.defaults.get("multiline") {
         if cli.multiline.is_none() {
             cli.multiline = Some(multiline.clone());
         }
     }
-    
+
     if let Some(begin) = config_file.defaults.get("begin") {
         if cli.begin.is_none() {
             cli.begin = Some(begin.clone());
         }
     }
-    
+
     if let Some(end) = config_file.defaults.get("end") {
         if cli.end.is_none() {
             cli.end = Some(end.clone());
         }
     }
-    
+
     if let Some(inject_prefix) = config_file.defaults.get("inject_prefix") {
         if cli.inject_prefix.is_none() {
             cli.inject_prefix = Some(inject_prefix.clone());
         }
     }
-    
+
     // Apply list values (only if CLI lists are empty)
     if let Some(filters) = config_file.defaults.get("filters") {
         if cli.filters.is_empty() {
             cli.filters = filters.split(',').map(|s| s.trim().to_string()).collect();
         }
     }
-    
+
     if let Some(execs) = config_file.defaults.get("execs") {
         if cli.execs.is_empty() {
             cli.execs = execs.split(',').map(|s| s.trim().to_string()).collect();
         }
     }
-    
+
     if let Some(levels) = config_file.defaults.get("levels") {
         if cli.levels.is_empty() {
             cli.levels = levels.split(',').map(|s| s.trim().to_string()).collect();
         }
     }
-    
+
     if let Some(exclude_levels) = config_file.defaults.get("exclude_levels") {
         if cli.exclude_levels.is_empty() {
-            cli.exclude_levels = exclude_levels.split(',').map(|s| s.trim().to_string()).collect();
+            cli.exclude_levels = exclude_levels
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .collect();
         }
     }
-    
+
     if let Some(keys) = config_file.defaults.get("keys") {
         if cli.keys.is_empty() {
             cli.keys = keys.split(',').map(|s| s.trim().to_string()).collect();
         }
     }
-    
+
     if let Some(exclude_keys) = config_file.defaults.get("exclude_keys") {
         if cli.exclude_keys.is_empty() {
-            cli.exclude_keys = exclude_keys.split(',').map(|s| s.trim().to_string()).collect();
+            cli.exclude_keys = exclude_keys
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .collect();
         }
     }
-    
+
+    // Apply window_size from config if not explicitly set
+    if let Some(window_size) = config_file.defaults.get("window_size") {
+        if cli.window_size.is_none() {
+            if let Ok(size) = window_size.parse::<usize>() {
+                cli.window_size = Some(size);
+            }
+        }
+    }
+
     cli
 }

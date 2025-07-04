@@ -468,11 +468,19 @@ mod tests {
     #[test]
     fn test_parse_timestamp_with_timezone() {
         // Test parsing with valid timezone
-        let result = parse_timestamp("2023-07-04 12:34:56", Some("%Y-%m-%d %H:%M:%S"), Some("UTC"));
+        let result = parse_timestamp(
+            "2023-07-04 12:34:56",
+            Some("%Y-%m-%d %H:%M:%S"),
+            Some("UTC"),
+        );
         assert!(result.is_ok());
 
         // Test parsing with invalid timezone
-        let result = parse_timestamp("2023-07-04 12:34:56", Some("%Y-%m-%d %H:%M:%S"), Some("INVALID"));
+        let result = parse_timestamp(
+            "2023-07-04 12:34:56",
+            Some("%Y-%m-%d %H:%M:%S"),
+            Some("INVALID"),
+        );
         assert!(result.is_err());
     }
 

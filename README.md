@@ -29,6 +29,12 @@ kubectl logs app | kelora -f jsonl --filter 'level == "error"' -F text
 
 # Process compressed log files (automatic decompression)
 kelora -f jsonl app.log.1.gz --filter 'status >= 400'
+
+# Window-based event correlation (analyze recent events together)
+kelora -f jsonl --window 3 --exec 'let statuses = window_values(window, "status"); print("Recent statuses: " + statuses.len())' logs.jsonl
+
+# Detect patterns across event history
+kelora -f jsonl --window 2 --filter 'window.len() > 1 && window[1].status == "404" && status == "500"' logs.jsonl
 ```
 
 ---
@@ -40,6 +46,7 @@ kelora -f jsonl app.log.1.gz --filter 'status >= 400'
 * Supports JSON, logfmt, syslog, and raw lines
 * Uses [Rhai](https://rhai.rs/), a simple JavaScript-like language, to filter, mutate, and analyze logs
 * Includes built-in global state tracking (`track_*`)
+* Sliding window functionality for event correlation and pattern detection
 * Supports parallel and streaming modes
 * Automatic gzip decompression for `.gz` files
 * Multiple input file support with flexible ordering options
@@ -75,6 +82,12 @@ let is_num = field.is_digit();               // Check if all digits
 // Basic regex extraction
 let user = line.extract_re("user=(\\w+)");   // Extract first group
 let ip = line.extract_ip();                  // Extract first IP address
+
+// Window-based analysis (with --window N)
+let prev_statuses = window_values(window, "status");  // ["200", "404"] 
+let response_times = window_numbers(window, "time");  // [0.15, 0.23]
+let current = window[0];                             // Current event
+let previous = window[1];                            // Previous event
 ```
 
 Available variables:
@@ -83,6 +96,7 @@ Available variables:
 * `line` — original line text
 * `tracked` — global metrics state
 * `meta.linenum` — current line number
+* `window` — array of recent events (with `--window N`)
 
 ---
 
@@ -93,6 +107,7 @@ Available variables:
 * Real-time `kubectl logs` processing
 * Streaming one-liner data pipelines
 * Field selection, tagging, and global stats
+* Event correlation and pattern detection across log history
 * Processing compressed log files with automatic decompression
 
 ---
@@ -129,6 +144,7 @@ cargo install --path .
 | `--filter`      | Rhai filter expression (repeatable)    |
 | `--exec`        | Rhai exec scripts (repeatable)         |
 | `--exec-file`   | Execute Rhai script from file (repeatable) |
+| `--window`      | Enable sliding window of N+1 recent events |
 | `--begin/--end` | Logic before/after stream              |
 | `--on-error`    | Strategy: skip, print, abort, stub |
 | `--parallel`    | Enable parallel batch mode             |

@@ -593,6 +593,52 @@ impl RhaiEngine {
         Ok(())
     }
 
+    // Window-aware execution methods
+    pub fn execute_compiled_filter_with_window(
+        &mut self,
+        compiled: &CompiledExpression,
+        event: &Event,
+        window: &[Event],
+        tracked: &mut HashMap<String, Dynamic>,
+    ) -> Result<bool> {
+        Self::set_thread_tracking_state(tracked);
+        let mut scope = self.create_scope_for_event_with_window(event, window);
+
+        let result = self
+            .engine
+            .eval_expression_with_scope::<bool>(&mut scope, &compiled.expr)
+            .map_err(|e| {
+                let detailed_msg = Self::format_rhai_error(e, "filter expression", &compiled.expr);
+                anyhow::anyhow!("{}", detailed_msg)
+            })?;
+
+        *tracked = Self::get_thread_tracking_state();
+        Ok(result)
+    }
+
+    pub fn execute_compiled_exec_with_window(
+        &mut self,
+        compiled: &CompiledExpression,
+        event: &mut Event,
+        window: &[Event],
+        tracked: &mut HashMap<String, Dynamic>,
+    ) -> Result<()> {
+        Self::set_thread_tracking_state(tracked);
+        let mut scope = self.create_scope_for_event_with_window(event, window);
+
+        let _ = self
+            .engine
+            .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
+            .map_err(|e| {
+                let detailed_msg = Self::format_rhai_error(e, "exec script", &compiled.expr);
+                anyhow::anyhow!("{}", detailed_msg)
+            })?;
+
+        self.update_event_from_scope(event, &scope);
+        *tracked = Self::get_thread_tracking_state();
+        Ok(())
+    }
+
     fn create_scope_for_event(&self, event: &Event) -> Scope {
         let mut scope = self.scope_template.clone();
 
@@ -626,6 +672,34 @@ impl RhaiEngine {
         scope
     }
 
+    fn create_scope_for_event_with_window(&self, event: &Event, window: &[Event]) -> Scope {
+        let mut scope = self.create_scope_for_event(event);
+
+        // Add window array to scope
+        let window_array: rhai::Array = window
+            .iter()
+            .map(|event| {
+                let mut event_map = rhai::Map::new();
+                // Add all event fields to the map
+                for (k, v) in &event.fields {
+                    event_map.insert(k.clone().into(), v.clone());
+                }
+                // Add built-in fields
+                event_map.insert("line".into(), Dynamic::from(event.original_line.clone()));
+                if let Some(line_num) = event.line_number {
+                    event_map.insert("line_number".into(), Dynamic::from(line_num as i64));
+                }
+                if let Some(filename) = &event.filename {
+                    event_map.insert("filename".into(), Dynamic::from(filename.clone()));
+                }
+                Dynamic::from(event_map)
+            })
+            .collect();
+
+        scope.set_value("window", window_array);
+        scope
+    }
+
     fn update_event_from_scope(&self, event: &mut Event, scope: &Scope) {
         // Capture mutations made directly to the `event` map
         if let Some(obj) = scope.get_value::<Map>("event") {
@@ -636,7 +710,7 @@ impl RhaiEngine {
 
         // Also include top-level vars (e.g. `let x = ...`)
         for (name, _constant, value) in scope.iter() {
-            if name != "line" && name != "event" && name != "meta" {
+            if name != "line" && name != "event" && name != "meta" && name != "window" {
                 event.fields.insert(name.to_string(), value.clone());
             }
         }
