@@ -141,6 +141,27 @@ seq 1 1000000 | ./target/release/kelora --filter "line.to_int() % 1000 == 0" --s
 ./target/release/kelora -f jsonl app.log --ignore-lines "^#.*|^$"           # Skip comments and empty lines
 ./target/release/kelora -f line /var/log/syslog --ignore-lines "systemd.*"  # Skip systemd messages
 ./target/release/kelora -f csv data.csv --ignore-lines "^\"?Date"          # Skip CSV header lines
+
+# DateTime and duration processing
+./target/release/kelora -f jsonl access.log --exec "let dt = parse_timestamp(timestamp); if dt.hour() >= 9 && dt.hour() <= 17 { print('Business hours') }"
+
+# Parse custom timestamp formats
+./target/release/kelora -f line app.log --exec "let dt = parse_timestamp(line.before(' '), '%Y/%m/%d-%H:%M:%S'); print(dt.format('%Y-%m-%d %H:%M:%S'))"
+
+# Filter by time ranges
+./target/release/kelora -f jsonl app.log --filter "parse_timestamp(timestamp) > parse_timestamp('2023-07-04T00:00:00Z')"
+
+# Performance analysis with durations
+./target/release/kelora -f jsonl api.log --exec "let dur = parse_duration(response_time); if dur > duration_from_seconds(5) { print('Slow: ' + dur.as_seconds() + 's') }"
+
+# Time-based log aggregation
+./target/release/kelora -f jsonl access.log --exec "let dt = parse_timestamp(timestamp); track_count('hour_' + dt.format('%H'))" --summary
+
+# Calculate request duration from start/end times  
+./target/release/kelora -f jsonl requests.log --exec "let start = parse_timestamp(start_time); let end = parse_timestamp(end_time); let duration = end - start; print('Duration: ' + duration.as_milliseconds() + 'ms')"
+
+# Timezone conversion for global logs
+./target/release/kelora -f jsonl global.log --exec "let utc_time = parse_timestamp(timestamp).to_utc(); print('UTC: ' + utc_time.format('%Y-%m-%d %H:%M:%S %Z'))"
 ```
 
 ## CLI Help Organization
@@ -325,4 +346,98 @@ let missing_num = get_path(json_str, "user.invalid[99]", 0);       // 0
 // Common use case with log events
 let user_data = get_path(user, "profile.settings.theme", "light"); // Extract theme with fallback
 let error_count = get_path(metrics, "errors.count", 0);            // Extract error count with 0 default
+```
+
+#### DateTime and Duration Functions
+
+**Timestamp Parsing:**
+- `parse_timestamp(s)` - Parse timestamp with automatic format detection
+- `parse_timestamp(s, format)` - Parse with explicit format string
+- `parse_timestamp(s, format, timezone)` - Parse with format and timezone
+
+**Current Time:**
+- `now_utc()` - Get current UTC time
+- `now_local()` - Get current local time
+
+**Duration Creation:**
+- `duration_from_seconds(n)` - Create duration from seconds
+- `duration_from_minutes(n)` - Create duration from minutes  
+- `duration_from_hours(n)` - Create duration from hours
+- `duration_from_days(n)` - Create duration from days
+- `duration_from_milliseconds(n)` - Create duration from milliseconds
+- `duration_from_nanoseconds(n)` - Create duration from nanoseconds
+- `parse_duration(s)` - Parse human-readable duration ("1h 30m", "2d", etc.)
+
+**DateTime Methods:**
+- `dt.year()`, `dt.month()`, `dt.day()` - Get date components
+- `dt.hour()`, `dt.minute()`, `dt.second()` - Get time components
+- `dt.timestamp_nanos()` - Get Unix timestamp in nanoseconds
+- `dt.timezone_name()` - Get timezone name
+- `dt.format(fmt)` - Format using strftime format
+- `dt.to_utc()` - Convert to UTC timezone
+- `dt.to_local()` - Convert to local timezone
+- `dt.to_timezone(tz)` - Convert to specific timezone
+
+**Duration Methods:**
+- `dur.as_seconds()`, `dur.as_minutes()`, `dur.as_hours()`, `dur.as_days()` - Convert to different units
+- `dur.as_milliseconds()`, `dur.as_nanoseconds()` - High precision conversions
+
+**Arithmetic and Comparison:**
+- `dt + dur`, `dt - dur` - Add/subtract duration from datetime
+- `dt1 - dt2` - Get duration between datetimes (always positive)
+- `dur1 + dur2`, `dur1 - dur2` - Duration arithmetic (always positive results)
+- `dur * n`, `dur / n` - Duration multiplication/division
+- All comparison operators work on both datetime and duration types
+
+Examples:
+```rhai
+// Parse various timestamp formats (automatic detection)
+let dt1 = parse_timestamp("2023-07-04T12:34:56Z");           // ISO 8601
+let dt2 = parse_timestamp("04/Jul/2023:12:34:56 +0000");     // Apache logs
+let dt3 = parse_timestamp("2023-07-04 12:34:56");           // Common format
+
+// Parse with explicit format and timezone
+let dt4 = parse_timestamp("2023/07/04 12:34:56", "%Y/%m/%d %H:%M:%S", "UTC");
+
+// Duration parsing and creation
+let dur1 = parse_duration("1h 30m");                        // 90 minutes
+let dur2 = parse_duration("2d 3h 45m");                     // Complex duration
+let dur3 = duration_from_hours(2);                          // 2 hours
+
+// DateTime component access
+let year = dt1.year();                                       // 2023
+let formatted = dt1.format("%Y-%m-%d %H:%M:%S");           // "2023-07-04 12:34:56"
+
+// Timezone conversions
+let utc_time = dt1.to_utc();
+let pst_time = dt1.to_timezone("America/Los_Angeles");
+
+// Duration operations
+let minutes = dur1.as_minutes();                            // 90
+let seconds = dur1.as_seconds();                            // 5400
+
+// Arithmetic operations
+let end_time = dt1 + dur1;                                  // Add 1h 30m to datetime
+let duration_between = dt2 - dt1;                          // Duration between times
+let double_dur = dur1 * 2;                                 // 3 hours
+let half_dur = dur1 / 2;                                   // 45 minutes
+
+// Time-based log analysis
+let request_time = parse_timestamp(timestamp);
+let process_duration = parse_duration(elapsed);
+let end_time = request_time + process_duration;
+
+// Filter by time ranges
+if request_time > parse_timestamp("2023-07-04T00:00:00Z") {
+    print("Recent request");
+}
+
+// Performance analysis
+if process_duration > duration_from_seconds(5) {
+    print("Slow request: " + process_duration.as_seconds() + "s");
+}
+
+// Time bucketing for analysis
+let hour_bucket = request_time.format("%Y-%m-%d %H:00:00");
+track_count("requests_by_hour_" + hour_bucket);
 ```

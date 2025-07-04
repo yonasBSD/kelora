@@ -1,6 +1,7 @@
 use rhai::Engine;
 
 pub mod columns;
+pub mod datetime;
 pub mod maps;
 pub mod strings;
 pub mod tracking;
@@ -10,4 +11,5 @@ pub fn register_all_functions(engine: &mut Engine) {
     tracking::register_functions(engine);
     columns::register_functions(engine);
     maps::register_functions(engine);
+    datetime::register_functions(engine);
 }
