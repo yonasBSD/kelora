@@ -87,6 +87,31 @@ make test-full          # Comprehensive test suite
 # Create custom level field and filter by it
 ./target/release/kelora -f line app.log --exec 'let level = line.before(":")' --levels ERROR,WARN
 
+# Multi-line log event processing
+# ⚠️  IMPORTANT: Multi-line mode buffers events until complete. In streaming scenarios,
+# the last event may not appear until the next event starts.
+
+# Group Java/Python stack traces by indentation
+./target/release/kelora -f line app.log --multiline indent --filter 'line.contains("Exception")'
+
+# Group syslog entries by timestamp (handles continuation lines)
+./target/release/kelora -f syslog /var/log/syslog --multiline timestamp
+
+# Group log entries starting with timestamp pattern
+./target/release/kelora -f line app.log --multiline timestamp:pattern=^\d{4}-\d{2}-\d{2}
+
+# Group lines that end with backslash continuation
+./target/release/kelora -f line config.log --multiline backslash
+
+# Group events starting with ERROR keyword
+./target/release/kelora -f line debug.log --multiline start:^ERROR
+
+# Group events ending with semicolon
+./target/release/kelora -f line sql.log --multiline end:;$
+
+# For immediate output without buffering (streaming-friendly), omit --multiline entirely
+./target/release/kelora -f line app.log
+
 # Extract columns using integer syntax (cleaner than string selectors)
 ./target/release/kelora -f line access.log --exec "let user_name=line.col(1,2)" --filter "user_name != ''"
 ./target/release/kelora -f csv access.csv --exec "let fields=line.cols(0,2,4)" --filter "fields[1] != ''"

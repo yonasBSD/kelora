@@ -8,11 +8,13 @@ use crate::event::Event;
 // Re-export submodules
 pub mod builders;
 pub mod defaults;
+pub mod multiline;
 pub mod stages;
 
 // Re-export main types for convenience
 pub use builders::*;
 pub use defaults::*;
+pub use multiline::*;
 pub use stages::*;
 
 /// Core pipeline result types

@@ -17,6 +17,7 @@ pub struct InputConfig {
     pub format: InputFormat,
     pub file_order: FileOrder,
     pub ignore_lines: Option<regex::Regex>,
+    pub multiline: Option<MultilineConfig>,
 }
 
 /// Output configuration
@@ -109,6 +110,185 @@ pub enum ColorMode {
     Auto,
     Always,
     Never,
+}
+
+/// Multi-line event detection configuration
+#[derive(Debug, Clone)]
+pub struct MultilineConfig {
+    pub strategy: MultilineStrategy,
+}
+
+/// Multi-line event detection strategies
+#[derive(Debug, Clone)]
+pub enum MultilineStrategy {
+    /// Events start with timestamp pattern
+    Timestamp { pattern: String },
+    /// Continuation lines are indented
+    Indent {
+        spaces: Option<u32>,
+        tabs: bool,
+        mixed: bool,
+    },
+    /// Lines end with continuation character
+    Backslash { char: char },
+    /// Events start with pattern
+    Start { pattern: String },
+    /// Events end with pattern
+    End { pattern: String },
+    /// Events have both start and end boundaries
+    Boundary { start: String, end: String },
+}
+
+impl MultilineConfig {
+    /// Parse multiline configuration from CLI string
+    pub fn parse(value: &str) -> Result<Self, String> {
+        let parts: Vec<&str> = value.split(':').collect();
+
+        if parts.is_empty() {
+            return Err("Empty multiline configuration".to_string());
+        }
+
+        let strategy_name = parts[0];
+        let strategy = match strategy_name {
+            "timestamp" => {
+                let pattern = if parts.len() > 1 {
+                    Self::parse_pattern_option(parts[1])?
+                } else {
+                    // Default timestamp patterns (ISO and syslog) - both anchored to start
+                    r"^(\d{4}-\d{2}-\d{2}|\w{3}\s+\d{1,2})".to_string()
+                };
+                MultilineStrategy::Timestamp { pattern }
+            }
+            "indent" => {
+                let (spaces, tabs, mixed) = if parts.len() > 1 {
+                    Self::parse_indent_options(parts[1])?
+                } else {
+                    (None, false, true) // Default: any whitespace
+                };
+                MultilineStrategy::Indent {
+                    spaces,
+                    tabs,
+                    mixed,
+                }
+            }
+            "backslash" => {
+                let char = if parts.len() > 1 {
+                    Self::parse_char_option(parts[1])?
+                } else {
+                    '\\' // Default backslash
+                };
+                MultilineStrategy::Backslash { char }
+            }
+            "start" => {
+                if parts.len() < 2 {
+                    return Err("Start strategy requires pattern: start:REGEX".to_string());
+                }
+                let pattern = parts[1].to_string();
+                MultilineStrategy::Start { pattern }
+            }
+            "end" => {
+                if parts.len() < 2 {
+                    return Err("End strategy requires pattern: end:REGEX".to_string());
+                }
+                let pattern = parts[1].to_string();
+                MultilineStrategy::End { pattern }
+            }
+            "boundary" => {
+                if parts.len() < 2 {
+                    return Err(
+                        "Boundary strategy requires start and end: boundary:start=REGEX:end=REGEX"
+                            .to_string(),
+                    );
+                }
+                let (start, end) = Self::parse_boundary_options(&parts[1..])?;
+                MultilineStrategy::Boundary { start, end }
+            }
+            _ => return Err(format!("Unknown multiline strategy: {}", strategy_name)),
+        };
+
+        Ok(MultilineConfig { strategy })
+    }
+
+    fn parse_pattern_option(option: &str) -> Result<String, String> {
+        if let Some(pattern) = option.strip_prefix("pattern=") {
+            Ok(pattern.to_string())
+        } else {
+            Err(format!("Invalid timestamp option: {}", option))
+        }
+    }
+
+    fn parse_indent_options(option: &str) -> Result<(Option<u32>, bool, bool), String> {
+        match option {
+            "tabs" => Ok((None, true, false)),
+            "mixed" => Ok((None, false, true)),
+            option if option.starts_with("spaces=") => {
+                let spaces_str = &option[7..];
+                match spaces_str.parse::<u32>() {
+                    Ok(n) => Ok((Some(n), false, false)),
+                    Err(_) => Err(format!("Invalid spaces value: {}", spaces_str)),
+                }
+            }
+            _ => Err(format!("Invalid indent option: {}", option)),
+        }
+    }
+
+    fn parse_char_option(option: &str) -> Result<char, String> {
+        if let Some(char_str) = option.strip_prefix("char=") {
+            if char_str.len() == 1 {
+                Ok(char_str.chars().next().unwrap())
+            } else {
+                Err(format!(
+                    "Continuation character must be single character: {}",
+                    char_str
+                ))
+            }
+        } else {
+            Err(format!("Invalid backslash option: {}", option))
+        }
+    }
+
+    fn parse_boundary_options(parts: &[&str]) -> Result<(String, String), String> {
+        let mut start = None;
+        let mut end = None;
+
+        for part in parts {
+            if let Some(start_pattern) = part.strip_prefix("start=") {
+                start = Some(start_pattern.to_string());
+            } else if let Some(end_pattern) = part.strip_prefix("end=") {
+                end = Some(end_pattern.to_string());
+            } else {
+                return Err(format!("Invalid boundary option: {}", part));
+            }
+        }
+
+        match (start, end) {
+            (Some(s), Some(e)) => Ok((s, e)),
+            _ => Err("Boundary strategy requires both start=REGEX and end=REGEX".to_string()),
+        }
+    }
+}
+
+impl Default for MultilineConfig {
+    fn default() -> Self {
+        Self {
+            strategy: MultilineStrategy::Timestamp {
+                pattern: r"^(\d{4}-\d{2}-\d{2}|\w{3}\s+\d{1,2})".to_string(),
+            },
+        }
+    }
+}
+
+impl InputFormat {
+    /// Get default multiline configuration for this input format
+    ///
+    /// NOTE: Multiline processing is disabled by default for all formats
+    /// to avoid unexpected buffering behavior in streaming scenarios.
+    /// Users must explicitly enable multiline with --multiline option.
+    pub fn default_multiline(&self) -> Option<MultilineConfig> {
+        // Multiline is now strictly opt-in for all formats to avoid
+        // unexpected "last event buffering" behavior in streaming scenarios
+        None
+    }
 }
 
 impl KeloraConfig {
@@ -211,7 +391,11 @@ impl KeloraConfig {
 
         // Rows (no header)
         for (key, value) in user_values {
-            result.push_str(&self.format_summary_line(&format!("{:<key_width$} {}", key, format_tracked_value(value))));
+            result.push_str(&self.format_summary_line(&format!(
+                "{:<key_width$} {}",
+                key,
+                format_tracked_value(value)
+            )));
             result.push('\n');
         }
 
@@ -265,6 +449,7 @@ impl KeloraConfig {
                 format: cli.format.clone().into(),
                 file_order: cli.file_order.clone().into(),
                 ignore_lines: None, // Will be set after CLI parsing
+                multiline: None,    // Will be set after CLI parsing
             },
             output: OutputConfig {
                 format: cli.output_format.clone().into(),
@@ -327,6 +512,7 @@ impl Default for KeloraConfig {
                 format: InputFormat::Jsonl,
                 file_order: FileOrder::None,
                 ignore_lines: None,
+                multiline: None,
             },
             output: OutputConfig {
                 format: OutputFormat::Default,
@@ -490,7 +676,7 @@ fn format_tracked_value(value: &Dynamic) -> String {
                     .collect();
                 pairs.sort();
                 let result = format!("{{{}}}", pairs.join(", "));
-                
+
                 // Truncate very long maps to keep output readable
                 if result.len() > 120 {
                     format!("{}...}}", &result[..117])
@@ -505,4 +691,3 @@ fn format_tracked_value(value: &Dynamic) -> String {
         value.to_string()
     }
 }
-

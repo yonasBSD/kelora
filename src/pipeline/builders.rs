@@ -4,9 +4,9 @@ use std::fs;
 use std::io::{self, BufRead};
 
 use super::{
-    BeginStage, EndStage, EventLimiter, EventParser, ExecStage, FilterStage, Formatter,
-    KeyFilterStage, LevelFilterStage, MetaData, Pipeline, PipelineConfig, PipelineContext,
-    ScriptStage, SimpleChunker, SimpleWindowManager, StdoutWriter, TakeNLimiter,
+    create_multiline_chunker, BeginStage, EndStage, EventLimiter, EventParser, ExecStage,
+    FilterStage, Formatter, KeyFilterStage, LevelFilterStage, MetaData, Pipeline, PipelineConfig,
+    PipelineContext, ScriptStage, SimpleChunker, SimpleWindowManager, StdoutWriter, TakeNLimiter,
 };
 use crate::decompression::DecompressionReader;
 use crate::engine::RhaiEngine;
@@ -25,6 +25,7 @@ pub struct PipelineBuilder {
     exclude_keys: Vec<String>,
     levels: Vec<String>,
     exclude_levels: Vec<String>,
+    multiline: Option<crate::config::MultilineConfig>,
 }
 
 impl PipelineBuilder {
@@ -46,6 +47,7 @@ impl PipelineBuilder {
             exclude_keys: Vec::new(),
             levels: Vec::new(),
             exclude_levels: Vec::new(),
+            multiline: None,
         }
     }
 
@@ -140,10 +142,18 @@ impl PipelineBuilder {
             meta: MetaData::default(),
         };
 
+        // Create chunker based on multiline configuration
+        let chunker = if let Some(ref multiline_config) = self.multiline {
+            create_multiline_chunker(multiline_config)
+                .map_err(|e| anyhow::anyhow!("Failed to create multiline chunker: {}", e))?
+        } else {
+            Box::new(SimpleChunker) as Box<dyn super::Chunker>
+        };
+
         // Create pipeline
         let pipeline = Pipeline {
             line_filter: None, // No line filter implementation yet
-            chunker: Box::new(SimpleChunker),
+            chunker,
             parser,
             script_stages,
             limiter,
@@ -259,10 +269,18 @@ impl PipelineBuilder {
             meta: MetaData::default(),
         };
 
+        // Create chunker based on multiline configuration
+        let chunker = if let Some(ref multiline_config) = self.multiline {
+            create_multiline_chunker(multiline_config)
+                .map_err(|e| anyhow::anyhow!("Failed to create multiline chunker: {}", e))?
+        } else {
+            Box::new(SimpleChunker) as Box<dyn super::Chunker>
+        };
+
         // Create worker pipeline (no output writer - results are collected by the processor)
         let pipeline = Pipeline {
             line_filter: None,
-            chunker: Box::new(SimpleChunker),
+            chunker,
             parser,
             script_stages,
             limiter,
@@ -311,6 +329,7 @@ pub fn create_pipeline_builder_from_config(
     builder.exclude_keys = config.output.exclude_keys.clone();
     builder.levels = config.processing.levels.clone();
     builder.exclude_levels = config.processing.exclude_levels.clone();
+    builder.multiline = config.input.multiline.clone();
     builder
 }
 

@@ -68,6 +68,15 @@ pub struct Cli {
     #[arg(long = "ignore-lines", help_heading = "Input Options")]
     pub ignore_lines: Option<String>,
 
+    /// Multi-line event detection strategy
+    #[arg(
+        short = 'M',
+        long = "multiline",
+        help_heading = "Input Options",
+        long_help = "Multi-line event detection strategy and options\n\n⚠️  IMPORTANT: Multiline mode buffers input lines until events are complete.\nIn streaming scenarios (like tail -f), the last event may not appear until\nthe next event starts. This is expected behavior, not a bug.\n\nStrategies:\n  timestamp[:pattern=REGEX]        Events start with timestamp\n  indent[:spaces=N|tabs|mixed]     Continuation by indentation\n  backslash[:char=C]               Continuation by end character\n  start:REGEX                      Events start with pattern\n  end:REGEX                        Events end with pattern\n  boundary:start=REGEX:end=REGEX   Events have start/end boundaries\n\nCommon patterns:\n  --multiline timestamp                    # ISO/syslog timestamps\n  --multiline timestamp:pattern=^ERROR     # Lines starting with ERROR\n  --multiline indent                       # Stack traces, indented logs\n\nFor immediate output without buffering, omit the --multiline option entirely."
+    )]
+    pub multiline: Option<String>,
+
     /// Run once before processing
     #[arg(long = "begin", help_heading = "Processing Options")]
     pub begin: Option<String>,
@@ -349,6 +358,27 @@ fn main() -> Result<()> {
         }
     }
 
+    // Parse multiline configuration if provided, or apply format defaults
+    if let Some(multiline_str) = &cli.multiline {
+        match config::MultilineConfig::parse(multiline_str) {
+            Ok(multiline_config) => {
+                config.input.multiline = Some(multiline_config);
+            }
+            Err(e) => {
+                stderr
+                    .writeln(&config.format_error_message(&format!(
+                        "Invalid multiline configuration '{}': {}",
+                        multiline_str, e
+                    )))
+                    .unwrap_or(());
+                ExitCode::InvalidUsage.exit();
+            }
+        }
+    } else {
+        // Apply format-specific default multiline configuration
+        config.input.multiline = config.input.format.default_multiline();
+    }
+
     // Validate arguments early
     if let Err(e) = validate_cli_args(&cli) {
         stderr
@@ -390,9 +420,7 @@ fn main() -> Result<()> {
                 .writeln(&config.format_summary_message(""))
                 .unwrap_or(());
             for line in summary_lines.lines() {
-                stderr
-                    .writeln(line)
-                    .unwrap_or(());
+                stderr.writeln(line).unwrap_or(());
             }
         }
 
@@ -528,9 +556,7 @@ fn run_parallel(
             .writeln(&config.format_summary_message(""))
             .unwrap_or(());
         for line in summary_lines.lines() {
-            stderr
-                .writeln(line)
-                .unwrap_or(());
+            stderr.writeln(line).unwrap_or(());
         }
     }
 
