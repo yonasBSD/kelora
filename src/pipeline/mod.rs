@@ -143,7 +143,24 @@ impl Pipeline {
         if let Some(chunk) = self.chunker.feed_line(line) {
             // Parse stage
             let event = match self.parser.parse(&chunk) {
-                Ok(e) => e,
+                Ok(e) => {
+                    // Event was successfully created from chunk
+                    crate::stats::stats_add_event_created();
+
+                    // Also track in Rhai context for parallel processing
+                    if !ctx.tracker.is_empty() {
+                        ctx.tracker
+                            .entry("__kelora_stats_events_created".to_string())
+                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                            .or_insert(rhai::Dynamic::from(1i64));
+                        ctx.tracker.insert(
+                            "__op___kelora_stats_events_created".to_string(),
+                            rhai::Dynamic::from("count"),
+                        );
+                    }
+
+                    e
+                }
                 Err(err) => {
                     return match ctx.config.on_error {
                         crate::ErrorStrategy::Skip => Ok(results),
@@ -217,17 +234,95 @@ impl Pipeline {
             match result {
                 ScriptResult::Emit(event) => {
                     if self.limiter.as_mut().map_or(true, |l| l.allow()) {
+                        crate::stats::stats_add_event_output();
+
+                        // Also track in Rhai context for parallel processing
+                        if !ctx.tracker.is_empty() {
+                            ctx.tracker
+                                .entry("__kelora_stats_events_output".to_string())
+                                .and_modify(|v| {
+                                    *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
+                                })
+                                .or_insert(rhai::Dynamic::from(1i64));
+                            ctx.tracker.insert(
+                                "__op___kelora_stats_events_output".to_string(),
+                                rhai::Dynamic::from("count"),
+                            );
+                        }
+
                         results.push(self.formatter.format(&event));
+                    } else {
+                        crate::stats::stats_add_event_filtered();
+
+                        // Also track in Rhai context for parallel processing
+                        if !ctx.tracker.is_empty() {
+                            ctx.tracker
+                                .entry("__kelora_stats_events_filtered".to_string())
+                                .and_modify(|v| {
+                                    *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
+                                })
+                                .or_insert(rhai::Dynamic::from(1i64));
+                            ctx.tracker.insert(
+                                "__op___kelora_stats_events_filtered".to_string(),
+                                rhai::Dynamic::from("count"),
+                            );
+                        }
                     }
                 }
                 ScriptResult::EmitMultiple(events) => {
                     for event in events {
                         if self.limiter.as_mut().map_or(true, |l| l.allow()) {
+                            crate::stats::stats_add_event_output();
+
+                            // Also track in Rhai context for parallel processing
+                            if !ctx.tracker.is_empty() {
+                                ctx.tracker
+                                    .entry("__kelora_stats_events_output".to_string())
+                                    .and_modify(|v| {
+                                        *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
+                                    })
+                                    .or_insert(rhai::Dynamic::from(1i64));
+                                ctx.tracker.insert(
+                                    "__op___kelora_stats_events_output".to_string(),
+                                    rhai::Dynamic::from("count"),
+                                );
+                            }
+
                             results.push(self.formatter.format(&event));
+                        } else {
+                            crate::stats::stats_add_event_filtered();
+
+                            // Also track in Rhai context for parallel processing
+                            if !ctx.tracker.is_empty() {
+                                ctx.tracker
+                                    .entry("__kelora_stats_events_filtered".to_string())
+                                    .and_modify(|v| {
+                                        *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
+                                    })
+                                    .or_insert(rhai::Dynamic::from(1i64));
+                                ctx.tracker.insert(
+                                    "__op___kelora_stats_events_filtered".to_string(),
+                                    rhai::Dynamic::from("count"),
+                                );
+                            }
                         }
                     }
                 }
-                ScriptResult::Skip => {}
+                ScriptResult::Skip => {
+                    crate::stats::stats_add_event_filtered();
+
+                    // Also track in Rhai context for parallel processing
+                    if !ctx.tracker.is_empty() {
+                        ctx.tracker
+                            .entry("__kelora_stats_events_filtered".to_string())
+                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                            .or_insert(rhai::Dynamic::from(1i64));
+                        ctx.tracker.insert(
+                            "__op___kelora_stats_events_filtered".to_string(),
+                            rhai::Dynamic::from("count"),
+                        );
+                    }
+                }
                 ScriptResult::Error(msg) => {
                     return match ctx.config.on_error {
                         crate::ErrorStrategy::Skip => Ok(results),

@@ -106,10 +106,25 @@ impl GlobalTracker {
             .get("__kelora_stats_errors")
             .and_then(|v| v.as_int().ok())
             .unwrap_or(0) as usize;
+        let events_created = tracked
+            .get("__kelora_stats_events_created")
+            .and_then(|v| v.as_int().ok())
+            .unwrap_or(0) as usize;
+        let events_output = tracked
+            .get("__kelora_stats_events_output")
+            .and_then(|v| v.as_int().ok())
+            .unwrap_or(0) as usize;
+        let events_filtered = tracked
+            .get("__kelora_stats_events_filtered")
+            .and_then(|v| v.as_int().ok())
+            .unwrap_or(0) as usize;
 
         stats.lines_output = output;
         stats.lines_filtered = filtered;
         stats.errors = errors;
+        stats.events_created = events_created;
+        stats.events_output = events_output;
+        stats.events_filtered = events_filtered;
 
         Ok(())
     }
@@ -492,6 +507,18 @@ impl ParallelProcessor {
                     .get("__kelora_stats_errors")
                     .and_then(|v| v.as_int().ok())
                     .unwrap_or(0),
+                ctx.tracker
+                    .get("__kelora_stats_events_created")
+                    .and_then(|v| v.as_int().ok())
+                    .unwrap_or(0),
+                ctx.tracker
+                    .get("__kelora_stats_events_output")
+                    .and_then(|v| v.as_int().ok())
+                    .unwrap_or(0),
+                ctx.tracker
+                    .get("__kelora_stats_events_filtered")
+                    .and_then(|v| v.as_int().ok())
+                    .unwrap_or(0),
             );
 
             let mut batch_results = Vec::with_capacity(batch.lines.len());
@@ -588,6 +615,18 @@ impl ParallelProcessor {
                     .get("__kelora_stats_errors")
                     .and_then(|v| v.as_int().ok())
                     .unwrap_or(0),
+                ctx.tracker
+                    .get("__kelora_stats_events_created")
+                    .and_then(|v| v.as_int().ok())
+                    .unwrap_or(0),
+                ctx.tracker
+                    .get("__kelora_stats_events_output")
+                    .and_then(|v| v.as_int().ok())
+                    .unwrap_or(0),
+                ctx.tracker
+                    .get("__kelora_stats_events_filtered")
+                    .and_then(|v| v.as_int().ok())
+                    .unwrap_or(0),
             );
 
             let mut deltas = std::collections::HashMap::new();
@@ -618,6 +657,36 @@ impl ParallelProcessor {
                 );
                 deltas.insert(
                     "__op___kelora_stats_errors".to_string(),
+                    Dynamic::from("count"),
+                );
+            }
+            if after.3 > before.3 {
+                deltas.insert(
+                    "__kelora_stats_events_created".to_string(),
+                    Dynamic::from(after.3 - before.3),
+                );
+                deltas.insert(
+                    "__op___kelora_stats_events_created".to_string(),
+                    Dynamic::from("count"),
+                );
+            }
+            if after.4 > before.4 {
+                deltas.insert(
+                    "__kelora_stats_events_output".to_string(),
+                    Dynamic::from(after.4 - before.4),
+                );
+                deltas.insert(
+                    "__op___kelora_stats_events_output".to_string(),
+                    Dynamic::from("count"),
+                );
+            }
+            if after.5 > before.5 {
+                deltas.insert(
+                    "__kelora_stats_events_filtered".to_string(),
+                    Dynamic::from(after.5 - before.5),
+                );
+                deltas.insert(
+                    "__op___kelora_stats_events_filtered".to_string(),
                     Dynamic::from("count"),
                 );
             }

@@ -7,6 +7,9 @@ pub struct ProcessingStats {
     pub lines_read: usize,
     pub lines_output: usize,
     pub lines_filtered: usize,
+    pub events_created: usize,
+    pub events_output: usize,
+    pub events_filtered: usize,
     pub files_processed: usize,
     pub script_executions: usize,
     pub errors: usize,
@@ -35,6 +38,24 @@ pub fn stats_add_line_output() {
 pub fn stats_add_line_filtered() {
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().lines_filtered += 1;
+    });
+}
+
+pub fn stats_add_event_created() {
+    THREAD_STATS.with(|stats| {
+        stats.borrow_mut().events_created += 1;
+    });
+}
+
+pub fn stats_add_event_output() {
+    THREAD_STATS.with(|stats| {
+        stats.borrow_mut().events_output += 1;
+    });
+}
+
+pub fn stats_add_event_filtered() {
+    THREAD_STATS.with(|stats| {
+        stats.borrow_mut().events_filtered += 1;
     });
 }
 
@@ -71,13 +92,22 @@ impl ProcessingStats {
         }
     }
 
-    pub fn format_stats(&self) -> String {
+    pub fn format_stats(&self, multiline_enabled: bool) -> String {
         let mut output = String::new();
 
-        output.push_str(&format!(
-            "Lines processed: {} total, {} output, {} filtered",
-            self.lines_read, self.lines_output, self.lines_filtered
-        ));
+        if multiline_enabled && self.events_created > 0 {
+            // In multiline mode, show both lines and events
+            output.push_str(&format!(
+                "Lines processed: {} total, {} filtered; Events created: {} total, {} output, {} filtered",
+                self.lines_read, self.lines_filtered, self.events_created, self.events_output, self.events_filtered
+            ));
+        } else {
+            // In non-multiline mode, show traditional line stats
+            output.push_str(&format!(
+                "Lines processed: {} total, {} output, {} filtered",
+                self.lines_read, self.lines_output, self.lines_filtered
+            ));
+        }
 
         if self.files_processed > 0 {
             output.push_str(&format!(", {} files", self.files_processed));

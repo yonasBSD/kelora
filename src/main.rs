@@ -395,45 +395,50 @@ fn main() -> Result<()> {
         stats_start_timer();
     }
 
-    let final_stats = if use_parallel {
-        // Get effective values from config for parallel mode
-        let batch_size = config.effective_batch_size();
-        let stats = run_parallel(&config, batch_size, &mut stdout, &mut stderr);
+    let final_stats =
+        if use_parallel {
+            // Get effective values from config for parallel mode
+            let batch_size = config.effective_batch_size();
+            let stats = run_parallel(&config, batch_size, &mut stdout, &mut stderr);
 
-        // Print parallel stats if enabled (only if not terminated, will be handled later)
-        if config.output.stats && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
-            if let Some(ref s) = stats {
+            // Print parallel stats if enabled (only if not terminated, will be handled later)
+            if config.output.stats && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+                if let Some(ref s) = stats {
+                    stderr
+                        .writeln(&config.format_stats_message(
+                            &s.format_stats(config.input.multiline.is_some()),
+                        ))
+                        .unwrap_or(());
+                }
+            }
+            stats
+        } else {
+            run_sequential(&config, &mut stdout, &mut stderr);
+
+            // Print summary if enabled (only if not terminated)
+            if config.output.summary && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+                let tracked = crate::rhai_functions::tracking::get_thread_tracking_state();
+                let summary_lines = config.format_tracked_summary(&tracked);
                 stderr
-                    .writeln(&config.format_stats_message(&s.format_stats()))
+                    .writeln(&config.format_summary_message(""))
+                    .unwrap_or(());
+                for line in summary_lines.lines() {
+                    stderr.writeln(line).unwrap_or(());
+                }
+            }
+
+            // Finish statistics collection and print stats if enabled (only if not terminated)
+            if config.output.stats && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+                stats_finish_processing();
+                let stats = get_thread_stats();
+                stderr
+                    .writeln(&config.format_stats_message(
+                        &stats.format_stats(config.input.multiline.is_some()),
+                    ))
                     .unwrap_or(());
             }
-        }
-        stats
-    } else {
-        run_sequential(&config, &mut stdout, &mut stderr);
-
-        // Print summary if enabled (only if not terminated)
-        if config.output.summary && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
-            let tracked = crate::rhai_functions::tracking::get_thread_tracking_state();
-            let summary_lines = config.format_tracked_summary(&tracked);
-            stderr
-                .writeln(&config.format_summary_message(""))
-                .unwrap_or(());
-            for line in summary_lines.lines() {
-                stderr.writeln(line).unwrap_or(());
-            }
-        }
-
-        // Finish statistics collection and print stats if enabled (only if not terminated)
-        if config.output.stats && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
-            stats_finish_processing();
-            let stats = get_thread_stats();
-            stderr
-                .writeln(&config.format_stats_message(&stats.format_stats()))
-                .unwrap_or(());
-        }
-        None
-    };
+            None
+        };
 
     // Check if we were terminated by a signal and print stats
     if SHOULD_TERMINATE.load(Ordering::Relaxed) {
@@ -442,7 +447,9 @@ fn main() -> Result<()> {
                 // For parallel mode, try to get stats from the processor if available
                 if let Some(stats) = final_stats {
                     stderr
-                        .writeln(&config.format_stats_message(&stats.format_stats()))
+                        .writeln(&config.format_stats_message(
+                            &stats.format_stats(config.input.multiline.is_some()),
+                        ))
                         .unwrap_or(());
                 } else {
                     stderr
@@ -454,7 +461,9 @@ fn main() -> Result<()> {
                 stats_finish_processing();
                 let stats = get_thread_stats();
                 stderr
-                    .writeln(&config.format_stats_message(&stats.format_stats()))
+                    .writeln(&config.format_stats_message(
+                        &stats.format_stats(config.input.multiline.is_some()),
+                    ))
                     .unwrap_or(());
             }
         }
