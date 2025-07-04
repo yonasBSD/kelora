@@ -19,37 +19,16 @@ cat logs.jsonl | kelora -f jsonl --filter 'status >= 400'
 # Enrich and transform fields
 kelora -f jsonl --exec 'let sev = if status >= 500 { "crit" } else { "warn" };' logs.jsonl
 
-# Execute Rhai script from file
-kelora -f jsonl --exec-file transform.rhai logs.jsonl
-
 # Track max value across the stream
 kelora -f jsonl \
   --exec 'track_max("max", duration_ms)' \
   --end 'print(`Max: ${tracked["max"]}`)' logs.jsonl
-
-# Extract columns from delimited text
-kelora -f line --exec 'user = line.col("0"); msg = line.col("3:")' access.log
 
 # Real-time Kubernetes logs
 kubectl logs app | kelora -f jsonl --filter 'level == "error"' -F text
 
 # Process compressed log files (automatic decompression)
 kelora -f jsonl app.log.1.gz --filter 'status >= 400'
-
-# Process multiple files with different ordering
-kelora -f jsonl file1.jsonl file2.jsonl file3.jsonl  # CLI order (default)
-kelora -f jsonl --file-order name *.jsonl            # Alphabetical order
-kelora -f jsonl --file-order mtime *.jsonl           # Modification time order
-
-# Handle log rotation (mixed compressed/uncompressed, chronological order)
-# Matches: app.log app.log.1 app.log.2.gz app.log.3.gz (auto-decompressed)
-kelora -f jsonl --file-order mtime app.log*
-
-# Show processing statistics (lines processed, filtered, timing, performance)
-kelora -f jsonl --filter 'status >= 400' --stats logs.jsonl
-
-# Statistics work in both sequential and parallel modes, and survive CTRL-C
-kelora -f jsonl --filter 'level == "error"' --parallel --stats large.log
 ```
 
 ---
@@ -83,31 +62,19 @@ track_max("max_duration", duration_ms);
 // Column extraction from delimited text
 let user = line.col("0");
 let msg = line.col("3:");
-let parts = line.cols(["0", "2", "-1"]);
 
 // Parse structured data
 let json_data = parse_json(line);
 let kv_data = parse_kv("level=info method=GET status=200");
-let custom_kv = parse_kv("user:alice,role:admin", ",", ":");
 
 // String processing with built-in methods
 let clean = text.strip();                    // Remove whitespace
 let upper = text.upper();                    // Convert to uppercase
 let is_num = field.is_digit();               // Check if all digits
-let count = message.count("error");          // Count occurrences
 
-// Advanced regex extraction for complex logs
-let user = line.extract_re("user=(\\w+)");                    // Extract first group
-let users = logs.extract_all_re("user=(\\w+)", 1);           // All usernames
-let parts = line.split_re("[,;:]");                          // Split by delimiters
-let clean = text.replace_re("\\d{4}", "YEAR");               // Replace years
-
-// Network/IP analysis for security logs
-let ip = line.extract_ip();                      // Extract first IP address
-let all_ips = line.extract_ips();                // Extract all IP addresses
-let masked = ip.mask_ip(2);                      // Privacy: "192.168.X.X"
-let is_internal = ip.is_private_ip();            // Check private ranges
-let domain = line.extract_domain();              // Extract domain from URLs/emails
+// Basic regex extraction
+let user = line.extract_re("user=(\\w+)");   // Extract first group
+let ip = line.extract_ip();                  // Extract first IP address
 ```
 
 Available variables:

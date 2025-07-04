@@ -34,134 +34,72 @@ make test-full          # Comprehensive test suite
 
 ### Example Usage
 ```bash
-# Filter high response times from JSON logs
+# Basic filtering and parsing
 ./target/release/kelora -f jsonl logs.jsonl --filter "response_time.sub_string(0,2).to_int() > 98"
-
-# Parse and filter syslog by severity
 ./target/release/kelora -f syslog /var/log/syslog --filter 'severity <= 3'
-
-# Parse CEF (Common Event Format) logs with syslog prefix
-./target/release/kelora -f cef security.log --filter 'severity.to_int() >= 7'
-
-# Parse CEF logs and extract specific fields
-./target/release/kelora -f cef firewall.cef --filter 'src.extract_ip() != ""' --keys timestamp,host,vendor,product,event,src,dst
-
-# Count status codes and track metrics
-./target/release/kelora -f jsonl access.log --exec "track_count(status_class(status))" --end "print(tracked)"
-
-# Execute script from file
-./target/release/kelora -f jsonl access.log --exec-file transform.rhai
-
-# Process any log file (default line format)
 ./target/release/kelora /var/log/syslog --filter 'line.matches("ERROR|WARN")'
 
-# Process gzip compressed log files (automatic decompression)
+# CEF (Common Event Format) parsing
+./target/release/kelora -f cef security.log --filter 'severity.to_int() >= 7'
+./target/release/kelora -f cef firewall.cef --filter 'src.extract_ip() != ""' --keys timestamp,host,vendor,product,event,src,dst
+
+# Tracking and metrics
+./target/release/kelora -f jsonl access.log --exec "track_count(status_class(status))" --end "print(tracked)"
+./target/release/kelora -f jsonl access.log --exec-file transform.rhai
+
+# File processing and compression
 ./target/release/kelora -f jsonl logs.jsonl.gz --filter "status >= 400"
-
-# Ignore lines matching a regex pattern (applied before parsing for efficiency)
-./target/release/kelora -f jsonl app.log --ignore-lines "^#.*|^$"  # Skip comments and empty lines
-./target/release/kelora -f line /var/log/syslog --ignore-lines "systemd.*"  # Skip systemd messages
-
-# Process multiple files with different ordering
 ./target/release/kelora -f jsonl file1.jsonl file2.jsonl file3.jsonl  # CLI order (default)
 ./target/release/kelora -f jsonl --file-order name *.jsonl            # Alphabetical order
 ./target/release/kelora -f jsonl --file-order mtime *.jsonl           # Modification time order
+./target/release/kelora -f jsonl --file-order mtime app.log*          # Handle log rotation
 
-# Handle log rotation (mixed compressed/uncompressed, chronological order)
-# Matches: app.log app.log.1 app.log.2.gz app.log.3.gz - .gz files auto-decompressed
-./target/release/kelora -f jsonl --file-order mtime app.log*
+# Field selection and filtering
+./target/release/kelora -f jsonl app.log --core                       # Core fields only
+./target/release/kelora -f jsonl app.log --core --keys user,status    # Core + specific fields
+./target/release/kelora -f jsonl app.log --levels debug,error,warn    # Filter by log levels
+./target/release/kelora -f jsonl app.log --exclude-levels debug,trace # Exclude specific levels
 
-# Output only core fields (timestamp, level, message)
-./target/release/kelora -f jsonl app.log --core
-
-# Output core fields plus specific additional fields
-./target/release/kelora -f jsonl app.log --core --keys user,status
-./target/release/kelora -f jsonl app.log --core -k user,status  # Short option
-
-# Filter events by log level (case-insensitive)
-./target/release/kelora -f jsonl app.log --levels debug,error,warn
-
-# Exclude specific log levels (higher priority than --levels)
-./target/release/kelora -f jsonl app.log --exclude-levels debug,trace
-
-# Create custom level field and filter by it
-./target/release/kelora -f line app.log --exec 'let level = line.before(":")' --levels ERROR,WARN
+# Line preprocessing and ignoring patterns
+./target/release/kelora -f jsonl app.log --ignore-lines "^#.*|^$"     # Skip comments and empty lines
+./target/release/kelora -f line /var/log/syslog --ignore-lines "systemd.*"  # Skip systemd messages
+./target/release/kelora -f csv data.csv --ignore-lines "^\"?Date"     # Skip CSV header lines
 
 # Multi-line log event processing
 # ⚠️  IMPORTANT: Multi-line mode buffers events until complete. In streaming scenarios,
 # the last event may not appear until the next event starts.
-
-# Group Java/Python stack traces by indentation
 ./target/release/kelora -f line app.log --multiline indent --filter 'line.contains("Exception")'
-
-# Group syslog entries by timestamp (handles continuation lines)
 ./target/release/kelora -f syslog /var/log/syslog --multiline timestamp
-
-# Group log entries starting with timestamp pattern
 ./target/release/kelora -f line app.log --multiline timestamp:pattern=^\d{4}-\d{2}-\d{2}
-
-# Group lines that end with backslash continuation
 ./target/release/kelora -f line config.log --multiline backslash
-
-# Group events starting with ERROR keyword
 ./target/release/kelora -f line debug.log --multiline start:^ERROR
-
-# Group events ending with semicolon
 ./target/release/kelora -f line sql.log --multiline end:;$
 
-# For immediate output without buffering (streaming-friendly), omit --multiline entirely
-./target/release/kelora -f line app.log
-
-# Extract columns using integer syntax (cleaner than string selectors)
+# Column extraction and data processing
 ./target/release/kelora -f line access.log --exec "let user_name=line.col(1,2)" --filter "user_name != ''"
 ./target/release/kelora -f csv access.csv --exec "let fields=line.cols(0,2,4)" --filter "fields[1] != ''"
-
-# Select specific fields using short option
 ./target/release/kelora -f jsonl app.log -k timestamp,level,message,user_id
 
-# Show summary of tracked values in a table format
+# Performance monitoring and statistics
 ./target/release/kelora -f jsonl app.log --exec "track_count('total'); track_bucket('status_codes', status.to_string())" --summary
-
-# Show processing statistics (lines processed, filtered, timing, performance)
 ./target/release/kelora -f jsonl app.log --filter "status >= 400" --stats
-
-# Combined summary and statistics output (summary appears first)
 ./target/release/kelora -f jsonl app.log --exec "track_count('errors')" --summary --stats
-
-# Statistics work in both sequential and parallel modes
 ./target/release/kelora -f jsonl large.log --filter "level == 'ERROR'" --parallel --stats
-
-# Summary also works in parallel mode with different batch sizes
 ./target/release/kelora -f jsonl large.log --exec "track_unique('users', user)" --summary --parallel --batch-size 10
-
-# Statistics are displayed even when interrupted with CTRL-C
 seq 1 1000000 | ./target/release/kelora --filter "line.to_int() % 1000 == 0" --stats
-
-# Ignore input lines matching regex patterns (pre-parsing filter for efficiency)
-./target/release/kelora -f jsonl app.log --ignore-lines "^#.*|^$"           # Skip comments and empty lines
-./target/release/kelora -f line /var/log/syslog --ignore-lines "systemd.*"  # Skip systemd messages
-./target/release/kelora -f csv data.csv --ignore-lines "^\"?Date"          # Skip CSV header lines
 
 # DateTime and duration processing
 ./target/release/kelora -f jsonl access.log --exec "let dt = parse_timestamp(timestamp); if dt.hour() >= 9 && dt.hour() <= 17 { print('Business hours') }"
-
-# Parse custom timestamp formats
 ./target/release/kelora -f line app.log --exec "let dt = parse_timestamp(line.before(' '), '%Y/%m/%d-%H:%M:%S'); print(dt.format('%Y-%m-%d %H:%M:%S'))"
-
-# Filter by time ranges
 ./target/release/kelora -f jsonl app.log --filter "parse_timestamp(timestamp) > parse_timestamp('2023-07-04T00:00:00Z')"
-
-# Performance analysis with durations
 ./target/release/kelora -f jsonl api.log --exec "let dur = parse_duration(response_time); if dur > duration_from_seconds(5) { print('Slow: ' + dur.as_seconds() + 's') }"
-
-# Time-based log aggregation
 ./target/release/kelora -f jsonl access.log --exec "let dt = parse_timestamp(timestamp); track_count('hour_' + dt.format('%H'))" --summary
-
-# Calculate request duration from start/end times  
 ./target/release/kelora -f jsonl requests.log --exec "let start = parse_timestamp(start_time); let end = parse_timestamp(end_time); let duration = end - start; print('Duration: ' + duration.as_milliseconds() + 'ms')"
-
-# Timezone conversion for global logs
 ./target/release/kelora -f jsonl global.log --exec "let utc_time = parse_timestamp(timestamp).to_utc(); print('UTC: ' + utc_time.format('%Y-%m-%d %H:%M:%S %Z'))"
+
+# Real-time and streaming scenarios
+kubectl logs app | ./target/release/kelora -f jsonl --filter 'level == "error"' -F text
+tail -f /var/log/app.log | ./target/release/kelora -f jsonl --filter 'status >= 400'
 ```
 
 ## CLI Help Organization
@@ -188,6 +126,69 @@ The `--help` output is organized into logical sections that follow the data proc
 - `-b` = `--brief` (brief output)
 
 ## Development Guidelines
+
+### Architecture Overview
+
+Kelora is built around a streaming pipeline architecture:
+
+1. **Input Stage**: File reading, decompression, and line preprocessing
+2. **Parsing Stage**: Format-specific parsing (JSON, syslog, CEF, etc.)
+3. **Processing Stage**: Rhai script execution (filter, exec, transform)
+4. **Output Stage**: Formatting and writing results
+
+**Key Design Principles:**
+- **Fail Fast**: Invalid data or scripts should error immediately
+- **No Magic**: Explicit behavior, predictable outcomes
+- **Composable**: Each stage can be configured independently
+- **Performance**: Parallel processing and efficient memory usage
+
+### Error Handling Patterns
+
+**On-Error Strategies:**
+- `skip` - Skip invalid lines, continue processing
+- `print` - Print error and original line, continue processing (default)
+- `abort` - Stop processing on first error
+- `stub` - Insert placeholder event for invalid lines
+
+**Error Strategy Selection:**
+- Use `skip` for production pipelines where data quality varies
+- Use `print` for debugging and log analysis
+- Use `abort` for strict validation scenarios
+- Use `stub` when maintaining line count is important
+
+### Performance Considerations
+
+**Sequential vs Parallel Processing:**
+- Sequential: Maintains order, lower memory usage, simpler debugging
+- Parallel: Higher throughput, higher memory usage, may reorder output
+- Use `--unordered` with `--parallel` for maximum performance
+
+**Batch Processing:**
+- Default batch size: 1000 lines
+- Adjust with `--batch-size` for memory vs. throughput tradeoffs
+- Use `--batch-timeout` for real-time processing scenarios
+
+**Memory Management:**
+- Multi-line mode buffers complete events in memory
+- Large batch sizes increase memory usage
+- Consider `--stats` overhead for high-volume processing
+
+### Testing Approach
+
+**Unit Tests:**
+- Test individual parsing functions and Rhai integrations
+- Located in `src/` alongside implementation files
+- Run with `cargo test --lib`
+
+**Integration Tests:**
+- End-to-end CLI testing with sample data
+- Located in `tests/integration_tests.rs`
+- Run with `cargo test --test integration_tests`
+
+**Performance Tests:**
+- Benchmark suites for regression detection
+- Run with `make bench` for comprehensive testing
+- Use `time` command for quick performance checks
 
 ### Rhai Scripting Best Practices
 
