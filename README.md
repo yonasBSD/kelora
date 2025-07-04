@@ -115,7 +115,7 @@ Available variables:
 ```bash
 git clone https://github.com/dloss/kelora.git
 cd kelora
-cargo build --release
+cargo install --path .
 ```
 
 ---
