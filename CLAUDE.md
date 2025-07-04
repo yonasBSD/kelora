@@ -6,6 +6,48 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Kelora is a command-line log analysis tool written in Rust that uses the Rhai scripting engine for flexible log processing. It processes structured logs (JSON, CSV, etc.) and allows users to filter, transform, and analyze log data using embedded Rhai scripts.
 
+## Configuration File Support
+
+Kelora supports INI configuration files for setting defaults and defining aliases, similar to klp.
+
+### Configuration File Locations
+
+Kelora searches for configuration files in the following order:
+1. `$XDG_CONFIG_HOME/kelora/config.ini` (Unix)
+2. `~/.config/kelora/config.ini` (Unix fallback)
+3. `~/.kelorarc` (legacy compatibility)
+4. `%APPDATA%\kelora\config.ini` (Windows)
+5. `%USERPROFILE%\.kelorarc` (Windows legacy)
+
+### Configuration File Format
+
+```ini
+[defaults]
+input-format = jsonl
+output-format = jsonl
+on-error = skip
+parallel = true
+stats = true
+
+[aliases]
+errors = --filter 'level == "error"' --stats
+json-errors = --format jsonl --filter 'level == "error"' --output-format jsonl
+slow-requests = --filter 'response_time.to_int() > 1000' --keys timestamp,method,path,response_time
+```
+
+### Configuration Commands
+
+```bash
+# Show current configuration and search paths
+./target/release/kelora --show-config
+
+# Use an alias from configuration
+./target/release/kelora -a errors /path/to/logs
+
+# Ignore configuration file (use CLI defaults only)
+./target/release/kelora --ignore-config --filter "level == 'error'"
+```
+
 ## Key Commands
 
 ### Build and Test
