@@ -253,7 +253,14 @@ fn test_cols_format_with_filtering() {
     let input = "2023-01-01 10:30:00 ERROR database connection_failed\n2023-01-01 10:31:00 INFO user login_success";
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["-f", "cols", "--filter", "c3 == \"ERROR\"", "-k", "c1,c2,c3,c4"],
+        &[
+            "-f",
+            "cols",
+            "--filter",
+            "c3 == \"ERROR\"",
+            "-k",
+            "c1,c2,c3,c4",
+        ],
         input,
     );
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -285,7 +292,12 @@ fn test_cols_format_with_exec() {
     let input = "user1 200 1.23\nuser2 404 0.45\nuser3 200 2.10";
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["-f", "cols", "--exec", "print(c1 + \" status=\" + c2 + \" time=\" + c3)"],
+        &[
+            "-f",
+            "cols",
+            "--exec",
+            "print(c1 + \" status=\" + c2 + \" time=\" + c3)",
+        ],
         input,
     );
     assert_eq!(exit_code, 0, "kelora should exit successfully");
@@ -1089,6 +1101,107 @@ fn test_multiline_real_world_scenario() {
             assert_eq!(alert_level, "warning");
         }
     }
+}
+
+#[test]
+fn test_skip_lines_functionality() {
+    // Test with headers in CSV-style data
+    let input = r#"header1,header2,header3
+description,more info,extra
+alice,user,200
+bob,admin,404
+charlie,guest,500"#;
+
+    // Test skipping first 2 lines (headers)
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "line",
+            "--skip-lines",
+            "2",
+            "--filter",
+            "line.contains(\"user\") || line.contains(\"admin\")",
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(
+        lines.len(),
+        2,
+        "Should have 2 lines after skipping headers and filtering"
+    );
+    assert!(
+        stdout.contains("alice,user,200"),
+        "Should contain alice line"
+    );
+    assert!(stdout.contains("bob,admin,404"), "Should contain bob line");
+    assert!(!stdout.contains("header1"), "Should not contain header1");
+    assert!(
+        !stdout.contains("description"),
+        "Should not contain description line"
+    );
+
+    // Test with parallel processing
+    let (stdout_parallel, _stderr_parallel, exit_code_parallel) = run_kelora_with_input(
+        &[
+            "-f",
+            "line",
+            "--skip-lines",
+            "2",
+            "--parallel",
+            "--filter",
+            "line.contains(\"user\") || line.contains(\"admin\")",
+        ],
+        input,
+    );
+    assert_eq!(
+        exit_code_parallel, 0,
+        "kelora should exit successfully in parallel mode"
+    );
+
+    let lines_parallel: Vec<&str> = stdout_parallel.trim().lines().collect();
+    assert_eq!(
+        lines_parallel.len(),
+        2,
+        "Parallel processing should give same result"
+    );
+}
+
+#[test]
+fn test_skip_lines_with_zero() {
+    let input = r#"line1
+line2
+line3"#;
+
+    let (stdout, _stderr, exit_code) =
+        run_kelora_with_input(&["-f", "line", "--skip-lines", "0"], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(
+        lines.len(),
+        3,
+        "Should process all lines when skip-lines is 0"
+    );
+}
+
+#[test]
+fn test_skip_lines_greater_than_input() {
+    let input = r#"line1
+line2"#;
+
+    let (stdout, _stderr, exit_code) =
+        run_kelora_with_input(&["-f", "line", "--skip-lines", "5"], input);
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let lines: Vec<&str> = stdout.trim().lines().filter(|l| !l.is_empty()).collect();
+    assert_eq!(
+        lines.len(),
+        0,
+        "Should produce no output when skipping more lines than available"
+    );
 }
 
 #[test]

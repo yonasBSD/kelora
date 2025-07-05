@@ -66,6 +66,10 @@ pub struct Cli {
     )]
     pub file_order: FileOrder,
 
+    /// Skip the first N input lines (applied before ignore-lines and parsing)
+    #[arg(long = "skip-lines", help_heading = "Input Options")]
+    pub skip_lines: Option<usize>,
+
     /// Ignore input lines matching this regex pattern (applied before parsing)
     #[arg(long = "ignore-lines", help_heading = "Input Options")]
     pub ignore_lines: Option<String>,
@@ -636,6 +640,7 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
 
     // Process lines using pipeline
     let mut line_num = 0;
+    let mut skipped_lines = 0;
     for line_result in reader.lines() {
         // Check for termination signal between lines
         if check_termination().is_err() {
@@ -658,6 +663,16 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
         // Count line read for stats
         if config.output.stats {
             stats_add_line_read();
+        }
+
+        // Skip the first N lines if configured (applied before ignore-lines and parsing)
+        if skipped_lines < config.input.skip_lines {
+            skipped_lines += 1;
+            // Count skipped line for stats
+            if config.output.stats {
+                stats_add_line_filtered();
+            }
+            continue;
         }
 
         // Apply ignore-lines filter if configured (early filtering before parsing)
@@ -979,6 +994,14 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
     if let Some(summary) = config_file.defaults.get("summary") {
         if !cli.summary && summary.parse::<bool>().unwrap_or(false) {
             cli.summary = true;
+        }
+    }
+
+    if let Some(skip_lines) = config_file.defaults.get("skip_lines") {
+        if cli.skip_lines.is_none() {
+            if let Ok(value) = skip_lines.parse::<usize>() {
+                cli.skip_lines = Some(value);
+            }
         }
     }
 

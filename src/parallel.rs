@@ -276,6 +276,7 @@ impl ParallelProcessor {
             let batch_size = self.config.batch_size;
             let batch_timeout = Duration::from_millis(self.config.batch_timeout_ms);
             let ignore_lines = config.input.ignore_lines.clone();
+            let skip_lines = config.input.skip_lines;
 
             let global_tracker_clone = self.global_tracker.clone();
             thread::spawn(move || {
@@ -286,6 +287,7 @@ impl ParallelProcessor {
                     batch_timeout,
                     global_tracker_clone,
                     ignore_lines,
+                    skip_lines,
                 )
             })
         };
@@ -366,6 +368,7 @@ impl ParallelProcessor {
         batch_timeout: Duration,
         global_tracker: GlobalTracker,
         ignore_lines: Option<regex::Regex>,
+        skip_lines: usize,
     ) -> Result<()> {
         let mut batch_id = 0u64;
         let mut current_batch = Vec::with_capacity(batch_size);
@@ -373,6 +376,7 @@ impl ParallelProcessor {
         let mut batch_start_line = 1usize;
         let mut last_batch_time = Instant::now();
         let mut line_buffer = String::new();
+        let mut skipped_lines = 0;
 
         // For truly streaming behavior, we need to:
         // 1. Process lines immediately as they arrive
@@ -410,6 +414,12 @@ impl ParallelProcessor {
                 Ok(_) => {
                     line_num += 1;
                     let line = line_buffer.trim_end().to_string();
+
+                    // Skip the first N lines if configured (applied before ignore-lines and parsing)
+                    if skipped_lines < skip_lines {
+                        skipped_lines += 1;
+                        continue;
+                    }
 
                     // Skip empty lines
                     if line.is_empty() {

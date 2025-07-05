@@ -164,6 +164,7 @@ impl ConfigFile {
             println!("format = jsonl");
             println!("output-format = default");
             println!("on-error = skip");
+            println!("skip-lines = 0");
             println!();
             println!("[aliases]");
             println!("errors = --filter 'level == \"error\"' --stats");

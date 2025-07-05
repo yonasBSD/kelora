@@ -29,12 +29,14 @@ on-error = skip
 parallel = true
 stats = true
 window_size = 5
+skip-lines = 0
 
 [aliases]
 errors = --filter 'level == "error"' --stats
 json-errors = --format jsonl --filter 'level == "error"' --output-format jsonl
 slow-requests = --filter 'response_time.to_int() > 1000' --keys timestamp,method,path,response_time
 windowed-errors = --window 3 --filter 'level == "error"' --exec 'let prev_levels = window_values(window, "level"); print("Previous levels: " + prev_levels.join(","))'
+csv-skip-headers = --format csv --skip-lines 1 --keys col1,col2,col3
 ```
 
 ### Configuration Commands
@@ -131,6 +133,11 @@ make test-full          # Comprehensive test suite
 ./target/release/kelora -f jsonl app.log --ignore-lines "^#.*|^$"     # Skip comments and empty lines
 ./target/release/kelora -f line /var/log/syslog --ignore-lines "systemd.*"  # Skip systemd messages
 ./target/release/kelora -f line data.csv --ignore-lines "^\"?Date"    # Skip CSV headers when using line format
+
+# Skip first N lines (headers, metadata, etc.)
+./target/release/kelora -f csv data.csv --skip-lines 1                # Skip CSV header row
+./target/release/kelora -f jsonl app.log --skip-lines 3              # Skip first 3 lines (metadata, headers, etc.)
+./target/release/kelora -f line config.log --skip-lines 2 --filter 'line.contains("ERROR")'  # Skip headers then filter
 
 # Multi-line log event processing
 # ⚠️  IMPORTANT: Multi-line mode buffers events until complete. In streaming scenarios,

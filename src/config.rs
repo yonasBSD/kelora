@@ -16,6 +16,7 @@ pub struct InputConfig {
     pub files: Vec<String>,
     pub format: InputFormat,
     pub file_order: FileOrder,
+    pub skip_lines: usize,
     pub ignore_lines: Option<regex::Regex>,
     pub multiline: Option<MultilineConfig>,
 }
@@ -459,6 +460,7 @@ impl KeloraConfig {
                 files: cli.files.clone(),
                 format: cli.format.clone().into(),
                 file_order: cli.file_order.clone().into(),
+                skip_lines: cli.skip_lines.unwrap_or(0),
                 ignore_lines: None, // Will be set after CLI parsing
                 multiline: None,    // Will be set after CLI parsing
             },
@@ -523,6 +525,7 @@ impl Default for KeloraConfig {
                 files: Vec::new(),
                 format: InputFormat::Jsonl,
                 file_order: FileOrder::None,
+                skip_lines: 0,
                 ignore_lines: None,
                 multiline: None,
             },
