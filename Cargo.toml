@@ -14,7 +14,7 @@ clap = { version = "4.0", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 chrono = { version = "0.4", features = ["serde"] }
-chrono-tz = "0.8"
+chrono-tz = "0.10"
 regex = "1.10"
 anyhow = "1.0"
 rhai = { version = "1.22", features = ["sync"] }
