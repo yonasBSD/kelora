@@ -1,7 +1,7 @@
 pub mod apache;
 pub mod cef;
-pub mod csv;
 pub mod cols;
+pub mod csv;
 pub mod jsonl;
 pub mod line;
 pub mod logfmt;
@@ -10,8 +10,8 @@ pub mod syslog;
 
 pub use apache::ApacheParser;
 pub use cef::CefParser;
-pub use csv::CsvParser;
 pub use cols::ColsParser;
+pub use csv::CsvParser;
 pub use jsonl::JsonlParser;
 pub use line::LineParser;
 pub use logfmt::LogfmtParser;

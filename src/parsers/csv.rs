@@ -283,10 +283,7 @@ mod tests {
 
         // Parse data with varying column counts
         let data_result1 = parser.parse("Alice,25").unwrap();
-        assert_eq!(
-            data_result1.fields.get("c1").unwrap().to_string(),
-            "Alice"
-        );
+        assert_eq!(data_result1.fields.get("c1").unwrap().to_string(), "Alice");
         assert_eq!(data_result1.fields.get("c2").unwrap().to_string(), "25");
         assert!(data_result1.fields.get("c3").is_none());
 

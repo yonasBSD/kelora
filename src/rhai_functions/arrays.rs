@@ -4,10 +4,10 @@ use rhai::{Array, Dynamic, Engine};
 pub fn register_functions(engine: &mut Engine) {
     // Register sorted function - like Python's sorted(), takes any iterable and returns sorted items
     engine.register_fn("sorted", sorted_array);
-    
+
     // Register reversed function - like Python's reversed(), reverses array order
     engine.register_fn("reversed", reversed_array);
-    
+
     // Register sorted_by function - sort objects/maps by field name
     engine.register_fn("sorted_by", sorted_by_field);
 }
@@ -145,7 +145,7 @@ fn reversed_array(mut arr: Array) -> Array {
 ///     {"name": "bob", "age": 25, "score": 92},
 ///     {"name": "charlie", "age": 35, "score": 78}
 /// ];
-/// 
+///
 /// let by_age = sorted_by(users, "age");      // Sorted by age: bob(25), alice(30), charlie(35)
 /// let by_score = sorted_by(users, "score");  // Sorted by score: charlie(78), alice(85), bob(92)
 /// let by_name = sorted_by(users, "name");    // Sorted by name: alice, bob, charlie
@@ -166,7 +166,7 @@ fn sorted_by_field(mut arr: Array, field_name: String) -> Array {
         // Extract field values from both objects
         let a_field = extract_field_value(a, &field_name);
         let b_field = extract_field_value(b, &field_name);
-        
+
         // Handle missing fields - objects without the field come first
         match (a_field, b_field) {
             (None, None) => std::cmp::Ordering::Equal,
@@ -178,7 +178,7 @@ fn sorted_by_field(mut arr: Array, field_name: String) -> Array {
             }
         }
     });
-    
+
     arr
 }
 
@@ -203,12 +203,14 @@ fn compare_dynamic_values(a: &Dynamic, b: &Dynamic) -> std::cmp::Ordering {
     if b.is_unit() {
         return std::cmp::Ordering::Greater;
     }
-    
+
     // If both are numbers, compare numerically
     if let (Ok(a_num), Ok(b_num)) = (get_number_value(a), get_number_value(b)) {
-        return a_num.partial_cmp(&b_num).unwrap_or(std::cmp::Ordering::Equal);
+        return a_num
+            .partial_cmp(&b_num)
+            .unwrap_or(std::cmp::Ordering::Equal);
     }
-    
+
     // If one is a number and the other isn't, numbers come first
     if get_number_value(a).is_ok() && get_number_value(b).is_err() {
         return std::cmp::Ordering::Less;
@@ -216,7 +218,7 @@ fn compare_dynamic_values(a: &Dynamic, b: &Dynamic) -> std::cmp::Ordering {
     if get_number_value(a).is_err() && get_number_value(b).is_ok() {
         return std::cmp::Ordering::Greater;
     }
-    
+
     // Otherwise, compare as strings
     let a_str = a.to_string();
     let b_str = b.to_string();
@@ -390,7 +392,7 @@ mod tests {
     #[test]
     fn test_sorted_by_numeric_field() {
         let mut arr = Array::new();
-        
+
         // Create objects with age field
         let mut obj1 = rhai::Map::new();
         obj1.insert("name".into(), Dynamic::from("alice"));
@@ -410,7 +412,7 @@ mod tests {
         let sorted = sorted_by_field(arr, "age".to_string());
 
         assert_eq!(sorted.len(), 3);
-        
+
         // Should be sorted by age: bob(25), alice(30), charlie(35)
         if let Some(obj) = sorted[0].clone().try_cast::<rhai::Map>() {
             assert_eq!(obj.get("name").unwrap().to_string(), "bob");
@@ -429,7 +431,7 @@ mod tests {
     #[test]
     fn test_sorted_by_string_field() {
         let mut arr = Array::new();
-        
+
         // Create objects with name field
         let mut obj1 = rhai::Map::new();
         obj1.insert("name".into(), Dynamic::from("charlie"));
@@ -449,7 +451,7 @@ mod tests {
         let sorted = sorted_by_field(arr, "name".to_string());
 
         assert_eq!(sorted.len(), 3);
-        
+
         // Should be sorted by name: alice, bob, charlie
         if let Some(obj) = sorted[0].clone().try_cast::<rhai::Map>() {
             assert_eq!(obj.get("name").unwrap().to_string(), "alice");
@@ -465,7 +467,7 @@ mod tests {
     #[test]
     fn test_sorted_by_missing_field() {
         let mut arr = Array::new();
-        
+
         // Create objects, some with the field, some without
         let mut obj1 = rhai::Map::new();
         obj1.insert("name".into(), Dynamic::from("alice"));
@@ -485,7 +487,7 @@ mod tests {
         let sorted = sorted_by_field(arr, "age".to_string());
 
         assert_eq!(sorted.len(), 3);
-        
+
         // Objects without the field should come first, then sorted by field value
         if let Some(obj) = sorted[0].clone().try_cast::<rhai::Map>() {
             assert_eq!(obj.get("name").unwrap().to_string(), "bob"); // no age field
