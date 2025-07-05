@@ -1,168 +1,150 @@
 # Kelora
 
-Kelora is a programmable, scriptable CLI tool for turning messy, real-world logs into structured, analyzable data. It’s designed for fast pipelines, complete control, and logic you own — not a log viewer, not a dashboard, not a black box.
+Kelora is a fast, scriptable CLI log processor built for real-world logs and clean data pipelines. It reads raw or structured logs (JSON, syslog, logfmt, CSV, etc.), and uses Rhai scripts to filter, enrich, and analyze them — all from the terminal.
 
 ---
 
-## 🚀 Try It in One Line
+## 🔧 Quick Start
 
 ```bash
-# Filter any log file (default line format)
-cat /var/log/syslog | kelora --filter 'line.matches("ERROR|WARN")'
+# Filter warnings and errors from a structured JSON log
+kelora -f jsonl app.log --levels warn,error
 
-# Parse syslog format (RFC3164/RFC5424)
-cat /var/log/syslog | kelora -f syslog --filter 'severity <= 3'
+# System logs (RHEL/Fedora: /var/log/messages; Ubuntu: /var/log/syslog)
+kelora -f syslog /var/log/messages --levels warn,error
+# OR
+kelora -f syslog /var/log/syslog --levels warn,error
 
-# Filter structured logs with Rhai
-cat logs.jsonl | kelora -f jsonl --filter 'status >= 400'
+# Extract slow HTTP requests
+kelora -f jsonl access.log \
+  --filter 'response_time.to_int() > 1000' \
+  --keys timestamp,method,path,response_time
 
-# Enrich and transform fields
-kelora -f jsonl --exec 'let sev = if status >= 500 { "crit" } else { "warn" };' logs.jsonl
+# Add a derived status class and export as CSV
+kelora -f jsonl app.log \
+  --exec 'let class = status_class(status)' \
+  --keys timestamp,status,class -F csv
 
-# Track max value across the stream
-kelora -f jsonl \
-  --exec 'track_max("max", duration_ms)' \
-  --end 'print(`Max: ${tracked["max"]}`)' logs.jsonl
+# Process compressed logs and filter server errors
+kelora -f jsonl logs/app.log.1.gz \
+  --filter 'status.to_int() >= 500'
 
-# Real-time Kubernetes logs
-kubectl logs app | kelora -f jsonl --filter 'level == "error"' -F text
+# Detect repeated login failures using a sliding window
+kelora -f jsonl auth.log --window 5 \
+  --filter 'event_type == "login_failed"' \
+  --exec 'let failures = window_values(window, "username").len(); if failures >= 3 { print("Suspicious activity") }'
 
-# Process compressed log files (automatic decompression)
-kelora -f jsonl app.log.1.gz --filter 'status >= 400'
-
-# Window-based event correlation (analyze recent events together)
-kelora -f jsonl --window 3 --exec 'let statuses = window_values(window, "status"); print("Recent statuses: " + statuses.len())' logs.jsonl
-
-# Detect patterns across event history
-kelora -f jsonl --window 2 --filter 'window.len() > 1 && window[1].status == "404" && status == "500"' logs.jsonl
+# Real-time log triage from Kubernetes
+kubectl logs -f app | kelora -f jsonl --levels warn,error
 ```
 
 ---
 
-## ⚙️ What It Is
+## 💡 Key Features
 
-* A CLI tool for structured log transformation
-* Designed for UNIX-style pipelines — stdin in, stdout out
-* Supports JSON, logfmt, syslog, and raw lines
-* Uses [Rhai](https://rhai.rs/), a simple JavaScript-like language, to filter, mutate, and analyze logs
-* Includes built-in global state tracking (`track_*`)
-* Sliding window functionality for event correlation and pattern detection
-* Supports parallel and streaming modes
-* Automatic gzip decompression for `.gz` files
-* Multiple input file support with flexible ordering options
-* Column extraction methods for parsing delimited text
+- **Rhai scripting**: powerful and readable one-liners
+- **Window analysis**: look at past N events with `--window`
+- **Flexible formats**: JSON, logfmt, syslog, CEF, CSV, TSV, raw lines
+- **Real-time capable**: stream from `tail`, `kubectl logs`, stdin
+- **Compressed input**: automatic `.gz` decompression
+- **Multi-file support**: process logs in CLI, alphabetical, or mtime order
+- **Parallel mode**: scale up with `--parallel`, `--threads`, `--unordered`
 
 ---
 
-## 📃 Rhai Primer
-
-Rhai is a tiny, embeddable scripting language built for Rust. Kelora uses it to let you embed logic directly into log pipelines — with no external runtime.
+## ✍️ Rhai Snippets
 
 ```rhai
-// Conditional tagging
-let sev = if status >= 500 { "crit" } else { "warn" };
+// Filtering
+level == "error" && user != "system"
 
-// Global counters or stats
+// Enrichment
+let sev = if status >= 500 { "crit" } else { "info" };
+
+// Global metrics
 track_count("errors");
 track_max("max_duration", duration_ms);
 
-// Column extraction from delimited text
-let user = line.col("0");
-let msg = line.col("3:");
+// Window-based logic (with --window N)
+let recent = window_values(window, "status");
+let changed = window.len() > 1 && window[1].status != status;
 
-// Parse structured data
-let json_data = parse_json(line);
-let kv_data = parse_kv("level=info method=GET status=200");
-
-// String processing with built-in methods
-let clean = text.strip();                    // Remove whitespace
-let upper = text.upper();                    // Convert to uppercase
-let is_num = field.is_digit();               // Check if all digits
-
-// Basic regex extraction
-let user = line.extract_re("user=(\\w+)");   // Extract first group
-let ip = line.extract_ip();                  // Extract first IP address
-
-// Window-based analysis (with --window N)
-let prev_statuses = window_values(window, "status");  // ["200", "404"] 
-let response_times = window_numbers(window, "time");  // [0.15, 0.23]
-let current = window[0];                             // Current event
-let previous = window[1];                            // Previous event
+// Regex, strings, JSON
+let user = line.extract_re("user=(\w+)");
+let ip = line.extract_ip();
+let data = parse_json(line);
 ```
 
-Available variables:
-
-* `event` — parsed field map
-* `line` — original line text
-* `tracked` — global metrics state
-* `meta.linenum` — current line number
-* `window` — array of recent events (with `--window N`)
-
----
-
-## 📊 What It’s Great For
-
-* Filtering and enriching logs in CI pipelines
-* Transforming logfmt ⇄ JSON
-* Real-time `kubectl logs` processing
-* Streaming one-liner data pipelines
-* Field selection, tagging, and global stats
-* Event correlation and pattern detection across log history
-* Processing compressed log files with automatic decompression
+Built-in objects:
+- `line` – raw line
+- `event` – parsed fields
+- `meta.linenum` – line number
+- `tracked` – global state
+- `window` – recent events (if `--window` is used)
 
 ---
 
-## 🕵️ What It’s Not
-
-| Task                     | Use Instead                                                               |
-| ------------------------ | ------------------------------------------------------------------------- |
-| Browsing logs            | [lnav](https://lnav.org/)                                                 |
-| Multi-host log ingestion | [Loki](https://grafana.com/oss/loki/), [fluentbit](https://fluentbit.io/) |
-| Full-text search         | [ripgrep](https://github.com/BurntSushi/ripgrep)                          |
-| JSON-only transformation | [jq](https://jqlang.org/)                                                 |
-| Regex-heavy pipelines    | [angle-grinder](https://github.com/rcoh/angle-grinder)                    |
-| Dashboards and alerting  | [Grafana](https://grafana.com/), [Kibana](https://www.elastic.co/kibana/) |
-
----
-
-## ✏️ Installation
+## 🏗️ Common Patterns
 
 ```bash
-git clone https://github.com/dloss/kelora.git
+# Filter and extract fields
+kelora -f jsonl logs.jsonl --filter 'status >= 500' --keys ts,level,msg
+
+# Format output
+kelora -f jsonl app.log -F csv --keys user,status,duration_ms
+kelora -f jsonl app.log -F logfmt --core --brief
+
+# Use aliases (from config)
+kelora -a errors logs.jsonl
+```
+
+---
+
+## 📦 Install
+
+```bash
+git clone https://github.com/dloss/kelora
 cd kelora
 cargo install --path .
 ```
 
 ---
 
-## ✈️ CLI Overview
+## 📚 Help & Options
 
-| Flag            | Purpose                                      |
-| --------------- | ---------------------------------------- |
-| `-f`            | Input format: `jsonl`, `logfmt`, `syslog`, `line` (default) |
-| `-F`            | Output format: `json`, `text`, `csv`   |
-| `--filter`      | Rhai filter expression (repeatable)    |
-| `--exec`        | Rhai exec scripts (repeatable)         |
-| `--exec-file`   | Execute Rhai script from file (repeatable) |
-| `--window`      | Enable sliding window of N+1 recent events |
-| `--begin/--end` | Logic before/after stream              |
-| `--on-error`    | Strategy: skip, print, abort, stub |
-| `--parallel`    | Enable parallel batch mode             |
-| `--unordered`   | Drop output order for performance      |
-| `--file-order`  | File processing order: `none`, `name`, `mtime` |
+```bash
+kelora --help         # Show CLI help
+kelora --show-config  # Show config file and aliases
+```
 
----
+### Example flags:
 
-## 🔖 Philosophy
-
-* Logs are **data**, not text
-* Be **explicit** — no guessing
-* Fail **visibly** — don’t drop data silently
-* CLI-first. Scriptable. Composable.
-* One format per stream. One job per flag.
+| Flag         | Purpose                                      |
+| ------------ | -------------------------------------------- |
+| `-f`         | Input format (`jsonl`, `line`, `syslog`, …) |
+| `-F`         | Output format (`jsonl`, `csv`, `logfmt`, …) |
+| `--filter`   | Rhai expression to include events            |
+| `--exec`     | Rhai script to transform events              |
+| `--window N` | Enable N+1 sliding event window              |
+| `--summary`  | Show tracked key/value table                 |
+| `--stats`    | Show line counts and performance stats       |
+| `--on-error` | How to handle bad lines (`print`, `skip`, …) |
 
 ---
 
-## ✍️ License
+## 🕵️ Not a Replacement For
 
-MIT License — see [LICENSE](LICENSE)
+| Task                | Use Instead                          |
+| ------------------- | ------------------------------------- |
+| Log browsing        | `lnav`                                |
+| Full-text search    | `ripgrep`                             |
+| Dashboards          | `Grafana`, `Kibana`                   |
+| Log ingestion       | `fluentbit`, `vector`, `loki`         |
+| JSON-only pipelines | `jq`                                  |
+| Regex pipelines     | `angle-grinder`                       |
+
+---
+
+## 📄 License
+
+MIT — see [LICENSE](LICENSE)
