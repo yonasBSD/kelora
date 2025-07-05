@@ -15,12 +15,9 @@ impl EventParser for ColsParser {
     fn parse(&self, line: &str) -> Result<Event> {
         // Split line on any whitespace and collect into vector
         let fields: Vec<&str> = line.split_whitespace().collect();
-        
-        // Create event with capacity for the fields plus the original line
-        let mut event = Event::with_capacity(line.to_string(), fields.len() + 1);
 
-        // Set the original line as a field so it's available as event["line"]
-        event.set_field("line".to_string(), Dynamic::from(line.to_string()));
+        // Create event with capacity for the fields
+        let mut event = Event::with_capacity(line.to_string(), fields.len());
 
         // Set numbered columns c1, c2, c3, etc.
         for (i, field) in fields.iter().enumerate() {
@@ -43,18 +40,8 @@ mod tests {
         let test_line = "field1 field2 field3";
         let result = EventParser::parse(&parser, test_line).unwrap();
 
-        // Should have the line available as a field
-        assert!(result.fields.get("line").is_some());
-        assert_eq!(
-            result
-                .fields
-                .get("line")
-                .unwrap()
-                .clone()
-                .into_string()
-                .unwrap(),
-            test_line
-        );
+        // Should NOT have the line field (cols format only provides c1, c2, c3...)
+        assert!(result.fields.get("line").is_none());
 
         // Should have numbered columns
         assert_eq!(
@@ -125,8 +112,8 @@ mod tests {
         let test_line = "";
         let result = EventParser::parse(&parser, test_line).unwrap();
 
-        // Should have line field but no c1, c2, etc.
-        assert!(result.fields.get("line").is_some());
+        // Should have no fields for empty line
+        assert!(result.fields.get("line").is_none());
         assert!(result.fields.get("c1").is_none());
     }
 
