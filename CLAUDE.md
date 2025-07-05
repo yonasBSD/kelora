@@ -140,6 +140,10 @@ make test-full          # Comprehensive test suite
 ./target/release/kelora -f csv access.csv --exec "let fields=line.cols(0,2,4)" --filter "fields[1] != ''"
 ./target/release/kelora -f jsonl app.log -k timestamp,level,message,user_id
 
+# Array sorting and analysis
+./target/release/kelora -f jsonl app.log --exec "let scores = get_path(parse_json(line), 'metrics.scores'); let top_scores = sorted(scores); print('Top score: ' + top_scores[-1])"
+./target/release/kelora -f jsonl api.log --window 5 --exec "let times = window_numbers(window, 'response_time'); let sorted_times = sorted(times); if sorted_times.len() > 2 { print('Response time range: ' + sorted_times[0] + '-' + sorted_times[-1] + 'ms') }"
+
 # Performance monitoring and statistics
 ./target/release/kelora -f jsonl app.log --exec "track_count('total'); track_bucket('status_codes', status.to_string())" --summary
 ./target/release/kelora -f jsonl app.log --filter "status >= 400" --stats
@@ -423,6 +427,45 @@ let method = kv.method;  // "GET"
 // Parse with custom separators
 let data = parse_kv("key1:value1,key2:value2", ",", ":");
 let key1 = data.key1;  // "value1"
+```
+
+#### Array Manipulation Functions
+
+**`sorted(array)`** - Sort an array and return a new sorted array (like Python's `sorted()`)
+- Takes any array and returns a new sorted array without modifying the original
+- Numbers are compared numerically when both elements are numbers
+- Strings are compared lexicographically  
+- Mixed types: numbers come before strings
+- Null values sort first
+- Booleans are converted to strings for comparison
+
+Examples:
+```rhai
+// Sort numbers
+let numbers = [3, 1, 4, 1, 5];
+let sorted_nums = sorted(numbers);  // [1, 1, 3, 4, 5]
+print(numbers);  // [3, 1, 4, 1, 5] - original unchanged
+
+// Sort strings
+let fruits = ["banana", "apple", "cherry"];
+let sorted_fruits = sorted(fruits);  // ["apple", "banana", "cherry"]
+
+// Sort mixed types - numbers come first, then strings
+let mixed = [3, "banana", 1, "apple"];
+let sorted_mixed = sorted(mixed);  // [1, 3, "apple", "banana"]
+
+// Use with parsed JSON data
+let data = get_path(parse_json(line), "scores");
+let top_scores = sorted(data);  // Sort array from JSON field
+
+// Common pattern: sort and take top N
+let response_times = window_numbers(window, "response_time");
+let sorted_times = sorted(response_times);
+if sorted_times.len() > 0 {
+    let fastest = sorted_times[0];
+    let slowest = sorted_times[-1];  // Last element
+    print("Range: " + fastest + "-" + slowest + "ms");
+}
 ```
 
 #### String Processing Functions
