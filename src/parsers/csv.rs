@@ -11,8 +11,8 @@ use std::sync::{Arc, Mutex};
 /// Supported formats:
 /// - CSV: Comma-separated values with headers
 /// - TSV: Tab-separated values with headers  
-/// - CSVNH: Comma-separated values without headers (generates col1, col2, col3...)
-/// - TSVNH: Tab-separated values without headers (generates col1, col2, col3...)
+/// - CSVNH: Comma-separated values without headers (generates c1, c2, c3...)
+/// - TSVNH: Tab-separated values without headers (generates c1, c2, c3...)
 pub struct CsvParser {
     delimiter: u8,
     has_headers: bool,
@@ -41,7 +41,7 @@ impl CsvParser {
         }
     }
 
-    /// Create a new CSV parser without headers (comma-separated, generates col1, col2, col3...)
+    /// Create a new CSV parser without headers (comma-separated, generates c1, c2, c3...)
     pub fn new_csv_no_headers() -> Self {
         Self {
             delimiter: b',',
@@ -51,7 +51,7 @@ impl CsvParser {
         }
     }
 
-    /// Create a new TSV parser without headers (tab-separated, generates col1, col2, col3...)
+    /// Create a new TSV parser without headers (tab-separated, generates c1, c2, c3...)
     pub fn new_tsv_no_headers() -> Self {
         Self {
             delimiter: b'\t',
@@ -78,7 +78,7 @@ impl CsvParser {
         }
     }
 
-    /// Generate column names for headerless CSV (col1, col2, col3...)
+    /// Generate column names for headerless CSV (c1, c2, c3...)
     fn generate_column_names(&self, line: &str) -> Result<Vec<String>> {
         let mut reader = ReaderBuilder::new()
             .delimiter(self.delimiter)
@@ -88,7 +88,7 @@ impl CsvParser {
 
         if let Some(result) = reader.records().next() {
             let record = result.context("Failed to parse CSV data line for column count")?;
-            let headers: Vec<String> = (1..=record.len()).map(|i| format!("col{}", i)).collect();
+            let headers: Vec<String> = (1..=record.len()).map(|i| format!("c{}", i)).collect();
             Ok(headers)
         } else {
             Err(anyhow::anyhow!("Empty CSV data line"))
@@ -197,10 +197,10 @@ mod tests {
 
         // First line should be data with generated column names
         let data_result = parser.parse("Alice,25,New York").unwrap();
-        assert_eq!(data_result.fields.get("col1").unwrap().to_string(), "Alice");
-        assert_eq!(data_result.fields.get("col2").unwrap().to_string(), "25");
+        assert_eq!(data_result.fields.get("c1").unwrap().to_string(), "Alice");
+        assert_eq!(data_result.fields.get("c2").unwrap().to_string(), "25");
         assert_eq!(
-            data_result.fields.get("col3").unwrap().to_string(),
+            data_result.fields.get("c3").unwrap().to_string(),
             "New York"
         );
     }
@@ -284,17 +284,17 @@ mod tests {
         // Parse data with varying column counts
         let data_result1 = parser.parse("Alice,25").unwrap();
         assert_eq!(
-            data_result1.fields.get("col1").unwrap().to_string(),
+            data_result1.fields.get("c1").unwrap().to_string(),
             "Alice"
         );
-        assert_eq!(data_result1.fields.get("col2").unwrap().to_string(), "25");
-        assert!(data_result1.fields.get("col3").is_none());
+        assert_eq!(data_result1.fields.get("c2").unwrap().to_string(), "25");
+        assert!(data_result1.fields.get("c3").is_none());
 
         // Second line with more columns (should still work)
         let data_result2 = parser.parse("Bob,30,Engineer").unwrap();
-        assert_eq!(data_result2.fields.get("col1").unwrap().to_string(), "Bob");
-        assert_eq!(data_result2.fields.get("col2").unwrap().to_string(), "30");
-        // col3 won't exist because headers were set by first line
-        assert!(data_result2.fields.get("col3").is_none());
+        assert_eq!(data_result2.fields.get("c1").unwrap().to_string(), "Bob");
+        assert_eq!(data_result2.fields.get("c2").unwrap().to_string(), "30");
+        // c3 won't exist because headers were set by first line
+        assert!(data_result2.fields.get("c3").is_none());
     }
 }

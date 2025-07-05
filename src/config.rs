@@ -80,6 +80,7 @@ pub enum InputFormat {
     Tsvnh,
     Apache,
     Nginx,
+    Cols,
 }
 
 /// Output format enumeration
@@ -573,6 +574,7 @@ impl From<crate::InputFormat> for InputFormat {
             crate::InputFormat::Tsvnh => InputFormat::Tsvnh,
             crate::InputFormat::Apache => InputFormat::Apache,
             crate::InputFormat::Nginx => InputFormat::Nginx,
+            crate::InputFormat::Cols => InputFormat::Cols,
         }
     }
 }
@@ -591,6 +593,7 @@ impl From<InputFormat> for crate::InputFormat {
             InputFormat::Tsvnh => crate::InputFormat::Tsvnh,
             InputFormat::Apache => crate::InputFormat::Apache,
             InputFormat::Nginx => crate::InputFormat::Nginx,
+            InputFormat::Cols => crate::InputFormat::Cols,
         }
     }
 }

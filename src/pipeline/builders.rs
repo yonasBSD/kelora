@@ -79,6 +79,7 @@ impl PipelineBuilder {
             crate::InputFormat::Tsvnh => Box::new(crate::parsers::CsvParser::new_tsv_no_headers()),
             crate::InputFormat::Apache => Box::new(crate::parsers::ApacheParser::new()?),
             crate::InputFormat::Nginx => Box::new(crate::parsers::NginxParser::new()?),
+            crate::InputFormat::Cols => Box::new(crate::parsers::ColsParser::new()),
         };
 
         // Create formatter
@@ -261,6 +262,7 @@ impl PipelineBuilder {
             crate::InputFormat::Tsvnh => Box::new(crate::parsers::CsvParser::new_tsv_no_headers()),
             crate::InputFormat::Apache => Box::new(crate::parsers::ApacheParser::new()?),
             crate::InputFormat::Nginx => Box::new(crate::parsers::NginxParser::new()?),
+            crate::InputFormat::Cols => Box::new(crate::parsers::ColsParser::new()),
         };
 
         // Create formatter (workers still need formatters for output)

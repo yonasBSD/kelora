@@ -90,8 +90,8 @@ make test-full          # Comprehensive test suite
 # CSV/TSV (Tabular Data) parsing and output
 ./target/release/kelora -f csv sales.csv --filter 'revenue.to_int() > 1000' --keys date,customer,revenue
 ./target/release/kelora -f tsv query_results.tsv --filter 'status == "success"' --keys user_id,action,timestamp
-./target/release/kelora -f csvnh sensor_data.csv --filter 'col3.to_float() > 25.0' --keys col1,col2,col3  # No headers
-./target/release/kelora -f tsvnh measurement.tsv --exec 'if col2.to_float() > 30.0 { print("Hot: " + col2) }'
+./target/release/kelora -f csvnh sensor_data.csv --filter 'c3.to_float() > 25.0' --keys c1,c2,c3  # No headers
+./target/release/kelora -f tsvnh measurement.tsv --exec 'if c2.to_float() > 30.0 { print("Hot: " + c2) }'
 
 # CSV/TSV output formatting (requires --keys for field order)
 ./target/release/kelora -f jsonl app.log --keys user,status,response_time -F csv     # CSV output with headers
@@ -102,6 +102,13 @@ make test-full          # Comprehensive test suite
 # CSV with complex data (automatic quoting)
 ./target/release/kelora -f csv "data with spaces.csv" --filter 'description.contains("error")' --keys id,description,timestamp
 ./target/release/kelora -f jsonl app.log --keys user,message -F csv  # Handles quotes: "Smith, John","He said ""hello"""
+
+# Cols format (whitespace-separated columns, similar to AWK)
+# Note: Both 'cols' format and CSV/TSV formats without headers use unified c1, c2, c3... naming
+./target/release/kelora -f cols access.log --filter 'c3 == "ERROR"' --keys c1,c2,c3,c4  # Split on whitespace into c1, c2, c3, etc.
+./target/release/kelora -f cols app.log --exec 'print("User: " + c1 + ", Status: " + c2 + ", Time: " + c3)'
+./target/release/kelora -f cols /var/log/messages --filter 'c4.contains("error")' --keys c1,c2,c3,c4,c5  # Process syslog-style logs
+./target/release/kelora -f cols data.txt --exec 'if c2.to_int() > 100 { print("High value: " + c2) }'  # Numeric processing
 
 # Tracking and metrics
 ./target/release/kelora -f jsonl access.log --exec "track_count(status_class(status))" --end "print(tracked)"

@@ -250,6 +250,7 @@ pub enum InputFormat {
     Tsvnh,
     Apache,
     Nginx,
+    Cols,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, Default)]
@@ -915,6 +916,7 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
                 "csv" => crate::InputFormat::Csv,
                 "apache" => crate::InputFormat::Apache,
                 "nginx" => crate::InputFormat::Nginx,
+                "cols" => crate::InputFormat::Cols,
                 _ => cli.format, // Keep original if invalid
             };
         }
