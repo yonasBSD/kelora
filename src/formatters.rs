@@ -293,6 +293,21 @@ impl pipeline::Formatter for DefaultFormatter {
     }
 }
 
+// Hide formatter - suppresses all event output
+pub struct HideFormatter;
+
+impl HideFormatter {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl pipeline::Formatter for HideFormatter {
+    fn format(&self, _event: &Event) -> String {
+        String::new()
+    }
+}
+
 // Logfmt formatter - strict logfmt output formatter (no colors, no brief mode)
 pub struct LogfmtFormatter;
 
@@ -478,6 +493,26 @@ mod tests {
     fn test_logfmt_formatter_empty_event() {
         let event = Event::default();
         let formatter = LogfmtFormatter::new();
+        let result = formatter.format(&event);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_hide_formatter() {
+        let mut event = Event::default();
+        event.set_field("level".to_string(), Dynamic::from("INFO".to_string()));
+        event.set_field("message".to_string(), Dynamic::from("Test message".to_string()));
+        event.set_field("user".to_string(), Dynamic::from("alice".to_string()));
+
+        let formatter = HideFormatter::new();
+        let result = formatter.format(&event);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_hide_formatter_empty_event() {
+        let event = Event::default();
+        let formatter = HideFormatter::new();
         let result = formatter.format(&event);
         assert_eq!(result, "");
     }

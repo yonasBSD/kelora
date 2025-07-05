@@ -845,8 +845,10 @@ impl ParallelProcessor {
                 eprintln!("{}", eprint_msg);
             }
 
-            // Then output the event itself
-            stdout.writeln(&processed.event.original_line).unwrap_or(());
+            // Then output the event itself, skip empty strings
+            if !processed.event.original_line.is_empty() {
+                stdout.writeln(&processed.event.original_line).unwrap_or(());
+            }
         }
 
         stdout.flush().unwrap_or(());

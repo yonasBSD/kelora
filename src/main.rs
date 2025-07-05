@@ -256,6 +256,7 @@ pub enum OutputFormat {
     Default,
     Logfmt,
     Csv,
+    Hide,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -679,14 +680,16 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
                     stats_add_line_filtered();
                 }
 
-                // Output all results (usually just one)
+                // Output all results (usually just one), skip empty strings
                 for result in results {
-                    stdout.writeln(&result).unwrap_or_else(|e| {
-                        stderr
-                            .writeln(&config.format_error_message(&format!("Output error: {}", e)))
-                            .unwrap_or(());
-                        ExitCode::GeneralError.exit();
-                    });
+                    if !result.is_empty() {
+                        stdout.writeln(&result).unwrap_or_else(|e| {
+                            stderr
+                                .writeln(&config.format_error_message(&format!("Output error: {}", e)))
+                                .unwrap_or(());
+                            ExitCode::GeneralError.exit();
+                        });
+                    }
                 }
                 stdout.flush().unwrap_or_else(|e| {
                     stderr
@@ -719,12 +722,14 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
     match pipeline.flush(&mut ctx) {
         Ok(results) => {
             for result in results {
-                stdout.writeln(&result).unwrap_or_else(|e| {
-                    stderr
-                        .writeln(&config.format_error_message(&format!("Output error: {}", e)))
-                        .unwrap_or(());
-                    ExitCode::GeneralError.exit();
-                });
+                if !result.is_empty() {
+                    stdout.writeln(&result).unwrap_or_else(|e| {
+                        stderr
+                            .writeln(&config.format_error_message(&format!("Output error: {}", e)))
+                            .unwrap_or(());
+                        ExitCode::GeneralError.exit();
+                    });
+                }
             }
         }
         Err(e) => {

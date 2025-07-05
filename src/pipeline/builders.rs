@@ -94,6 +94,7 @@ impl PipelineBuilder {
             crate::OutputFormat::Csv => {
                 return Err(anyhow::anyhow!("CSV formatter not implemented yet"))
             }
+            crate::OutputFormat::Hide => Box::new(crate::formatters::HideFormatter::new()),
         };
 
         // Create script stages
@@ -236,6 +237,7 @@ impl PipelineBuilder {
             crate::OutputFormat::Csv => {
                 return Err(anyhow::anyhow!("CSV formatter not implemented yet"))
             }
+            crate::OutputFormat::Hide => Box::new(crate::formatters::HideFormatter::new()),
         };
 
         // Create script stages
