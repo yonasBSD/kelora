@@ -143,6 +143,8 @@ make test-full          # Comprehensive test suite
 # Array sorting and analysis
 ./target/release/kelora -f jsonl app.log --exec "let scores = get_path(parse_json(line), 'metrics.scores'); let top_scores = sorted(scores); print('Top score: ' + top_scores[-1])"
 ./target/release/kelora -f jsonl api.log --window 5 --exec "let times = window_numbers(window, 'response_time'); let sorted_times = sorted(times); if sorted_times.len() > 2 { print('Response time range: ' + sorted_times[0] + '-' + sorted_times[-1] + 'ms') }"
+./target/release/kelora -f jsonl access.log --exec "let users = get_path(parse_json(line), 'users'); let top_user = users.sorted_by('request_count').reversed()[0]; print('Most active user: ' + top_user.username)"
+./target/release/kelora -f jsonl errors.log --exec "let events = get_path(parse_json(line), 'error_events'); let first_error = events.sorted_by('timestamp')[0]; print('First error: ' + first_error.message)"
 
 # Performance monitoring and statistics
 ./target/release/kelora -f jsonl app.log --exec "track_count('total'); track_bucket('status_codes', status.to_string())" --summary
@@ -439,6 +441,17 @@ let key1 = data.key1;  // "value1"
 - Null values sort first
 - Booleans are converted to strings for comparison
 
+**`reversed(array)`** - Reverse an array and return a new reversed array (like Python's `reversed()`)
+- Takes any array and returns a new array with elements in reverse order
+- Does not modify the original array
+- Works with any array type (numbers, strings, objects, mixed)
+
+**`sorted_by(field_name)`** - Sort an array of objects/maps by a specific field (method syntax)
+- Call as `array.sorted_by(field_name)` to sort objects by the specified field
+- Field values are compared using the same logic as `sorted()`
+- Objects without the specified field are placed at the beginning
+- Useful for sorting log entries, user data, or any structured objects
+
 Examples:
 ```rhai
 // Sort numbers
@@ -450,15 +463,34 @@ print(numbers);  // [3, 1, 4, 1, 5] - original unchanged
 let fruits = ["banana", "apple", "cherry"];
 let sorted_fruits = sorted(fruits);  // ["apple", "banana", "cherry"]
 
-// Sort mixed types - numbers come first, then strings
-let mixed = [3, "banana", 1, "apple"];
-let sorted_mixed = sorted(mixed);  // [1, 3, "apple", "banana"]
+// Reverse any array
+let numbers = [1, 2, 3, 4, 5];
+let backwards = reversed(numbers);  // [5, 4, 3, 2, 1]
+
+// Common pattern: sort then reverse for descending order
+let scores = [85, 92, 78, 96, 88];
+let highest_first = reversed(sorted(scores));  // [96, 92, 88, 85, 78]
+
+// Sort objects by field (method syntax)
+let users = [
+    {"name": "alice", "age": 30, "score": 85},
+    {"name": "bob", "age": 25, "score": 92},
+    {"name": "charlie", "age": 35, "score": 78}
+];
+let by_age = users.sorted_by("age");      // Sorted by age: bob(25), alice(30), charlie(35)
+let by_score = users.sorted_by("score");  // Sorted by score: charlie(78), alice(85), bob(92)
+let by_name = users.sorted_by("name");    // Sorted by name: alice, bob, charlie
 
 // Use with parsed JSON data
-let data = get_path(parse_json(line), "scores");
-let top_scores = sorted(data);  // Sort array from JSON field
+let events = get_path(parse_json(line), "events");
+let by_timestamp = events.sorted_by("timestamp");  // Chronological order
+let by_severity = events.sorted_by("level");       // By log level
 
-// Common pattern: sort and take top N
+// Chain methods for complex sorting
+let top_performers = users.sorted_by("score").reversed();  // Highest scores first
+let oldest_by_name = users.sorted_by("age").reversed().sorted_by("name");  // Oldest first, then by name
+
+// Advanced analysis patterns
 let response_times = window_numbers(window, "response_time");
 let sorted_times = sorted(response_times);
 if sorted_times.len() > 0 {
@@ -466,6 +498,10 @@ if sorted_times.len() > 0 {
     let slowest = sorted_times[-1];  // Last element
     print("Range: " + fastest + "-" + slowest + "ms");
 }
+
+// Sort mixed types - numbers come first, then strings
+let mixed = [3, "banana", 1, "apple"];
+let sorted_mixed = sorted(mixed);  // [1, 3, "apple", "banana"]
 ```
 
 #### String Processing Functions

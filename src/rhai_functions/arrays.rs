@@ -4,6 +4,12 @@ use rhai::{Array, Dynamic, Engine};
 pub fn register_functions(engine: &mut Engine) {
     // Register sorted function - like Python's sorted(), takes any iterable and returns sorted items
     engine.register_fn("sorted", sorted_array);
+    
+    // Register reversed function - like Python's reversed(), reverses array order
+    engine.register_fn("reversed", reversed_array);
+    
+    // Register sorted_by function - sort objects/maps by field name
+    engine.register_fn("sorted_by", sorted_by_field);
 }
 
 /// Sort an array and return a new sorted array (like Python's sorted())
@@ -88,6 +94,133 @@ fn get_number_value(value: &Dynamic) -> Result<f64, ()> {
     } else {
         Err(())
     }
+}
+
+/// Reverse an array and return a new reversed array (like Python's reversed())
+///
+/// Takes any array and returns a new array with elements in reverse order
+/// without modifying the original.
+///
+/// # Arguments
+/// * `arr` - The array to reverse
+///
+/// # Returns
+/// A new array containing the same elements in reverse order
+///
+/// # Examples
+/// ```rhai
+/// let numbers = [1, 2, 3, 4, 5];
+/// let backwards = reversed(numbers);  // [5, 4, 3, 2, 1]
+/// print(numbers);  // [1, 2, 3, 4, 5] - original unchanged
+///
+/// let words = ["first", "second", "third"];
+/// let reversed_words = reversed(words);  // ["third", "second", "first"]
+///
+/// // Common pattern: sort then reverse for descending order
+/// let scores = [85, 92, 78, 96, 88];
+/// let highest_first = reversed(sorted(scores));  // [96, 92, 88, 85, 78]
+/// ```
+fn reversed_array(mut arr: Array) -> Array {
+    arr.reverse();
+    arr
+}
+
+/// Sort an array of objects/maps by a specific field name
+///
+/// Takes an array of objects (maps) and sorts them by the specified field.
+/// The field values are compared using the same logic as sorted():
+/// numbers numerically, strings lexicographically, mixed types with numbers first.
+///
+/// # Arguments
+/// * `arr` - The array of objects to sort
+/// * `field_name` - The name of the field to sort by
+///
+/// # Returns
+/// A new array containing the same objects sorted by the specified field
+///
+/// # Examples
+/// ```rhai
+/// let users = [
+///     {"name": "alice", "age": 30, "score": 85},
+///     {"name": "bob", "age": 25, "score": 92},
+///     {"name": "charlie", "age": 35, "score": 78}
+/// ];
+/// 
+/// let by_age = sorted_by(users, "age");      // Sorted by age: bob(25), alice(30), charlie(35)
+/// let by_score = sorted_by(users, "score");  // Sorted by score: charlie(78), alice(85), bob(92)
+/// let by_name = sorted_by(users, "name");    // Sorted by name: alice, bob, charlie
+///
+/// // Use with log entries
+/// let events = get_path(parse_json(line), "events");
+/// let by_timestamp = sorted_by(events, "timestamp");  // Chronological order
+/// let by_severity = sorted_by(events, "level");       // By log level
+/// ```
+///
+/// # Behavior with Missing Fields
+/// - Objects without the specified field are placed at the beginning
+/// - Objects with null/empty field values sort before non-empty values
+/// - Field values are compared using the same rules as sorted()
+fn sorted_by_field(mut arr: Array, field_name: String) -> Array {
+    // Sort using a custom comparator that looks at the specified field
+    arr.sort_by(|a, b| {
+        // Extract field values from both objects
+        let a_field = extract_field_value(a, &field_name);
+        let b_field = extract_field_value(b, &field_name);
+        
+        // Handle missing fields - objects without the field come first
+        match (a_field, b_field) {
+            (None, None) => std::cmp::Ordering::Equal,
+            (None, Some(_)) => std::cmp::Ordering::Less,
+            (Some(_), None) => std::cmp::Ordering::Greater,
+            (Some(a_val), Some(b_val)) => {
+                // Use the same comparison logic as sorted()
+                compare_dynamic_values(&a_val, &b_val)
+            }
+        }
+    });
+    
+    arr
+}
+
+/// Helper function to extract a field value from a Dynamic object
+fn extract_field_value(obj: &Dynamic, field_name: &str) -> Option<Dynamic> {
+    if let Some(map) = obj.clone().try_cast::<rhai::Map>() {
+        map.get(field_name).cloned()
+    } else {
+        None
+    }
+}
+
+/// Helper function to compare two Dynamic values using the same logic as sorted()
+fn compare_dynamic_values(a: &Dynamic, b: &Dynamic) -> std::cmp::Ordering {
+    // Handle null values first
+    if a.is_unit() && b.is_unit() {
+        return std::cmp::Ordering::Equal;
+    }
+    if a.is_unit() {
+        return std::cmp::Ordering::Less;
+    }
+    if b.is_unit() {
+        return std::cmp::Ordering::Greater;
+    }
+    
+    // If both are numbers, compare numerically
+    if let (Ok(a_num), Ok(b_num)) = (get_number_value(a), get_number_value(b)) {
+        return a_num.partial_cmp(&b_num).unwrap_or(std::cmp::Ordering::Equal);
+    }
+    
+    // If one is a number and the other isn't, numbers come first
+    if get_number_value(a).is_ok() && get_number_value(b).is_err() {
+        return std::cmp::Ordering::Less;
+    }
+    if get_number_value(a).is_err() && get_number_value(b).is_ok() {
+        return std::cmp::Ordering::Greater;
+    }
+    
+    // Otherwise, compare as strings
+    let a_str = a.to_string();
+    let b_str = b.to_string();
+    a_str.cmp(&b_str)
 }
 
 #[cfg(test)]
@@ -211,5 +344,157 @@ mod tests {
         assert_eq!(sorted[0].to_string(), "apple");
         assert_eq!(sorted[1].to_string(), "false");
         assert_eq!(sorted[2].to_string(), "true");
+    }
+
+    #[test]
+    fn test_reversed_basic() {
+        let mut arr = Array::new();
+        arr.push(Dynamic::from(1i64));
+        arr.push(Dynamic::from(2i64));
+        arr.push(Dynamic::from(3i64));
+        arr.push(Dynamic::from(4i64));
+        arr.push(Dynamic::from(5i64));
+
+        let reversed = reversed_array(arr);
+
+        assert_eq!(reversed.len(), 5);
+        assert_eq!(reversed[0].as_int().unwrap(), 5i64);
+        assert_eq!(reversed[1].as_int().unwrap(), 4i64);
+        assert_eq!(reversed[2].as_int().unwrap(), 3i64);
+        assert_eq!(reversed[3].as_int().unwrap(), 2i64);
+        assert_eq!(reversed[4].as_int().unwrap(), 1i64);
+    }
+
+    #[test]
+    fn test_reversed_strings() {
+        let mut arr = Array::new();
+        arr.push(Dynamic::from("first"));
+        arr.push(Dynamic::from("second"));
+        arr.push(Dynamic::from("third"));
+
+        let reversed = reversed_array(arr);
+
+        assert_eq!(reversed.len(), 3);
+        assert_eq!(reversed[0].to_string(), "third");
+        assert_eq!(reversed[1].to_string(), "second");
+        assert_eq!(reversed[2].to_string(), "first");
+    }
+
+    #[test]
+    fn test_reversed_empty_array() {
+        let arr = Array::new();
+        let reversed = reversed_array(arr);
+        assert_eq!(reversed.len(), 0);
+    }
+
+    #[test]
+    fn test_sorted_by_numeric_field() {
+        let mut arr = Array::new();
+        
+        // Create objects with age field
+        let mut obj1 = rhai::Map::new();
+        obj1.insert("name".into(), Dynamic::from("alice"));
+        obj1.insert("age".into(), Dynamic::from(30i64));
+        arr.push(Dynamic::from(obj1));
+
+        let mut obj2 = rhai::Map::new();
+        obj2.insert("name".into(), Dynamic::from("bob"));
+        obj2.insert("age".into(), Dynamic::from(25i64));
+        arr.push(Dynamic::from(obj2));
+
+        let mut obj3 = rhai::Map::new();
+        obj3.insert("name".into(), Dynamic::from("charlie"));
+        obj3.insert("age".into(), Dynamic::from(35i64));
+        arr.push(Dynamic::from(obj3));
+
+        let sorted = sorted_by_field(arr, "age".to_string());
+
+        assert_eq!(sorted.len(), 3);
+        
+        // Should be sorted by age: bob(25), alice(30), charlie(35)
+        if let Some(obj) = sorted[0].clone().try_cast::<rhai::Map>() {
+            assert_eq!(obj.get("name").unwrap().to_string(), "bob");
+            assert_eq!(obj.get("age").unwrap().as_int().unwrap(), 25i64);
+        }
+        if let Some(obj) = sorted[1].clone().try_cast::<rhai::Map>() {
+            assert_eq!(obj.get("name").unwrap().to_string(), "alice");
+            assert_eq!(obj.get("age").unwrap().as_int().unwrap(), 30i64);
+        }
+        if let Some(obj) = sorted[2].clone().try_cast::<rhai::Map>() {
+            assert_eq!(obj.get("name").unwrap().to_string(), "charlie");
+            assert_eq!(obj.get("age").unwrap().as_int().unwrap(), 35i64);
+        }
+    }
+
+    #[test]
+    fn test_sorted_by_string_field() {
+        let mut arr = Array::new();
+        
+        // Create objects with name field
+        let mut obj1 = rhai::Map::new();
+        obj1.insert("name".into(), Dynamic::from("charlie"));
+        obj1.insert("score".into(), Dynamic::from(78i64));
+        arr.push(Dynamic::from(obj1));
+
+        let mut obj2 = rhai::Map::new();
+        obj2.insert("name".into(), Dynamic::from("alice"));
+        obj2.insert("score".into(), Dynamic::from(85i64));
+        arr.push(Dynamic::from(obj2));
+
+        let mut obj3 = rhai::Map::new();
+        obj3.insert("name".into(), Dynamic::from("bob"));
+        obj3.insert("score".into(), Dynamic::from(92i64));
+        arr.push(Dynamic::from(obj3));
+
+        let sorted = sorted_by_field(arr, "name".to_string());
+
+        assert_eq!(sorted.len(), 3);
+        
+        // Should be sorted by name: alice, bob, charlie
+        if let Some(obj) = sorted[0].clone().try_cast::<rhai::Map>() {
+            assert_eq!(obj.get("name").unwrap().to_string(), "alice");
+        }
+        if let Some(obj) = sorted[1].clone().try_cast::<rhai::Map>() {
+            assert_eq!(obj.get("name").unwrap().to_string(), "bob");
+        }
+        if let Some(obj) = sorted[2].clone().try_cast::<rhai::Map>() {
+            assert_eq!(obj.get("name").unwrap().to_string(), "charlie");
+        }
+    }
+
+    #[test]
+    fn test_sorted_by_missing_field() {
+        let mut arr = Array::new();
+        
+        // Create objects, some with the field, some without
+        let mut obj1 = rhai::Map::new();
+        obj1.insert("name".into(), Dynamic::from("alice"));
+        obj1.insert("age".into(), Dynamic::from(30i64));
+        arr.push(Dynamic::from(obj1));
+
+        let mut obj2 = rhai::Map::new();
+        obj2.insert("name".into(), Dynamic::from("bob"));
+        // No age field
+        arr.push(Dynamic::from(obj2));
+
+        let mut obj3 = rhai::Map::new();
+        obj3.insert("name".into(), Dynamic::from("charlie"));
+        obj3.insert("age".into(), Dynamic::from(25i64));
+        arr.push(Dynamic::from(obj3));
+
+        let sorted = sorted_by_field(arr, "age".to_string());
+
+        assert_eq!(sorted.len(), 3);
+        
+        // Objects without the field should come first, then sorted by field value
+        if let Some(obj) = sorted[0].clone().try_cast::<rhai::Map>() {
+            assert_eq!(obj.get("name").unwrap().to_string(), "bob"); // no age field
+        }
+        if let Some(obj) = sorted[1].clone().try_cast::<rhai::Map>() {
+            assert_eq!(obj.get("name").unwrap().to_string(), "charlie"); // age 25
+        }
+        if let Some(obj) = sorted[2].clone().try_cast::<rhai::Map>() {
+            assert_eq!(obj.get("name").unwrap().to_string(), "alice"); // age 30
+        }
     }
 }
