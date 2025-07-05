@@ -256,6 +256,11 @@ impl ScriptStage for KeyFilterStage {
         // Apply the filtering
         event.filter_keys(&effective_keys);
 
-        ScriptResult::Emit(event)
+        // If any key filtering was applied and no fields remain, skip this event
+        if self.is_active() && event.fields.is_empty() {
+            ScriptResult::Skip
+        } else {
+            ScriptResult::Emit(event)
+        }
     }
 }
