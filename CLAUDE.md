@@ -87,6 +87,22 @@ make test-full          # Comprehensive test suite
 ./target/release/kelora -f cef security.log --filter 'severity.to_int() >= 7'
 ./target/release/kelora -f cef firewall.cef --filter 'src.extract_ip() != ""' --keys timestamp,host,vendor,product,event,src,dst
 
+# CSV/TSV (Tabular Data) parsing and output
+./target/release/kelora -f csv sales.csv --filter 'revenue.to_int() > 1000' --keys date,customer,revenue
+./target/release/kelora -f tsv query_results.tsv --filter 'status == "success"' --keys user_id,action,timestamp
+./target/release/kelora -f csvnh sensor_data.csv --filter 'col3.to_float() > 25.0' --keys col1,col2,col3  # No headers
+./target/release/kelora -f tsvnh measurement.tsv --exec 'if col2.to_float() > 30.0 { print("Hot: " + col2) }'
+
+# CSV/TSV output formatting (requires --keys for field order)
+./target/release/kelora -f jsonl app.log --keys user,status,response_time -F csv     # CSV output with headers
+./target/release/kelora -f jsonl app.log --keys user,status,response_time -F tsv     # TSV output with headers  
+./target/release/kelora -f jsonl app.log --keys user,status,response_time -F csvnh   # CSV output without headers
+./target/release/kelora -f jsonl app.log --keys user,status,response_time -F tsvnh   # TSV output without headers
+
+# CSV with complex data (automatic quoting)
+./target/release/kelora -f csv "data with spaces.csv" --filter 'description.contains("error")' --keys id,description,timestamp
+./target/release/kelora -f jsonl app.log --keys user,message -F csv  # Handles quotes: "Smith, John","He said ""hello"""
+
 # Tracking and metrics
 ./target/release/kelora -f jsonl access.log --exec "track_count(status_class(status))" --end "print(tracked)"
 ./target/release/kelora -f jsonl access.log --exec-file transform.rhai
@@ -107,7 +123,7 @@ make test-full          # Comprehensive test suite
 # Line preprocessing and ignoring patterns
 ./target/release/kelora -f jsonl app.log --ignore-lines "^#.*|^$"     # Skip comments and empty lines
 ./target/release/kelora -f line /var/log/syslog --ignore-lines "systemd.*"  # Skip systemd messages
-./target/release/kelora -f csv data.csv --ignore-lines "^\"?Date"     # Skip CSV header lines
+./target/release/kelora -f line data.csv --ignore-lines "^\"?Date"    # Skip CSV headers when using line format
 
 # Multi-line log event processing
 # ⚠️  IMPORTANT: Multi-line mode buffers events until complete. In streaming scenarios,

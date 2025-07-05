@@ -2,6 +2,7 @@ use crate::colors::ColorScheme;
 use crate::event::Event;
 use crate::pipeline;
 use rhai::Dynamic;
+use std::sync::{Arc, Mutex};
 
 #[cfg(test)]
 use crate::pipeline::Formatter;
@@ -96,6 +97,27 @@ fn dynamic_to_json(value: &Dynamic) -> serde_json::Value {
     } else {
         // For other types, convert to string
         serde_json::Value::String(value.to_string())
+    }
+}
+
+/// Check if a CSV value needs quoting
+fn needs_csv_quoting(value: &str, delimiter: char) -> bool {
+    value.is_empty()
+        || value.contains(delimiter)
+        || value.contains('"')
+        || value.contains('\n')
+        || value.contains('\r')
+        || value.starts_with(' ')
+        || value.ends_with(' ')
+}
+
+/// Escape CSV value with proper quoting
+fn escape_csv_value(value: &str, delimiter: char) -> String {
+    if needs_csv_quoting(value, delimiter) {
+        let escaped = value.replace('"', "\"\"");
+        format!("\"{}\"", escaped)
+    } else {
+        value.to_string()
     }
 }
 
@@ -354,6 +376,96 @@ impl pipeline::Formatter for LogfmtFormatter {
     }
 }
 
+// CSV formatter - outputs CSV format with required field order
+pub struct CsvFormatter {
+    delimiter: char,
+    keys: Vec<String>,
+    include_header: bool,
+    header_written: Arc<Mutex<bool>>,
+}
+
+impl CsvFormatter {
+    pub fn new(keys: Vec<String>) -> Self {
+        Self {
+            delimiter: ',',
+            keys,
+            include_header: true,
+            header_written: Arc::new(Mutex::new(false)),
+        }
+    }
+
+    pub fn new_tsv(keys: Vec<String>) -> Self {
+        Self {
+            delimiter: '\t',
+            keys,
+            include_header: true,
+            header_written: Arc::new(Mutex::new(false)),
+        }
+    }
+
+    pub fn new_csv_no_header(keys: Vec<String>) -> Self {
+        Self {
+            delimiter: ',',
+            keys,
+            include_header: false,
+            header_written: Arc::new(Mutex::new(true)), // Skip header
+        }
+    }
+
+    pub fn new_tsv_no_header(keys: Vec<String>) -> Self {
+        Self {
+            delimiter: '\t',
+            keys,
+            include_header: false,
+            header_written: Arc::new(Mutex::new(true)), // Skip header
+        }
+    }
+
+    /// Format the header row
+    fn format_header(&self) -> String {
+        self.keys
+            .iter()
+            .map(|key| escape_csv_value(key, self.delimiter))
+            .collect::<Vec<_>>()
+            .join(&self.delimiter.to_string())
+    }
+
+    /// Format a data row
+    fn format_data_row(&self, event: &Event) -> String {
+        self.keys
+            .iter()
+            .map(|key| {
+                if let Some(value) = event.fields.get(key) {
+                    escape_csv_value(&value.to_string(), self.delimiter)
+                } else {
+                    String::new() // Empty field for missing values
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(&self.delimiter.to_string())
+    }
+}
+
+impl pipeline::Formatter for CsvFormatter {
+    fn format(&self, event: &Event) -> String {
+        let mut output = String::new();
+
+        // Write header row if needed (thread-safe, once only)
+        if self.include_header {
+            let mut header_written = self.header_written.lock().unwrap();
+            if !*header_written {
+                output.push_str(&self.format_header());
+                output.push('\n');
+                *header_written = true;
+            }
+        }
+
+        // Write data row
+        output.push_str(&self.format_data_row(event));
+        output
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -501,7 +613,10 @@ mod tests {
     fn test_hide_formatter() {
         let mut event = Event::default();
         event.set_field("level".to_string(), Dynamic::from("INFO".to_string()));
-        event.set_field("message".to_string(), Dynamic::from("Test message".to_string()));
+        event.set_field(
+            "message".to_string(),
+            Dynamic::from("Test message".to_string()),
+        );
         event.set_field("user".to_string(), Dynamic::from("alice".to_string()));
 
         let formatter = HideFormatter::new();
@@ -522,7 +637,10 @@ mod tests {
         // Null format uses HideFormatter, so test that it produces empty strings
         let mut event = Event::default();
         event.set_field("level".to_string(), Dynamic::from("ERROR".to_string()));
-        event.set_field("message".to_string(), Dynamic::from("Critical error".to_string()));
+        event.set_field(
+            "message".to_string(),
+            Dynamic::from("Critical error".to_string()),
+        );
 
         let formatter = HideFormatter::new(); // Null format uses HideFormatter
         let result = formatter.format(&event);
@@ -559,5 +677,111 @@ mod tests {
             format_dynamic_value(&Dynamic::from(true)),
             ("true".to_string(), false)
         );
+    }
+
+    #[test]
+    fn test_csv_formatter_basic() {
+        let keys = vec!["name".to_string(), "age".to_string(), "city".to_string()];
+        let formatter = CsvFormatter::new(keys);
+
+        let mut event = Event::default();
+        event.set_field("name".to_string(), Dynamic::from("Alice".to_string()));
+        event.set_field("age".to_string(), Dynamic::from(25i64));
+        event.set_field("city".to_string(), Dynamic::from("New York".to_string()));
+
+        let result = formatter.format(&event);
+
+        // Should include header and data
+        assert!(result.contains("name,age,city"));
+        assert!(result.contains("Alice,25,New York"));
+    }
+
+    #[test]
+    fn test_csv_formatter_with_quoting() {
+        let keys = vec!["name".to_string(), "message".to_string()];
+        let formatter = CsvFormatter::new(keys);
+
+        let mut event = Event::default();
+        event.set_field("name".to_string(), Dynamic::from("Smith, John".to_string()));
+        event.set_field(
+            "message".to_string(),
+            Dynamic::from("He said \"hello\"".to_string()),
+        );
+
+        let result = formatter.format(&event);
+
+        // Should properly quote values with commas and quotes
+        assert!(result.contains("\"Smith, John\""));
+        assert!(result.contains("\"He said \"\"hello\"\"\""));
+    }
+
+    #[test]
+    fn test_tsv_formatter_basic() {
+        let keys = vec!["name".to_string(), "age".to_string()];
+        let formatter = CsvFormatter::new_tsv(keys);
+
+        let mut event = Event::default();
+        event.set_field("name".to_string(), Dynamic::from("Alice".to_string()));
+        event.set_field("age".to_string(), Dynamic::from(25i64));
+
+        let result = formatter.format(&event);
+
+        // Should use tab separator
+        assert!(result.contains("name\tage"));
+        assert!(result.contains("Alice\t25"));
+    }
+
+    #[test]
+    fn test_csv_formatter_no_header() {
+        let keys = vec!["name".to_string(), "age".to_string()];
+        let formatter = CsvFormatter::new_csv_no_header(keys);
+
+        let mut event = Event::default();
+        event.set_field("name".to_string(), Dynamic::from("Alice".to_string()));
+        event.set_field("age".to_string(), Dynamic::from(25i64));
+
+        let result = formatter.format(&event);
+
+        // Should not include header
+        assert!(!result.contains("name,age"));
+        assert_eq!(result, "Alice,25");
+    }
+
+    #[test]
+    fn test_csv_formatter_missing_fields() {
+        let keys = vec!["name".to_string(), "age".to_string(), "city".to_string()];
+        let formatter = CsvFormatter::new_csv_no_header(keys);
+
+        let mut event = Event::default();
+        event.set_field("name".to_string(), Dynamic::from("Alice".to_string()));
+        // age is missing
+        event.set_field("city".to_string(), Dynamic::from("Boston".to_string()));
+
+        let result = formatter.format(&event);
+
+        // Should have empty field for missing age
+        assert_eq!(result, "Alice,,Boston");
+    }
+
+    #[test]
+    fn test_csv_escaping_utilities() {
+        // Test needs_csv_quoting
+        assert!(!needs_csv_quoting("simple", ','));
+        assert!(needs_csv_quoting("with,comma", ','));
+        assert!(needs_csv_quoting("with\"quote", ','));
+        assert!(needs_csv_quoting("with\nnewline", ','));
+        assert!(needs_csv_quoting("", ','));
+        assert!(needs_csv_quoting(" leading", ','));
+        assert!(needs_csv_quoting("trailing ", ','));
+
+        // Test with tab delimiter
+        assert!(!needs_csv_quoting("with,comma", '\t'));
+        assert!(needs_csv_quoting("with\ttab", '\t'));
+
+        // Test escape_csv_value
+        assert_eq!(escape_csv_value("simple", ','), "simple");
+        assert_eq!(escape_csv_value("with,comma", ','), "\"with,comma\"");
+        assert_eq!(escape_csv_value("with\"quote", ','), "\"with\"\"quote\"");
+        assert_eq!(escape_csv_value("", ','), "\"\"");
     }
 }

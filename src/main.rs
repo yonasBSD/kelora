@@ -245,6 +245,9 @@ pub enum InputFormat {
     Syslog,
     Cef,
     Csv,
+    Tsv,
+    Csvnh,
+    Tsvnh,
     Apache,
     Nginx,
 }
@@ -256,6 +259,9 @@ pub enum OutputFormat {
     Default,
     Logfmt,
     Csv,
+    Tsv,
+    Csvnh,
+    Tsvnh,
     Hide,
     Null,
 }
@@ -686,7 +692,9 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
                     if !result.is_empty() {
                         stdout.writeln(&result).unwrap_or_else(|e| {
                             stderr
-                                .writeln(&config.format_error_message(&format!("Output error: {}", e)))
+                                .writeln(
+                                    &config.format_error_message(&format!("Output error: {}", e)),
+                                )
                                 .unwrap_or(());
                             ExitCode::GeneralError.exit();
                         });

@@ -73,9 +73,10 @@ impl PipelineBuilder {
             crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
             crate::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
             crate::InputFormat::Cef => Box::new(crate::parsers::CefParser::new()),
-            crate::InputFormat::Csv => {
-                return Err(anyhow::anyhow!("CSV parser not implemented yet"))
-            }
+            crate::InputFormat::Csv => Box::new(crate::parsers::CsvParser::new_csv()),
+            crate::InputFormat::Tsv => Box::new(crate::parsers::CsvParser::new_tsv()),
+            crate::InputFormat::Csvnh => Box::new(crate::parsers::CsvParser::new_csv_no_headers()),
+            crate::InputFormat::Tsvnh => Box::new(crate::parsers::CsvParser::new_tsv_no_headers()),
             crate::InputFormat::Apache => Box::new(crate::parsers::ApacheParser::new()?),
             crate::InputFormat::Nginx => Box::new(crate::parsers::NginxParser::new()?),
         };
@@ -92,7 +93,40 @@ impl PipelineBuilder {
             }
             crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
             crate::OutputFormat::Csv => {
-                return Err(anyhow::anyhow!("CSV formatter not implemented yet"))
+                if self.keys.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "CSV output format requires --keys to specify field order"
+                    ));
+                }
+                Box::new(crate::formatters::CsvFormatter::new(self.keys.clone()))
+            }
+            crate::OutputFormat::Tsv => {
+                if self.keys.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "TSV output format requires --keys to specify field order"
+                    ));
+                }
+                Box::new(crate::formatters::CsvFormatter::new_tsv(self.keys.clone()))
+            }
+            crate::OutputFormat::Csvnh => {
+                if self.keys.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "CSVNH output format requires --keys to specify field order"
+                    ));
+                }
+                Box::new(crate::formatters::CsvFormatter::new_csv_no_header(
+                    self.keys.clone(),
+                ))
+            }
+            crate::OutputFormat::Tsvnh => {
+                if self.keys.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "TSVNH output format requires --keys to specify field order"
+                    ));
+                }
+                Box::new(crate::formatters::CsvFormatter::new_tsv_no_header(
+                    self.keys.clone(),
+                ))
             }
             crate::OutputFormat::Hide => Box::new(crate::formatters::HideFormatter::new()),
             crate::OutputFormat::Null => {
@@ -221,9 +255,10 @@ impl PipelineBuilder {
             crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
             crate::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
             crate::InputFormat::Cef => Box::new(crate::parsers::CefParser::new()),
-            crate::InputFormat::Csv => {
-                return Err(anyhow::anyhow!("CSV parser not implemented yet"))
-            }
+            crate::InputFormat::Csv => Box::new(crate::parsers::CsvParser::new_csv()),
+            crate::InputFormat::Tsv => Box::new(crate::parsers::CsvParser::new_tsv()),
+            crate::InputFormat::Csvnh => Box::new(crate::parsers::CsvParser::new_csv_no_headers()),
+            crate::InputFormat::Tsvnh => Box::new(crate::parsers::CsvParser::new_tsv_no_headers()),
             crate::InputFormat::Apache => Box::new(crate::parsers::ApacheParser::new()?),
             crate::InputFormat::Nginx => Box::new(crate::parsers::NginxParser::new()?),
         };
@@ -240,7 +275,40 @@ impl PipelineBuilder {
             }
             crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
             crate::OutputFormat::Csv => {
-                return Err(anyhow::anyhow!("CSV formatter not implemented yet"))
+                if self.keys.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "CSV output format requires --keys to specify field order"
+                    ));
+                }
+                Box::new(crate::formatters::CsvFormatter::new(self.keys.clone()))
+            }
+            crate::OutputFormat::Tsv => {
+                if self.keys.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "TSV output format requires --keys to specify field order"
+                    ));
+                }
+                Box::new(crate::formatters::CsvFormatter::new_tsv(self.keys.clone()))
+            }
+            crate::OutputFormat::Csvnh => {
+                if self.keys.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "CSVNH output format requires --keys to specify field order"
+                    ));
+                }
+                Box::new(crate::formatters::CsvFormatter::new_csv_no_header(
+                    self.keys.clone(),
+                ))
+            }
+            crate::OutputFormat::Tsvnh => {
+                if self.keys.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "TSVNH output format requires --keys to specify field order"
+                    ));
+                }
+                Box::new(crate::formatters::CsvFormatter::new_tsv_no_header(
+                    self.keys.clone(),
+                ))
             }
             crate::OutputFormat::Hide => Box::new(crate::formatters::HideFormatter::new()),
             crate::OutputFormat::Null => {

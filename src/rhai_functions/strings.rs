@@ -173,7 +173,7 @@ pub fn register_functions(engine: &mut Engine) {
             // Suppress all eprint output
             return;
         }
-        
+
         let msg = message.to_string();
         if is_parallel_mode() {
             capture_eprint(msg);

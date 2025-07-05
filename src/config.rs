@@ -75,6 +75,9 @@ pub enum InputFormat {
     Syslog,
     Cef,
     Csv,
+    Tsv,
+    Csvnh,
+    Tsvnh,
     Apache,
     Nginx,
 }
@@ -87,6 +90,9 @@ pub enum OutputFormat {
     Default,
     Logfmt,
     Csv,
+    Tsv,
+    Csvnh,
+    Tsvnh,
     Hide,
     Null,
 }
@@ -562,6 +568,9 @@ impl From<crate::InputFormat> for InputFormat {
             crate::InputFormat::Syslog => InputFormat::Syslog,
             crate::InputFormat::Cef => InputFormat::Cef,
             crate::InputFormat::Csv => InputFormat::Csv,
+            crate::InputFormat::Tsv => InputFormat::Tsv,
+            crate::InputFormat::Csvnh => InputFormat::Csvnh,
+            crate::InputFormat::Tsvnh => InputFormat::Tsvnh,
             crate::InputFormat::Apache => InputFormat::Apache,
             crate::InputFormat::Nginx => InputFormat::Nginx,
         }
@@ -577,6 +586,9 @@ impl From<InputFormat> for crate::InputFormat {
             InputFormat::Syslog => crate::InputFormat::Syslog,
             InputFormat::Cef => crate::InputFormat::Cef,
             InputFormat::Csv => crate::InputFormat::Csv,
+            InputFormat::Tsv => crate::InputFormat::Tsv,
+            InputFormat::Csvnh => crate::InputFormat::Csvnh,
+            InputFormat::Tsvnh => crate::InputFormat::Tsvnh,
             InputFormat::Apache => crate::InputFormat::Apache,
             InputFormat::Nginx => crate::InputFormat::Nginx,
         }
@@ -590,6 +602,9 @@ impl From<crate::OutputFormat> for OutputFormat {
             crate::OutputFormat::Default => OutputFormat::Default,
             crate::OutputFormat::Logfmt => OutputFormat::Logfmt,
             crate::OutputFormat::Csv => OutputFormat::Csv,
+            crate::OutputFormat::Tsv => OutputFormat::Tsv,
+            crate::OutputFormat::Csvnh => OutputFormat::Csvnh,
+            crate::OutputFormat::Tsvnh => OutputFormat::Tsvnh,
             crate::OutputFormat::Hide => OutputFormat::Hide,
             crate::OutputFormat::Null => OutputFormat::Null,
         }
@@ -603,6 +618,9 @@ impl From<OutputFormat> for crate::OutputFormat {
             OutputFormat::Default => crate::OutputFormat::Default,
             OutputFormat::Logfmt => crate::OutputFormat::Logfmt,
             OutputFormat::Csv => crate::OutputFormat::Csv,
+            OutputFormat::Tsv => crate::OutputFormat::Tsv,
+            OutputFormat::Csvnh => crate::OutputFormat::Csvnh,
+            OutputFormat::Tsvnh => crate::OutputFormat::Tsvnh,
             OutputFormat::Hide => crate::OutputFormat::Hide,
             OutputFormat::Null => crate::OutputFormat::Null,
         }

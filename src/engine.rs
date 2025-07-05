@@ -35,7 +35,7 @@ impl Clone for RhaiEngine {
                 // Suppress all print output
                 return;
             }
-            
+
             if crate::rhai_functions::strings::is_parallel_mode() {
                 crate::rhai_functions::strings::capture_print(text.to_string());
             } else {
@@ -419,10 +419,10 @@ impl RhaiEngine {
     /// Set whether to suppress side effects (print, eprint, etc.)
     pub fn set_suppress_side_effects(&mut self, suppress: bool) {
         self.suppress_side_effects = suppress;
-        
+
         // Set the thread-local flag for eprint and other functions
         crate::rhai_functions::strings::set_suppress_side_effects(suppress);
-        
+
         // Re-register the print handler with the new suppression setting
         let suppress_copy = suppress;
         self.engine.on_print(move |text| {
@@ -430,7 +430,7 @@ impl RhaiEngine {
                 // Suppress all print output
                 return;
             }
-            
+
             if crate::rhai_functions::strings::is_parallel_mode() {
                 crate::rhai_functions::strings::capture_print(text.to_string());
             } else {
