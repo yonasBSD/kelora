@@ -31,8 +31,8 @@ use stats::{
     stats_add_line_read, stats_finish_processing, stats_start_timer, ProcessingStats,
 };
 use unix::{
-    check_termination, ExitCode, ProcessCleanup, SafeFileOut, SafeStderr, SafeStdout, SignalHandler,
-    SHOULD_TERMINATE,
+    check_termination, ExitCode, ProcessCleanup, SafeFileOut, SafeStderr, SafeStdout,
+    SignalHandler, SHOULD_TERMINATE,
 };
 
 /// Trait for output writing that works with both stdout and file output
@@ -45,7 +45,7 @@ impl OutputWriter for SafeStdout {
     fn writeln(&mut self, data: &str) -> Result<()> {
         self.writeln(data)
     }
-    
+
     fn flush(&mut self) -> Result<()> {
         self.flush()
     }
@@ -55,7 +55,7 @@ impl OutputWriter for SafeFileOut {
     fn writeln(&mut self, data: &str) -> Result<()> {
         self.writeln(data)
     }
-    
+
     fn flush(&mut self) -> Result<()> {
         self.flush()
     }
@@ -456,14 +456,16 @@ fn main() -> Result<()> {
         if use_parallel {
             // Get effective values from config for parallel mode
             let batch_size = config.effective_batch_size();
-            
+
             // Handle output destination (stdout vs file)
             let stats = if let Some(ref output_file_path) = cli.output_file {
                 // Use file output
                 let file_output = match SafeFileOut::new(output_file_path) {
                     Ok(file) => file,
                     Err(e) => {
-                        stderr.writeln(&config.format_error_message(&e.to_string())).unwrap_or(());
+                        stderr
+                            .writeln(&config.format_error_message(&e.to_string()))
+                            .unwrap_or(());
                         ExitCode::GeneralError.exit();
                     }
                 };
@@ -492,7 +494,9 @@ fn main() -> Result<()> {
                 let mut file_output = match SafeFileOut::new(output_file_path) {
                     Ok(file) => file,
                     Err(e) => {
-                        stderr.writeln(&config.format_error_message(&e.to_string())).unwrap_or(());
+                        stderr
+                            .writeln(&config.format_error_message(&e.to_string()))
+                            .unwrap_or(());
                         ExitCode::GeneralError.exit();
                     }
                 };

@@ -202,7 +202,7 @@ impl SafeStderr {
 /// Create a helpful error message for file creation failures
 fn create_helpful_error_message(path: &Path, error: &io::Error) -> String {
     let base_msg = format!("Cannot create output file '{}': {}", path.display(), error);
-    
+
     let suggestion = match error.kind() {
         io::ErrorKind::PermissionDenied => {
             if path.parent().is_some_and(|p| !p.exists()) {
@@ -218,7 +218,7 @@ fn create_helpful_error_message(path: &Path, error: &io::Error) -> String {
         io::ErrorKind::InvalidInput => "Suggestion: Check for invalid characters in filename",
         _ => return base_msg, // No suggestion for other errors
     };
-    
+
     format!("{}\n{}", base_msg, suggestion)
 }
 
@@ -233,7 +233,7 @@ impl SafeFileOut {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path_ref = path.as_ref();
         let path_string = path_ref.to_string_lossy().to_string();
-        
+
         match File::create(path_ref) {
             Ok(file) => Ok(Self {
                 file,
@@ -253,14 +253,18 @@ impl SafeFileOut {
                 // Flush after each write for immediate visibility to file watchers
                 match self.file.flush() {
                     Ok(()) => Ok(()),
-                    Err(e) => {
-                        Err(anyhow::anyhow!("Output file flush failed '{}': {}", self.path, e))
-                    }
+                    Err(e) => Err(anyhow::anyhow!(
+                        "Output file flush failed '{}': {}",
+                        self.path,
+                        e
+                    )),
                 }
             }
-            Err(e) => {
-                Err(anyhow::anyhow!("Output file write failed '{}': {}", self.path, e))
-            }
+            Err(e) => Err(anyhow::anyhow!(
+                "Output file write failed '{}': {}",
+                self.path,
+                e
+            )),
         }
     }
 
@@ -268,9 +272,11 @@ impl SafeFileOut {
     pub fn flush(&mut self) -> Result<()> {
         match self.file.flush() {
             Ok(()) => Ok(()),
-            Err(e) => {
-                Err(anyhow::anyhow!("Output file flush failed '{}': {}", self.path, e))
-            }
+            Err(e) => Err(anyhow::anyhow!(
+                "Output file flush failed '{}': {}",
+                self.path,
+                e
+            )),
         }
     }
 }

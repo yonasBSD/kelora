@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use crate::event::Event;
 use crate::pipeline::PipelineBuilder;
 use crate::stats::{get_thread_stats, stats_finish_processing, stats_start_timer, ProcessingStats};
-use crate::unix::{SHOULD_TERMINATE};
+use crate::unix::SHOULD_TERMINATE;
 
 /// Configuration for parallel processing
 #[derive(Debug, Clone)]
@@ -250,7 +250,10 @@ impl ParallelProcessor {
     }
 
     /// Process input using the parallel pipeline
-    pub fn process_with_pipeline<R: std::io::BufRead + Send + 'static, W: std::io::Write + Send + 'static>(
+    pub fn process_with_pipeline<
+        R: std::io::BufRead + Send + 'static,
+        W: std::io::Write + Send + 'static,
+    >(
         &self,
         reader: R,
         pipeline_builder: PipelineBuilder,
@@ -326,7 +329,12 @@ impl ParallelProcessor {
             let mut output = output;
 
             thread::spawn(move || {
-                Self::pipeline_result_sink_thread(result_receiver, preserve_order, global_tracker, &mut output)
+                Self::pipeline_result_sink_thread(
+                    result_receiver,
+                    preserve_order,
+                    global_tracker,
+                    &mut output,
+                )
             })
         };
 
@@ -848,7 +856,7 @@ impl ParallelProcessor {
 
     fn pipeline_output_batch_results<W: std::io::Write>(
         output: &mut W,
-        results: &[ProcessedEvent]
+        results: &[ProcessedEvent],
     ) -> Result<()> {
         for processed in results {
             // First output any captured prints for this specific event (to stdout, not file)
