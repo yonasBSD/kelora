@@ -518,6 +518,18 @@ mod tests {
     }
 
     #[test]
+    fn test_null_formatter_behavior() {
+        // Null format uses HideFormatter, so test that it produces empty strings
+        let mut event = Event::default();
+        event.set_field("level".to_string(), Dynamic::from("ERROR".to_string()));
+        event.set_field("message".to_string(), Dynamic::from("Critical error".to_string()));
+
+        let formatter = HideFormatter::new(); // Null format uses HideFormatter
+        let result = formatter.format(&event);
+        assert_eq!(result, ""); // Should be empty for null format
+    }
+
+    #[test]
     fn test_shared_escaping_utilities() {
         // Test escape_logfmt_string
         assert_eq!(escape_logfmt_string("simple"), "simple");

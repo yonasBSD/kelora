@@ -95,6 +95,11 @@ impl PipelineBuilder {
                 return Err(anyhow::anyhow!("CSV formatter not implemented yet"))
             }
             crate::OutputFormat::Hide => Box::new(crate::formatters::HideFormatter::new()),
+            crate::OutputFormat::Null => {
+                // Null format: suppress side effects in addition to hiding output
+                rhai_engine.set_suppress_side_effects(true);
+                Box::new(crate::formatters::HideFormatter::new())
+            }
         };
 
         // Create script stages
@@ -238,6 +243,11 @@ impl PipelineBuilder {
                 return Err(anyhow::anyhow!("CSV formatter not implemented yet"))
             }
             crate::OutputFormat::Hide => Box::new(crate::formatters::HideFormatter::new()),
+            crate::OutputFormat::Null => {
+                // Null format: suppress side effects in addition to hiding output
+                rhai_engine.set_suppress_side_effects(true);
+                Box::new(crate::formatters::HideFormatter::new())
+            }
         };
 
         // Create script stages

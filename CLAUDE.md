@@ -132,6 +132,24 @@ make test-full          # Comprehensive test suite
 ./target/release/kelora -f jsonl large.log --exec "track_unique('users', user)" --summary --parallel --batch-size 10
 seq 1 1000000 | ./target/release/kelora --filter "line.to_int() % 1000 == 0" --stats
 
+# Output format control
+# Control event output and side effects for different use cases
+./target/release/kelora -f jsonl app.log                                    # Default format (logfmt-style)
+./target/release/kelora -f jsonl app.log -F jsonl                          # JSON lines output
+./target/release/kelora -f jsonl app.log -F logfmt                         # Strict logfmt output
+./target/release/kelora -f jsonl app.log -F hide --exec 'print("Debug: " + level)' --summary  # Hide events, show side effects
+./target/release/kelora -f jsonl app.log -F null --exec 'track_count(level)' --summary        # Suppress all output, show analytics only
+
+# Output format comparison for analytics workflows
+./target/release/kelora -f jsonl app.log --exec 'print("Processing: " + level); track_count(level)' --summary  # Shows: print output + events + summary
+./target/release/kelora -f jsonl app.log --exec 'print("Processing: " + level); track_count(level)' --summary -F hide  # Shows: print output + summary (no events)
+./target/release/kelora -f jsonl app.log --exec 'print("Processing: " + level); track_count(level)' --summary -F null  # Shows: summary only (no print, no events)
+
+# Performance testing and validation use cases
+time ./target/release/kelora -f jsonl huge.log --filter 'complex_expression' -F null  # Pure processing speed test
+./target/release/kelora --exec-file test_script.rhai -F null < /dev/null              # Validate script syntax without side effects
+./target/release/kelora -f jsonl data.log --exec 'complex_calculation()' -F null --stats  # Resource usage analysis
+
 # DateTime and duration processing
 ./target/release/kelora -f jsonl access.log --exec "let dt = parse_timestamp(timestamp); if dt.hour() >= 9 && dt.hour() <= 17 { print('Business hours') }"
 ./target/release/kelora -f line app.log --exec "let dt = parse_timestamp(line.before(' '), '%Y/%m/%d-%H:%M:%S'); print(dt.format('%Y-%m-%d %H:%M:%S'))"
@@ -268,6 +286,35 @@ The `--help` output is organized into logical sections that follow the data proc
 - `-L` = `--exclude-levels` (exclude log levels)
 - `-m` = `--core` (core fields only)
 - `-b` = `--brief` (brief output)
+
+### Output Format Behavior Matrix
+
+Kelora supports different output formats optimized for various use cases:
+
+| Format | Event Output | Side Effects (print/eprint) | Stats/Summary | Use Case |
+|--------|-------------|----------------------------|---------------|----------|
+| `default` | ✅ Show (logfmt-style) | ✅ Show | ✅ Show | Normal log analysis and debugging |
+| `jsonl` | ✅ Show (JSON lines) | ✅ Show | ✅ Show | Structured data processing |  
+| `logfmt` | ✅ Show (strict logfmt) | ✅ Show | ✅ Show | Standardized key=value output |
+| `hide` | ❌ Hide | ✅ Show | ✅ Show | Analytics with debug output |
+| `null` | ❌ Hide | ❌ Hide | ✅ Show | Performance testing, validation |
+
+**Key distinctions:**
+- **hide**: Suppresses event output but preserves print/eprint for debugging and tracking
+- **null**: Suppresses all output except core functionality (stats, summary, tracking)
+- **Core functionality** (stats, summary, tracking) always works regardless of format
+
+**Common patterns:**
+```bash
+# Development and debugging
+kelora app.log --exec 'print("Debug: " + level)' --summary
+
+# Production analytics  
+kelora app.log --exec 'track_count(level)' --summary -F hide
+
+# Performance benchmarking
+time kelora huge.log --filter 'complex_expression' -F null
+```
 
 ## Development Guidelines
 

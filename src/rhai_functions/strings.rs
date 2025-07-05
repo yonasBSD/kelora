@@ -5,6 +5,7 @@ thread_local! {
     static CAPTURED_PRINTS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     static CAPTURED_EPRINTS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     static PARALLEL_MODE: RefCell<bool> = const { RefCell::new(false) };
+    static SUPPRESS_SIDE_EFFECTS: RefCell<bool> = const { RefCell::new(false) };
 }
 
 /// Capture a print statement in thread-local storage for parallel processing
@@ -55,6 +56,18 @@ pub fn set_parallel_mode(enabled: bool) {
 /// Check if we're in parallel processing mode
 pub fn is_parallel_mode() -> bool {
     PARALLEL_MODE.with(|mode| *mode.borrow())
+}
+
+/// Set whether to suppress side effects (print, eprint, etc.)
+pub fn set_suppress_side_effects(suppress: bool) {
+    SUPPRESS_SIDE_EFFECTS.with(|flag| {
+        *flag.borrow_mut() = suppress;
+    });
+}
+
+/// Check if side effects should be suppressed
+pub fn is_suppress_side_effects() -> bool {
+    SUPPRESS_SIDE_EFFECTS.with(|flag| *flag.borrow())
 }
 
 /// Mask IP address for privacy (replace last N octets with 'X')
@@ -154,8 +167,13 @@ fn parse_kv_impl(text: &str, sep: Option<&str>, kv_sep: &str) -> rhai::Map {
 pub fn register_functions(engine: &mut Engine) {
     // Note: print() function is now handled via engine.on_print() in engine.rs
 
-    // Custom eprint function that captures output in parallel mode
+    // Custom eprint function that captures output in parallel mode and respects suppression
     engine.register_fn("eprint", |message: rhai::Dynamic| {
+        if is_suppress_side_effects() {
+            // Suppress all eprint output
+            return;
+        }
+        
         let msg = message.to_string();
         if is_parallel_mode() {
             capture_eprint(msg);

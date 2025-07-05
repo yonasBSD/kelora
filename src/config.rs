@@ -88,6 +88,7 @@ pub enum OutputFormat {
     Logfmt,
     Csv,
     Hide,
+    Null,
 }
 
 /// Error handling strategy
@@ -590,6 +591,7 @@ impl From<crate::OutputFormat> for OutputFormat {
             crate::OutputFormat::Logfmt => OutputFormat::Logfmt,
             crate::OutputFormat::Csv => OutputFormat::Csv,
             crate::OutputFormat::Hide => OutputFormat::Hide,
+            crate::OutputFormat::Null => OutputFormat::Null,
         }
     }
 }
@@ -602,6 +604,7 @@ impl From<OutputFormat> for crate::OutputFormat {
             OutputFormat::Logfmt => crate::OutputFormat::Logfmt,
             OutputFormat::Csv => crate::OutputFormat::Csv,
             OutputFormat::Hide => crate::OutputFormat::Hide,
+            OutputFormat::Null => crate::OutputFormat::Null,
         }
     }
 }

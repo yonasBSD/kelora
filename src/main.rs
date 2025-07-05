@@ -257,6 +257,7 @@ pub enum OutputFormat {
     Logfmt,
     Csv,
     Hide,
+    Null,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]

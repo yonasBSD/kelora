@@ -20,6 +20,7 @@ pub struct RhaiEngine {
     compiled_begin: Option<CompiledExpression>,
     compiled_end: Option<CompiledExpression>,
     scope_template: Scope<'static>,
+    suppress_side_effects: bool,
 }
 
 impl Clone for RhaiEngine {
@@ -27,8 +28,14 @@ impl Clone for RhaiEngine {
         let mut engine = Engine::new();
         engine.set_optimization_level(rhai::OptimizationLevel::Simple);
 
-        // Apply the same on_print override as in new()
-        engine.on_print(|text| {
+        // Apply the same on_print override as in new(), respecting suppress_side_effects
+        let suppress_side_effects = self.suppress_side_effects;
+        engine.on_print(move |text| {
+            if suppress_side_effects {
+                // Suppress all print output
+                return;
+            }
+            
             if crate::rhai_functions::strings::is_parallel_mode() {
                 crate::rhai_functions::strings::capture_print(text.to_string());
             } else {
@@ -45,6 +52,7 @@ impl Clone for RhaiEngine {
             compiled_begin: self.compiled_begin.clone(),
             compiled_end: self.compiled_end.clone(),
             scope_template: self.scope_template.clone(),
+            suppress_side_effects,
         }
     }
 }
@@ -377,6 +385,7 @@ impl RhaiEngine {
         engine.set_optimization_level(rhai::OptimizationLevel::Simple);
 
         // Override the built-in print function to support capture in parallel mode
+        // Note: suppress_side_effects is false by default in new()
         engine.on_print(|text| {
             if crate::rhai_functions::strings::is_parallel_mode() {
                 crate::rhai_functions::strings::capture_print(text.to_string());
@@ -403,7 +412,31 @@ impl RhaiEngine {
             compiled_begin: None,
             compiled_end: None,
             scope_template,
+            suppress_side_effects: false,
         }
+    }
+
+    /// Set whether to suppress side effects (print, eprint, etc.)
+    pub fn set_suppress_side_effects(&mut self, suppress: bool) {
+        self.suppress_side_effects = suppress;
+        
+        // Set the thread-local flag for eprint and other functions
+        crate::rhai_functions::strings::set_suppress_side_effects(suppress);
+        
+        // Re-register the print handler with the new suppression setting
+        let suppress_copy = suppress;
+        self.engine.on_print(move |text| {
+            if suppress_copy {
+                // Suppress all print output
+                return;
+            }
+            
+            if crate::rhai_functions::strings::is_parallel_mode() {
+                crate::rhai_functions::strings::capture_print(text.to_string());
+            } else {
+                println!("{}", text);
+            }
+        });
     }
 
     // Individual compilation methods for pipeline stages
