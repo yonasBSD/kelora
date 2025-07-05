@@ -157,6 +157,16 @@ impl SafeStdout {
     }
 }
 
+impl std::io::Write for SafeStdout {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.stdout.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.stdout.flush()
+    }
+}
+
 /// Safe wrapper for writing to stderr
 pub struct SafeStderr {
     stderr: io::Stderr,
@@ -262,6 +272,16 @@ impl SafeFileOut {
                 Err(anyhow::anyhow!("Output file flush failed '{}': {}", self.path, e))
             }
         }
+    }
+}
+
+impl std::io::Write for SafeFileOut {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.file.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.file.flush()
     }
 }
 

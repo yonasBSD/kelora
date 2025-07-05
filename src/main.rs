@@ -457,13 +457,22 @@ fn main() -> Result<()> {
             // Get effective values from config for parallel mode
             let batch_size = config.effective_batch_size();
             
-            // TODO: Add file output support for parallel mode
-            if cli.output_file.is_some() {
-                stderr.writeln(&config.format_error_message("File output (--output-file) is not yet supported in parallel mode. Use sequential processing instead.")).unwrap_or(());
-                ExitCode::InvalidUsage.exit();
-            }
-            
-            let stats = run_parallel(&config, batch_size, &mut stdout, &mut stderr);
+            // Handle output destination (stdout vs file)
+            let stats = if let Some(ref output_file_path) = cli.output_file {
+                // Use file output
+                let file_output = match SafeFileOut::new(output_file_path) {
+                    Ok(file) => file,
+                    Err(e) => {
+                        stderr.writeln(&config.format_error_message(&e.to_string())).unwrap_or(());
+                        ExitCode::GeneralError.exit();
+                    }
+                };
+                run_parallel(&config, batch_size, file_output, &mut stderr)
+            } else {
+                // Use stdout output
+                let stdout_output = SafeStdout::new();
+                run_parallel(&config, batch_size, stdout_output, &mut stderr)
+            };
 
             // Print parallel stats if enabled (only if not terminated, will be handled later)
             if config.output.stats && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
@@ -555,10 +564,10 @@ fn main() -> Result<()> {
 /// Run parallel processing mode
 /// Note: stdout parameter is currently unused as ParallelProcessor creates its own SafeStdout,
 /// but kept for consistency with run_sequential and future flexibility
-fn run_parallel(
+fn run_parallel<W: std::io::Write + Send + 'static>(
     config: &KeloraConfig,
     batch_size: usize,
-    _stdout: &mut SafeStdout,
+    output: W,
     stderr: &mut SafeStderr,
 ) -> Option<ProcessingStats> {
     // Parallel processing mode with proper Unix behavior
@@ -609,6 +618,7 @@ fn run_parallel(
         pipeline_builder,
         config.processing.stages.clone(),
         config,
+        output,
     ) {
         stderr
             .writeln(&config.format_error_message(&format!("Parallel processing error: {}", e)))

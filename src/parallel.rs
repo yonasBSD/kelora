@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use crate::event::Event;
 use crate::pipeline::PipelineBuilder;
 use crate::stats::{get_thread_stats, stats_finish_processing, stats_start_timer, ProcessingStats};
-use crate::unix::{SafeStdout, SHOULD_TERMINATE};
+use crate::unix::{SHOULD_TERMINATE};
 
 /// Configuration for parallel processing
 #[derive(Debug, Clone)]
@@ -250,12 +250,13 @@ impl ParallelProcessor {
     }
 
     /// Process input using the parallel pipeline
-    pub fn process_with_pipeline<R: std::io::BufRead + Send + 'static>(
+    pub fn process_with_pipeline<R: std::io::BufRead + Send + 'static, W: std::io::Write + Send + 'static>(
         &self,
         reader: R,
         pipeline_builder: PipelineBuilder,
         stages: Vec<crate::config::ScriptStageType>,
         config: &crate::config::KeloraConfig,
+        output: W,
     ) -> Result<()> {
         // Create channels
         let (batch_sender, batch_receiver) = if let Some(size) = self.config.buffer_size {
@@ -322,9 +323,10 @@ impl ParallelProcessor {
             let result_receiver = result_receiver;
             let preserve_order = self.config.preserve_order;
             let global_tracker = self.global_tracker.clone();
+            let mut output = output;
 
             thread::spawn(move || {
-                Self::pipeline_result_sink_thread(result_receiver, preserve_order, global_tracker)
+                Self::pipeline_result_sink_thread(result_receiver, preserve_order, global_tracker, &mut output)
             })
         };
 
@@ -734,21 +736,23 @@ impl ParallelProcessor {
 
     /// Pipeline result sink thread: handles output ordering and merges global state
     /// Results are already formatted by the pipeline, so we just need to output them
-    fn pipeline_result_sink_thread(
+    fn pipeline_result_sink_thread<W: std::io::Write>(
         result_receiver: Receiver<BatchResult>,
         preserve_order: bool,
         global_tracker: GlobalTracker,
+        output: &mut W,
     ) -> Result<()> {
         if preserve_order {
-            Self::pipeline_ordered_result_sink(result_receiver, global_tracker)
+            Self::pipeline_ordered_result_sink(result_receiver, global_tracker, output)
         } else {
-            Self::pipeline_unordered_result_sink(result_receiver, global_tracker)
+            Self::pipeline_unordered_result_sink(result_receiver, global_tracker, output)
         }
     }
 
-    fn pipeline_ordered_result_sink(
+    fn pipeline_ordered_result_sink<W: std::io::Write>(
         result_receiver: Receiver<BatchResult>,
         global_tracker: GlobalTracker,
+        output: &mut W,
     ) -> Result<()> {
         let mut pending_batches: HashMap<u64, BatchResult> = HashMap::new();
         let mut next_expected_id = 0u64;
@@ -790,22 +794,23 @@ impl ParallelProcessor {
 
             // Output all consecutive batches starting from next_expected_id
             while let Some(batch) = pending_batches.remove(&next_expected_id) {
-                Self::pipeline_output_batch_results(&batch.results)?;
+                Self::pipeline_output_batch_results(output, &batch.results)?;
                 next_expected_id += 1;
             }
         }
 
         // Output any remaining batches (shouldn't happen with proper shutdown)
         for (_, batch) in pending_batches {
-            Self::pipeline_output_batch_results(&batch.results)?;
+            Self::pipeline_output_batch_results(output, &batch.results)?;
         }
 
         Ok(())
     }
 
-    fn pipeline_unordered_result_sink(
+    fn pipeline_unordered_result_sink<W: std::io::Write>(
         result_receiver: Receiver<BatchResult>,
         global_tracker: GlobalTracker,
+        output: &mut W,
     ) -> Result<()> {
         let mut termination_detected = false;
         while let Ok(batch_result) = result_receiver.recv() {
@@ -835,19 +840,20 @@ impl ParallelProcessor {
             }
 
             // Output immediately
-            Self::pipeline_output_batch_results(&batch_result.results)?;
+            Self::pipeline_output_batch_results(output, &batch_result.results)?;
         }
 
         Ok(())
     }
 
-    fn pipeline_output_batch_results(results: &[ProcessedEvent]) -> Result<()> {
-        let mut stdout = SafeStdout::new();
-
+    fn pipeline_output_batch_results<W: std::io::Write>(
+        output: &mut W,
+        results: &[ProcessedEvent]
+    ) -> Result<()> {
         for processed in results {
-            // First output any captured prints for this specific event (to stdout)
+            // First output any captured prints for this specific event (to stdout, not file)
             for print_msg in &processed.captured_prints {
-                stdout.writeln(print_msg).unwrap_or(());
+                println!("{}", print_msg);
             }
 
             // Output any captured eprints for this specific event (to stderr)
@@ -855,13 +861,13 @@ impl ParallelProcessor {
                 eprintln!("{}", eprint_msg);
             }
 
-            // Then output the event itself, skip empty strings
+            // Then output the event itself to the designated output, skip empty strings
             if !processed.event.original_line.is_empty() {
-                stdout.writeln(&processed.event.original_line).unwrap_or(());
+                writeln!(output, "{}", &processed.event.original_line).unwrap_or(());
             }
         }
 
-        stdout.flush().unwrap_or(());
+        output.flush().unwrap_or(());
         Ok(())
     }
 }
