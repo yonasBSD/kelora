@@ -1,5 +1,7 @@
 use anyhow::Result;
+use std::fs::File;
 use std::io::{self, Write};
+use std::path::Path;
 use std::process;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
@@ -182,6 +184,82 @@ impl SafeStderr {
                     ))
                 );
                 ExitCode::GeneralError.exit();
+            }
+        }
+    }
+}
+
+/// Create a helpful error message for file creation failures
+fn create_helpful_error_message(path: &Path, error: &io::Error) -> String {
+    let base_msg = format!("Cannot create output file '{}': {}", path.display(), error);
+    
+    let suggestion = match error.kind() {
+        io::ErrorKind::PermissionDenied => {
+            if path.parent().is_some_and(|p| !p.exists()) {
+                "Suggestion: Parent directory does not exist, create it first"
+            } else {
+                "Suggestion: Check file permissions or choose a writable location"
+            }
+        }
+        io::ErrorKind::NotFound => "Suggestion: Parent directory does not exist, create it first",
+        io::ErrorKind::AlreadyExists if path.is_dir() => {
+            "Suggestion: Path points to a directory, specify a filename instead"
+        }
+        io::ErrorKind::InvalidInput => "Suggestion: Check for invalid characters in filename",
+        _ => return base_msg, // No suggestion for other errors
+    };
+    
+    format!("{}\n{}", base_msg, suggestion)
+}
+
+/// Safe wrapper for writing to a file that handles I/O errors gracefully
+pub struct SafeFileOut {
+    file: File,
+    path: String,
+}
+
+impl SafeFileOut {
+    /// Create a new SafeFileOut, truncating the file if it exists
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let path_ref = path.as_ref();
+        let path_string = path_ref.to_string_lossy().to_string();
+        
+        match File::create(path_ref) {
+            Ok(file) => Ok(Self {
+                file,
+                path: path_string,
+            }),
+            Err(e) => {
+                let error_msg = create_helpful_error_message(path_ref, &e);
+                Err(anyhow::anyhow!("{}", error_msg))
+            }
+        }
+    }
+
+    /// Write a line to the file and flush immediately
+    pub fn writeln(&mut self, data: &str) -> Result<()> {
+        match writeln!(self.file, "{}", data) {
+            Ok(()) => {
+                // Flush after each write for immediate visibility to file watchers
+                match self.file.flush() {
+                    Ok(()) => Ok(()),
+                    Err(e) => {
+                        Err(anyhow::anyhow!("Output file flush failed '{}': {}", self.path, e))
+                    }
+                }
+            }
+            Err(e) => {
+                Err(anyhow::anyhow!("Output file write failed '{}': {}", self.path, e))
+            }
+        }
+    }
+
+    /// Explicit flush (already done after each write, but provided for consistency)
+    pub fn flush(&mut self) -> Result<()> {
+        match self.file.flush() {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                Err(anyhow::anyhow!("Output file flush failed '{}': {}", self.path, e))
             }
         }
     }

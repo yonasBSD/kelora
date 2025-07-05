@@ -31,9 +31,35 @@ use stats::{
     stats_add_line_read, stats_finish_processing, stats_start_timer, ProcessingStats,
 };
 use unix::{
-    check_termination, ExitCode, ProcessCleanup, SafeStderr, SafeStdout, SignalHandler,
+    check_termination, ExitCode, ProcessCleanup, SafeFileOut, SafeStderr, SafeStdout, SignalHandler,
     SHOULD_TERMINATE,
 };
+
+/// Trait for output writing that works with both stdout and file output
+trait OutputWriter {
+    fn writeln(&mut self, data: &str) -> Result<()>;
+    fn flush(&mut self) -> Result<()>;
+}
+
+impl OutputWriter for SafeStdout {
+    fn writeln(&mut self, data: &str) -> Result<()> {
+        self.writeln(data)
+    }
+    
+    fn flush(&mut self) -> Result<()> {
+        self.flush()
+    }
+}
+
+impl OutputWriter for SafeFileOut {
+    fn writeln(&mut self, data: &str) -> Result<()> {
+        self.writeln(data)
+    }
+    
+    fn flush(&mut self) -> Result<()> {
+        self.flush()
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "kelora")]
@@ -179,6 +205,10 @@ pub struct Cli {
     /// Output only field values (no keys), space-separated
     #[arg(short = 'b', long = "brief", help_heading = "Output Options")]
     pub brief: bool,
+
+    /// Output file for formatted events (default: stdout)
+    #[arg(short = 'o', long = "output-file", help_heading = "Output Options")]
+    pub output_file: Option<String>,
 
     /// Enable parallel processing for high-throughput analysis (batch-size=1000 by default)
     #[arg(long = "parallel", help_heading = "Performance Options")]
@@ -426,6 +456,13 @@ fn main() -> Result<()> {
         if use_parallel {
             // Get effective values from config for parallel mode
             let batch_size = config.effective_batch_size();
+            
+            // TODO: Add file output support for parallel mode
+            if cli.output_file.is_some() {
+                stderr.writeln(&config.format_error_message("File output (--output-file) is not yet supported in parallel mode. Use sequential processing instead.")).unwrap_or(());
+                ExitCode::InvalidUsage.exit();
+            }
+            
             let stats = run_parallel(&config, batch_size, &mut stdout, &mut stderr);
 
             // Print parallel stats if enabled (only if not terminated, will be handled later)
@@ -440,7 +477,21 @@ fn main() -> Result<()> {
             }
             stats
         } else {
-            run_sequential(&config, &mut stdout, &mut stderr);
+            // Handle output destination (stdout vs file)
+            if let Some(ref output_file_path) = cli.output_file {
+                // Use file output
+                let mut file_output = match SafeFileOut::new(output_file_path) {
+                    Ok(file) => file,
+                    Err(e) => {
+                        stderr.writeln(&config.format_error_message(&e.to_string())).unwrap_or(());
+                        ExitCode::GeneralError.exit();
+                    }
+                };
+                run_sequential(&config, &mut file_output, &mut stderr);
+            } else {
+                // Use stdout output
+                run_sequential(&config, &mut stdout, &mut stderr);
+            }
 
             // Print summary if enabled (only if not terminated)
             if config.output.summary && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
@@ -609,7 +660,7 @@ fn run_parallel(
 }
 
 /// Run sequential processing mode
-fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut SafeStderr) {
+fn run_sequential<W: OutputWriter>(config: &KeloraConfig, output: &mut W, stderr: &mut SafeStderr) {
     // Sequential processing mode using new pipeline architecture
     let (mut pipeline, begin_stage, end_stage, mut ctx) = match create_pipeline_from_config(config)
     {
@@ -706,7 +757,7 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
                 // Output all results (usually just one), skip empty strings
                 for result in results {
                     if !result.is_empty() {
-                        stdout.writeln(&result).unwrap_or_else(|e| {
+                        output.writeln(&result).unwrap_or_else(|e| {
                             stderr
                                 .writeln(
                                     &config.format_error_message(&format!("Output error: {}", e)),
@@ -716,7 +767,7 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
                         });
                     }
                 }
-                stdout.flush().unwrap_or_else(|e| {
+                output.flush().unwrap_or_else(|e| {
                     stderr
                         .writeln(&config.format_error_message(&format!("Flush error: {}", e)))
                         .unwrap_or(());
@@ -748,7 +799,7 @@ fn run_sequential(config: &KeloraConfig, stdout: &mut SafeStdout, stderr: &mut S
         Ok(results) => {
             for result in results {
                 if !result.is_empty() {
-                    stdout.writeln(&result).unwrap_or_else(|e| {
+                    output.writeln(&result).unwrap_or_else(|e| {
                         stderr
                             .writeln(&config.format_error_message(&format!("Output error: {}", e)))
                             .unwrap_or(());
