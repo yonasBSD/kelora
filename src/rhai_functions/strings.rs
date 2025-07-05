@@ -390,6 +390,15 @@ pub fn register_functions(engine: &mut Engine) {
             .join(separator)
     });
 
+    // Overloaded variant for method syntax: array.join(separator)
+    engine.register_fn("join", |items: rhai::Array, separator: &str| -> String {
+        items
+            .into_iter()
+            .filter_map(|item| item.into_string().ok())
+            .collect::<Vec<String>>()
+            .join(separator)
+    });
+
     // Regex string methods
     engine.register_fn("extract_re", |text: &str, pattern: &str| -> String {
         match regex::Regex::new(pattern) {
@@ -969,6 +978,7 @@ mod tests {
 
         let mut scope = Scope::new();
 
+        // Test original syntax: separator.join(array)
         let result: String = engine
             .eval_with_scope(&mut scope, r#"",".join(["a", "b", "c"])"#)
             .unwrap();
@@ -992,6 +1002,33 @@ mod tests {
         // Test with mixed types (non-strings filtered out)
         let result: String = engine
             .eval_with_scope(&mut scope, r#"",".join(["a", 123, "b"])"#)
+            .unwrap();
+        assert_eq!(result, "a,b");
+
+        // Test new method syntax: array.join(separator)
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"["a", "b", "c"].join(",")"#)
+            .unwrap();
+        assert_eq!(result, "a,b,c");
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"["hello", "world"].join(" ")"#)
+            .unwrap();
+        assert_eq!(result, "hello world");
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"["one"].join("-")"#)
+            .unwrap();
+        assert_eq!(result, "one");
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"[].join(",")"#)
+            .unwrap();
+        assert_eq!(result, "");
+
+        // Test method syntax with mixed types (non-strings filtered out)
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"["a", 123, "b"].join(",")"#)
             .unwrap();
         assert_eq!(result, "a,b");
     }

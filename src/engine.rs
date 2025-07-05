@@ -243,7 +243,7 @@ impl RhaiEngine {
             "between" => "string, start_delimiter, end_delimiter".to_string(),
             "starting_with" | "ending_with" => "string, prefix_or_suffix".to_string(),
             "strip" => "string, optional_characters_to_strip".to_string(),
-            "join" => "string_separator, array".to_string(),
+            "join" => "string_separator, array OR array, string_separator".to_string(),
             "extract_ip" | "extract_ips" | "extract_url" | "extract_domain" => "string".to_string(),
             "mask_ip" => "string, optional_octets_to_mask".to_string(),
             "is_private_ip" | "is_digit" => "string".to_string(),
