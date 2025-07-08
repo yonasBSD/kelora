@@ -528,7 +528,7 @@ pub fn create_input_reader(
 pub fn create_file_aware_input_reader(
     config: &crate::config::KeloraConfig,
 ) -> Result<Box<dyn crate::readers::FileAwareRead>> {
-    use crate::readers::FileAwareRead;
+    
     
     if config.input.files.is_empty() {
         // For stdin, we don't have filename information
@@ -568,16 +568,3 @@ pub fn sort_files(files: &[String], order: &crate::config::FileOrder) -> Result<
     Ok(sorted_files)
 }
 
-/// Create input reader for sequential processing (doesn't need to be Send)
-pub fn create_sequential_input_reader(
-    config: &crate::config::KeloraConfig,
-) -> Result<Box<dyn BufRead>> {
-    if config.input.files.is_empty() {
-        // Use stdin lock directly for sequential processing (most efficient)
-        Ok(Box::new(io::stdin().lock()))
-    } else {
-        // Use streaming multi-file reader for sequential processing too
-        let sorted_files = sort_files(&config.input.files, &config.input.file_order)?;
-        Ok(Box::new(MultiFileReader::new(sorted_files)?))
-    }
-}

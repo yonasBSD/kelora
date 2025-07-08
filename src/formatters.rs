@@ -493,11 +493,6 @@ impl CsvFormatter {
         hasher.finish()
     }
 
-    /// Check if header has been written globally for this formatter configuration
-    fn header_written_globally(&self) -> bool {
-        let registry = CSV_FORMATTER_HEADER_REGISTRY.lock().unwrap();
-        registry.get(&self.formatter_key).copied().unwrap_or(false)
-    }
 
     /// Mark header as written globally for this formatter configuration
     /// Returns true if this call was the first to mark it (header should be written)

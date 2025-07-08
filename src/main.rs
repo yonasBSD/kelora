@@ -673,6 +673,7 @@ fn run_parallel<W: std::io::Write + Send + 'static>(
 }
 
 /// Process a single line in sequential mode with filename tracking and CSV schema detection
+#[allow(clippy::too_many_arguments)]
 fn process_line<W: OutputWriter>(
     line_result: io::Result<String>,
     line_num: &mut usize,
@@ -731,49 +732,47 @@ fn process_line<W: OutputWriter>(
     // For CSV formats, detect file changes and reinitialize parser
     if matches!(config.input.format, 
         config::InputFormat::Csv | config::InputFormat::Tsv | config::InputFormat::Csvnh | config::InputFormat::Tsvnh
-    ) {
-        if current_filename != *last_filename {
-            // File changed, reinitialize CSV parser for this file
-            let mut temp_parser = match config.input.format {
-                config::InputFormat::Csv => crate::parsers::CsvParser::new_csv(),
-                config::InputFormat::Tsv => crate::parsers::CsvParser::new_tsv(),
-                config::InputFormat::Csvnh => crate::parsers::CsvParser::new_csv_no_headers(),
-                config::InputFormat::Tsvnh => crate::parsers::CsvParser::new_tsv_no_headers(),
-                _ => unreachable!(),
-            };
-            
-            // Initialize headers from the first line
-            let was_consumed = temp_parser.initialize_headers_from_line(&line).unwrap_or_else(|e| {
-                stderr
-                    .writeln(&config.format_error_message(&format!("Failed to initialize CSV headers: {}", e)))
-                    .unwrap_or(());
-                ExitCode::GeneralError.exit();
-            });
-            
-            // Get the initialized headers
-            let headers = temp_parser.get_headers();
-            *current_csv_headers = Some(headers.clone());
-            *last_filename = current_filename.clone();
-            
-            // Rebuild the pipeline with new headers
-            let mut pipeline_builder = create_pipeline_builder_from_config(config);
-            pipeline_builder = pipeline_builder.with_csv_headers(headers);
-            
-            let (new_pipeline, _new_begin_stage, _new_end_stage, new_ctx) = pipeline_builder.build(config.processing.stages.clone()).unwrap_or_else(|e| {
-                stderr
-                    .writeln(&config.format_error_message(&format!("Failed to rebuild pipeline with CSV headers: {}", e)))
-                    .unwrap_or(());
-                ExitCode::GeneralError.exit();
-            });
-            
-            *pipeline = new_pipeline;
-            // Keep the existing context's tracking state but update the Rhai engine
-            ctx.rhai = new_ctx.rhai;
-            
-            // If the first line was consumed as a header, don't process it as data
-            if was_consumed {
-                return;
-            }
+    ) && current_filename != *last_filename {
+        // File changed, reinitialize CSV parser for this file
+        let mut temp_parser = match config.input.format {
+            config::InputFormat::Csv => crate::parsers::CsvParser::new_csv(),
+            config::InputFormat::Tsv => crate::parsers::CsvParser::new_tsv(),
+            config::InputFormat::Csvnh => crate::parsers::CsvParser::new_csv_no_headers(),
+            config::InputFormat::Tsvnh => crate::parsers::CsvParser::new_tsv_no_headers(),
+            _ => unreachable!(),
+        };
+        
+        // Initialize headers from the first line
+        let was_consumed = temp_parser.initialize_headers_from_line(&line).unwrap_or_else(|e| {
+            stderr
+                .writeln(&config.format_error_message(&format!("Failed to initialize CSV headers: {}", e)))
+                .unwrap_or(());
+            ExitCode::GeneralError.exit();
+        });
+        
+        // Get the initialized headers
+        let headers = temp_parser.get_headers();
+        *current_csv_headers = Some(headers.clone());
+        *last_filename = current_filename.clone();
+        
+        // Rebuild the pipeline with new headers
+        let mut pipeline_builder = create_pipeline_builder_from_config(config);
+        pipeline_builder = pipeline_builder.with_csv_headers(headers);
+        
+        let (new_pipeline, _new_begin_stage, _new_end_stage, new_ctx) = pipeline_builder.build(config.processing.stages.clone()).unwrap_or_else(|e| {
+            stderr
+                .writeln(&config.format_error_message(&format!("Failed to rebuild pipeline with CSV headers: {}", e)))
+                .unwrap_or(());
+            ExitCode::GeneralError.exit();
+        });
+        
+        *pipeline = new_pipeline;
+        // Keep the existing context's tracking state but update the Rhai engine
+        ctx.rhai = new_ctx.rhai;
+        
+        // If the first line was consumed as a header, don't process it as data
+        if was_consumed {
+            return;
         }
     }
 
@@ -823,10 +822,7 @@ fn process_line<W: OutputWriter>(
                     line_num, e
                 )))
                 .unwrap_or(());
-            match config.processing.on_error {
-                config::ErrorStrategy::Abort => ExitCode::GeneralError.exit(),
-                _ => return, // Skip, Print, and Stub all continue processing
-            }
+            if let config::ErrorStrategy::Abort = config.processing.on_error { ExitCode::GeneralError.exit() }
         }
     }
 }

@@ -259,7 +259,7 @@ impl ParallelProcessor {
     >(
         &self,
         reader: R,
-        mut pipeline_builder: PipelineBuilder,
+        pipeline_builder: PipelineBuilder,
         stages: Vec<crate::config::ScriptStageType>,
         config: &crate::config::KeloraConfig,
         output: W,
@@ -279,7 +279,7 @@ impl ParallelProcessor {
     >(
         &self,
         reader: R,
-        mut pipeline_builder: PipelineBuilder,
+        pipeline_builder: PipelineBuilder,
         stages: Vec<crate::config::ScriptStageType>,
         config: &crate::config::KeloraConfig,
         output: W,
@@ -390,7 +390,7 @@ impl ParallelProcessor {
         W: std::io::Write + Send + 'static,
     >(
         &self,
-        mut pipeline_builder: PipelineBuilder,
+        pipeline_builder: PipelineBuilder,
         stages: Vec<crate::config::ScriptStageType>,
         config: &crate::config::KeloraConfig,
         output: W,
@@ -524,6 +524,7 @@ impl ParallelProcessor {
     }
 
     /// File-aware reader thread: batches input lines with filename tracking
+    #[allow(clippy::too_many_arguments)]
     fn file_aware_reader_thread(
         mut reader: Box<dyn crate::readers::FileAwareRead>,
         batch_sender: Sender<Batch>,
@@ -542,6 +543,7 @@ impl ParallelProcessor {
         let mut last_batch_time = Instant::now();
         let mut line_buffer = String::new();
         let mut skipped_lines = 0;
+        #[allow(unused_assignments)]
         let mut current_csv_parser: Option<crate::parsers::CsvParser> = None;
         let mut last_filename: Option<String> = None;
         let mut current_headers: Option<Vec<String>> = None;
@@ -605,36 +607,34 @@ impl ParallelProcessor {
                     if matches!(input_format, 
                         crate::config::InputFormat::Csv | crate::config::InputFormat::Tsv |
                         crate::config::InputFormat::Csvnh | crate::config::InputFormat::Tsvnh
-                    ) {
-                        if current_filename != last_filename {
-                            // File changed - send current batch before processing new file
-                            if !current_batch.is_empty() {
-                                Self::send_batch_with_filenames_and_headers(
-                                    &batch_sender,
-                                    &mut current_batch,
-                                    &mut current_filenames,
-                                    batch_id,
-                                    batch_start_line,
-                                    current_headers.clone(),
-                                )?;
-                                batch_id += 1;
-                                batch_start_line = line_num + 1;
-                                last_batch_time = Instant::now();
-                            }
-                            
-                            // File changed, reinitialize CSV parser for this file
-                            current_csv_parser = Self::create_csv_parser_for_file(&input_format, &line);
-                            current_headers = current_csv_parser.as_ref().map(|parser| parser.get_headers());
-                            last_filename = current_filename.clone();
-                            
-                            
-                            // Skip header lines for CSV/TSV (not for CSVNH/TSVNH)
-                            if matches!(input_format, 
-                                crate::config::InputFormat::Csv | crate::config::InputFormat::Tsv
-                            ) {
-                                // This line was consumed as a header, skip it
-                                continue;
-                            }
+                    ) && current_filename != last_filename {
+                        // File changed - send current batch before processing new file
+                        if !current_batch.is_empty() {
+                            Self::send_batch_with_filenames_and_headers(
+                                &batch_sender,
+                                &mut current_batch,
+                                &mut current_filenames,
+                                batch_id,
+                                batch_start_line,
+                                current_headers.clone(),
+                            )?;
+                            batch_id += 1;
+                            batch_start_line = line_num + 1;
+                            last_batch_time = Instant::now();
+                        }
+                        
+                        // File changed, reinitialize CSV parser for this file
+                        current_csv_parser = Self::create_csv_parser_for_file(&input_format, &line);
+                        current_headers = current_csv_parser.as_ref().map(|parser| parser.get_headers());
+                        last_filename = current_filename.clone();
+                        
+                        
+                        // Skip header lines for CSV/TSV (not for CSVNH/TSVNH)
+                        if matches!(input_format, 
+                            crate::config::InputFormat::Csv | crate::config::InputFormat::Tsv
+                        ) {
+                            // This line was consumed as a header, skip it
+                            continue;
                         }
                     }
 
@@ -680,7 +680,7 @@ impl ParallelProcessor {
         };
 
         // Initialize headers from the first line
-        if let Ok(_) = parser.initialize_headers_from_line(first_line) {
+        if parser.initialize_headers_from_line(first_line).is_ok() {
             Some(parser)
         } else {
             None
@@ -811,22 +811,6 @@ impl ParallelProcessor {
         Ok(())
     }
 
-    fn send_batch_with_filenames(
-        batch_sender: &Sender<Batch>,
-        current_batch: &mut Vec<String>,
-        current_filenames: &mut Vec<Option<String>>,
-        batch_id: u64,
-        batch_start_line: usize,
-    ) -> Result<()> {
-        Self::send_batch_with_filenames_and_headers(
-            batch_sender,
-            current_batch,
-            current_filenames,
-            batch_id,
-            batch_start_line,
-            None,
-        )
-    }
 
     fn send_batch_with_filenames_and_headers(
         batch_sender: &Sender<Batch>,
