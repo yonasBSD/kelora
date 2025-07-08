@@ -976,6 +976,15 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
         }
     };
 
+    // Show usage if on TTY and no input files provided
+    if crate::tty::is_stdin_tty() && cli.files.is_empty() {
+        // Print brief usage with description and help hint
+        println!("{}", Cli::command().render_usage());
+        println!("A command-line log analysis tool with embedded Rhai scripting");
+        println!("Try 'kelora --help' for more information.");
+        std::process::exit(0);
+    }
+
     (matches, cli)
 }
 

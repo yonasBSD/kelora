@@ -6,6 +6,11 @@ pub fn is_stdout_tty() -> bool {
     std::io::stdout().is_terminal()
 }
 
+/// Check if stdin is connected to a TTY
+pub fn is_stdin_tty() -> bool {
+    std::io::stdin().is_terminal()
+}
+
 /// Determine if colors should be used based on CLI color mode and environment
 pub fn should_use_colors_with_mode(color_mode: &ColorMode) -> bool {
     match color_mode {
