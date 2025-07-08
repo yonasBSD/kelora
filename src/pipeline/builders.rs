@@ -28,6 +28,7 @@ pub struct PipelineBuilder {
     exclude_levels: Vec<String>,
     multiline: Option<crate::config::MultilineConfig>,
     window_size: usize,
+    csv_headers: Option<Vec<String>>, // Pre-processed CSV headers for parallel mode
 }
 
 impl PipelineBuilder {
@@ -51,6 +52,7 @@ impl PipelineBuilder {
             exclude_levels: Vec::new(),
             multiline: None,
             window_size: 0,
+            csv_headers: None,
         }
     }
 
@@ -73,10 +75,34 @@ impl PipelineBuilder {
             crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
             crate::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
             crate::InputFormat::Cef => Box::new(crate::parsers::CefParser::new()),
-            crate::InputFormat::Csv => Box::new(crate::parsers::CsvParser::new_csv()),
-            crate::InputFormat::Tsv => Box::new(crate::parsers::CsvParser::new_tsv()),
-            crate::InputFormat::Csvnh => Box::new(crate::parsers::CsvParser::new_csv_no_headers()),
-            crate::InputFormat::Tsvnh => Box::new(crate::parsers::CsvParser::new_tsv_no_headers()),
+            crate::InputFormat::Csv => {
+                if let Some(ref headers) = self.csv_headers {
+                    Box::new(crate::parsers::CsvParser::new_csv_with_headers(headers.clone()))
+                } else {
+                    Box::new(crate::parsers::CsvParser::new_csv())
+                }
+            },
+            crate::InputFormat::Tsv => {
+                if let Some(ref headers) = self.csv_headers {
+                    Box::new(crate::parsers::CsvParser::new_tsv_with_headers(headers.clone()))
+                } else {
+                    Box::new(crate::parsers::CsvParser::new_tsv())
+                }
+            },
+            crate::InputFormat::Csvnh => {
+                if let Some(ref headers) = self.csv_headers {
+                    Box::new(crate::parsers::CsvParser::new_csv_no_headers_with_columns(headers.clone()))
+                } else {
+                    Box::new(crate::parsers::CsvParser::new_csv_no_headers())
+                }
+            },
+            crate::InputFormat::Tsvnh => {
+                if let Some(ref headers) = self.csv_headers {
+                    Box::new(crate::parsers::CsvParser::new_tsv_no_headers_with_columns(headers.clone()))
+                } else {
+                    Box::new(crate::parsers::CsvParser::new_tsv_no_headers())
+                }
+            },
             crate::InputFormat::Apache => Box::new(crate::parsers::ApacheParser::new()?),
             crate::InputFormat::Nginx => Box::new(crate::parsers::NginxParser::new()?),
             crate::InputFormat::Cols => Box::new(crate::parsers::ColsParser::new()),
@@ -249,17 +275,41 @@ impl PipelineBuilder {
     ) -> Result<(Pipeline, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
 
-        // Create parser
+        // Create parser (with pre-processed CSV headers if available)
         let parser: Box<dyn EventParser> = match self.input_format {
             crate::InputFormat::Jsonl => Box::new(crate::parsers::JsonlParser::new()),
             crate::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
             crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
             crate::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
             crate::InputFormat::Cef => Box::new(crate::parsers::CefParser::new()),
-            crate::InputFormat::Csv => Box::new(crate::parsers::CsvParser::new_csv()),
-            crate::InputFormat::Tsv => Box::new(crate::parsers::CsvParser::new_tsv()),
-            crate::InputFormat::Csvnh => Box::new(crate::parsers::CsvParser::new_csv_no_headers()),
-            crate::InputFormat::Tsvnh => Box::new(crate::parsers::CsvParser::new_tsv_no_headers()),
+            crate::InputFormat::Csv => {
+                if let Some(ref headers) = self.csv_headers {
+                    Box::new(crate::parsers::CsvParser::new_csv_with_headers(headers.clone()))
+                } else {
+                    Box::new(crate::parsers::CsvParser::new_csv())
+                }
+            },
+            crate::InputFormat::Tsv => {
+                if let Some(ref headers) = self.csv_headers {
+                    Box::new(crate::parsers::CsvParser::new_tsv_with_headers(headers.clone()))
+                } else {
+                    Box::new(crate::parsers::CsvParser::new_tsv())
+                }
+            },
+            crate::InputFormat::Csvnh => {
+                if let Some(ref headers) = self.csv_headers {
+                    Box::new(crate::parsers::CsvParser::new_csv_no_headers_with_columns(headers.clone()))
+                } else {
+                    Box::new(crate::parsers::CsvParser::new_csv_no_headers())
+                }
+            },
+            crate::InputFormat::Tsvnh => {
+                if let Some(ref headers) = self.csv_headers {
+                    Box::new(crate::parsers::CsvParser::new_tsv_no_headers_with_columns(headers.clone()))
+                } else {
+                    Box::new(crate::parsers::CsvParser::new_tsv_no_headers())
+                }
+            },
             crate::InputFormat::Apache => Box::new(crate::parsers::ApacheParser::new()?),
             crate::InputFormat::Nginx => Box::new(crate::parsers::NginxParser::new()?),
             crate::InputFormat::Cols => Box::new(crate::parsers::ColsParser::new()),
@@ -282,7 +332,7 @@ impl PipelineBuilder {
                         "CSV output format requires --keys to specify field order"
                     ));
                 }
-                Box::new(crate::formatters::CsvFormatter::new(self.keys.clone()))
+                Box::new(crate::formatters::CsvFormatter::new_worker(self.keys.clone()))
             }
             crate::OutputFormat::Tsv => {
                 if self.keys.is_empty() {
@@ -290,7 +340,7 @@ impl PipelineBuilder {
                         "TSV output format requires --keys to specify field order"
                     ));
                 }
-                Box::new(crate::formatters::CsvFormatter::new_tsv(self.keys.clone()))
+                Box::new(crate::formatters::CsvFormatter::new_tsv_worker(self.keys.clone()))
             }
             crate::OutputFormat::Csvnh => {
                 if self.keys.is_empty() {
@@ -298,7 +348,7 @@ impl PipelineBuilder {
                         "CSVNH output format requires --keys to specify field order"
                     ));
                 }
-                Box::new(crate::formatters::CsvFormatter::new_csv_no_header(
+                Box::new(crate::formatters::CsvFormatter::new_csv_no_header_worker(
                     self.keys.clone(),
                 ))
             }
@@ -308,7 +358,7 @@ impl PipelineBuilder {
                         "TSVNH output format requires --keys to specify field order"
                     ));
                 }
-                Box::new(crate::formatters::CsvFormatter::new_tsv_no_header(
+                Box::new(crate::formatters::CsvFormatter::new_tsv_no_header_worker(
                     self.keys.clone(),
                 ))
             }
@@ -390,6 +440,12 @@ impl PipelineBuilder {
 
         Ok((pipeline, ctx))
     }
+
+    pub fn with_csv_headers(mut self, headers: Vec<String>) -> Self {
+        self.csv_headers = Some(headers);
+        self
+    }
+
 }
 
 impl Default for PipelineBuilder {
@@ -465,6 +521,22 @@ pub fn create_input_reader(
     } else {
         let sorted_files = sort_files(&config.input.files, &config.input.file_order)?;
         Ok(Box::new(MultiFileReader::new(sorted_files)?))
+    }
+}
+
+/// Create file-aware input reader for parallel processing with filename tracking
+pub fn create_file_aware_input_reader(
+    config: &crate::config::KeloraConfig,
+) -> Result<Box<dyn crate::readers::FileAwareRead>> {
+    use crate::readers::FileAwareRead;
+    
+    if config.input.files.is_empty() {
+        // For stdin, we don't have filename information
+        // We'll need to create a wrapper that implements FileAwareRead
+        Err(anyhow::anyhow!("File-aware reader not supported for stdin"))
+    } else {
+        let sorted_files = sort_files(&config.input.files, &config.input.file_order)?;
+        Ok(Box::new(crate::readers::FileAwareMultiFileReader::new(sorted_files)?))
     }
 }
 

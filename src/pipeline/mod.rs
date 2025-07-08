@@ -143,7 +143,7 @@ impl Pipeline {
         if let Some(chunk) = self.chunker.feed_line(line) {
             // Parse stage
             let event = match self.parser.parse(&chunk) {
-                Ok(e) => {
+                Ok(mut e) => {
                     // Event was successfully created from chunk
                     crate::stats::stats_add_event_created();
 
@@ -157,6 +157,11 @@ impl Pipeline {
                             "__op___kelora_stats_events_created".to_string(),
                             rhai::Dynamic::from("count"),
                         );
+                    }
+
+                    // Copy metadata from context to event
+                    if let Some(line_num) = ctx.meta.line_number {
+                        e.set_metadata(line_num, ctx.meta.filename.clone());
                     }
 
                     e

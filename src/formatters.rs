@@ -2,7 +2,15 @@ use crate::colors::ColorScheme;
 use crate::event::Event;
 use crate::pipeline;
 use rhai::Dynamic;
-use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+use once_cell::sync::Lazy;
+
+/// Global header tracking registry for CSV formatters in parallel mode
+/// Key format: "{delimiter}_{keys_hash}" for uniqueness across different CSV configurations
+static CSV_FORMATTER_HEADER_REGISTRY: Lazy<Mutex<HashMap<String, bool>>> = 
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[cfg(test)]
 use crate::pipeline::Formatter;
@@ -381,48 +389,132 @@ pub struct CsvFormatter {
     delimiter: char,
     keys: Vec<String>,
     include_header: bool,
-    header_written: Arc<Mutex<bool>>,
+    formatter_key: String,
+    worker_mode: bool, // If true, never write headers (for parallel workers)
 }
 
 impl CsvFormatter {
     pub fn new(keys: Vec<String>) -> Self {
+        let formatter_key = format!(",_{}", Self::keys_hash(&keys));
         Self {
             delimiter: ',',
             keys,
             include_header: true,
-            header_written: Arc::new(Mutex::new(false)),
+            formatter_key,
+            worker_mode: false,
         }
     }
 
     pub fn new_tsv(keys: Vec<String>) -> Self {
+        let formatter_key = format!("\t_{}", Self::keys_hash(&keys));
         Self {
             delimiter: '\t',
             keys,
             include_header: true,
-            header_written: Arc::new(Mutex::new(false)),
+            formatter_key,
+            worker_mode: false,
         }
     }
 
     pub fn new_csv_no_header(keys: Vec<String>) -> Self {
+        let formatter_key = format!(",_noheader_{}", Self::keys_hash(&keys));
         Self {
             delimiter: ',',
             keys,
             include_header: false,
-            header_written: Arc::new(Mutex::new(true)), // Skip header
+            formatter_key,
+            worker_mode: false,
         }
     }
 
     pub fn new_tsv_no_header(keys: Vec<String>) -> Self {
+        let formatter_key = format!("\t_noheader_{}", Self::keys_hash(&keys));
         Self {
             delimiter: '\t',
             keys,
             include_header: false,
-            header_written: Arc::new(Mutex::new(true)), // Skip header
+            formatter_key,
+            worker_mode: false,
+        }
+    }
+
+    /// Create worker-mode variants that never write headers
+    pub fn new_worker(keys: Vec<String>) -> Self {
+        let formatter_key = format!(",_worker_{}", Self::keys_hash(&keys));
+        Self {
+            delimiter: ',',
+            keys,
+            include_header: false, // Workers never write headers
+            formatter_key,
+            worker_mode: true,
+        }
+    }
+
+    pub fn new_tsv_worker(keys: Vec<String>) -> Self {
+        let formatter_key = format!("\t_worker_{}", Self::keys_hash(&keys));
+        Self {
+            delimiter: '\t',
+            keys,
+            include_header: false, // Workers never write headers
+            formatter_key,
+            worker_mode: true,
+        }
+    }
+
+    pub fn new_csv_no_header_worker(keys: Vec<String>) -> Self {
+        let formatter_key = format!(",_noheader_worker_{}", Self::keys_hash(&keys));
+        Self {
+            delimiter: ',',
+            keys,
+            include_header: false,
+            formatter_key,
+            worker_mode: true,
+        }
+    }
+
+    pub fn new_tsv_no_header_worker(keys: Vec<String>) -> Self {
+        let formatter_key = format!("\t_noheader_worker_{}", Self::keys_hash(&keys));
+        Self {
+            delimiter: '\t',
+            keys,
+            include_header: false,
+            formatter_key,
+            worker_mode: true,
+        }
+    }
+
+    /// Create a simple hash of the keys for uniqueness
+    fn keys_hash(keys: &[String]) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        
+        let mut hasher = DefaultHasher::new();
+        keys.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    /// Check if header has been written globally for this formatter configuration
+    fn header_written_globally(&self) -> bool {
+        let registry = CSV_FORMATTER_HEADER_REGISTRY.lock().unwrap();
+        registry.get(&self.formatter_key).copied().unwrap_or(false)
+    }
+
+    /// Mark header as written globally for this formatter configuration
+    /// Returns true if this call was the first to mark it (header should be written)
+    fn mark_header_written_globally(&self) -> bool {
+        let mut registry = CSV_FORMATTER_HEADER_REGISTRY.lock().unwrap();
+        if registry.get(&self.formatter_key).copied().unwrap_or(false) {
+            // Already marked by another thread
+            false
+        } else {
+            // This is the first thread to mark it
+            registry.insert(self.formatter_key.clone(), true);
+            true
         }
     }
 
     /// Format the header row
-    fn format_header(&self) -> String {
+    pub fn format_header(&self) -> String {
         self.keys
             .iter()
             .map(|key| escape_csv_value(key, self.delimiter))
@@ -450,14 +542,11 @@ impl pipeline::Formatter for CsvFormatter {
     fn format(&self, event: &Event) -> String {
         let mut output = String::new();
 
-        // Write header row if needed (thread-safe, once only)
-        if self.include_header {
-            let mut header_written = self.header_written.lock().unwrap();
-            if !*header_written {
-                output.push_str(&self.format_header());
-                output.push('\n');
-                *header_written = true;
-            }
+        // Write header row if needed (thread-safe, once only across all workers)
+        // Workers in parallel mode never write headers
+        if !self.worker_mode && self.include_header && self.mark_header_written_globally() {
+            output.push_str(&self.format_header());
+            output.push('\n');
         }
 
         // Write data row

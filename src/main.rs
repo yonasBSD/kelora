@@ -703,6 +703,10 @@ fn run_sequential<W: OutputWriter>(config: &KeloraConfig, output: &mut W, stderr
         }
     };
 
+    // For CSV formats, we need to initialize headers from the first line
+    // This needs to be done inline during processing
+    let mut csv_headers_initialized = false;
+    
     // Process lines using pipeline
     let mut line_num = 0;
     let mut skipped_lines = 0;
@@ -739,7 +743,7 @@ fn run_sequential<W: OutputWriter>(config: &KeloraConfig, output: &mut W, stderr
             }
             continue;
         }
-
+        
         // Apply ignore-lines filter if configured (early filtering before parsing)
         if let Some(ref ignore_regex) = config.input.ignore_lines {
             if ignore_regex.is_match(&line) {
@@ -753,6 +757,54 @@ fn run_sequential<W: OutputWriter>(config: &KeloraConfig, output: &mut W, stderr
 
         if line.trim().is_empty() {
             continue;
+        }
+
+        // For CSV formats, initialize headers from the first data line
+        if !csv_headers_initialized && matches!(config.input.format, 
+            config::InputFormat::Csv | config::InputFormat::Tsv | config::InputFormat::Csvnh | config::InputFormat::Tsvnh
+        ) {
+            // Initialize headers and rebuild pipeline
+            let mut pipeline_builder = create_pipeline_builder_from_config(config);
+            
+            // Create a temporary parser to extract headers
+            let mut temp_parser = match config.input.format {
+                config::InputFormat::Csv => crate::parsers::CsvParser::new_csv(),
+                config::InputFormat::Tsv => crate::parsers::CsvParser::new_tsv(),
+                config::InputFormat::Csvnh => crate::parsers::CsvParser::new_csv_no_headers(),
+                config::InputFormat::Tsvnh => crate::parsers::CsvParser::new_tsv_no_headers(),
+                _ => unreachable!(),
+            };
+            
+            // Initialize headers from the first line
+            let was_consumed = temp_parser.initialize_headers_from_line(&line).unwrap_or_else(|e| {
+                stderr
+                    .writeln(&config.format_error_message(&format!("Failed to initialize CSV headers: {}", e)))
+                    .unwrap_or(());
+                ExitCode::GeneralError.exit();
+            });
+            
+            // Get the initialized headers
+            let headers = temp_parser.get_headers();
+            
+            // Add headers to pipeline builder and rebuild
+            pipeline_builder = pipeline_builder.with_csv_headers(headers);
+            
+            // Rebuild the pipeline with initialized headers
+            let (new_pipeline, new_begin_stage, new_end_stage, new_ctx) = pipeline_builder.build(config.processing.stages.clone()).unwrap_or_else(|e| {
+                stderr
+                    .writeln(&config.format_error_message(&format!("Failed to rebuild pipeline with CSV headers: {}", e)))
+                    .unwrap_or(());
+                ExitCode::GeneralError.exit();
+            });
+            
+            pipeline = new_pipeline;
+            ctx = new_ctx;
+            csv_headers_initialized = true;
+            
+            // If the first line was consumed as a header, don't process it as data
+            if was_consumed {
+                continue;
+            }
         }
 
         // Update metadata

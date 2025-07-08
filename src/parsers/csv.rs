@@ -3,8 +3,6 @@ use crate::pipeline::EventParser;
 use anyhow::{Context, Result};
 use csv::ReaderBuilder;
 use rhai::Dynamic;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 
 /// CSV/TSV Parser that supports multiple dialects
 ///
@@ -16,8 +14,7 @@ use std::sync::{Arc, Mutex};
 pub struct CsvParser {
     delimiter: u8,
     has_headers: bool,
-    headers: Arc<Mutex<Vec<String>>>,
-    initialized: Arc<AtomicBool>,
+    headers: Vec<String>,
 }
 
 impl CsvParser {
@@ -26,8 +23,7 @@ impl CsvParser {
         Self {
             delimiter: b',',
             has_headers: true,
-            headers: Arc::new(Mutex::new(Vec::new())),
-            initialized: Arc::new(AtomicBool::new(false)),
+            headers: Vec::new(),
         }
     }
 
@@ -36,8 +32,7 @@ impl CsvParser {
         Self {
             delimiter: b'\t',
             has_headers: true,
-            headers: Arc::new(Mutex::new(Vec::new())),
-            initialized: Arc::new(AtomicBool::new(false)),
+            headers: Vec::new(),
         }
     }
 
@@ -46,8 +41,7 @@ impl CsvParser {
         Self {
             delimiter: b',',
             has_headers: false,
-            headers: Arc::new(Mutex::new(Vec::new())),
-            initialized: Arc::new(AtomicBool::new(false)),
+            headers: Vec::new(),
         }
     }
 
@@ -56,8 +50,66 @@ impl CsvParser {
         Self {
             delimiter: b'\t',
             has_headers: false,
-            headers: Arc::new(Mutex::new(Vec::new())),
-            initialized: Arc::new(AtomicBool::new(false)),
+            headers: Vec::new(),
+        }
+    }
+
+    /// Create a CSV parser with pre-initialized headers (for parallel processing)
+    pub fn new_csv_with_headers(headers: Vec<String>) -> Self {
+        Self {
+            delimiter: b',',
+            has_headers: true,
+            headers,
+        }
+    }
+
+    /// Create a TSV parser with pre-initialized headers (for parallel processing)
+    pub fn new_tsv_with_headers(headers: Vec<String>) -> Self {
+        Self {
+            delimiter: b'\t',
+            has_headers: true,
+            headers,
+        }
+    }
+
+    /// Create a CSV parser without headers but with pre-generated column names
+    pub fn new_csv_no_headers_with_columns(headers: Vec<String>) -> Self {
+        Self {
+            delimiter: b',',
+            has_headers: false,
+            headers,
+        }
+    }
+
+    /// Create a TSV parser without headers but with pre-generated column names
+    pub fn new_tsv_no_headers_with_columns(headers: Vec<String>) -> Self {
+        Self {
+            delimiter: b'\t',
+            has_headers: false,
+            headers,
+        }
+    }
+
+    /// Get the headers (for extracting initialized headers)
+    pub fn get_headers(&self) -> Vec<String> {
+        self.headers.clone()
+    }
+
+    /// Initialize headers from the first line if needed
+    pub fn initialize_headers_from_line(&mut self, line: &str) -> Result<bool> {
+        if !self.headers.is_empty() {
+            // Headers already initialized
+            return Ok(false);
+        }
+
+        if self.has_headers {
+            // Parse headers from this line
+            self.headers = self.parse_header_line(line)?;
+            Ok(true) // This line was consumed as headers
+        } else {
+            // Generate column names based on this line
+            self.headers = self.generate_column_names(line)?;
+            Ok(false) // This line should still be processed as data
         }
     }
 
@@ -95,7 +147,7 @@ impl CsvParser {
         }
     }
 
-    /// Parse a data line using the stored headers
+    /// Parse a data line using the initialized headers
     fn parse_data_line(&self, line: &str) -> Result<Event> {
         let mut reader = ReaderBuilder::new()
             .delimiter(self.delimiter)
@@ -107,10 +159,9 @@ impl CsvParser {
             let record = result.context("Failed to parse CSV data line")?;
             let mut event = Event::with_capacity(line.to_string(), record.len());
 
-            // Map CSV fields to event using stored headers
-            let headers = self.headers.lock().unwrap();
+            // Map CSV fields to event using local headers
             for (i, field) in record.iter().enumerate() {
-                if let Some(header) = headers.get(i) {
+                if let Some(header) = self.headers.get(i) {
                     // Store field values as strings (consistent with other parsers)
                     event.set_field(header.clone(), Dynamic::from(field.to_string()));
                 }
@@ -138,32 +189,14 @@ impl EventParser for CsvParser {
             return Ok(self.create_skip_event(line));
         }
 
-        // Thread-safe header initialization
-        if !self.initialized.load(Ordering::Relaxed) {
-            let mut headers = self.headers.lock().unwrap();
-            if headers.is_empty() {
-                if self.has_headers {
-                    // First line is headers - parse and store them
-                    *headers = self
-                        .parse_header_line(line)
-                        .context("Failed to parse CSV headers")?;
-                    self.initialized.store(true, Ordering::Relaxed);
-
-                    // Return a skip event for the header line
-                    return Ok(self.create_skip_event(line));
-                } else {
-                    // No headers - generate column names based on first data line
-                    *headers = self
-                        .generate_column_names(line)
-                        .context("Failed to generate CSV column names")?;
-                    self.initialized.store(true, Ordering::Relaxed);
-
-                    // Fall through to parse this line as data
-                }
-            }
+        // If headers are not initialized, this is sequential mode - use old behavior
+        if self.headers.is_empty() {
+            return Err(anyhow::anyhow!(
+                "CSV parser not properly initialized. This should not happen in normal usage."
+            ));
         }
 
-        // Parse data line
+        // Parse data line using pre-initialized headers
         self.parse_data_line(line)
             .with_context(|| format!("Failed to parse CSV line: {}", line))
     }
@@ -175,11 +208,12 @@ mod tests {
 
     #[test]
     fn test_csv_with_headers() {
-        let parser = CsvParser::new_csv();
+        let mut parser = CsvParser::new_csv();
 
-        // First line should be headers (skipped)
-        let header_result = parser.parse("name,age,city").unwrap();
-        assert!(header_result.fields.get("__skip__").is_some());
+        // Initialize headers from first line
+        let header_line = "name,age,city";
+        let was_consumed = parser.initialize_headers_from_line(header_line).unwrap();
+        assert!(was_consumed); // Header line should be consumed
 
         // Second line should be data
         let data_result = parser.parse("Alice,25,New York").unwrap();
@@ -193,7 +227,12 @@ mod tests {
 
     #[test]
     fn test_csv_no_headers() {
-        let parser = CsvParser::new_csv_no_headers();
+        let mut parser = CsvParser::new_csv_no_headers();
+
+        // Initialize column names from first line
+        let data_line = "Alice,25,New York";
+        let was_consumed = parser.initialize_headers_from_line(data_line).unwrap();
+        assert!(!was_consumed); // Data line should not be consumed
 
         // First line should be data with generated column names
         let data_result = parser.parse("Alice,25,New York").unwrap();
@@ -207,11 +246,12 @@ mod tests {
 
     #[test]
     fn test_tsv_with_headers() {
-        let parser = CsvParser::new_tsv();
+        let mut parser = CsvParser::new_tsv();
 
-        // First line should be headers (skipped)
-        let header_result = parser.parse("name\tage\tcity").unwrap();
-        assert!(header_result.fields.get("__skip__").is_some());
+        // Initialize headers from first line
+        let header_line = "name\tage\tcity";
+        let was_consumed = parser.initialize_headers_from_line(header_line).unwrap();
+        assert!(was_consumed); // Header line should be consumed
 
         // Second line should be data
         let data_result = parser.parse("Alice\t25\tNew York").unwrap();
@@ -225,10 +265,10 @@ mod tests {
 
     #[test]
     fn test_csv_with_quotes() {
-        let parser = CsvParser::new_csv();
+        let mut parser = CsvParser::new_csv();
 
-        // Skip headers
-        let _ = parser.parse("name,message").unwrap();
+        // Initialize headers
+        let _ = parser.initialize_headers_from_line("name,message").unwrap();
 
         // Parse quoted data
         let data_result = parser.parse("\"John Smith\",\"Hello, world!\"").unwrap();
@@ -244,10 +284,10 @@ mod tests {
 
     #[test]
     fn test_csv_with_escaped_quotes() {
-        let parser = CsvParser::new_csv();
+        let mut parser = CsvParser::new_csv();
 
-        // Skip headers
-        let _ = parser.parse("name,message").unwrap();
+        // Initialize headers
+        let _ = parser.initialize_headers_from_line("name,message").unwrap();
 
         // Parse data with escaped quotes
         let data_result = parser
@@ -262,10 +302,10 @@ mod tests {
 
     #[test]
     fn test_csv_empty_fields() {
-        let parser = CsvParser::new_csv();
+        let mut parser = CsvParser::new_csv();
 
-        // Skip headers
-        let _ = parser.parse("name,age,city").unwrap();
+        // Initialize headers
+        let _ = parser.initialize_headers_from_line("name,age,city").unwrap();
 
         // Parse data with empty fields
         let data_result = parser.parse("Alice,,Boston").unwrap();
@@ -279,15 +319,19 @@ mod tests {
 
     #[test]
     fn test_csv_variable_columns() {
-        let parser = CsvParser::new_csv_no_headers();
+        let mut parser = CsvParser::new_csv_no_headers();
 
-        // Parse data with varying column counts
+        // Initialize column names from first line
+        let first_line = "Alice,25";
+        let _ = parser.initialize_headers_from_line(first_line).unwrap();
+
+        // Parse data with initial column count
         let data_result1 = parser.parse("Alice,25").unwrap();
         assert_eq!(data_result1.fields.get("c1").unwrap().to_string(), "Alice");
         assert_eq!(data_result1.fields.get("c2").unwrap().to_string(), "25");
         assert!(data_result1.fields.get("c3").is_none());
 
-        // Second line with more columns (should still work)
+        // Second line with more columns (extra columns ignored)
         let data_result2 = parser.parse("Bob,30,Engineer").unwrap();
         assert_eq!(data_result2.fields.get("c1").unwrap().to_string(), "Bob");
         assert_eq!(data_result2.fields.get("c2").unwrap().to_string(), "30");

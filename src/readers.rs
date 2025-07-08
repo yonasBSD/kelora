@@ -133,6 +133,50 @@ pub struct MultiFileReader {
     buffer_size: usize,
 }
 
+/// A file-aware reader that can provide filename information
+pub trait FileAwareRead: BufRead + Send {
+    fn current_filename(&self) -> Option<&str>;
+}
+
+/// A multi-file reader that provides filename information
+pub struct FileAwareMultiFileReader {
+    inner: MultiFileReader,
+}
+
+impl FileAwareMultiFileReader {
+    pub fn new(files: Vec<String>) -> Result<Self> {
+        Ok(Self {
+            inner: MultiFileReader::new(files)?,
+        })
+    }
+}
+
+impl io::Read for FileAwareMultiFileReader {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.read(buf)
+    }
+}
+
+impl io::BufRead for FileAwareMultiFileReader {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        self.inner.fill_buf()
+    }
+
+    fn consume(&mut self, amt: usize) {
+        self.inner.consume(amt)
+    }
+
+    fn read_line(&mut self, buf: &mut String) -> io::Result<usize> {
+        self.inner.read_line(buf)
+    }
+}
+
+impl FileAwareRead for FileAwareMultiFileReader {
+    fn current_filename(&self) -> Option<&str> {
+        self.inner.current_filename()
+    }
+}
+
 impl MultiFileReader {
     /// Create a new MultiFileReader with default buffer size (256KB for better throughput)
     pub fn new(files: Vec<String>) -> Result<Self> {
@@ -179,6 +223,15 @@ impl MultiFileReader {
     fn advance_to_next_file(&mut self) {
         self.current_reader = None;
         self.current_file_idx += 1;
+    }
+
+    /// Get the current filename being read (if any)
+    pub fn current_filename(&self) -> Option<&str> {
+        if self.current_file_idx < self.files.len() {
+            Some(&self.files[self.current_file_idx])
+        } else {
+            None
+        }
     }
 }
 
