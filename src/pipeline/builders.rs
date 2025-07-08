@@ -541,7 +541,7 @@ pub fn create_file_aware_input_reader(
 }
 
 /// Sort files according to the specified file order
-fn sort_files(files: &[String], order: &crate::config::FileOrder) -> Result<Vec<String>> {
+pub fn sort_files(files: &[String], order: &crate::config::FileOrder) -> Result<Vec<String>> {
     let mut sorted_files = files.to_vec();
 
     match order {

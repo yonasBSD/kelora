@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::{ArgMatches, CommandFactory, FromArgMatches, Parser};
-use std::io::BufRead;
+use std::io::{self, BufRead};
 use std::sync::atomic::Ordering;
 
 mod colors;
@@ -24,7 +24,6 @@ use config_file::ConfigFile;
 use parallel::{ParallelConfig, ParallelProcessor};
 use pipeline::{
     create_input_reader, create_pipeline_builder_from_config, create_pipeline_from_config,
-    create_sequential_input_reader,
 };
 use stats::{
     get_thread_stats, stats_add_error, stats_add_line_filtered, stats_add_line_output,
@@ -673,100 +672,68 @@ fn run_parallel<W: std::io::Write + Send + 'static>(
     }
 }
 
-/// Run sequential processing mode
-fn run_sequential<W: OutputWriter>(config: &KeloraConfig, output: &mut W, stderr: &mut SafeStderr) {
-    // Sequential processing mode using new pipeline architecture
-    let (mut pipeline, begin_stage, end_stage, mut ctx) = match create_pipeline_from_config(config)
-    {
-        Ok(pipeline_components) => pipeline_components,
-        Err(e) => {
-            stderr
-                .writeln(&config.format_error_message(&format!("Failed to create pipeline: {}", e)))
-                .unwrap_or(());
-            ExitCode::GeneralError.exit();
-        }
-    };
-
-    // Execute begin stage
-    execute_begin_stage(&begin_stage, &mut ctx, config, stderr);
-
-    // Get input reader using pipeline builder
-    let reader = match create_sequential_input_reader(config) {
-        Ok(r) => r,
-        Err(e) => {
+/// Process a single line in sequential mode with filename tracking and CSV schema detection
+fn process_line<W: OutputWriter>(
+    line_result: io::Result<String>,
+    line_num: &mut usize,
+    skipped_lines: &mut usize,
+    pipeline: &mut pipeline::Pipeline,
+    ctx: &mut pipeline::PipelineContext,
+    config: &KeloraConfig,
+    output: &mut W,
+    stderr: &mut SafeStderr,
+    current_filename: Option<String>,
+    current_csv_headers: &mut Option<Vec<String>>,
+    last_filename: &mut Option<String>,
+) {
+    let line = line_result
+        .map_err(|e| {
             stderr
                 .writeln(
-                    &config.format_error_message(&format!("Failed to create input reader: {}", e)),
+                    &config.format_error_message(&format!("Failed to read input line: {}", e)),
                 )
                 .unwrap_or(());
             ExitCode::GeneralError.exit();
-        }
-    };
+        })
+        .unwrap();
+    *line_num += 1;
 
-    // For CSV formats, we need to initialize headers from the first line
-    // This needs to be done inline during processing
-    let mut csv_headers_initialized = false;
-    
-    // Process lines using pipeline
-    let mut line_num = 0;
-    let mut skipped_lines = 0;
-    for line_result in reader.lines() {
-        // Check for termination signal between lines
-        if check_termination().is_err() {
-            // Return early to allow graceful shutdown with stats
-            return;
-        }
+    // Count line read for stats
+    if config.output.stats {
+        stats_add_line_read();
+    }
 
-        let line = line_result
-            .map_err(|e| {
-                stderr
-                    .writeln(
-                        &config.format_error_message(&format!("Failed to read input line: {}", e)),
-                    )
-                    .unwrap_or(());
-                ExitCode::GeneralError.exit();
-            })
-            .unwrap();
-        line_num += 1;
-
-        // Count line read for stats
+    // Skip the first N lines if configured (applied before ignore-lines and parsing)
+    if *skipped_lines < config.input.skip_lines {
+        *skipped_lines += 1;
+        // Count skipped line for stats
         if config.output.stats {
-            stats_add_line_read();
+            stats_add_line_filtered();
         }
-
-        // Skip the first N lines if configured (applied before ignore-lines and parsing)
-        if skipped_lines < config.input.skip_lines {
-            skipped_lines += 1;
-            // Count skipped line for stats
+        return;
+    }
+    
+    // Apply ignore-lines filter if configured (early filtering before parsing)
+    if let Some(ref ignore_regex) = config.input.ignore_lines {
+        if ignore_regex.is_match(&line) {
+            // Count filtered line for stats
             if config.output.stats {
                 stats_add_line_filtered();
             }
-            continue;
+            return;
         }
-        
-        // Apply ignore-lines filter if configured (early filtering before parsing)
-        if let Some(ref ignore_regex) = config.input.ignore_lines {
-            if ignore_regex.is_match(&line) {
-                // Count filtered line for stats
-                if config.output.stats {
-                    stats_add_line_filtered();
-                }
-                continue;
-            }
-        }
+    }
 
-        if line.trim().is_empty() {
-            continue;
-        }
+    if line.trim().is_empty() {
+        return;
+    }
 
-        // For CSV formats, initialize headers from the first data line
-        if !csv_headers_initialized && matches!(config.input.format, 
-            config::InputFormat::Csv | config::InputFormat::Tsv | config::InputFormat::Csvnh | config::InputFormat::Tsvnh
-        ) {
-            // Initialize headers and rebuild pipeline
-            let mut pipeline_builder = create_pipeline_builder_from_config(config);
-            
-            // Create a temporary parser to extract headers
+    // For CSV formats, detect file changes and reinitialize parser
+    if matches!(config.input.format, 
+        config::InputFormat::Csv | config::InputFormat::Tsv | config::InputFormat::Csvnh | config::InputFormat::Tsvnh
+    ) {
+        if current_filename != *last_filename {
+            // File changed, reinitialize CSV parser for this file
             let mut temp_parser = match config.input.format {
                 config::InputFormat::Csv => crate::parsers::CsvParser::new_csv(),
                 config::InputFormat::Tsv => crate::parsers::CsvParser::new_tsv(),
@@ -785,77 +752,164 @@ fn run_sequential<W: OutputWriter>(config: &KeloraConfig, output: &mut W, stderr
             
             // Get the initialized headers
             let headers = temp_parser.get_headers();
+            *current_csv_headers = Some(headers.clone());
+            *last_filename = current_filename.clone();
             
-            // Add headers to pipeline builder and rebuild
+            // Rebuild the pipeline with new headers
+            let mut pipeline_builder = create_pipeline_builder_from_config(config);
             pipeline_builder = pipeline_builder.with_csv_headers(headers);
             
-            // Rebuild the pipeline with initialized headers
-            let (new_pipeline, new_begin_stage, new_end_stage, new_ctx) = pipeline_builder.build(config.processing.stages.clone()).unwrap_or_else(|e| {
+            let (new_pipeline, _new_begin_stage, _new_end_stage, new_ctx) = pipeline_builder.build(config.processing.stages.clone()).unwrap_or_else(|e| {
                 stderr
                     .writeln(&config.format_error_message(&format!("Failed to rebuild pipeline with CSV headers: {}", e)))
                     .unwrap_or(());
                 ExitCode::GeneralError.exit();
             });
             
-            pipeline = new_pipeline;
-            ctx = new_ctx;
-            csv_headers_initialized = true;
+            *pipeline = new_pipeline;
+            // Keep the existing context's tracking state but update the Rhai engine
+            ctx.rhai = new_ctx.rhai;
             
             // If the first line was consumed as a header, don't process it as data
             if was_consumed {
-                continue;
+                return;
             }
         }
+    }
 
-        // Update metadata
-        ctx.meta.line_number = Some(line_num);
+    // Update metadata with filename tracking
+    ctx.meta.line_number = Some(*line_num);
+    ctx.meta.filename = current_filename;
 
-        // Process line through pipeline
-        match pipeline.process_line(line, &mut ctx) {
-            Ok(results) => {
-                // Count output lines for stats
-                if config.output.stats && !results.is_empty() {
-                    stats_add_line_output();
-                } else if config.output.stats && results.is_empty() {
-                    stats_add_line_filtered();
-                }
-
-                // Output all results (usually just one), skip empty strings
-                for result in results {
-                    if !result.is_empty() {
-                        output.writeln(&result).unwrap_or_else(|e| {
-                            stderr
-                                .writeln(
-                                    &config.format_error_message(&format!("Output error: {}", e)),
-                                )
-                                .unwrap_or(());
-                            ExitCode::GeneralError.exit();
-                        });
-                    }
-                }
-                output.flush().unwrap_or_else(|e| {
-                    stderr
-                        .writeln(&config.format_error_message(&format!("Flush error: {}", e)))
-                        .unwrap_or(());
-                    ExitCode::GeneralError.exit();
-                });
+    // Process line through pipeline
+    match pipeline.process_line(line, ctx) {
+        Ok(results) => {
+            // Count output lines for stats
+            if config.output.stats && !results.is_empty() {
+                stats_add_line_output();
+            } else if config.output.stats && results.is_empty() {
+                stats_add_line_filtered();
             }
-            Err(e) => {
-                // Count errors for stats
-                if config.output.stats {
-                    stats_add_error();
-                }
 
-                stderr
-                    .writeln(&config.format_error_message(&format!(
-                        "Pipeline error on line {}: {}",
-                        line_num, e
-                    )))
-                    .unwrap_or(());
-                match config.processing.on_error {
-                    config::ErrorStrategy::Abort => ExitCode::GeneralError.exit(),
-                    _ => continue, // Skip, Print, and Stub all continue processing
+            // Output all results (usually just one), skip empty strings
+            for result in results {
+                if !result.is_empty() {
+                    output.writeln(&result).unwrap_or_else(|e| {
+                        stderr
+                            .writeln(
+                                &config.format_error_message(&format!("Output error: {}", e)),
+                            )
+                            .unwrap_or(());
+                        ExitCode::GeneralError.exit();
+                    });
                 }
+            }
+            output.flush().unwrap_or_else(|e| {
+                stderr
+                    .writeln(&config.format_error_message(&format!("Flush error: {}", e)))
+                    .unwrap_or(());
+                ExitCode::GeneralError.exit();
+            });
+        }
+        Err(e) => {
+            // Count errors for stats
+            if config.output.stats {
+                stats_add_error();
+            }
+
+            stderr
+                .writeln(&config.format_error_message(&format!(
+                    "Pipeline error on line {}: {}",
+                    line_num, e
+                )))
+                .unwrap_or(());
+            match config.processing.on_error {
+                config::ErrorStrategy::Abort => ExitCode::GeneralError.exit(),
+                _ => return, // Skip, Print, and Stub all continue processing
+            }
+        }
+    }
+}
+
+/// Run sequential processing mode
+fn run_sequential<W: OutputWriter>(config: &KeloraConfig, output: &mut W, stderr: &mut SafeStderr) {
+    // Sequential processing mode using new pipeline architecture
+    let (mut pipeline, begin_stage, end_stage, mut ctx) = match create_pipeline_from_config(config)
+    {
+        Ok(pipeline_components) => pipeline_components,
+        Err(e) => {
+            stderr
+                .writeln(&config.format_error_message(&format!("Failed to create pipeline: {}", e)))
+                .unwrap_or(());
+            ExitCode::GeneralError.exit();
+        }
+    };
+
+    // Execute begin stage
+    execute_begin_stage(&begin_stage, &mut ctx, config, stderr);
+
+    // For CSV formats, we need to track per-file schema
+    let mut current_csv_headers: Option<Vec<String>> = None;
+    let mut last_filename: Option<String> = None;
+    
+    // Process lines using pipeline
+    let mut line_num = 0;
+    let mut skipped_lines = 0;
+    
+    // Handle filename tracking by creating the appropriate reader
+    if config.input.files.is_empty() {
+        // Stdin processing - no filename tracking
+        let stdin = io::stdin();
+        let reader = stdin.lock();
+        
+        for line_result in reader.lines() {
+            // Check for termination signal between lines
+            if check_termination().is_err() {
+                // Return early to allow graceful shutdown with stats
+                return;
+            }
+            
+            process_line(line_result, &mut line_num, &mut skipped_lines, &mut pipeline, &mut ctx, config, output, stderr, None, &mut current_csv_headers, &mut last_filename);
+        }
+    } else {
+        // File processing - with filename tracking
+        let sorted_files = pipeline::builders::sort_files(&config.input.files, &config.input.file_order).unwrap_or_else(|e| {
+            stderr
+                .writeln(&config.format_error_message(&format!("Failed to sort files: {}", e)))
+                .unwrap_or(());
+            ExitCode::GeneralError.exit();
+        });
+        
+        let mut multi_reader = crate::readers::MultiFileReader::new(sorted_files).unwrap_or_else(|e| {
+            stderr
+                .writeln(&config.format_error_message(&format!("Failed to create multi-file reader: {}", e)))
+                .unwrap_or(());
+            ExitCode::GeneralError.exit();
+        });
+        
+        let mut line_buf = String::new();
+        loop {
+            // Check for termination signal between lines
+            if check_termination().is_err() {
+                // Return early to allow graceful shutdown with stats
+                return;
+            }
+            
+            line_buf.clear();
+            let bytes_read = match multi_reader.read_line(&mut line_buf) {
+                Ok(0) => break, // EOF
+                Ok(n) => n,
+                Err(e) => {
+                    let line_result = Err(e);
+                    let current_filename = multi_reader.current_filename().map(|s| s.to_string());
+                    process_line(line_result, &mut line_num, &mut skipped_lines, &mut pipeline, &mut ctx, config, output, stderr, current_filename, &mut current_csv_headers, &mut last_filename);
+                    continue;
+                }
+            };
+            
+            if bytes_read > 0 {
+                let current_filename = multi_reader.current_filename().map(|s| s.to_string());
+                process_line(Ok(line_buf.clone()), &mut line_num, &mut skipped_lines, &mut pipeline, &mut ctx, config, output, stderr, current_filename, &mut current_csv_headers, &mut last_filename);
             }
         }
     }
