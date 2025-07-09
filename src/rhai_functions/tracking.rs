@@ -32,11 +32,52 @@ pub fn register_functions(engine: &mut Engine) {
         });
     });
 
+    // track_min overloads for different number types
     engine.register_fn("track_min", |key: &str, value: i64| {
         THREAD_TRACKING_STATE.with(|state| {
             let mut state = state.borrow_mut();
-            let current = state.get(key).cloned().unwrap_or(Dynamic::from(i64::MAX));
-            let current_val = current.as_int().unwrap_or(i64::MAX);
+            let current = state.get(key).cloned().unwrap_or(Dynamic::from(f64::INFINITY));
+            let current_val = if current.is_int() {
+                current.as_int().unwrap_or(i64::MAX) as f64
+            } else {
+                current.as_float().unwrap_or(f64::INFINITY)
+            };
+            let value_f64 = value as f64;
+            if value_f64 < current_val {
+                state.insert(key.to_string(), Dynamic::from(value));
+                // Store operation type metadata for parallel merging
+                state.insert(format!("__op_{}", key), Dynamic::from("min"));
+            }
+        });
+    });
+
+    engine.register_fn("track_min", |key: &str, value: i32| {
+        THREAD_TRACKING_STATE.with(|state| {
+            let mut state = state.borrow_mut();
+            let current = state.get(key).cloned().unwrap_or(Dynamic::from(f64::INFINITY));
+            let current_val = if current.is_int() {
+                current.as_int().unwrap_or(i64::MAX) as f64
+            } else {
+                current.as_float().unwrap_or(f64::INFINITY)
+            };
+            let value_f64 = value as f64;
+            if value_f64 < current_val {
+                state.insert(key.to_string(), Dynamic::from(value));
+                // Store operation type metadata for parallel merging
+                state.insert(format!("__op_{}", key), Dynamic::from("min"));
+            }
+        });
+    });
+
+    engine.register_fn("track_min", |key: &str, value: f64| {
+        THREAD_TRACKING_STATE.with(|state| {
+            let mut state = state.borrow_mut();
+            let current = state.get(key).cloned().unwrap_or(Dynamic::from(f64::INFINITY));
+            let current_val = if current.is_int() {
+                current.as_int().unwrap_or(i64::MAX) as f64
+            } else {
+                current.as_float().unwrap_or(f64::INFINITY)
+            };
             if value < current_val {
                 state.insert(key.to_string(), Dynamic::from(value));
                 // Store operation type metadata for parallel merging
@@ -45,12 +86,89 @@ pub fn register_functions(engine: &mut Engine) {
         });
     });
 
+    engine.register_fn("track_min", |key: &str, value: f32| {
+        THREAD_TRACKING_STATE.with(|state| {
+            let mut state = state.borrow_mut();
+            let current = state.get(key).cloned().unwrap_or(Dynamic::from(f64::INFINITY));
+            let current_val = if current.is_int() {
+                current.as_int().unwrap_or(i64::MAX) as f64
+            } else {
+                current.as_float().unwrap_or(f64::INFINITY)
+            };
+            let value_f64 = value as f64;
+            if value_f64 < current_val {
+                state.insert(key.to_string(), Dynamic::from(value));
+                // Store operation type metadata for parallel merging
+                state.insert(format!("__op_{}", key), Dynamic::from("min"));
+            }
+        });
+    });
+
+    // track_max overloads for different number types
     engine.register_fn("track_max", |key: &str, value: i64| {
         THREAD_TRACKING_STATE.with(|state| {
             let mut state = state.borrow_mut();
-            let current = state.get(key).cloned().unwrap_or(Dynamic::from(i64::MIN));
-            let current_val = current.as_int().unwrap_or(i64::MIN);
+            let current = state.get(key).cloned().unwrap_or(Dynamic::from(f64::NEG_INFINITY));
+            let current_val = if current.is_int() {
+                current.as_int().unwrap_or(i64::MIN) as f64
+            } else {
+                current.as_float().unwrap_or(f64::NEG_INFINITY)
+            };
+            let value_f64 = value as f64;
+            if value_f64 > current_val {
+                state.insert(key.to_string(), Dynamic::from(value));
+                // Store operation type metadata for parallel merging
+                state.insert(format!("__op_{}", key), Dynamic::from("max"));
+            }
+        });
+    });
+
+    engine.register_fn("track_max", |key: &str, value: i32| {
+        THREAD_TRACKING_STATE.with(|state| {
+            let mut state = state.borrow_mut();
+            let current = state.get(key).cloned().unwrap_or(Dynamic::from(f64::NEG_INFINITY));
+            let current_val = if current.is_int() {
+                current.as_int().unwrap_or(i64::MIN) as f64
+            } else {
+                current.as_float().unwrap_or(f64::NEG_INFINITY)
+            };
+            let value_f64 = value as f64;
+            if value_f64 > current_val {
+                state.insert(key.to_string(), Dynamic::from(value));
+                // Store operation type metadata for parallel merging
+                state.insert(format!("__op_{}", key), Dynamic::from("max"));
+            }
+        });
+    });
+
+    engine.register_fn("track_max", |key: &str, value: f64| {
+        THREAD_TRACKING_STATE.with(|state| {
+            let mut state = state.borrow_mut();
+            let current = state.get(key).cloned().unwrap_or(Dynamic::from(f64::NEG_INFINITY));
+            let current_val = if current.is_int() {
+                current.as_int().unwrap_or(i64::MIN) as f64
+            } else {
+                current.as_float().unwrap_or(f64::NEG_INFINITY)
+            };
             if value > current_val {
+                state.insert(key.to_string(), Dynamic::from(value));
+                // Store operation type metadata for parallel merging
+                state.insert(format!("__op_{}", key), Dynamic::from("max"));
+            }
+        });
+    });
+
+    engine.register_fn("track_max", |key: &str, value: f32| {
+        THREAD_TRACKING_STATE.with(|state| {
+            let mut state = state.borrow_mut();
+            let current = state.get(key).cloned().unwrap_or(Dynamic::from(f64::NEG_INFINITY));
+            let current_val = if current.is_int() {
+                current.as_int().unwrap_or(i64::MIN) as f64
+            } else {
+                current.as_float().unwrap_or(f64::NEG_INFINITY)
+            };
+            let value_f64 = value as f64;
+            if value_f64 > current_val {
                 state.insert(key.to_string(), Dynamic::from(value));
                 // Store operation type metadata for parallel merging
                 state.insert(format!("__op_{}", key), Dynamic::from("max"));
