@@ -2626,3 +2626,260 @@ fn run_kelora_with_files(args: &[&str], files: &[&str]) -> (String, String, i32)
         output.status.code().unwrap_or(-1),
     )
 }
+
+#[test]
+fn test_error_stats_sequential_mode() {
+    // Test error stats counting in sequential mode with mixed valid/invalid JSON
+    let input = r#"{"valid": "json", "status": 200}
+{malformed json line}
+{"another": "valid", "status": 404}
+not jsonl at all
+{"final": "entry", "status": 500}"#;
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &["-f", "jsonl", "--on-error", "skip", "--stats"],
+        input,
+    );
+    assert_eq!(exit_code, 0, "Should exit successfully with skip error handling");
+
+    // Should output 3 valid JSON lines, skip 2 malformed ones
+    let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(output_lines.len(), 3, "Should output 3 valid JSON lines");
+
+    // Stats should show separate error count
+    assert!(stderr.contains("5 total"), "Should show 5 total lines");
+    assert!(stderr.contains("3 output"), "Should show 3 output lines");
+    assert!(stderr.contains("2 errors"), "Should show 2 parsing errors");
+    assert!(stderr.contains("0 filtered"), "Should show 0 filtered lines");
+}
+
+#[test]
+fn test_error_stats_parallel_mode() {
+    // Test error stats counting in parallel mode with mixed valid/invalid JSON
+    let input = r#"{"valid": "json", "status": 200}
+{malformed json line}
+{"another": "valid", "status": 404}
+not jsonl at all
+{"final": "entry", "status": 500}"#;
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f", "jsonl",
+            "--on-error", "skip",
+            "--stats",
+            "--parallel",
+            "--batch-size", "2",
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "Should exit successfully with skip error handling");
+
+    // Should output 3 valid JSON lines, skip 2 malformed ones
+    let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(output_lines.len(), 3, "Should output 3 valid JSON lines");
+
+    // Stats should show separate error count (same as sequential)
+    assert!(stderr.contains("5 total"), "Should show 5 total lines");
+    assert!(stderr.contains("3 output"), "Should show 3 output lines");
+    assert!(stderr.contains("2 errors"), "Should show 2 parsing errors");
+    assert!(stderr.contains("0 filtered"), "Should show 0 filtered lines");
+}
+
+#[test]
+fn test_error_stats_with_filter_expression() {
+    // Test error stats with both parsing errors and filter expression rejections
+    let input = r#"{"valid": "json", "status": 200}
+{malformed json line}
+{"another": "valid", "status": 404}
+not jsonl at all
+{"final": "entry", "status": 500}"#;
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f", "jsonl",
+            "--filter", "status >= 400",
+            "--on-error", "skip",
+            "--stats",
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "Should exit successfully");
+
+    // Should output 2 lines (status 404 and 500), filter out 1 (status 200), skip 2 malformed
+    let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(output_lines.len(), 2, "Should output 2 lines with status >= 400");
+
+    // Stats should show separate error and filtered counts
+    assert!(stderr.contains("5 total"), "Should show 5 total lines");
+    assert!(stderr.contains("2 output"), "Should show 2 output lines");
+    assert!(stderr.contains("1 filtered"), "Should show 1 filtered line (status 200)");
+    assert!(stderr.contains("2 errors"), "Should show 2 parsing errors");
+}
+
+#[test]
+fn test_error_stats_with_ignore_lines() {
+    // Test error stats with ignore-lines preprocessing
+    let input = r#"# This is a comment
+{"valid": "json", "status": 200}
+{malformed json line}
+# Another comment
+{"another": "valid", "status": 404}"#;
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f", "jsonl",
+            "--ignore-lines", "^#",
+            "--on-error", "skip",
+            "--stats",
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "Should exit successfully");
+
+    // Should output 2 valid JSON lines, ignore 2 comments, skip 1 malformed
+    let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(output_lines.len(), 2, "Should output 2 valid JSON lines");
+
+    // Stats should show combined filtered count (ignore-lines + filter expressions)
+    assert!(stderr.contains("5 total"), "Should show 5 total lines");
+    assert!(stderr.contains("2 output"), "Should show 2 output lines");
+    assert!(stderr.contains("2 filtered"), "Should show 2 filtered lines (comments)");
+    assert!(stderr.contains("1 errors"), "Should show 1 parsing error");
+}
+
+#[test]
+fn test_error_stats_different_error_strategies() {
+    // Test that error stats count correctly regardless of error handling strategy
+    let input = r#"{"valid": "json", "status": 200}
+{malformed json line}
+{"another": "valid", "status": 404}"#;
+
+    // Test with --on-error print
+    let (_stdout1, stderr1, exit_code1) = run_kelora_with_input(
+        &["-f", "jsonl", "--on-error", "print", "--stats"],
+        input,
+    );
+    assert_eq!(exit_code1, 0, "Should exit successfully with print error handling");
+
+    // Test with --on-error skip
+    let (_stdout2, stderr2, exit_code2) = run_kelora_with_input(
+        &["-f", "jsonl", "--on-error", "skip", "--stats"],
+        input,
+    );
+    assert_eq!(exit_code2, 0, "Should exit successfully with skip error handling");
+
+    // Both should show the same error count in stats
+    let expected_stats = ["3 total", "2 output", "1 errors"];
+    for stat in &expected_stats {
+        assert!(stderr1.contains(stat), "Print mode should contain: {}", stat);
+        assert!(stderr2.contains(stat), "Skip mode should contain: {}", stat);
+    }
+
+    // Print mode should also show the error message
+    assert!(stderr1.contains("Parse error"), "Print mode should show error message");
+    assert!(!stderr2.contains("Parse error"), "Skip mode should not show error message");
+}
+
+#[test]
+fn test_error_stats_no_errors() {
+    // Test that error stats are not shown when there are no errors
+    let input = r#"{"valid": "json", "status": 200}
+{"another": "valid", "status": 404}
+{"final": "entry", "status": 500}"#;
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &["-f", "jsonl", "--filter", "status >= 400", "--stats"],
+        input,
+    );
+    assert_eq!(exit_code, 0, "Should exit successfully");
+
+    // Should output 2 lines (status 404 and 500), filter out 1 (status 200)
+    let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(output_lines.len(), 2, "Should output 2 lines with status >= 400");
+
+    // Stats should not show error count when there are no errors
+    assert!(stderr.contains("3 total"), "Should show 3 total lines");
+    assert!(stderr.contains("2 output"), "Should show 2 output lines");
+    assert!(stderr.contains("1 filtered"), "Should show 1 filtered line");
+    assert!(!stderr.contains("errors"), "Should not show error count when there are no errors");
+}
+
+#[test]
+fn test_error_stats_parallel_vs_sequential_consistency() {
+    // Test that parallel and sequential modes show identical error stats
+    let input = r#"{"valid": "json", "status": 200}
+{malformed json line}
+{"another": "valid", "status": 404}
+not jsonl at all
+{"final": "entry", "status": 500}
+invalid json again"#;
+
+    // Run in sequential mode
+    let (stdout_seq, stderr_seq, exit_code_seq) = run_kelora_with_input(
+        &["-f", "jsonl", "--filter", "status >= 400", "--on-error", "skip", "--stats"],
+        input,
+    );
+
+    // Run in parallel mode
+    let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(
+        &[
+            "-f", "jsonl",
+            "--filter", "status >= 400",
+            "--on-error", "skip",
+            "--stats",
+            "--parallel",
+            "--batch-size", "2",
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code_seq, 0, "Sequential mode should exit successfully");
+    assert_eq!(exit_code_par, 0, "Parallel mode should exit successfully");
+
+    // Both should produce the same output
+    let seq_lines: Vec<&str> = stdout_seq.trim().split('\n').collect();
+    let par_lines: Vec<&str> = stdout_par.trim().split('\n').collect();
+    assert_eq!(seq_lines.len(), par_lines.len(), "Should produce same number of output lines");
+
+    // Both should show identical statistics
+    let expected_stats = ["6 total", "2 output", "1 filtered", "3 errors"];
+    for stat in &expected_stats {
+        assert!(stderr_seq.contains(stat), "Sequential mode should contain: {}", stat);
+        assert!(stderr_par.contains(stat), "Parallel mode should contain: {}", stat);
+    }
+}
+
+#[test]
+fn test_error_stats_multiline_mode() {
+    // Test error stats in multiline mode to ensure proper display format
+    let input = r#"{"valid": "json", "message": "line1\nline2"}
+{malformed json line}
+{"another": "valid", "message": "single line"}"#;
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &["-f", "jsonl", "--on-error", "skip", "--stats"],
+        input,
+    );
+    assert_eq!(exit_code, 0, "Should exit successfully");
+
+    // Should output 2 valid JSON lines, skip 1 malformed line  
+    let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(output_lines.len(), 2, "Should output 2 valid JSON lines");
+
+    // Stats should show separate error count
+    assert!(stderr.contains("3 total"), "Should show 3 total lines processed");
+    assert!(stderr.contains("2 output"), "Should show 2 output lines");
+    assert!(stderr.contains("1 errors"), "Should show 1 parsing error");
+    assert!(stderr.contains("0 filtered"), "Should show 0 filtered lines");
+    
+    // Test multiline mode specifically with events created
+    let (_stdout2, stderr2, exit_code2) = run_kelora_with_input(
+        &["-f", "jsonl", "--multiline", "indent", "--on-error", "skip", "--stats"],
+        input,
+    );
+    assert_eq!(exit_code2, 0, "Should exit successfully with multiline mode");
+    
+    // In multiline mode, stats should show both line and event information
+    assert!(stderr2.contains("Events created:"), "Should show event statistics in multiline mode");
+    assert!(stderr2.contains("1 errors"), "Should show 1 parsing error in multiline mode");
+}
