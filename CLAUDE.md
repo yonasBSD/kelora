@@ -177,9 +177,17 @@ seq 1 1000000 | ./target/release/kelora --filter "line.to_int() % 1000 == 0" --s
 # Control event output and side effects for different use cases
 ./target/release/kelora -f jsonl app.log                                    # Default format (logfmt-style)
 ./target/release/kelora -f jsonl app.log -F jsonl                          # JSON lines output
-./target/release/kelora -f jsonl app.log -F logfmt                         # Strict logfmt output
+./target/release/kelora -f jsonl app.log -F logfmt                         # Strict logfmt output (keys sanitized)
 ./target/release/kelora -f jsonl app.log -F hide --exec 'print("Debug: " + level)' --summary  # Hide events, show side effects
 ./target/release/kelora -f jsonl app.log -F null --exec 'track_count(level)' --summary        # Suppress all output, show analytics only
+
+# Logfmt output format behavior
+# The -F logfmt formatter ensures logfmt compliance by sanitizing field keys:
+# - Spaces, tabs, newlines, carriage returns are replaced with underscores
+# - Equals signs (=) are replaced with underscores (to avoid parsing ambiguity)
+# - Other characters like dots, dashes, underscores are preserved
+# - This ensures output can be parsed by standard logfmt parsers including Kelora itself
+./target/release/kelora -f jsonl app.log -F logfmt | ./target/release/kelora -f logfmt  # Round-trip compatibility
 
 # Output format comparison for analytics workflows
 ./target/release/kelora -f jsonl app.log --exec 'print("Processing: " + level); track_count(level)' --summary  # Shows: print output + events + summary
