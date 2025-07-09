@@ -2370,3 +2370,259 @@ fn test_get_path_function_with_real_world_log() {
         stdout
     );
 }
+
+#[test]
+fn test_filename_tracking_jsonl_sequential() {
+    // Test filename tracking with JSONL format in sequential mode
+    let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
+    let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
+    
+    temp_file1.write_all(b"{\"message\": \"test1\"}\n").expect("Failed to write to temp file");
+    temp_file2.write_all(b"{\"message\": \"test2\"}\n").expect("Failed to write to temp file");
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_files(
+        &[
+            "-f", "jsonl",
+            "--exec", "print(\"File: \" + meta.filename + \", Message: \" + message)"
+        ],
+        &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
+    );
+    
+    assert_eq!(exit_code, 0, "Should exit successfully");
+    assert!(stdout.contains("File: ") && stdout.contains("Message: test1"), 
+            "Should show filename and message for file1: {}", stdout);
+    assert!(stdout.contains("File: ") && stdout.contains("Message: test2"), 
+            "Should show filename and message for file2: {}", stdout);
+}
+
+#[test]
+fn test_filename_tracking_jsonl_parallel() {
+    // Test filename tracking with JSONL format in parallel mode
+    let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
+    let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
+    
+    temp_file1.write_all(b"{\"message\": \"test1\"}\n").expect("Failed to write to temp file");
+    temp_file2.write_all(b"{\"message\": \"test2\"}\n").expect("Failed to write to temp file");
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_files(
+        &[
+            "-f", "jsonl",
+            "--parallel",
+            "--exec", "print(\"File: \" + meta.filename + \", Message: \" + message)"
+        ],
+        &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
+    );
+    
+    assert_eq!(exit_code, 0, "Should exit successfully");
+    assert!(stdout.contains("File: ") && stdout.contains("Message: test1"), 
+            "Should show filename and message for file1: {}", stdout);
+    assert!(stdout.contains("File: ") && stdout.contains("Message: test2"), 
+            "Should show filename and message for file2: {}", stdout);
+}
+
+#[test]
+fn test_filename_tracking_line_format() {
+    // Test filename tracking with line format
+    let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
+    let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
+    
+    temp_file1.write_all(b"line from file1\n").expect("Failed to write to temp file");
+    temp_file2.write_all(b"line from file2\n").expect("Failed to write to temp file");
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_files(
+        &[
+            "-f", "line",
+            "--exec", "print(\"File: \" + meta.filename + \", Line: \" + line)"
+        ],
+        &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
+    );
+    
+    assert_eq!(exit_code, 0, "Should exit successfully");
+    assert!(stdout.contains("File: ") && stdout.contains("Line: line from file1"), 
+            "Should show filename and content for file1: {}", stdout);
+    assert!(stdout.contains("File: ") && stdout.contains("Line: line from file2"), 
+            "Should show filename and content for file2: {}", stdout);
+}
+
+#[test]
+fn test_per_file_csv_schema_detection_sequential() {
+    // Test per-file CSV schema detection in sequential mode
+    let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
+    let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
+    
+    temp_file1.write_all(b"name,age\nAlice,30\nBob,25\n").expect("Failed to write to temp file");
+    temp_file2.write_all(b"user,score,level\nCharlie,95,A\nDave,88,B\n").expect("Failed to write to temp file");
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_files(
+        &[
+            "-f", "csv",
+            "--exec", "let fields = event.keys(); print(\"File: \" + meta.filename + \", Fields: \" + fields.join(\",\"))"
+        ],
+        &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
+    );
+    
+    assert_eq!(exit_code, 0, "Should exit successfully");
+    assert!(stdout.contains("Fields: name,age") || stdout.contains("Fields: age,name"), 
+            "Should detect schema for file1: {}", stdout);
+    assert!(stdout.contains("Fields: user,score,level") || stdout.contains("Fields: level,score,user") || stdout.contains("Fields: score,user,level"), 
+            "Should detect schema for file2: {}", stdout);
+}
+
+#[test]
+fn test_per_file_csv_schema_detection_parallel() {
+    // Test per-file CSV schema detection in parallel mode
+    let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
+    let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
+    
+    temp_file1.write_all(b"name,age\nAlice,30\nBob,25\n").expect("Failed to write to temp file");
+    temp_file2.write_all(b"user,score,level\nCharlie,95,A\nDave,88,B\n").expect("Failed to write to temp file");
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_files(
+        &[
+            "-f", "csv",
+            "--parallel",
+            "--exec", "let fields = event.keys(); print(\"File: \" + meta.filename + \", Fields: \" + fields.join(\",\"))"
+        ],
+        &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
+    );
+    
+    assert_eq!(exit_code, 0, "Should exit successfully");
+    assert!(stdout.contains("Fields: name,age") || stdout.contains("Fields: age,name"), 
+            "Should detect schema for file1: {}", stdout);
+    assert!(stdout.contains("Fields: user,score,level") || stdout.contains("Fields: level,score,user") || stdout.contains("Fields: score,user,level"), 
+            "Should detect schema for file2: {}", stdout);
+}
+
+#[test]
+fn test_csv_with_different_column_counts() {
+    // Test CSV files with different numbers of columns
+    let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
+    let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
+    
+    temp_file1.write_all(b"a,b\n1,2\n").expect("Failed to write to temp file");
+    temp_file2.write_all(b"x,y,z,w\n10,20,30,40\n").expect("Failed to write to temp file");
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_files(
+        &[
+            "-f", "csv",
+            "--exec", "let count = event.keys().len(); print(\"File: \" + meta.filename + \", Columns: \" + count)"
+        ],
+        &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
+    );
+    
+    assert_eq!(exit_code, 0, "Should exit successfully");
+    assert!(stdout.contains("Columns: 2"), "Should detect 2 columns in file1: {}", stdout);
+    assert!(stdout.contains("Columns: 4"), "Should detect 4 columns in file2: {}", stdout);
+}
+
+#[test]
+fn test_sequential_parallel_mode_parity() {
+    // Test that sequential and parallel modes produce similar results
+    let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
+    let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
+    
+    temp_file1.write_all(b"{\"user\": \"alice\", \"status\": \"active\"}\n{\"user\": \"bob\", \"status\": \"inactive\"}\n").expect("Failed to write to temp file");
+    temp_file2.write_all(b"{\"user\": \"charlie\", \"status\": \"active\"}\n{\"user\": \"dave\", \"status\": \"inactive\"}\n").expect("Failed to write to temp file");
+    
+    let files = &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()];
+    
+    // Test sequential mode
+    let (stdout_seq, stderr_seq, exit_code_seq) = run_kelora_with_files(
+        &[
+            "-f", "jsonl",
+            "--exec", "print(\"File: \" + meta.filename + \", User: \" + user + \", Status: \" + status)",
+        ],
+        files,
+    );
+    
+    // Test parallel mode
+    let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_files(
+        &[
+            "-f", "jsonl",
+            "--parallel",
+            "--exec", "print(\"File: \" + meta.filename + \", User: \" + user + \", Status: \" + status)",
+        ],
+        files,
+    );
+    
+    assert_eq!(exit_code_seq, 0, "Sequential mode should exit successfully, stderr: {}", stderr_seq);
+    assert_eq!(exit_code_par, 0, "Parallel mode should exit successfully, stderr: {}", stderr_par);
+    
+    // Both modes should show filename tracking
+    assert!(stdout_seq.contains("File: ") && stdout_seq.contains("User: alice"), 
+            "Sequential mode should show filename and user data: {}", stdout_seq);
+    assert!(stdout_par.contains("File: ") && stdout_par.contains("User: alice"), 
+            "Parallel mode should show filename and user data: {}", stdout_par);
+}
+
+#[test]
+fn test_filename_tracking_with_file_order() {
+    // Test filename tracking with file ordering
+    let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
+    let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
+    
+    temp_file1.write_all(b"first\n").expect("Failed to write to temp file");
+    temp_file2.write_all(b"second\n").expect("Failed to write to temp file");
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_files(
+        &[
+            "-f", "line",
+            "--file-order", "name",
+            "--exec", "print(\"Processing: \" + meta.filename + \" -> \" + line)"
+        ],
+        &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
+    );
+    
+    assert_eq!(exit_code, 0, "Should exit successfully");
+    assert!(stdout.contains("Processing: ") && stdout.contains("first"), 
+            "Should process first file: {}", stdout);
+    assert!(stdout.contains("Processing: ") && stdout.contains("second"), 
+            "Should process second file: {}", stdout);
+}
+
+#[test]
+fn test_csv_no_headers_with_filename_tracking() {
+    // Test CSV without headers but with filename tracking
+    let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
+    let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
+    
+    temp_file1.write_all(b"alice,30\nbob,25\n").expect("Failed to write to temp file");
+    temp_file2.write_all(b"charlie,95,A\ndave,88,B\n").expect("Failed to write to temp file");
+    
+    let (stdout, _stderr, exit_code) = run_kelora_with_files(
+        &[
+            "-f", "csvnh",
+            "--exec", "print(\"File: \" + meta.filename + \", Col1: \" + c1 + \", Col2: \" + c2)"
+        ],
+        &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
+    );
+    
+    assert_eq!(exit_code, 0, "Should exit successfully");
+    assert!(stdout.contains("File: ") && stdout.contains("Col1: alice"), 
+            "Should show filename and data for file1: {}", stdout);
+    assert!(stdout.contains("File: ") && stdout.contains("Col1: charlie"), 
+            "Should show filename and data for file2: {}", stdout);
+}
+
+/// Helper function to run kelora with multiple files
+fn run_kelora_with_files(args: &[&str], files: &[&str]) -> (String, String, i32) {
+    let mut full_args = args.to_vec();
+    full_args.extend(files);
+    
+    let binary_path = if cfg!(debug_assertions) {
+        "./target/debug/kelora"
+    } else {
+        "./target/release/kelora"
+    };
+    
+    let output = Command::new(binary_path)
+        .args(&full_args)
+        .output()
+        .expect("Failed to execute kelora");
+    
+    (
+        String::from_utf8_lossy(&output.stdout).to_string(),
+        String::from_utf8_lossy(&output.stderr).to_string(),
+        output.status.code().unwrap_or(-1),
+    )
+}
