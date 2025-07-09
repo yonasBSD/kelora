@@ -130,6 +130,204 @@ kelora --show-config  # Show config file and aliases
 | `--stats`    | Show line counts and performance stats       |
 | `--on-error` | How to handle bad lines (`print`, `skip`, …) |
 
+## 📖 Configuration
+
+Kelora supports configuration files for setting defaults and aliases.
+
+### Configuration File Locations
+
+1. `$XDG_CONFIG_HOME/kelora/config.ini` (Unix)
+2. `~/.config/kelora/config.ini` (Unix fallback)
+3. `~/.kelorarc` (legacy compatibility)
+4. `%APPDATA%\kelora\config.ini` (Windows)
+5. `%USERPROFILE%\.kelorarc` (Windows legacy)
+
+### Configuration Example
+
+```ini
+[defaults]
+input-format = jsonl
+output-format = jsonl
+on-error = skip
+parallel = true
+stats = true
+
+[aliases]
+errors = --filter 'level == "error"' --stats
+json-errors = --format jsonl --filter 'level == "error"' --output-format jsonl
+slow-requests = --filter 'response_time.to_int() > 1000' --keys timestamp,method,path,response_time
+```
+
+### Configuration Commands
+
+```bash
+# Show current configuration and search paths
+kelora --show-config
+
+# Use an alias from configuration
+kelora -a errors /path/to/logs
+
+# Ignore configuration file (use CLI defaults only)
+kelora --ignore-config --filter "level == 'error'"
+```
+
+## 🔧 Input & Output Formats
+
+### Input Formats (`-f FORMAT`)
+
+| Format | Description | Example |
+|--------|-------------|---------|
+| `jsonl` | JSON lines (default) | `{"level": "info", "msg": "..."}` |
+| `line` | Raw text lines | Any text file |
+| `syslog` | Syslog format | `/var/log/messages` |
+| `logfmt` | Key=value pairs | `level=info method=GET status=200` |
+| `csv` | Comma-separated values | `date,user,action` |
+| `tsv` | Tab-separated values | `date	user	action` |
+| `cef` | Common Event Format | Security logs |
+| `cols` | Whitespace-separated columns | Like AWK processing |
+
+### Output Formats (`-F FORMAT`)
+
+| Format | Description | Use Case |
+|--------|-------------|----------|
+| `default` | Logfmt-style output | Normal log analysis |
+| `jsonl` | JSON lines | Structured data processing |
+| `logfmt` | Strict logfmt | Standardized output |
+| `csv` | Comma-separated values | Data analysis |
+| `tsv` | Tab-separated values | Data analysis |
+| `hide` | Hide events, show side effects | Analytics with debug |
+| `null` | Suppress all output | Performance testing |
+
+## 🪟 Window Analysis
+
+The `--window N` option enables sliding window analysis for pattern detection:
+
+```bash
+# Detect consecutive errors
+kelora -f jsonl app.log --window 2 --filter 'level == "error"' \
+  --exec 'if window.len() > 1 && window[1].level == "error" { print("Consecutive errors!") }'
+
+# Monitor response time trends
+kelora -f jsonl api.log --window 5 \
+  --exec 'let times = window_numbers(window, "response_time"); 
+          if times.len() >= 3 { 
+            let avg = times.iter().sum() / times.len(); 
+            print("Avg response time: " + avg + "ms") 
+          }'
+```
+
+### Window Functions
+
+- `window_values(window, field)` - Extract field values from all window events
+- `window_numbers(window, field)` - Extract numeric values from window events
+- `window[0]` - Current event
+- `window[1]` - Previous event
+- `window[N]` - Event N steps back
+
+## 🔍 Built-in Functions
+
+### String Processing
+- `extract_re(pattern)` - Extract with regex
+- `extract_ip()` - Extract IP addresses
+- `extract_url()` - Extract URLs
+- `mask_ip(octets)` - Mask IP addresses
+- `is_private_ip()` - Check if IP is private
+
+### Data Parsing
+- `parse_json(string)` - Parse JSON
+- `parse_kv(string)` - Parse key=value pairs
+- `parse_timestamp(string)` - Parse timestamps (auto-detect format)
+- `get_path(data, "path.to.field")` - Extract nested values
+
+### Array Operations
+- `sorted(array)` - Sort array (returns new array)
+- `reversed(array)` - Reverse array (returns new array)
+- `array.sorted_by(field)` - Sort objects by field
+
+### DateTime & Duration
+- `parse_timestamp(s)` - Parse with auto-detection
+- `parse_duration(s)` - Parse durations like "1h 30m"
+- `now_utc()` - Current UTC time
+- `duration_from_seconds(n)` - Create duration
+
+### Tracking & Metrics
+- `track_count(key)` - Count occurrences
+- `track_max(key, value)` - Track maximum value
+- `track_min(key, value)` - Track minimum value
+- `track_sum(key, value)` - Sum values
+- `track_unique(key, value)` - Count unique values
+
+## 📊 Performance & Parallelization
+
+```bash
+# Parallel processing for large files
+kelora -f jsonl large.log --parallel --threads 8 --filter 'level == "error"'
+
+# Unordered processing for maximum speed
+kelora -f jsonl huge.log --parallel --unordered --filter 'status >= 500'
+
+# Batch processing configuration
+kelora -f jsonl stream.log --batch-size 5000 --batch-timeout 100ms
+```
+
+### Performance Tips
+
+- Use `--parallel` for large files
+- Add `--unordered` for maximum throughput
+- Use `-F null` for performance testing
+- Adjust `--batch-size` based on memory constraints
+- Use `--on-error skip` for production pipelines
+
+## 🔄 Multi-line Processing
+
+For logs with multi-line events:
+
+```bash
+# Stack traces (indented continuation)
+kelora -f line app.log --multiline indent --filter 'line.contains("Exception")'
+
+# SQL statements (semicolon-terminated)
+kelora -f line sql.log --multiline end:';$'
+
+# Timestamp-based grouping
+kelora -f line app.log --multiline timestamp --filter 'line.contains("ERROR")'
+```
+
+## 📝 Common Examples
+
+### Error Analysis
+```bash
+# Count errors by hour
+kelora -f jsonl app.log --filter 'level == "error"' \
+  --exec 'let dt = parse_timestamp(timestamp); track_count("hour_" + dt.format("%H"))' \
+  --summary
+
+# Find slow requests with context
+kelora -f jsonl api.log --window 2 --filter 'response_time.to_int() > 1000' \
+  --exec 'let prev = window.len() > 1 ? window[1].response_time : "none"; 
+          print("Slow request, prev: " + prev + "ms")'
+```
+
+### Log Transformation
+```bash
+# Convert syslog to JSON
+kelora -f syslog /var/log/messages -F jsonl --keys timestamp,level,message
+
+# Extract and mask IP addresses
+kelora -f line access.log \
+  --exec 'let ip = line.extract_ip(); let masked = ip.mask_ip(2)' \
+  --keys timestamp,masked_ip,request
+```
+
+### Real-time Monitoring
+```bash
+# Monitor Kubernetes pods
+kubectl logs -f deployment/app | kelora -f jsonl --levels warn,error
+
+# System log monitoring
+tail -f /var/log/syslog | kelora -f syslog --filter 'level <= 3' --stats
+```
+
 ---
 
 ## 🕵️ Not a Replacement For
