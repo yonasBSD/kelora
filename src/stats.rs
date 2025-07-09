@@ -101,37 +101,21 @@ impl ProcessingStats {
         }
     }
 
-    pub fn format_stats(&self, multiline_enabled: bool) -> String {
+    pub fn format_stats(&self, _multiline_enabled: bool) -> String {
         let mut output = String::new();
 
-        if multiline_enabled && self.events_created > 0 {
-            // In multiline mode, show both lines and events with separate error count
-            if self.lines_errors > 0 {
-                output.push_str(&format!(
-                    "Lines processed: {} total, {} filtered, {} errors; Events created: {} total, {} output, {} filtered",
-                    self.lines_read, self.lines_filtered, self.lines_errors, self.events_created, self.events_output, self.events_filtered
-                ));
-            } else {
-                output.push_str(&format!(
-                    "Lines processed: {} total, {} filtered; Events created: {} total, {} output, {} filtered",
-                    self.lines_read, self.lines_filtered, self.events_created, self.events_output, self.events_filtered
-                ));
-            }
+        // Always show both lines and events for consistency and accuracy
+        // This clearly separates line-level filtering (ignore-lines) from event-level filtering (filter expressions)
+        if self.lines_errors > 0 {
+            output.push_str(&format!(
+                "Lines processed: {} total, {} filtered, {} errors; Events created: {} total, {} output, {} filtered",
+                self.lines_read, self.lines_filtered, self.lines_errors, self.events_created, self.events_output, self.events_filtered
+            ));
         } else {
-            // In non-multiline mode, show line stats with separate error count
-            // Total filtered includes both line-level filtering (ignore-lines) and event-level filtering (filter expressions)
-            let total_filtered = self.lines_filtered + self.events_filtered;
-            if self.lines_errors > 0 {
-                output.push_str(&format!(
-                    "Lines processed: {} total, {} output, {} filtered, {} errors",
-                    self.lines_read, self.lines_output, total_filtered, self.lines_errors
-                ));
-            } else {
-                output.push_str(&format!(
-                    "Lines processed: {} total, {} output, {} filtered",
-                    self.lines_read, self.lines_output, total_filtered
-                ));
-            }
+            output.push_str(&format!(
+                "Lines processed: {} total, {} filtered; Events created: {} total, {} output, {} filtered",
+                self.lines_read, self.lines_filtered, self.events_created, self.events_output, self.events_filtered
+            ));
         }
 
         if self.files_processed > 0 {

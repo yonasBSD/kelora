@@ -2648,9 +2648,9 @@ not jsonl at all
 
     // Stats should show separate error count
     assert!(stderr.contains("5 total"), "Should show 5 total lines");
-    assert!(stderr.contains("3 output"), "Should show 3 output lines");
     assert!(stderr.contains("2 errors"), "Should show 2 parsing errors");
     assert!(stderr.contains("0 filtered"), "Should show 0 filtered lines");
+    assert!(stderr.contains("Events created: 3 total, 3 output, 0 filtered"), "Should show 3 events created and output");
 }
 
 #[test]
@@ -2680,9 +2680,9 @@ not jsonl at all
 
     // Stats should show separate error count (same as sequential)
     assert!(stderr.contains("5 total"), "Should show 5 total lines");
-    assert!(stderr.contains("3 output"), "Should show 3 output lines");
     assert!(stderr.contains("2 errors"), "Should show 2 parsing errors");
     assert!(stderr.contains("0 filtered"), "Should show 0 filtered lines");
+    assert!(stderr.contains("Events created: 3 total, 3 output, 0 filtered"), "Should show 3 events created and output");
 }
 
 #[test]
