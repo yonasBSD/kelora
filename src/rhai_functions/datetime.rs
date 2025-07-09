@@ -133,7 +133,33 @@ pub fn parse_timestamp(
         }
     }
 
-    // Try standard formats
+    // Try Unix timestamp parsing for numeric-only strings
+    if s.chars().all(|c| c.is_ascii_digit()) {
+        if let Ok(timestamp_int) = s.parse::<i64>() {
+            // Detect Unix timestamp precision by string length
+            let dt = if s.len() == 10 {
+                // Seconds (1735566123)
+                DateTime::from_timestamp(timestamp_int, 0)
+            } else if s.len() == 13 {
+                // Milliseconds (1735566123000)
+                DateTime::from_timestamp(timestamp_int / 1000, (timestamp_int % 1000) as u32 * 1_000_000)
+            } else if s.len() == 16 {
+                // Microseconds (1735566123000000)
+                DateTime::from_timestamp(timestamp_int / 1_000_000, (timestamp_int % 1_000_000) as u32 * 1_000)
+            } else if s.len() == 19 {
+                // Nanoseconds (1735566123000000000)
+                DateTime::from_timestamp(timestamp_int / 1_000_000_000, (timestamp_int % 1_000_000_000) as u32)
+            } else {
+                None
+            };
+            
+            if let Some(dt) = dt {
+                return Ok(DateTimeWrapper::new(dt.with_timezone(&Tz::UTC)));
+            }
+        }
+    }
+
+    // Try standard formats (only unambiguous ones)
     let standard_formats = [
         "%Y-%m-%dT%H:%M:%S%.fZ",  // ISO 8601 with fractional seconds
         "%Y-%m-%dT%H:%M:%SZ",     // ISO 8601 without fractional seconds
@@ -141,8 +167,15 @@ pub fn parse_timestamp(
         "%Y-%m-%dT%H:%M:%S%.f%z", // ISO 8601 with fractional seconds and timezone
         "%Y-%m-%d %H:%M:%S%.f",   // Common log format with fractional seconds
         "%Y-%m-%d %H:%M:%S",      // Common log format
-        "%d/%b/%Y:%H:%M:%S %z",   // Apache log format
-        "%b %d %H:%M:%S",         // Syslog format
+        "%d/%b/%Y:%H:%M:%S %z",   // Apache log format (unambiguous: uses month names)
+        "%b %d %H:%M:%S",         // Syslog format (unambiguous: uses month names)
+        "%Y-%m-%d %H:%M:%S,%f",   // Python logging format (unambiguous: YYYY-MM-DD)
+        "%y%m%d %H:%M:%S",        // MySQL legacy format (unambiguous: YYMMDD)
+        "%Y/%m/%d %H:%M:%S",      // Nginx error log format (unambiguous: YYYY/MM/DD)
+        "%b %d %Y %H:%M:%S",      // BSD syslog with year (unambiguous: uses month names)
+        "%d-%b-%y %I:%M:%S.%f %p", // Oracle format (unambiguous: uses month names)
+        "%b %d, %Y %I:%M:%S %p",  // Java SimpleDateFormat (unambiguous: uses month names)
+        "%d.%m.%Y %H:%M:%S",      // German format (unambiguous: DD.MM.YYYY with 4-digit year)
     ];
 
     for fmt in &standard_formats {
@@ -618,5 +651,198 @@ mod tests {
         // Test year boundaries
         let y2k_result = parse_timestamp("2000-01-01T00:00:00Z", None, None);
         assert!(y2k_result.is_ok());
+    }
+
+    #[test]
+    fn test_unix_timestamp_parsing() {
+        // Test Unix timestamp in seconds (10 digits)
+        let unix_seconds = parse_timestamp("1735566123", None, None);
+        assert!(unix_seconds.is_ok());
+        let dt = unix_seconds.unwrap();
+        assert_eq!(dt.inner.year(), 2024);
+        assert_eq!(dt.inner.month(), 12);
+        assert_eq!(dt.inner.day(), 30);
+
+        // Test Unix timestamp in milliseconds (13 digits)
+        let unix_millis = parse_timestamp("1735566123000", None, None);
+        assert!(unix_millis.is_ok());
+        let dt = unix_millis.unwrap();
+        assert_eq!(dt.inner.year(), 2024);
+        assert_eq!(dt.inner.month(), 12);
+        assert_eq!(dt.inner.day(), 30);
+
+        // Test Unix timestamp in microseconds (16 digits)
+        let unix_micros = parse_timestamp("1735566123000000", None, None);
+        assert!(unix_micros.is_ok());
+        let dt = unix_micros.unwrap();
+        assert_eq!(dt.inner.year(), 2024);
+        assert_eq!(dt.inner.month(), 12);
+        assert_eq!(dt.inner.day(), 30);
+
+        // Test Unix timestamp in nanoseconds (19 digits)
+        let unix_nanos = parse_timestamp("1735566123000000000", None, None);
+        assert!(unix_nanos.is_ok());
+        let dt = unix_nanos.unwrap();
+        assert_eq!(dt.inner.year(), 2024);
+        assert_eq!(dt.inner.month(), 12);
+        assert_eq!(dt.inner.day(), 30);
+
+        // Test invalid Unix timestamp (wrong length)
+        let invalid_unix = parse_timestamp("12345", None, None);
+        assert!(invalid_unix.is_err());
+
+        // Test Unix timestamp with non-numeric characters
+        let invalid_chars = parse_timestamp("1735566123a", None, None);
+        assert!(invalid_chars.is_err());
+    }
+
+    #[test]
+    fn test_new_timestamp_formats() {
+        // Test Python logging format with comma separator
+        let python_result = parse_timestamp("2023-07-04 12:34:56,123", None, None);
+        assert!(python_result.is_ok());
+        let dt = python_result.unwrap();
+        assert_eq!(dt.inner.year(), 2023);
+        assert_eq!(dt.inner.month(), 7);
+        assert_eq!(dt.inner.day(), 4);
+        assert_eq!(dt.inner.hour(), 12);
+        assert_eq!(dt.inner.minute(), 34);
+        assert_eq!(dt.inner.second(), 56);
+
+        // Note: Ambiguous formats like "7/4/2023 12:34:56 PM" are not supported
+        // in automatic parsing due to month/day ambiguity. Use explicit format instead.
+
+        // Test MySQL legacy format
+        let mysql_result = parse_timestamp("230704 12:34:56", None, None);
+        assert!(mysql_result.is_ok());
+        let dt = mysql_result.unwrap();
+        assert_eq!(dt.inner.year(), 2023);
+        assert_eq!(dt.inner.month(), 7);
+        assert_eq!(dt.inner.day(), 4);
+        assert_eq!(dt.inner.hour(), 12);
+        assert_eq!(dt.inner.minute(), 34);
+        assert_eq!(dt.inner.second(), 56);
+
+        // Test Nginx error log format
+        let nginx_result = parse_timestamp("2023/07/04 12:34:56", None, None);
+        assert!(nginx_result.is_ok());
+        let dt = nginx_result.unwrap();
+        assert_eq!(dt.inner.year(), 2023);
+        assert_eq!(dt.inner.month(), 7);
+        assert_eq!(dt.inner.day(), 4);
+        assert_eq!(dt.inner.hour(), 12);
+        assert_eq!(dt.inner.minute(), 34);
+        assert_eq!(dt.inner.second(), 56);
+
+        // Test BSD syslog with year
+        let bsd_result = parse_timestamp("Jul 04 2023 12:34:56", None, None);
+        assert!(bsd_result.is_ok());
+        let dt = bsd_result.unwrap();
+        assert_eq!(dt.inner.year(), 2023);
+        assert_eq!(dt.inner.month(), 7);
+        assert_eq!(dt.inner.day(), 4);
+        assert_eq!(dt.inner.hour(), 12);
+        assert_eq!(dt.inner.minute(), 34);
+        assert_eq!(dt.inner.second(), 56);
+
+        // Test Java SimpleDateFormat
+        let java_result = parse_timestamp("Jul 04, 2023 12:34:56 PM", None, None);
+        assert!(java_result.is_ok());
+        let dt = java_result.unwrap();
+        assert_eq!(dt.inner.year(), 2023);
+        assert_eq!(dt.inner.month(), 7);
+        assert_eq!(dt.inner.day(), 4);
+        assert_eq!(dt.inner.hour(), 12);
+        assert_eq!(dt.inner.minute(), 34);
+        assert_eq!(dt.inner.second(), 56);
+
+        // Test German format with dots
+        let german_result = parse_timestamp("04.07.2023 12:34:56", None, None);
+        assert!(german_result.is_ok());
+        let dt = german_result.unwrap();
+        assert_eq!(dt.inner.year(), 2023);
+        assert_eq!(dt.inner.month(), 7);
+        assert_eq!(dt.inner.day(), 4);
+        assert_eq!(dt.inner.hour(), 12);
+        assert_eq!(dt.inner.minute(), 34);
+        assert_eq!(dt.inner.second(), 56);
+    }
+
+    #[test]
+    fn test_oracle_format_parsing() {
+        // Test Oracle format - this one is complex and may need adjustment
+        let oracle_result = parse_timestamp("04-JUL-23 12:34:56.123 PM", None, None);
+        assert!(oracle_result.is_ok());
+        let dt = oracle_result.unwrap();
+        assert_eq!(dt.inner.year(), 2023);
+        assert_eq!(dt.inner.month(), 7);
+        assert_eq!(dt.inner.day(), 4);
+        assert_eq!(dt.inner.hour(), 12);
+        assert_eq!(dt.inner.minute(), 34);
+        assert_eq!(dt.inner.second(), 56);
+    }
+
+    #[test]
+    fn test_explicit_format_for_ambiguous_dates() {
+        // Test US format (M/D/YYYY) with explicit format
+        let us_result = parse_timestamp("7/4/2023 12:34:56 PM", Some("%m/%d/%Y %I:%M:%S %p"), None);
+        assert!(us_result.is_ok());
+        let dt = us_result.unwrap();
+        assert_eq!(dt.inner.year(), 2023);
+        assert_eq!(dt.inner.month(), 7);  // July (US interpretation)
+        assert_eq!(dt.inner.day(), 4);
+        assert_eq!(dt.inner.hour(), 12);
+
+        // Test European format (D/M/YYYY) with explicit format
+        let eu_result = parse_timestamp("7/4/2023 12:34:56", Some("%d/%m/%Y %H:%M:%S"), None);
+        assert!(eu_result.is_ok());
+        let dt = eu_result.unwrap();
+        assert_eq!(dt.inner.year(), 2023);
+        assert_eq!(dt.inner.month(), 4);  // April (European interpretation)
+        assert_eq!(dt.inner.day(), 7);
+        assert_eq!(dt.inner.hour(), 12);
+
+        // Test that ambiguous formats fail without explicit format
+        let ambiguous_result = parse_timestamp("7/4/2023 12:34:56 PM", None, None);
+        assert!(ambiguous_result.is_err(), "Ambiguous date format should fail without explicit format");
+
+        // Test Windows Event Log format variations with explicit format
+        let windows_us = parse_timestamp("12/31/2023 11:59:59 PM", Some("%m/%d/%Y %I:%M:%S %p"), None);
+        assert!(windows_us.is_ok());
+        let dt = windows_us.unwrap();
+        assert_eq!(dt.inner.year(), 2023);
+        assert_eq!(dt.inner.month(), 12);
+        assert_eq!(dt.inner.day(), 31);
+        assert_eq!(dt.inner.hour(), 23);  // 11 PM = 23:00
+    }
+
+    #[test]
+    fn test_unix_timestamp_edge_cases() {
+        // Test earliest Unix timestamp (1970-01-01 00:00:00)
+        let epoch_result = parse_timestamp("0", None, None);
+        assert!(epoch_result.is_err()); // Single digit should fail
+
+        let epoch_result = parse_timestamp("0000000000", None, None);
+        assert!(epoch_result.is_ok());
+        let dt = epoch_result.unwrap();
+        assert_eq!(dt.inner.year(), 1970);
+        assert_eq!(dt.inner.month(), 1);
+        assert_eq!(dt.inner.day(), 1);
+
+        // Test year 2038 problem boundary
+        let y2038_result = parse_timestamp("2147483647", None, None);
+        assert!(y2038_result.is_ok());
+        let dt = y2038_result.unwrap();
+        assert_eq!(dt.inner.year(), 2038);
+        assert_eq!(dt.inner.month(), 1);
+        assert_eq!(dt.inner.day(), 19);
+
+        // Test millisecond precision
+        let millis_result = parse_timestamp("1735566123456", None, None);
+        assert!(millis_result.is_ok());
+        let dt = millis_result.unwrap();
+        assert_eq!(dt.inner.year(), 2024);
+        assert_eq!(dt.inner.month(), 12);
+        assert_eq!(dt.inner.day(), 30);
     }
 }

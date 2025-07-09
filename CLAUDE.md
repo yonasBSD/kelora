@@ -208,6 +208,15 @@ time ./target/release/kelora -f jsonl huge.log --filter 'complex_expression' -F 
 ./target/release/kelora -f jsonl requests.log --exec "let start = parse_timestamp(start_time); let end = parse_timestamp(end_time); let duration = end - start; print('Duration: ' + duration.as_milliseconds() + 'ms')"
 ./target/release/kelora -f jsonl global.log --exec "let utc_time = parse_timestamp(timestamp).to_utc(); print('UTC: ' + utc_time.format('%Y-%m-%d %H:%M:%S %Z'))"
 
+# Unix timestamp parsing (automatic precision detection)
+./target/release/kelora -f jsonl api.log --exec "let dt = parse_timestamp(unix_timestamp); print('Unix timestamp: ' + dt.format('%Y-%m-%d %H:%M:%S'))"  # Supports seconds, milliseconds, microseconds, nanoseconds
+./target/release/kelora -f jsonl db.log --filter "parse_timestamp(created_at) > parse_timestamp('1735566123')"  # Unix timestamp filtering
+
+# Explicit format parsing for ambiguous dates
+./target/release/kelora -f jsonl windows.log --exec "let dt = parse_timestamp(timestamp, '%m/%d/%Y %I:%M:%S %p'); print('US format: ' + dt.format('%Y-%m-%d'))"  # US: July 4th
+./target/release/kelora -f jsonl european.log --exec "let dt = parse_timestamp(timestamp, '%d/%m/%Y %H:%M:%S'); print('EU format: ' + dt.format('%Y-%m-%d'))"    # EU: April 7th
+./target/release/kelora -f jsonl database.log --exec "let dt = parse_timestamp(timestamp, '%y%m%d %H:%M:%S'); print('MySQL legacy: ' + dt.format('%Y-%m-%d'))"  # MySQL legacy format
+
 # Window functionality for event correlation and analysis
 # Enable sliding window of recent events for pattern detection and correlation
 ./target/release/kelora -f jsonl app.log --window 3 --exec "let curr_status = status; let prev_statuses = window_values(window, 'status'); print('Current: ' + curr_status + ', Previous: [' + prev_statuses.join(',') + ']')"
@@ -732,6 +741,25 @@ if window.len() > 1 {
 - `parse_timestamp(s, format)` - Parse with explicit format string
 - `parse_timestamp(s, format, timezone)` - Parse with format and timezone
 
+**Supported Automatic Formats:**
+- Unix timestamps: `1735566123` (seconds), `1735566123000` (milliseconds), `1735566123000000` (microseconds), `1735566123000000000` (nanoseconds)
+- ISO 8601 variants: `2023-07-04T12:34:56Z`, `2023-07-04T12:34:56.123Z`, `2023-07-04T12:34:56+00:00`
+- Common log formats: `2023-07-04 12:34:56`, `2023-07-04 12:34:56.123`
+- Apache logs: `04/Jul/2023:12:34:56 +0000`
+- Syslog formats: `Jul 04 12:34:56`, `Jul 04 2023 12:34:56`
+- Python logging: `2023-07-04 12:34:56,123`
+- MySQL legacy: `230704 12:34:56`
+- Nginx error logs: `2023/07/04 12:34:56`
+- Oracle format: `04-JUL-23 12:34:56.123 PM`
+- Java format: `Jul 04, 2023 12:34:56 PM`
+- German format: `04.07.2023 12:34:56`
+- RFC3339 and RFC2822 standards
+
+**Ambiguous Formats Require Explicit Format:**
+- `7/4/2023 12:34:56 PM` - Could be July 4th (US) or April 7th (EU)
+- Use `parse_timestamp(s, "%m/%d/%Y %I:%M:%S %p")` for US format
+- Use `parse_timestamp(s, "%d/%m/%Y %I:%M:%S %p")` for European format
+
 **Current Time:**
 - `now_utc()` - Get current UTC time
 - `now_local()` - Get current local time
@@ -773,8 +801,18 @@ let dt1 = parse_timestamp("2023-07-04T12:34:56Z");           // ISO 8601
 let dt2 = parse_timestamp("04/Jul/2023:12:34:56 +0000");     // Apache logs
 let dt3 = parse_timestamp("2023-07-04 12:34:56");           // Common format
 
+// Unix timestamp parsing (automatic precision detection)
+let dt4 = parse_timestamp("1735566123");                     // Unix seconds
+let dt5 = parse_timestamp("1735566123000");                  // Unix milliseconds
+let dt6 = parse_timestamp("1735566123000000");               // Unix microseconds
+let dt7 = parse_timestamp("1735566123000000000");            // Unix nanoseconds
+
 // Parse with explicit format and timezone
-let dt4 = parse_timestamp("2023/07/04 12:34:56", "%Y/%m/%d %H:%M:%S", "UTC");
+let dt8 = parse_timestamp("2023/07/04 12:34:56", "%Y/%m/%d %H:%M:%S", "UTC");
+
+// Handle ambiguous dates with explicit format
+let us_date = parse_timestamp("7/4/2023 12:34:56 PM", "%m/%d/%Y %I:%M:%S %p");  // July 4th (US)
+let eu_date = parse_timestamp("7/4/2023 12:34:56", "%d/%m/%Y %H:%M:%S");        // April 7th (EU)
 
 // Duration parsing and creation
 let dur1 = parse_duration("1h 30m");                        // 90 minutes
