@@ -726,7 +726,11 @@ fn process_line<W: OutputWriter>(
     }
 
     if line.trim().is_empty() {
-        return;
+        // Only skip empty lines for structured formats, not for line format
+        if !matches!(config.input.format, config::InputFormat::Line) {
+            return;
+        }
+        // For line format, continue processing the empty line
     }
 
     // For CSV formats, detect file changes and reinitialize parser

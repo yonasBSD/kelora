@@ -327,6 +327,7 @@ impl ParallelProcessor {
             let skip_lines = config.input.skip_lines;
 
             let global_tracker_clone = self.global_tracker.clone();
+            let input_format = config.input.format.clone();
             thread::spawn(move || {
                 Self::reader_thread(
                     reader,
@@ -336,6 +337,7 @@ impl ParallelProcessor {
                     global_tracker_clone,
                     ignore_lines,
                     skip_lines,
+                    input_format,
                 )
             })
         };
@@ -603,8 +605,8 @@ impl ParallelProcessor {
                         continue;
                     }
 
-                    // Skip empty lines
-                    if line.is_empty() {
+                    // Skip empty lines for structured formats only, not for line format
+                    if line.is_empty() && !matches!(input_format, crate::config::InputFormat::Line) {
                         continue;
                     }
 
@@ -702,6 +704,7 @@ impl ParallelProcessor {
     }
 
     /// Reader thread: batches input lines with timeout - simpler approach
+    #[allow(clippy::too_many_arguments)]
     fn reader_thread<R: std::io::BufRead>(
         mut reader: R,
         batch_sender: Sender<Batch>,
@@ -710,6 +713,7 @@ impl ParallelProcessor {
         global_tracker: GlobalTracker,
         ignore_lines: Option<regex::Regex>,
         skip_lines: usize,
+        input_format: crate::config::InputFormat,
     ) -> Result<()> {
         let mut batch_id = 0u64;
         let mut current_batch = Vec::with_capacity(batch_size);
@@ -764,8 +768,8 @@ impl ParallelProcessor {
                         continue;
                     }
 
-                    // Skip empty lines
-                    if line.is_empty() {
+                    // Skip empty lines for structured formats only, not for line format
+                    if line.is_empty() && !matches!(input_format, crate::config::InputFormat::Line) {
                         continue;
                     }
 

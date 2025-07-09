@@ -85,6 +85,11 @@ make test-full          # Comprehensive test suite
 ./target/release/kelora -f syslog /var/log/syslog --filter 'severity <= 3'
 ./target/release/kelora /var/log/syslog --filter 'line.matches("ERROR|WARN")'
 
+# Empty line handling varies by format
+./target/release/kelora -f line input.txt                           # Processes all lines including empty ones
+./target/release/kelora -f jsonl input.jsonl                       # Skips empty lines (structured format)
+./target/release/kelora -f line input.txt --filter 'line.len() > 0' # Filter out empty lines if needed
+
 # CEF (Common Event Format) parsing
 ./target/release/kelora -f cef security.log --filter 'severity.to_int() >= 7'
 ./target/release/kelora -f cef firewall.cef --filter 'src.extract_ip() != ""' --keys timestamp,host,vendor,product,event,src,dst
@@ -368,6 +373,25 @@ Kelora is built around a streaming pipeline architecture:
 - **No Magic**: Explicit behavior, predictable outcomes
 - **Composable**: Each stage can be configured independently
 - **Performance**: Parallel processing and efficient memory usage
+
+### Empty Line Handling
+
+Empty lines are handled differently based on input format:
+
+**Line Format (`-f line`)**:
+- Empty lines are processed as events with `line: ""`
+- Maintains line-by-line correspondence for debugging
+- Use `--filter 'line.len() > 0'` to exclude empty lines if needed
+
+**Structured Formats** (`-f jsonl`, `-f csv`, `-f syslog`, etc.):
+- Empty lines are skipped entirely (never reach the parser)
+- This prevents noise in structured data processing
+- Statistics reflect only non-empty lines that were processed
+
+This design ensures that:
+- Line format behaves predictably for text processing
+- Structured formats focus on meaningful data records
+- Users can filter empty lines explicitly when needed
 
 ### Error Handling Patterns
 
