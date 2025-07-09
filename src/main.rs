@@ -733,10 +733,10 @@ fn process_line<W: OutputWriter>(
         // For line format, continue processing the empty line
     }
 
-    // For CSV formats, detect file changes and reinitialize parser
+    // For CSV formats, detect file changes and reinitialize parser, or handle first line for stdin
     if matches!(config.input.format, 
         config::InputFormat::Csv | config::InputFormat::Tsv | config::InputFormat::Csvnh | config::InputFormat::Tsvnh
-    ) && current_filename != *last_filename {
+    ) && (current_filename != *last_filename || (current_filename.is_none() && current_csv_headers.is_none())) {
         // File changed, reinitialize CSV parser for this file
         let mut temp_parser = match config.input.format {
             config::InputFormat::Csv => crate::parsers::CsvParser::new_csv(),
