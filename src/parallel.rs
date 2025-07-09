@@ -122,7 +122,6 @@ impl GlobalTracker {
             .unwrap_or(0) as usize;
 
         stats.lines_output = output;
-        stats.lines_filtered = 0; // No line-level filtering
         stats.lines_errors = lines_errors;
         stats.errors = lines_errors; // Keep errors field for backward compatibility
         stats.events_created = events_created;
@@ -144,6 +143,12 @@ impl GlobalTracker {
     pub fn set_total_lines_read(&self, total_lines: usize) -> Result<()> {
         let mut global_stats = self.processing_stats.lock().unwrap();
         global_stats.lines_read = total_lines;
+        Ok(())
+    }
+
+    pub fn add_lines_filtered(&self, count: usize) -> Result<()> {
+        let mut global_stats = self.processing_stats.lock().unwrap();
+        global_stats.lines_filtered += count;
         Ok(())
     }
 
@@ -548,6 +553,7 @@ impl ParallelProcessor {
         let mut last_batch_time = Instant::now();
         let mut line_buffer = String::new();
         let mut skipped_lines = 0;
+        let mut filtered_lines = 0;
         #[allow(unused_assignments)]
         let mut current_csv_parser: Option<crate::parsers::CsvParser> = None;
         let mut last_filename: Option<String> = None;
@@ -593,6 +599,7 @@ impl ParallelProcessor {
                     // Skip the first N lines if configured
                     if skipped_lines < skip_lines {
                         skipped_lines += 1;
+                        filtered_lines += 1;
                         continue;
                     }
 
@@ -604,6 +611,7 @@ impl ParallelProcessor {
                     // Apply ignore-lines filter if configured
                     if let Some(ref ignore_regex) = ignore_lines {
                         if ignore_regex.is_match(&line) {
+                            filtered_lines += 1;
                             continue;
                         }
                     }
@@ -665,8 +673,9 @@ impl ParallelProcessor {
             }
         }
 
-        // Report final line count to global tracker
+        // Report final line count and filtered lines to global tracker
         global_tracker.set_total_lines_read(line_num)?;
+        global_tracker.add_lines_filtered(filtered_lines)?;
 
         Ok(())
     }
@@ -709,6 +718,7 @@ impl ParallelProcessor {
         let mut last_batch_time = Instant::now();
         let mut line_buffer = String::new();
         let mut skipped_lines = 0;
+        let mut filtered_lines = 0;
 
         // For truly streaming behavior, we need to:
         // 1. Process lines immediately as they arrive
@@ -750,6 +760,7 @@ impl ParallelProcessor {
                     // Skip the first N lines if configured (applied before ignore-lines and parsing)
                     if skipped_lines < skip_lines {
                         skipped_lines += 1;
+                        filtered_lines += 1;
                         continue;
                     }
 
@@ -761,6 +772,7 @@ impl ParallelProcessor {
                     // Apply ignore-lines filter if configured (early filtering before parsing)
                     if let Some(ref ignore_regex) = ignore_lines {
                         if ignore_regex.is_match(&line) {
+                            filtered_lines += 1;
                             continue;
                         }
                     }
@@ -784,8 +796,9 @@ impl ParallelProcessor {
             }
         }
 
-        // Report final line count to global tracker
+        // Report final line count and filtered lines to global tracker
         global_tracker.set_total_lines_read(line_num)?;
+        global_tracker.add_lines_filtered(filtered_lines)?;
 
         Ok(())
     }
