@@ -309,13 +309,13 @@ impl ParallelProcessor {
 
         // For CSV formats, we need to peek at the first line to initialize headers
         // We'll wrap the reader to handle this preprocessing
-        let (reader, pipeline_builder) = if matches!(config.input.format, 
+        let (reader, pipeline_builder, preprocessing_line_count) = if matches!(config.input.format, 
             crate::config::InputFormat::Csv | crate::config::InputFormat::Tsv |
             crate::config::InputFormat::Csvnh | crate::config::InputFormat::Tsvnh
         ) {
             Self::preprocess_csv_with_reader(reader, pipeline_builder, config)?
         } else {
-            (Box::new(reader) as Box<dyn std::io::BufRead + Send>, pipeline_builder)
+            (Box::new(reader) as Box<dyn std::io::BufRead + Send>, pipeline_builder, 0)
         };
 
         // Start reader thread
@@ -338,6 +338,7 @@ impl ParallelProcessor {
                     ignore_lines,
                     skip_lines,
                     input_format,
+                    preprocessing_line_count,
                 )
             })
         };
@@ -714,10 +715,11 @@ impl ParallelProcessor {
         ignore_lines: Option<regex::Regex>,
         skip_lines: usize,
         input_format: crate::config::InputFormat,
+        preprocessing_line_count: usize,
     ) -> Result<()> {
         let mut batch_id = 0u64;
         let mut current_batch = Vec::with_capacity(batch_size);
-        let mut line_num = 0usize;
+        let mut line_num = preprocessing_line_count;
         let mut batch_start_line = 1usize;
         let mut last_batch_time = Instant::now();
         let mut line_buffer = String::new();
@@ -1274,12 +1276,12 @@ impl ParallelProcessor {
         mut reader: R,
         mut pipeline_builder: PipelineBuilder,
         config: &crate::config::KeloraConfig,
-    ) -> Result<(Box<dyn std::io::BufRead + Send>, PipelineBuilder)> {
+    ) -> Result<(Box<dyn std::io::BufRead + Send>, PipelineBuilder, usize)> {
         let mut first_line = String::new();
         reader.read_line(&mut first_line)?;
         
         if first_line.trim().is_empty() {
-            return Ok((Box::new(reader), pipeline_builder)); // No data to process
+            return Ok((Box::new(reader), pipeline_builder, 0)); // Empty line will be processed normally
         }
 
         // Remove trailing newline for processing, but keep original for reinsertion
@@ -1291,7 +1293,7 @@ impl ParallelProcessor {
             crate::config::InputFormat::Tsv => crate::parsers::CsvParser::new_tsv(),
             crate::config::InputFormat::Csvnh => crate::parsers::CsvParser::new_csv_no_headers(),
             crate::config::InputFormat::Tsvnh => crate::parsers::CsvParser::new_tsv_no_headers(),
-            _ => return Ok((Box::new(reader), pipeline_builder)), // Not a CSV format
+            _ => return Ok((Box::new(reader), pipeline_builder, 0)), // Not a CSV format
         };
 
         // Initialize headers from the first line
@@ -1314,6 +1316,8 @@ impl ParallelProcessor {
             Box::new(first_line_reader.chain(reader))
         };
 
-        Ok((final_reader, pipeline_builder))
+        // Only count the line as preprocessed if it was consumed (not re-inserted)
+        let preprocessing_count = if was_consumed { 1 } else { 0 };
+        Ok((final_reader, pipeline_builder, preprocessing_count))
     }
 }
