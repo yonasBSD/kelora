@@ -254,8 +254,12 @@ pub struct Cli {
     pub summary: bool,
 
     /// Show processing statistics
-    #[arg(long = "stats", help_heading = "Display Options")]
+    #[arg(short = 's', long = "stats", help_heading = "Display Options")]
     pub stats: bool,
+
+    /// Show processing statistics with no output (equivalent to --stats --output-format null)
+    #[arg(short = 'S', long = "stats-only", help_heading = "Display Options")]
+    pub stats_only: bool,
 
     /// Use alias from configuration file
     #[arg(short = 'a', long = "alias", help_heading = "Configuration Options")]
@@ -1190,6 +1194,12 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
     if let Some(stats) = config_file.defaults.get("stats") {
         if !cli.stats && stats.parse::<bool>().unwrap_or(false) {
             cli.stats = true;
+        }
+    }
+
+    if let Some(stats_only) = config_file.defaults.get("stats_only") {
+        if !cli.stats_only && stats_only.parse::<bool>().unwrap_or(false) {
+            cli.stats_only = true;
         }
     }
 

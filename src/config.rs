@@ -465,7 +465,11 @@ impl KeloraConfig {
                 multiline: None,    // Will be set after CLI parsing
             },
             output: OutputConfig {
-                format: cli.output_format.clone().into(),
+                format: if cli.stats_only {
+                    OutputFormat::Null
+                } else {
+                    cli.output_format.clone().into()
+                },
                 keys: cli.keys.clone(),
                 exclude_keys: cli.exclude_keys.clone(),
                 core: cli.core,
@@ -473,7 +477,7 @@ impl KeloraConfig {
                 color: color_mode,
                 no_emoji: cli.no_emoji,
                 summary: cli.summary,
-                stats: cli.stats,
+                stats: cli.stats || cli.stats_only,
             },
             processing: ProcessingConfig {
                 begin: cli.begin.clone(),
