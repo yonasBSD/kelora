@@ -744,6 +744,7 @@ if window.len() > 1 {
 **Supported Automatic Formats:**
 - Unix timestamps: `1735566123` (seconds), `1735566123000` (milliseconds), `1735566123000000` (microseconds), `1735566123000000000` (nanoseconds)
 - ISO 8601 variants: `2023-07-04T12:34:56Z`, `2023-07-04T12:34:56.123Z`, `2023-07-04T12:34:56+00:00`
+- Space-separated ISO 8601: `2023-07-04 12:34:56Z`, `2023-07-04 12:34:56.123Z`, `2023-07-04 12:34:56+0000`
 - Common log formats: `2023-07-04 12:34:56`, `2023-07-04 12:34:56.123`
 - Apache logs: `04/Jul/2023:12:34:56 +0000`
 - Syslog formats: `Jul 04 12:34:56`, `Jul 04 2023 12:34:56`
@@ -753,6 +754,7 @@ if window.len() > 1 {
 - Oracle format: `04-JUL-23 12:34:56.123 PM`
 - Java format: `Jul 04, 2023 12:34:56 PM`
 - German format: `04.07.2023 12:34:56`
+- Unix ctime format: `Tue Jul 04 12:34:56 2023`
 - RFC3339 and RFC2822 standards
 
 **Ambiguous Formats Require Explicit Format:**
@@ -813,6 +815,14 @@ let dt8 = parse_timestamp("2023/07/04 12:34:56", "%Y/%m/%d %H:%M:%S", "UTC");
 // Handle ambiguous dates with explicit format
 let us_date = parse_timestamp("7/4/2023 12:34:56 PM", "%m/%d/%Y %I:%M:%S %p");  // July 4th (US)
 let eu_date = parse_timestamp("7/4/2023 12:34:56", "%d/%m/%Y %H:%M:%S");        // April 7th (EU)
+
+// Space-separated ISO 8601 variants (from klp compatibility)
+let space_iso_z = parse_timestamp("2023-07-04 12:34:56Z");                     // Space-separated with Z
+let space_iso_tz = parse_timestamp("2023-07-04 12:34:56+0000");                // Space-separated with timezone
+let space_iso_frac = parse_timestamp("2023-07-04 12:34:56.123Z");              // Space-separated with fractional seconds
+
+// Unix ctime format
+let ctime_format = parse_timestamp("Tue Jul 04 12:34:56 2023");                // Classic Unix ctime
 
 // Duration parsing and creation
 let dur1 = parse_duration("1h 30m");                        // 90 minutes

@@ -167,6 +167,10 @@ pub fn parse_timestamp(
         "%Y-%m-%dT%H:%M:%S%.f%z", // ISO 8601 with fractional seconds and timezone
         "%Y-%m-%d %H:%M:%S%.f",   // Common log format with fractional seconds
         "%Y-%m-%d %H:%M:%S",      // Common log format
+        "%Y-%m-%d %H:%M:%S%.fZ",  // Space-separated ISO 8601 with fractional seconds and Z
+        "%Y-%m-%d %H:%M:%SZ",     // Space-separated ISO 8601 without fractional seconds but with Z
+        "%Y-%m-%d %H:%M:%S%z",    // Space-separated ISO 8601 with timezone offset
+        "%Y-%m-%d %H:%M:%S%.f%z", // Space-separated ISO 8601 with fractional seconds and timezone
         "%d/%b/%Y:%H:%M:%S %z",   // Apache log format (unambiguous: uses month names)
         "%b %d %H:%M:%S",         // Syslog format (unambiguous: uses month names)
         "%Y-%m-%d %H:%M:%S,%f",   // Python logging format (unambiguous: YYYY-MM-DD)
@@ -176,6 +180,7 @@ pub fn parse_timestamp(
         "%d-%b-%y %I:%M:%S.%f %p", // Oracle format (unambiguous: uses month names)
         "%b %d, %Y %I:%M:%S %p",  // Java SimpleDateFormat (unambiguous: uses month names)
         "%d.%m.%Y %H:%M:%S",      // German format (unambiguous: DD.MM.YYYY with 4-digit year)
+        "%a %b %d %H:%M:%S %Y",   // Classic Unix timestamp with weekday
     ];
 
     for fmt in &standard_formats {
@@ -760,6 +765,65 @@ mod tests {
         let german_result = parse_timestamp("04.07.2023 12:34:56", None, None);
         assert!(german_result.is_ok());
         let dt = german_result.unwrap();
+        assert_eq!(dt.inner.year(), 2023);
+        assert_eq!(dt.inner.month(), 7);
+        assert_eq!(dt.inner.day(), 4);
+        assert_eq!(dt.inner.hour(), 12);
+        assert_eq!(dt.inner.minute(), 34);
+        assert_eq!(dt.inner.second(), 56);
+    }
+
+    #[test]
+    fn test_klp_inspired_formats() {
+        // Test space-separated ISO 8601 with fractional seconds and Z
+        let space_iso_frac_z = parse_timestamp("2023-07-04 12:34:56.123Z", None, None);
+        assert!(space_iso_frac_z.is_ok());
+        let dt = space_iso_frac_z.unwrap();
+        assert_eq!(dt.inner.year(), 2023);
+        assert_eq!(dt.inner.month(), 7);
+        assert_eq!(dt.inner.day(), 4);
+        assert_eq!(dt.inner.hour(), 12);
+        assert_eq!(dt.inner.minute(), 34);
+        assert_eq!(dt.inner.second(), 56);
+
+        // Test space-separated ISO 8601 without fractional seconds but with Z
+        let space_iso_z = parse_timestamp("2023-07-04 12:34:56Z", None, None);
+        assert!(space_iso_z.is_ok());
+        let dt = space_iso_z.unwrap();
+        assert_eq!(dt.inner.year(), 2023);
+        assert_eq!(dt.inner.month(), 7);
+        assert_eq!(dt.inner.day(), 4);
+        assert_eq!(dt.inner.hour(), 12);
+        assert_eq!(dt.inner.minute(), 34);
+        assert_eq!(dt.inner.second(), 56);
+
+        // Test space-separated ISO 8601 with timezone offset
+        let space_iso_tz = parse_timestamp("2023-07-04 12:34:56+0000", None, None);
+        assert!(space_iso_tz.is_ok());
+        let dt = space_iso_tz.unwrap();
+        assert_eq!(dt.inner.year(), 2023);
+        assert_eq!(dt.inner.month(), 7);
+        assert_eq!(dt.inner.day(), 4);
+        assert_eq!(dt.inner.hour(), 12);
+        assert_eq!(dt.inner.minute(), 34);
+        assert_eq!(dt.inner.second(), 56);
+
+        // Test space-separated ISO 8601 with fractional seconds and timezone
+        let space_iso_frac_tz = parse_timestamp("2023-07-04 12:34:56.123+0000", None, None);
+        assert!(space_iso_frac_tz.is_ok());
+        let dt = space_iso_frac_tz.unwrap();
+        assert_eq!(dt.inner.year(), 2023);
+        assert_eq!(dt.inner.month(), 7);
+        assert_eq!(dt.inner.day(), 4);
+        assert_eq!(dt.inner.hour(), 12);
+        assert_eq!(dt.inner.minute(), 34);
+        assert_eq!(dt.inner.second(), 56);
+
+        // Test classic Unix timestamp with weekday
+        // July 4th, 2023 was a Tuesday
+        let unix_weekday = parse_timestamp("Tue Jul 04 12:34:56 2023", None, None);
+        assert!(unix_weekday.is_ok());
+        let dt = unix_weekday.unwrap();
         assert_eq!(dt.inner.year(), 2023);
         assert_eq!(dt.inner.month(), 7);
         assert_eq!(dt.inner.day(), 4);
