@@ -7,12 +7,13 @@ pub struct ProcessingStats {
     pub lines_read: usize,
     pub lines_output: usize,
     pub lines_filtered: usize,
+    pub lines_errors: usize, // Parse errors (regardless of error handling strategy)
     pub events_created: usize,
     pub events_output: usize,
     pub events_filtered: usize,
     pub files_processed: usize,
     pub script_executions: usize,
-    pub errors: usize,
+    pub errors: usize, // Kept for backward compatibility, but lines_errors is more specific
     pub processing_time: Duration,
     pub start_time: Option<Instant>,
 }
@@ -38,6 +39,14 @@ pub fn stats_add_line_output() {
 pub fn stats_add_line_filtered() {
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().lines_filtered += 1;
+    });
+}
+
+pub fn stats_add_line_error() {
+    THREAD_STATS.with(|stats| {
+        let mut stats = stats.borrow_mut();
+        stats.lines_errors += 1;
+        stats.errors += 1; // Keep both for backward compatibility
     });
 }
 
@@ -96,26 +105,40 @@ impl ProcessingStats {
         let mut output = String::new();
 
         if multiline_enabled && self.events_created > 0 {
-            // In multiline mode, show both lines and events
-            output.push_str(&format!(
-                "Lines processed: {} total, {} filtered; Events created: {} total, {} output, {} filtered",
-                self.lines_read, self.lines_filtered, self.events_created, self.events_output, self.events_filtered
-            ));
+            // In multiline mode, show both lines and events with separate error count
+            if self.lines_errors > 0 {
+                output.push_str(&format!(
+                    "Lines processed: {} total, {} filtered, {} errors; Events created: {} total, {} output, {} filtered",
+                    self.lines_read, self.lines_filtered, self.lines_errors, self.events_created, self.events_output, self.events_filtered
+                ));
+            } else {
+                output.push_str(&format!(
+                    "Lines processed: {} total, {} filtered; Events created: {} total, {} output, {} filtered",
+                    self.lines_read, self.lines_filtered, self.events_created, self.events_output, self.events_filtered
+                ));
+            }
         } else {
-            // In non-multiline mode, show traditional line stats
-            output.push_str(&format!(
-                "Lines processed: {} total, {} output, {} filtered",
-                self.lines_read, self.lines_output, self.lines_filtered
-            ));
+            // In non-multiline mode, show line stats with separate error count
+            // Total filtered includes both line-level filtering (ignore-lines) and event-level filtering (filter expressions)
+            let total_filtered = self.lines_filtered + self.events_filtered;
+            if self.lines_errors > 0 {
+                output.push_str(&format!(
+                    "Lines processed: {} total, {} output, {} filtered, {} errors",
+                    self.lines_read, self.lines_output, total_filtered, self.lines_errors
+                ));
+            } else {
+                output.push_str(&format!(
+                    "Lines processed: {} total, {} output, {} filtered",
+                    self.lines_read, self.lines_output, total_filtered
+                ));
+            }
         }
 
         if self.files_processed > 0 {
             output.push_str(&format!(", {} files", self.files_processed));
         }
 
-        if self.errors > 0 {
-            output.push_str(&format!(", {} errors", self.errors));
-        }
+        // Don't show generic errors count anymore since it's already in the main stats line
 
         let processing_time_ms = self.processing_time.as_millis();
         output.push_str(&format!(" in {}ms", processing_time_ms));

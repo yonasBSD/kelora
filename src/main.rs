@@ -786,9 +786,11 @@ fn process_line<W: OutputWriter>(
             // Count output lines for stats
             if config.output.stats && !results.is_empty() {
                 stats_add_line_output();
-            } else if config.output.stats && results.is_empty() {
-                stats_add_line_filtered();
             }
+            // Note: Empty results are now counted as either:
+            // 1. Parsing errors (counted by stats_add_line_error() in pipeline)
+            // 2. Filter rejections (counted by stats_add_event_filtered() in pipeline)
+            // So we don't need to count empty results as filtered here anymore
 
             // Output all results (usually just one), skip empty strings
             for result in results {

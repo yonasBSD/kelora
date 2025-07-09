@@ -167,6 +167,21 @@ impl Pipeline {
                     e
                 }
                 Err(err) => {
+                    // Count parsing errors in stats
+                    crate::stats::stats_add_line_error();
+                    
+                    // Also track in Rhai context for parallel processing
+                    if !ctx.tracker.is_empty() {
+                        ctx.tracker
+                            .entry("__kelora_stats_lines_errors".to_string())
+                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                            .or_insert(rhai::Dynamic::from(1i64));
+                        ctx.tracker.insert(
+                            "__op___kelora_stats_lines_errors".to_string(),
+                            rhai::Dynamic::from("count"),
+                        );
+                    }
+                    
                     return match ctx.config.on_error {
                         crate::ErrorStrategy::Skip => Ok(results),
                         crate::ErrorStrategy::Abort => Err(err),
@@ -298,18 +313,16 @@ impl Pipeline {
                             crate::stats::stats_add_event_filtered();
 
                             // Also track in Rhai context for parallel processing
-                            if !ctx.tracker.is_empty() {
-                                ctx.tracker
-                                    .entry("__kelora_stats_events_filtered".to_string())
-                                    .and_modify(|v| {
-                                        *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
-                                    })
-                                    .or_insert(rhai::Dynamic::from(1i64));
-                                ctx.tracker.insert(
-                                    "__op___kelora_stats_events_filtered".to_string(),
-                                    rhai::Dynamic::from("count"),
-                                );
-                            }
+                            ctx.tracker
+                                .entry("__kelora_stats_events_filtered".to_string())
+                                .and_modify(|v| {
+                                    *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
+                                })
+                                .or_insert(rhai::Dynamic::from(1i64));
+                            ctx.tracker.insert(
+                                "__op___kelora_stats_events_filtered".to_string(),
+                                rhai::Dynamic::from("count"),
+                            );
                         }
                     }
                 }
@@ -317,16 +330,14 @@ impl Pipeline {
                     crate::stats::stats_add_event_filtered();
 
                     // Also track in Rhai context for parallel processing
-                    if !ctx.tracker.is_empty() {
-                        ctx.tracker
-                            .entry("__kelora_stats_events_filtered".to_string())
-                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
-                            .or_insert(rhai::Dynamic::from(1i64));
-                        ctx.tracker.insert(
-                            "__op___kelora_stats_events_filtered".to_string(),
-                            rhai::Dynamic::from("count"),
-                        );
-                    }
+                    ctx.tracker
+                        .entry("__kelora_stats_events_filtered".to_string())
+                        .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                        .or_insert(rhai::Dynamic::from(1i64));
+                    ctx.tracker.insert(
+                        "__op___kelora_stats_events_filtered".to_string(),
+                        rhai::Dynamic::from("count"),
+                    );
                 }
                 ScriptResult::Error(msg) => {
                     return match ctx.config.on_error {

@@ -67,6 +67,7 @@ pub struct ProcessedEvent {
 pub struct GlobalTracker {
     internal_tracked: Arc<Mutex<HashMap<String, Dynamic>>>,
     processing_stats: Arc<Mutex<ProcessingStats>>,
+    start_time: Option<Instant>,
 }
 
 impl GlobalTracker {
@@ -74,6 +75,7 @@ impl GlobalTracker {
         Self {
             internal_tracked: Arc::new(Mutex::new(HashMap::new())),
             processing_stats: Arc::new(Mutex::new(ProcessingStats::new())),
+            start_time: Some(Instant::now()),
         }
     }
 
@@ -84,9 +86,9 @@ impl GlobalTracker {
         // Only merge timing and other safe stats
         global_stats.files_processed += worker_stats.files_processed;
         global_stats.script_executions += worker_stats.script_executions;
-        // Keep the longest processing time for total duration
-        if worker_stats.processing_time > global_stats.processing_time {
-            global_stats.processing_time = worker_stats.processing_time;
+        // Calculate total processing time from global start time
+        if let Some(start_time) = self.start_time {
+            global_stats.processing_time = start_time.elapsed();
         }
         Ok(())
     }
@@ -101,12 +103,9 @@ impl GlobalTracker {
             .get("__kelora_stats_output")
             .and_then(|v| v.as_int().ok())
             .unwrap_or(0) as usize;
-        let filtered = tracked
-            .get("__kelora_stats_filtered")
-            .and_then(|v| v.as_int().ok())
-            .unwrap_or(0) as usize;
-        let errors = tracked
-            .get("__kelora_stats_errors")
+        // Note: Line-level filtering is not used - all filtering is done at event level
+        let lines_errors = tracked
+            .get("__kelora_stats_lines_errors")
             .and_then(|v| v.as_int().ok())
             .unwrap_or(0) as usize;
         let events_created = tracked
@@ -123,8 +122,9 @@ impl GlobalTracker {
             .unwrap_or(0) as usize;
 
         stats.lines_output = output;
-        stats.lines_filtered = filtered;
-        stats.errors = errors;
+        stats.lines_filtered = 0; // No line-level filtering
+        stats.lines_errors = lines_errors;
+        stats.errors = lines_errors; // Keep errors field for backward compatibility
         stats.events_created = events_created;
         stats.events_output = events_output;
         stats.events_filtered = events_filtered;
@@ -133,7 +133,12 @@ impl GlobalTracker {
     }
 
     pub fn get_final_stats(&self) -> ProcessingStats {
-        self.processing_stats.lock().unwrap().clone()
+        let mut stats = self.processing_stats.lock().unwrap().clone();
+        // Ensure we have the latest processing time
+        if let Some(start_time) = self.start_time {
+            stats.processing_time = start_time.elapsed();
+        }
+        stats
     }
 
     pub fn set_total_lines_read(&self, total_lines: usize) -> Result<()> {
@@ -885,11 +890,7 @@ impl ParallelProcessor {
                     .and_then(|v| v.as_int().ok())
                     .unwrap_or(0),
                 ctx.tracker
-                    .get("__kelora_stats_filtered")
-                    .and_then(|v| v.as_int().ok())
-                    .unwrap_or(0),
-                ctx.tracker
-                    .get("__kelora_stats_errors")
+                    .get("__kelora_stats_lines_errors")
                     .and_then(|v| v.as_int().ok())
                     .unwrap_or(0),
                 ctx.tracker
@@ -922,7 +923,7 @@ impl ParallelProcessor {
                 // Process line through pipeline
                 match pipeline.process_line(line.clone(), &mut ctx) {
                     Ok(formatted_results) => {
-                        // Count output/filtered lines
+                        // Count output lines
                         if !formatted_results.is_empty() {
                             ctx.tracker
                                 .entry("__kelora_stats_output".to_string())
@@ -932,16 +933,11 @@ impl ParallelProcessor {
                                 "__op___kelora_stats_output".to_string(),
                                 Dynamic::from("count"),
                             );
-                        } else {
-                            ctx.tracker
-                                .entry("__kelora_stats_filtered".to_string())
-                                .and_modify(|v| *v = Dynamic::from(v.as_int().unwrap_or(0) + 1))
-                                .or_insert(Dynamic::from(1i64));
-                            ctx.tracker.insert(
-                                "__op___kelora_stats_filtered".to_string(),
-                                Dynamic::from("count"),
-                            );
                         }
+                        // Note: Empty results are now counted as either:
+                        // 1. Parsing errors (counted by stats_add_line_error() in pipeline)
+                        // 2. Filter rejections (counted by stats_add_event_filtered() in pipeline)
+                        // So we don't need to count empty results as filtered here anymore
                         // Get any prints/eprints that were captured during processing this specific event
                         let captured_prints =
                             crate::rhai_functions::strings::take_captured_prints();
@@ -967,17 +963,7 @@ impl ParallelProcessor {
                         }
                     }
                     Err(e) => {
-                        // Count errors
-                        ctx.tracker
-                            .entry("__kelora_stats_errors".to_string())
-                            .and_modify(|v| *v = Dynamic::from(v.as_int().unwrap_or(0) + 1))
-                            .or_insert(Dynamic::from(1i64));
-                        ctx.tracker.insert(
-                            "__op___kelora_stats_errors".to_string(),
-                            Dynamic::from("count"),
-                        );
-
-                        // Error handling is already done in pipeline.process_line()
+                        // Error handling and stats tracking is already done in pipeline.process_line()
                         // based on the ctx.config.on_error strategy
                         match ctx.config.on_error {
                             crate::ErrorStrategy::Abort => return Err(e),
@@ -994,11 +980,7 @@ impl ParallelProcessor {
                     .and_then(|v| v.as_int().ok())
                     .unwrap_or(0),
                 ctx.tracker
-                    .get("__kelora_stats_filtered")
-                    .and_then(|v| v.as_int().ok())
-                    .unwrap_or(0),
-                ctx.tracker
-                    .get("__kelora_stats_errors")
+                    .get("__kelora_stats_lines_errors")
                     .and_then(|v| v.as_int().ok())
                     .unwrap_or(0),
                 ctx.tracker
@@ -1028,48 +1010,38 @@ impl ParallelProcessor {
             }
             if after.1 > before.1 {
                 deltas.insert(
-                    "__kelora_stats_filtered".to_string(),
+                    "__kelora_stats_lines_errors".to_string(),
                     Dynamic::from(after.1 - before.1),
                 );
                 deltas.insert(
-                    "__op___kelora_stats_filtered".to_string(),
+                    "__op___kelora_stats_lines_errors".to_string(),
                     Dynamic::from("count"),
                 );
             }
             if after.2 > before.2 {
                 deltas.insert(
-                    "__kelora_stats_errors".to_string(),
-                    Dynamic::from(after.2 - before.2),
-                );
-                deltas.insert(
-                    "__op___kelora_stats_errors".to_string(),
-                    Dynamic::from("count"),
-                );
-            }
-            if after.3 > before.3 {
-                deltas.insert(
                     "__kelora_stats_events_created".to_string(),
-                    Dynamic::from(after.3 - before.3),
+                    Dynamic::from(after.2 - before.2),
                 );
                 deltas.insert(
                     "__op___kelora_stats_events_created".to_string(),
                     Dynamic::from("count"),
                 );
             }
-            if after.4 > before.4 {
+            if after.3 > before.3 {
                 deltas.insert(
                     "__kelora_stats_events_output".to_string(),
-                    Dynamic::from(after.4 - before.4),
+                    Dynamic::from(after.3 - before.3),
                 );
                 deltas.insert(
                     "__op___kelora_stats_events_output".to_string(),
                     Dynamic::from("count"),
                 );
             }
-            if after.5 > before.5 {
+            if after.4 > before.4 {
                 deltas.insert(
                     "__kelora_stats_events_filtered".to_string(),
-                    Dynamic::from(after.5 - before.5),
+                    Dynamic::from(after.4 - before.4),
                 );
                 deltas.insert(
                     "__op___kelora_stats_events_filtered".to_string(),
