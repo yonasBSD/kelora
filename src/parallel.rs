@@ -41,7 +41,7 @@ pub struct Batch {
     pub id: u64,
     pub lines: Vec<String>,
     pub start_line_num: usize,
-    pub filenames: Vec<Option<String>>, // Filename for each line
+    pub filenames: Vec<Option<String>>,   // Filename for each line
     pub csv_headers: Option<Vec<String>>, // CSV headers for this batch (if applicable)
 }
 
@@ -309,13 +309,20 @@ impl ParallelProcessor {
 
         // For CSV formats, we need to peek at the first line to initialize headers
         // We'll wrap the reader to handle this preprocessing
-        let (reader, pipeline_builder, preprocessing_line_count) = if matches!(config.input.format, 
-            crate::config::InputFormat::Csv | crate::config::InputFormat::Tsv |
-            crate::config::InputFormat::Csvnh | crate::config::InputFormat::Tsvnh
+        let (reader, pipeline_builder, preprocessing_line_count) = if matches!(
+            config.input.format,
+            crate::config::InputFormat::Csv
+                | crate::config::InputFormat::Tsv
+                | crate::config::InputFormat::Csvnh
+                | crate::config::InputFormat::Tsvnh
         ) {
             Self::preprocess_csv_with_reader(reader, pipeline_builder, config)?
         } else {
-            (Box::new(reader) as Box<dyn std::io::BufRead + Send>, pipeline_builder, 0)
+            (
+                Box::new(reader) as Box<dyn std::io::BufRead + Send>,
+                pipeline_builder,
+                0,
+            )
         };
 
         // Start reader thread
@@ -399,9 +406,7 @@ impl ParallelProcessor {
         Ok(())
     }
 
-    fn process_with_file_aware_pipeline<
-        W: std::io::Write + Send + 'static,
-    >(
+    fn process_with_file_aware_pipeline<W: std::io::Write + Send + 'static>(
         &self,
         pipeline_builder: PipelineBuilder,
         stages: Vec<crate::config::ScriptStageType>,
@@ -410,7 +415,7 @@ impl ParallelProcessor {
     ) -> Result<()> {
         // Create file-aware reader
         let file_aware_reader = crate::pipeline::builders::create_file_aware_input_reader(config)?;
-        
+
         // Create channels
         let (batch_sender, batch_receiver) = if let Some(size) = self.config.buffer_size {
             bounded(size)
@@ -425,9 +430,12 @@ impl ParallelProcessor {
         };
 
         // For CSV formats, we need to handle per-file preprocessing
-        let file_aware_pipeline_builder = if matches!(config.input.format, 
-            crate::config::InputFormat::Csv | crate::config::InputFormat::Tsv |
-            crate::config::InputFormat::Csvnh | crate::config::InputFormat::Tsvnh
+        let file_aware_pipeline_builder = if matches!(
+            config.input.format,
+            crate::config::InputFormat::Csv
+                | crate::config::InputFormat::Tsv
+                | crate::config::InputFormat::Csvnh
+                | crate::config::InputFormat::Tsvnh
         ) {
             // For now, we'll let the file-aware reader handle CSV initialization
             // This will be improved when we implement proper per-file schema detection
@@ -607,7 +615,8 @@ impl ParallelProcessor {
                     }
 
                     // Skip empty lines for structured formats only, not for line format
-                    if line.is_empty() && !matches!(input_format, crate::config::InputFormat::Line) {
+                    if line.is_empty() && !matches!(input_format, crate::config::InputFormat::Line)
+                    {
                         continue;
                     }
 
@@ -620,10 +629,14 @@ impl ParallelProcessor {
                     }
 
                     // For CSV formats, detect file changes and reinitialize parser
-                    if matches!(input_format, 
-                        crate::config::InputFormat::Csv | crate::config::InputFormat::Tsv |
-                        crate::config::InputFormat::Csvnh | crate::config::InputFormat::Tsvnh
-                    ) && current_filename != last_filename {
+                    if matches!(
+                        input_format,
+                        crate::config::InputFormat::Csv
+                            | crate::config::InputFormat::Tsv
+                            | crate::config::InputFormat::Csvnh
+                            | crate::config::InputFormat::Tsvnh
+                    ) && current_filename != last_filename
+                    {
                         // File changed - send current batch before processing new file
                         if !current_batch.is_empty() {
                             Self::send_batch_with_filenames_and_headers(
@@ -638,15 +651,17 @@ impl ParallelProcessor {
                             batch_start_line = line_num + 1;
                             last_batch_time = Instant::now();
                         }
-                        
+
                         // File changed, reinitialize CSV parser for this file
                         current_csv_parser = Self::create_csv_parser_for_file(&input_format, &line);
-                        current_headers = current_csv_parser.as_ref().map(|parser| parser.get_headers());
+                        current_headers = current_csv_parser
+                            .as_ref()
+                            .map(|parser| parser.get_headers());
                         last_filename = current_filename.clone();
-                        
-                        
+
                         // Skip header lines for CSV/TSV (not for CSVNH/TSVNH)
-                        if matches!(input_format, 
+                        if matches!(
+                            input_format,
                             crate::config::InputFormat::Csv | crate::config::InputFormat::Tsv
                         ) {
                             // This line was consumed as a header, skip it
@@ -771,7 +786,8 @@ impl ParallelProcessor {
                     }
 
                     // Skip empty lines for structured formats only, not for line format
-                    if line.is_empty() && !matches!(input_format, crate::config::InputFormat::Line) {
+                    if line.is_empty() && !matches!(input_format, crate::config::InputFormat::Line)
+                    {
                         continue;
                     }
 
@@ -825,7 +841,7 @@ impl ParallelProcessor {
             lines: std::mem::take(current_batch),
             start_line_num: batch_start_line,
             filenames: vec![None; batch_len], // No filename tracking for regular batches
-            csv_headers: None, // No CSV headers for regular batches
+            csv_headers: None,                // No CSV headers for regular batches
         };
 
         if batch_sender.send(batch).is_err() {
@@ -834,7 +850,6 @@ impl ParallelProcessor {
 
         Ok(())
     }
-
 
     fn send_batch_with_filenames_and_headers(
         batch_sender: &Sender<Batch>,
@@ -878,7 +893,7 @@ impl ParallelProcessor {
 
         // Create worker pipeline and context
         let (mut pipeline, mut ctx) = pipeline_builder.clone().build_worker(stages.clone())?;
-        
+
         // Keep track of current CSV headers to avoid recreating parsers unnecessarily
         let mut current_csv_headers: Option<Vec<String>> = None;
 
@@ -887,15 +902,16 @@ impl ParallelProcessor {
             if SHOULD_TERMINATE.load(Ordering::Relaxed) {
                 break;
             }
-            
+
             // If this batch has CSV headers and they're different from our current ones,
             // we need to rebuild the pipeline with the new headers
             if batch.csv_headers.is_some() && batch.csv_headers != current_csv_headers {
                 current_csv_headers = batch.csv_headers.clone();
-                
-                
+
                 // Rebuild the pipeline with the new headers
-                let new_pipeline_builder = pipeline_builder.clone().with_csv_headers(current_csv_headers.clone().unwrap());
+                let new_pipeline_builder = pipeline_builder
+                    .clone()
+                    .with_csv_headers(current_csv_headers.clone().unwrap());
                 let (new_pipeline, new_ctx) = new_pipeline_builder.build_worker(stages.clone())?;
                 pipeline = new_pipeline;
                 // Note: We keep the existing ctx to preserve tracking state
@@ -1110,15 +1126,19 @@ impl ParallelProcessor {
                 // Create a temporary formatter to generate the header
                 let keys = config.output.get_effective_keys();
                 if keys.is_empty() {
-                    return Err(anyhow::anyhow!("CSV output format requires --keys to specify field order"));
+                    return Err(anyhow::anyhow!(
+                        "CSV output format requires --keys to specify field order"
+                    ));
                 }
-                
+
                 let formatter = match config.output.format {
                     crate::config::OutputFormat::Csv => crate::formatters::CsvFormatter::new(keys),
-                    crate::config::OutputFormat::Tsv => crate::formatters::CsvFormatter::new_tsv(keys),
+                    crate::config::OutputFormat::Tsv => {
+                        crate::formatters::CsvFormatter::new_tsv(keys)
+                    }
                     _ => unreachable!(),
                 };
-                
+
                 // Generate and write the header
                 let header = formatter.format_header();
                 writeln!(output, "{}", header)?;
@@ -1141,7 +1161,7 @@ impl ParallelProcessor {
     ) -> Result<()> {
         // Write CSV header if needed (before any worker results)
         Self::write_csv_header_if_needed(output, config)?;
-        
+
         if preserve_order {
             Self::pipeline_ordered_result_sink(result_receiver, global_tracker, output)
         } else {
@@ -1279,7 +1299,7 @@ impl ParallelProcessor {
     ) -> Result<(Box<dyn std::io::BufRead + Send>, PipelineBuilder, usize)> {
         let mut first_line = String::new();
         reader.read_line(&mut first_line)?;
-        
+
         if first_line.trim().is_empty() {
             return Ok((Box::new(reader), pipeline_builder, 0)); // Empty line will be processed normally
         }
@@ -1298,10 +1318,10 @@ impl ParallelProcessor {
 
         // Initialize headers from the first line
         let was_consumed = temp_parser.initialize_headers_from_line(&first_line_trimmed)?;
-        
+
         // Get the initialized headers
         let headers = temp_parser.get_headers();
-        
+
         // Add headers to pipeline builder
         pipeline_builder = pipeline_builder.with_csv_headers(headers);
 

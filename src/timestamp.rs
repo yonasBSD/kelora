@@ -48,7 +48,7 @@ impl AdaptiveTsParser {
                 return Some(parsed);
             }
         }
-        
+
         None
     }
 
@@ -77,19 +77,19 @@ fn try_parse_with_format(ts_str: &str, format: &str) -> Option<DateTime<Utc>> {
     if let Ok(dt) = DateTime::parse_from_str(ts_str, format) {
         return Some(dt.with_timezone(&Utc));
     }
-    
+
     // Try naive parsing and assume UTC
     if let Ok(naive_dt) = chrono::NaiveDateTime::parse_from_str(ts_str, format) {
         return Some(naive_dt.and_utc());
     }
-    
+
     None
 }
 
 /// Try to parse Unix timestamp based on string length
 fn try_parse_unix_timestamp(ts_str: &str) -> Option<DateTime<Utc>> {
     let timestamp_int = ts_str.parse::<i64>().ok()?;
-    
+
     // Detect Unix timestamp precision by string length
     let dt = match ts_str.len() {
         10 => {
@@ -99,27 +99,27 @@ fn try_parse_unix_timestamp(ts_str: &str) -> Option<DateTime<Utc>> {
         13 => {
             // Milliseconds (1735566123000)
             DateTime::from_timestamp(
-                timestamp_int / 1000, 
-                (timestamp_int % 1000) as u32 * 1_000_000
+                timestamp_int / 1000,
+                (timestamp_int % 1000) as u32 * 1_000_000,
             )
         }
         16 => {
             // Microseconds (1735566123000000)
             DateTime::from_timestamp(
-                timestamp_int / 1_000_000, 
-                (timestamp_int % 1_000_000) as u32 * 1_000
+                timestamp_int / 1_000_000,
+                (timestamp_int % 1_000_000) as u32 * 1_000,
             )
         }
         19 => {
             // Nanoseconds (1735566123000000000)
             DateTime::from_timestamp(
-                timestamp_int / 1_000_000_000, 
-                (timestamp_int % 1_000_000_000) as u32
+                timestamp_int / 1_000_000_000,
+                (timestamp_int % 1_000_000_000) as u32,
             )
         }
         _ => None,
     };
-    
+
     dt.map(|dt| dt.with_timezone(&Utc))
 }
 
@@ -128,34 +128,30 @@ fn try_parse_unix_timestamp(ts_str: &str) -> Option<DateTime<Utc>> {
 fn get_initial_timestamp_formats() -> Vec<String> {
     vec![
         // ISO 8601 variants (most common in logs)
-        "%Y-%m-%dT%H:%M:%S%.fZ".to_string(),   // ISO 8601 with subseconds
-        "%Y-%m-%dT%H:%M:%SZ".to_string(),      // ISO 8601
+        "%Y-%m-%dT%H:%M:%S%.fZ".to_string(), // ISO 8601 with subseconds
+        "%Y-%m-%dT%H:%M:%SZ".to_string(),    // ISO 8601
         "%Y-%m-%dT%H:%M:%S%.f%:z".to_string(), // ISO 8601 with timezone
-        "%Y-%m-%dT%H:%M:%S%:z".to_string(),    // ISO 8601 with timezone
-        
+        "%Y-%m-%dT%H:%M:%S%:z".to_string(),  // ISO 8601 with timezone
         // Space-separated ISO variants (common in many log formats)
-        "%Y-%m-%d %H:%M:%S%.f".to_string(),    // Common log format with subseconds
-        "%Y-%m-%d %H:%M:%S".to_string(),       // Common log format
-        "%Y-%m-%d %H:%M:%S%.fZ".to_string(),   // Space-separated with Z
-        "%Y-%m-%d %H:%M:%SZ".to_string(),      // Space-separated with Z
-        "%Y-%m-%d %H:%M:%S%z".to_string(),     // Space-separated with timezone
-        "%Y-%m-%d %H:%M:%S%.f%z".to_string(),  // Space-separated with fractional + timezone
-        
+        "%Y-%m-%d %H:%M:%S%.f".to_string(), // Common log format with subseconds
+        "%Y-%m-%d %H:%M:%S".to_string(),    // Common log format
+        "%Y-%m-%d %H:%M:%S%.fZ".to_string(), // Space-separated with Z
+        "%Y-%m-%d %H:%M:%SZ".to_string(),   // Space-separated with Z
+        "%Y-%m-%d %H:%M:%S%z".to_string(),  // Space-separated with timezone
+        "%Y-%m-%d %H:%M:%S%.f%z".to_string(), // Space-separated with fractional + timezone
         // Syslog and server log formats
-        "%b %d %H:%M:%S".to_string(),          // Syslog format
-        "%b %d %Y %H:%M:%S".to_string(),       // BSD syslog with year
-        "%d/%b/%Y:%H:%M:%S %z".to_string(),    // Apache log format
-        
+        "%b %d %H:%M:%S".to_string(),       // Syslog format
+        "%b %d %Y %H:%M:%S".to_string(),    // BSD syslog with year
+        "%d/%b/%Y:%H:%M:%S %z".to_string(), // Apache log format
         // Application-specific formats
-        "%Y-%m-%d %H:%M:%S,%f".to_string(),    // Python logging format
-        "%Y/%m/%d %H:%M:%S".to_string(),       // Nginx error log format
-        "%d.%m.%Y %H:%M:%S".to_string(),       // German format
-        "%y%m%d %H:%M:%S".to_string(),         // MySQL legacy format
-        
+        "%Y-%m-%d %H:%M:%S,%f".to_string(), // Python logging format
+        "%Y/%m/%d %H:%M:%S".to_string(),    // Nginx error log format
+        "%d.%m.%Y %H:%M:%S".to_string(),    // German format
+        "%y%m%d %H:%M:%S".to_string(),      // MySQL legacy format
         // Less common but valid formats
-        "%a %b %d %H:%M:%S %Y".to_string(),    // Classic Unix timestamp
+        "%a %b %d %H:%M:%S %Y".to_string(), // Classic Unix timestamp
         "%d-%b-%y %I:%M:%S.%f %p".to_string(), // Oracle format
-        "%b %d, %Y %I:%M:%S %p".to_string(),   // Java SimpleDateFormat
+        "%b %d, %Y %I:%M:%S %p".to_string(), // Java SimpleDateFormat
     ]
 }
 
@@ -212,7 +208,7 @@ mod tests {
     #[test]
     fn test_adaptive_parser_basic() {
         let mut parser = AdaptiveTsParser::new();
-        
+
         // Test ISO 8601 parsing
         let result = parser.parse_ts("2023-07-04T12:34:56Z");
         assert!(result.is_some());
@@ -225,17 +221,17 @@ mod tests {
     #[test]
     fn test_format_reordering() {
         let mut parser = AdaptiveTsParser::new();
-        
+
         // Parse first timestamp - should move successful format to front
         let result1 = parser.parse_ts("2023-07-04 12:34:56");
         assert!(result1.is_some());
-        
+
         // Check that format was moved to front
         let formats = parser.get_format_ordering();
         assert!(!formats.is_empty());
         // The successful format should now be at index 0
         assert_eq!(formats[0], "%Y-%m-%d %H:%M:%S%.f");
-        
+
         // Parse second timestamp with same format - should be faster (first try)
         let result2 = parser.parse_ts("2023-07-05 13:45:07");
         assert!(result2.is_some());
@@ -244,13 +240,13 @@ mod tests {
     #[test]
     fn test_unix_timestamp_parsing() {
         let mut parser = AdaptiveTsParser::new();
-        
+
         // Test seconds precision
         let result = parser.parse_ts("1735566123");
         assert!(result.is_some());
         let dt = result.unwrap();
         assert_eq!(dt.year(), 2024);
-        
+
         // Test milliseconds precision
         let result = parser.parse_ts("1735566123000");
         assert!(result.is_some());
@@ -262,14 +258,14 @@ mod tests {
     fn test_timestamp_field_identification() {
         use indexmap::IndexMap;
         use rhai::Dynamic;
-        
+
         let mut fields = IndexMap::new();
         fields.insert("ts".to_string(), Dynamic::from("2023-07-04T12:34:56Z"));
         fields.insert("message".to_string(), Dynamic::from("test message"));
-        
+
         let config = TsConfig::default();
         let result = identify_timestamp_field(&fields, &config);
-        
+
         assert!(result.is_some());
         let (field_name, value) = result.unwrap();
         assert_eq!(field_name, "ts");
@@ -280,18 +276,21 @@ mod tests {
     fn test_custom_timestamp_field() {
         use indexmap::IndexMap;
         use rhai::Dynamic;
-        
+
         let mut fields = IndexMap::new();
-        fields.insert("custom_time".to_string(), Dynamic::from("2023-07-04T12:34:56Z"));
+        fields.insert(
+            "custom_time".to_string(),
+            Dynamic::from("2023-07-04T12:34:56Z"),
+        );
         fields.insert("ts".to_string(), Dynamic::from("other_timestamp"));
-        
+
         let config = TsConfig {
             custom_field: Some("custom_time".to_string()),
             auto_parse: true,
         };
-        
+
         let result = identify_timestamp_field(&fields, &config);
-        
+
         assert!(result.is_some());
         let (field_name, value) = result.unwrap();
         assert_eq!(field_name, "custom_time");
@@ -301,12 +300,12 @@ mod tests {
     #[test]
     fn test_ordering_reset() {
         let mut parser = AdaptiveTsParser::new();
-        
+
         // Parse to change ordering
         parser.parse_ts("2023-07-04 12:34:56");
         let formats_after = parser.get_format_ordering();
         assert_eq!(formats_after[0], "%Y-%m-%d %H:%M:%S%.f");
-        
+
         // Reset ordering
         parser.reset_ordering();
         let formats_reset = parser.get_format_ordering();
@@ -317,10 +316,10 @@ mod tests {
     #[test]
     fn test_invalid_timestamp() {
         let mut parser = AdaptiveTsParser::new();
-        
+
         let result = parser.parse_ts("not-a-timestamp");
         assert!(result.is_none());
-        
+
         let result = parser.parse_ts("2023-13-45T25:70:70Z");
         assert!(result.is_none());
     }
@@ -328,12 +327,12 @@ mod tests {
     #[test]
     fn test_multiple_format_reordering() {
         let mut parser = AdaptiveTsParser::new();
-        
+
         // Parse different formats to test reordering
-        parser.parse_ts("2023-07-04 12:34:56");  // Common format
+        parser.parse_ts("2023-07-04 12:34:56"); // Common format
         parser.parse_ts("2023-07-05T13:45:07Z"); // ISO format
-        parser.parse_ts("2023-07-06 14:56:08");  // Common format again
-        
+        parser.parse_ts("2023-07-06 14:56:08"); // Common format again
+
         let formats = parser.get_format_ordering();
         // Most recently used format should be at front
         assert_eq!(formats[0], "%Y-%m-%d %H:%M:%S%.f");

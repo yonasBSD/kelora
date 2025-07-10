@@ -136,8 +136,8 @@ impl EventParser for LogfmtParser {
             event.set_field(key, dynamic_value);
         }
 
-        // Extract core fields (level, message, timestamp) from the parsed data
-        event.extract_core_fields();
+        // Extract timestamp from the parsed data
+        event.extract_timestamp();
         Ok(event)
     }
 }
@@ -153,8 +153,26 @@ mod tests {
         let result =
             EventParser::parse(&parser, r#"level=info message="test message" count=42"#).unwrap();
 
-        assert_eq!(result.level, Some("info".to_string()));
-        assert_eq!(result.msg, Some("test message".to_string()));
+        assert_eq!(
+            result
+                .fields
+                .get("level")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "info"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("message")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "test message"
+        );
         assert!(result.fields.get("count").is_some());
         assert_eq!(result.fields.get("count").unwrap().as_int().unwrap(), 42);
     }
@@ -323,10 +341,28 @@ mod tests {
         )
         .unwrap();
 
-        // Core fields should be extracted
-        assert_eq!(result.level, Some("error".to_string()));
-        assert_eq!(result.msg, Some("Connection failed".to_string()));
-        assert!(result.ts.is_some());
+        // Core fields should be accessible through fields map
+        assert_eq!(
+            result
+                .fields
+                .get("level")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "error"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("message")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "Connection failed"
+        );
+        assert!(result.parsed_ts.is_some());
 
         // Other fields should be available
         assert_eq!(

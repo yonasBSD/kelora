@@ -699,9 +699,7 @@ fn process_line<W: OutputWriter>(
     let line = line_result
         .map_err(|e| {
             stderr
-                .writeln(
-                    &config.format_error_message(&format!("Failed to read input line: {}", e)),
-                )
+                .writeln(&config.format_error_message(&format!("Failed to read input line: {}", e)))
                 .unwrap_or(());
             ExitCode::GeneralError.exit();
         })
@@ -722,7 +720,7 @@ fn process_line<W: OutputWriter>(
         }
         return;
     }
-    
+
     // Apply ignore-lines filter if configured (early filtering before parsing)
     if let Some(ref ignore_regex) = config.input.ignore_lines {
         if ignore_regex.is_match(&line) {
@@ -743,9 +741,15 @@ fn process_line<W: OutputWriter>(
     }
 
     // For CSV formats, detect file changes and reinitialize parser, or handle first line for stdin
-    if matches!(config.input.format, 
-        config::InputFormat::Csv | config::InputFormat::Tsv | config::InputFormat::Csvnh | config::InputFormat::Tsvnh
-    ) && (current_filename != *last_filename || (current_filename.is_none() && current_csv_headers.is_none())) {
+    if matches!(
+        config.input.format,
+        config::InputFormat::Csv
+            | config::InputFormat::Tsv
+            | config::InputFormat::Csvnh
+            | config::InputFormat::Tsvnh
+    ) && (current_filename != *last_filename
+        || (current_filename.is_none() && current_csv_headers.is_none()))
+    {
         // File changed, reinitialize CSV parser for this file
         let mut temp_parser = match config.input.format {
             config::InputFormat::Csv => crate::parsers::CsvParser::new_csv(),
@@ -754,35 +758,46 @@ fn process_line<W: OutputWriter>(
             config::InputFormat::Tsvnh => crate::parsers::CsvParser::new_tsv_no_headers(),
             _ => unreachable!(),
         };
-        
+
         // Initialize headers from the first line
-        let was_consumed = temp_parser.initialize_headers_from_line(&line).unwrap_or_else(|e| {
-            stderr
-                .writeln(&config.format_error_message(&format!("Failed to initialize CSV headers: {}", e)))
-                .unwrap_or(());
-            ExitCode::GeneralError.exit();
-        });
-        
+        let was_consumed =
+            temp_parser
+                .initialize_headers_from_line(&line)
+                .unwrap_or_else(|e| {
+                    stderr
+                        .writeln(&config.format_error_message(&format!(
+                            "Failed to initialize CSV headers: {}",
+                            e
+                        )))
+                        .unwrap_or(());
+                    ExitCode::GeneralError.exit();
+                });
+
         // Get the initialized headers
         let headers = temp_parser.get_headers();
         *current_csv_headers = Some(headers.clone());
         *last_filename = current_filename.clone();
-        
+
         // Rebuild the pipeline with new headers
         let mut pipeline_builder = create_pipeline_builder_from_config(config);
         pipeline_builder = pipeline_builder.with_csv_headers(headers);
-        
-        let (new_pipeline, _new_begin_stage, _new_end_stage, new_ctx) = pipeline_builder.build(config.processing.stages.clone()).unwrap_or_else(|e| {
-            stderr
-                .writeln(&config.format_error_message(&format!("Failed to rebuild pipeline with CSV headers: {}", e)))
-                .unwrap_or(());
-            ExitCode::GeneralError.exit();
-        });
-        
+
+        let (new_pipeline, _new_begin_stage, _new_end_stage, new_ctx) = pipeline_builder
+            .build(config.processing.stages.clone())
+            .unwrap_or_else(|e| {
+                stderr
+                    .writeln(&config.format_error_message(&format!(
+                        "Failed to rebuild pipeline with CSV headers: {}",
+                        e
+                    )))
+                    .unwrap_or(());
+                ExitCode::GeneralError.exit();
+            });
+
         *pipeline = new_pipeline;
         // Keep the existing context's tracking state but update the Rhai engine
         ctx.rhai = new_ctx.rhai;
-        
+
         // If the first line was consumed as a header, don't process it as data
         if was_consumed {
             return;
@@ -810,9 +825,7 @@ fn process_line<W: OutputWriter>(
                 if !result.is_empty() {
                     output.writeln(&result).unwrap_or_else(|e| {
                         stderr
-                            .writeln(
-                                &config.format_error_message(&format!("Output error: {}", e)),
-                            )
+                            .writeln(&config.format_error_message(&format!("Output error: {}", e)))
                             .unwrap_or(());
                         ExitCode::GeneralError.exit();
                     });
@@ -832,12 +845,16 @@ fn process_line<W: OutputWriter>(
             }
 
             stderr
-                .writeln(&config.format_error_message(&format!(
-                    "Pipeline error on line {}: {}",
-                    line_num, e
-                )))
+                .writeln(
+                    &config.format_error_message(&format!(
+                        "Pipeline error on line {}: {}",
+                        line_num, e
+                    )),
+                )
                 .unwrap_or(());
-            if let config::ErrorStrategy::Abort = config.processing.on_error { ExitCode::GeneralError.exit() }
+            if let config::ErrorStrategy::Abort = config.processing.on_error {
+                ExitCode::GeneralError.exit()
+            }
         }
     }
 }
@@ -862,42 +879,62 @@ fn run_sequential<W: OutputWriter>(config: &KeloraConfig, output: &mut W, stderr
     // For CSV formats, we need to track per-file schema
     let mut current_csv_headers: Option<Vec<String>> = None;
     let mut last_filename: Option<String> = None;
-    
+
     // Process lines using pipeline
     let mut line_num = 0;
     let mut skipped_lines = 0;
-    
+
     // Handle filename tracking by creating the appropriate reader
     if config.input.files.is_empty() {
         // Stdin processing - no filename tracking
         let stdin = io::stdin();
         let reader = stdin.lock();
-        
+
         for line_result in reader.lines() {
             // Check for termination signal between lines
             if check_termination().is_err() {
                 // Return early to allow graceful shutdown with stats
                 return;
             }
-            
-            process_line(line_result, &mut line_num, &mut skipped_lines, &mut pipeline, &mut ctx, config, output, stderr, None, &mut current_csv_headers, &mut last_filename);
+
+            process_line(
+                line_result,
+                &mut line_num,
+                &mut skipped_lines,
+                &mut pipeline,
+                &mut ctx,
+                config,
+                output,
+                stderr,
+                None,
+                &mut current_csv_headers,
+                &mut last_filename,
+            );
         }
     } else {
         // File processing - with filename tracking
-        let sorted_files = pipeline::builders::sort_files(&config.input.files, &config.input.file_order).unwrap_or_else(|e| {
-            stderr
-                .writeln(&config.format_error_message(&format!("Failed to sort files: {}", e)))
-                .unwrap_or(());
-            ExitCode::GeneralError.exit();
-        });
-        
-        let mut multi_reader = crate::readers::MultiFileReader::new(sorted_files).unwrap_or_else(|e| {
-            stderr
-                .writeln(&config.format_error_message(&format!("Failed to create multi-file reader: {}", e)))
-                .unwrap_or(());
-            ExitCode::GeneralError.exit();
-        });
-        
+        let sorted_files =
+            pipeline::builders::sort_files(&config.input.files, &config.input.file_order)
+                .unwrap_or_else(|e| {
+                    stderr
+                        .writeln(
+                            &config.format_error_message(&format!("Failed to sort files: {}", e)),
+                        )
+                        .unwrap_or(());
+                    ExitCode::GeneralError.exit();
+                });
+
+        let mut multi_reader =
+            crate::readers::MultiFileReader::new(sorted_files).unwrap_or_else(|e| {
+                stderr
+                    .writeln(&config.format_error_message(&format!(
+                        "Failed to create multi-file reader: {}",
+                        e
+                    )))
+                    .unwrap_or(());
+                ExitCode::GeneralError.exit();
+            });
+
         let mut line_buf = String::new();
         loop {
             // Check for termination signal between lines
@@ -905,7 +942,7 @@ fn run_sequential<W: OutputWriter>(config: &KeloraConfig, output: &mut W, stderr
                 // Return early to allow graceful shutdown with stats
                 return;
             }
-            
+
             line_buf.clear();
             let bytes_read = match multi_reader.read_line(&mut line_buf) {
                 Ok(0) => break, // EOF
@@ -913,14 +950,38 @@ fn run_sequential<W: OutputWriter>(config: &KeloraConfig, output: &mut W, stderr
                 Err(e) => {
                     let line_result = Err(e);
                     let current_filename = multi_reader.current_filename().map(|s| s.to_string());
-                    process_line(line_result, &mut line_num, &mut skipped_lines, &mut pipeline, &mut ctx, config, output, stderr, current_filename, &mut current_csv_headers, &mut last_filename);
+                    process_line(
+                        line_result,
+                        &mut line_num,
+                        &mut skipped_lines,
+                        &mut pipeline,
+                        &mut ctx,
+                        config,
+                        output,
+                        stderr,
+                        current_filename,
+                        &mut current_csv_headers,
+                        &mut last_filename,
+                    );
                     continue;
                 }
             };
-            
+
             if bytes_read > 0 {
                 let current_filename = multi_reader.current_filename().map(|s| s.to_string());
-                process_line(Ok(line_buf.clone()), &mut line_num, &mut skipped_lines, &mut pipeline, &mut ctx, config, output, stderr, current_filename, &mut current_csv_headers, &mut last_filename);
+                process_line(
+                    Ok(line_buf.clone()),
+                    &mut line_num,
+                    &mut skipped_lines,
+                    &mut pipeline,
+                    &mut ctx,
+                    config,
+                    output,
+                    stderr,
+                    current_filename,
+                    &mut current_csv_headers,
+                    &mut last_filename,
+                );
             }
         }
     }

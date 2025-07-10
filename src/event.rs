@@ -58,9 +58,6 @@ pub const MESSAGE_FIELD_NAMES: &[&str] = &[
 
 #[derive(Debug, Clone, Default)]
 pub struct Event {
-    pub ts: Option<DateTime<Utc>>,
-    pub level: Option<String>,
-    pub msg: Option<String>,
     pub fields: IndexMap<String, Dynamic>,
     pub original_line: String,
     pub line_number: Option<usize>,
@@ -82,9 +79,6 @@ pub enum FieldValue {
 impl Event {
     pub fn with_capacity(original_line: String, capacity: usize) -> Self {
         Self {
-            ts: None,
-            level: None,
-            msg: None,
             fields: IndexMap::with_capacity(capacity),
             original_line,
             line_number: None,
@@ -123,59 +117,39 @@ impl Event {
         self.fields = new_fields;
     }
 
-    /// Try to parse and extract core fields from the fields map
-    pub fn extract_core_fields(&mut self) {
-        self.extract_core_fields_with_parser(None);
+    /// Try to parse and extract timestamp from the fields map
+    pub fn extract_timestamp(&mut self) {
+        self.extract_timestamp_with_parser(None);
     }
 
-    /// Try to parse and extract core fields from the fields map with optional adaptive parser
-    pub fn extract_core_fields_with_parser(&mut self, parser: Option<&mut crate::timestamp::AdaptiveTsParser>) {
-        self.extract_core_fields_with_config(parser, &crate::timestamp::TsConfig::default());
+    /// Try to parse and extract timestamp from the fields map with optional adaptive parser
+    pub fn extract_timestamp_with_parser(
+        &mut self,
+        parser: Option<&mut crate::timestamp::AdaptiveTsParser>,
+    ) {
+        self.extract_timestamp_with_config(parser, &crate::timestamp::TsConfig::default());
     }
 
-    /// Extract core fields with timestamp configuration
-    pub fn extract_core_fields_with_config(
-        &mut self, 
+    /// Extract timestamp with configuration
+    pub fn extract_timestamp_with_config(
+        &mut self,
         parser: Option<&mut crate::timestamp::AdaptiveTsParser>,
         ts_config: &crate::timestamp::TsConfig,
     ) {
-        // Extract and parse timestamp with more comprehensive field recognition
-        if self.ts.is_none() {
-            if let Some((_field_name, ts_str)) = crate::timestamp::identify_timestamp_field(&self.fields, ts_config) {
+        // Extract and parse timestamp with comprehensive field recognition
+        if self.parsed_ts.is_none() {
+            if let Some((_field_name, ts_str)) =
+                crate::timestamp::identify_timestamp_field(&self.fields, ts_config)
+            {
                 let parsed_ts = if let Some(parser) = parser {
                     parser.parse_ts(&ts_str)
                 } else {
                     // Fall back to original parsing
                     parse_timestamp(&ts_str).ok()
                 };
-                
+
                 if let Some(ts) = parsed_ts {
-                    self.ts = Some(ts);
                     self.parsed_ts = Some(ts);
-                }
-            }
-        }
-
-        // Extract level with comprehensive field recognition
-        if self.level.is_none() {
-            for level_key in LEVEL_FIELD_NAMES {
-                if let Some(value) = self.fields.get(*level_key) {
-                    if let Ok(level_str) = value.clone().into_string() {
-                        self.level = Some(level_str);
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Extract message with comprehensive field recognition
-        if self.msg.is_none() {
-            for msg_key in MESSAGE_FIELD_NAMES {
-                if let Some(value) = self.fields.get(*msg_key) {
-                    if let Ok(msg_str) = value.clone().into_string() {
-                        self.msg = Some(msg_str);
-                        break;
-                    }
                 }
             }
         }

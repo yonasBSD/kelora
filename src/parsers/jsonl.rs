@@ -45,7 +45,7 @@ impl EventParser for JsonlParser {
                 event.set_field(key.clone(), dynamic_value);
             }
 
-            event.extract_core_fields();
+            event.extract_timestamp();
             Ok(event)
         } else {
             Err(anyhow::anyhow!("Expected JSON object, got: {}", json_value))
@@ -64,8 +64,26 @@ mod tests {
         let result =
             EventParser::parse(&parser, r#"{"level":"info","message":"test","count":42}"#).unwrap();
 
-        assert_eq!(result.level, Some("info".to_string()));
-        assert_eq!(result.msg, Some("test".to_string()));
+        assert_eq!(
+            result
+                .fields
+                .get("level")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "info"
+        );
+        assert_eq!(
+            result
+                .fields
+                .get("message")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "test"
+        );
         assert!(result.fields.get("count").is_some());
         assert_eq!(result.fields.get("count").unwrap().as_int().unwrap(), 42);
     }
@@ -79,7 +97,16 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(result.level, Some("error".to_string()));
+        assert_eq!(
+            result
+                .fields
+                .get("level")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "error"
+        );
         assert!(result.fields.get("user").is_some());
         assert_eq!(
             result

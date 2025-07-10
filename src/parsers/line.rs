@@ -50,10 +50,8 @@ mod tests {
         // Original line should also be preserved
         assert_eq!(result.original_line, test_line);
 
-        // No core fields should be extracted from plain text
-        assert_eq!(result.level, None);
-        assert_eq!(result.msg, None);
-        assert_eq!(result.ts, None);
+        // No timestamp should be extracted from plain text
+        assert_eq!(result.parsed_ts, None);
     }
 
     #[test]
@@ -78,8 +76,7 @@ mod tests {
         // Original line should be preserved
         assert_eq!(result.original_line, test_line);
 
-        // Line parser doesn't extract core fields
-        assert_eq!(result.level, None);
-        assert_eq!(result.msg, None);
+        // Line parser doesn't extract timestamps
+        assert_eq!(result.parsed_ts, None);
     }
 }

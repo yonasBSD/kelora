@@ -78,10 +78,8 @@ mod tests {
         // Original line should be preserved
         assert_eq!(result.original_line, test_line);
 
-        // No core fields should be extracted automatically
-        assert_eq!(result.level, None);
-        assert_eq!(result.msg, None);
-        assert_eq!(result.ts, None);
+        // No timestamp should be extracted automatically
+        assert_eq!(result.parsed_ts, None);
     }
 
     #[test]

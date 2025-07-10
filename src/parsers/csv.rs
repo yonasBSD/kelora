@@ -167,7 +167,7 @@ impl CsvParser {
                 }
             }
 
-            event.extract_core_fields();
+            event.extract_timestamp();
             Ok(event)
         } else {
             Err(anyhow::anyhow!("Empty CSV record"))
@@ -305,7 +305,9 @@ mod tests {
         let mut parser = CsvParser::new_csv();
 
         // Initialize headers
-        let _ = parser.initialize_headers_from_line("name,age,city").unwrap();
+        let _ = parser
+            .initialize_headers_from_line("name,age,city")
+            .unwrap();
 
         // Parse data with empty fields
         let data_result = parser.parse("Alice,,Boston").unwrap();

@@ -109,7 +109,7 @@ impl fmt::Display for DurationWrapper {
 
 // Thread-local adaptive parser for Rhai timestamp parsing
 thread_local! {
-    static RHAI_TS_PARSER: RefCell<crate::timestamp::AdaptiveTsParser> = 
+    static RHAI_TS_PARSER: RefCell<crate::timestamp::AdaptiveTsParser> =
         RefCell::new(crate::timestamp::AdaptiveTsParser::new());
 }
 
@@ -145,9 +145,7 @@ pub fn parse_ts(
     }
 
     // For auto-parsing (no explicit format), use the adaptive parser
-    let parsed_utc = RHAI_TS_PARSER.with(|parser| {
-        parser.borrow_mut().parse_ts(s)
-    });
+    let parsed_utc = RHAI_TS_PARSER.with(|parser| parser.borrow_mut().parse_ts(s));
 
     if let Some(utc_dt) = parsed_utc {
         // Convert to the requested timezone
@@ -257,14 +255,8 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("dur_from_minutes", DurationWrapper::from_minutes);
     engine.register_fn("dur_from_hours", DurationWrapper::from_hours);
     engine.register_fn("dur_from_days", DurationWrapper::from_days);
-    engine.register_fn(
-        "dur_from_milliseconds",
-        DurationWrapper::from_milliseconds,
-    );
-    engine.register_fn(
-        "dur_from_nanoseconds",
-        DurationWrapper::from_nanoseconds,
-    );
+    engine.register_fn("dur_from_milliseconds", DurationWrapper::from_milliseconds);
+    engine.register_fn("dur_from_nanoseconds", DurationWrapper::from_nanoseconds);
 
     // Register the custom types
     engine
@@ -804,7 +796,7 @@ mod tests {
     fn test_adaptive_parsing_in_rhai() {
         // Test that the Rhai parse_ts function benefits from adaptive parsing
         // by parsing similar formats multiple times
-        
+
         // First parse - should learn the format
         let result1 = parse_ts("2023-07-04 12:34:56", None, None);
         assert!(result1.is_ok());
@@ -812,7 +804,7 @@ mod tests {
         assert_eq!(dt1.inner.year(), 2023);
         assert_eq!(dt1.inner.month(), 7);
         assert_eq!(dt1.inner.day(), 4);
-        
+
         // Second parse with same format - should be faster due to learning
         let result2 = parse_ts("2023-07-05 13:45:07", None, None);
         assert!(result2.is_ok());
@@ -820,7 +812,7 @@ mod tests {
         assert_eq!(dt2.inner.year(), 2023);
         assert_eq!(dt2.inner.month(), 7);
         assert_eq!(dt2.inner.day(), 5);
-        
+
         // Third parse with same format - should still work efficiently
         let result3 = parse_ts("2023-07-06 14:56:08", None, None);
         assert!(result3.is_ok());
@@ -837,7 +829,7 @@ mod tests {
         assert!(us_result.is_ok());
         let dt = us_result.unwrap();
         assert_eq!(dt.inner.year(), 2023);
-        assert_eq!(dt.inner.month(), 7);  // July (US interpretation)
+        assert_eq!(dt.inner.month(), 7); // July (US interpretation)
         assert_eq!(dt.inner.day(), 4);
         assert_eq!(dt.inner.hour(), 12);
 
@@ -846,13 +838,16 @@ mod tests {
         assert!(eu_result.is_ok());
         let dt = eu_result.unwrap();
         assert_eq!(dt.inner.year(), 2023);
-        assert_eq!(dt.inner.month(), 4);  // April (European interpretation)
+        assert_eq!(dt.inner.month(), 4); // April (European interpretation)
         assert_eq!(dt.inner.day(), 7);
         assert_eq!(dt.inner.hour(), 12);
 
         // Test that ambiguous formats fail without explicit format
         let ambiguous_result = parse_ts("7/4/2023 12:34:56 PM", None, None);
-        assert!(ambiguous_result.is_err(), "Ambiguous date format should fail without explicit format");
+        assert!(
+            ambiguous_result.is_err(),
+            "Ambiguous date format should fail without explicit format"
+        );
 
         // Test Windows Event Log format variations with explicit format
         let windows_us = parse_ts("12/31/2023 11:59:59 PM", Some("%m/%d/%Y %I:%M:%S %p"), None);
@@ -861,7 +856,7 @@ mod tests {
         assert_eq!(dt.inner.year(), 2023);
         assert_eq!(dt.inner.month(), 12);
         assert_eq!(dt.inner.day(), 31);
-        assert_eq!(dt.inner.hour(), 23);  // 11 PM = 23:00
+        assert_eq!(dt.inner.hour(), 23); // 11 PM = 23:00
     }
 
     #[test]

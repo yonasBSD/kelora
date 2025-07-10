@@ -9,7 +9,7 @@ use once_cell::sync::Lazy;
 
 /// Global header tracking registry for CSV formatters in parallel mode
 /// Key format: "{delimiter}_{keys_hash}" for uniqueness across different CSV configurations
-static CSV_FORMATTER_HEADER_REGISTRY: Lazy<Mutex<HashMap<String, bool>>> = 
+static CSV_FORMATTER_HEADER_REGISTRY: Lazy<Mutex<HashMap<String, bool>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[cfg(test)]
@@ -339,18 +339,18 @@ impl pipeline::Formatter for HideFormatter {
 }
 
 /// Sanitize a field key to ensure logfmt compliance
-/// 
+///
 /// The logfmt specification requires keys to:
 /// - Not contain whitespace (spaces, tabs, newlines, carriage returns)
 /// - Not contain equals signs (=) as they delimit key-value pairs
-/// 
+///
 /// This function replaces problematic characters with underscores to maintain
 /// field information while ensuring valid logfmt output. This approach:
 /// - Preserves all field data (no information loss)
 /// - Produces parseable logfmt output
 /// - Maintains deterministic key mapping
 /// - Handles edge cases gracefully
-/// 
+///
 /// # Examples
 /// ```
 /// assert_eq!(sanitize_logfmt_key("field with spaces"), "field_with_spaces");
@@ -367,12 +367,12 @@ fn sanitize_logfmt_key(key: &str) -> String {
 }
 
 // Logfmt formatter - strict logfmt output formatter (no colors, no brief mode)
-// 
+//
 // This formatter produces logfmt-compliant output by:
 // 1. Sanitizing field keys to replace invalid characters with underscores
 // 2. Properly quoting string values that contain special characters
 // 3. Leaving numeric and boolean values unquoted
-// 
+//
 // Key sanitization ensures that output can be parsed by standard logfmt parsers,
 // including Kelora's own logfmt input parser.
 pub struct LogfmtFormatter;
@@ -525,12 +525,11 @@ impl CsvFormatter {
     fn keys_hash(keys: &[String]) -> u64 {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
-        
+
         let mut hasher = DefaultHasher::new();
         keys.hash(&mut hasher);
         hasher.finish()
     }
-
 
     /// Mark header as written globally for this formatter configuration
     /// Returns true if this call was the first to mark it (header should be written)
@@ -604,10 +603,7 @@ mod tests {
     fn test_json_formatter_with_fields() {
         let mut event = Event::default();
         event.set_field("level".to_string(), Dynamic::from("INFO".to_string()));
-        event.set_field(
-            "msg".to_string(),
-            Dynamic::from("Test message".to_string()),
-        );
+        event.set_field("msg".to_string(), Dynamic::from("Test message".to_string()));
         event.set_field("user".to_string(), Dynamic::from("alice".to_string()));
         event.set_field("status".to_string(), Dynamic::from(200i64));
 
@@ -643,10 +639,7 @@ mod tests {
     fn test_default_formatter_brief_mode() {
         let mut event = Event::default();
         event.set_field("level".to_string(), Dynamic::from("info".to_string()));
-        event.set_field(
-            "msg".to_string(),
-            Dynamic::from("test message".to_string()),
-        );
+        event.set_field("msg".to_string(), Dynamic::from("test message".to_string()));
 
         let formatter = DefaultFormatter::new(false, true); // No colors, brief mode
         let result = formatter.format(&event);
@@ -659,10 +652,7 @@ mod tests {
     fn test_logfmt_formatter_basic() {
         let mut event = Event::default();
         event.set_field("level".to_string(), Dynamic::from("INFO".to_string()));
-        event.set_field(
-            "msg".to_string(),
-            Dynamic::from("Test message".to_string()),
-        );
+        event.set_field("msg".to_string(), Dynamic::from("Test message".to_string()));
         event.set_field("user".to_string(), Dynamic::from("alice".to_string()));
         event.set_field("status".to_string(), Dynamic::from(200i64));
 
@@ -735,14 +725,38 @@ mod tests {
     fn test_logfmt_formatter_key_sanitization() {
         let mut event = Event::default();
         // Test various problematic key characters
-        event.set_field("field with spaces".to_string(), Dynamic::from("value1".to_string()));
-        event.set_field("field=with=equals".to_string(), Dynamic::from("value2".to_string()));
-        event.set_field("field\twith\ttabs".to_string(), Dynamic::from("value3".to_string()));
-        event.set_field("field\nwith\nnewlines".to_string(), Dynamic::from("value4".to_string()));
-        event.set_field("field\rwith\rcarriage".to_string(), Dynamic::from("value5".to_string()));
-        event.set_field("normal_field".to_string(), Dynamic::from("value6".to_string()));
-        event.set_field("field-with-dashes".to_string(), Dynamic::from("value7".to_string()));
-        event.set_field("field.with.dots".to_string(), Dynamic::from("value8".to_string()));
+        event.set_field(
+            "field with spaces".to_string(),
+            Dynamic::from("value1".to_string()),
+        );
+        event.set_field(
+            "field=with=equals".to_string(),
+            Dynamic::from("value2".to_string()),
+        );
+        event.set_field(
+            "field\twith\ttabs".to_string(),
+            Dynamic::from("value3".to_string()),
+        );
+        event.set_field(
+            "field\nwith\nnewlines".to_string(),
+            Dynamic::from("value4".to_string()),
+        );
+        event.set_field(
+            "field\rwith\rcarriage".to_string(),
+            Dynamic::from("value5".to_string()),
+        );
+        event.set_field(
+            "normal_field".to_string(),
+            Dynamic::from("value6".to_string()),
+        );
+        event.set_field(
+            "field-with-dashes".to_string(),
+            Dynamic::from("value7".to_string()),
+        );
+        event.set_field(
+            "field.with.dots".to_string(),
+            Dynamic::from("value8".to_string()),
+        );
 
         let formatter = LogfmtFormatter::new();
         let result = formatter.format(&event);
@@ -754,7 +768,7 @@ mod tests {
         assert!(result.contains("field_with_newlines=value4"));
         assert!(result.contains("field_with_carriage=value5"));
         assert!(result.contains("normal_field=value6"));
-        
+
         // Non-problematic characters should be preserved
         assert!(result.contains("field-with-dashes=value7"));
         assert!(result.contains("field.with.dots=value8"));
@@ -762,29 +776,68 @@ mod tests {
         // Ensure the result can be parsed by the logfmt parser
         let parser = crate::parsers::logfmt::LogfmtParser::new();
         let parsed = crate::pipeline::EventParser::parse(&parser, &result);
-        assert!(parsed.is_ok(), "Sanitized logfmt output should be parseable: {}", result);
-        
+        assert!(
+            parsed.is_ok(),
+            "Sanitized logfmt output should be parseable: {}",
+            result
+        );
+
         let parsed_event = parsed.unwrap();
         // Verify that sanitized keys preserve the data
-        assert_eq!(parsed_event.fields.get("field_with_spaces").unwrap().to_string(), "value1");
-        assert_eq!(parsed_event.fields.get("field_with_equals").unwrap().to_string(), "value2");
-        assert_eq!(parsed_event.fields.get("normal_field").unwrap().to_string(), "value6");
+        assert_eq!(
+            parsed_event
+                .fields
+                .get("field_with_spaces")
+                .unwrap()
+                .to_string(),
+            "value1"
+        );
+        assert_eq!(
+            parsed_event
+                .fields
+                .get("field_with_equals")
+                .unwrap()
+                .to_string(),
+            "value2"
+        );
+        assert_eq!(
+            parsed_event.fields.get("normal_field").unwrap().to_string(),
+            "value6"
+        );
     }
 
     #[test]
     fn test_sanitize_logfmt_key_function() {
         // Test the sanitize_logfmt_key function directly
         assert_eq!(sanitize_logfmt_key("normal_field"), "normal_field");
-        assert_eq!(sanitize_logfmt_key("field with spaces"), "field_with_spaces");
-        assert_eq!(sanitize_logfmt_key("field=with=equals"), "field_with_equals");
+        assert_eq!(
+            sanitize_logfmt_key("field with spaces"),
+            "field_with_spaces"
+        );
+        assert_eq!(
+            sanitize_logfmt_key("field=with=equals"),
+            "field_with_equals"
+        );
         assert_eq!(sanitize_logfmt_key("field\twith\ttabs"), "field_with_tabs");
-        assert_eq!(sanitize_logfmt_key("field\nwith\nnewlines"), "field_with_newlines");
-        assert_eq!(sanitize_logfmt_key("field\rwith\rcarriage"), "field_with_carriage");
-        assert_eq!(sanitize_logfmt_key("field-with-dashes"), "field-with-dashes");
+        assert_eq!(
+            sanitize_logfmt_key("field\nwith\nnewlines"),
+            "field_with_newlines"
+        );
+        assert_eq!(
+            sanitize_logfmt_key("field\rwith\rcarriage"),
+            "field_with_carriage"
+        );
+        assert_eq!(
+            sanitize_logfmt_key("field-with-dashes"),
+            "field-with-dashes"
+        );
         assert_eq!(sanitize_logfmt_key("field.with.dots"), "field.with.dots");
-        assert_eq!(sanitize_logfmt_key("field_with_underscores"), "field_with_underscores");
+        assert_eq!(
+            sanitize_logfmt_key("field_with_underscores"),
+            "field_with_underscores"
+        );
         assert_eq!(sanitize_logfmt_key(""), "");
-        
+
         // Test edge cases
         assert_eq!(sanitize_logfmt_key("==="), "___");
         assert_eq!(sanitize_logfmt_key("   "), "___");
@@ -795,10 +848,7 @@ mod tests {
     fn test_hide_formatter() {
         let mut event = Event::default();
         event.set_field("level".to_string(), Dynamic::from("INFO".to_string()));
-        event.set_field(
-            "msg".to_string(),
-            Dynamic::from("Test message".to_string()),
-        );
+        event.set_field("msg".to_string(), Dynamic::from("Test message".to_string()));
         event.set_field("user".to_string(), Dynamic::from("alice".to_string()));
 
         let formatter = HideFormatter::new();

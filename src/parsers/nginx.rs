@@ -141,7 +141,7 @@ impl NginxParser {
                 }
             }
 
-            event.extract_core_fields();
+            event.extract_timestamp();
             Some(event)
         } else {
             None
@@ -212,7 +212,7 @@ impl NginxParser {
                 }
             }
 
-            event.extract_core_fields();
+            event.extract_timestamp();
             Some(event)
         } else {
             None

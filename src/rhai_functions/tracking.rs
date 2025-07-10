@@ -69,7 +69,10 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("track_min", |key: &str, value: i64| {
         THREAD_TRACKING_STATE.with(|state| {
             let mut state = state.borrow_mut();
-            let current = state.get(key).cloned().unwrap_or(Dynamic::from(f64::INFINITY));
+            let current = state
+                .get(key)
+                .cloned()
+                .unwrap_or(Dynamic::from(f64::INFINITY));
             let current_val = if current.is_int() {
                 current.as_int().unwrap_or(i64::MAX) as f64
             } else {
@@ -87,7 +90,10 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("track_min", |key: &str, value: i32| {
         THREAD_TRACKING_STATE.with(|state| {
             let mut state = state.borrow_mut();
-            let current = state.get(key).cloned().unwrap_or(Dynamic::from(f64::INFINITY));
+            let current = state
+                .get(key)
+                .cloned()
+                .unwrap_or(Dynamic::from(f64::INFINITY));
             let current_val = if current.is_int() {
                 current.as_int().unwrap_or(i64::MAX) as f64
             } else {
@@ -105,7 +111,10 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("track_min", |key: &str, value: f64| {
         THREAD_TRACKING_STATE.with(|state| {
             let mut state = state.borrow_mut();
-            let current = state.get(key).cloned().unwrap_or(Dynamic::from(f64::INFINITY));
+            let current = state
+                .get(key)
+                .cloned()
+                .unwrap_or(Dynamic::from(f64::INFINITY));
             let current_val = if current.is_int() {
                 current.as_int().unwrap_or(i64::MAX) as f64
             } else {
@@ -122,7 +131,10 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("track_min", |key: &str, value: f32| {
         THREAD_TRACKING_STATE.with(|state| {
             let mut state = state.borrow_mut();
-            let current = state.get(key).cloned().unwrap_or(Dynamic::from(f64::INFINITY));
+            let current = state
+                .get(key)
+                .cloned()
+                .unwrap_or(Dynamic::from(f64::INFINITY));
             let current_val = if current.is_int() {
                 current.as_int().unwrap_or(i64::MAX) as f64
             } else {
@@ -141,7 +153,10 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("track_max", |key: &str, value: i64| {
         THREAD_TRACKING_STATE.with(|state| {
             let mut state = state.borrow_mut();
-            let current = state.get(key).cloned().unwrap_or(Dynamic::from(f64::NEG_INFINITY));
+            let current = state
+                .get(key)
+                .cloned()
+                .unwrap_or(Dynamic::from(f64::NEG_INFINITY));
             let current_val = if current.is_int() {
                 current.as_int().unwrap_or(i64::MIN) as f64
             } else {
@@ -159,7 +174,10 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("track_max", |key: &str, value: i32| {
         THREAD_TRACKING_STATE.with(|state| {
             let mut state = state.borrow_mut();
-            let current = state.get(key).cloned().unwrap_or(Dynamic::from(f64::NEG_INFINITY));
+            let current = state
+                .get(key)
+                .cloned()
+                .unwrap_or(Dynamic::from(f64::NEG_INFINITY));
             let current_val = if current.is_int() {
                 current.as_int().unwrap_or(i64::MIN) as f64
             } else {
@@ -177,7 +195,10 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("track_max", |key: &str, value: f64| {
         THREAD_TRACKING_STATE.with(|state| {
             let mut state = state.borrow_mut();
-            let current = state.get(key).cloned().unwrap_or(Dynamic::from(f64::NEG_INFINITY));
+            let current = state
+                .get(key)
+                .cloned()
+                .unwrap_or(Dynamic::from(f64::NEG_INFINITY));
             let current_val = if current.is_int() {
                 current.as_int().unwrap_or(i64::MIN) as f64
             } else {
@@ -194,7 +215,10 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("track_max", |key: &str, value: f32| {
         THREAD_TRACKING_STATE.with(|state| {
             let mut state = state.borrow_mut();
-            let current = state.get(key).cloned().unwrap_or(Dynamic::from(f64::NEG_INFINITY));
+            let current = state
+                .get(key)
+                .cloned()
+                .unwrap_or(Dynamic::from(f64::NEG_INFINITY));
             let current_val = if current.is_int() {
                 current.as_int().unwrap_or(i64::MIN) as f64
             } else {
@@ -246,10 +270,7 @@ pub fn register_functions(engine: &mut Engine) {
             if let Ok(mut arr) = current.into_array() {
                 let value_dynamic = Dynamic::from(value);
                 // Check if value already exists in array
-                if !arr
-                    .iter()
-                    .any(|v| v.as_int().unwrap_or(i64::MIN) == value)
-                {
+                if !arr.iter().any(|v| v.as_int().unwrap_or(i64::MIN) == value) {
                     arr.push(value_dynamic);
                 }
                 state.insert(key.to_string(), Dynamic::from(arr));
@@ -365,7 +386,10 @@ pub fn register_functions(engine: &mut Engine) {
 
             if let Some(mut map) = current.try_cast::<rhai::Map>() {
                 let bucket_str = bucket.to_string();
-                let count = map.get(bucket_str.as_str()).cloned().unwrap_or(Dynamic::from(0i64));
+                let count = map
+                    .get(bucket_str.as_str())
+                    .cloned()
+                    .unwrap_or(Dynamic::from(0i64));
                 let new_count = count.as_int().unwrap_or(0) + 1;
                 map.insert(bucket_str.into(), Dynamic::from(new_count));
                 state.insert(key.to_string(), Dynamic::from(map));
@@ -386,7 +410,10 @@ pub fn register_functions(engine: &mut Engine) {
 
             if let Some(mut map) = current.try_cast::<rhai::Map>() {
                 let bucket_str = bucket.to_string();
-                let count = map.get(bucket_str.as_str()).cloned().unwrap_or(Dynamic::from(0i64));
+                let count = map
+                    .get(bucket_str.as_str())
+                    .cloned()
+                    .unwrap_or(Dynamic::from(0i64));
                 let new_count = count.as_int().unwrap_or(0) + 1;
                 map.insert(bucket_str.into(), Dynamic::from(new_count));
                 state.insert(key.to_string(), Dynamic::from(map));
@@ -407,7 +434,10 @@ pub fn register_functions(engine: &mut Engine) {
 
             if let Some(mut map) = current.try_cast::<rhai::Map>() {
                 let bucket_str = bucket.to_string();
-                let count = map.get(bucket_str.as_str()).cloned().unwrap_or(Dynamic::from(0i64));
+                let count = map
+                    .get(bucket_str.as_str())
+                    .cloned()
+                    .unwrap_or(Dynamic::from(0i64));
                 let new_count = count.as_int().unwrap_or(0) + 1;
                 map.insert(bucket_str.into(), Dynamic::from(new_count));
                 state.insert(key.to_string(), Dynamic::from(map));
@@ -428,7 +458,10 @@ pub fn register_functions(engine: &mut Engine) {
 
             if let Some(mut map) = current.try_cast::<rhai::Map>() {
                 let bucket_str = bucket.to_string();
-                let count = map.get(bucket_str.as_str()).cloned().unwrap_or(Dynamic::from(0i64));
+                let count = map
+                    .get(bucket_str.as_str())
+                    .cloned()
+                    .unwrap_or(Dynamic::from(0i64));
                 let new_count = count.as_int().unwrap_or(0) + 1;
                 map.insert(bucket_str.into(), Dynamic::from(new_count));
                 state.insert(key.to_string(), Dynamic::from(map));

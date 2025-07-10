@@ -225,7 +225,7 @@ impl EventParser for CefParser {
         }
 
         // Extract core fields
-        event.extract_core_fields();
+        event.extract_timestamp();
 
         Ok(event)
     }

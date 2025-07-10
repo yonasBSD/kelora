@@ -2376,23 +2376,38 @@ fn test_filename_tracking_jsonl_sequential() {
     // Test filename tracking with JSONL format in sequential mode
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
-    
-    temp_file1.write_all(b"{\"message\": \"test1\"}\n").expect("Failed to write to temp file");
-    temp_file2.write_all(b"{\"message\": \"test2\"}\n").expect("Failed to write to temp file");
-    
+
+    temp_file1
+        .write_all(b"{\"message\": \"test1\"}\n")
+        .expect("Failed to write to temp file");
+    temp_file2
+        .write_all(b"{\"message\": \"test2\"}\n")
+        .expect("Failed to write to temp file");
+
     let (stdout, _stderr, exit_code) = run_kelora_with_files(
         &[
-            "-f", "jsonl",
-            "--exec", "print(\"File: \" + meta.filename + \", Message: \" + message)"
+            "-f",
+            "jsonl",
+            "--exec",
+            "print(\"File: \" + meta.filename + \", Message: \" + message)",
         ],
-        &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
+        &[
+            temp_file1.path().to_str().unwrap(),
+            temp_file2.path().to_str().unwrap(),
+        ],
     );
-    
+
     assert_eq!(exit_code, 0, "Should exit successfully");
-    assert!(stdout.contains("File: ") && stdout.contains("Message: test1"), 
-            "Should show filename and message for file1: {}", stdout);
-    assert!(stdout.contains("File: ") && stdout.contains("Message: test2"), 
-            "Should show filename and message for file2: {}", stdout);
+    assert!(
+        stdout.contains("File: ") && stdout.contains("Message: test1"),
+        "Should show filename and message for file1: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("File: ") && stdout.contains("Message: test2"),
+        "Should show filename and message for file2: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -2400,24 +2415,39 @@ fn test_filename_tracking_jsonl_parallel() {
     // Test filename tracking with JSONL format in parallel mode
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
-    
-    temp_file1.write_all(b"{\"message\": \"test1\"}\n").expect("Failed to write to temp file");
-    temp_file2.write_all(b"{\"message\": \"test2\"}\n").expect("Failed to write to temp file");
-    
+
+    temp_file1
+        .write_all(b"{\"message\": \"test1\"}\n")
+        .expect("Failed to write to temp file");
+    temp_file2
+        .write_all(b"{\"message\": \"test2\"}\n")
+        .expect("Failed to write to temp file");
+
     let (stdout, _stderr, exit_code) = run_kelora_with_files(
         &[
-            "-f", "jsonl",
+            "-f",
+            "jsonl",
             "--parallel",
-            "--exec", "print(\"File: \" + meta.filename + \", Message: \" + message)"
+            "--exec",
+            "print(\"File: \" + meta.filename + \", Message: \" + message)",
         ],
-        &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
+        &[
+            temp_file1.path().to_str().unwrap(),
+            temp_file2.path().to_str().unwrap(),
+        ],
     );
-    
+
     assert_eq!(exit_code, 0, "Should exit successfully");
-    assert!(stdout.contains("File: ") && stdout.contains("Message: test1"), 
-            "Should show filename and message for file1: {}", stdout);
-    assert!(stdout.contains("File: ") && stdout.contains("Message: test2"), 
-            "Should show filename and message for file2: {}", stdout);
+    assert!(
+        stdout.contains("File: ") && stdout.contains("Message: test1"),
+        "Should show filename and message for file1: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("File: ") && stdout.contains("Message: test2"),
+        "Should show filename and message for file2: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -2425,23 +2455,38 @@ fn test_filename_tracking_line_format() {
     // Test filename tracking with line format
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
-    
-    temp_file1.write_all(b"line from file1\n").expect("Failed to write to temp file");
-    temp_file2.write_all(b"line from file2\n").expect("Failed to write to temp file");
-    
+
+    temp_file1
+        .write_all(b"line from file1\n")
+        .expect("Failed to write to temp file");
+    temp_file2
+        .write_all(b"line from file2\n")
+        .expect("Failed to write to temp file");
+
     let (stdout, _stderr, exit_code) = run_kelora_with_files(
         &[
-            "-f", "line",
-            "--exec", "print(\"File: \" + meta.filename + \", Line: \" + line)"
+            "-f",
+            "line",
+            "--exec",
+            "print(\"File: \" + meta.filename + \", Line: \" + line)",
         ],
-        &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
+        &[
+            temp_file1.path().to_str().unwrap(),
+            temp_file2.path().to_str().unwrap(),
+        ],
     );
-    
+
     assert_eq!(exit_code, 0, "Should exit successfully");
-    assert!(stdout.contains("File: ") && stdout.contains("Line: line from file1"), 
-            "Should show filename and content for file1: {}", stdout);
-    assert!(stdout.contains("File: ") && stdout.contains("Line: line from file2"), 
-            "Should show filename and content for file2: {}", stdout);
+    assert!(
+        stdout.contains("File: ") && stdout.contains("Line: line from file1"),
+        "Should show filename and content for file1: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("File: ") && stdout.contains("Line: line from file2"),
+        "Should show filename and content for file2: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -2449,10 +2494,14 @@ fn test_per_file_csv_schema_detection_sequential() {
     // Test per-file CSV schema detection in sequential mode
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
-    
-    temp_file1.write_all(b"name,age\nAlice,30\nBob,25\n").expect("Failed to write to temp file");
-    temp_file2.write_all(b"user,score,level\nCharlie,95,A\nDave,88,B\n").expect("Failed to write to temp file");
-    
+
+    temp_file1
+        .write_all(b"name,age\nAlice,30\nBob,25\n")
+        .expect("Failed to write to temp file");
+    temp_file2
+        .write_all(b"user,score,level\nCharlie,95,A\nDave,88,B\n")
+        .expect("Failed to write to temp file");
+
     let (stdout, _stderr, exit_code) = run_kelora_with_files(
         &[
             "-f", "csv",
@@ -2460,12 +2509,20 @@ fn test_per_file_csv_schema_detection_sequential() {
         ],
         &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
     );
-    
+
     assert_eq!(exit_code, 0, "Should exit successfully");
-    assert!(stdout.contains("Fields: name,age") || stdout.contains("Fields: age,name"), 
-            "Should detect schema for file1: {}", stdout);
-    assert!(stdout.contains("Fields: user,score,level") || stdout.contains("Fields: level,score,user") || stdout.contains("Fields: score,user,level"), 
-            "Should detect schema for file2: {}", stdout);
+    assert!(
+        stdout.contains("Fields: name,age") || stdout.contains("Fields: age,name"),
+        "Should detect schema for file1: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("Fields: user,score,level")
+            || stdout.contains("Fields: level,score,user")
+            || stdout.contains("Fields: score,user,level"),
+        "Should detect schema for file2: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -2473,10 +2530,14 @@ fn test_per_file_csv_schema_detection_parallel() {
     // Test per-file CSV schema detection in parallel mode
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
-    
-    temp_file1.write_all(b"name,age\nAlice,30\nBob,25\n").expect("Failed to write to temp file");
-    temp_file2.write_all(b"user,score,level\nCharlie,95,A\nDave,88,B\n").expect("Failed to write to temp file");
-    
+
+    temp_file1
+        .write_all(b"name,age\nAlice,30\nBob,25\n")
+        .expect("Failed to write to temp file");
+    temp_file2
+        .write_all(b"user,score,level\nCharlie,95,A\nDave,88,B\n")
+        .expect("Failed to write to temp file");
+
     let (stdout, _stderr, exit_code) = run_kelora_with_files(
         &[
             "-f", "csv",
@@ -2485,12 +2546,20 @@ fn test_per_file_csv_schema_detection_parallel() {
         ],
         &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
     );
-    
+
     assert_eq!(exit_code, 0, "Should exit successfully");
-    assert!(stdout.contains("Fields: name,age") || stdout.contains("Fields: age,name"), 
-            "Should detect schema for file1: {}", stdout);
-    assert!(stdout.contains("Fields: user,score,level") || stdout.contains("Fields: level,score,user") || stdout.contains("Fields: score,user,level"), 
-            "Should detect schema for file2: {}", stdout);
+    assert!(
+        stdout.contains("Fields: name,age") || stdout.contains("Fields: age,name"),
+        "Should detect schema for file1: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("Fields: user,score,level")
+            || stdout.contains("Fields: level,score,user")
+            || stdout.contains("Fields: score,user,level"),
+        "Should detect schema for file2: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -2498,10 +2567,14 @@ fn test_csv_with_different_column_counts() {
     // Test CSV files with different numbers of columns
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
-    
-    temp_file1.write_all(b"a,b\n1,2\n").expect("Failed to write to temp file");
-    temp_file2.write_all(b"x,y,z,w\n10,20,30,40\n").expect("Failed to write to temp file");
-    
+
+    temp_file1
+        .write_all(b"a,b\n1,2\n")
+        .expect("Failed to write to temp file");
+    temp_file2
+        .write_all(b"x,y,z,w\n10,20,30,40\n")
+        .expect("Failed to write to temp file");
+
     let (stdout, _stderr, exit_code) = run_kelora_with_files(
         &[
             "-f", "csv",
@@ -2509,10 +2582,18 @@ fn test_csv_with_different_column_counts() {
         ],
         &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
     );
-    
+
     assert_eq!(exit_code, 0, "Should exit successfully");
-    assert!(stdout.contains("Columns: 2"), "Should detect 2 columns in file1: {}", stdout);
-    assert!(stdout.contains("Columns: 4"), "Should detect 4 columns in file2: {}", stdout);
+    assert!(
+        stdout.contains("Columns: 2"),
+        "Should detect 2 columns in file1: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("Columns: 4"),
+        "Should detect 4 columns in file2: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -2520,39 +2601,60 @@ fn test_sequential_parallel_mode_parity() {
     // Test that sequential and parallel modes produce similar results
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
-    
+
     temp_file1.write_all(b"{\"user\": \"alice\", \"status\": \"active\"}\n{\"user\": \"bob\", \"status\": \"inactive\"}\n").expect("Failed to write to temp file");
     temp_file2.write_all(b"{\"user\": \"charlie\", \"status\": \"active\"}\n{\"user\": \"dave\", \"status\": \"inactive\"}\n").expect("Failed to write to temp file");
-    
-    let files = &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()];
-    
+
+    let files = &[
+        temp_file1.path().to_str().unwrap(),
+        temp_file2.path().to_str().unwrap(),
+    ];
+
     // Test sequential mode
     let (stdout_seq, stderr_seq, exit_code_seq) = run_kelora_with_files(
         &[
-            "-f", "jsonl",
-            "--exec", "print(\"File: \" + meta.filename + \", User: \" + user + \", Status: \" + status)",
+            "-f",
+            "jsonl",
+            "--exec",
+            "print(\"File: \" + meta.filename + \", User: \" + user + \", Status: \" + status)",
         ],
         files,
     );
-    
+
     // Test parallel mode
     let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_files(
         &[
-            "-f", "jsonl",
+            "-f",
+            "jsonl",
             "--parallel",
-            "--exec", "print(\"File: \" + meta.filename + \", User: \" + user + \", Status: \" + status)",
+            "--exec",
+            "print(\"File: \" + meta.filename + \", User: \" + user + \", Status: \" + status)",
         ],
         files,
     );
-    
-    assert_eq!(exit_code_seq, 0, "Sequential mode should exit successfully, stderr: {}", stderr_seq);
-    assert_eq!(exit_code_par, 0, "Parallel mode should exit successfully, stderr: {}", stderr_par);
-    
+
+    assert_eq!(
+        exit_code_seq, 0,
+        "Sequential mode should exit successfully, stderr: {}",
+        stderr_seq
+    );
+    assert_eq!(
+        exit_code_par, 0,
+        "Parallel mode should exit successfully, stderr: {}",
+        stderr_par
+    );
+
     // Both modes should show filename tracking
-    assert!(stdout_seq.contains("File: ") && stdout_seq.contains("User: alice"), 
-            "Sequential mode should show filename and user data: {}", stdout_seq);
-    assert!(stdout_par.contains("File: ") && stdout_par.contains("User: alice"), 
-            "Parallel mode should show filename and user data: {}", stdout_par);
+    assert!(
+        stdout_seq.contains("File: ") && stdout_seq.contains("User: alice"),
+        "Sequential mode should show filename and user data: {}",
+        stdout_seq
+    );
+    assert!(
+        stdout_par.contains("File: ") && stdout_par.contains("User: alice"),
+        "Parallel mode should show filename and user data: {}",
+        stdout_par
+    );
 }
 
 #[test]
@@ -2560,24 +2662,40 @@ fn test_filename_tracking_with_file_order() {
     // Test filename tracking with file ordering
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
-    
-    temp_file1.write_all(b"first\n").expect("Failed to write to temp file");
-    temp_file2.write_all(b"second\n").expect("Failed to write to temp file");
-    
+
+    temp_file1
+        .write_all(b"first\n")
+        .expect("Failed to write to temp file");
+    temp_file2
+        .write_all(b"second\n")
+        .expect("Failed to write to temp file");
+
     let (stdout, _stderr, exit_code) = run_kelora_with_files(
         &[
-            "-f", "line",
-            "--file-order", "name",
-            "--exec", "print(\"Processing: \" + meta.filename + \" -> \" + line)"
+            "-f",
+            "line",
+            "--file-order",
+            "name",
+            "--exec",
+            "print(\"Processing: \" + meta.filename + \" -> \" + line)",
         ],
-        &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
+        &[
+            temp_file1.path().to_str().unwrap(),
+            temp_file2.path().to_str().unwrap(),
+        ],
     );
-    
+
     assert_eq!(exit_code, 0, "Should exit successfully");
-    assert!(stdout.contains("Processing: ") && stdout.contains("first"), 
-            "Should process first file: {}", stdout);
-    assert!(stdout.contains("Processing: ") && stdout.contains("second"), 
-            "Should process second file: {}", stdout);
+    assert!(
+        stdout.contains("Processing: ") && stdout.contains("first"),
+        "Should process first file: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("Processing: ") && stdout.contains("second"),
+        "Should process second file: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -2585,41 +2703,56 @@ fn test_csv_no_headers_with_filename_tracking() {
     // Test CSV without headers but with filename tracking
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
-    
-    temp_file1.write_all(b"alice,30\nbob,25\n").expect("Failed to write to temp file");
-    temp_file2.write_all(b"charlie,95,A\ndave,88,B\n").expect("Failed to write to temp file");
-    
+
+    temp_file1
+        .write_all(b"alice,30\nbob,25\n")
+        .expect("Failed to write to temp file");
+    temp_file2
+        .write_all(b"charlie,95,A\ndave,88,B\n")
+        .expect("Failed to write to temp file");
+
     let (stdout, _stderr, exit_code) = run_kelora_with_files(
         &[
-            "-f", "csvnh",
-            "--exec", "print(\"File: \" + meta.filename + \", Col1: \" + c1 + \", Col2: \" + c2)"
+            "-f",
+            "csvnh",
+            "--exec",
+            "print(\"File: \" + meta.filename + \", Col1: \" + c1 + \", Col2: \" + c2)",
         ],
-        &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
+        &[
+            temp_file1.path().to_str().unwrap(),
+            temp_file2.path().to_str().unwrap(),
+        ],
     );
-    
+
     assert_eq!(exit_code, 0, "Should exit successfully");
-    assert!(stdout.contains("File: ") && stdout.contains("Col1: alice"), 
-            "Should show filename and data for file1: {}", stdout);
-    assert!(stdout.contains("File: ") && stdout.contains("Col1: charlie"), 
-            "Should show filename and data for file2: {}", stdout);
+    assert!(
+        stdout.contains("File: ") && stdout.contains("Col1: alice"),
+        "Should show filename and data for file1: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("File: ") && stdout.contains("Col1: charlie"),
+        "Should show filename and data for file2: {}",
+        stdout
+    );
 }
 
 /// Helper function to run kelora with multiple files
 fn run_kelora_with_files(args: &[&str], files: &[&str]) -> (String, String, i32) {
     let mut full_args = args.to_vec();
     full_args.extend(files);
-    
+
     let binary_path = if cfg!(debug_assertions) {
         "./target/debug/kelora"
     } else {
         "./target/release/kelora"
     };
-    
+
     let output = Command::new(binary_path)
         .args(&full_args)
         .output()
         .expect("Failed to execute kelora");
-    
+
     (
         String::from_utf8_lossy(&output.stdout).to_string(),
         String::from_utf8_lossy(&output.stderr).to_string(),
@@ -2636,11 +2769,12 @@ fn test_error_stats_sequential_mode() {
 not jsonl at all
 {"final": "entry", "status": 500}"#;
 
-    let (stdout, stderr, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--on-error", "skip", "--stats"],
-        input,
+    let (stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "jsonl", "--on-error", "skip", "--stats"], input);
+    assert_eq!(
+        exit_code, 0,
+        "Should exit successfully with skip error handling"
     );
-    assert_eq!(exit_code, 0, "Should exit successfully with skip error handling");
 
     // Should output 3 valid JSON lines, skip 2 malformed ones
     let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
@@ -2649,8 +2783,14 @@ not jsonl at all
     // Stats should show separate error count
     assert!(stderr.contains("5 total"), "Should show 5 total lines");
     assert!(stderr.contains("2 errors"), "Should show 2 parsing errors");
-    assert!(stderr.contains("0 filtered"), "Should show 0 filtered lines");
-    assert!(stderr.contains("Events created: 3 total, 3 output, 0 filtered"), "Should show 3 events created and output");
+    assert!(
+        stderr.contains("0 filtered"),
+        "Should show 0 filtered lines"
+    );
+    assert!(
+        stderr.contains("Events created: 3 total, 3 output, 0 filtered"),
+        "Should show 3 events created and output"
+    );
 }
 
 #[test]
@@ -2664,15 +2804,21 @@ not jsonl at all
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
         &[
-            "-f", "jsonl",
-            "--on-error", "skip",
+            "-f",
+            "jsonl",
+            "--on-error",
+            "skip",
             "--stats",
             "--parallel",
-            "--batch-size", "2",
+            "--batch-size",
+            "2",
         ],
         input,
     );
-    assert_eq!(exit_code, 0, "Should exit successfully with skip error handling");
+    assert_eq!(
+        exit_code, 0,
+        "Should exit successfully with skip error handling"
+    );
 
     // Should output 3 valid JSON lines, skip 2 malformed ones
     let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
@@ -2681,8 +2827,14 @@ not jsonl at all
     // Stats should show separate error count (same as sequential)
     assert!(stderr.contains("5 total"), "Should show 5 total lines");
     assert!(stderr.contains("2 errors"), "Should show 2 parsing errors");
-    assert!(stderr.contains("0 filtered"), "Should show 0 filtered lines");
-    assert!(stderr.contains("Events created: 3 total, 3 output, 0 filtered"), "Should show 3 events created and output");
+    assert!(
+        stderr.contains("0 filtered"),
+        "Should show 0 filtered lines"
+    );
+    assert!(
+        stderr.contains("Events created: 3 total, 3 output, 0 filtered"),
+        "Should show 3 events created and output"
+    );
 }
 
 #[test]
@@ -2696,9 +2848,12 @@ not jsonl at all
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
         &[
-            "-f", "jsonl",
-            "--filter", "status >= 400",
-            "--on-error", "skip",
+            "-f",
+            "jsonl",
+            "--filter",
+            "status >= 400",
+            "--on-error",
+            "skip",
             "--stats",
         ],
         input,
@@ -2707,12 +2862,19 @@ not jsonl at all
 
     // Should output 2 lines (status 404 and 500), filter out 1 (status 200), skip 2 malformed
     let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
-    assert_eq!(output_lines.len(), 2, "Should output 2 lines with status >= 400");
+    assert_eq!(
+        output_lines.len(),
+        2,
+        "Should output 2 lines with status >= 400"
+    );
 
     // Stats should show separate error and filtered counts
     assert!(stderr.contains("5 total"), "Should show 5 total lines");
     assert!(stderr.contains("2 output"), "Should show 2 output lines");
-    assert!(stderr.contains("1 filtered"), "Should show 1 filtered line (status 200)");
+    assert!(
+        stderr.contains("1 filtered"),
+        "Should show 1 filtered line (status 200)"
+    );
     assert!(stderr.contains("2 errors"), "Should show 2 parsing errors");
 }
 
@@ -2727,9 +2889,12 @@ fn test_error_stats_with_ignore_lines() {
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
         &[
-            "-f", "jsonl",
-            "--ignore-lines", "^#",
-            "--on-error", "skip",
+            "-f",
+            "jsonl",
+            "--ignore-lines",
+            "^#",
+            "--on-error",
+            "skip",
             "--stats",
         ],
         input,
@@ -2743,7 +2908,10 @@ fn test_error_stats_with_ignore_lines() {
     // Stats should show combined filtered count (ignore-lines + filter expressions)
     assert!(stderr.contains("5 total"), "Should show 5 total lines");
     assert!(stderr.contains("2 output"), "Should show 2 output lines");
-    assert!(stderr.contains("2 filtered"), "Should show 2 filtered lines (comments)");
+    assert!(
+        stderr.contains("2 filtered"),
+        "Should show 2 filtered lines (comments)"
+    );
     assert!(stderr.contains("1 errors"), "Should show 1 parsing error");
 }
 
@@ -2755,29 +2923,41 @@ fn test_error_stats_different_error_strategies() {
 {"another": "valid", "status": 404}"#;
 
     // Test with --on-error print
-    let (_stdout1, stderr1, exit_code1) = run_kelora_with_input(
-        &["-f", "jsonl", "--on-error", "print", "--stats"],
-        input,
+    let (_stdout1, stderr1, exit_code1) =
+        run_kelora_with_input(&["-f", "jsonl", "--on-error", "print", "--stats"], input);
+    assert_eq!(
+        exit_code1, 0,
+        "Should exit successfully with print error handling"
     );
-    assert_eq!(exit_code1, 0, "Should exit successfully with print error handling");
 
     // Test with --on-error skip
-    let (_stdout2, stderr2, exit_code2) = run_kelora_with_input(
-        &["-f", "jsonl", "--on-error", "skip", "--stats"],
-        input,
+    let (_stdout2, stderr2, exit_code2) =
+        run_kelora_with_input(&["-f", "jsonl", "--on-error", "skip", "--stats"], input);
+    assert_eq!(
+        exit_code2, 0,
+        "Should exit successfully with skip error handling"
     );
-    assert_eq!(exit_code2, 0, "Should exit successfully with skip error handling");
 
     // Both should show the same error count in stats
     let expected_stats = ["3 total", "2 output", "1 errors"];
     for stat in &expected_stats {
-        assert!(stderr1.contains(stat), "Print mode should contain: {}", stat);
+        assert!(
+            stderr1.contains(stat),
+            "Print mode should contain: {}",
+            stat
+        );
         assert!(stderr2.contains(stat), "Skip mode should contain: {}", stat);
     }
 
     // Print mode should also show the error message
-    assert!(stderr1.contains("Parse error"), "Print mode should show error message");
-    assert!(!stderr2.contains("Parse error"), "Skip mode should not show error message");
+    assert!(
+        stderr1.contains("Parse error"),
+        "Print mode should show error message"
+    );
+    assert!(
+        !stderr2.contains("Parse error"),
+        "Skip mode should not show error message"
+    );
 }
 
 #[test]
@@ -2795,13 +2975,20 @@ fn test_error_stats_no_errors() {
 
     // Should output 2 lines (status 404 and 500), filter out 1 (status 200)
     let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
-    assert_eq!(output_lines.len(), 2, "Should output 2 lines with status >= 400");
+    assert_eq!(
+        output_lines.len(),
+        2,
+        "Should output 2 lines with status >= 400"
+    );
 
     // Stats should not show error count when there are no errors
     assert!(stderr.contains("3 total"), "Should show 3 total lines");
     assert!(stderr.contains("2 output"), "Should show 2 output lines");
     assert!(stderr.contains("1 filtered"), "Should show 1 filtered line");
-    assert!(!stderr.contains("errors"), "Should not show error count when there are no errors");
+    assert!(
+        !stderr.contains("errors"),
+        "Should not show error count when there are no errors"
+    );
 }
 
 #[test]
@@ -2816,19 +3003,31 @@ invalid json again"#;
 
     // Run in sequential mode
     let (stdout_seq, stderr_seq, exit_code_seq) = run_kelora_with_input(
-        &["-f", "jsonl", "--filter", "status >= 400", "--on-error", "skip", "--stats"],
+        &[
+            "-f",
+            "jsonl",
+            "--filter",
+            "status >= 400",
+            "--on-error",
+            "skip",
+            "--stats",
+        ],
         input,
     );
 
     // Run in parallel mode
     let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(
         &[
-            "-f", "jsonl",
-            "--filter", "status >= 400",
-            "--on-error", "skip",
+            "-f",
+            "jsonl",
+            "--filter",
+            "status >= 400",
+            "--on-error",
+            "skip",
             "--stats",
             "--parallel",
-            "--batch-size", "2",
+            "--batch-size",
+            "2",
         ],
         input,
     );
@@ -2839,13 +3038,25 @@ invalid json again"#;
     // Both should produce the same output
     let seq_lines: Vec<&str> = stdout_seq.trim().split('\n').collect();
     let par_lines: Vec<&str> = stdout_par.trim().split('\n').collect();
-    assert_eq!(seq_lines.len(), par_lines.len(), "Should produce same number of output lines");
+    assert_eq!(
+        seq_lines.len(),
+        par_lines.len(),
+        "Should produce same number of output lines"
+    );
 
     // Both should show identical statistics
     let expected_stats = ["6 total", "2 output", "1 filtered", "3 errors"];
     for stat in &expected_stats {
-        assert!(stderr_seq.contains(stat), "Sequential mode should contain: {}", stat);
-        assert!(stderr_par.contains(stat), "Parallel mode should contain: {}", stat);
+        assert!(
+            stderr_seq.contains(stat),
+            "Sequential mode should contain: {}",
+            stat
+        );
+        assert!(
+            stderr_par.contains(stat),
+            "Parallel mode should contain: {}",
+            stat
+        );
     }
 }
 
@@ -2856,54 +3067,98 @@ fn test_error_stats_multiline_mode() {
 {malformed json line}
 {"another": "valid", "message": "single line"}"#;
 
-    let (stdout, stderr, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--on-error", "skip", "--stats"],
-        input,
-    );
+    let (stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "jsonl", "--on-error", "skip", "--stats"], input);
     assert_eq!(exit_code, 0, "Should exit successfully");
 
-    // Should output 2 valid JSON lines, skip 1 malformed line  
+    // Should output 2 valid JSON lines, skip 1 malformed line
     let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
     assert_eq!(output_lines.len(), 2, "Should output 2 valid JSON lines");
 
     // Stats should show separate error count
-    assert!(stderr.contains("3 total"), "Should show 3 total lines processed");
+    assert!(
+        stderr.contains("3 total"),
+        "Should show 3 total lines processed"
+    );
     assert!(stderr.contains("2 output"), "Should show 2 output lines");
     assert!(stderr.contains("1 errors"), "Should show 1 parsing error");
-    assert!(stderr.contains("0 filtered"), "Should show 0 filtered lines");
-    
+    assert!(
+        stderr.contains("0 filtered"),
+        "Should show 0 filtered lines"
+    );
+
     // Test multiline mode specifically with events created
     let (_stdout2, stderr2, exit_code2) = run_kelora_with_input(
-        &["-f", "jsonl", "--multiline", "indent", "--on-error", "skip", "--stats"],
+        &[
+            "-f",
+            "jsonl",
+            "--multiline",
+            "indent",
+            "--on-error",
+            "skip",
+            "--stats",
+        ],
         input,
     );
-    assert_eq!(exit_code2, 0, "Should exit successfully with multiline mode");
-    
+    assert_eq!(
+        exit_code2, 0,
+        "Should exit successfully with multiline mode"
+    );
+
     // In multiline mode, stats should show both line and event information
-    assert!(stderr2.contains("Events created:"), "Should show event statistics in multiline mode");
-    assert!(stderr2.contains("1 errors"), "Should show 1 parsing error in multiline mode");
+    assert!(
+        stderr2.contains("Events created:"),
+        "Should show event statistics in multiline mode"
+    );
+    assert!(
+        stderr2.contains("1 errors"),
+        "Should show 1 parsing error in multiline mode"
+    );
 }
 
 #[test]
 fn test_empty_line_handling_line_format() {
     // Test that empty lines are processed as events in line format
     let input = "first line\n\nsecond line\n\n\nthird line\n";
-    
+
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["-f", "line", "--exec", "print(\"Line: [\" + line + \"]\")", "-F", "hide"],
+        &[
+            "-f",
+            "line",
+            "--exec",
+            "print(\"Line: [\" + line + \"]\")",
+            "-F",
+            "hide",
+        ],
         input,
     );
     assert_eq!(exit_code, 0, "Should exit successfully with line format");
-    
+
     // Should process all lines including empty ones
     let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
-    assert_eq!(output_lines.len(), 6, "Should process all 6 lines including empty ones");
-    
+    assert_eq!(
+        output_lines.len(),
+        6,
+        "Should process all 6 lines including empty ones"
+    );
+
     // Check that empty lines are present
-    assert!(stdout.contains("Line: []"), "Should process empty lines as events");
-    assert!(stdout.contains("Line: [first line]"), "Should process non-empty lines");
-    assert!(stdout.contains("Line: [second line]"), "Should process non-empty lines");
-    assert!(stdout.contains("Line: [third line]"), "Should process non-empty lines");
+    assert!(
+        stdout.contains("Line: []"),
+        "Should process empty lines as events"
+    );
+    assert!(
+        stdout.contains("Line: [first line]"),
+        "Should process non-empty lines"
+    );
+    assert!(
+        stdout.contains("Line: [second line]"),
+        "Should process non-empty lines"
+    );
+    assert!(
+        stdout.contains("Line: [third line]"),
+        "Should process non-empty lines"
+    );
 }
 
 #[test]
@@ -2914,20 +3169,23 @@ fn test_empty_line_handling_structured_formats() {
 {"level": "ERROR", "message": "Second message"}
 
 {"level": "DEBUG", "message": "Third message"}"#;
-    
-    let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "-F", "jsonl"],
-        input,
-    );
+
+    let (stdout, _stderr, exit_code) =
+        run_kelora_with_input(&["-f", "jsonl", "-F", "jsonl"], input);
     assert_eq!(exit_code, 0, "Should exit successfully with jsonl format");
-    
+
     // Should skip empty lines and only process JSON lines
     let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
-    assert_eq!(output_lines.len(), 3, "Should process only 3 JSON lines, skipping empty ones");
-    
+    assert_eq!(
+        output_lines.len(),
+        3,
+        "Should process only 3 JSON lines, skipping empty ones"
+    );
+
     // Verify all output lines are valid JSON
     for line in output_lines {
-        let parsed: serde_json::Value = serde_json::from_str(line).expect("Line should be valid JSON");
+        let parsed: serde_json::Value =
+            serde_json::from_str(line).expect("Line should be valid JSON");
         assert!(parsed.is_object(), "Each line should be a JSON object");
     }
 }
@@ -2936,25 +3194,50 @@ fn test_empty_line_handling_structured_formats() {
 fn test_empty_line_handling_line_format_with_filter() {
     // Test that empty lines can be filtered in line format
     let input = "first line\n\nsecond line\n\n\nthird line\n";
-    
+
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["-f", "line", "--filter", "line.len() > 0", "--exec", "print(\"Non-empty: \" + line)", "-F", "hide"],
+        &[
+            "-f",
+            "line",
+            "--filter",
+            "line.len() > 0",
+            "--exec",
+            "print(\"Non-empty: \" + line)",
+            "-F",
+            "hide",
+        ],
         input,
     );
-    assert_eq!(exit_code, 0, "Should exit successfully with line format and filter");
-    
+    assert_eq!(
+        exit_code, 0,
+        "Should exit successfully with line format and filter"
+    );
+
     // Should filter out empty lines
     let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
     assert_eq!(output_lines.len(), 3, "Should filter to 3 non-empty lines");
-    
+
     // Check that only non-empty lines are present
-    assert!(stdout.contains("Non-empty: first line"), "Should contain first line");
-    assert!(stdout.contains("Non-empty: second line"), "Should contain second line");
-    assert!(stdout.contains("Non-empty: third line"), "Should contain third line");
-    
+    assert!(
+        stdout.contains("Non-empty: first line"),
+        "Should contain first line"
+    );
+    assert!(
+        stdout.contains("Non-empty: second line"),
+        "Should contain second line"
+    );
+    assert!(
+        stdout.contains("Non-empty: third line"),
+        "Should contain third line"
+    );
+
     // Check that there are no empty line entries (lines with just "Non-empty: " followed by newline)
     for line in output_lines {
-        assert!(line.len() > "Non-empty: ".len(), "Should not have empty line entries: '{}'", line);
+        assert!(
+            line.len() > "Non-empty: ".len(),
+            "Should not have empty line entries: '{}'",
+            line
+        );
     }
 }
 
@@ -2962,18 +3245,24 @@ fn test_empty_line_handling_line_format_with_filter() {
 fn test_empty_line_handling_line_format_with_stats() {
     // Test that empty lines are counted in stats for line format
     let input = "first line\n\nsecond line\n\n\nthird line\n";
-    
-    let (stdout, stderr, exit_code) = run_kelora_with_input(
-        &["-f", "line", "--stats"],
-        input,
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "line", "--stats"], input);
+    assert_eq!(
+        exit_code, 0,
+        "Should exit successfully with line format and stats"
     );
-    assert_eq!(exit_code, 0, "Should exit successfully with line format and stats");
-    
+
     // Should count all lines including empty ones
-    assert!(stderr.contains("6 total"), "Should show 6 total lines processed");
+    assert!(
+        stderr.contains("6 total"),
+        "Should show 6 total lines processed"
+    );
     assert!(stderr.contains("6 output"), "Should show 6 output lines");
-    assert!(stderr.contains("0 filtered"), "Should show 0 filtered lines");
-    
+    assert!(
+        stderr.contains("0 filtered"),
+        "Should show 0 filtered lines"
+    );
+
     // Should output all 6 lines
     let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
     assert_eq!(output_lines.len(), 6, "Should output all 6 lines");
@@ -2987,18 +3276,24 @@ fn test_empty_line_handling_structured_format_with_stats() {
 {"level": "ERROR", "message": "Second message"}
 
 {"level": "DEBUG", "message": "Third message"}"#;
-    
-    let (stdout, stderr, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--stats"],
-        input,
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl", "--stats"], input);
+    assert_eq!(
+        exit_code, 0,
+        "Should exit successfully with jsonl format and stats"
     );
-    assert_eq!(exit_code, 0, "Should exit successfully with jsonl format and stats");
-    
+
     // Should count only non-empty lines that were processed
-    assert!(stderr.contains("3 total"), "Should show 3 total lines processed (empty lines skipped)");
+    assert!(
+        stderr.contains("3 total"),
+        "Should show 3 total lines processed (empty lines skipped)"
+    );
     assert!(stderr.contains("3 output"), "Should show 3 output lines");
-    assert!(stderr.contains("0 filtered"), "Should show 0 filtered lines");
-    
+    assert!(
+        stderr.contains("0 filtered"),
+        "Should show 0 filtered lines"
+    );
+
     // Should output only 3 JSON lines
     let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
     assert_eq!(output_lines.len(), 3, "Should output only 3 JSON lines");
@@ -3008,42 +3303,85 @@ fn test_empty_line_handling_structured_format_with_stats() {
 fn test_empty_line_handling_consistency_across_formats() {
     // Test that empty line handling is consistent with format expectations
     let input = "line1\n\nline2\n\n";
-    
+
     // Line format should process all lines
     let (stdout_line, _stderr_line, exit_code_line) = run_kelora_with_input(
-        &["-f", "line", "--exec", "print(\"[\" + line + \"]\")", "-F", "hide"],
+        &[
+            "-f",
+            "line",
+            "--exec",
+            "print(\"[\" + line + \"]\")",
+            "-F",
+            "hide",
+        ],
         input,
     );
     assert_eq!(exit_code_line, 0, "Line format should exit successfully");
     let line_count = stdout_line.trim().split('\n').collect::<Vec<&str>>().len();
-    assert_eq!(line_count, 4, "Line format should process 4 lines including empty ones");
-    
+    assert_eq!(
+        line_count, 4,
+        "Line format should process 4 lines including empty ones"
+    );
+
     // Structured format (cols) should skip empty lines
     let (stdout_cols, _stderr_cols, exit_code_cols) = run_kelora_with_input(
-        &["-f", "cols", "--exec", "print(\"[\" + c1 + \"]\")", "-F", "hide"],
+        &[
+            "-f",
+            "cols",
+            "--exec",
+            "print(\"[\" + c1 + \"]\")",
+            "-F",
+            "hide",
+        ],
         input,
     );
     assert_eq!(exit_code_cols, 0, "Cols format should exit successfully");
     let cols_count = stdout_cols.trim().split('\n').collect::<Vec<&str>>().len();
-    assert_eq!(cols_count, 2, "Cols format should process 2 lines, skipping empty ones");
+    assert_eq!(
+        cols_count, 2,
+        "Cols format should process 2 lines, skipping empty ones"
+    );
 }
 
 #[test]
 fn test_empty_line_handling_parallel_mode_line_format() {
     // Test that empty lines are processed correctly in parallel mode with line format
     let input = "first line\n\nsecond line\n\n\nthird line\n";
-    
+
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["-f", "line", "--parallel", "--batch-size", "2", "--exec", "print(\"Line: [\" + line + \"]\")", "-F", "hide"],
+        &[
+            "-f",
+            "line",
+            "--parallel",
+            "--batch-size",
+            "2",
+            "--exec",
+            "print(\"Line: [\" + line + \"]\")",
+            "-F",
+            "hide",
+        ],
         input,
     );
-    assert_eq!(exit_code, 0, "Should exit successfully with line format in parallel mode");
-    
+    assert_eq!(
+        exit_code, 0,
+        "Should exit successfully with line format in parallel mode"
+    );
+
     // Should process all lines including empty ones
     let output_lines: Vec<&str> = stdout.trim().split('\n').collect();
-    assert_eq!(output_lines.len(), 6, "Should process all 6 lines including empty ones in parallel mode");
-    
+    assert_eq!(
+        output_lines.len(),
+        6,
+        "Should process all 6 lines including empty ones in parallel mode"
+    );
+
     // Check that empty lines are present
-    assert!(stdout.contains("Line: []"), "Should process empty lines as events in parallel mode");
-    assert!(stdout.contains("Line: [first line]"), "Should process non-empty lines in parallel mode");
+    assert!(
+        stdout.contains("Line: []"),
+        "Should process empty lines as events in parallel mode"
+    );
+    assert!(
+        stdout.contains("Line: [first line]"),
+        "Should process non-empty lines in parallel mode"
+    );
 }

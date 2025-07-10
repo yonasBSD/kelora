@@ -118,7 +118,7 @@ impl SyslogParser {
                 event.set_field("msg".to_string(), Dynamic::from(msg.as_str().to_string()));
             }
 
-            event.extract_core_fields();
+            event.extract_timestamp();
             Some(event)
         } else {
             None
@@ -179,7 +179,7 @@ impl SyslogParser {
                 event.set_field("msg".to_string(), Dynamic::from(msg.as_str().to_string()));
             }
 
-            event.extract_core_fields();
+            event.extract_timestamp();
             Some(event)
         } else {
             None
