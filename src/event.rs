@@ -58,7 +58,7 @@ pub const MESSAGE_FIELD_NAMES: &[&str] = &[
 
 #[derive(Debug, Clone, Default)]
 pub struct Event {
-    pub timestamp: Option<DateTime<Utc>>,
+    pub ts: Option<DateTime<Utc>>,
     pub level: Option<String>,
     pub message: Option<String>,
     pub fields: IndexMap<String, Dynamic>,
@@ -82,7 +82,7 @@ pub enum FieldValue {
 impl Event {
     pub fn with_capacity(original_line: String, capacity: usize) -> Self {
         Self {
-            timestamp: None,
+            ts: None,
             level: None,
             message: None,
             fields: IndexMap::with_capacity(capacity),
@@ -129,28 +129,28 @@ impl Event {
     }
 
     /// Try to parse and extract core fields from the fields map with optional adaptive parser
-    pub fn extract_core_fields_with_parser(&mut self, parser: Option<&mut crate::timestamp::AdaptiveTimestampParser>) {
-        self.extract_core_fields_with_config(parser, &crate::timestamp::TimestampConfig::default());
+    pub fn extract_core_fields_with_parser(&mut self, parser: Option<&mut crate::timestamp::AdaptiveTsParser>) {
+        self.extract_core_fields_with_config(parser, &crate::timestamp::TsConfig::default());
     }
 
     /// Extract core fields with timestamp configuration
     pub fn extract_core_fields_with_config(
         &mut self, 
-        parser: Option<&mut crate::timestamp::AdaptiveTimestampParser>,
-        ts_config: &crate::timestamp::TimestampConfig,
+        parser: Option<&mut crate::timestamp::AdaptiveTsParser>,
+        ts_config: &crate::timestamp::TsConfig,
     ) {
         // Extract and parse timestamp with more comprehensive field recognition
-        if self.timestamp.is_none() {
+        if self.ts.is_none() {
             if let Some((_field_name, ts_str)) = crate::timestamp::identify_timestamp_field(&self.fields, ts_config) {
                 let parsed_ts = if let Some(parser) = parser {
-                    parser.parse_timestamp(&ts_str)
+                    parser.parse_ts(&ts_str)
                 } else {
                     // Fall back to original parsing
                     parse_timestamp(&ts_str).ok()
                 };
                 
                 if let Some(ts) = parsed_ts {
-                    self.timestamp = Some(ts);
+                    self.ts = Some(ts);
                     self.parsed_ts = Some(ts);
                 }
             }

@@ -307,7 +307,7 @@ impl InputFormat {
 }
 
 impl KeloraConfig {
-    /// Get the list of core field names (timestamp, level, message variants)
+    /// Get the list of core field names (ts, level, message variants)
     pub fn get_core_field_names() -> Vec<String> {
         let mut core_fields = Vec::new();
 

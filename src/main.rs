@@ -202,7 +202,7 @@ pub struct Cli {
     )]
     pub output_format: OutputFormat,
 
-    /// Output only core fields (timestamp, level, message) plus any explicitly specified --keys
+    /// Output only core fields (ts, level, message) plus any explicitly specified --keys
     #[arg(short = 'm', long = "core", help_heading = "Output Options")]
     pub core: bool,
 

@@ -326,7 +326,7 @@ mod tests {
         // Core fields should be extracted
         assert_eq!(result.level, Some("error".to_string()));
         assert_eq!(result.message, Some("Connection failed".to_string()));
-        assert!(result.timestamp.is_some());
+        assert!(result.ts.is_some());
 
         // Other fields should be available
         assert_eq!(

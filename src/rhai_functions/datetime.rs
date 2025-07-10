@@ -109,12 +109,12 @@ impl fmt::Display for DurationWrapper {
 
 // Thread-local adaptive parser for Rhai timestamp parsing
 thread_local! {
-    static RHAI_TIMESTAMP_PARSER: RefCell<crate::timestamp::AdaptiveTimestampParser> = 
-        RefCell::new(crate::timestamp::AdaptiveTimestampParser::new());
+    static RHAI_TS_PARSER: RefCell<crate::timestamp::AdaptiveTsParser> = 
+        RefCell::new(crate::timestamp::AdaptiveTsParser::new());
 }
 
 /// Parse timestamp with optional format and timezone
-pub fn parse_timestamp(
+pub fn parse_ts(
     s: &str,
     format: Option<&str>,
     tz: Option<&str>,
@@ -145,8 +145,8 @@ pub fn parse_timestamp(
     }
 
     // For auto-parsing (no explicit format), use the adaptive parser
-    let parsed_utc = RHAI_TIMESTAMP_PARSER.with(|parser| {
-        parser.borrow_mut().parse_timestamp(s)
+    let parsed_utc = RHAI_TS_PARSER.with(|parser| {
+        parser.borrow_mut().parse_ts(s)
     });
 
     if let Some(utc_dt) = parsed_utc {
@@ -166,7 +166,7 @@ pub fn parse_timestamp(
 }
 
 /// Parse duration from string like "1h 30m", "2d", etc.
-pub fn parse_duration(s: &str) -> Result<DurationWrapper, Box<EvalAltResult>> {
+pub fn parse_dur(s: &str) -> Result<DurationWrapper, Box<EvalAltResult>> {
     let mut total_duration = Duration::zero();
     let mut current_number = String::new();
     let mut found_unit = false;
@@ -228,41 +228,41 @@ pub fn parse_duration(s: &str) -> Result<DurationWrapper, Box<EvalAltResult>> {
 pub fn register_functions(engine: &mut Engine) {
     // Parsing functions
     engine.register_fn(
-        "parse_timestamp",
-        |s: &str| -> Result<DateTimeWrapper, Box<EvalAltResult>> { parse_timestamp(s, None, None) },
+        "parse_ts",
+        |s: &str| -> Result<DateTimeWrapper, Box<EvalAltResult>> { parse_ts(s, None, None) },
     );
 
     engine.register_fn(
-        "parse_timestamp",
+        "parse_ts",
         |s: &str, format: &str| -> Result<DateTimeWrapper, Box<EvalAltResult>> {
-            parse_timestamp(s, Some(format), None)
+            parse_ts(s, Some(format), None)
         },
     );
 
     engine.register_fn(
-        "parse_timestamp",
+        "parse_ts",
         |s: &str, format: &str, tz: &str| -> Result<DateTimeWrapper, Box<EvalAltResult>> {
-            parse_timestamp(s, Some(format), Some(tz))
+            parse_ts(s, Some(format), Some(tz))
         },
     );
 
-    engine.register_fn("parse_duration", parse_duration);
+    engine.register_fn("parse_dur", parse_dur);
 
     // Current time helpers
     engine.register_fn("now_utc", || DateTimeWrapper::from_utc(Utc::now()));
     engine.register_fn("now_local", || DateTimeWrapper::from_local(Local::now()));
 
     // Duration creation functions
-    engine.register_fn("duration_from_seconds", DurationWrapper::from_seconds);
-    engine.register_fn("duration_from_minutes", DurationWrapper::from_minutes);
-    engine.register_fn("duration_from_hours", DurationWrapper::from_hours);
-    engine.register_fn("duration_from_days", DurationWrapper::from_days);
+    engine.register_fn("dur_from_seconds", DurationWrapper::from_seconds);
+    engine.register_fn("dur_from_minutes", DurationWrapper::from_minutes);
+    engine.register_fn("dur_from_hours", DurationWrapper::from_hours);
+    engine.register_fn("dur_from_days", DurationWrapper::from_days);
     engine.register_fn(
-        "duration_from_milliseconds",
+        "dur_from_milliseconds",
         DurationWrapper::from_milliseconds,
     );
     engine.register_fn(
-        "duration_from_nanoseconds",
+        "dur_from_nanoseconds",
         DurationWrapper::from_nanoseconds,
     );
 
@@ -308,7 +308,7 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("second", |dt: &mut DateTimeWrapper| {
         dt.inner.second() as i64
     });
-    engine.register_fn("timestamp_nanos", |dt: &mut DateTimeWrapper| {
+    engine.register_fn("ts_nanos", |dt: &mut DateTimeWrapper| {
         dt.inner.timestamp_nanos_opt().unwrap_or(0)
     });
     engine.register_fn("timezone_name", |dt: &mut DateTimeWrapper| {
@@ -429,24 +429,24 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_timestamp_edge_cases() {
+    fn test_parse_ts_edge_cases() {
         // Test empty string
-        assert!(parse_timestamp("", None, None).is_err());
+        assert!(parse_ts("", None, None).is_err());
 
         // Test invalid formats
-        assert!(parse_timestamp("not-a-date", None, None).is_err());
-        assert!(parse_timestamp("2023-13-01T12:00:00Z", None, None).is_err()); // Invalid month
-        assert!(parse_timestamp("2023-02-30T12:00:00Z", None, None).is_err()); // Invalid day
+        assert!(parse_ts("not-a-date", None, None).is_err());
+        assert!(parse_ts("2023-13-01T12:00:00Z", None, None).is_err()); // Invalid month
+        assert!(parse_ts("2023-02-30T12:00:00Z", None, None).is_err()); // Invalid day
 
         // Test valid edge cases
-        assert!(parse_timestamp("2023-01-01T00:00:00Z", None, None).is_ok());
-        assert!(parse_timestamp("2023-12-31T23:59:59Z", None, None).is_ok());
+        assert!(parse_ts("2023-01-01T00:00:00Z", None, None).is_ok());
+        assert!(parse_ts("2023-12-31T23:59:59Z", None, None).is_ok());
     }
 
     #[test]
-    fn test_parse_timestamp_with_explicit_format() {
+    fn test_parse_ts_with_explicit_format() {
         // Test custom format parsing
-        let result = parse_timestamp("2023/07/04 12:34:56", Some("%Y/%m/%d %H:%M:%S"), None);
+        let result = parse_ts("2023/07/04 12:34:56", Some("%Y/%m/%d %H:%M:%S"), None);
         assert!(result.is_ok());
         let dt = result.unwrap();
         assert_eq!(dt.inner.year(), 2023);
@@ -454,13 +454,13 @@ mod tests {
         assert_eq!(dt.inner.day(), 4);
 
         // Test invalid format with explicit format
-        assert!(parse_timestamp("2023-07-04", Some("%Y/%m/%d"), None).is_err());
+        assert!(parse_ts("2023-07-04", Some("%Y/%m/%d"), None).is_err());
     }
 
     #[test]
-    fn test_parse_timestamp_with_timezone() {
+    fn test_parse_ts_with_timezone() {
         // Test parsing with valid timezone
-        let result = parse_timestamp(
+        let result = parse_ts(
             "2023-07-04 12:34:56",
             Some("%Y-%m-%d %H:%M:%S"),
             Some("UTC"),
@@ -468,7 +468,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Test parsing with invalid timezone
-        let result = parse_timestamp(
+        let result = parse_ts(
             "2023-07-04 12:34:56",
             Some("%Y-%m-%d %H:%M:%S"),
             Some("INVALID"),
@@ -477,46 +477,46 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_duration_edge_cases() {
+    fn test_parse_dur_edge_cases() {
         // Test empty string
-        assert!(parse_duration("").is_err());
+        assert!(parse_dur("").is_err());
 
         // Test invalid characters
-        assert!(parse_duration("1x").is_err());
-        assert!(parse_duration("1h@30m").is_err());
+        assert!(parse_dur("1x").is_err());
+        assert!(parse_dur("1h@30m").is_err());
 
         // Test invalid numbers
-        assert!(parse_duration("ah").is_err());
+        assert!(parse_dur("ah").is_err());
 
         // Test zero duration
-        assert!(parse_duration("0s").is_ok());
+        assert!(parse_dur("0s").is_ok());
 
         // Test complex valid durations
-        assert!(parse_duration("1d 2h 3m 4s").is_ok());
-        assert!(parse_duration("100h").is_ok());
+        assert!(parse_dur("1d 2h 3m 4s").is_ok());
+        assert!(parse_dur("100h").is_ok());
     }
 
     #[test]
-    fn test_parse_duration_various_formats() {
+    fn test_parse_dur_various_formats() {
         // Test single units
-        let dur_s = parse_duration("30s").unwrap();
+        let dur_s = parse_dur("30s").unwrap();
         assert_eq!(dur_s.inner.num_seconds(), 30);
 
-        let dur_m = parse_duration("5m").unwrap();
+        let dur_m = parse_dur("5m").unwrap();
         assert_eq!(dur_m.inner.num_minutes(), 5);
 
-        let dur_h = parse_duration("2h").unwrap();
+        let dur_h = parse_dur("2h").unwrap();
         assert_eq!(dur_h.inner.num_hours(), 2);
 
-        let dur_d = parse_duration("3d").unwrap();
+        let dur_d = parse_dur("3d").unwrap();
         assert_eq!(dur_d.inner.num_days(), 3);
 
         // Test mixed units
-        let dur_mixed = parse_duration("1h 30m").unwrap();
+        let dur_mixed = parse_dur("1h 30m").unwrap();
         assert_eq!(dur_mixed.inner.num_minutes(), 90);
 
         // Test with extra spaces
-        let dur_spaced = parse_duration("  1h   30m  ").unwrap();
+        let dur_spaced = parse_dur("  1h   30m  ").unwrap();
         assert_eq!(dur_spaced.inner.num_minutes(), 90);
     }
 
@@ -532,7 +532,7 @@ mod tests {
 
     #[test]
     fn test_datetime_wrapper_display() {
-        let dt = parse_timestamp("2023-07-04T12:34:56Z", None, None).unwrap();
+        let dt = parse_ts("2023-07-04T12:34:56Z", None, None).unwrap();
         let display_str = dt.to_string();
         assert!(display_str.contains("2023-07-04"));
         assert!(display_str.contains("12:34:56"));
@@ -540,7 +540,7 @@ mod tests {
 
     #[test]
     fn test_datetime_component_access() {
-        let dt = parse_timestamp("2023-07-04T12:34:56Z", None, None).unwrap();
+        let dt = parse_ts("2023-07-04T12:34:56Z", None, None).unwrap();
         assert_eq!(dt.inner.year(), 2023);
         assert_eq!(dt.inner.month(), 7);
         assert_eq!(dt.inner.day(), 4);
@@ -563,26 +563,26 @@ mod tests {
     #[test]
     fn test_rfc3339_and_rfc2822_parsing() {
         // RFC3339
-        let rfc3339_result = parse_timestamp("2023-07-04T12:34:56+00:00", None, None);
+        let rfc3339_result = parse_ts("2023-07-04T12:34:56+00:00", None, None);
         assert!(rfc3339_result.is_ok());
 
         // RFC2822
-        let rfc2822_result = parse_timestamp("Tue, 04 Jul 2023 12:34:56 +0000", None, None);
+        let rfc2822_result = parse_ts("Tue, 04 Jul 2023 12:34:56 +0000", None, None);
         assert!(rfc2822_result.is_ok());
     }
 
     #[test]
     fn test_standard_format_parsing() {
         // Apache log format
-        let apache_result = parse_timestamp("04/Jul/2023:12:34:56 +0000", None, None);
+        let apache_result = parse_ts("04/Jul/2023:12:34:56 +0000", None, None);
         assert!(apache_result.is_ok());
 
         // Common log format
-        let common_result = parse_timestamp("2023-07-04 12:34:56", None, None);
+        let common_result = parse_ts("2023-07-04 12:34:56", None, None);
         assert!(common_result.is_ok());
 
         // ISO 8601 variants
-        let iso_result = parse_timestamp("2023-07-04T12:34:56.123Z", None, None);
+        let iso_result = parse_ts("2023-07-04T12:34:56.123Z", None, None);
         assert!(iso_result.is_ok());
     }
 
@@ -600,22 +600,22 @@ mod tests {
     #[test]
     fn test_boundary_conditions() {
         // Test leap year
-        let leap_year_result = parse_timestamp("2024-02-29T12:00:00Z", None, None);
+        let leap_year_result = parse_ts("2024-02-29T12:00:00Z", None, None);
         assert!(leap_year_result.is_ok());
 
         // Test non-leap year (should fail)
-        let non_leap_result = parse_timestamp("2023-02-29T12:00:00Z", None, None);
+        let non_leap_result = parse_ts("2023-02-29T12:00:00Z", None, None);
         assert!(non_leap_result.is_err());
 
         // Test year boundaries
-        let y2k_result = parse_timestamp("2000-01-01T00:00:00Z", None, None);
+        let y2k_result = parse_ts("2000-01-01T00:00:00Z", None, None);
         assert!(y2k_result.is_ok());
     }
 
     #[test]
     fn test_unix_timestamp_parsing() {
         // Test Unix timestamp in seconds (10 digits)
-        let unix_seconds = parse_timestamp("1735566123", None, None);
+        let unix_seconds = parse_ts("1735566123", None, None);
         assert!(unix_seconds.is_ok());
         let dt = unix_seconds.unwrap();
         assert_eq!(dt.inner.year(), 2024);
@@ -623,7 +623,7 @@ mod tests {
         assert_eq!(dt.inner.day(), 30);
 
         // Test Unix timestamp in milliseconds (13 digits)
-        let unix_millis = parse_timestamp("1735566123000", None, None);
+        let unix_millis = parse_ts("1735566123000", None, None);
         assert!(unix_millis.is_ok());
         let dt = unix_millis.unwrap();
         assert_eq!(dt.inner.year(), 2024);
@@ -631,7 +631,7 @@ mod tests {
         assert_eq!(dt.inner.day(), 30);
 
         // Test Unix timestamp in microseconds (16 digits)
-        let unix_micros = parse_timestamp("1735566123000000", None, None);
+        let unix_micros = parse_ts("1735566123000000", None, None);
         assert!(unix_micros.is_ok());
         let dt = unix_micros.unwrap();
         assert_eq!(dt.inner.year(), 2024);
@@ -639,7 +639,7 @@ mod tests {
         assert_eq!(dt.inner.day(), 30);
 
         // Test Unix timestamp in nanoseconds (19 digits)
-        let unix_nanos = parse_timestamp("1735566123000000000", None, None);
+        let unix_nanos = parse_ts("1735566123000000000", None, None);
         assert!(unix_nanos.is_ok());
         let dt = unix_nanos.unwrap();
         assert_eq!(dt.inner.year(), 2024);
@@ -647,18 +647,18 @@ mod tests {
         assert_eq!(dt.inner.day(), 30);
 
         // Test invalid Unix timestamp (wrong length)
-        let invalid_unix = parse_timestamp("12345", None, None);
+        let invalid_unix = parse_ts("12345", None, None);
         assert!(invalid_unix.is_err());
 
         // Test Unix timestamp with non-numeric characters
-        let invalid_chars = parse_timestamp("1735566123a", None, None);
+        let invalid_chars = parse_ts("1735566123a", None, None);
         assert!(invalid_chars.is_err());
     }
 
     #[test]
     fn test_new_timestamp_formats() {
         // Test Python logging format with comma separator
-        let python_result = parse_timestamp("2023-07-04 12:34:56,123", None, None);
+        let python_result = parse_ts("2023-07-04 12:34:56,123", None, None);
         assert!(python_result.is_ok());
         let dt = python_result.unwrap();
         assert_eq!(dt.inner.year(), 2023);
@@ -672,7 +672,7 @@ mod tests {
         // in automatic parsing due to month/day ambiguity. Use explicit format instead.
 
         // Test MySQL legacy format
-        let mysql_result = parse_timestamp("230704 12:34:56", None, None);
+        let mysql_result = parse_ts("230704 12:34:56", None, None);
         assert!(mysql_result.is_ok());
         let dt = mysql_result.unwrap();
         assert_eq!(dt.inner.year(), 2023);
@@ -683,7 +683,7 @@ mod tests {
         assert_eq!(dt.inner.second(), 56);
 
         // Test Nginx error log format
-        let nginx_result = parse_timestamp("2023/07/04 12:34:56", None, None);
+        let nginx_result = parse_ts("2023/07/04 12:34:56", None, None);
         assert!(nginx_result.is_ok());
         let dt = nginx_result.unwrap();
         assert_eq!(dt.inner.year(), 2023);
@@ -694,7 +694,7 @@ mod tests {
         assert_eq!(dt.inner.second(), 56);
 
         // Test BSD syslog with year
-        let bsd_result = parse_timestamp("Jul 04 2023 12:34:56", None, None);
+        let bsd_result = parse_ts("Jul 04 2023 12:34:56", None, None);
         assert!(bsd_result.is_ok());
         let dt = bsd_result.unwrap();
         assert_eq!(dt.inner.year(), 2023);
@@ -705,7 +705,7 @@ mod tests {
         assert_eq!(dt.inner.second(), 56);
 
         // Test Java SimpleDateFormat
-        let java_result = parse_timestamp("Jul 04, 2023 12:34:56 PM", None, None);
+        let java_result = parse_ts("Jul 04, 2023 12:34:56 PM", None, None);
         assert!(java_result.is_ok());
         let dt = java_result.unwrap();
         assert_eq!(dt.inner.year(), 2023);
@@ -716,7 +716,7 @@ mod tests {
         assert_eq!(dt.inner.second(), 56);
 
         // Test German format with dots
-        let german_result = parse_timestamp("04.07.2023 12:34:56", None, None);
+        let german_result = parse_ts("04.07.2023 12:34:56", None, None);
         assert!(german_result.is_ok());
         let dt = german_result.unwrap();
         assert_eq!(dt.inner.year(), 2023);
@@ -730,7 +730,7 @@ mod tests {
     #[test]
     fn test_klp_inspired_formats() {
         // Test space-separated ISO 8601 with fractional seconds and Z
-        let space_iso_frac_z = parse_timestamp("2023-07-04 12:34:56.123Z", None, None);
+        let space_iso_frac_z = parse_ts("2023-07-04 12:34:56.123Z", None, None);
         assert!(space_iso_frac_z.is_ok());
         let dt = space_iso_frac_z.unwrap();
         assert_eq!(dt.inner.year(), 2023);
@@ -741,7 +741,7 @@ mod tests {
         assert_eq!(dt.inner.second(), 56);
 
         // Test space-separated ISO 8601 without fractional seconds but with Z
-        let space_iso_z = parse_timestamp("2023-07-04 12:34:56Z", None, None);
+        let space_iso_z = parse_ts("2023-07-04 12:34:56Z", None, None);
         assert!(space_iso_z.is_ok());
         let dt = space_iso_z.unwrap();
         assert_eq!(dt.inner.year(), 2023);
@@ -752,7 +752,7 @@ mod tests {
         assert_eq!(dt.inner.second(), 56);
 
         // Test space-separated ISO 8601 with timezone offset
-        let space_iso_tz = parse_timestamp("2023-07-04 12:34:56+0000", None, None);
+        let space_iso_tz = parse_ts("2023-07-04 12:34:56+0000", None, None);
         assert!(space_iso_tz.is_ok());
         let dt = space_iso_tz.unwrap();
         assert_eq!(dt.inner.year(), 2023);
@@ -763,7 +763,7 @@ mod tests {
         assert_eq!(dt.inner.second(), 56);
 
         // Test space-separated ISO 8601 with fractional seconds and timezone
-        let space_iso_frac_tz = parse_timestamp("2023-07-04 12:34:56.123+0000", None, None);
+        let space_iso_frac_tz = parse_ts("2023-07-04 12:34:56.123+0000", None, None);
         assert!(space_iso_frac_tz.is_ok());
         let dt = space_iso_frac_tz.unwrap();
         assert_eq!(dt.inner.year(), 2023);
@@ -775,7 +775,7 @@ mod tests {
 
         // Test classic Unix timestamp with weekday
         // July 4th, 2023 was a Tuesday
-        let unix_weekday = parse_timestamp("Tue Jul 04 12:34:56 2023", None, None);
+        let unix_weekday = parse_ts("Tue Jul 04 12:34:56 2023", None, None);
         assert!(unix_weekday.is_ok());
         let dt = unix_weekday.unwrap();
         assert_eq!(dt.inner.year(), 2023);
@@ -789,7 +789,7 @@ mod tests {
     #[test]
     fn test_oracle_format_parsing() {
         // Test Oracle format - this one is complex and may need adjustment
-        let oracle_result = parse_timestamp("04-JUL-23 12:34:56.123 PM", None, None);
+        let oracle_result = parse_ts("04-JUL-23 12:34:56.123 PM", None, None);
         assert!(oracle_result.is_ok());
         let dt = oracle_result.unwrap();
         assert_eq!(dt.inner.year(), 2023);
@@ -802,11 +802,11 @@ mod tests {
 
     #[test]
     fn test_adaptive_parsing_in_rhai() {
-        // Test that the Rhai parse_timestamp function benefits from adaptive parsing
+        // Test that the Rhai parse_ts function benefits from adaptive parsing
         // by parsing similar formats multiple times
         
         // First parse - should learn the format
-        let result1 = parse_timestamp("2023-07-04 12:34:56", None, None);
+        let result1 = parse_ts("2023-07-04 12:34:56", None, None);
         assert!(result1.is_ok());
         let dt1 = result1.unwrap();
         assert_eq!(dt1.inner.year(), 2023);
@@ -814,7 +814,7 @@ mod tests {
         assert_eq!(dt1.inner.day(), 4);
         
         // Second parse with same format - should be faster due to learning
-        let result2 = parse_timestamp("2023-07-05 13:45:07", None, None);
+        let result2 = parse_ts("2023-07-05 13:45:07", None, None);
         assert!(result2.is_ok());
         let dt2 = result2.unwrap();
         assert_eq!(dt2.inner.year(), 2023);
@@ -822,7 +822,7 @@ mod tests {
         assert_eq!(dt2.inner.day(), 5);
         
         // Third parse with same format - should still work efficiently
-        let result3 = parse_timestamp("2023-07-06 14:56:08", None, None);
+        let result3 = parse_ts("2023-07-06 14:56:08", None, None);
         assert!(result3.is_ok());
         let dt3 = result3.unwrap();
         assert_eq!(dt3.inner.year(), 2023);
@@ -833,7 +833,7 @@ mod tests {
     #[test]
     fn test_explicit_format_for_ambiguous_dates() {
         // Test US format (M/D/YYYY) with explicit format
-        let us_result = parse_timestamp("7/4/2023 12:34:56 PM", Some("%m/%d/%Y %I:%M:%S %p"), None);
+        let us_result = parse_ts("7/4/2023 12:34:56 PM", Some("%m/%d/%Y %I:%M:%S %p"), None);
         assert!(us_result.is_ok());
         let dt = us_result.unwrap();
         assert_eq!(dt.inner.year(), 2023);
@@ -842,7 +842,7 @@ mod tests {
         assert_eq!(dt.inner.hour(), 12);
 
         // Test European format (D/M/YYYY) with explicit format
-        let eu_result = parse_timestamp("7/4/2023 12:34:56", Some("%d/%m/%Y %H:%M:%S"), None);
+        let eu_result = parse_ts("7/4/2023 12:34:56", Some("%d/%m/%Y %H:%M:%S"), None);
         assert!(eu_result.is_ok());
         let dt = eu_result.unwrap();
         assert_eq!(dt.inner.year(), 2023);
@@ -851,11 +851,11 @@ mod tests {
         assert_eq!(dt.inner.hour(), 12);
 
         // Test that ambiguous formats fail without explicit format
-        let ambiguous_result = parse_timestamp("7/4/2023 12:34:56 PM", None, None);
+        let ambiguous_result = parse_ts("7/4/2023 12:34:56 PM", None, None);
         assert!(ambiguous_result.is_err(), "Ambiguous date format should fail without explicit format");
 
         // Test Windows Event Log format variations with explicit format
-        let windows_us = parse_timestamp("12/31/2023 11:59:59 PM", Some("%m/%d/%Y %I:%M:%S %p"), None);
+        let windows_us = parse_ts("12/31/2023 11:59:59 PM", Some("%m/%d/%Y %I:%M:%S %p"), None);
         assert!(windows_us.is_ok());
         let dt = windows_us.unwrap();
         assert_eq!(dt.inner.year(), 2023);
@@ -867,10 +867,10 @@ mod tests {
     #[test]
     fn test_unix_timestamp_edge_cases() {
         // Test earliest Unix timestamp (1970-01-01 00:00:00)
-        let epoch_result = parse_timestamp("0", None, None);
+        let epoch_result = parse_ts("0", None, None);
         assert!(epoch_result.is_err()); // Single digit should fail
 
-        let epoch_result = parse_timestamp("0000000000", None, None);
+        let epoch_result = parse_ts("0000000000", None, None);
         assert!(epoch_result.is_ok());
         let dt = epoch_result.unwrap();
         assert_eq!(dt.inner.year(), 1970);
@@ -878,7 +878,7 @@ mod tests {
         assert_eq!(dt.inner.day(), 1);
 
         // Test year 2038 problem boundary
-        let y2038_result = parse_timestamp("2147483647", None, None);
+        let y2038_result = parse_ts("2147483647", None, None);
         assert!(y2038_result.is_ok());
         let dt = y2038_result.unwrap();
         assert_eq!(dt.inner.year(), 2038);
@@ -886,7 +886,7 @@ mod tests {
         assert_eq!(dt.inner.day(), 19);
 
         // Test millisecond precision
-        let millis_result = parse_timestamp("1735566123456", None, None);
+        let millis_result = parse_ts("1735566123456", None, None);
         assert!(millis_result.is_ok());
         let dt = millis_result.unwrap();
         assert_eq!(dt.inner.year(), 2024);
