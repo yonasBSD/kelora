@@ -60,7 +60,7 @@ pub const MESSAGE_FIELD_NAMES: &[&str] = &[
 pub struct Event {
     pub ts: Option<DateTime<Utc>>,
     pub level: Option<String>,
-    pub message: Option<String>,
+    pub msg: Option<String>,
     pub fields: IndexMap<String, Dynamic>,
     pub original_line: String,
     pub line_number: Option<usize>,
@@ -84,7 +84,7 @@ impl Event {
         Self {
             ts: None,
             level: None,
-            message: None,
+            msg: None,
             fields: IndexMap::with_capacity(capacity),
             original_line,
             line_number: None,
@@ -169,11 +169,11 @@ impl Event {
         }
 
         // Extract message with comprehensive field recognition
-        if self.message.is_none() {
+        if self.msg.is_none() {
             for msg_key in MESSAGE_FIELD_NAMES {
                 if let Some(value) = self.fields.get(*msg_key) {
                     if let Ok(msg_str) = value.clone().into_string() {
-                        self.message = Some(msg_str);
+                        self.msg = Some(msg_str);
                         break;
                     }
                 }

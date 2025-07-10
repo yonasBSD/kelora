@@ -80,7 +80,7 @@ mod tests {
 
         // No core fields should be extracted automatically
         assert_eq!(result.level, None);
-        assert_eq!(result.message, None);
+        assert_eq!(result.msg, None);
         assert_eq!(result.ts, None);
     }
 

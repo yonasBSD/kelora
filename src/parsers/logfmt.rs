@@ -154,7 +154,7 @@ mod tests {
             EventParser::parse(&parser, r#"level=info message="test message" count=42"#).unwrap();
 
         assert_eq!(result.level, Some("info".to_string()));
-        assert_eq!(result.message, Some("test message".to_string()));
+        assert_eq!(result.msg, Some("test message".to_string()));
         assert!(result.fields.get("count").is_some());
         assert_eq!(result.fields.get("count").unwrap().as_int().unwrap(), 42);
     }
@@ -325,7 +325,7 @@ mod tests {
 
         // Core fields should be extracted
         assert_eq!(result.level, Some("error".to_string()));
-        assert_eq!(result.message, Some("Connection failed".to_string()));
+        assert_eq!(result.msg, Some("Connection failed".to_string()));
         assert!(result.ts.is_some());
 
         // Other fields should be available

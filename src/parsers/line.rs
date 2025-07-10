@@ -52,7 +52,7 @@ mod tests {
 
         // No core fields should be extracted from plain text
         assert_eq!(result.level, None);
-        assert_eq!(result.message, None);
+        assert_eq!(result.msg, None);
         assert_eq!(result.ts, None);
     }
 
@@ -80,6 +80,6 @@ mod tests {
 
         // Line parser doesn't extract core fields
         assert_eq!(result.level, None);
-        assert_eq!(result.message, None);
+        assert_eq!(result.msg, None);
     }
 }

@@ -605,7 +605,7 @@ mod tests {
         let mut event = Event::default();
         event.set_field("level".to_string(), Dynamic::from("INFO".to_string()));
         event.set_field(
-            "message".to_string(),
+            "msg".to_string(),
             Dynamic::from("Test message".to_string()),
         );
         event.set_field("user".to_string(), Dynamic::from("alice".to_string()));
@@ -615,7 +615,7 @@ mod tests {
         let result = formatter.format(&event);
 
         assert!(result.contains("\"level\":\"INFO\""));
-        assert!(result.contains("\"message\":\"Test message\""));
+        assert!(result.contains("\"msg\":\"Test message\""));
         assert!(result.contains("\"user\":\"alice\""));
         assert!(result.contains("\"status\":200"));
     }
@@ -644,7 +644,7 @@ mod tests {
         let mut event = Event::default();
         event.set_field("level".to_string(), Dynamic::from("info".to_string()));
         event.set_field(
-            "message".to_string(),
+            "msg".to_string(),
             Dynamic::from("test message".to_string()),
         );
 
@@ -660,7 +660,7 @@ mod tests {
         let mut event = Event::default();
         event.set_field("level".to_string(), Dynamic::from("INFO".to_string()));
         event.set_field(
-            "message".to_string(),
+            "msg".to_string(),
             Dynamic::from("Test message".to_string()),
         );
         event.set_field("user".to_string(), Dynamic::from("alice".to_string()));
@@ -671,7 +671,7 @@ mod tests {
 
         // Should properly quote strings with spaces, leave numbers unquoted
         assert!(result.contains("level=INFO"));
-        assert!(result.contains("message=\"Test message\""));
+        assert!(result.contains("msg=\"Test message\""));
         assert!(result.contains("user=alice"));
         assert!(result.contains("status=200"));
         // Fields should be space-separated
@@ -796,7 +796,7 @@ mod tests {
         let mut event = Event::default();
         event.set_field("level".to_string(), Dynamic::from("INFO".to_string()));
         event.set_field(
-            "message".to_string(),
+            "msg".to_string(),
             Dynamic::from("Test message".to_string()),
         );
         event.set_field("user".to_string(), Dynamic::from("alice".to_string()));
@@ -820,7 +820,7 @@ mod tests {
         let mut event = Event::default();
         event.set_field("level".to_string(), Dynamic::from("ERROR".to_string()));
         event.set_field(
-            "message".to_string(),
+            "msg".to_string(),
             Dynamic::from("Critical error".to_string()),
         );
 
@@ -880,13 +880,13 @@ mod tests {
 
     #[test]
     fn test_csv_formatter_with_quoting() {
-        let keys = vec!["name".to_string(), "message".to_string()];
+        let keys = vec!["name".to_string(), "msg".to_string()];
         let formatter = CsvFormatter::new(keys);
 
         let mut event = Event::default();
         event.set_field("name".to_string(), Dynamic::from("Smith, John".to_string()));
         event.set_field(
-            "message".to_string(),
+            "msg".to_string(),
             Dynamic::from("He said \"hello\"".to_string()),
         );
 
