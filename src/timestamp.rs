@@ -52,12 +52,14 @@ impl AdaptiveTimestampParser {
         None
     }
 
-    /// Reset the format ordering to initial state
+    /// Reset the format ordering to initial state (for testing/debugging)
+    #[allow(dead_code)]
     pub fn reset_ordering(&mut self) {
         self.formats = get_initial_timestamp_formats();
     }
 
     /// Get current format ordering (for debugging/monitoring)
+    #[allow(dead_code)]
     pub fn get_format_ordering(&self) -> Vec<String> {
         self.formats.clone()
     }
@@ -162,7 +164,8 @@ fn get_initial_timestamp_formats() -> Vec<String> {
 pub struct TimestampConfig {
     /// Custom timestamp field name (overrides auto-detection)
     pub custom_field: Option<String>,
-    /// Whether to automatically parse timestamps from events
+    /// Whether to automatically parse timestamps from events (reserved for future features)
+    #[allow(dead_code)]
     pub auto_parse: bool,
 }
 

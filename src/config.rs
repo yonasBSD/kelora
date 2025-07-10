@@ -19,6 +19,8 @@ pub struct InputConfig {
     pub skip_lines: usize,
     pub ignore_lines: Option<regex::Regex>,
     pub multiline: Option<MultilineConfig>,
+    /// Custom timestamp field name (reserved for --since/--until features)
+    #[allow(dead_code)]
     pub ts_field: Option<String>,
 }
 
