@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 
 /// Adaptive timestamp parser that dynamically reorders formats based on success
 /// Each thread should have its own instance to avoid contention
@@ -17,7 +17,40 @@ impl AdaptiveTsParser {
     /// Parse timestamp using adaptive format ordering
     /// Successful formats are moved to front of the list for faster future parsing
     pub fn parse_ts(&mut self, ts_str: &str) -> Option<DateTime<Utc>> {
-        // Try Unix timestamp parsing for numeric-only strings first
+        let ts_str = ts_str.trim();
+
+        // Handle special values (journalctl-compatible)
+        match ts_str {
+            "now" => return Some(Utc::now()),
+            "today" => {
+                let local_today = Local::now().date_naive();
+                if let Some(naive_datetime) = local_today.and_hms_opt(0, 0, 0) {
+                    return Some(naive_datetime.and_utc());
+                }
+            }
+            "yesterday" => {
+                let local_yesterday = Local::now().date_naive() - chrono::Duration::days(1);
+                if let Some(naive_datetime) = local_yesterday.and_hms_opt(0, 0, 0) {
+                    return Some(naive_datetime.and_utc());
+                }
+            }
+            "tomorrow" => {
+                let local_tomorrow = Local::now().date_naive() + chrono::Duration::days(1);
+                if let Some(naive_datetime) = local_tomorrow.and_hms_opt(0, 0, 0) {
+                    return Some(naive_datetime.and_utc());
+                }
+            }
+            _ => {}
+        }
+
+        // Handle relative times (e.g., "-1h", "+30m", "-2d")
+        if ts_str.starts_with('-') || ts_str.starts_with('+') {
+            if let Ok(dt) = parse_relative_time(ts_str) {
+                return Some(dt);
+            }
+        }
+
+        // Try Unix timestamp parsing for numeric-only strings
         if ts_str.chars().all(|c| c.is_ascii_digit()) {
             if let Some(parsed) = try_parse_unix_timestamp(ts_str) {
                 return Some(parsed);
@@ -30,6 +63,16 @@ impl AdaptiveTsParser {
         }
         if let Ok(dt) = DateTime::parse_from_rfc2822(ts_str) {
             return Some(dt.with_timezone(&Utc));
+        }
+
+        // Try date-only formats and assume 00:00:00
+        if let Some(dt) = parse_date_only(ts_str) {
+            return Some(dt);
+        }
+
+        // Try time-only formats and assume today's date
+        if let Some(dt) = parse_time_only(ts_str) {
+            return Some(dt);
         }
 
         // Try format list with adaptive reordering
@@ -200,6 +243,98 @@ pub fn identify_timestamp_field(
     None
 }
 
+/// Parse timestamp arguments (--since, --until) in journalctl-compatible format
+/// Uses the enhanced adaptive parser with journalctl support
+pub fn parse_timestamp_arg(arg: &str) -> Result<DateTime<Utc>, String> {
+    let mut parser = AdaptiveTsParser::new();
+    parser
+        .parse_ts(arg)
+        .ok_or_else(|| format!("Could not parse timestamp: {}", arg))
+}
+
+/// Parse relative time expressions like "-1h", "+30m", "-2d"
+fn parse_relative_time(arg: &str) -> Result<DateTime<Utc>, String> {
+    let (sign, rest) = if let Some(stripped) = arg.strip_prefix('-') {
+        (-1, stripped)
+    } else if let Some(stripped) = arg.strip_prefix('+') {
+        (1, stripped)
+    } else {
+        return Err("Relative time must start with + or -".to_string());
+    };
+
+    if rest.is_empty() {
+        return Err("Empty relative time".to_string());
+    }
+
+    // Parse number and unit
+    let (num_str, unit) = if let Some(pos) = rest.find(|c: char| c.is_alphabetic()) {
+        (&rest[..pos], &rest[pos..])
+    } else {
+        return Err("Relative time must have a unit (h, m, d, etc.)".to_string());
+    };
+
+    let num: i64 = num_str
+        .parse()
+        .map_err(|_| "Invalid number in relative time")?;
+    let signed_num = sign * num;
+
+    let duration = match unit {
+        "s" | "sec" | "secs" | "second" | "seconds" => chrono::Duration::seconds(signed_num),
+        "m" | "min" | "mins" | "minute" | "minutes" => chrono::Duration::minutes(signed_num),
+        "h" | "hour" | "hours" => chrono::Duration::hours(signed_num),
+        "d" | "day" | "days" => chrono::Duration::days(signed_num),
+        "w" | "week" | "weeks" => chrono::Duration::weeks(signed_num),
+        _ => return Err(format!("Unknown time unit: {}", unit)),
+    };
+
+    Ok(Utc::now() + duration)
+}
+
+/// Parse date-only strings and assume 00:00:00
+fn parse_date_only(arg: &str) -> Option<DateTime<Utc>> {
+    // Try YYYY-MM-DD format
+    if let Ok(date) = chrono::NaiveDate::parse_from_str(arg, "%Y-%m-%d") {
+        if let Some(naive_dt) = date.and_hms_opt(0, 0, 0) {
+            return Some(naive_dt.and_utc());
+        }
+    }
+
+    // Try MM/DD/YYYY format
+    if let Ok(date) = chrono::NaiveDate::parse_from_str(arg, "%m/%d/%Y") {
+        if let Some(naive_dt) = date.and_hms_opt(0, 0, 0) {
+            return Some(naive_dt.and_utc());
+        }
+    }
+
+    // Try DD.MM.YYYY format
+    if let Ok(date) = chrono::NaiveDate::parse_from_str(arg, "%d.%m.%Y") {
+        if let Some(naive_dt) = date.and_hms_opt(0, 0, 0) {
+            return Some(naive_dt.and_utc());
+        }
+    }
+
+    None
+}
+
+/// Parse time-only strings and assume today's date
+fn parse_time_only(arg: &str) -> Option<DateTime<Utc>> {
+    let today = Local::now().date_naive();
+
+    // Try HH:MM:SS format
+    if let Ok(time) = chrono::NaiveTime::parse_from_str(arg, "%H:%M:%S") {
+        let naive_dt = today.and_time(time);
+        return Some(naive_dt.and_utc());
+    }
+
+    // Try HH:MM format (assume :00 seconds)
+    if let Ok(time) = chrono::NaiveTime::parse_from_str(arg, "%H:%M") {
+        let naive_dt = today.and_time(time);
+        return Some(naive_dt.and_utc());
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -336,5 +471,134 @@ mod tests {
         let formats = parser.get_format_ordering();
         // Most recently used format should be at front
         assert_eq!(formats[0], "%Y-%m-%d %H:%M:%S%.f");
+    }
+
+    #[test]
+    fn test_journalctl_compatible_formats() {
+        let mut parser = AdaptiveTsParser::new();
+
+        // Test special values
+        let now = parser.parse_ts("now");
+        assert!(now.is_some());
+
+        let today = parser.parse_ts("today");
+        assert!(today.is_some());
+
+        let yesterday = parser.parse_ts("yesterday");
+        assert!(yesterday.is_some());
+
+        let tomorrow = parser.parse_ts("tomorrow");
+        assert!(tomorrow.is_some());
+
+        // Test relative times
+        let one_hour_ago = parser.parse_ts("-1h");
+        assert!(one_hour_ago.is_some());
+
+        let thirty_min_from_now = parser.parse_ts("+30m");
+        assert!(thirty_min_from_now.is_some());
+
+        // Test date-only formats
+        let date_only = parser.parse_ts("2023-07-04");
+        assert!(date_only.is_some());
+
+        // Test time-only formats
+        let time_only = parser.parse_ts("15:30:45");
+        assert!(time_only.is_some());
+    }
+
+    #[test]
+    fn test_parse_timestamp_arg() {
+        // Test that the wrapper function works
+        let result = parse_timestamp_arg("2023-07-04T12:34:56Z");
+        assert!(result.is_ok());
+
+        let result = parse_timestamp_arg("now");
+        assert!(result.is_ok());
+
+        let result = parse_timestamp_arg("-1h");
+        assert!(result.is_ok());
+
+        let result = parse_timestamp_arg("invalid-timestamp");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_relative_time_parsing() {
+        // Test various relative time formats
+        let result = parse_timestamp_arg("-30m");
+        assert!(result.is_ok());
+
+        let result = parse_timestamp_arg("+2h");
+        assert!(result.is_ok());
+
+        let result = parse_timestamp_arg("-1d");
+        assert!(result.is_ok());
+
+        let result = parse_timestamp_arg("-2w");
+        assert!(result.is_ok());
+
+        // Test invalid relative times
+        let result = parse_timestamp_arg("-");
+        assert!(result.is_err());
+
+        let result = parse_timestamp_arg("-1x");
+        assert!(result.is_err());
+
+        let result = parse_timestamp_arg("1h"); // Missing sign
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_date_only_parsing() {
+        let result = parse_timestamp_arg("2023-07-04");
+        assert!(result.is_ok());
+
+        let result = parse_timestamp_arg("07/04/2023");
+        assert!(result.is_ok());
+
+        let result = parse_timestamp_arg("04.07.2023");
+        assert!(result.is_ok());
+
+        // Invalid date formats
+        let result = parse_timestamp_arg("2023-13-45");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_time_only_parsing() {
+        let result = parse_timestamp_arg("15:30:45");
+        assert!(result.is_ok());
+
+        let result = parse_timestamp_arg("09:15");
+        assert!(result.is_ok());
+
+        // Invalid time formats
+        let result = parse_timestamp_arg("25:70:80");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_unix_timestamp_parsing_enhanced() {
+        let mut parser = AdaptiveTsParser::new();
+
+        // Test various Unix timestamp precisions
+        let result = parser.parse_ts("1735566123"); // seconds
+        assert!(result.is_some());
+
+        let result = parser.parse_ts("1735566123000"); // milliseconds
+        assert!(result.is_some());
+
+        let result = parser.parse_ts("1735566123000000"); // microseconds
+        assert!(result.is_some());
+
+        let result = parser.parse_ts("1735566123000000000"); // nanoseconds
+        assert!(result.is_some());
+
+        // Test invalid Unix timestamps
+        let result = parser.parse_ts("123"); // too short
+        assert!(result.is_none());
+
+        let result = parser.parse_ts("12345678901234567890123"); // too long
+        assert!(result.is_none());
     }
 }

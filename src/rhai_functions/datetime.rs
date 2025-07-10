@@ -142,6 +142,13 @@ pub fn parse_ts(
         if let Ok(dt) = DateTime::parse_from_str(s, fmt) {
             return Ok(DateTimeWrapper::new(dt.with_timezone(&default_tz)));
         }
+
+        // If explicit format was provided but failed, return error immediately
+        // Don't fall back to adaptive parsing
+        return Err(Box::new(EvalAltResult::ErrorRuntime(
+            format!("Failed to parse '{}' with format '{}'", s, fmt).into(),
+            Position::NONE,
+        )));
     }
 
     // For auto-parsing (no explicit format), use the adaptive parser

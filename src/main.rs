@@ -192,6 +192,22 @@ pub struct Cli {
     )]
     pub exclude_keys: Vec<String>,
 
+    /// Start showing entries on or newer than the specified date (like journalctl --since)
+    #[arg(
+        long = "since",
+        help_heading = "Filtering Options",
+        long_help = "Start showing entries on or newer than the specified date.\n\nSupported formats:\n  - ISO 8601: 2023-07-04T12:34:56Z\n  - Date with space: 2023-07-04 12:34:56\n  - Unix timestamps: 1735566123\n  - Relative times: -1h, -30m, -1d (relative to now)\n  - Special values: now, today, yesterday, tomorrow\n\nIf time is omitted, 00:00:00 is assumed.\nIf date is omitted, today is assumed."
+    )]
+    pub since: Option<String>,
+
+    /// Stop showing entries on or older than the specified date (like journalctl --until)
+    #[arg(
+        long = "until",
+        help_heading = "Filtering Options",
+        long_help = "Stop showing entries on or older than the specified date.\n\nSupported formats:\n  - ISO 8601: 2023-07-04T12:34:56Z\n  - Date with space: 2023-07-04 12:34:56\n  - Unix timestamps: 1735566123\n  - Relative times: -1h, -30m, -1d (relative to now)\n  - Special values: now, today, yesterday, tomorrow\n\nIf time is omitted, 00:00:00 is assumed.\nIf date is omitted, today is assumed."
+    )]
+    pub until: Option<String>,
+
     /// Output format
     #[arg(
         short = 'F',
@@ -404,6 +420,46 @@ fn main() -> Result<()> {
     // Create configuration from CLI and set stages
     let mut config = KeloraConfig::from_cli(&cli);
     config.processing.stages = ordered_stages;
+
+    // Parse timestamp filter arguments if provided
+    if cli.since.is_some() || cli.until.is_some() {
+        let since = if let Some(ref since_str) = cli.since {
+            match crate::timestamp::parse_timestamp_arg(since_str) {
+                Ok(dt) => Some(dt),
+                Err(e) => {
+                    stderr
+                        .writeln(&config.format_error_message(&format!(
+                            "Invalid --since timestamp '{}': {}",
+                            since_str, e
+                        )))
+                        .unwrap_or(());
+                    ExitCode::InvalidUsage.exit();
+                }
+            }
+        } else {
+            None
+        };
+
+        let until = if let Some(ref until_str) = cli.until {
+            match crate::timestamp::parse_timestamp_arg(until_str) {
+                Ok(dt) => Some(dt),
+                Err(e) => {
+                    stderr
+                        .writeln(&config.format_error_message(&format!(
+                            "Invalid --until timestamp '{}': {}",
+                            until_str, e
+                        )))
+                        .unwrap_or(());
+                    ExitCode::InvalidUsage.exit();
+                }
+            }
+        } else {
+            None
+        };
+
+        config.processing.timestamp_filter =
+            Some(crate::config::TimestampFilterConfig { since, until });
+    }
 
     // Compile ignore-lines regex if provided
     if let Some(ignore_pattern) = &cli.ignore_lines {

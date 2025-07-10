@@ -1,4 +1,5 @@
 use super::{PipelineContext, ScriptResult, ScriptStage};
+use crate::config::TimestampFilterConfig;
 use crate::engine::RhaiEngine;
 use crate::event::Event;
 use anyhow::Result;
@@ -262,5 +263,199 @@ impl ScriptStage for KeyFilterStage {
         } else {
             ScriptResult::Emit(event)
         }
+    }
+}
+
+/// Timestamp filter stage for --since and --until filtering
+pub struct TimestampFilterStage {
+    config: TimestampFilterConfig,
+}
+
+impl TimestampFilterStage {
+    pub fn new(config: TimestampFilterConfig) -> Self {
+        Self { config }
+    }
+}
+
+impl ScriptStage for TimestampFilterStage {
+    fn apply(&mut self, event: Event, ctx: &mut PipelineContext) -> ScriptResult {
+        // Get the parsed timestamp from the event
+        let event_timestamp = match event.parsed_ts {
+            Some(ts) => ts,
+            None => {
+                // No timestamp available - behavior depends on --on-error setting
+                match ctx.config.on_error {
+                    crate::ErrorStrategy::Skip => {
+                        // Filter out events without valid timestamps
+                        return ScriptResult::Skip;
+                    }
+                    crate::ErrorStrategy::Print => {
+                        // Pass through but print warning
+                        eprintln!(
+                            "{}",
+                            crate::config::format_error_message_auto(
+                                "Event has no valid timestamp for --since/--until filtering (passing through)"
+                            )
+                        );
+                        return ScriptResult::Emit(event);
+                    }
+                    crate::ErrorStrategy::Abort => {
+                        // Stop processing on missing timestamp
+                        return ScriptResult::Error(
+                            "Event has no valid timestamp for --since/--until filtering"
+                                .to_string(),
+                        );
+                    }
+                    crate::ErrorStrategy::Stub => {
+                        // Pass through (same as default behavior)
+                        return ScriptResult::Emit(event);
+                    }
+                }
+            }
+        };
+
+        // Check since filter (event must be >= since)
+        if let Some(since) = self.config.since {
+            if event_timestamp < since {
+                return ScriptResult::Skip;
+            }
+        }
+
+        // Check until filter (event must be <= until)
+        if let Some(until) = self.config.until {
+            if event_timestamp > until {
+                return ScriptResult::Skip;
+            }
+        }
+
+        // Event is within the time range
+        ScriptResult::Emit(event)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::TimestampFilterConfig;
+    use crate::pipeline::{MetaData, PipelineConfig};
+    use chrono::{Duration, Utc};
+
+    #[test]
+    fn test_timestamp_filter_stage_since() {
+        let since = Utc::now() - Duration::hours(1);
+        let config = TimestampFilterConfig {
+            since: Some(since),
+            until: None,
+        };
+        let mut stage = TimestampFilterStage::new(config);
+
+        // Create dummy context
+        let mut ctx = PipelineContext {
+            config: PipelineConfig {
+                on_error: crate::ErrorStrategy::Print,
+                brief: false,
+                no_inject_fields: false,
+                inject_prefix: None,
+                color_mode: crate::config::ColorMode::Auto,
+            },
+            tracker: std::collections::HashMap::new(),
+            window: Vec::new(),
+            rhai: crate::engine::RhaiEngine::new(),
+            meta: MetaData::default(),
+        };
+
+        // Test event before since time (should be skipped)
+        let old_event = crate::event::Event {
+            parsed_ts: Some(since - Duration::minutes(30)),
+            ..Default::default()
+        };
+
+        let result = stage.apply(old_event, &mut ctx);
+        matches!(result, ScriptResult::Skip);
+
+        // Test event after since time (should be emitted)
+        let new_event = crate::event::Event {
+            parsed_ts: Some(since + Duration::minutes(30)),
+            ..Default::default()
+        };
+
+        let result = stage.apply(new_event, &mut ctx);
+        matches!(result, ScriptResult::Emit(_));
+    }
+
+    #[test]
+    fn test_timestamp_filter_stage_until() {
+        let until = Utc::now() - Duration::hours(1);
+        let config = TimestampFilterConfig {
+            since: None,
+            until: Some(until),
+        };
+        let mut stage = TimestampFilterStage::new(config);
+
+        // Create dummy context
+        let mut ctx = PipelineContext {
+            config: PipelineConfig {
+                on_error: crate::ErrorStrategy::Print,
+                brief: false,
+                no_inject_fields: false,
+                inject_prefix: None,
+                color_mode: crate::config::ColorMode::Auto,
+            },
+            tracker: std::collections::HashMap::new(),
+            window: Vec::new(),
+            rhai: crate::engine::RhaiEngine::new(),
+            meta: MetaData::default(),
+        };
+
+        // Test event before until time (should be emitted)
+        let old_event = crate::event::Event {
+            parsed_ts: Some(until - Duration::minutes(30)),
+            ..Default::default()
+        };
+
+        let result = stage.apply(old_event, &mut ctx);
+        matches!(result, ScriptResult::Emit(_));
+
+        // Test event after until time (should be skipped)
+        let new_event = crate::event::Event {
+            parsed_ts: Some(until + Duration::minutes(30)),
+            ..Default::default()
+        };
+
+        let result = stage.apply(new_event, &mut ctx);
+        matches!(result, ScriptResult::Skip);
+    }
+
+    #[test]
+    fn test_timestamp_filter_stage_no_timestamp() {
+        let config = TimestampFilterConfig {
+            since: Some(Utc::now() - Duration::hours(1)),
+            until: Some(Utc::now() + Duration::hours(1)),
+        };
+        let mut stage = TimestampFilterStage::new(config);
+
+        // Create dummy context
+        let mut ctx = PipelineContext {
+            config: PipelineConfig {
+                on_error: crate::ErrorStrategy::Print,
+                brief: false,
+                no_inject_fields: false,
+                inject_prefix: None,
+                color_mode: crate::config::ColorMode::Auto,
+            },
+            tracker: std::collections::HashMap::new(),
+            window: Vec::new(),
+            rhai: crate::engine::RhaiEngine::new(),
+            meta: MetaData::default(),
+        };
+
+        // Test event without timestamp (should be emitted - pass through behavior)
+        let event_no_ts = crate::event::Event {
+            parsed_ts: None,
+            ..Default::default()
+        };
+
+        let result = stage.apply(event_no_ts, &mut ctx);
+        matches!(result, ScriptResult::Emit(_));
     }
 }

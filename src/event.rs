@@ -144,8 +144,9 @@ impl Event {
                 let parsed_ts = if let Some(parser) = parser {
                     parser.parse_ts(&ts_str)
                 } else {
-                    // Fall back to original parsing
-                    parse_timestamp(&ts_str).ok()
+                    // Use the enhanced adaptive parser as default
+                    let mut default_parser = crate::timestamp::AdaptiveTsParser::new();
+                    default_parser.parse_ts(&ts_str)
                 };
 
                 if let Some(ts) = parsed_ts {
@@ -165,29 +166,4 @@ impl std::fmt::Display for FieldValue {
             FieldValue::Null => write!(f, "null"),
         }
     }
-}
-
-fn parse_timestamp(ts_str: &str) -> Result<DateTime<Utc>, chrono::ParseError> {
-    // Try common timestamp formats in order of likelihood
-    let formats = [
-        "%Y-%m-%dT%H:%M:%S%.fZ",   // ISO 8601 with subseconds
-        "%Y-%m-%dT%H:%M:%SZ",      // ISO 8601
-        "%Y-%m-%dT%H:%M:%S%.f%:z", // ISO 8601 with timezone
-        "%Y-%m-%dT%H:%M:%S%:z",    // ISO 8601 with timezone
-        "%Y-%m-%d %H:%M:%S%.f",    // Common log format with subseconds
-        "%Y-%m-%d %H:%M:%S",       // Common log format
-        "%b %d %H:%M:%S",          // Syslog format
-    ];
-
-    for format in &formats {
-        if let Ok(dt) = DateTime::parse_from_str(ts_str, format) {
-            return Ok(dt.with_timezone(&Utc));
-        }
-        if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(ts_str, format) {
-            return Ok(dt.and_utc());
-        }
-    }
-
-    // Return a proper chrono parse error
-    chrono::NaiveDateTime::parse_from_str(ts_str, "%Y-%m-%dT%H:%M:%SZ").map(|dt| dt.and_utc())
 }

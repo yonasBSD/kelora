@@ -7,7 +7,7 @@ use super::{
     create_multiline_chunker, BeginStage, EndStage, EventLimiter, EventParser, ExecStage,
     FilterStage, Formatter, KeyFilterStage, LevelFilterStage, MetaData, Pipeline, PipelineConfig,
     PipelineContext, ScriptStage, SimpleChunker, SimpleWindowManager, SlidingWindowManager,
-    StdoutWriter, TakeNLimiter,
+    StdoutWriter, TakeNLimiter, TimestampFilterStage,
 };
 use crate::decompression::DecompressionReader;
 use crate::engine::RhaiEngine;
@@ -29,6 +29,7 @@ pub struct PipelineBuilder {
     multiline: Option<crate::config::MultilineConfig>,
     window_size: usize,
     csv_headers: Option<Vec<String>>, // Pre-processed CSV headers for parallel mode
+    timestamp_filter: Option<crate::config::TimestampFilterConfig>,
 }
 
 impl PipelineBuilder {
@@ -53,6 +54,7 @@ impl PipelineBuilder {
             multiline: None,
             window_size: 0,
             csv_headers: None,
+            timestamp_filter: None,
         }
     }
 
@@ -187,7 +189,13 @@ impl PipelineBuilder {
             }
         }
 
-        // Add level filtering stage (runs after all script stages, before key filtering)
+        // Add timestamp filtering stage (runs after script stages, before level filtering)
+        if let Some(timestamp_filter_config) = self.timestamp_filter {
+            let timestamp_filter_stage = TimestampFilterStage::new(timestamp_filter_config);
+            script_stages.push(Box::new(timestamp_filter_stage));
+        }
+
+        // Add level filtering stage (runs after timestamp filtering, before key filtering)
         let level_filter_stage =
             LevelFilterStage::new(self.levels.clone(), self.exclude_levels.clone());
         if level_filter_stage.is_active() {
@@ -406,7 +414,13 @@ impl PipelineBuilder {
             }
         }
 
-        // Add level filtering stage (runs after all script stages, before key filtering)
+        // Add timestamp filtering stage (runs after script stages, before level filtering)
+        if let Some(timestamp_filter_config) = self.timestamp_filter {
+            let timestamp_filter_stage = TimestampFilterStage::new(timestamp_filter_config);
+            script_stages.push(Box::new(timestamp_filter_stage));
+        }
+
+        // Add level filtering stage (runs after timestamp filtering, before key filtering)
         let level_filter_stage =
             LevelFilterStage::new(self.levels.clone(), self.exclude_levels.clone());
         if level_filter_stage.is_active() {
@@ -465,6 +479,15 @@ impl PipelineBuilder {
         self.csv_headers = Some(headers);
         self
     }
+
+    #[allow(dead_code)]
+    pub fn with_timestamp_filter(
+        mut self,
+        timestamp_filter: Option<crate::config::TimestampFilterConfig>,
+    ) -> Self {
+        self.timestamp_filter = timestamp_filter;
+        self
+    }
 }
 
 impl Default for PipelineBuilder {
@@ -505,6 +528,7 @@ pub fn create_pipeline_builder_from_config(
     builder.exclude_levels = config.processing.exclude_levels.clone();
     builder.multiline = config.input.multiline.clone();
     builder.window_size = config.processing.window_size;
+    builder.timestamp_filter = config.processing.timestamp_filter.clone();
     builder
 }
 

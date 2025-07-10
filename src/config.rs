@@ -58,6 +58,8 @@ pub struct ProcessingConfig {
     pub exclude_levels: Vec<String>,
     /// Window size for sliding window functionality (0 = disabled)
     pub window_size: usize,
+    /// Timestamp filtering configuration
+    pub timestamp_filter: Option<TimestampFilterConfig>,
 }
 
 /// Performance configuration
@@ -125,6 +127,13 @@ pub enum ColorMode {
     Auto,
     Always,
     Never,
+}
+
+/// Timestamp filtering configuration
+#[derive(Debug, Clone)]
+pub struct TimestampFilterConfig {
+    pub since: Option<chrono::DateTime<chrono::Utc>>,
+    pub until: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// Multi-line event detection configuration
@@ -493,6 +502,7 @@ impl KeloraConfig {
                 levels: cli.levels.clone(),
                 exclude_levels: cli.exclude_levels.clone(),
                 window_size: cli.window_size.unwrap_or(0),
+                timestamp_filter: None, // Will be set in main() after parsing since/until
             },
             performance: PerformanceConfig {
                 parallel: cli.parallel,
@@ -559,6 +569,7 @@ impl Default for KeloraConfig {
                 levels: Vec::new(),
                 exclude_levels: Vec::new(),
                 window_size: 0,
+                timestamp_filter: None,
             },
             performance: PerformanceConfig {
                 parallel: false,
