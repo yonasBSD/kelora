@@ -20,7 +20,7 @@ mod timestamp;
 mod tty;
 mod unix;
 
-use config::{KeloraConfig, ScriptStageType};
+use config::KeloraConfig;
 use config_file::ConfigFile;
 use parallel::{ParallelConfig, ParallelProcessor};
 use pipeline::{
@@ -61,239 +61,8 @@ impl OutputWriter for SafeFileOut {
     }
 }
 
-#[derive(Parser)]
-#[command(name = "kelora")]
-#[command(about = "A command-line log analysis tool with embedded Rhai scripting")]
-#[command(
-    long_about = "A command-line log analysis tool with embedded Rhai scripting\n\nMODES:\n  (default)   Sequential processing - best for streaming/interactive use\n  --parallel  Parallel processing - best for high-throughput batch analysis"
-)]
-#[command(version = "0.2.0")]
-#[command(author = "Dirk Loss <mail@dirk-loss.de>")]
-pub struct Cli {
-    /// Input files (stdin if not specified)
-    pub files: Vec<String>,
 
-    /// Input format
-    #[arg(
-        short = 'f',
-        long = "format",
-        value_enum,
-        default_value = "line",
-        help_heading = "Input Options"
-    )]
-    pub format: InputFormat,
-
-    /// File processing order: none (CLI order), name (alphabetical), mtime (modification time, oldest first)
-    #[arg(
-        long = "file-order",
-        value_enum,
-        default_value = "none",
-        help_heading = "Input Options"
-    )]
-    pub file_order: FileOrder,
-
-    /// Skip the first N input lines (applied before ignore-lines and parsing)
-    #[arg(long = "skip-lines", help_heading = "Input Options")]
-    pub skip_lines: Option<usize>,
-
-    /// Ignore input lines matching this regex pattern (applied before parsing)
-    #[arg(long = "ignore-lines", help_heading = "Input Options")]
-    pub ignore_lines: Option<String>,
-
-    /// Custom timestamp field name for parsing (overrides auto-detection)
-    #[arg(long = "ts-field", help_heading = "Input Options")]
-    pub ts_field: Option<String>,
-
-    /// Multi-line event detection strategy
-    #[arg(
-        short = 'M',
-        long = "multiline",
-        help_heading = "Input Options",
-        long_help = "Multi-line event detection strategy and options\n\n⚠️  IMPORTANT: Multiline mode buffers input lines until events are complete.\nIn streaming scenarios (like tail -f), the last event may not appear until\nthe next event starts. This is expected behavior, not a bug.\n\nStrategies:\n  timestamp[:pattern=REGEX]        Events start with timestamp\n  indent[:spaces=N|tabs|mixed]     Continuation by indentation\n  backslash[:char=C]               Continuation by end character\n  start:REGEX                      Events start with pattern\n  end:REGEX                        Events end with pattern\n  boundary:start=REGEX:end=REGEX   Events have start/end boundaries\n\nCommon patterns:\n  --multiline timestamp                    # ISO/syslog timestamps\n  --multiline timestamp:pattern=^ERROR     # Lines starting with ERROR\n  --multiline indent                       # Stack traces, indented logs\n\nFor immediate output without buffering, omit the --multiline option entirely."
-    )]
-    pub multiline: Option<String>,
-
-    /// Run once before processing
-    #[arg(long = "begin", help_heading = "Processing Options")]
-    pub begin: Option<String>,
-
-    /// Boolean filter expressions (can be repeated)
-    #[arg(long = "filter", help_heading = "Processing Options")]
-    pub filters: Vec<String>,
-
-    /// Transform/process exec scripts (can be repeated)
-    #[arg(short = 'e', long = "exec", help_heading = "Processing Options")]
-    pub execs: Vec<String>,
-
-    /// Execute script from file (can be repeated)
-    #[arg(short = 'E', long = "exec-file", help_heading = "Processing Options")]
-    pub exec_files: Vec<String>,
-
-    /// Run once after processing
-    #[arg(long = "end", help_heading = "Processing Options")]
-    pub end: Option<String>,
-
-    /// Enable access to a sliding window of N+1 recent events.
-    /// Scripts can use `window[0]` (current event), `window[1]` (previous), etc.
-    /// Window functions: `window_values(field)`, `window_numbers(field)`
-    #[arg(long = "window", help_heading = "Processing Options")]
-    pub window_size: Option<usize>,
-
-    /// Error handling strategy
-    #[arg(
-        long = "on-error",
-        value_enum,
-        default_value = "print",
-        help_heading = "Processing Options"
-    )]
-    pub on_error: ErrorStrategy,
-
-    /// Disable field auto-injection
-    #[arg(long = "no-inject", help_heading = "Processing Options")]
-    pub no_inject_fields: bool,
-
-    /// Prefix for injected variables
-    #[arg(long = "inject-prefix", help_heading = "Processing Options")]
-    pub inject_prefix: Option<String>,
-
-    /// Include only events with these log levels (comma-separated, case-insensitive, e.g. debug,warn,error)
-    #[arg(
-        short = 'l',
-        long = "levels",
-        value_delimiter = ',',
-        help_heading = "Filtering Options"
-    )]
-    pub levels: Vec<String>,
-
-    /// Exclude events with these log levels (comma-separated, case-insensitive, higher priority than --levels)
-    #[arg(
-        short = 'L',
-        long = "exclude-levels",
-        value_delimiter = ',',
-        help_heading = "Filtering Options"
-    )]
-    pub exclude_levels: Vec<String>,
-
-    /// Output only specific fields (comma-separated)
-    #[arg(
-        short = 'k',
-        long = "keys",
-        value_delimiter = ',',
-        help_heading = "Filtering Options"
-    )]
-    pub keys: Vec<String>,
-
-    /// Exclude specific fields from output (comma-separated, higher priority than --keys)
-    #[arg(
-        short = 'K',
-        long = "exclude-keys",
-        value_delimiter = ',',
-        help_heading = "Filtering Options"
-    )]
-    pub exclude_keys: Vec<String>,
-
-    /// Start showing entries on or newer than the specified date (like journalctl --since)
-    #[arg(
-        long = "since",
-        help_heading = "Filtering Options",
-        long_help = "Start showing entries on or newer than the specified date.\n\nSupported formats:\n  - ISO 8601: 2023-07-04T12:34:56Z\n  - Date with space: 2023-07-04 12:34:56\n  - Unix timestamps: 1735566123\n  - Relative times: -1h, -30m, -1d (relative to now)\n  - Special values: now, today, yesterday, tomorrow\n\nIf time is omitted, 00:00:00 is assumed.\nIf date is omitted, today is assumed."
-    )]
-    pub since: Option<String>,
-
-    /// Stop showing entries on or older than the specified date (like journalctl --until)
-    #[arg(
-        long = "until",
-        help_heading = "Filtering Options",
-        long_help = "Stop showing entries on or older than the specified date.\n\nSupported formats:\n  - ISO 8601: 2023-07-04T12:34:56Z\n  - Date with space: 2023-07-04 12:34:56\n  - Unix timestamps: 1735566123\n  - Relative times: -1h, -30m, -1d (relative to now)\n  - Special values: now, today, yesterday, tomorrow\n\nIf time is omitted, 00:00:00 is assumed.\nIf date is omitted, today is assumed."
-    )]
-    pub until: Option<String>,
-
-    /// Output format
-    #[arg(
-        short = 'F',
-        long = "output-format",
-        value_enum,
-        default_value = "default",
-        help_heading = "Output Options"
-    )]
-    pub output_format: OutputFormat,
-
-    /// Output only core fields (ts, level, msg) plus any explicitly specified --keys
-    #[arg(short = 'm', long = "core", help_heading = "Output Options")]
-    pub core: bool,
-
-    /// Output only field values (no keys), space-separated
-    #[arg(short = 'b', long = "brief", help_heading = "Output Options")]
-    pub brief: bool,
-
-    /// Output file for formatted events (default: stdout)
-    #[arg(short = 'o', long = "output-file", help_heading = "Output Options")]
-    pub output_file: Option<String>,
-
-    /// Enable parallel processing for high-throughput analysis (batch-size=1000 by default)
-    #[arg(long = "parallel", help_heading = "Performance Options")]
-    pub parallel: bool,
-
-    /// Number of worker threads for parallel processing
-    #[arg(
-        long = "threads",
-        default_value_t = 0,
-        help_heading = "Performance Options"
-    )]
-    pub threads: usize,
-
-    /// Batch size for parallel processing (default: 1000)
-    #[arg(long = "batch-size", help_heading = "Performance Options")]
-    pub batch_size: Option<usize>,
-
-    /// Batch timeout in milliseconds
-    #[arg(
-        long = "batch-timeout",
-        default_value_t = 200,
-        help_heading = "Performance Options"
-    )]
-    pub batch_timeout: u64,
-
-    /// Disable ordered output (faster but may reorder results)
-    #[arg(long = "unordered", help_heading = "Performance Options")]
-    pub no_preserve_order: bool,
-
-    /// Force colored output even when not on TTY (overrides NO_COLOR environment variable)
-    #[arg(long = "force-color", help_heading = "Display Options")]
-    pub force_color: bool,
-
-    /// Disable colored output (takes precedence over --force-color)
-    #[arg(long = "no-color", help_heading = "Display Options")]
-    pub no_color: bool,
-
-    /// Disable emoji prefixes in error messages
-    #[arg(long = "no-emoji", help_heading = "Display Options")]
-    pub no_emoji: bool,
-
-    /// Show summary of tracked values in a table format
-    #[arg(long = "summary", help_heading = "Display Options")]
-    pub summary: bool,
-
-    /// Show processing statistics
-    #[arg(short = 's', long = "stats", help_heading = "Display Options")]
-    pub stats: bool,
-
-    /// Show processing statistics with no output (equivalent to --stats --output-format null)
-    #[arg(short = 'S', long = "stats-only", help_heading = "Display Options")]
-    pub stats_only: bool,
-
-    /// Use alias from configuration file
-    #[arg(short = 'a', long = "alias", help_heading = "Configuration Options")]
-    pub alias: Vec<String>,
-
-    /// Show configuration file and exit
-    #[arg(long = "show-config", help_heading = "Configuration Options")]
-    pub show_config: bool,
-
-    /// Ignore configuration file
-    #[arg(long = "ignore-config", help_heading = "Configuration Options")]
-    pub ignore_config: bool,
-}
+use config::ScriptStageType;
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum InputFormat {
@@ -338,6 +107,175 @@ pub enum FileOrder {
     None,
     Name,
     Mtime,
+}
+
+#[derive(Parser)]
+#[command(name = "kelora")]
+#[command(about = "A command-line log analysis tool with embedded Rhai scripting")]
+#[command(
+    long_about = "A command-line log analysis tool with embedded Rhai scripting\n\nMODES:\n  (default)   Sequential processing - best for streaming/interactive use\n  --parallel  Parallel processing - best for high-throughput batch analysis"
+)]
+#[command(version = "0.2.0")]
+#[command(author = "Dirk Loss <mail@dirk-loss.de>")]
+pub struct Cli {
+    /// Input files (stdin if not specified)
+    pub files: Vec<String>,
+
+    /// Input format
+    #[arg(short = 'f', long = "format", value_enum, default_value = "line", help_heading = "Input Options")]
+    pub format: InputFormat,
+
+    /// File processing order
+    #[arg(long = "file-order", value_enum, default_value = "none", help_heading = "Input Options")]
+    pub file_order: FileOrder,
+
+    /// Skip the first N input lines
+    #[arg(long = "skip-lines", help_heading = "Input Options")]
+    pub skip_lines: Option<usize>,
+
+    /// Ignore input lines matching this regex pattern
+    #[arg(long = "ignore-lines", help_heading = "Input Options")]
+    pub ignore_lines: Option<String>,
+
+    /// Custom timestamp field name for parsing
+    #[arg(long = "ts-field", help_heading = "Input Options")]
+    pub ts_field: Option<String>,
+
+    /// Multi-line event detection strategy
+    #[arg(short = 'M', long = "multiline", help_heading = "Input Options")]
+    pub multiline: Option<String>,
+
+    /// Run once before processing
+    #[arg(long = "begin", help_heading = "Processing Options")]
+    pub begin: Option<String>,
+
+    /// Boolean filter expressions
+    #[arg(long = "filter", help_heading = "Processing Options")]
+    pub filters: Vec<String>,
+
+    /// Transform/process exec scripts
+    #[arg(short = 'e', long = "exec", help_heading = "Processing Options")]
+    pub execs: Vec<String>,
+
+    /// Execute script from file
+    #[arg(short = 'E', long = "exec-file", help_heading = "Processing Options")]
+    pub exec_files: Vec<String>,
+
+    /// Run once after processing
+    #[arg(long = "end", help_heading = "Processing Options")]
+    pub end: Option<String>,
+
+    /// Enable access to a sliding window of N+1 recent events
+    #[arg(long = "window", help_heading = "Processing Options")]
+    pub window_size: Option<usize>,
+
+    /// Error handling strategy
+    #[arg(long = "on-error", value_enum, default_value = "print", help_heading = "Processing Options")]
+    pub on_error: ErrorStrategy,
+
+    /// Disable field auto-injection
+    #[arg(long = "no-inject", help_heading = "Processing Options")]
+    pub no_inject_fields: bool,
+
+    /// Prefix for injected variables
+    #[arg(long = "inject-prefix", help_heading = "Processing Options")]
+    pub inject_prefix: Option<String>,
+
+    /// Include only events with these log levels
+    #[arg(short = 'l', long = "levels", value_delimiter = ',', help_heading = "Filtering Options")]
+    pub levels: Vec<String>,
+
+    /// Exclude events with these log levels
+    #[arg(short = 'L', long = "exclude-levels", value_delimiter = ',', help_heading = "Filtering Options")]
+    pub exclude_levels: Vec<String>,
+
+    /// Output only specific fields
+    #[arg(short = 'k', long = "keys", value_delimiter = ',', help_heading = "Filtering Options")]
+    pub keys: Vec<String>,
+
+    /// Exclude specific fields from output
+    #[arg(short = 'K', long = "exclude-keys", value_delimiter = ',', help_heading = "Filtering Options")]
+    pub exclude_keys: Vec<String>,
+
+    /// Start showing entries on or newer than the specified date
+    #[arg(long = "since", help_heading = "Filtering Options")]
+    pub since: Option<String>,
+
+    /// Stop showing entries on or older than the specified date
+    #[arg(long = "until", help_heading = "Filtering Options")]
+    pub until: Option<String>,
+
+    /// Output format
+    #[arg(short = 'F', long = "output-format", value_enum, default_value = "default", help_heading = "Output Options")]
+    pub output_format: OutputFormat,
+
+    /// Output only core fields
+    #[arg(short = 'm', long = "core", help_heading = "Output Options")]
+    pub core: bool,
+
+    /// Output only field values
+    #[arg(short = 'b', long = "brief", help_heading = "Output Options")]
+    pub brief: bool,
+
+    /// Output file for formatted events
+    #[arg(short = 'o', long = "output-file", help_heading = "Output Options")]
+    pub output_file: Option<String>,
+
+    /// Enable parallel processing
+    #[arg(long = "parallel", help_heading = "Performance Options")]
+    pub parallel: bool,
+
+    /// Number of worker threads
+    #[arg(long = "threads", default_value_t = 0, help_heading = "Performance Options")]
+    pub threads: usize,
+
+    /// Batch size for parallel processing
+    #[arg(long = "batch-size", help_heading = "Performance Options")]
+    pub batch_size: Option<usize>,
+
+    /// Batch timeout in milliseconds
+    #[arg(long = "batch-timeout", default_value_t = 200, help_heading = "Performance Options")]
+    pub batch_timeout: u64,
+
+    /// Disable ordered output
+    #[arg(long = "unordered", help_heading = "Performance Options")]
+    pub no_preserve_order: bool,
+
+    /// Force colored output
+    #[arg(long = "force-color", help_heading = "Display Options")]
+    pub force_color: bool,
+
+    /// Disable colored output
+    #[arg(long = "no-color", help_heading = "Display Options")]
+    pub no_color: bool,
+
+    /// Disable emoji prefixes
+    #[arg(long = "no-emoji", help_heading = "Display Options")]
+    pub no_emoji: bool,
+
+    /// Show summary of tracked values
+    #[arg(long = "summary", help_heading = "Display Options")]
+    pub summary: bool,
+
+    /// Show processing statistics
+    #[arg(short = 's', long = "stats", help_heading = "Display Options")]
+    pub stats: bool,
+
+    /// Show processing statistics with no output
+    #[arg(short = 'S', long = "stats-only", help_heading = "Display Options")]
+    pub stats_only: bool,
+
+    /// Use alias from configuration file
+    #[arg(short = 'a', long = "alias", help_heading = "Configuration Options")]
+    pub alias: Vec<String>,
+
+    /// Show configuration file and exit
+    #[arg(long = "show-config", help_heading = "Configuration Options")]
+    pub show_config: bool,
+
+    /// Ignore configuration file
+    #[arg(long = "ignore-config", help_heading = "Configuration Options")]
+    pub ignore_config: bool,
 }
 
 impl Cli {
@@ -386,6 +324,7 @@ impl Cli {
             .collect())
     }
 }
+
 
 fn main() -> Result<()> {
     // Initialize signal handling early
