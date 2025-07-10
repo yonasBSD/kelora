@@ -19,6 +19,7 @@ pub struct InputConfig {
     pub skip_lines: usize,
     pub ignore_lines: Option<regex::Regex>,
     pub multiline: Option<MultilineConfig>,
+    pub ts_field: Option<String>,
 }
 
 /// Output configuration
@@ -463,6 +464,7 @@ impl KeloraConfig {
                 skip_lines: cli.skip_lines.unwrap_or(0),
                 ignore_lines: None, // Will be set after CLI parsing
                 multiline: None,    // Will be set after CLI parsing
+                ts_field: cli.ts_field.clone(),
             },
             output: OutputConfig {
                 format: if cli.stats_only {
@@ -532,6 +534,7 @@ impl Default for KeloraConfig {
                 skip_lines: 0,
                 ignore_lines: None,
                 multiline: None,
+                ts_field: None,
             },
             output: OutputConfig {
                 format: OutputFormat::Default,

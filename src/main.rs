@@ -16,6 +16,7 @@ mod pipeline;
 mod readers;
 mod rhai_functions;
 mod stats;
+mod timestamp;
 mod tty;
 mod unix;
 
@@ -98,6 +99,10 @@ pub struct Cli {
     /// Ignore input lines matching this regex pattern (applied before parsing)
     #[arg(long = "ignore-lines", help_heading = "Input Options")]
     pub ignore_lines: Option<String>,
+
+    /// Custom timestamp field name for parsing (overrides auto-detection)
+    #[arg(long = "ts-field", help_heading = "Input Options")]
+    pub ts_field: Option<String>,
 
     /// Multi-line event detection strategy
     #[arg(
