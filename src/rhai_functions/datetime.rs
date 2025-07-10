@@ -1,6 +1,7 @@
 use chrono::{DateTime, Datelike, Duration, Local, NaiveDateTime, TimeZone, Timelike, Utc};
 use chrono_tz::Tz;
 use rhai::{Engine, EvalAltResult, Position};
+use std::cell::RefCell;
 use std::fmt;
 use std::str::FromStr;
 
@@ -106,6 +107,12 @@ impl fmt::Display for DurationWrapper {
     }
 }
 
+// Thread-local adaptive parser for Rhai timestamp parsing
+thread_local! {
+    static RHAI_TIMESTAMP_PARSER: RefCell<crate::timestamp::AdaptiveTimestampParser> = 
+        RefCell::new(crate::timestamp::AdaptiveTimestampParser::new());
+}
+
 /// Parse timestamp with optional format and timezone
 pub fn parse_timestamp(
     s: &str,
@@ -131,78 +138,25 @@ pub fn parse_timestamp(
                 default_tz.from_utc_datetime(&naive_dt),
             ));
         }
-    }
-
-    // Try Unix timestamp parsing for numeric-only strings
-    if s.chars().all(|c| c.is_ascii_digit()) {
-        if let Ok(timestamp_int) = s.parse::<i64>() {
-            // Detect Unix timestamp precision by string length
-            let dt = if s.len() == 10 {
-                // Seconds (1735566123)
-                DateTime::from_timestamp(timestamp_int, 0)
-            } else if s.len() == 13 {
-                // Milliseconds (1735566123000)
-                DateTime::from_timestamp(timestamp_int / 1000, (timestamp_int % 1000) as u32 * 1_000_000)
-            } else if s.len() == 16 {
-                // Microseconds (1735566123000000)
-                DateTime::from_timestamp(timestamp_int / 1_000_000, (timestamp_int % 1_000_000) as u32 * 1_000)
-            } else if s.len() == 19 {
-                // Nanoseconds (1735566123000000000)
-                DateTime::from_timestamp(timestamp_int / 1_000_000_000, (timestamp_int % 1_000_000_000) as u32)
-            } else {
-                None
-            };
-            
-            if let Some(dt) = dt {
-                return Ok(DateTimeWrapper::new(dt.with_timezone(&Tz::UTC)));
-            }
-        }
-    }
-
-    // Try standard formats (only unambiguous ones)
-    let standard_formats = [
-        "%Y-%m-%dT%H:%M:%S%.fZ",  // ISO 8601 with fractional seconds
-        "%Y-%m-%dT%H:%M:%SZ",     // ISO 8601 without fractional seconds
-        "%Y-%m-%dT%H:%M:%S%z",    // ISO 8601 with timezone offset
-        "%Y-%m-%dT%H:%M:%S%.f%z", // ISO 8601 with fractional seconds and timezone
-        "%Y-%m-%d %H:%M:%S%.f",   // Common log format with fractional seconds
-        "%Y-%m-%d %H:%M:%S",      // Common log format
-        "%Y-%m-%d %H:%M:%S%.fZ",  // Space-separated ISO 8601 with fractional seconds and Z
-        "%Y-%m-%d %H:%M:%SZ",     // Space-separated ISO 8601 without fractional seconds but with Z
-        "%Y-%m-%d %H:%M:%S%z",    // Space-separated ISO 8601 with timezone offset
-        "%Y-%m-%d %H:%M:%S%.f%z", // Space-separated ISO 8601 with fractional seconds and timezone
-        "%d/%b/%Y:%H:%M:%S %z",   // Apache log format (unambiguous: uses month names)
-        "%b %d %H:%M:%S",         // Syslog format (unambiguous: uses month names)
-        "%Y-%m-%d %H:%M:%S,%f",   // Python logging format (unambiguous: YYYY-MM-DD)
-        "%y%m%d %H:%M:%S",        // MySQL legacy format (unambiguous: YYMMDD)
-        "%Y/%m/%d %H:%M:%S",      // Nginx error log format (unambiguous: YYYY/MM/DD)
-        "%b %d %Y %H:%M:%S",      // BSD syslog with year (unambiguous: uses month names)
-        "%d-%b-%y %I:%M:%S.%f %p", // Oracle format (unambiguous: uses month names)
-        "%b %d, %Y %I:%M:%S %p",  // Java SimpleDateFormat (unambiguous: uses month names)
-        "%d.%m.%Y %H:%M:%S",      // German format (unambiguous: DD.MM.YYYY with 4-digit year)
-        "%a %b %d %H:%M:%S %Y",   // Classic Unix timestamp with weekday
-    ];
-
-    for fmt in &standard_formats {
-        if let Ok(naive_dt) = NaiveDateTime::parse_from_str(s, fmt) {
-            return Ok(DateTimeWrapper::new(
-                default_tz.from_utc_datetime(&naive_dt),
-            ));
-        }
-        // Also try with timezone-aware parsing
+        // Also try with timezone-aware parsing for explicit format
         if let Ok(dt) = DateTime::parse_from_str(s, fmt) {
-            return Ok(DateTimeWrapper::new(dt.with_timezone(&Tz::UTC)));
+            return Ok(DateTimeWrapper::new(dt.with_timezone(&default_tz)));
         }
     }
 
-    // Try RFC3339 parsing
-    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
-        return Ok(DateTimeWrapper::new(dt.with_timezone(&Tz::UTC)));
-    }
+    // For auto-parsing (no explicit format), use the adaptive parser
+    let parsed_utc = RHAI_TIMESTAMP_PARSER.with(|parser| {
+        parser.borrow_mut().parse_timestamp(s)
+    });
 
-    // Try RFC2822 parsing
-    if let Ok(dt) = DateTime::parse_from_rfc2822(s) {
-        return Ok(DateTimeWrapper::new(dt.with_timezone(&Tz::UTC)));
+    if let Some(utc_dt) = parsed_utc {
+        // Convert to the requested timezone
+        let tz_dt = if default_tz == Tz::UTC {
+            utc_dt.with_timezone(&Tz::UTC)
+        } else {
+            utc_dt.with_timezone(&default_tz)
+        };
+        return Ok(DateTimeWrapper::new(tz_dt));
     }
 
     Err(Box::new(EvalAltResult::ErrorRuntime(
@@ -844,6 +798,36 @@ mod tests {
         assert_eq!(dt.inner.hour(), 12);
         assert_eq!(dt.inner.minute(), 34);
         assert_eq!(dt.inner.second(), 56);
+    }
+
+    #[test]
+    fn test_adaptive_parsing_in_rhai() {
+        // Test that the Rhai parse_timestamp function benefits from adaptive parsing
+        // by parsing similar formats multiple times
+        
+        // First parse - should learn the format
+        let result1 = parse_timestamp("2023-07-04 12:34:56", None, None);
+        assert!(result1.is_ok());
+        let dt1 = result1.unwrap();
+        assert_eq!(dt1.inner.year(), 2023);
+        assert_eq!(dt1.inner.month(), 7);
+        assert_eq!(dt1.inner.day(), 4);
+        
+        // Second parse with same format - should be faster due to learning
+        let result2 = parse_timestamp("2023-07-05 13:45:07", None, None);
+        assert!(result2.is_ok());
+        let dt2 = result2.unwrap();
+        assert_eq!(dt2.inner.year(), 2023);
+        assert_eq!(dt2.inner.month(), 7);
+        assert_eq!(dt2.inner.day(), 5);
+        
+        // Third parse with same format - should still work efficiently
+        let result3 = parse_timestamp("2023-07-06 14:56:08", None, None);
+        assert!(result3.is_ok());
+        let dt3 = result3.unwrap();
+        assert_eq!(dt3.inner.year(), 2023);
+        assert_eq!(dt3.inner.month(), 7);
+        assert_eq!(dt3.inner.day(), 6);
     }
 
     #[test]
