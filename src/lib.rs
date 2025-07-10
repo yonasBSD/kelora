@@ -2,6 +2,112 @@
 
 pub use config::{KeloraConfig, ScriptStageType};
 
+/// Core pipeline configuration - contains only what's needed for processing
+/// Separated from CLI-specific concerns like colors, stats output, etc.
+#[derive(Debug, Clone)]
+pub struct PipelineConfig {
+    /// Input configuration
+    pub input: PipelineInputConfig,
+    /// Processing configuration  
+    pub processing: PipelineProcessingConfig,
+    /// Performance configuration
+    pub performance: PipelinePerformanceConfig,
+    /// Output format (for data transformation, not display)
+    pub output_format: OutputFormat,
+}
+
+#[derive(Debug, Clone)]
+pub struct PipelineInputConfig {
+    pub files: Vec<String>,
+    pub format: InputFormat,
+    pub file_order: FileOrder,
+    pub skip_lines: usize,
+    pub ignore_lines: Option<regex::Regex>,
+    pub multiline: Option<config::MultilineConfig>,
+    pub ts_field: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PipelineProcessingConfig {
+    pub begin: Option<String>,
+    pub stages: Vec<ScriptStageType>,
+    pub end: Option<String>,
+    pub no_inject_fields: bool,
+    pub inject_prefix: Option<String>,
+    pub on_error: ErrorStrategy,
+    pub levels: Vec<String>,
+    pub exclude_levels: Vec<String>,
+    pub window_size: usize,
+    pub timestamp_filter: Option<config::TimestampFilterConfig>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PipelinePerformanceConfig {
+    pub parallel: bool,
+    pub threads: usize,
+    pub batch_size: Option<usize>,
+    pub batch_timeout: u64,
+    pub no_preserve_order: bool,
+}
+
+impl PipelineConfig {
+    /// Convert from KeloraConfig to PipelineConfig
+    pub fn from_kelora_config(config: &KeloraConfig) -> Self {
+        Self {
+            input: PipelineInputConfig {
+                files: config.input.files.clone(),
+                format: config.input.format.clone().into(),
+                file_order: config.input.file_order.clone().into(),
+                skip_lines: config.input.skip_lines,
+                ignore_lines: config.input.ignore_lines.clone(),
+                multiline: config.input.multiline.clone(),
+                ts_field: config.input.ts_field.clone(),
+            },
+            processing: PipelineProcessingConfig {
+                begin: config.processing.begin.clone(),
+                stages: config.processing.stages.clone(),
+                end: config.processing.end.clone(),
+                no_inject_fields: config.processing.no_inject_fields,
+                inject_prefix: config.processing.inject_prefix.clone(),
+                on_error: config.processing.on_error.clone().into(),
+                levels: config.processing.levels.clone(),
+                exclude_levels: config.processing.exclude_levels.clone(),
+                window_size: config.processing.window_size,
+                timestamp_filter: config.processing.timestamp_filter.clone(),
+            },
+            performance: PipelinePerformanceConfig {
+                parallel: config.performance.parallel,
+                threads: config.performance.threads,
+                batch_size: config.performance.batch_size,
+                batch_timeout: config.performance.batch_timeout,
+                no_preserve_order: config.performance.no_preserve_order,
+            },
+            output_format: config.output.format.clone().into(),
+        }
+    }
+
+    /// Check if parallel processing should be used
+    pub fn should_use_parallel(&self) -> bool {
+        self.performance.parallel
+            || self.performance.threads > 0
+            || self.performance.batch_size.is_some()
+    }
+
+    /// Get effective batch size with defaults
+    pub fn effective_batch_size(&self) -> usize {
+        self.performance.batch_size.unwrap_or(1000)
+    }
+
+    /// Get effective thread count with defaults
+    pub fn effective_threads(&self) -> usize {
+        if self.performance.threads == 0 {
+            num_cpus::get()
+        } else {
+            self.performance.threads
+        }
+    }
+}
+
 // CLI types - these will eventually be moved to a separate module
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum InputFormat {
@@ -224,9 +330,62 @@ pub struct PipelineResult {
     pub success: bool,
 }
 
-/// Core pipeline processing function
-/// This is the main entry point for processing log data with the given configuration
+/// Core pipeline processing function (new API using PipelineConfig)
+/// This is the preferred entry point for processing log data with clean configuration
 pub fn run_pipeline<W: Write + Send + 'static>(
+    config: &PipelineConfig,
+    output: W,
+    collect_stats: bool,
+) -> Result<PipelineResult> {
+    // Convert PipelineConfig back to KeloraConfig temporarily
+    // TODO: Remove this conversion in future increments when core functions are updated
+    let kelora_config = KeloraConfig {
+        input: config::InputConfig {
+            files: config.input.files.clone(),
+            format: config.input.format.clone().into(),
+            file_order: config.input.file_order.clone().into(),
+            skip_lines: config.input.skip_lines,
+            ignore_lines: config.input.ignore_lines.clone(),
+            multiline: config.input.multiline.clone(),
+            ts_field: config.input.ts_field.clone(),
+        },
+        output: config::OutputConfig {
+            format: config.output_format.clone().into(),
+            keys: Vec::new(), // Not needed for core processing
+            exclude_keys: Vec::new(), // Not needed for core processing
+            core: false, // Not needed for core processing
+            brief: false, // Not needed for core processing
+            color: config::ColorMode::Auto, // Not needed for core processing
+            no_emoji: false, // Not needed for core processing
+            summary: false, // Not needed for core processing
+            stats: collect_stats,
+        },
+        processing: config::ProcessingConfig {
+            begin: config.processing.begin.clone(),
+            stages: config.processing.stages.clone(),
+            end: config.processing.end.clone(),
+            no_inject_fields: config.processing.no_inject_fields,
+            inject_prefix: config.processing.inject_prefix.clone(),
+            on_error: config.processing.on_error.clone().into(),
+            levels: config.processing.levels.clone(),
+            exclude_levels: config.processing.exclude_levels.clone(),
+            window_size: config.processing.window_size,
+            timestamp_filter: config.processing.timestamp_filter.clone(),
+        },
+        performance: config::PerformanceConfig {
+            parallel: config.performance.parallel,
+            threads: config.performance.threads,
+            batch_size: config.performance.batch_size,
+            batch_timeout: config.performance.batch_timeout,
+            no_preserve_order: config.performance.no_preserve_order,
+        },
+    };
+
+    run_pipeline_with_kelora_config(&kelora_config, output)
+}
+
+/// Legacy API for backward compatibility - will be removed in future increments
+pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
     config: &KeloraConfig,
     output: W,
 ) -> Result<PipelineResult> {
