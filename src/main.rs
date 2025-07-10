@@ -63,8 +63,7 @@ impl OutputWriter for SafeFileOut {
 
 
 // Use CLI types from library
-use kelora::{InputFormat, OutputFormat, ErrorStrategy, FileOrder, Cli};
-use config::ScriptStageType;
+use kelora::{InputFormat, OutputFormat, ErrorStrategy, FileOrder, Cli, ScriptStageType};
 
 
 fn main() -> Result<()> {
@@ -99,7 +98,13 @@ fn main() -> Result<()> {
 
     // Create configuration from CLI and set stages
     let mut config = KeloraConfig::from_cli(&cli);
-    config.processing.stages = ordered_stages;
+    // Convert kelora::ScriptStageType to config::ScriptStageType
+    config.processing.stages = ordered_stages.into_iter().map(|stage| {
+        match stage {
+            ScriptStageType::Filter(script) => config::ScriptStageType::Filter(script),
+            ScriptStageType::Exec(script) => config::ScriptStageType::Exec(script),
+        }
+    }).collect();
 
     // Parse timestamp filter arguments if provided
     if cli.since.is_some() || cli.until.is_some() {
