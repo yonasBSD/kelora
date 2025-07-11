@@ -120,7 +120,7 @@ mod event;
 mod formatters;
 mod parallel;
 mod parsers;
-mod pipeline;
+pub mod pipeline;
 mod readers;
 mod rhai_functions;
 mod stats;

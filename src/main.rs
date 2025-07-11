@@ -56,7 +56,7 @@ impl OutputWriter for SafeFileOut {
 
 
 // Use CLI types from library
-use kelora::{InputFormat, OutputFormat, ErrorStrategy, FileOrder, Cli, PipelineConfig, run_pipeline, KeloraConfig as LibKeloraConfig, TimestampFilterConfig, MultilineConfig};
+use kelora::{InputFormat, OutputFormat, ErrorStrategy, FileOrder, Cli, run_pipeline_with_kelora_config, KeloraConfig as LibKeloraConfig, TimestampFilterConfig, MultilineConfig};
 
 
 fn main() -> Result<()> {
@@ -181,8 +181,6 @@ fn main() -> Result<()> {
         ExitCode::InvalidUsage.exit();
     }
 
-    let pipeline_config = PipelineConfig::from_kelora_config(&lib_config);
-
     // Handle output destination and run pipeline
     let result = if let Some(ref output_file_path) = cli.output_file {
         // Use file output
@@ -195,11 +193,11 @@ fn main() -> Result<()> {
                 ExitCode::GeneralError.exit();
             }
         };
-        run_pipeline(&pipeline_config, file_output, lib_config.output.stats)
+        run_pipeline_with_kelora_config(&lib_config, file_output)
     } else {
         // Use stdout output
         let stdout_output = SafeStdout::new();
-        run_pipeline(&pipeline_config, stdout_output, lib_config.output.stats)
+        run_pipeline_with_kelora_config(&lib_config, stdout_output)
     };
 
     let final_stats = match result {
