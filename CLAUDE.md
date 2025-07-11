@@ -112,6 +112,26 @@ Empty lines are handled differently based on input format:
 - Run with `make bench` for comprehensive testing
 - Use `time` command for quick performance checks
 
+### Timestamp Parsing and Timezone Handling
+
+**Custom Timestamp Formats:**
+- Use `--ts-format` to specify custom timestamp formats using chrono format strings
+- Use `--help-time` to see comprehensive format reference and examples
+- Formats support subseconds, timezones, and various date/time layouts
+
+**Timezone Configuration:**
+- `--utc` - Interpret naive timestamps as UTC
+- `--local-time` - Interpret naive timestamps as local time (default)
+- `--timezone TZ` - Use specific timezone (e.g., "America/New_York", "UTC")
+- `TZ` environment variable - Automatic timezone detection
+- Priority: CLI flags > --timezone > TZ env var > local time
+
+**Adaptive Parsing:**
+- Single consolidated parser handles all timestamp parsing tasks
+- Automatically learns and reorders formats for performance
+- Supports CLI arguments (--since/--until), event parsing, and Rhai scripts
+- Rhai scripts use UTC interpretation for consistency
+
 ### Rhai Scripting Best Practices
 
 - **Variable Declaration**: Always use "let" when using new Rhai variables (e.g. 'let myfield=line.col("1,2")' or 'let myfield=line.col(1,2)').

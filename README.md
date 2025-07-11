@@ -20,6 +20,11 @@ kelora -f jsonl access.log \
   --filter 'response_time.to_int() > 1000' \
   --keys timestamp,method,path,response_time
 
+# Filter logs by time range
+kelora -f jsonl app.log \
+  --since "2024-01-01T00:00:00Z" \
+  --until "2024-01-01T23:59:59Z"
+
 # Add a derived status class and export as CSV
 kelora -f jsonl app.log \
   --exec 'let class = status_class(status)' \
@@ -114,21 +119,26 @@ cargo install --path .
 
 ```bash
 kelora --help         # Show CLI help
+kelora --help-time    # Show timestamp format reference
 kelora --show-config  # Show config file and aliases
 ```
 
 ### Example flags:
 
-| Flag         | Purpose                                      |
-| ------------ | -------------------------------------------- |
-| `-f`         | Input format (`jsonl`, `line`, `syslog`, …) |
-| `-F`         | Output format (`jsonl`, `csv`, `logfmt`, …) |
-| `--filter`   | Rhai expression to include events            |
-| `--exec`     | Rhai script to transform events              |
-| `--window N` | Enable N+1 sliding event window              |
-| `--summary`  | Show tracked key/value table                 |
-| `--stats`    | Show line counts and performance stats       |
-| `--on-error` | How to handle bad lines (`print`, `skip`, …) |
+| Flag           | Purpose                                      |
+| -------------- | -------------------------------------------- |
+| `-f`           | Input format (`jsonl`, `line`, `syslog`, …) |
+| `-F`           | Output format (`jsonl`, `csv`, `logfmt`, …) |
+| `--filter`     | Rhai expression to include events            |
+| `--exec`       | Rhai script to transform events              |
+| `--window N`   | Enable N+1 sliding event window              |
+| `--summary`    | Show tracked key/value table                 |
+| `--stats`      | Show line counts and performance stats       |
+| `--on-error`   | How to handle bad lines (`print`, `skip`, …) |
+| `--ts-format`  | Custom timestamp format (chrono syntax)     |
+| `--utc`        | Parse naive timestamps as UTC                |
+| `--since`      | Filter events after timestamp               |
+| `--until`      | Filter events before timestamp              |
 
 ## 📖 Configuration
 
