@@ -1,6 +1,6 @@
 // Core library for Kelora log analysis tool
 
-pub use config::{KeloraConfig, ScriptStageType};
+pub use config::{KeloraConfig, ScriptStageType, TimestampFilterConfig, MultilineConfig};
 
 /// Core pipeline configuration - contains only what's needed for processing
 /// Separated from CLI-specific concerns like colors, stats output, etc.
@@ -159,51 +159,30 @@ pub fn run_pipeline<W: Write + Send + 'static>(
     output: W,
     collect_stats: bool,
 ) -> Result<PipelineResult> {
-    // Convert PipelineConfig back to KeloraConfig temporarily
-    // TODO: Remove this conversion in future increments when core functions are updated
-    let kelora_config = KeloraConfig {
-        input: config::InputConfig {
-            files: config.input.files.clone(),
-            format: config.input.format.clone().into(),
-            file_order: config.input.file_order.clone().into(),
-            skip_lines: config.input.skip_lines,
-            ignore_lines: config.input.ignore_lines.clone(),
-            multiline: config.input.multiline.clone(),
-            ts_field: config.input.ts_field.clone(),
-        },
-        output: config::OutputConfig {
-            format: config.output_format.clone().into(),
-            keys: Vec::new(), // Not needed for core processing
-            exclude_keys: Vec::new(), // Not needed for core processing
-            core: false, // Not needed for core processing
-            brief: false, // Not needed for core processing
-            color: config::ColorMode::Auto, // Not needed for core processing
-            no_emoji: false, // Not needed for core processing
-            summary: false, // Not needed for core processing
-            stats: collect_stats,
-        },
-        processing: config::ProcessingConfig {
-            begin: config.processing.begin.clone(),
-            stages: config.processing.stages.clone(),
-            end: config.processing.end.clone(),
-            no_inject_fields: config.processing.no_inject_fields,
-            inject_prefix: config.processing.inject_prefix.clone(),
-            on_error: config.processing.on_error.clone().into(),
-            levels: config.processing.levels.clone(),
-            exclude_levels: config.processing.exclude_levels.clone(),
-            window_size: config.processing.window_size,
-            timestamp_filter: config.processing.timestamp_filter.clone(),
-        },
-        performance: config::PerformanceConfig {
-            parallel: config.performance.parallel,
-            threads: config.performance.threads,
-            batch_size: config.performance.batch_size,
-            batch_timeout: config.performance.batch_timeout,
-            no_preserve_order: config.performance.no_preserve_order,
-        },
+    // Start statistics collection if enabled
+    if collect_stats {
+        stats_start_timer();
+    }
+
+    let use_parallel = config.should_use_parallel();
+    
+    let final_stats = if use_parallel {
+        run_pipeline_parallel_with_config(config, output)?
+    } else {
+        let mut output = output;
+        run_pipeline_sequential_with_config(config, &mut output)?;
+        if collect_stats {
+            stats_finish_processing();
+            Some(get_thread_stats())
+        } else {
+            None
+        }
     };
 
-    run_pipeline_with_kelora_config(&kelora_config, output)
+    Ok(PipelineResult {
+        stats: final_stats,
+        success: !SHOULD_TERMINATE.load(Ordering::Relaxed),
+    })
 }
 
 /// Legacy API for backward compatibility - will be removed in future increments
@@ -237,7 +216,58 @@ pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
     })
 }
 
-/// Run pipeline in parallel mode
+/// Run pipeline in parallel mode using PipelineConfig
+pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
+    config: &PipelineConfig,
+    output: W,
+) -> Result<Option<ProcessingStats>> {
+    // Convert to KeloraConfig temporarily - will be removed when all core functions are updated
+    let kelora_config = KeloraConfig {
+        input: config::InputConfig {
+            files: config.input.files.clone(),
+            format: config.input.format.clone().into(),
+            file_order: config.input.file_order.clone().into(),
+            skip_lines: config.input.skip_lines,
+            ignore_lines: config.input.ignore_lines.clone(),
+            multiline: config.input.multiline.clone(),
+            ts_field: config.input.ts_field.clone(),
+        },
+        output: config::OutputConfig {
+            format: config.output_format.clone().into(),
+            keys: Vec::new(),
+            exclude_keys: Vec::new(),
+            core: false,
+            brief: false,
+            color: config::ColorMode::Auto,
+            no_emoji: false,
+            summary: false,
+            stats: false, // Stats handled at higher level
+        },
+        processing: config::ProcessingConfig {
+            begin: config.processing.begin.clone(),
+            stages: config.processing.stages.clone(),
+            end: config.processing.end.clone(),
+            no_inject_fields: config.processing.no_inject_fields,
+            inject_prefix: config.processing.inject_prefix.clone(),
+            on_error: config.processing.on_error.clone().into(),
+            levels: config.processing.levels.clone(),
+            exclude_levels: config.processing.exclude_levels.clone(),
+            window_size: config.processing.window_size,
+            timestamp_filter: config.processing.timestamp_filter.clone(),
+        },
+        performance: config::PerformanceConfig {
+            parallel: config.performance.parallel,
+            threads: config.performance.threads,
+            batch_size: config.performance.batch_size,
+            batch_timeout: config.performance.batch_timeout,
+            no_preserve_order: config.performance.no_preserve_order,
+        },
+    };
+
+    run_pipeline_parallel(&kelora_config, output)
+}
+
+/// Run pipeline in parallel mode using KeloraConfig (legacy)
 fn run_pipeline_parallel<W: Write + Send + 'static>(
     config: &KeloraConfig,
     output: W,
@@ -310,8 +340,59 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     }
 }
 
-/// Run pipeline in sequential mode
-fn run_pipeline_sequential<W: Write>(
+/// Run pipeline in sequential mode using PipelineConfig
+pub fn run_pipeline_sequential_with_config<W: Write>(
+    config: &PipelineConfig,
+    output: &mut W,
+) -> Result<()> {
+    // Convert to KeloraConfig temporarily - will be removed when all core functions are updated
+    let kelora_config = KeloraConfig {
+        input: config::InputConfig {
+            files: config.input.files.clone(),
+            format: config.input.format.clone().into(),
+            file_order: config.input.file_order.clone().into(),
+            skip_lines: config.input.skip_lines,
+            ignore_lines: config.input.ignore_lines.clone(),
+            multiline: config.input.multiline.clone(),
+            ts_field: config.input.ts_field.clone(),
+        },
+        output: config::OutputConfig {
+            format: config.output_format.clone().into(),
+            keys: Vec::new(),
+            exclude_keys: Vec::new(),
+            core: false,
+            brief: false,
+            color: config::ColorMode::Auto,
+            no_emoji: false,
+            summary: false,
+            stats: false, // Stats handled at higher level
+        },
+        processing: config::ProcessingConfig {
+            begin: config.processing.begin.clone(),
+            stages: config.processing.stages.clone(),
+            end: config.processing.end.clone(),
+            no_inject_fields: config.processing.no_inject_fields,
+            inject_prefix: config.processing.inject_prefix.clone(),
+            on_error: config.processing.on_error.clone().into(),
+            levels: config.processing.levels.clone(),
+            exclude_levels: config.processing.exclude_levels.clone(),
+            window_size: config.processing.window_size,
+            timestamp_filter: config.processing.timestamp_filter.clone(),
+        },
+        performance: config::PerformanceConfig {
+            parallel: config.performance.parallel,
+            threads: config.performance.threads,
+            batch_size: config.performance.batch_size,
+            batch_timeout: config.performance.batch_timeout,
+            no_preserve_order: config.performance.no_preserve_order,
+        },
+    };
+
+    run_pipeline_sequential(&kelora_config, output)
+}
+
+/// Run pipeline in sequential mode using KeloraConfig (legacy)
+pub fn run_pipeline_sequential<W: Write>(
     config: &KeloraConfig,
     output: &mut W,
 ) -> Result<()> {
@@ -424,7 +505,7 @@ fn run_pipeline_sequential<W: Write>(
     Ok(())
 }
 
-/// Process a single line in sequential mode (simplified from main.rs)
+/// Process a single line in sequential mode with filename tracking and CSV schema detection
 #[allow(clippy::too_many_arguments)]
 fn process_line_sequential<W: Write>(
     line_result: io::Result<String>,
@@ -446,18 +527,20 @@ fn process_line_sequential<W: Write>(
         stats_add_line_read();
     }
 
-    // Skip the first N lines if configured
+    // Skip the first N lines if configured (applied before ignore-lines and parsing)
     if *skipped_lines < config.input.skip_lines {
         *skipped_lines += 1;
+        // Count skipped line for stats
         if config.output.stats {
             stats_add_line_filtered();
         }
         return Ok(());
     }
 
-    // Apply ignore-lines filter if configured
+    // Apply ignore-lines filter if configured (early filtering before parsing)
     if let Some(ref ignore_regex) = config.input.ignore_lines {
         if ignore_regex.is_match(&line) {
+            // Count filtered line for stats
             if config.output.stats {
                 stats_add_line_filtered();
             }
@@ -470,15 +553,52 @@ fn process_line_sequential<W: Write>(
         if !matches!(config.input.format, config::InputFormat::Line) {
             return Ok(());
         }
+        // For line format, continue processing the empty line
     }
 
-    // Note: Simplified CSV handling - full logic would be needed for production
+    // For CSV formats, detect file changes and reinitialize parser, or handle first line for stdin
     if matches!(
         config.input.format,
-        config::InputFormat::Csv | config::InputFormat::Tsv | config::InputFormat::Csvnh | config::InputFormat::Tsvnh
-    ) && (current_filename != *last_filename || (current_filename.is_none() && current_csv_headers.is_none())) {
+        config::InputFormat::Csv
+            | config::InputFormat::Tsv
+            | config::InputFormat::Csvnh
+            | config::InputFormat::Tsvnh
+    ) && (current_filename != *last_filename
+        || (current_filename.is_none() && current_csv_headers.is_none()))
+    {
+        // File changed, reinitialize CSV parser for this file
+        let mut temp_parser = match config.input.format {
+            config::InputFormat::Csv => crate::parsers::CsvParser::new_csv(),
+            config::InputFormat::Tsv => crate::parsers::CsvParser::new_tsv(),
+            config::InputFormat::Csvnh => crate::parsers::CsvParser::new_csv_no_headers(),
+            config::InputFormat::Tsvnh => crate::parsers::CsvParser::new_tsv_no_headers(),
+            _ => unreachable!(),
+        };
+
+        // Initialize headers from the first line
+        let was_consumed = temp_parser
+            .initialize_headers_from_line(&line)?;
+
+        // Get the initialized headers
+        let headers = temp_parser.get_headers();
+        *current_csv_headers = Some(headers.clone());
         *last_filename = current_filename.clone();
-        // TODO: Add full CSV header reinitialization logic
+
+        // Rebuild the pipeline with new headers
+        let mut pipeline_builder = create_pipeline_builder_from_config(config);
+        pipeline_builder = pipeline_builder.with_csv_headers(headers);
+
+        let (new_pipeline, _new_begin_stage, _new_end_stage, new_ctx) = pipeline_builder
+            .build(config.processing.stages.clone())?;
+
+        *pipeline = new_pipeline;
+        // Keep the existing context's tracking state but update the Rhai engine
+        ctx.rhai = new_ctx.rhai;
+
+        // If the first line was consumed as a header, don't process it as data
+        if was_consumed {
+            return Ok(());
+        }
     }
 
     // Update metadata with filename tracking
@@ -492,8 +612,12 @@ fn process_line_sequential<W: Write>(
             if config.output.stats && !results.is_empty() {
                 stats_add_line_output();
             }
+            // Note: Empty results are now counted as either:
+            // 1. Parsing errors (counted by stats_add_line_error() in pipeline)
+            // 2. Filter rejections (counted by stats_add_event_filtered() in pipeline)
+            // So we don't need to count empty results as filtered here anymore
 
-            // Output all results
+            // Output all results (usually just one), skip empty strings
             for result in results {
                 if !result.is_empty() {
                     writeln!(output, "{}", result)?;
