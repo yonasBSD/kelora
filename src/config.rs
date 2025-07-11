@@ -25,6 +25,8 @@ pub struct InputConfig {
     pub ts_field: Option<String>,
     /// Custom timestamp format string
     pub ts_format: Option<String>,
+    /// Default timezone for naive timestamps (None = local time)
+    pub default_timezone: Option<String>,
 }
 
 /// Output configuration
@@ -480,6 +482,7 @@ impl KeloraConfig {
                 multiline: None,    // Will be set after CLI parsing
                 ts_field: cli.ts_field.clone(),
                 ts_format: cli.ts_format.clone(),
+                default_timezone: determine_default_timezone(&cli),
             },
             output: OutputConfig {
                 format: if cli.stats_only {
@@ -552,6 +555,7 @@ impl Default for KeloraConfig {
                 multiline: None,
                 ts_field: None,
                 ts_format: None,
+                default_timezone: None,
             },
             output: OutputConfig {
                 format: OutputFormat::Default,
@@ -585,6 +589,34 @@ impl Default for KeloraConfig {
             },
         }
     }
+}
+
+/// Determine the default timezone based on CLI options and environment
+fn determine_default_timezone(cli: &crate::Cli) -> Option<String> {
+    // Priority 1: Explicit --timezone option
+    if let Some(ref tz) = cli.timezone {
+        return Some(tz.clone());
+    }
+    
+    // Priority 2: --utc flag
+    if cli.utc {
+        return Some("UTC".to_string());
+    }
+    
+    // Priority 3: --local-time flag (explicit local time)
+    if cli.local_time {
+        return None; // None means local time
+    }
+    
+    // Priority 4: TZ environment variable
+    if let Ok(tz) = std::env::var("TZ") {
+        if !tz.is_empty() {
+            return Some(tz);
+        }
+    }
+    
+    // Default: local time (None)
+    None
 }
 
 // Conversion traits to maintain compatibility with existing CLI types

@@ -26,6 +26,7 @@ pub struct PipelineInputConfig {
     pub multiline: Option<config::MultilineConfig>,
     pub ts_field: Option<String>,
     pub ts_format: Option<String>,
+    pub default_timezone: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +65,7 @@ impl PipelineConfig {
                 multiline: config.input.multiline.clone(),
                 ts_field: config.input.ts_field.clone(),
             ts_format: config.input.ts_format.clone(),
+            default_timezone: config.input.default_timezone.clone(),
             },
             processing: PipelineProcessingConfig {
                 begin: config.processing.begin.clone(),
@@ -234,6 +236,7 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
             multiline: config.input.multiline.clone(),
             ts_field: config.input.ts_field.clone(),
             ts_format: config.input.ts_format.clone(),
+            default_timezone: config.input.default_timezone.clone(),
         },
         output: config::OutputConfig {
             format: config.output_format.clone().into(),
@@ -359,6 +362,7 @@ pub fn run_pipeline_sequential_with_config<W: Write>(
             multiline: config.input.multiline.clone(),
             ts_field: config.input.ts_field.clone(),
             ts_format: config.input.ts_format.clone(),
+            default_timezone: config.input.default_timezone.clone(),
         },
         output: config::OutputConfig {
             format: config.output_format.clone().into(),

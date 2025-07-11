@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Local, TimeZone, Utc};
 
 /// Adaptive timestamp parser that dynamically reorders formats based on success
 /// Each thread should have its own instance to avoid contention
@@ -18,17 +18,17 @@ impl AdaptiveTsParser {
     /// Parse timestamp using adaptive format ordering
     /// Successful formats are moved to front of the list for faster future parsing
     pub fn parse_ts(&mut self, ts_str: &str) -> Option<DateTime<Utc>> {
-        self.parse_ts_with_custom_format(ts_str, None)
+        self.parse_ts_with_config(ts_str, None, None)
     }
 
-    /// Parse timestamp with optional custom format
-    /// If custom_format is provided, it's tried first before falling back to adaptive parsing
-    pub fn parse_ts_with_custom_format(&mut self, ts_str: &str, custom_format: Option<&str>) -> Option<DateTime<Utc>> {
+
+    /// Parse timestamp with full configuration support
+    pub fn parse_ts_with_config(&mut self, ts_str: &str, custom_format: Option<&str>, default_timezone: Option<&str>) -> Option<DateTime<Utc>> {
         let ts_str = ts_str.trim();
 
         // Try custom format first if provided
         if let Some(format) = custom_format {
-            if let Some(parsed) = try_parse_with_format(ts_str, format) {
+            if let Some(parsed) = try_parse_with_format(ts_str, format, default_timezone) {
                 return Some(parsed);
             }
         }
@@ -90,13 +90,14 @@ impl AdaptiveTsParser {
         }
 
         // Try format list with adaptive reordering
-        self.try_formats_with_reordering(ts_str)
+        self.try_formats_with_reordering(ts_str, default_timezone)
     }
 
-    /// Try formats and move successful ones to front
-    fn try_formats_with_reordering(&mut self, ts_str: &str) -> Option<DateTime<Utc>> {
+
+    /// Try formats with timezone configuration and move successful ones to front
+    fn try_formats_with_reordering(&mut self, ts_str: &str, default_timezone: Option<&str>) -> Option<DateTime<Utc>> {
         for (index, format) in self.formats.iter().enumerate() {
-            if let Some(parsed) = try_parse_with_format(ts_str, format) {
+            if let Some(parsed) = try_parse_with_format(ts_str, format, default_timezone) {
                 // Move successful format to front if it's not already there
                 if index > 0 {
                     let successful_format = self.formats.remove(index);
@@ -128,16 +129,41 @@ impl Default for AdaptiveTsParser {
     }
 }
 
-/// Try to parse a timestamp with a specific format
-fn try_parse_with_format(ts_str: &str, format: &str) -> Option<DateTime<Utc>> {
+/// Try to parse a timestamp with a specific format and timezone configuration
+fn try_parse_with_format(ts_str: &str, format: &str, default_timezone: Option<&str>) -> Option<DateTime<Utc>> {
+    use chrono_tz::Tz;
+    
     // Try timezone-aware parsing first
     if let Ok(dt) = DateTime::parse_from_str(ts_str, format) {
         return Some(dt.with_timezone(&Utc));
     }
 
-    // Try naive parsing and assume UTC
+    // Try naive parsing
     if let Ok(naive_dt) = chrono::NaiveDateTime::parse_from_str(ts_str, format) {
-        return Some(naive_dt.and_utc());
+        // Apply timezone configuration
+        match default_timezone {
+            Some("UTC") => {
+                return Some(naive_dt.and_utc());
+            }
+            Some(tz_str) => {
+                // Try to parse as named timezone
+                if let Ok(tz) = tz_str.parse::<Tz>() {
+                    if let Some(dt) = tz.from_local_datetime(&naive_dt).single() {
+                        return Some(dt.with_timezone(&Utc));
+                    }
+                }
+                // Fall back to local time if timezone parsing fails
+                if let Some(local_dt) = chrono::Local.from_local_datetime(&naive_dt).single() {
+                    return Some(local_dt.with_timezone(&Utc));
+                }
+            }
+            None => {
+                // Default: interpret as local time
+                if let Some(local_dt) = chrono::Local.from_local_datetime(&naive_dt).single() {
+                    return Some(local_dt.with_timezone(&Utc));
+                }
+            }
+        }
     }
 
     None
@@ -189,6 +215,8 @@ fn get_initial_timestamp_formats() -> Vec<String> {
         "%Y-%m-%dT%H:%M:%SZ".to_string(),    // ISO 8601
         "%Y-%m-%dT%H:%M:%S%.f%:z".to_string(), // ISO 8601 with timezone
         "%Y-%m-%dT%H:%M:%S%:z".to_string(),  // ISO 8601 with timezone
+        "%Y-%m-%dT%H:%M:%S%.f".to_string(),  // ISO 8601 without timezone (with subseconds)
+        "%Y-%m-%dT%H:%M:%S".to_string(),     // ISO 8601 without timezone
         // Space-separated ISO variants (common in many log formats)
         "%Y-%m-%d %H:%M:%S%.f".to_string(), // Common log format with subseconds
         "%Y-%m-%d %H:%M:%S".to_string(),    // Common log format
@@ -219,6 +247,8 @@ pub struct TsConfig {
     pub custom_field: Option<String>,
     /// Custom timestamp format string
     pub custom_format: Option<String>,
+    /// Default timezone for naive timestamps (None = local time)
+    pub default_timezone: Option<String>,
     /// Whether to automatically parse timestamps from events (reserved for future features)
     #[allow(dead_code)]
     pub auto_parse: bool,
@@ -229,6 +259,7 @@ impl Default for TsConfig {
         Self {
             custom_field: None,
             custom_format: None,
+            default_timezone: None,
             auto_parse: true,
         }
     }
@@ -262,10 +293,10 @@ pub fn identify_timestamp_field(
 
 /// Parse timestamp arguments (--since, --until) in journalctl-compatible format
 /// Uses the enhanced adaptive parser with journalctl support
-pub fn parse_timestamp_arg(arg: &str) -> Result<DateTime<Utc>, String> {
+pub fn parse_timestamp_arg_with_timezone(arg: &str, default_timezone: Option<&str>) -> Result<DateTime<Utc>, String> {
     let mut parser = AdaptiveTsParser::new();
     parser
-        .parse_ts(arg)
+        .parse_ts_with_config(arg, None, default_timezone)
         .ok_or_else(|| format!("Could not parse timestamp: {}", arg))
 }
 
@@ -439,6 +470,7 @@ mod tests {
         let config = TsConfig {
             custom_field: Some("custom_time".to_string()),
             custom_format: None,
+            default_timezone: None,
             auto_parse: true,
         };
 
@@ -525,73 +557,73 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_timestamp_arg() {
+    fn test_parse_timestamp_arg_with_timezone() {
         // Test that the wrapper function works
-        let result = parse_timestamp_arg("2023-07-04T12:34:56Z");
+        let result = parse_timestamp_arg_with_timezone("2023-07-04T12:34:56Z", None);
         assert!(result.is_ok());
 
-        let result = parse_timestamp_arg("now");
+        let result = parse_timestamp_arg_with_timezone("now", None);
         assert!(result.is_ok());
 
-        let result = parse_timestamp_arg("-1h");
+        let result = parse_timestamp_arg_with_timezone("-1h", None);
         assert!(result.is_ok());
 
-        let result = parse_timestamp_arg("invalid-timestamp");
+        let result = parse_timestamp_arg_with_timezone("invalid-timestamp", None);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_relative_time_parsing() {
         // Test various relative time formats
-        let result = parse_timestamp_arg("-30m");
+        let result = parse_timestamp_arg_with_timezone("-30m", None);
         assert!(result.is_ok());
 
-        let result = parse_timestamp_arg("+2h");
+        let result = parse_timestamp_arg_with_timezone("+2h", None);
         assert!(result.is_ok());
 
-        let result = parse_timestamp_arg("-1d");
+        let result = parse_timestamp_arg_with_timezone("-1d", None);
         assert!(result.is_ok());
 
-        let result = parse_timestamp_arg("-2w");
+        let result = parse_timestamp_arg_with_timezone("-2w", None);
         assert!(result.is_ok());
 
         // Test invalid relative times
-        let result = parse_timestamp_arg("-");
+        let result = parse_timestamp_arg_with_timezone("-", None);
         assert!(result.is_err());
 
-        let result = parse_timestamp_arg("-1x");
+        let result = parse_timestamp_arg_with_timezone("-1x", None);
         assert!(result.is_err());
 
-        let result = parse_timestamp_arg("1h"); // Missing sign
+        let result = parse_timestamp_arg_with_timezone("1h", None); // Missing sign
         assert!(result.is_err());
     }
 
     #[test]
     fn test_date_only_parsing() {
-        let result = parse_timestamp_arg("2023-07-04");
+        let result = parse_timestamp_arg_with_timezone("2023-07-04", None);
         assert!(result.is_ok());
 
-        let result = parse_timestamp_arg("07/04/2023");
+        let result = parse_timestamp_arg_with_timezone("07/04/2023", None);
         assert!(result.is_ok());
 
-        let result = parse_timestamp_arg("04.07.2023");
+        let result = parse_timestamp_arg_with_timezone("04.07.2023", None);
         assert!(result.is_ok());
 
         // Invalid date formats
-        let result = parse_timestamp_arg("2023-13-45");
+        let result = parse_timestamp_arg_with_timezone("2023-13-45", None);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_time_only_parsing() {
-        let result = parse_timestamp_arg("15:30:45");
+        let result = parse_timestamp_arg_with_timezone("15:30:45", None);
         assert!(result.is_ok());
 
-        let result = parse_timestamp_arg("09:15");
+        let result = parse_timestamp_arg_with_timezone("09:15", None);
         assert!(result.is_ok());
 
         // Invalid time formats
-        let result = parse_timestamp_arg("25:70:80");
+        let result = parse_timestamp_arg_with_timezone("25:70:80", None);
         assert!(result.is_err());
     }
 

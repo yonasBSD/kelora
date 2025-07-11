@@ -10,12 +10,13 @@ struct TimestampConfiguredParser {
 }
 
 impl TimestampConfiguredParser {
-    fn new(inner: Box<dyn EventParser>, ts_field: Option<String>, ts_format: Option<String>) -> Self {
+    fn new(inner: Box<dyn EventParser>, ts_field: Option<String>, ts_format: Option<String>, default_timezone: Option<String>) -> Self {
         Self {
             inner,
             ts_config: crate::timestamp::TsConfig {
                 custom_field: ts_field,
                 custom_format: ts_format,
+                default_timezone,
                 auto_parse: true,
             },
         }
@@ -60,6 +61,7 @@ pub struct PipelineBuilder {
     timestamp_filter: Option<crate::config::TimestampFilterConfig>,
     ts_field: Option<String>,
     ts_format: Option<String>,
+    default_timezone: Option<String>,
 }
 
 impl PipelineBuilder {
@@ -87,6 +89,7 @@ impl PipelineBuilder {
             timestamp_filter: None,
             ts_field: None,
             ts_format: None,
+            default_timezone: None,
         }
     }
 
@@ -151,11 +154,12 @@ impl PipelineBuilder {
         };
 
         // Wrap parser with timestamp configuration if needed
-        let parser: Box<dyn EventParser> = if self.ts_field.is_some() || self.ts_format.is_some() {
+        let parser: Box<dyn EventParser> = if self.ts_field.is_some() || self.ts_format.is_some() || self.default_timezone.is_some() {
             Box::new(TimestampConfiguredParser::new(
                 base_parser,
                 self.ts_field.clone(),
                 self.ts_format.clone(),
+                self.default_timezone.clone(),
             ))
         } else {
             base_parser
@@ -383,11 +387,12 @@ impl PipelineBuilder {
         };
 
         // Wrap parser with timestamp configuration if needed
-        let parser: Box<dyn EventParser> = if self.ts_field.is_some() || self.ts_format.is_some() {
+        let parser: Box<dyn EventParser> = if self.ts_field.is_some() || self.ts_format.is_some() || self.default_timezone.is_some() {
             Box::new(TimestampConfiguredParser::new(
                 base_parser,
                 self.ts_field.clone(),
                 self.ts_format.clone(),
+                self.default_timezone.clone(),
             ))
         } else {
             base_parser
@@ -552,6 +557,11 @@ impl PipelineBuilder {
         self.ts_format = ts_format;
         self
     }
+
+    pub fn with_default_timezone(mut self, default_timezone: Option<String>) -> Self {
+        self.default_timezone = default_timezone;
+        self
+    }
 }
 
 impl Default for PipelineBuilder {
@@ -595,6 +605,7 @@ pub fn create_pipeline_builder_from_config(
     builder.timestamp_filter = config.processing.timestamp_filter.clone();
     builder.ts_field = config.input.ts_field.clone();
     builder.ts_format = config.input.ts_format.clone();
+    builder.default_timezone = config.input.default_timezone.clone();
     builder
 }
 

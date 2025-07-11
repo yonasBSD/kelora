@@ -152,7 +152,10 @@ pub fn parse_ts(
     }
 
     // For auto-parsing (no explicit format), use the adaptive parser
-    let parsed_utc = RHAI_TS_PARSER.with(|parser| parser.borrow_mut().parse_ts(s));
+    // Rhai scripts use UTC interpretation for consistency
+    let parsed_utc = RHAI_TS_PARSER.with(|parser| {
+        parser.borrow_mut().parse_ts_with_config(s, None, Some("UTC"))
+    });
 
     if let Some(utc_dt) = parsed_utc {
         // Convert to the requested timezone

@@ -280,8 +280,12 @@ fn test_different_timestamp_formats() {
     );
 
     let since_ts = get_test_timestamp_iso(-45); // 45 minutes ago
+    
+    // Set TZ=UTC for consistent test behavior regardless of system timezone
+    std::env::set_var("TZ", "UTC");
     let (stdout, stderr, exit_code) =
         run_kelora_with_input(&["-f", "jsonl", "--since", &since_ts], &input);
+    std::env::remove_var("TZ");
 
     assert_eq!(
         exit_code, 0,

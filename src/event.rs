@@ -143,11 +143,11 @@ impl Event {
                 crate::timestamp::identify_timestamp_field(&self.fields, ts_config)
             {
                 let parsed_ts = if let Some(parser) = parser {
-                    parser.parse_ts_with_custom_format(&ts_str, ts_config.custom_format.as_deref())
+                    parser.parse_ts_with_config(&ts_str, ts_config.custom_format.as_deref(), ts_config.default_timezone.as_deref())
                 } else {
                     // Use the enhanced adaptive parser as default
                     let mut default_parser = crate::timestamp::AdaptiveTsParser::new();
-                    default_parser.parse_ts_with_custom_format(&ts_str, ts_config.custom_format.as_deref())
+                    default_parser.parse_ts_with_config(&ts_str, ts_config.custom_format.as_deref(), ts_config.default_timezone.as_deref())
                 };
 
                 if let Some(ts) = parsed_ts {

@@ -88,6 +88,18 @@ pub struct Cli {
     #[arg(long = "ts-format", help_heading = "Input Options")]
     pub ts_format: Option<String>,
 
+    /// Interpret timezone-naive timestamps as UTC
+    #[arg(long = "utc", help_heading = "Input Options")]
+    pub utc: bool,
+
+    /// Interpret timezone-naive timestamps as local time (default)
+    #[arg(long = "local-time", help_heading = "Input Options")]
+    pub local_time: bool,
+
+    /// Timezone for interpreting naive timestamps (e.g., "America/New_York", "UTC")
+    #[arg(long = "timezone", help_heading = "Input Options")]
+    pub timezone: Option<String>,
+
     /// Multi-line event detection strategy
     #[arg(short = 'M', long = "multiline", help_heading = "Input Options")]
     pub multiline: Option<String>,

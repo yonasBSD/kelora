@@ -68,8 +68,20 @@ fn main() -> Result<()> {
 
     // Parse timestamp filter arguments if provided
     if cli.since.is_some() || cli.until.is_some() {
+        // Determine timezone for CLI timestamp parsing
+        let env_tz = std::env::var("TZ").unwrap_or_default();
+        let cli_timezone = if cli.utc {
+            Some("UTC")
+        } else if let Some(ref tz) = cli.timezone {
+            Some(tz.as_str())
+        } else if !env_tz.is_empty() {
+            Some(env_tz.as_str())
+        } else {
+            None // Default to local time
+        };
+
         let since = if let Some(ref since_str) = cli.since {
-            match crate::timestamp::parse_timestamp_arg(since_str) {
+            match crate::timestamp::parse_timestamp_arg_with_timezone(since_str, cli_timezone) {
                 Ok(dt) => Some(dt),
                 Err(e) => {
                     stderr
@@ -86,7 +98,7 @@ fn main() -> Result<()> {
         };
 
         let until = if let Some(ref until_str) = cli.until {
-            match crate::timestamp::parse_timestamp_arg(until_str) {
+            match crate::timestamp::parse_timestamp_arg_with_timezone(until_str, cli_timezone) {
                 Ok(dt) => Some(dt),
                 Err(e) => {
                     stderr
