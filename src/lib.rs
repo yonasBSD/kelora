@@ -141,7 +141,7 @@ use stats::{
     get_thread_stats, stats_add_error, stats_add_line_filtered, stats_add_line_output,
     stats_add_line_read, stats_finish_processing, stats_start_timer, ProcessingStats,
 };
-use unix::{check_termination, ExitCode, SafeStderr, SHOULD_TERMINATE};
+use unix::{check_termination, SHOULD_TERMINATE};
 use std::io::{self, BufRead, Write};
 use std::sync::atomic::Ordering;
 
