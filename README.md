@@ -139,9 +139,9 @@ kelora --show-config  # Show config file and aliases
 | `--on-error`   | How to handle bad lines (`print`, `skip`, …) |
 | `--ts-format`  | Custom timestamp format (chrono syntax)     |
 | `--input-tz`   | Timezone for naive timestamps (default: UTC) |
-| `--format-ts`  | Format specific fields as timestamps         |
-| `-z`           | Format all timestamps as local time          |
-| `-Z`           | Format all timestamps as UTC                 |
+| `--pretty-ts`  | Format specific fields as RFC3339 timestamps |
+| `-z`           | Format all timestamps as local RFC3339       |
+| `-Z`           | Format all timestamps as UTC RFC3339         |
 | `--since`      | Filter events after timestamp               |
 | `--until`      | Filter events before timestamp              |
 
@@ -163,14 +163,14 @@ kelora -f jsonl app.log --input-tz Europe/Berlin
 
 ### Output Timestamp Formatting (Display Only)
 ```bash
-# Format all known timestamp fields as local time
+# Format all known timestamp fields as local RFC3339
 kelora -f jsonl app.log -z
 
-# Format all known timestamp fields as UTC
+# Format all known timestamp fields as UTC RFC3339
 kelora -f jsonl app.log -Z
 
-# Format specific fields as timestamps (local time)
-kelora -f jsonl app.log --format-ts created_at,updated_at
+# Format specific fields as RFC3339 timestamps (local time)
+kelora -f jsonl app.log --pretty-ts created_at,updated_at
 
 # Combine: parse as Berlin time, display as UTC
 kelora -f jsonl app.log --input-tz Europe/Berlin -Z

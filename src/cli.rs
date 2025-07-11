@@ -174,10 +174,10 @@ pub struct Cli {
     #[arg(short = 'o', long = "output-file", help_heading = "Output Options")]
     pub output_file: Option<String>,
 
-    /// Comma-separated list of fields to format as local RFC3339.
+    /// Comma-separated list of fields to format as RFC3339 timestamps.
     /// Only affects default output; does not modify event data.
-    #[arg(long = "format-ts", help_heading = "Output Options")]
-    pub format_ts: Option<String>,
+    #[arg(long = "pretty-ts", help_heading = "Output Options")]
+    pub pretty_ts: Option<String>,
 
     /// Auto-format all known timestamp fields as local RFC3339.
     /// Only affects default output; does not modify event data.

@@ -127,7 +127,7 @@ Empty lines are handled differently based on input format:
 - Only affects naive timestamps (those without explicit timezone info)
 
 **Output Timestamp Formatting (Display Stage):**
-- `--format-ts field1,field2` - Format specific fields as timestamps
+- `--pretty-ts field1,field2` - Format specific fields as RFC3339 timestamps
 - `-z` - Auto-format all known timestamp fields as local RFC3339
 - `-Z` - Auto-format all known timestamp fields as UTC RFC3339
 - Only affects default output format (human-readable display)

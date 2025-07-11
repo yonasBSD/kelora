@@ -618,8 +618,8 @@ impl Default for KeloraConfig {
 
 /// Create timestamp formatting configuration from CLI options
 fn create_timestamp_format_config(cli: &crate::Cli) -> TimestampFormatConfig {
-    let format_fields = if let Some(ref format_ts) = cli.format_ts {
-        format_ts.split(',').map(|s| s.trim().to_string()).collect()
+    let format_fields = if let Some(ref pretty_ts) = cli.pretty_ts {
+        pretty_ts.split(',').map(|s| s.trim().to_string()).collect()
     } else {
         Vec::new()
     };
