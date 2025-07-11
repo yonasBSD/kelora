@@ -22,6 +22,12 @@ pub struct SimpleWindowManager {
     current: Option<Event>,
 }
 
+impl Default for SimpleWindowManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SimpleWindowManager {
     pub fn new() -> Self {
         Self { current: None }

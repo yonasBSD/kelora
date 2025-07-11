@@ -1,6 +1,5 @@
 use anyhow::Result;
 use clap::{ArgMatches, CommandFactory, FromArgMatches};
-use std::io::{self, BufRead};
 use std::sync::atomic::Ordering;
 
 mod colors;
@@ -22,37 +21,11 @@ mod unix;
 
 use config::KeloraConfig;
 use config_file::ConfigFile;
-use stats::ProcessingStats;
 use unix::{
-    check_termination, ExitCode, ProcessCleanup, SafeFileOut, SafeStderr, SafeStdout,
+    ExitCode, ProcessCleanup, SafeFileOut, SafeStderr, SafeStdout,
     SignalHandler, SHOULD_TERMINATE,
 };
 
-/// Trait for output writing that works with both stdout and file output
-trait OutputWriter {
-    fn writeln(&mut self, data: &str) -> Result<()>;
-    fn flush(&mut self) -> Result<()>;
-}
-
-impl OutputWriter for SafeStdout {
-    fn writeln(&mut self, data: &str) -> Result<()> {
-        self.writeln(data)
-    }
-
-    fn flush(&mut self) -> Result<()> {
-        self.flush()
-    }
-}
-
-impl OutputWriter for SafeFileOut {
-    fn writeln(&mut self, data: &str) -> Result<()> {
-        self.writeln(data)
-    }
-
-    fn flush(&mut self) -> Result<()> {
-        self.flush()
-    }
-}
 
 
 // Use CLI types from library
@@ -72,7 +45,6 @@ fn main() -> Result<()> {
     let _cleanup = ProcessCleanup::new();
 
     // Initialize safe I/O wrappers
-    let mut stdout = SafeStdout::new();
     let mut stderr = SafeStderr::new();
 
     // Process command line arguments with config file support
