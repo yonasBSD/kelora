@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// ANSI color codes for logfmt output formatting
 #[derive(Debug, Clone)]
 pub struct ColorScheme {

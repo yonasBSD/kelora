@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use chrono::{DateTime, Local, Utc};
 
 /// Adaptive timestamp parser that dynamically reorders formats based on success

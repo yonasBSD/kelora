@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::colors::ColorScheme;
 use crate::event::Event;
 use crate::pipeline;

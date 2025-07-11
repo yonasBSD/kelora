@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use anyhow::Result;
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use rhai::Dynamic;

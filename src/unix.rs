@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use anyhow::Result;
 use std::fs::File;
 use std::io::{self, Write};
