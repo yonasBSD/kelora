@@ -23,6 +23,8 @@ pub struct InputConfig {
     /// Custom timestamp field name (reserved for --since/--until features)
     #[allow(dead_code)]
     pub ts_field: Option<String>,
+    /// Custom timestamp format string
+    pub ts_format: Option<String>,
 }
 
 /// Output configuration
@@ -477,6 +479,7 @@ impl KeloraConfig {
                 ignore_lines: None, // Will be set after CLI parsing
                 multiline: None,    // Will be set after CLI parsing
                 ts_field: cli.ts_field.clone(),
+                ts_format: cli.ts_format.clone(),
             },
             output: OutputConfig {
                 format: if cli.stats_only {
@@ -548,6 +551,7 @@ impl Default for KeloraConfig {
                 ignore_lines: None,
                 multiline: None,
                 ts_field: None,
+                ts_format: None,
             },
             output: OutputConfig {
                 format: OutputFormat::Default,

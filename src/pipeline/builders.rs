@@ -3,6 +3,34 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{self, BufRead};
 
+/// Wrapper parser that applies timestamp configuration after parsing
+struct TimestampConfiguredParser {
+    inner: Box<dyn EventParser>,
+    ts_config: crate::timestamp::TsConfig,
+}
+
+impl TimestampConfiguredParser {
+    fn new(inner: Box<dyn EventParser>, ts_field: Option<String>, ts_format: Option<String>) -> Self {
+        Self {
+            inner,
+            ts_config: crate::timestamp::TsConfig {
+                custom_field: ts_field,
+                custom_format: ts_format,
+                auto_parse: true,
+            },
+        }
+    }
+}
+
+impl EventParser for TimestampConfiguredParser {
+    fn parse(&self, line: &str) -> Result<crate::event::Event> {
+        let mut event = self.inner.parse(line)?;
+        // Apply timestamp configuration
+        event.extract_timestamp_with_config(None, &self.ts_config);
+        Ok(event)
+    }
+}
+
 use super::{
     create_multiline_chunker, BeginStage, EndStage, EventLimiter, EventParser, ExecStage,
     FilterStage, Formatter, KeyFilterStage, LevelFilterStage, MetaData, Pipeline, PipelineConfig,
@@ -30,6 +58,8 @@ pub struct PipelineBuilder {
     window_size: usize,
     csv_headers: Option<Vec<String>>, // Pre-processed CSV headers for parallel mode
     timestamp_filter: Option<crate::config::TimestampFilterConfig>,
+    ts_field: Option<String>,
+    ts_format: Option<String>,
 }
 
 impl PipelineBuilder {
@@ -55,6 +85,8 @@ impl PipelineBuilder {
             window_size: 0,
             csv_headers: None,
             timestamp_filter: None,
+            ts_field: None,
+            ts_format: None,
         }
     }
 
@@ -71,7 +103,7 @@ impl PipelineBuilder {
         let mut rhai_engine = RhaiEngine::new();
 
         // Create parser
-        let parser: Box<dyn EventParser> = match self.input_format {
+        let base_parser: Box<dyn EventParser> = match self.input_format {
             crate::InputFormat::Jsonl => Box::new(crate::parsers::JsonlParser::new()),
             crate::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
             crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
@@ -116,6 +148,17 @@ impl PipelineBuilder {
             crate::InputFormat::Apache => Box::new(crate::parsers::ApacheParser::new()?),
             crate::InputFormat::Nginx => Box::new(crate::parsers::NginxParser::new()?),
             crate::InputFormat::Cols => Box::new(crate::parsers::ColsParser::new()),
+        };
+
+        // Wrap parser with timestamp configuration if needed
+        let parser: Box<dyn EventParser> = if self.ts_field.is_some() || self.ts_format.is_some() {
+            Box::new(TimestampConfiguredParser::new(
+                base_parser,
+                self.ts_field.clone(),
+                self.ts_format.clone(),
+            ))
+        } else {
+            base_parser
         };
 
         // Create formatter
@@ -292,7 +335,7 @@ impl PipelineBuilder {
         let mut rhai_engine = RhaiEngine::new();
 
         // Create parser (with pre-processed CSV headers if available)
-        let parser: Box<dyn EventParser> = match self.input_format {
+        let base_parser: Box<dyn EventParser> = match self.input_format {
             crate::InputFormat::Jsonl => Box::new(crate::parsers::JsonlParser::new()),
             crate::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
             crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
@@ -337,6 +380,17 @@ impl PipelineBuilder {
             crate::InputFormat::Apache => Box::new(crate::parsers::ApacheParser::new()?),
             crate::InputFormat::Nginx => Box::new(crate::parsers::NginxParser::new()?),
             crate::InputFormat::Cols => Box::new(crate::parsers::ColsParser::new()),
+        };
+
+        // Wrap parser with timestamp configuration if needed
+        let parser: Box<dyn EventParser> = if self.ts_field.is_some() || self.ts_format.is_some() {
+            Box::new(TimestampConfiguredParser::new(
+                base_parser,
+                self.ts_field.clone(),
+                self.ts_format.clone(),
+            ))
+        } else {
+            base_parser
         };
 
         // Create formatter (workers still need formatters for output)
@@ -488,6 +542,16 @@ impl PipelineBuilder {
         self.timestamp_filter = timestamp_filter;
         self
     }
+
+    pub fn with_ts_field(mut self, ts_field: Option<String>) -> Self {
+        self.ts_field = ts_field;
+        self
+    }
+
+    pub fn with_ts_format(mut self, ts_format: Option<String>) -> Self {
+        self.ts_format = ts_format;
+        self
+    }
 }
 
 impl Default for PipelineBuilder {
@@ -529,6 +593,8 @@ pub fn create_pipeline_builder_from_config(
     builder.multiline = config.input.multiline.clone();
     builder.window_size = config.processing.window_size;
     builder.timestamp_filter = config.processing.timestamp_filter.clone();
+    builder.ts_field = config.input.ts_field.clone();
+    builder.ts_format = config.input.ts_format.clone();
     builder
 }
 

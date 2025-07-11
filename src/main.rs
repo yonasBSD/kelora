@@ -295,6 +295,12 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
         std::process::exit(0);
     }
 
+    // Check for --help-time
+    if raw_args.iter().any(|arg| arg == "--help-time") {
+        print_time_format_help();
+        std::process::exit(0);
+    }
+
     // Check for --ignore-config
     let ignore_config = raw_args.iter().any(|arg| arg == "--ignore-config");
 
@@ -584,4 +590,58 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
     }
 
     cli
+}
+
+/// Print time format help message adapted for Rust/chrono
+fn print_time_format_help() {
+    let help_text = r#"
+Time Format Reference for --ts-format:
+
+Basic Date/Time Components:
+%Y - Year with century (e.g., 2024)
+%y - Year without century (00-99)
+%m - Month as zero-padded decimal (01-12)
+%b - Month as abbreviated name (Jan, Feb, ..., Dec)
+%B - Month as full name (January, February, ..., December)
+%d - Day of month as zero-padded decimal (01-31)
+%j - Day of year as zero-padded decimal (001-366)
+%H - Hour (24-hour) as zero-padded decimal (00-23)
+%I - Hour (12-hour) as zero-padded decimal (01-12)
+%p - AM/PM indicator
+%M - Minute as zero-padded decimal (00-59)
+%S - Second as zero-padded decimal (00-59)
+
+Subsecond Precision:
+%f - Microseconds (000000-999999)
+%3f - Milliseconds (000-999)
+%6f - Microseconds (000000-999999)
+%9f - Nanoseconds (000000000-999999999)
+%. - Subseconds with automatic precision
+
+Time Zone:
+%z - UTC offset (+HHMM or -HHMM)
+%Z - Time zone name (if available)
+%:z - UTC offset with colon (+HH:MM or -HH:MM)
+
+Weekday:
+%w - Weekday as decimal (0=Sunday, 6=Saturday)
+%a - Weekday as abbreviated name (Sun, Mon, ..., Sat)
+%A - Weekday as full name (Sunday, Monday, ..., Saturday)
+
+Week Numbers:
+%W - Week number (Monday as first day of week)
+%U - Week number (Sunday as first day of week)
+
+Common Examples:
+%Y-%m-%d %H:%M:%S           # 2024-01-15 14:30:45
+%Y-%m-%dT%H:%M:%S%z         # 2024-01-15T14:30:45+0000
+%Y-%m-%d %H:%M:%S%.f        # 2024-01-15 14:30:45.123456
+%b %d %H:%M:%S              # Jan 15 14:30:45 (syslog format)
+%d/%b/%Y:%H:%M:%S %z        # 15/Jan/2024:14:30:45 +0000 (Apache format)
+%Y-%m-%d %H:%M:%S,%3f       # 2024-01-15 14:30:45,123 (Python logging)
+
+For complete format reference, see:
+https://docs.rs/chrono/latest/chrono/format/strftime/index.html
+"#;
+    println!("{}", help_text);
 }

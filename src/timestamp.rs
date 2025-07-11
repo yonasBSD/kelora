@@ -18,7 +18,20 @@ impl AdaptiveTsParser {
     /// Parse timestamp using adaptive format ordering
     /// Successful formats are moved to front of the list for faster future parsing
     pub fn parse_ts(&mut self, ts_str: &str) -> Option<DateTime<Utc>> {
+        self.parse_ts_with_custom_format(ts_str, None)
+    }
+
+    /// Parse timestamp with optional custom format
+    /// If custom_format is provided, it's tried first before falling back to adaptive parsing
+    pub fn parse_ts_with_custom_format(&mut self, ts_str: &str, custom_format: Option<&str>) -> Option<DateTime<Utc>> {
         let ts_str = ts_str.trim();
+
+        // Try custom format first if provided
+        if let Some(format) = custom_format {
+            if let Some(parsed) = try_parse_with_format(ts_str, format) {
+                return Some(parsed);
+            }
+        }
 
         // Handle special values (journalctl-compatible)
         match ts_str {
@@ -204,6 +217,8 @@ fn get_initial_timestamp_formats() -> Vec<String> {
 pub struct TsConfig {
     /// Custom timestamp field name (overrides auto-detection)
     pub custom_field: Option<String>,
+    /// Custom timestamp format string
+    pub custom_format: Option<String>,
     /// Whether to automatically parse timestamps from events (reserved for future features)
     #[allow(dead_code)]
     pub auto_parse: bool,
@@ -213,6 +228,7 @@ impl Default for TsConfig {
     fn default() -> Self {
         Self {
             custom_field: None,
+            custom_format: None,
             auto_parse: true,
         }
     }
@@ -422,6 +438,7 @@ mod tests {
 
         let config = TsConfig {
             custom_field: Some("custom_time".to_string()),
+            custom_format: None,
             auto_parse: true,
         };
 

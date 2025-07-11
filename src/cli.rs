@@ -84,6 +84,10 @@ pub struct Cli {
     #[arg(long = "ts-field", help_heading = "Input Options")]
     pub ts_field: Option<String>,
 
+    /// Custom timestamp format for parsing (uses chrono format strings)
+    #[arg(long = "ts-format", help_heading = "Input Options")]
+    pub ts_format: Option<String>,
+
     /// Multi-line event detection strategy
     #[arg(short = 'M', long = "multiline", help_heading = "Input Options")]
     pub multiline: Option<String>,
@@ -219,6 +223,10 @@ pub struct Cli {
     /// Ignore configuration file
     #[arg(long = "ignore-config", help_heading = "Configuration Options")]
     pub ignore_config: bool,
+
+    /// Show time format help and exit
+    #[arg(long = "help-time", help_heading = "Help Options")]
+    pub help_time: bool,
 }
 
 impl Cli {

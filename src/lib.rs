@@ -25,6 +25,7 @@ pub struct PipelineInputConfig {
     pub ignore_lines: Option<regex::Regex>,
     pub multiline: Option<config::MultilineConfig>,
     pub ts_field: Option<String>,
+    pub ts_format: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -62,6 +63,7 @@ impl PipelineConfig {
                 ignore_lines: config.input.ignore_lines.clone(),
                 multiline: config.input.multiline.clone(),
                 ts_field: config.input.ts_field.clone(),
+            ts_format: config.input.ts_format.clone(),
             },
             processing: PipelineProcessingConfig {
                 begin: config.processing.begin.clone(),
@@ -231,6 +233,7 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
             ignore_lines: config.input.ignore_lines.clone(),
             multiline: config.input.multiline.clone(),
             ts_field: config.input.ts_field.clone(),
+            ts_format: config.input.ts_format.clone(),
         },
         output: config::OutputConfig {
             format: config.output_format.clone().into(),
@@ -355,6 +358,7 @@ pub fn run_pipeline_sequential_with_config<W: Write>(
             ignore_lines: config.input.ignore_lines.clone(),
             multiline: config.input.multiline.clone(),
             ts_field: config.input.ts_field.clone(),
+            ts_format: config.input.ts_format.clone(),
         },
         output: config::OutputConfig {
             format: config.output_format.clone().into(),
