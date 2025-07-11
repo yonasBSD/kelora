@@ -248,6 +248,7 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
             no_emoji: false,
             summary: false,
             stats: false, // Stats handled at higher level
+            timestamp_formatting: config::TimestampFormatConfig::default(),
         },
         processing: config::ProcessingConfig {
             begin: config.processing.begin.clone(),
@@ -374,6 +375,7 @@ pub fn run_pipeline_sequential_with_config<W: Write>(
             no_emoji: false,
             summary: false,
             stats: false, // Stats handled at higher level
+            timestamp_formatting: config::TimestampFormatConfig::default(),
         },
         processing: config::ProcessingConfig {
             begin: config.processing.begin.clone(),

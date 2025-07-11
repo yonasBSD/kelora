@@ -119,18 +119,25 @@ Empty lines are handled differently based on input format:
 - Use `--help-time` to see comprehensive format reference and examples
 - Formats support subseconds, timezones, and various date/time layouts
 
-**Timezone Configuration:**
-- `--utc` - Interpret naive timestamps as UTC
-- `--local-time` - Interpret naive timestamps as local time (default)
-- `--timezone TZ` - Use specific timezone (e.g., "America/New_York", "UTC")
-- `TZ` environment variable - Automatic timezone detection
-- Priority: CLI flags > --timezone > TZ env var > local time
+**Input Timezone Configuration (Parsing Stage):**
+- `--input-tz TZ` - Timezone for naive input timestamps (default: UTC)
+- Special values: `local` for system local time, `utc` for UTC
+- Named timezones: `Europe/Berlin`, `America/New_York`, etc.
+- Priority: `--input-tz` > `TZ` environment variable > UTC default
+- Only affects naive timestamps (those without explicit timezone info)
+
+**Output Timestamp Formatting (Display Stage):**
+- `--format-ts field1,field2` - Format specific fields as timestamps
+- `-z` - Auto-format all known timestamp fields as local RFC3339
+- `-Z` - Auto-format all known timestamp fields as UTC RFC3339
+- Only affects default output format (human-readable display)
+- No impact on structured outputs (JSON, CSV, etc.) or event data
 
 **Adaptive Parsing:**
 - Single consolidated parser handles all timestamp parsing tasks
 - Automatically learns and reorders formats for performance
 - Supports CLI arguments (--since/--until), event parsing, and Rhai scripts
-- Rhai scripts use UTC interpretation for consistency
+- Uses input timezone configuration for consistent interpretation
 
 ### Rhai Scripting Best Practices
 

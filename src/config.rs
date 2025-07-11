@@ -41,6 +41,8 @@ pub struct OutputConfig {
     pub no_emoji: bool,
     pub summary: bool,
     pub stats: bool,
+    /// Timestamp formatting configuration (display-only)
+    pub timestamp_formatting: TimestampFormatConfig,
 }
 
 /// Ordered script stages that preserve CLI order
@@ -139,6 +141,27 @@ pub enum ColorMode {
 pub struct TimestampFilterConfig {
     pub since: Option<chrono::DateTime<chrono::Utc>>,
     pub until: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+/// Timestamp formatting configuration (display-only, affects default output format only)
+#[derive(Debug, Clone)]
+pub struct TimestampFormatConfig {
+    /// Specific fields to format as timestamps
+    pub format_fields: Vec<String>,
+    /// Auto-format all known timestamp fields
+    pub auto_format_all: bool,
+    /// Target timezone for formatting (true = UTC, false = local)
+    pub format_as_utc: bool,
+}
+
+impl Default for TimestampFormatConfig {
+    fn default() -> Self {
+        Self {
+            format_fields: Vec::new(),
+            auto_format_all: false,
+            format_as_utc: false,
+        }
+    }
 }
 
 /// Multi-line event detection configuration
@@ -498,6 +521,7 @@ impl KeloraConfig {
                 no_emoji: cli.no_emoji,
                 summary: cli.summary,
                 stats: cli.stats || cli.stats_only,
+                timestamp_formatting: create_timestamp_format_config(cli),
             },
             processing: ProcessingConfig {
                 begin: cli.begin.clone(),
@@ -567,6 +591,7 @@ impl Default for KeloraConfig {
                 no_emoji: false,
                 summary: false,
                 stats: false,
+                timestamp_formatting: TimestampFormatConfig::default(),
             },
             processing: ProcessingConfig {
                 begin: None,
@@ -591,32 +616,45 @@ impl Default for KeloraConfig {
     }
 }
 
+/// Create timestamp formatting configuration from CLI options
+fn create_timestamp_format_config(cli: &crate::Cli) -> TimestampFormatConfig {
+    let format_fields = if let Some(ref format_ts) = cli.format_ts {
+        format_ts.split(',').map(|s| s.trim().to_string()).collect()
+    } else {
+        Vec::new()
+    };
+    
+    let auto_format_all = cli.format_timestamps_local || cli.format_timestamps_utc;
+    let format_as_utc = cli.format_timestamps_utc;
+    
+    TimestampFormatConfig {
+        format_fields,
+        auto_format_all,
+        format_as_utc,
+    }
+}
+
 /// Determine the default timezone based on CLI options and environment
+/// Following the new spec: --input-tz defaults to UTC
 fn determine_default_timezone(cli: &crate::Cli) -> Option<String> {
-    // Priority 1: Explicit --timezone option
-    if let Some(ref tz) = cli.timezone {
-        return Some(tz.clone());
+    // Priority 1: --input-tz option
+    if let Some(ref input_tz) = cli.input_tz {
+        if input_tz == "local" {
+            return None; // None means local time
+        } else {
+            return Some(input_tz.clone());
+        }
     }
     
-    // Priority 2: --utc flag
-    if cli.utc {
-        return Some("UTC".to_string());
-    }
-    
-    // Priority 3: --local-time flag (explicit local time)
-    if cli.local_time {
-        return None; // None means local time
-    }
-    
-    // Priority 4: TZ environment variable
+    // Priority 2: TZ environment variable
     if let Ok(tz) = std::env::var("TZ") {
         if !tz.is_empty() {
             return Some(tz);
         }
     }
     
-    // Default: local time (None)
-    None
+    // DEFAULT: UTC (per spec, --input-tz defaults to UTC)
+    Some("UTC".to_string())
 }
 
 // Conversion traits to maintain compatibility with existing CLI types

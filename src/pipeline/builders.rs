@@ -73,6 +73,7 @@ impl PipelineBuilder {
                 no_inject_fields: false,
                 inject_prefix: None,
                 color_mode: crate::config::ColorMode::Auto,
+                timestamp_formatting: crate::config::TimestampFormatConfig::default(),
             },
             begin: None,
             end: None,
@@ -173,6 +174,7 @@ impl PipelineBuilder {
                 Box::new(crate::formatters::DefaultFormatter::new(
                     use_colors,
                     self.config.brief,
+                    self.config.timestamp_formatting.clone(),
                 ))
             }
             crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
@@ -406,6 +408,7 @@ impl PipelineBuilder {
                 Box::new(crate::formatters::DefaultFormatter::new(
                     use_colors,
                     self.config.brief,
+                    self.config.timestamp_formatting.clone(),
                 ))
             }
             crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
@@ -588,6 +591,7 @@ pub fn create_pipeline_builder_from_config(
         no_inject_fields: config.processing.no_inject_fields,
         inject_prefix: config.processing.inject_prefix.clone(),
         color_mode: config.output.color.clone(),
+        timestamp_formatting: config.output.timestamp_formatting.clone(),
     };
 
     let mut builder = PipelineBuilder::new()

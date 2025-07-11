@@ -159,10 +159,11 @@ pub struct DefaultFormatter {
     colors: ColorScheme,
     level_keys: Vec<&'static str>,
     brief: bool,
+    timestamp_formatting: crate::config::TimestampFormatConfig,
 }
 
 impl DefaultFormatter {
-    pub fn new(use_colors: bool, brief: bool) -> Self {
+    pub fn new(use_colors: bool, brief: bool, timestamp_formatting: crate::config::TimestampFormatConfig) -> Self {
         Self {
             colors: ColorScheme::new(use_colors),
             level_keys: vec![
@@ -175,11 +176,29 @@ impl DefaultFormatter {
                 "@l",
             ],
             brief,
+            timestamp_formatting,
         }
     }
 
     /// Format a Dynamic value directly into buffer for performance (zero-allocation when possible)
     fn format_dynamic_value_into(&self, key: &str, value: &Dynamic, output: &mut String) {
+        // Check if this field should be formatted as a timestamp
+        if self.should_format_as_timestamp(key) {
+            if let Some(formatted_ts) = self.try_format_timestamp(value) {
+                // Use timestamp formatting
+                if !self.colors.string.is_empty() {
+                    output.push_str(self.colors.string);
+                }
+                output.push('"');
+                output.push_str(&escape_logfmt_string(&formatted_ts));
+                output.push('"');
+                if !self.colors.string.is_empty() {
+                    output.push_str(self.colors.reset);
+                }
+                return;
+            }
+        }
+
         // Choose color based on field type and value content
         let color = if self.is_level_field(key) {
             if let Ok(level_str) = value.clone().into_string() {
@@ -221,6 +240,21 @@ impl DefaultFormatter {
 
     /// Format a Dynamic value for brief mode (no quotes, just the value with colors)
     fn format_dynamic_value_brief_into(&self, key: &str, value: &Dynamic, output: &mut String) {
+        // Check if this field should be formatted as a timestamp
+        if self.should_format_as_timestamp(key) {
+            if let Some(formatted_ts) = self.try_format_timestamp(value) {
+                // Use timestamp formatting (no quotes in brief mode)
+                if !self.colors.string.is_empty() {
+                    output.push_str(self.colors.string);
+                }
+                output.push_str(&formatted_ts);
+                if !self.colors.string.is_empty() {
+                    output.push_str(self.colors.reset);
+                }
+                return;
+            }
+        }
+
         // Choose color based on field type and value content
         let color = if self.is_level_field(key) {
             if let Ok(level_str) = value.clone().into_string() {
@@ -272,6 +306,49 @@ impl DefaultFormatter {
     /// Check if key is likely a log level field
     fn is_level_field(&self, key: &str) -> bool {
         self.level_keys.iter().any(|&lk| lk == key)
+    }
+
+    /// Check if a field should be formatted as a timestamp
+    fn should_format_as_timestamp(&self, key: &str) -> bool {
+        // Check if this field is explicitly listed in format_fields
+        if self.timestamp_formatting.format_fields.contains(&key.to_string()) {
+            return true;
+        }
+        
+        // Check if auto-formatting is enabled and this is a known timestamp field
+        if self.timestamp_formatting.auto_format_all {
+            return crate::event::TIMESTAMP_FIELD_NAMES.contains(&key);
+        }
+        
+        false
+    }
+
+    /// Try to format a value as a timestamp, returning formatted string if successful
+    fn try_format_timestamp(&self, value: &Dynamic) -> Option<String> {
+        use chrono::{DateTime, Local, Utc};
+        
+        // First, try if it's already a DateTime value
+        if let Some(dt) = value.clone().try_cast::<DateTime<Utc>>() {
+            return Some(if self.timestamp_formatting.format_as_utc {
+                dt.to_rfc3339()
+            } else {
+                dt.with_timezone(&Local).to_rfc3339()
+            });
+        }
+        
+        // Otherwise, try to parse it as a string timestamp
+        if let Ok(ts_str) = value.clone().into_string() {
+            let mut parser = crate::timestamp::AdaptiveTsParser::new();
+            if let Some(parsed_dt) = parser.parse_ts(&ts_str) {
+                return Some(if self.timestamp_formatting.format_as_utc {
+                    parsed_dt.to_rfc3339()
+                } else {
+                    parsed_dt.with_timezone(&Local).to_rfc3339()
+                });
+            }
+        }
+        
+        None
     }
 }
 
@@ -624,7 +701,7 @@ mod tests {
         event.set_field("user".to_string(), Dynamic::from("alice".to_string()));
         event.set_field("count".to_string(), Dynamic::from(42i64));
 
-        let formatter = DefaultFormatter::new(false, false); // No colors, no brief mode
+        let formatter = DefaultFormatter::new(false, false, crate::config::TimestampFormatConfig::default()); // No colors, no brief mode
         let result = formatter.format(&event);
 
         // Check that all fields are present with proper formatting
@@ -642,7 +719,7 @@ mod tests {
         event.set_field("level".to_string(), Dynamic::from("info".to_string()));
         event.set_field("msg".to_string(), Dynamic::from("test message".to_string()));
 
-        let formatter = DefaultFormatter::new(false, true); // No colors, brief mode
+        let formatter = DefaultFormatter::new(false, true, crate::config::TimestampFormatConfig::default()); // No colors, brief mode
         let result = formatter.format(&event);
 
         // Brief mode should output only values, space-separated

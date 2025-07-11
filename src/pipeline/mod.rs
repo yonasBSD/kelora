@@ -57,6 +57,8 @@ pub struct PipelineConfig {
     #[allow(dead_code)]
     pub inject_prefix: Option<String>,
     pub color_mode: crate::config::ColorMode,
+    /// Timestamp formatting configuration (display-only)
+    pub timestamp_formatting: crate::config::TimestampFormatConfig,
 }
 
 /// Metadata about current processing context

@@ -6,6 +6,8 @@ Kelora is a fast, scriptable CLI log processor built for real-world logs and cle
 
 ## 🔧 Quick Start
 
+> **⚠️ Breaking Change**: Naive timestamps are now interpreted as UTC by default (was local time). Use `--input-tz local` for the old behavior.
+
 ```bash
 # Filter warnings and errors from a structured JSON log
 kelora -f jsonl app.log --levels warn,error
@@ -20,10 +22,10 @@ kelora -f jsonl access.log \
   --filter 'response_time.to_int() > 1000' \
   --keys timestamp,method,path,response_time
 
-# Filter logs by time range
+# Filter logs by time range with timezone-aware display
 kelora -f jsonl app.log \
   --since "2024-01-01T00:00:00Z" \
-  --until "2024-01-01T23:59:59Z"
+  --until "2024-01-01T23:59:59Z" -z
 
 # Add a derived status class and export as CSV
 kelora -f jsonl app.log \
@@ -136,9 +138,45 @@ kelora --show-config  # Show config file and aliases
 | `--stats`      | Show line counts and performance stats       |
 | `--on-error`   | How to handle bad lines (`print`, `skip`, …) |
 | `--ts-format`  | Custom timestamp format (chrono syntax)     |
-| `--utc`        | Parse naive timestamps as UTC                |
+| `--input-tz`   | Timezone for naive timestamps (default: UTC) |
+| `--format-ts`  | Format specific fields as timestamps         |
+| `-z`           | Format all timestamps as local time          |
+| `-Z`           | Format all timestamps as UTC                 |
 | `--since`      | Filter events after timestamp               |
 | `--until`      | Filter events before timestamp              |
+
+## 🌍 Timezone Handling
+
+Kelora provides separate controls for parsing input timestamps and formatting output timestamps:
+
+### Input Timezone (Parsing)
+```bash
+# Parse naive timestamps as UTC (default)
+kelora -f jsonl app.log --input-tz UTC
+
+# Parse naive timestamps as local system time
+kelora -f jsonl app.log --input-tz local
+
+# Parse naive timestamps as specific timezone
+kelora -f jsonl app.log --input-tz Europe/Berlin
+```
+
+### Output Timestamp Formatting (Display Only)
+```bash
+# Format all known timestamp fields as local time
+kelora -f jsonl app.log -z
+
+# Format all known timestamp fields as UTC
+kelora -f jsonl app.log -Z
+
+# Format specific fields as timestamps (local time)
+kelora -f jsonl app.log --format-ts created_at,updated_at
+
+# Combine: parse as Berlin time, display as UTC
+kelora -f jsonl app.log --input-tz Europe/Berlin -Z
+```
+
+**Important**: Timestamp formatting only affects the default output format for human-readable display. It does not modify event data or structured outputs (JSON, CSV, etc.).
 
 ## 📖 Configuration
 

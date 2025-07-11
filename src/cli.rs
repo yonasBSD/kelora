@@ -88,17 +88,11 @@ pub struct Cli {
     #[arg(long = "ts-format", help_heading = "Input Options")]
     pub ts_format: Option<String>,
 
-    /// Interpret timezone-naive timestamps as UTC
-    #[arg(long = "utc", help_heading = "Input Options")]
-    pub utc: bool,
-
-    /// Interpret timezone-naive timestamps as local time (default)
-    #[arg(long = "local-time", help_heading = "Input Options")]
-    pub local_time: bool,
-
-    /// Timezone for interpreting naive timestamps (e.g., "America/New_York", "UTC")
-    #[arg(long = "timezone", help_heading = "Input Options")]
-    pub timezone: Option<String>,
+    /// Assume timezone for input timestamps without timezone info (default: UTC).
+    /// Use 'local' for system local time.
+    /// Examples: 'UTC', 'local', 'Europe/Berlin'.
+    #[arg(long = "input-tz", help_heading = "Input Options")]
+    pub input_tz: Option<String>,
 
     /// Multi-line event detection strategy
     #[arg(short = 'M', long = "multiline", help_heading = "Input Options")]
@@ -179,6 +173,21 @@ pub struct Cli {
     /// Output file for formatted events
     #[arg(short = 'o', long = "output-file", help_heading = "Output Options")]
     pub output_file: Option<String>,
+
+    /// Comma-separated list of fields to format as local RFC3339.
+    /// Only affects default output; does not modify event data.
+    #[arg(long = "format-ts", help_heading = "Output Options")]
+    pub format_ts: Option<String>,
+
+    /// Auto-format all known timestamp fields as local RFC3339.
+    /// Only affects default output; does not modify event data.
+    #[arg(short = 'z', help_heading = "Output Options")]
+    pub format_timestamps_local: bool,
+
+    /// Auto-format all known timestamp fields as UTC RFC3339.
+    /// Only affects default output; does not modify event data.
+    #[arg(short = 'Z', help_heading = "Output Options")]
+    pub format_timestamps_utc: bool,
 
     /// Enable parallel processing
     #[arg(long = "parallel", help_heading = "Performance Options")]
