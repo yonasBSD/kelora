@@ -51,6 +51,7 @@ pub struct PipelineContext {
 #[derive(Debug, Clone)]
 pub struct PipelineConfig {
     pub on_error: crate::ErrorStrategy,
+    pub error_report: crate::config::ErrorReportConfig,
     pub brief: bool,
     #[allow(dead_code)]
     pub no_inject_fields: bool,
@@ -184,20 +185,34 @@ impl Pipeline {
 
                     return match ctx.config.on_error {
                         crate::ErrorStrategy::Skip => Ok(results),
-                        crate::ErrorStrategy::Abort => Err(err),
-                        crate::ErrorStrategy::Print => {
-                            eprintln!(
-                                "{}",
-                                crate::config::format_error_message_auto(&format!(
-                                    "Parse error: {}",
-                                    err
-                                ))
-                            );
+                        crate::ErrorStrategy::Fail => Err(err),
+                        crate::ErrorStrategy::Continue => {
+                            // Check error reporting configuration before printing
+                            match ctx.config.error_report.style {
+                                crate::config::ErrorReportStyle::Off => {
+                                    // Suppress error output
+                                },
+                                crate::config::ErrorReportStyle::Print => {
+                                    // Print each error immediately
+                                    eprintln!(
+                                        "{}",
+                                        crate::config::format_error_message_auto(&format!(
+                                            "Parse error: {}",
+                                            err
+                                        ))
+                                    );
+                                },
+                                crate::config::ErrorReportStyle::Summary => {
+                                    // Track error for summary collection
+                                    crate::rhai_functions::tracking::track_error(
+                                        "Medium", 
+                                        &format!("Parse error: {}", err)
+                                    );
+                                },
+                            }
                             Ok(results)
                         }
-                        crate::ErrorStrategy::Stub => Ok(vec![self
-                            .formatter
-                            .format(&Event::default_with_line(chunk))]),
+                        // Note: Old Stub behavior removed - using Skip instead
                     };
                 }
             };
@@ -223,18 +238,33 @@ impl Pipeline {
                                 ScriptResult::Error(msg) => {
                                     return match ctx.config.on_error {
                                         crate::ErrorStrategy::Skip => Ok(results),
-                                        crate::ErrorStrategy::Abort => Err(anyhow::anyhow!(msg)),
-                                        crate::ErrorStrategy::Print => {
-                                            eprintln!(
-                                                "{}",
-                                                crate::config::format_error_message_auto(&format!(
-                                                    "Script error: {}",
-                                                    msg
-                                                ))
-                                            );
+                                        crate::ErrorStrategy::Fail => Err(anyhow::anyhow!(msg)),
+                                        crate::ErrorStrategy::Continue => {
+                                            // Check error reporting configuration before printing
+                                            match ctx.config.error_report.style {
+                                                crate::config::ErrorReportStyle::Off => {
+                                                    // Suppress error output
+                                                },
+                                                crate::config::ErrorReportStyle::Print => {
+                                                    eprintln!(
+                                                        "{}",
+                                                        crate::config::format_error_message_auto(&format!(
+                                                            "Script error: {}",
+                                                            msg
+                                                        ))
+                                                    );
+                                                },
+                                                crate::config::ErrorReportStyle::Summary => {
+                                                    // Track error for summary collection
+                                                    crate::rhai_functions::tracking::track_error(
+                                                        "Hard", 
+                                                        &format!("Script error: {}", msg)
+                                                    );
+                                                },
+                                            }
                                             Ok(results)
                                         }
-                                        crate::ErrorStrategy::Stub => Ok(results),
+                                        // Note: Old Stub behavior removed
                                     };
                                 }
                             }
@@ -336,18 +366,33 @@ impl Pipeline {
                 ScriptResult::Error(msg) => {
                     return match ctx.config.on_error {
                         crate::ErrorStrategy::Skip => Ok(results),
-                        crate::ErrorStrategy::Abort => Err(anyhow::anyhow!(msg)),
-                        crate::ErrorStrategy::Print => {
-                            eprintln!(
-                                "{}",
-                                crate::config::format_error_message_auto(&format!(
-                                    "Script error: {}",
-                                    msg
-                                ))
-                            );
+                        crate::ErrorStrategy::Fail => Err(anyhow::anyhow!(msg)),
+                        crate::ErrorStrategy::Continue => {
+                            // Check error reporting configuration before printing
+                            match ctx.config.error_report.style {
+                                crate::config::ErrorReportStyle::Off => {
+                                    // Suppress error output
+                                },
+                                crate::config::ErrorReportStyle::Print => {
+                                    eprintln!(
+                                        "{}",
+                                        crate::config::format_error_message_auto(&format!(
+                                            "Script error: {}",
+                                            msg
+                                        ))
+                                    );
+                                },
+                                crate::config::ErrorReportStyle::Summary => {
+                                    // Track error for summary collection
+                                    crate::rhai_functions::tracking::track_error(
+                                        "Hard", 
+                                        &format!("Script error: {}", msg)
+                                    );
+                                },
+                            }
                             Ok(results)
                         }
-                        crate::ErrorStrategy::Stub => Ok(results),
+                        // Note: Old Stub behavior removed
                     };
                 }
             }

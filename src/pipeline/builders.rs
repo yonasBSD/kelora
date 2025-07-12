@@ -68,7 +68,11 @@ impl PipelineBuilder {
     pub fn new() -> Self {
         Self {
             config: PipelineConfig {
-                on_error: crate::ErrorStrategy::Print,
+                on_error: crate::ErrorStrategy::Continue,
+                error_report: crate::config::ErrorReportConfig {
+                    style: crate::config::ErrorReportStyle::Summary,
+                    file: None,
+                },
                 brief: false,
                 no_inject_fields: false,
                 inject_prefix: None,
@@ -587,6 +591,7 @@ pub fn create_pipeline_builder_from_config(
 ) -> PipelineBuilder {
     let pipeline_config = PipelineConfig {
         on_error: config.processing.on_error.clone().into(),
+        error_report: config.processing.error_report.clone(),
         brief: config.output.brief,
         no_inject_fields: config.processing.no_inject_fields,
         inject_prefix: config.processing.inject_prefix.clone(),

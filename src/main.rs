@@ -177,15 +177,27 @@ fn main() -> Result<()> {
 
     let final_stats = match result {
         Ok(pipeline_result) => {
-            // Print summary if enabled (only if not terminated)
-            if lib_config.output.summary && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+
+            // Print metrics if enabled (only if not terminated)
+            if lib_config.output.metrics && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
                 let tracked = crate::rhai_functions::tracking::get_thread_tracking_state();
-                let summary_lines = lib_config.format_tracked_summary(&tracked);
-                stderr
-                    .writeln(&lib_config.format_summary_message(""))
-                    .unwrap_or(());
-                for line in summary_lines.lines() {
-                    stderr.writeln(line).unwrap_or(());
+                let metrics_output = crate::rhai_functions::tracking::format_metrics_output(&tracked);
+                if !metrics_output.is_empty() && metrics_output != "No metrics tracked" {
+                    stderr
+                        .writeln(&lib_config.format_metrics_message(&metrics_output))
+                        .unwrap_or(());
+                }
+            }
+
+            // Write metrics to file if configured
+            if let Some(ref metrics_file) = lib_config.output.metrics_file {
+                let tracked = crate::rhai_functions::tracking::get_thread_tracking_state();
+                if let Ok(json_output) = crate::rhai_functions::tracking::format_metrics_json(&tracked) {
+                    if let Err(e) = std::fs::write(metrics_file, json_output) {
+                        stderr
+                            .writeln(&lib_config.format_error_message(&format!("Failed to write metrics file: {}", e)))
+                            .unwrap_or(());
+                    }
                 }
             }
 
@@ -227,7 +239,9 @@ fn main() -> Result<()> {
         ExitCode::SignalInt.exit();
     }
 
-    // Clean shutdown
+    // Determine exit code based on errors and --on-error mode
+    // Note: For this implementation, we'll add error tracking in future iterations
+    // For now, maintain existing behavior but prepare for proper exit codes
     ExitCode::Success.exit();
 }
 
@@ -398,12 +412,11 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
     }
 
     if let Some(on_error) = config_file.defaults.get("on_error") {
-        if matches!(cli.on_error, crate::ErrorStrategy::Print) {
+        if matches!(cli.on_error, crate::ErrorStrategy::Continue) {
             cli.on_error = match on_error.as_str() {
                 "skip" => crate::ErrorStrategy::Skip,
-                "abort" => crate::ErrorStrategy::Abort,
-                "print" => crate::ErrorStrategy::Print,
-                "stub" => crate::ErrorStrategy::Stub,
+                "fail" => crate::ErrorStrategy::Fail,
+                "continue" => crate::ErrorStrategy::Continue,
                 _ => cli.on_error,
             };
         }
@@ -439,11 +452,6 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
         }
     }
 
-    if let Some(summary) = config_file.defaults.get("summary") {
-        if !cli.summary && summary.parse::<bool>().unwrap_or(false) {
-            cli.summary = true;
-        }
-    }
 
     if let Some(skip_lines) = config_file.defaults.get("skip_lines") {
         if cli.skip_lines.is_none() {
@@ -462,6 +470,42 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
     if let Some(stats_only) = config_file.defaults.get("stats_only") {
         if !cli.stats_only && stats_only.parse::<bool>().unwrap_or(false) {
             cli.stats_only = true;
+        }
+    }
+
+    // Add support for new metrics and error reporting options
+    if let Some(metrics) = config_file.defaults.get("metrics") {
+        if !cli.metrics && metrics.parse::<bool>().unwrap_or(false) {
+            cli.metrics = true;
+        }
+    }
+
+    if let Some(metrics_file) = config_file.defaults.get("metrics_file") {
+        if cli.metrics_file.is_none() {
+            cli.metrics_file = Some(metrics_file.clone());
+        }
+    }
+
+    if let Some(error_report) = config_file.defaults.get("error_report") {
+        if cli.error_report.is_none() {
+            cli.error_report = match error_report.as_str() {
+                "off" => Some(kelora::cli::ErrorReportStyle::Off),
+                "summary" => Some(kelora::cli::ErrorReportStyle::Summary),
+                "print" => Some(kelora::cli::ErrorReportStyle::Print),
+                _ => None,
+            };
+        }
+    }
+
+    if let Some(error_report_file) = config_file.defaults.get("error_report_file") {
+        if cli.error_report_file.is_none() {
+            cli.error_report_file = Some(error_report_file.clone());
+        }
+    }
+
+    if let Some(no_section_headers) = config_file.defaults.get("no_section_headers") {
+        if !cli.no_section_headers && no_section_headers.parse::<bool>().unwrap_or(false) {
+            cli.no_section_headers = true;
         }
     }
 

@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 use clap::ValueEnum;
-use rhai::Dynamic;
 
 /// Main configuration struct for Kelora
 #[derive(Debug, Clone)]
@@ -39,8 +38,10 @@ pub struct OutputConfig {
     pub brief: bool,
     pub color: ColorMode,
     pub no_emoji: bool,
-    pub summary: bool,
+    pub no_section_headers: bool,
     pub stats: bool,
+    pub metrics: bool,
+    pub metrics_file: Option<String>,
     /// Timestamp formatting configuration (display-only)
     pub timestamp_formatting: TimestampFormatConfig,
 }
@@ -52,6 +53,20 @@ pub enum ScriptStageType {
     Exec(String),
 }
 
+/// Error reporting configuration
+#[derive(Debug, Clone)]
+pub struct ErrorReportConfig {
+    pub style: ErrorReportStyle,
+    pub file: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub enum ErrorReportStyle {
+    Off,
+    Summary,
+    Print,
+}
+
 /// Processing configuration
 #[derive(Debug, Clone)]
 pub struct ProcessingConfig {
@@ -61,6 +76,7 @@ pub struct ProcessingConfig {
     pub no_inject_fields: bool,
     pub inject_prefix: Option<String>,
     pub on_error: ErrorStrategy,
+    pub error_report: ErrorReportConfig,
     pub levels: Vec<String>,
     pub exclude_levels: Vec<String>,
     /// Window size for sliding window functionality (0 = disabled)
@@ -114,10 +130,9 @@ pub enum OutputFormat {
 /// Error handling strategy
 #[derive(ValueEnum, Clone, Debug)]
 pub enum ErrorStrategy {
+    Fail,
     Skip,
-    Abort,
-    Print,
-    Stub,
+    Continue,
 }
 
 /// File processing order
@@ -382,77 +397,36 @@ impl KeloraConfig {
 
     /// Format a stats message with appropriate prefix (emoji or "Stats:")
     pub fn format_stats_message(&self, message: &str) -> String {
-        let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
-        let use_emoji = use_colors && !self.output.no_emoji;
-
-        if use_emoji {
-            format!("📊 {}", message)
+        if self.output.no_section_headers {
+            message.to_string()
         } else {
-            format!("Stats: {}", message)
+            let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
+            let use_emoji = use_colors && !self.output.no_emoji;
+
+            if use_emoji {
+                format!("📈 === Kelora Stats ===\n{}", message)
+            } else {
+                format!("=== Kelora Stats ===\n{}", message)
+            }
         }
     }
 
-    /// Format a summary message with appropriate prefix (emoji or "Summary:")
-    pub fn format_summary_message(&self, _message: &str) -> String {
-        let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
-        let use_emoji = use_colors && !self.output.no_emoji;
-
-        if use_emoji {
-            "🧱 Summary (tracked keys and values):".to_string()
+    /// Format a metrics message with appropriate prefix (emoji or "Metrics:")
+    pub fn format_metrics_message(&self, message: &str) -> String {
+        if self.output.no_section_headers {
+            message.to_string()
         } else {
-            "kelora: Summary (tracked keys and values):".to_string()
+            let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
+            let use_emoji = use_colors && !self.output.no_emoji;
+
+            if use_emoji {
+                format!("📊 === Kelora Metrics ===\n{}", message)
+            } else {
+                format!("=== Kelora Metrics ===\n{}", message)
+            }
         }
     }
 
-    /// Format a summary line with appropriate prefix (emoji or "kelora:")  
-    pub fn format_summary_line(&self, message: &str) -> String {
-        message.to_string()
-    }
-
-    /// Format tracked values as a table
-    pub fn format_tracked_summary(
-        &self,
-        tracked: &std::collections::HashMap<String, rhai::Dynamic>,
-    ) -> String {
-        if tracked.is_empty() {
-            return "No tracked values".to_string();
-        }
-
-        // Filter out internal keys (operation metadata and stats)
-        let mut user_values: Vec<_> = tracked
-            .iter()
-            .filter(|(k, _)| !k.starts_with("__op_") && !k.starts_with("__kelora_stats_"))
-            .collect();
-
-        if user_values.is_empty() {
-            return "No tracked values".to_string();
-        }
-
-        // Sort by key for consistent output
-        user_values.sort_by_key(|(k, _)| k.as_str());
-
-        // Calculate column widths
-        let key_width = user_values
-            .iter()
-            .map(|(k, _)| k.len())
-            .max()
-            .unwrap_or(3)
-            .max(3);
-
-        let mut result = String::new();
-
-        // Rows (no header)
-        for (key, value) in user_values {
-            result.push_str(&self.format_summary_line(&format!(
-                "{:<key_width$} {}",
-                key,
-                format_tracked_value(value)
-            )));
-            result.push('\n');
-        }
-
-        result.trim_end().to_string()
-    }
 }
 
 /// Format an error message with appropriate prefix when config is not available
@@ -519,8 +493,10 @@ impl KeloraConfig {
                 brief: cli.brief,
                 color: color_mode,
                 no_emoji: cli.no_emoji,
-                summary: cli.summary,
+                no_section_headers: cli.no_section_headers,
                 stats: cli.stats || cli.stats_only,
+                metrics: cli.metrics,
+                metrics_file: cli.metrics_file.clone(),
                 timestamp_formatting: create_timestamp_format_config(cli),
             },
             processing: ProcessingConfig {
@@ -530,6 +506,7 @@ impl KeloraConfig {
                 no_inject_fields: cli.no_inject_fields,
                 inject_prefix: cli.inject_prefix.clone(),
                 on_error: cli.on_error.clone().into(),
+                error_report: parse_error_report_config(&cli),
                 levels: cli.levels.clone(),
                 exclude_levels: cli.exclude_levels.clone(),
                 window_size: cli.window_size.unwrap_or(0),
@@ -589,8 +566,10 @@ impl Default for KeloraConfig {
                 brief: false,
                 color: ColorMode::Auto,
                 no_emoji: false,
-                summary: false,
+                no_section_headers: false,
                 stats: false,
+                metrics: false,
+                metrics_file: None,
                 timestamp_formatting: TimestampFormatConfig::default(),
             },
             processing: ProcessingConfig {
@@ -599,7 +578,11 @@ impl Default for KeloraConfig {
                 end: None,
                 no_inject_fields: false,
                 inject_prefix: None,
-                on_error: ErrorStrategy::Print,
+                on_error: ErrorStrategy::Continue,
+                error_report: ErrorReportConfig {
+                    style: ErrorReportStyle::Summary,
+                    file: None,
+                },
                 levels: Vec::new(),
                 exclude_levels: Vec::new(),
                 window_size: 0,
@@ -631,6 +614,31 @@ fn create_timestamp_format_config(cli: &crate::Cli) -> TimestampFormatConfig {
         format_fields,
         auto_format_all,
         format_as_utc,
+    }
+}
+
+/// Parse error report configuration from CLI
+fn parse_error_report_config(cli: &crate::Cli) -> ErrorReportConfig {
+    let style = if let Some(ref error_report) = cli.error_report {
+        // Convert CLI ErrorReportStyle to config ErrorReportStyle
+        // Using format strings to avoid module path issues
+        match format!("{:?}", error_report).as_str() {
+            "Off" => ErrorReportStyle::Off,
+            "Summary" => ErrorReportStyle::Summary,
+            "Print" => ErrorReportStyle::Print,
+            _ => ErrorReportStyle::Summary, // fallback
+        }
+    } else {
+        // Default depends on --on-error mode
+        match format!("{:?}", cli.on_error).as_str() {
+            "Fail" => ErrorReportStyle::Print,
+            _ => ErrorReportStyle::Summary,
+        }
+    };
+    
+    ErrorReportConfig {
+        style,
+        file: cli.error_report_file.clone(),
     }
 }
 
@@ -732,9 +740,8 @@ impl From<crate::ErrorStrategy> for ErrorStrategy {
     fn from(strategy: crate::ErrorStrategy) -> Self {
         match strategy {
             crate::ErrorStrategy::Skip => ErrorStrategy::Skip,
-            crate::ErrorStrategy::Abort => ErrorStrategy::Abort,
-            crate::ErrorStrategy::Print => ErrorStrategy::Print,
-            crate::ErrorStrategy::Stub => ErrorStrategy::Stub,
+            crate::ErrorStrategy::Fail => ErrorStrategy::Fail,
+            crate::ErrorStrategy::Continue => ErrorStrategy::Continue,
         }
     }
 }
@@ -743,9 +750,8 @@ impl From<ErrorStrategy> for crate::ErrorStrategy {
     fn from(strategy: ErrorStrategy) -> Self {
         match strategy {
             ErrorStrategy::Skip => crate::ErrorStrategy::Skip,
-            ErrorStrategy::Abort => crate::ErrorStrategy::Abort,
-            ErrorStrategy::Print => crate::ErrorStrategy::Print,
-            ErrorStrategy::Stub => crate::ErrorStrategy::Stub,
+            ErrorStrategy::Fail => crate::ErrorStrategy::Fail,
+            ErrorStrategy::Continue => crate::ErrorStrategy::Continue,
         }
     }
 }
@@ -770,53 +776,4 @@ impl From<FileOrder> for crate::FileOrder {
     }
 }
 
-/// Format a tracked value for display
-fn format_tracked_value(value: &Dynamic) -> String {
-    if value.is_int() {
-        value.as_int().unwrap_or(0).to_string()
-    } else if value.is_float() {
-        format!("{:.2}", value.as_float().unwrap_or(0.0))
-    } else if value.is_string() {
-        value
-            .clone()
-            .into_string()
-            .unwrap_or_else(|_| "".to_string())
-    } else if value.is_bool() {
-        value.as_bool().unwrap_or(false).to_string()
-    } else if value.is_array() {
-        if let Ok(array) = value.clone().into_array() {
-            if array.is_empty() {
-                "[]".to_string()
-            } else {
-                format!("[{} items]", array.len())
-            }
-        } else {
-            "[]".to_string()
-        }
-    } else if value.is::<rhai::Map>() {
-        if let Some(map) = value.clone().try_cast::<rhai::Map>() {
-            if map.is_empty() {
-                "{}".to_string()
-            } else {
-                // Format as key:value pairs for bucket tracking
-                let mut pairs: Vec<String> = map
-                    .iter()
-                    .map(|(k, v)| format!("{}:{}", k, format_tracked_value(v)))
-                    .collect();
-                pairs.sort();
-                let result = format!("{{{}}}", pairs.join(", "));
 
-                // Truncate very long maps to keep output readable
-                if result.len() > 120 {
-                    format!("{}...}}", &result[..117])
-                } else {
-                    result
-                }
-            }
-        } else {
-            "{}".to_string()
-        }
-    } else {
-        value.to_string()
-    }
-}

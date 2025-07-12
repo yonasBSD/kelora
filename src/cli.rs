@@ -38,10 +38,16 @@ pub enum OutputFormat {
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum ErrorStrategy {
+    Fail,
     Skip,
-    Abort,
+    Continue,
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub enum ErrorReportStyle {
+    Off,
+    Summary,
     Print,
-    Stub,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -122,9 +128,17 @@ pub struct Cli {
     #[arg(long = "window", help_heading = "Processing Options")]
     pub window_size: Option<usize>,
 
-    /// Error handling strategy
-    #[arg(long = "on-error", value_enum, default_value = "print", help_heading = "Processing Options")]
+    /// What to do when errors occur: fail (stop on first error), skip (skip invalid input), continue (process all lines)
+    #[arg(short = 'x', long = "on-error", value_enum, default_value = "continue", help_heading = "Error Handling")]
     pub on_error: ErrorStrategy,
+
+    /// How to report errors: off (suppress), summary (grouped), print (each error)
+    #[arg(long = "error-report", value_enum, help_heading = "Error Handling")]
+    pub error_report: Option<ErrorReportStyle>,
+
+    /// File to write error reports to (used with --error-report)
+    #[arg(long = "error-report-file", help_heading = "Error Handling")]
+    pub error_report_file: Option<String>,
 
     /// Disable field auto-injection
     #[arg(long = "no-inject", help_heading = "Processing Options")]
@@ -221,17 +235,26 @@ pub struct Cli {
     #[arg(long = "no-emoji", help_heading = "Display Options")]
     pub no_emoji: bool,
 
-    /// Show summary of tracked values
-    #[arg(long = "summary", help_heading = "Display Options")]
-    pub summary: bool,
 
     /// Show processing statistics
-    #[arg(short = 's', long = "stats", help_heading = "Display Options")]
+    #[arg(short = 's', long = "stats", help_heading = "Metrics and Stats")]
     pub stats: bool,
 
     /// Show processing statistics with no output
-    #[arg(short = 'S', long = "stats-only", help_heading = "Display Options")]
+    #[arg(short = 'S', long = "stats-only", help_heading = "Metrics and Stats")]
     pub stats_only: bool,
+
+    /// Show values tracked in Rhai via track_*()
+    #[arg(long = "metrics", help_heading = "Metrics and Stats")]
+    pub metrics: bool,
+
+    /// Write metrics to file (JSON format)
+    #[arg(long = "metrics-file", help_heading = "Metrics and Stats")]
+    pub metrics_file: Option<String>,
+
+    /// Suppress emoji + section headers from stderr output
+    #[arg(long = "no-section-headers", help_heading = "Output Format Control")]
+    pub no_section_headers: bool,
 
     /// Use alias from configuration file
     #[arg(short = 'a', long = "alias", help_heading = "Configuration Options")]

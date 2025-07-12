@@ -231,6 +231,23 @@ impl GlobalTracker {
                             continue;
                         }
                     }
+                    "error_examples" => {
+                        // Merge error examples arrays (max 3 per type)
+                        if let (Ok(existing_arr), Ok(new_arr)) =
+                            (existing.clone().into_array(), value.clone().into_array())
+                        {
+                            let mut merged = existing_arr;
+                            for item in new_arr {
+                                if merged.len() < 3 && !merged.iter().any(|v| {
+                                    v.to_string() == item.to_string()
+                                }) {
+                                    merged.push(item);
+                                }
+                            }
+                            global.insert(key.clone(), Dynamic::from(merged));
+                            continue;
+                        }
+                    }
                     _ => {
                         // Default: replace with newer value
                     }
@@ -1002,8 +1019,8 @@ impl ParallelProcessor {
                         // Error handling and stats tracking is already done in pipeline.process_line()
                         // based on the ctx.config.on_error strategy
                         match ctx.config.on_error {
-                            crate::ErrorStrategy::Abort => return Err(e),
-                            _ => continue, // Skip, Print, Stub all continue
+                            crate::ErrorStrategy::Fail => return Err(e),
+                            _ => continue, // Skip, Continue all continue
                         }
                     }
                 }
@@ -1089,6 +1106,15 @@ impl ParallelProcessor {
             for (key, value) in &ctx.tracker {
                 if !key.starts_with("__kelora_stats_") && !key.starts_with("__op___kelora_stats_") {
                     deltas.insert(key.clone(), value.clone());
+                }
+            }
+
+            // Include thread-local tracking state (includes error tracking)
+            let thread_tracking = crate::rhai_functions::tracking::get_thread_tracking_state();
+            for (key, value) in thread_tracking {
+                // Include error tracking and user tracking, but not internal stats
+                if !key.starts_with("__op___kelora_stats_") && !key.starts_with("__kelora_stats_") {
+                    deltas.insert(key, value);
                 }
             }
 

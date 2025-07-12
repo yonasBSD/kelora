@@ -37,6 +37,7 @@ pub struct PipelineProcessingConfig {
     pub no_inject_fields: bool,
     pub inject_prefix: Option<String>,
     pub on_error: ErrorStrategy,
+    pub error_report: config::ErrorReportConfig,
     pub levels: Vec<String>,
     pub exclude_levels: Vec<String>,
     pub window_size: usize,
@@ -74,6 +75,7 @@ impl PipelineConfig {
                 no_inject_fields: config.processing.no_inject_fields,
                 inject_prefix: config.processing.inject_prefix.clone(),
                 on_error: config.processing.on_error.clone().into(),
+                error_report: config.processing.error_report.clone(),
                 levels: config.processing.levels.clone(),
                 exclude_levels: config.processing.exclude_levels.clone(),
                 window_size: config.processing.window_size,
@@ -120,6 +122,7 @@ mod config;
 mod config_file;
 mod decompression;
 mod engine;
+mod error_handling;
 mod event;
 mod formatters;
 mod parallel;
@@ -246,8 +249,10 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
             brief: false,
             color: config::ColorMode::Auto,
             no_emoji: false,
-            summary: false,
+            no_section_headers: false,
             stats: false, // Stats handled at higher level
+            metrics: false,
+            metrics_file: None,
             timestamp_formatting: config::TimestampFormatConfig::default(),
         },
         processing: config::ProcessingConfig {
@@ -257,6 +262,7 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
             no_inject_fields: config.processing.no_inject_fields,
             inject_prefix: config.processing.inject_prefix.clone(),
             on_error: config.processing.on_error.clone().into(),
+            error_report: config.processing.error_report.clone(),
             levels: config.processing.levels.clone(),
             exclude_levels: config.processing.exclude_levels.clone(),
             window_size: config.processing.window_size,
@@ -317,6 +323,19 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     // Merge the parallel tracked state with our pipeline context
     let parallel_tracked = processor.get_final_tracked_state();
 
+    // Generate error summary before merging if in summary mode
+    if matches!(config.processing.error_report.style, crate::config::ErrorReportStyle::Summary) {
+        if let Some(summary) = crate::rhai_functions::tracking::extract_error_summary(&parallel_tracked) {
+            eprintln!("Error Summary:\n{}", summary);
+        }
+    }
+
+    // Write error summary to file if configured
+    if let Some(ref file_path) = config.processing.error_report.file {
+        crate::rhai_functions::tracking::write_error_summary_to_file(&parallel_tracked, file_path)
+            .unwrap_or_else(|e| eprintln!("Failed to write error summary to file: {}", e));
+    }
+
     // Extract internal stats from tracking system before merging (if stats enabled)
     if config.output.stats {
         processor
@@ -324,11 +343,13 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
             .unwrap_or(());
     }
 
-    // Filter out stats from user-visible context and merge the rest
+    // Filter out stats and errors from user-visible context and merge the rest
     for (key, dynamic_value) in parallel_tracked {
         if !key.starts_with("__internal_")
             && !key.starts_with("__kelora_stats_")
             && !key.starts_with("__op___kelora_stats_")
+            && !key.starts_with("__kelora_error_")
+            && !key.starts_with("__op___kelora_error_")
         {
             ctx.tracker.insert(key, dynamic_value);
         }
@@ -373,8 +394,10 @@ pub fn run_pipeline_sequential_with_config<W: Write>(
             brief: false,
             color: config::ColorMode::Auto,
             no_emoji: false,
-            summary: false,
+            no_section_headers: false,
             stats: false, // Stats handled at higher level
+            metrics: false,
+            metrics_file: None,
             timestamp_formatting: config::TimestampFormatConfig::default(),
         },
         processing: config::ProcessingConfig {
@@ -384,6 +407,7 @@ pub fn run_pipeline_sequential_with_config<W: Write>(
             no_inject_fields: config.processing.no_inject_fields,
             inject_prefix: config.processing.inject_prefix.clone(),
             on_error: config.processing.on_error.clone().into(),
+            error_report: config.processing.error_report.clone(),
             levels: config.processing.levels.clone(),
             exclude_levels: config.processing.exclude_levels.clone(),
             window_size: config.processing.window_size,
@@ -510,6 +534,22 @@ pub fn run_pipeline_sequential<W: Write>(
     // Execute end stage
     if let Err(e) = end_stage.execute(&ctx) {
         return Err(anyhow::anyhow!("End stage error: {}", e));
+    }
+
+    // Merge thread-local tracking state (including errors) into context for sequential mode
+    crate::rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
+
+    // Generate error summary if in summary mode
+    if matches!(config.processing.error_report.style, crate::config::ErrorReportStyle::Summary) {
+        if let Some(summary) = crate::rhai_functions::tracking::extract_error_summary(&ctx.tracker) {
+            eprintln!("Error Summary:\n{}", summary);
+        }
+    }
+
+    // Write error summary to file if configured
+    if let Some(ref file_path) = config.processing.error_report.file {
+        crate::rhai_functions::tracking::write_error_summary_to_file(&ctx.tracker, file_path)
+            .unwrap_or_else(|e| eprintln!("Failed to write error summary to file: {}", e));
     }
 
     Ok(())
@@ -641,7 +681,7 @@ fn process_line_sequential<W: Write>(
             }
             
             // Handle error based on strategy
-            if let config::ErrorStrategy::Abort = config.processing.on_error {
+            if let config::ErrorStrategy::Fail = config.processing.on_error {
                 return Err(e);
             }
             // For other strategies, we continue processing
