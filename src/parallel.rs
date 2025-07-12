@@ -1019,7 +1019,7 @@ impl ParallelProcessor {
                         // Error handling and stats tracking is already done in pipeline.process_line()
                         // based on the ctx.config.on_error strategy
                         match ctx.config.on_error {
-                            crate::ErrorStrategy::Fail => return Err(e),
+                            crate::ErrorStrategy::Abort => return Err(e),
                             _ => continue, // Skip, Continue all continue
                         }
                     }

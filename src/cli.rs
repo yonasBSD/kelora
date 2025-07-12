@@ -38,7 +38,7 @@ pub enum OutputFormat {
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum ErrorStrategy {
-    Fail,
+    Abort,
     Skip,
     Continue,
 }
@@ -128,7 +128,7 @@ pub struct Cli {
     #[arg(long = "window", help_heading = "Processing Options")]
     pub window_size: Option<usize>,
 
-    /// What to do when errors occur: fail (stop on first error), skip (skip invalid input), continue (process all lines)
+    /// What to do when errors occur: abort (stop on first error), skip (skip invalid input), continue (process all lines)
     #[arg(short = 'x', long = "on-error", value_enum, default_value = "continue", help_heading = "Error Handling")]
     pub on_error: ErrorStrategy,
 

@@ -415,7 +415,7 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
         if matches!(cli.on_error, crate::ErrorStrategy::Continue) {
             cli.on_error = match on_error.as_str() {
                 "skip" => crate::ErrorStrategy::Skip,
-                "fail" => crate::ErrorStrategy::Fail,
+                "abort" => crate::ErrorStrategy::Abort,
                 "continue" => crate::ErrorStrategy::Continue,
                 _ => cli.on_error,
             };

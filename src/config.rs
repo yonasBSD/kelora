@@ -130,7 +130,7 @@ pub enum OutputFormat {
 /// Error handling strategy
 #[derive(ValueEnum, Clone, Debug)]
 pub enum ErrorStrategy {
-    Fail,
+    Abort,
     Skip,
     Continue,
 }
@@ -631,7 +631,7 @@ fn parse_error_report_config(cli: &crate::Cli) -> ErrorReportConfig {
     } else {
         // Default depends on --on-error mode
         match format!("{:?}", cli.on_error).as_str() {
-            "Fail" => ErrorReportStyle::Print,
+            "Abort" => ErrorReportStyle::Print,
             _ => ErrorReportStyle::Summary,
         }
     };
@@ -740,7 +740,7 @@ impl From<crate::ErrorStrategy> for ErrorStrategy {
     fn from(strategy: crate::ErrorStrategy) -> Self {
         match strategy {
             crate::ErrorStrategy::Skip => ErrorStrategy::Skip,
-            crate::ErrorStrategy::Fail => ErrorStrategy::Fail,
+            crate::ErrorStrategy::Abort => ErrorStrategy::Abort,
             crate::ErrorStrategy::Continue => ErrorStrategy::Continue,
         }
     }
@@ -750,7 +750,7 @@ impl From<ErrorStrategy> for crate::ErrorStrategy {
     fn from(strategy: ErrorStrategy) -> Self {
         match strategy {
             ErrorStrategy::Skip => crate::ErrorStrategy::Skip,
-            ErrorStrategy::Fail => crate::ErrorStrategy::Fail,
+            ErrorStrategy::Abort => crate::ErrorStrategy::Abort,
             ErrorStrategy::Continue => crate::ErrorStrategy::Continue,
         }
     }

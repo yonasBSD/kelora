@@ -289,7 +289,7 @@ impl ScriptStage for TimestampFilterStage {
                         // Filter out events without valid timestamps
                         return ScriptResult::Skip;
                     }
-                    crate::ErrorStrategy::Print => {
+                    crate::ErrorStrategy::Continue => {
                         // Pass through but print warning
                         eprintln!(
                             "{}",
@@ -305,10 +305,6 @@ impl ScriptStage for TimestampFilterStage {
                             "Event has no valid timestamp for --since/--until filtering"
                                 .to_string(),
                         );
-                    }
-                    crate::ErrorStrategy::Stub => {
-                        // Pass through (same as default behavior)
-                        return ScriptResult::Emit(event);
                     }
                 }
             }
@@ -352,7 +348,11 @@ mod tests {
         // Create dummy context
         let mut ctx = PipelineContext {
             config: PipelineConfig {
-                on_error: crate::ErrorStrategy::Print,
+                on_error: crate::ErrorStrategy::Continue,
+                error_report: crate::config::ErrorReportConfig {
+                    style: crate::config::ErrorReportStyle::Summary,
+                    file: None,
+                },
                 brief: false,
                 no_inject_fields: false,
                 inject_prefix: None,
@@ -396,7 +396,11 @@ mod tests {
         // Create dummy context
         let mut ctx = PipelineContext {
             config: PipelineConfig {
-                on_error: crate::ErrorStrategy::Print,
+                on_error: crate::ErrorStrategy::Continue,
+                error_report: crate::config::ErrorReportConfig {
+                    style: crate::config::ErrorReportStyle::Summary,
+                    file: None,
+                },
                 brief: false,
                 no_inject_fields: false,
                 inject_prefix: None,
@@ -439,7 +443,11 @@ mod tests {
         // Create dummy context
         let mut ctx = PipelineContext {
             config: PipelineConfig {
-                on_error: crate::ErrorStrategy::Print,
+                on_error: crate::ErrorStrategy::Continue,
+                error_report: crate::config::ErrorReportConfig {
+                    style: crate::config::ErrorReportStyle::Summary,
+                    file: None,
+                },
                 brief: false,
                 no_inject_fields: false,
                 inject_prefix: None,

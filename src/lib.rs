@@ -681,7 +681,7 @@ fn process_line_sequential<W: Write>(
             }
             
             // Handle error based on strategy
-            if let config::ErrorStrategy::Fail = config.processing.on_error {
+            if let config::ErrorStrategy::Abort = config.processing.on_error {
                 return Err(e);
             }
             // For other strategies, we continue processing

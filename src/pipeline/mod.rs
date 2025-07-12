@@ -185,7 +185,7 @@ impl Pipeline {
 
                     return match ctx.config.on_error {
                         crate::ErrorStrategy::Skip => Ok(results),
-                        crate::ErrorStrategy::Fail => Err(err),
+                        crate::ErrorStrategy::Abort => Err(err),
                         crate::ErrorStrategy::Continue => {
                             // Check error reporting configuration before printing
                             match ctx.config.error_report.style {
@@ -238,7 +238,7 @@ impl Pipeline {
                                 ScriptResult::Error(msg) => {
                                     return match ctx.config.on_error {
                                         crate::ErrorStrategy::Skip => Ok(results),
-                                        crate::ErrorStrategy::Fail => Err(anyhow::anyhow!(msg)),
+                                        crate::ErrorStrategy::Abort => Err(anyhow::anyhow!(msg)),
                                         crate::ErrorStrategy::Continue => {
                                             // Check error reporting configuration before printing
                                             match ctx.config.error_report.style {
@@ -366,7 +366,7 @@ impl Pipeline {
                 ScriptResult::Error(msg) => {
                     return match ctx.config.on_error {
                         crate::ErrorStrategy::Skip => Ok(results),
-                        crate::ErrorStrategy::Fail => Err(anyhow::anyhow!(msg)),
+                        crate::ErrorStrategy::Abort => Err(anyhow::anyhow!(msg)),
                         crate::ErrorStrategy::Continue => {
                             // Check error reporting configuration before printing
                             match ctx.config.error_report.style {
