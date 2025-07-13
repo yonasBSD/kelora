@@ -438,11 +438,9 @@ impl pipeline::Formatter for HideFormatter {
 /// - Handles edge cases gracefully
 ///
 /// # Examples
-/// ```ignore
-/// assert_eq!(sanitize_logfmt_key("field with spaces"), "field_with_spaces");
-/// assert_eq!(sanitize_logfmt_key("field=with=equals"), "field_with_equals");
-/// assert_eq!(sanitize_logfmt_key("normal_field"), "normal_field");
-/// ```
+/// - sanitize_logfmt_key("field with spaces") -> "field_with_spaces"
+/// - sanitize_logfmt_key("field=with=equals") -> "field_with_equals"  
+/// - sanitize_logfmt_key("normal_field") -> "normal_field"
 fn sanitize_logfmt_key(key: &str) -> String {
     key.chars()
         .map(|c| match c {
