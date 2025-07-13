@@ -124,7 +124,6 @@ mod config;
 mod config_file;
 mod decompression;
 mod engine;
-mod error_handling;
 mod event;
 mod formatters;
 mod parallel;
