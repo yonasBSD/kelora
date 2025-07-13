@@ -105,6 +105,7 @@ pub trait ScriptStage: Send {
 /// Optional event limiting (--take N)
 pub trait EventLimiter: Send {
     fn allow(&mut self) -> bool;
+    #[allow(dead_code)] // Used by implementors
     fn is_exhausted(&self) -> bool;
 }
 
@@ -434,7 +435,8 @@ impl Pipeline {
     }
 
     /// Check if the event limiter (--take N) is exhausted
+    #[allow(dead_code)] // Used by parallel processing logic
     pub fn is_take_limit_exhausted(&self) -> bool {
-        self.limiter.as_ref().map_or(false, |l| l.is_exhausted())
+        self.limiter.as_ref().is_some_and(|l| l.is_exhausted())
     }
 }
