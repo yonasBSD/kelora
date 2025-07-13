@@ -270,6 +270,7 @@ impl GlobalTracker {
 pub struct ParallelProcessor {
     config: ParallelConfig,
     global_tracker: GlobalTracker,
+    take_limit: Option<usize>,
 }
 
 impl ParallelProcessor {
@@ -277,7 +278,13 @@ impl ParallelProcessor {
         Self {
             config,
             global_tracker: GlobalTracker::new(),
+            take_limit: None,
         }
+    }
+
+    pub fn with_take_limit(mut self, take_limit: Option<usize>) -> Self {
+        self.take_limit = take_limit;
+        self
     }
 
     /// Process input using the parallel pipeline
@@ -400,6 +407,7 @@ impl ParallelProcessor {
             let global_tracker = self.global_tracker.clone();
             let mut output = output;
             let config_clone = config.clone();
+            let take_limit = self.take_limit;
 
             thread::spawn(move || {
                 Self::pipeline_result_sink_thread(
@@ -408,6 +416,7 @@ impl ParallelProcessor {
                     global_tracker,
                     &mut output,
                     &config_clone,
+                    take_limit,
                 )
             })
         };
@@ -518,6 +527,7 @@ impl ParallelProcessor {
             let global_tracker = self.global_tracker.clone();
             let mut output = output;
             let config_clone = config.clone();
+            let take_limit = self.take_limit;
 
             thread::spawn(move || {
                 Self::pipeline_result_sink_thread(
@@ -526,6 +536,7 @@ impl ParallelProcessor {
                     global_tracker,
                     &mut output,
                     &config_clone,
+                    take_limit,
                 )
             })
         };
@@ -1185,14 +1196,15 @@ impl ParallelProcessor {
         global_tracker: GlobalTracker,
         output: &mut W,
         config: &crate::config::KeloraConfig,
+        take_limit: Option<usize>,
     ) -> Result<()> {
         // Write CSV header if needed (before any worker results)
         Self::write_csv_header_if_needed(output, config)?;
 
         if preserve_order {
-            Self::pipeline_ordered_result_sink(result_receiver, global_tracker, output)
+            Self::pipeline_ordered_result_sink(result_receiver, global_tracker, output, take_limit)
         } else {
-            Self::pipeline_unordered_result_sink(result_receiver, global_tracker, output)
+            Self::pipeline_unordered_result_sink(result_receiver, global_tracker, output, take_limit)
         }
     }
 
@@ -1200,9 +1212,11 @@ impl ParallelProcessor {
         result_receiver: Receiver<BatchResult>,
         global_tracker: GlobalTracker,
         output: &mut W,
+        take_limit: Option<usize>,
     ) -> Result<()> {
         let mut pending_batches: HashMap<u64, BatchResult> = HashMap::new();
         let mut next_expected_id = 0u64;
+        let mut events_output = 0usize;
 
         let mut termination_detected = false;
         while let Ok(mut batch_result) = result_receiver.recv() {
@@ -1241,14 +1255,33 @@ impl ParallelProcessor {
 
             // Output all consecutive batches starting from next_expected_id
             while let Some(batch) = pending_batches.remove(&next_expected_id) {
-                Self::pipeline_output_batch_results(output, &batch.results)?;
+                let remaining_limit = take_limit.map(|limit| limit.saturating_sub(events_output));
+                let events_this_batch = Self::pipeline_output_batch_results(output, &batch.results, remaining_limit)?;
+                events_output += events_this_batch;
                 next_expected_id += 1;
+                
+                // Check if we've reached the take limit
+                if let Some(limit) = take_limit {
+                    if events_output >= limit {
+                        // Set termination signal to stop further processing
+                        SHOULD_TERMINATE.store(true, Ordering::Relaxed);
+                        break;
+                    }
+                }
             }
         }
 
         // Output any remaining batches (shouldn't happen with proper shutdown)
         for (_, batch) in pending_batches {
-            Self::pipeline_output_batch_results(output, &batch.results)?;
+            let remaining_limit = take_limit.map(|limit| limit.saturating_sub(events_output));
+            events_output += Self::pipeline_output_batch_results(output, &batch.results, remaining_limit)?;
+            
+            // Check if we've reached the take limit even in cleanup
+            if let Some(limit) = take_limit {
+                if events_output >= limit {
+                    break;
+                }
+            }
         }
 
         Ok(())
@@ -1258,8 +1291,10 @@ impl ParallelProcessor {
         result_receiver: Receiver<BatchResult>,
         global_tracker: GlobalTracker,
         output: &mut W,
+        take_limit: Option<usize>,
     ) -> Result<()> {
         let mut termination_detected = false;
+        let mut events_output = 0usize;
         while let Ok(batch_result) = result_receiver.recv() {
             // Check for termination signal, but don't break immediately
             // Continue processing to collect final stats from workers
@@ -1287,7 +1322,18 @@ impl ParallelProcessor {
             }
 
             // Output immediately
-            Self::pipeline_output_batch_results(output, &batch_result.results)?;
+            let remaining_limit = take_limit.map(|limit| limit.saturating_sub(events_output));
+            let events_this_batch = Self::pipeline_output_batch_results(output, &batch_result.results, remaining_limit)?;
+            events_output += events_this_batch;
+            
+            // Check if we've reached the take limit
+            if let Some(limit) = take_limit {
+                if events_output >= limit {
+                    // Set termination signal to stop further processing
+                    SHOULD_TERMINATE.store(true, Ordering::Relaxed);
+                    break;
+                }
+            }
         }
 
         Ok(())
@@ -1296,8 +1342,18 @@ impl ParallelProcessor {
     fn pipeline_output_batch_results<W: std::io::Write>(
         output: &mut W,
         results: &[ProcessedEvent],
-    ) -> Result<()> {
+        remaining_limit: Option<usize>,
+    ) -> Result<usize> {
+        let mut events_output = 0usize;
+        
         for processed in results {
+            // Check if we've reached the limit
+            if let Some(limit) = remaining_limit {
+                if events_output >= limit {
+                    break;
+                }
+            }
+
             // First output any captured prints for this specific event (to stdout, not file)
             for print_msg in &processed.captured_prints {
                 println!("{}", print_msg);
@@ -1311,11 +1367,12 @@ impl ParallelProcessor {
             // Then output the event itself to the designated output, skip empty strings
             if !processed.event.original_line.is_empty() {
                 writeln!(output, "{}", &processed.event.original_line).unwrap_or(());
+                events_output += 1;
             }
         }
 
         output.flush().unwrap_or(());
-        Ok(())
+        Ok(events_output)
     }
 
     /// Preprocess CSV headers and return a reader that includes the first line if it's data

@@ -42,6 +42,7 @@ pub struct PipelineProcessingConfig {
     pub exclude_levels: Vec<String>,
     pub window_size: usize,
     pub timestamp_filter: Option<config::TimestampFilterConfig>,
+    pub take_limit: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -80,6 +81,7 @@ impl PipelineConfig {
                 exclude_levels: config.processing.exclude_levels.clone(),
                 window_size: config.processing.window_size,
                 timestamp_filter: config.processing.timestamp_filter.clone(),
+                take_limit: config.processing.take_limit,
             },
             performance: PipelinePerformanceConfig {
                 parallel: config.performance.parallel,
@@ -267,6 +269,7 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
             exclude_levels: config.processing.exclude_levels.clone(),
             window_size: config.processing.window_size,
             timestamp_filter: config.processing.timestamp_filter.clone(),
+            take_limit: config.processing.take_limit,
         },
         performance: config::PerformanceConfig {
             parallel: config.performance.parallel,
@@ -295,7 +298,8 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
         buffer_size: Some(10000),
     };
 
-    let processor = ParallelProcessor::new(parallel_config);
+    let processor = ParallelProcessor::new(parallel_config)
+        .with_take_limit(config.processing.take_limit);
 
     // Create pipeline builder and components for begin/end stages
     let pipeline_builder = create_pipeline_builder_from_config(config);
@@ -417,6 +421,7 @@ pub fn run_pipeline_sequential_with_config<W: Write>(
             exclude_levels: config.processing.exclude_levels.clone(),
             window_size: config.processing.window_size,
             timestamp_filter: config.processing.timestamp_filter.clone(),
+            take_limit: config.processing.take_limit,
         },
         performance: config::PerformanceConfig {
             parallel: config.performance.parallel,

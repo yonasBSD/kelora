@@ -75,6 +75,18 @@ Empty lines are handled differently based on input format:
 - Use `skip` for production pipelines where data quality varies and broken lines should be discarded
 - Use `abort` for strict validation scenarios where any error should stop processing
 
+### Output Limiting
+
+**--take N Option:**
+- Limits output to the first N events from the input stream
+- Works with both sequential and parallel processing modes
+- Applies after filtering - returns first N events that pass all filters
+- Provides early exit behavior in parallel mode for efficient processing
+- Examples:
+  - `--take 10` - Output first 10 events
+  - `--take 100 --filter 'level == "ERROR"'` - First 100 error events
+  - `--take 5 --parallel` - First 5 events using parallel processing
+
 ### Performance Considerations
 
 **Sequential vs Parallel Processing:**

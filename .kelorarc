@@ -1,0 +1,6 @@
+[defaults]
+on_error = skip
+error_report = off
+metrics = true
+stats = true
+no_section_headers = true

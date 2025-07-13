@@ -626,6 +626,7 @@ pub fn create_pipeline_builder_from_config(
     builder.ts_field = config.input.ts_field.clone();
     builder.ts_format = config.input.ts_format.clone();
     builder.default_timezone = config.input.default_timezone.clone();
+    builder.take_limit = config.processing.take_limit;
     builder
 }
 

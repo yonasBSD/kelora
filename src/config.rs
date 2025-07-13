@@ -83,6 +83,8 @@ pub struct ProcessingConfig {
     pub window_size: usize,
     /// Timestamp filtering configuration
     pub timestamp_filter: Option<TimestampFilterConfig>,
+    /// Limit output to the first N events (None = no limit)
+    pub take_limit: Option<usize>,
 }
 
 /// Performance configuration
@@ -510,6 +512,7 @@ impl KeloraConfig {
                 exclude_levels: cli.exclude_levels.clone(),
                 window_size: cli.window_size.unwrap_or(0),
                 timestamp_filter: None, // Will be set in main() after parsing since/until
+                take_limit: cli.take,
             },
             performance: PerformanceConfig {
                 parallel: cli.parallel,
@@ -586,6 +589,7 @@ impl Default for KeloraConfig {
                 exclude_levels: Vec::new(),
                 window_size: 0,
                 timestamp_filter: None,
+                take_limit: None,
             },
             performance: PerformanceConfig {
                 parallel: false,

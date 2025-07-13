@@ -209,6 +209,10 @@ pub struct Cli {
     #[arg(long = "until", help_heading = "Filtering Options")]
     pub until: Option<String>,
 
+    /// Limit output to the first N events
+    #[arg(long = "take", help_heading = "Filtering Options")]
+    pub take: Option<usize>,
+
     /// Output format
     #[arg(
         short = 'F',
