@@ -149,7 +149,7 @@ pub struct Cli {
     )]
     pub on_error: ErrorStrategy,
 
-    /// How to report errors: off (suppress), summary (grouped), print (each error)
+    /// How to report errors: off (suppress), summary (grouped), print (each error). Defaults: abort->print, skip->summary, quarantine->summary
     #[arg(long = "error-report", value_enum, help_heading = "Error Handling")]
     pub error_report: Option<ErrorReportStyle>,
 

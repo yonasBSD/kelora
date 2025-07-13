@@ -75,6 +75,12 @@ Empty lines are handled differently based on input format:
 - Use `skip` for production pipelines where data quality varies and broken lines should be discarded
 - Use `abort` for strict validation scenarios where any error should stop processing
 
+**Error Reporting Defaults:**
+- `abort` mode defaults to `--error-report=print` (show each error immediately)
+- `skip` mode defaults to `--error-report=summary` (show summary of skipped errors)  
+- `quarantine` mode defaults to `--error-report=summary` (show summary of quarantined errors)
+- Override with explicit `--error-report=off` to suppress error reporting entirely
+
 ### Output Limiting
 
 **--take N Option:**
