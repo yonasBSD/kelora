@@ -3462,37 +3462,25 @@ fn test_take_limit_parallel_mode() {
 
     let (stdout, _stderr, exit_code) =
         run_kelora_with_input(&["-f", "jsonl", "--take", "3", "--parallel"], input);
-    
-    assert_eq!(exit_code, 0, "kelora should exit successfully with --take and --parallel");
-    
+
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully with --take and --parallel"
+    );
+
     let lines: Vec<&str> = stdout.trim().split('\n').collect();
     assert_eq!(
         lines.len(),
         3,
         "Should output exactly 3 lines when --take 3 is specified in parallel mode"
     );
-    
+
     // Check that it outputs the first 3 lines (order should be preserved by default)
-    assert!(
-        stdout.contains("Line 1"),
-        "Should include first line"
-    );
-    assert!(
-        stdout.contains("Line 2"),
-        "Should include second line"
-    );
-    assert!(
-        stdout.contains("Line 3"),
-        "Should include third line"
-    );
-    assert!(
-        !stdout.contains("Line 4"),
-        "Should not include fourth line"
-    );
-    assert!(
-        !stdout.contains("Line 10"),
-        "Should not include tenth line"
-    );
+    assert!(stdout.contains("Line 1"), "Should include first line");
+    assert!(stdout.contains("Line 2"), "Should include second line");
+    assert!(stdout.contains("Line 3"), "Should include third line");
+    assert!(!stdout.contains("Line 4"), "Should not include fourth line");
+    assert!(!stdout.contains("Line 10"), "Should not include tenth line");
 }
 
 #[test]
@@ -3504,12 +3492,23 @@ fn test_take_limit_parallel_small_batches() {
 {"level": "INFO", "message": "Line 5"}"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--take", "3", "--parallel", "--batch-size", "1"],
+        &[
+            "-f",
+            "jsonl",
+            "--take",
+            "3",
+            "--parallel",
+            "--batch-size",
+            "1",
+        ],
         input,
     );
-    
-    assert_eq!(exit_code, 0, "kelora should exit successfully with --take, --parallel, and small batch size");
-    
+
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully with --take, --parallel, and small batch size"
+    );
+
     let lines: Vec<&str> = stdout.trim().split('\n').collect();
     assert_eq!(
         lines.len(),
@@ -3529,19 +3528,30 @@ fn test_take_limit_parallel_with_filter() {
 {"level": "INFO", "message": "Good line 4"}"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--filter", "level == \"INFO\"", "--take", "2", "--parallel"],
+        &[
+            "-f",
+            "jsonl",
+            "--filter",
+            "level == \"INFO\"",
+            "--take",
+            "2",
+            "--parallel",
+        ],
         input,
     );
-    
-    assert_eq!(exit_code, 0, "kelora should exit successfully with --take, --filter, and --parallel");
-    
+
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully with --take, --filter, and --parallel"
+    );
+
     let lines: Vec<&str> = stdout.trim().split('\n').collect();
     assert_eq!(
         lines.len(),
         2,
         "Should output exactly 2 lines when --take 2 with filter in parallel mode"
     );
-    
+
     // Check that it outputs the first 2 INFO lines
     assert!(
         stdout.contains("Good line 1"),
@@ -3573,16 +3583,19 @@ fn test_take_limit_parallel_unordered() {
         &["-f", "jsonl", "--take", "3", "--parallel", "--unordered"],
         input,
     );
-    
-    assert_eq!(exit_code, 0, "kelora should exit successfully with --take, --parallel, and --unordered");
-    
+
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully with --take, --parallel, and --unordered"
+    );
+
     let lines: Vec<&str> = stdout.trim().split('\n').collect();
     assert_eq!(
         lines.len(),
         3,
         "Should output exactly 3 lines when --take 3 in unordered parallel mode"
     );
-    
+
     // In unordered mode, we can't guarantee which 3 lines we get, but we should get exactly 3
     // and they should all be from our input
     for line in lines {

@@ -1204,7 +1204,12 @@ impl ParallelProcessor {
         if preserve_order {
             Self::pipeline_ordered_result_sink(result_receiver, global_tracker, output, take_limit)
         } else {
-            Self::pipeline_unordered_result_sink(result_receiver, global_tracker, output, take_limit)
+            Self::pipeline_unordered_result_sink(
+                result_receiver,
+                global_tracker,
+                output,
+                take_limit,
+            )
         }
     }
 
@@ -1256,10 +1261,11 @@ impl ParallelProcessor {
             // Output all consecutive batches starting from next_expected_id
             while let Some(batch) = pending_batches.remove(&next_expected_id) {
                 let remaining_limit = take_limit.map(|limit| limit.saturating_sub(events_output));
-                let events_this_batch = Self::pipeline_output_batch_results(output, &batch.results, remaining_limit)?;
+                let events_this_batch =
+                    Self::pipeline_output_batch_results(output, &batch.results, remaining_limit)?;
                 events_output += events_this_batch;
                 next_expected_id += 1;
-                
+
                 // Check if we've reached the take limit
                 if let Some(limit) = take_limit {
                     if events_output >= limit {
@@ -1274,8 +1280,9 @@ impl ParallelProcessor {
         // Output any remaining batches (shouldn't happen with proper shutdown)
         for (_, batch) in pending_batches {
             let remaining_limit = take_limit.map(|limit| limit.saturating_sub(events_output));
-            events_output += Self::pipeline_output_batch_results(output, &batch.results, remaining_limit)?;
-            
+            events_output +=
+                Self::pipeline_output_batch_results(output, &batch.results, remaining_limit)?;
+
             // Check if we've reached the take limit even in cleanup
             if let Some(limit) = take_limit {
                 if events_output >= limit {
@@ -1323,9 +1330,13 @@ impl ParallelProcessor {
 
             // Output immediately
             let remaining_limit = take_limit.map(|limit| limit.saturating_sub(events_output));
-            let events_this_batch = Self::pipeline_output_batch_results(output, &batch_result.results, remaining_limit)?;
+            let events_this_batch = Self::pipeline_output_batch_results(
+                output,
+                &batch_result.results,
+                remaining_limit,
+            )?;
             events_output += events_this_batch;
-            
+
             // Check if we've reached the take limit
             if let Some(limit) = take_limit {
                 if events_output >= limit {
@@ -1345,7 +1356,7 @@ impl ParallelProcessor {
         remaining_limit: Option<usize>,
     ) -> Result<usize> {
         let mut events_output = 0usize;
-        
+
         for processed in results {
             // Check if we've reached the limit
             if let Some(limit) = remaining_limit {

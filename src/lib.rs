@@ -298,8 +298,8 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
         buffer_size: Some(10000),
     };
 
-    let processor = ParallelProcessor::new(parallel_config)
-        .with_take_limit(config.processing.take_limit);
+    let processor =
+        ParallelProcessor::new(parallel_config).with_take_limit(config.processing.take_limit);
 
     // Create pipeline builder and components for begin/end stages
     let pipeline_builder = create_pipeline_builder_from_config(config);
