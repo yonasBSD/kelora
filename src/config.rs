@@ -631,7 +631,8 @@ fn parse_error_report_config(cli: &crate::Cli) -> ErrorReportConfig {
         // Default depends on --on-error mode
         match format!("{:?}", cli.on_error).as_str() {
             "Abort" => ErrorReportStyle::Print,
-            _ => ErrorReportStyle::Summary,
+            "Skip" => ErrorReportStyle::Off,
+            _ => ErrorReportStyle::Summary, // quarantine and fallback
         }
     };
 
