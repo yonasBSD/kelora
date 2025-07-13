@@ -476,7 +476,7 @@ pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) 
                 return Ok(());
             }
 
-            process_line_sequential(
+            match process_line_sequential(
                 line_result,
                 &mut line_num,
                 &mut skipped_lines,
@@ -487,7 +487,10 @@ pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) 
                 None,
                 &mut current_csv_headers,
                 &mut last_filename,
-            )?;
+            )? {
+                ProcessingResult::Continue => {}
+                ProcessingResult::TakeLimitExhausted => break,
+            }
         }
     } else {
         // File processing - with filename tracking
@@ -509,7 +512,7 @@ pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) 
                 Err(e) => {
                     let line_result = Err(e);
                     let current_filename = multi_reader.current_filename().map(|s| s.to_string());
-                    process_line_sequential(
+                    match process_line_sequential(
                         line_result,
                         &mut line_num,
                         &mut skipped_lines,
@@ -520,14 +523,17 @@ pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) 
                         current_filename,
                         &mut current_csv_headers,
                         &mut last_filename,
-                    )?;
+                    )? {
+                        ProcessingResult::Continue => {}
+                        ProcessingResult::TakeLimitExhausted => break,
+                    }
                     continue;
                 }
             };
 
             if bytes_read > 0 {
                 let current_filename = multi_reader.current_filename().map(|s| s.to_string());
-                process_line_sequential(
+                match process_line_sequential(
                     Ok(line_buf.clone()),
                     &mut line_num,
                     &mut skipped_lines,
@@ -538,7 +544,10 @@ pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) 
                     current_filename,
                     &mut current_csv_headers,
                     &mut last_filename,
-                )?;
+                )? {
+                    ProcessingResult::Continue => {}
+                    ProcessingResult::TakeLimitExhausted => break,
+                }
             }
         }
     }
@@ -581,6 +590,12 @@ pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) 
 
 /// Process a single line in sequential mode with filename tracking and CSV schema detection
 #[allow(clippy::too_many_arguments)]
+/// Processing result for sequential pipeline
+enum ProcessingResult {
+    Continue,
+    TakeLimitExhausted,
+}
+
 fn process_line_sequential<W: Write>(
     line_result: io::Result<String>,
     line_num: &mut usize,
@@ -592,7 +607,7 @@ fn process_line_sequential<W: Write>(
     current_filename: Option<String>,
     current_csv_headers: &mut Option<Vec<String>>,
     last_filename: &mut Option<String>,
-) -> Result<()> {
+) -> Result<ProcessingResult> {
     let line = line_result?;
     *line_num += 1;
 
@@ -608,7 +623,7 @@ fn process_line_sequential<W: Write>(
         if config.output.stats {
             stats_add_line_filtered();
         }
-        return Ok(());
+        return Ok(ProcessingResult::Continue);
     }
 
     // Apply ignore-lines filter if configured (early filtering before parsing)
@@ -618,14 +633,14 @@ fn process_line_sequential<W: Write>(
             if config.output.stats {
                 stats_add_line_filtered();
             }
-            return Ok(());
+            return Ok(ProcessingResult::Continue);
         }
     }
 
     if line.trim().is_empty() {
         // Only skip empty lines for structured formats, not for line format
         if !matches!(config.input.format, config::InputFormat::Line) {
-            return Ok(());
+            return Ok(ProcessingResult::Continue);
         }
         // For line format, continue processing the empty line
     }
@@ -673,7 +688,7 @@ fn process_line_sequential<W: Write>(
 
         // If the first line was consumed as a header, don't process it as data
         if was_consumed {
-            return Ok(());
+            return Ok(ProcessingResult::Continue);
         }
     }
 
@@ -699,6 +714,11 @@ fn process_line_sequential<W: Write>(
                     writeln!(output, "{}", result)?;
                 }
             }
+
+            // Check if take limit is exhausted after processing
+            if pipeline.is_take_limit_exhausted() {
+                return Ok(ProcessingResult::TakeLimitExhausted);
+            }
         }
         Err(e) => {
             // Count errors for stats
@@ -714,5 +734,5 @@ fn process_line_sequential<W: Write>(
         }
     }
 
-    Ok(())
+    Ok(ProcessingResult::Continue)
 }

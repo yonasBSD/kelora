@@ -105,6 +105,7 @@ pub trait ScriptStage: Send {
 /// Optional event limiting (--take N)
 pub trait EventLimiter: Send {
     fn allow(&mut self) -> bool;
+    fn is_exhausted(&self) -> bool;
 }
 
 /// Format events for output
@@ -430,5 +431,10 @@ impl Pipeline {
         } else {
             Ok(Vec::new())
         }
+    }
+
+    /// Check if the event limiter (--take N) is exhausted
+    pub fn is_take_limit_exhausted(&self) -> bool {
+        self.limiter.as_ref().map_or(false, |l| l.is_exhausted())
     }
 }

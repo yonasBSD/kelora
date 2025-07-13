@@ -600,6 +600,11 @@ impl ParallelProcessor {
         let mut current_headers: Option<Vec<String>> = None;
 
         loop {
+            // Check for termination signal
+            if SHOULD_TERMINATE.load(Ordering::Relaxed) {
+                break;
+            }
+
             // Check if we should send current batch due to timeout
             if !current_batch.is_empty() && last_batch_time.elapsed() >= batch_timeout {
                 Self::send_batch_with_filenames_and_headers(
@@ -776,6 +781,11 @@ impl ParallelProcessor {
         // 3. Avoid blocking indefinitely on read_line
 
         loop {
+            // Check for termination signal
+            if SHOULD_TERMINATE.load(Ordering::Relaxed) {
+                break;
+            }
+
             // Check if we should send current batch due to timeout
             if !current_batch.is_empty() && last_batch_time.elapsed() >= batch_timeout {
                 Self::send_batch(

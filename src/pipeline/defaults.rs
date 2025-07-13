@@ -84,6 +84,10 @@ impl EventLimiter for TakeNLimiter {
             false
         }
     }
+
+    fn is_exhausted(&self) -> bool {
+        self.remaining == 0
+    }
 }
 
 /// Sliding window manager that maintains a configurable window of recent events
