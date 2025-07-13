@@ -14,6 +14,7 @@ pub struct ChannelStdinReader {
 }
 
 impl ChannelStdinReader {
+    #[allow(dead_code)] // Used by create_input_reader in builders.rs for stdin handling
     pub fn new() -> Result<Self> {
         let (sender, receiver) = crossbeam_channel::unbounded();
 

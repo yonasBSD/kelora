@@ -51,7 +51,9 @@ use crate::readers::{ChannelStdinReader, MultiFileReader};
 #[derive(Clone)]
 pub struct PipelineBuilder {
     config: PipelineConfig,
+    #[allow(dead_code)] // Used in builder pattern, stored for build() method
     begin: Option<String>,
+    #[allow(dead_code)] // Used in builder pattern, stored for build() method
     end: Option<String>,
     input_format: crate::InputFormat,
     output_format: crate::OutputFormat,
@@ -103,12 +105,14 @@ impl PipelineBuilder {
         }
     }
 
+    #[allow(dead_code)] // Used in builder pattern, called by helper functions
     pub fn with_config(mut self, config: PipelineConfig) -> Self {
         self.config = config;
         self
     }
 
     /// Build pipeline with stages
+    #[allow(dead_code)] // Used in builder pattern, called by create_pipeline_from_config
     pub fn build(
         self,
         stages: Vec<crate::config::ScriptStageType>,
@@ -319,21 +323,25 @@ impl PipelineBuilder {
         Ok((pipeline, begin_stage, end_stage, ctx))
     }
 
+    #[allow(dead_code)] // Used in builder pattern, called by create_pipeline_builder_from_config
     pub fn with_begin(mut self, begin: Option<String>) -> Self {
         self.begin = begin;
         self
     }
 
+    #[allow(dead_code)] // Used in builder pattern, called by create_pipeline_builder_from_config
     pub fn with_end(mut self, end: Option<String>) -> Self {
         self.end = end;
         self
     }
 
+    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
     pub fn with_input_format(mut self, format: crate::InputFormat) -> Self {
         self.input_format = format;
         self
     }
 
+    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
     pub fn with_output_format(mut self, format: crate::OutputFormat) -> Self {
         self.output_format = format;
         self
@@ -566,16 +574,19 @@ impl PipelineBuilder {
         self
     }
 
+    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
     pub fn with_ts_field(mut self, ts_field: Option<String>) -> Self {
         self.ts_field = ts_field;
         self
     }
 
+    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
     pub fn with_ts_format(mut self, ts_format: Option<String>) -> Self {
         self.ts_format = ts_format;
         self
     }
 
+    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
     pub fn with_default_timezone(mut self, default_timezone: Option<String>) -> Self {
         self.default_timezone = default_timezone;
         self
@@ -589,6 +600,7 @@ impl Default for PipelineBuilder {
 }
 
 /// Create a pipeline from configuration
+#[allow(dead_code)] // Used by lib.rs sequential processing, not detected across crate targets
 pub fn create_pipeline_from_config(
     config: &crate::config::KeloraConfig,
 ) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
@@ -597,6 +609,7 @@ pub fn create_pipeline_from_config(
 }
 
 /// Create a pipeline builder from configuration (useful for parallel processing)
+#[allow(dead_code)] // Used by lib.rs for both sequential and parallel processing
 pub fn create_pipeline_builder_from_config(
     config: &crate::config::KeloraConfig,
 ) -> PipelineBuilder {
@@ -653,6 +666,7 @@ fn read_all_files_to_memory(
 }
 
 /// Create input reader with optional decompression for parallel processing
+#[allow(dead_code)] // Used by lib.rs for parallel processing setup
 pub fn create_input_reader(
     config: &crate::config::KeloraConfig,
 ) -> Result<Box<dyn BufRead + Send>> {

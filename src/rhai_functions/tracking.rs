@@ -538,6 +538,7 @@ fn get_metrics_map() -> Dynamic {
 }
 
 /// Format metrics for CLI output according to specification
+#[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
 pub fn format_metrics_output(tracked: &HashMap<String, Dynamic>) -> String {
     let mut output = String::new();
 
@@ -587,7 +588,7 @@ pub fn format_metrics_output(tracked: &HashMap<String, Dynamic>) -> String {
                 value.as_float().unwrap_or(0.0)
             ));
         } else {
-            output.push_str(&format!("{:<12} = {}\n", key, value.to_string()));
+            output.push_str(&format!("{:<12} = {}\n", key, value));
         }
     }
 
@@ -595,6 +596,7 @@ pub fn format_metrics_output(tracked: &HashMap<String, Dynamic>) -> String {
 }
 
 /// Format metrics for JSON output
+#[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
 pub fn format_metrics_json(
     tracked: &HashMap<String, Dynamic>,
 ) -> Result<String, serde_json::Error> {

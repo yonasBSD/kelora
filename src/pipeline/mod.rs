@@ -189,8 +189,10 @@ impl Pipeline {
                         crate::ErrorStrategy::Abort => return Err(err),
                         crate::ErrorStrategy::Quarantine => {
                             // Create empty event with error info in meta
-                            let mut quarantined_event = crate::event::Event::default();
-                            quarantined_event.original_line = chunk.clone();
+                            let mut quarantined_event = crate::event::Event {
+                                original_line: chunk.clone(),
+                                ..Default::default()
+                            };
 
                             // Set metadata from context
                             if let Some(line_num) = ctx.meta.line_number {

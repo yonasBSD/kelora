@@ -161,7 +161,7 @@ pub struct TimestampFilterConfig {
 }
 
 /// Timestamp formatting configuration (display-only, affects default output format only)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TimestampFormatConfig {
     /// Specific fields to format as timestamps
     pub format_fields: Vec<String>,
@@ -169,16 +169,6 @@ pub struct TimestampFormatConfig {
     pub auto_format_all: bool,
     /// Target timezone for formatting (true = UTC, false = local)
     pub format_as_utc: bool,
-}
-
-impl Default for TimestampFormatConfig {
-    fn default() -> Self {
-        Self {
-            format_fields: Vec::new(),
-            auto_format_all: false,
-            format_as_utc: false,
-        }
-    }
 }
 
 /// Multi-line event detection configuration
@@ -480,7 +470,7 @@ impl KeloraConfig {
                 multiline: None,    // Will be set after CLI parsing
                 ts_field: cli.ts_field.clone(),
                 ts_format: cli.ts_format.clone(),
-                default_timezone: determine_default_timezone(&cli),
+                default_timezone: determine_default_timezone(cli),
             },
             output: OutputConfig {
                 format: if cli.stats_only {
@@ -507,7 +497,7 @@ impl KeloraConfig {
                 no_inject_fields: cli.no_inject_fields,
                 inject_prefix: cli.inject_prefix.clone(),
                 on_error: cli.on_error.clone().into(),
-                error_report: parse_error_report_config(&cli),
+                error_report: parse_error_report_config(cli),
                 levels: cli.levels.clone(),
                 exclude_levels: cli.exclude_levels.clone(),
                 window_size: cli.window_size.unwrap_or(0),
