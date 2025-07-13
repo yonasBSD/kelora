@@ -24,18 +24,22 @@ thread_local! {
 }
 
 // Public API functions for stats collection (following track_count pattern)
+// Note: These functions are conditionally called based on config.output.stats flag
+#[allow(dead_code)] // Used conditionally in lib.rs when stats are enabled
 pub fn stats_add_line_read() {
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().lines_read += 1;
     });
 }
 
+#[allow(dead_code)] // Used conditionally in lib.rs when stats are enabled
 pub fn stats_add_line_output() {
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().lines_output += 1;
     });
 }
 
+#[allow(dead_code)] // Used conditionally in lib.rs when stats are enabled
 pub fn stats_add_line_filtered() {
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().lines_filtered += 1;
@@ -68,6 +72,7 @@ pub fn stats_add_event_filtered() {
     });
 }
 
+#[allow(dead_code)] // Used conditionally in lib.rs when stats are enabled
 pub fn stats_add_error() {
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().errors += 1;
@@ -102,6 +107,7 @@ impl ProcessingStats {
     }
 
     /// Format stats according to the specification
+    #[allow(dead_code)] // Used in main.rs when stats are enabled
     pub fn format_stats(&self, _multiline_enabled: bool) -> String {
         let mut output = String::new();
 

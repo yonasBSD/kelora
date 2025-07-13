@@ -523,6 +523,7 @@ pub fn get_thread_tracking_state() -> HashMap<String, Dynamic> {
 }
 
 /// Merge thread-local tracking state into context tracker for sequential mode
+#[allow(dead_code)] // Planned feature for parallel mode metrics merging
 pub fn merge_thread_tracking_to_context(ctx: &mut crate::pipeline::PipelineContext) {
     let thread_state = get_thread_tracking_state();
     for (key, value) in thread_state {
@@ -531,6 +532,7 @@ pub fn merge_thread_tracking_to_context(ctx: &mut crate::pipeline::PipelineConte
 }
 
 /// Create a dynamic map that gives access to current metrics state
+#[allow(dead_code)] // Planned feature for exposing metrics to Rhai scripts
 fn get_metrics_map() -> Dynamic {
     Dynamic::from(rhai::Map::new()) // Will be populated by accessing current state
 }
@@ -659,6 +661,7 @@ pub fn format_metrics_json(
 }
 
 /// Extract error summary from tracking state
+#[allow(dead_code)] // Planned feature for error reporting
 pub fn extract_error_summary(tracked: &HashMap<String, Dynamic>) -> Option<String> {
     let mut has_errors = false;
     let mut summary = serde_json::Map::new();
@@ -717,6 +720,7 @@ pub fn extract_error_summary(tracked: &HashMap<String, Dynamic>) -> Option<Strin
 }
 
 /// Write error summary to file if configured
+#[allow(dead_code)] // Planned feature for error reporting
 pub fn write_error_summary_to_file(
     tracked: &HashMap<String, Dynamic>,
     file_path: &str,

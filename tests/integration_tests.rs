@@ -3605,3 +3605,147 @@ fn test_take_limit_parallel_unordered() {
         );
     }
 }
+
+// =============================================================================
+// METRICS REGRESSION TESTS
+// =============================================================================
+// These tests ensure that the --metrics functionality works correctly in both
+// sequential and parallel modes. This prevents regression of the bug where
+// metrics were broken due to incorrect thread-local vs global state handling.
+
+#[test]
+fn test_metrics_sequential_mode_basic() {
+    let input = r#"{"level":"info","message":"test1"}
+{"level":"error","message":"test2"}
+{"level":"info","message":"test3"}"#;
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f", "jsonl",
+            "--exec", "track_count(\"total\"); track_count(\"level_\" + level)",
+            "--metrics"
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    
+    // Check that metrics output appears in stderr
+    assert!(stderr.contains("=== Kelora Metrics ==="), "Should contain metrics header");
+    assert!(stderr.contains("total        = 3"), "Should count total events");
+    assert!(stderr.contains("level_info   = 2"), "Should count info events");
+    assert!(stderr.contains("level_error  = 1"), "Should count error events");
+    
+    // Check that main output still appears in stdout
+    assert!(stdout.contains("level=\"info\""), "Should output processed events");
+    assert!(stdout.contains("level=\"error\""), "Should output processed events");
+}
+
+#[test]
+fn test_metrics_parallel_mode_basic() {
+    let input = r#"{"level":"info","message":"test1"}
+{"level":"error","message":"test2"}
+{"level":"info","message":"test3"}
+{"level":"warn","message":"test4"}"#;
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f", "jsonl",
+            "--exec", "track_count(\"total\"); track_count(\"level_\" + level)",
+            "--metrics",
+            "--parallel",
+            "--batch-size", "2"
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    
+    // Check that metrics output appears in stderr (same as sequential)
+    assert!(stderr.contains("=== Kelora Metrics ==="), "Should contain metrics header");
+    assert!(stderr.contains("total        = 4"), "Should count total events across workers");
+    assert!(stderr.contains("level_info   = 2"), "Should count info events across workers");
+    assert!(stderr.contains("level_error  = 1"), "Should count error events across workers");
+    assert!(stderr.contains("level_warn   = 1"), "Should count warn events across workers");
+    
+    // Check that main output still appears in stdout
+    assert!(stdout.contains("level=\"info\""), "Should output processed events");
+    assert!(stdout.contains("level=\"error\""), "Should output processed events");
+    assert!(stdout.contains("level=\"warn\""), "Should output processed events");
+}
+
+#[test]
+fn test_metrics_file_output() {
+    let input = r#"{"level":"info","message":"test1"}
+{"level":"error","message":"test2"}"#;
+
+    // Create a temporary file for metrics output
+    let temp_file = NamedTempFile::new().expect("Failed to create temp file");
+    let metrics_file_path = temp_file.path().to_str().unwrap();
+
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f", "jsonl",
+            "--exec", "track_count(\"total\"); track_count(\"level_\" + level)",
+            "--metrics-file", metrics_file_path
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    
+    // Read the metrics file content
+    let metrics_content = std::fs::read_to_string(metrics_file_path)
+        .expect("Failed to read metrics file");
+    
+    // Parse as JSON to verify structure
+    let metrics_json: serde_json::Value = serde_json::from_str(&metrics_content)
+        .expect("Metrics file should contain valid JSON");
+    
+    // Check metrics content
+    assert_eq!(metrics_json["total"], 2, "Should have total count");
+    assert_eq!(metrics_json["level_info"], 1, "Should have info count");
+    assert_eq!(metrics_json["level_error"], 1, "Should have error count");
+    
+    // No metrics should appear in stderr when using file output only
+    assert!(!stderr.contains("=== Kelora Metrics ==="), "Should not display metrics to stderr");
+}
+
+#[test]
+fn test_metrics_parallel_consistency() {
+    // Test that parallel mode produces correct metrics with different batch sizes
+    let input = r#"{"level":"info","message":"test1"}
+{"level":"error","message":"test2"}
+{"level":"info","message":"test3"}
+{"level":"warn","message":"test4"}
+{"level":"error","message":"test5"}"#;
+
+    let exec_script = "track_count(\"total\"); track_count(\"level_\" + level)";
+
+    // Run in parallel mode with batch-size 1
+    let (_stdout1, stderr1, exit_code1) = run_kelora_with_input(
+        &["-f", "jsonl", "--exec", exec_script, "--metrics", "--parallel", "--batch-size", "1"],
+        input,
+    );
+    assert_eq!(exit_code1, 0, "Parallel mode batch-size 1 should exit successfully");
+
+    // Run in parallel mode with batch-size 2
+    let (_stdout2, stderr2, exit_code2) = run_kelora_with_input(
+        &["-f", "jsonl", "--exec", exec_script, "--metrics", "--parallel", "--batch-size", "2"],
+        input,
+    );
+    assert_eq!(exit_code2, 0, "Parallel mode batch-size 2 should exit successfully");
+
+    // Both should have identical metrics
+    assert!(stderr1.contains("total        = 5"), "Batch-size 1 should count all events");
+    assert!(stderr2.contains("total        = 5"), "Batch-size 2 should count all events");
+    
+    assert!(stderr1.contains("level_info   = 2"), "Batch-size 1 should count info events");
+    assert!(stderr2.contains("level_info   = 2"), "Batch-size 2 should count info events");
+    
+    assert!(stderr1.contains("level_error  = 2"), "Batch-size 1 should count error events");
+    assert!(stderr2.contains("level_error  = 2"), "Batch-size 2 should count error events");
+    
+    assert!(stderr1.contains("level_warn   = 1"), "Batch-size 1 should count warn events");
+    assert!(stderr2.contains("level_warn   = 1"), "Batch-size 2 should count warn events");
+}

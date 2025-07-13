@@ -1,6 +1,10 @@
 // Core library for Kelora log analysis tool
 
+use rhai::Dynamic;
+use std::collections::HashMap;
+
 pub use config::{KeloraConfig, MultilineConfig, ScriptStageType, TimestampFilterConfig};
+
 
 /// Core pipeline configuration - contains only what's needed for processing
 /// Separated from CLI-specific concerns like colors, stats output, etc.
@@ -158,6 +162,7 @@ use unix::{check_termination, SHOULD_TERMINATE};
 pub struct PipelineResult {
     pub stats: Option<ProcessingStats>,
     pub success: bool,
+    pub tracking_data: HashMap<String, Dynamic>,
 }
 
 /// Core pipeline processing function (new API using PipelineConfig)
@@ -174,23 +179,25 @@ pub fn run_pipeline<W: Write + Send + 'static>(
 
     let use_parallel = config.should_use_parallel();
 
-    let final_stats = if use_parallel {
-        run_pipeline_parallel_with_config(config, output)?
+    if use_parallel {
+        run_pipeline_parallel_with_config(config, output)
     } else {
         let mut output = output;
         run_pipeline_sequential_with_config(config, &mut output)?;
-        if collect_stats {
+        let final_stats = if collect_stats {
             stats_finish_processing();
             Some(get_thread_stats())
         } else {
             None
-        }
-    };
-
-    Ok(PipelineResult {
-        stats: final_stats,
-        success: !SHOULD_TERMINATE.load(Ordering::Relaxed),
-    })
+        };
+        let tracking_data = crate::rhai_functions::tracking::get_thread_tracking_state();
+        
+        Ok(PipelineResult {
+            stats: final_stats,
+            success: !SHOULD_TERMINATE.load(Ordering::Relaxed),
+            tracking_data,
+        })
+    }
 }
 
 /// Legacy API for backward compatibility - will be removed in future increments
@@ -205,30 +212,32 @@ pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
 
     let use_parallel = config.should_use_parallel();
 
-    let final_stats = if use_parallel {
-        run_pipeline_parallel(config, output)?
+    if use_parallel {
+        run_pipeline_parallel(config, output)
     } else {
         let mut output = output;
         run_pipeline_sequential(config, &mut output)?;
-        if config.output.stats {
+        let final_stats = if config.output.stats {
             stats_finish_processing();
             Some(get_thread_stats())
         } else {
             None
-        }
-    };
-
-    Ok(PipelineResult {
-        stats: final_stats,
-        success: !SHOULD_TERMINATE.load(Ordering::Relaxed),
-    })
+        };
+        let tracking_data = crate::rhai_functions::tracking::get_thread_tracking_state();
+        
+        Ok(PipelineResult {
+            stats: final_stats,
+            success: !SHOULD_TERMINATE.load(Ordering::Relaxed),
+            tracking_data,
+        })
+    }
 }
 
 /// Run pipeline in parallel mode using PipelineConfig
 pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
     config: &PipelineConfig,
     output: W,
-) -> Result<Option<ProcessingStats>> {
+) -> Result<PipelineResult> {
     // Convert to KeloraConfig temporarily - will be removed when all core functions are updated
     let kelora_config = KeloraConfig {
         input: config::InputConfig {
@@ -286,7 +295,7 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
 fn run_pipeline_parallel<W: Write + Send + 'static>(
     config: &KeloraConfig,
     output: W,
-) -> Result<Option<ProcessingStats>> {
+) -> Result<PipelineResult> {
     let batch_size = config.effective_batch_size();
 
     let parallel_config = ParallelConfig {
@@ -352,14 +361,14 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     }
 
     // Filter out stats and errors from user-visible context and merge the rest
-    for (key, dynamic_value) in parallel_tracked {
+    for (key, dynamic_value) in &parallel_tracked {
         if !key.starts_with("__internal_")
             && !key.starts_with("__kelora_stats_")
             && !key.starts_with("__op___kelora_stats_")
             && !key.starts_with("__kelora_error_")
             && !key.starts_with("__op___kelora_error_")
         {
-            ctx.tracker.insert(key, dynamic_value);
+            ctx.tracker.insert(key.clone(), dynamic_value.clone());
         }
     }
 
@@ -368,12 +377,16 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
         return Err(anyhow::anyhow!("End stage error: {}", e));
     }
 
-    // Get final stats if enabled
-    if config.output.stats {
-        Ok(Some(processor.get_final_stats()))
-    } else {
-        Ok(None)
-    }
+    // Return both stats and tracking data
+    Ok(PipelineResult {
+        stats: if config.output.stats {
+            Some(processor.get_final_stats())
+        } else {
+            None
+        },
+        success: !SHOULD_TERMINATE.load(Ordering::Relaxed),
+        tracking_data: parallel_tracked,
+    })
 }
 
 /// Run pipeline in sequential mode using PipelineConfig

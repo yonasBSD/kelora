@@ -177,9 +177,8 @@ fn main() -> Result<()> {
         Ok(pipeline_result) => {
             // Print metrics if enabled (only if not terminated)
             if lib_config.output.metrics && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
-                let tracked = crate::rhai_functions::tracking::get_thread_tracking_state();
                 let metrics_output =
-                    crate::rhai_functions::tracking::format_metrics_output(&tracked);
+                    crate::rhai_functions::tracking::format_metrics_output(&pipeline_result.tracking_data);
                 if !metrics_output.is_empty() && metrics_output != "No metrics tracked" {
                     stderr
                         .writeln(&lib_config.format_metrics_message(&metrics_output))
@@ -189,9 +188,8 @@ fn main() -> Result<()> {
 
             // Write metrics to file if configured
             if let Some(ref metrics_file) = lib_config.output.metrics_file {
-                let tracked = crate::rhai_functions::tracking::get_thread_tracking_state();
                 if let Ok(json_output) =
-                    crate::rhai_functions::tracking::format_metrics_json(&tracked)
+                    crate::rhai_functions::tracking::format_metrics_json(&pipeline_result.tracking_data)
                 {
                     if let Err(e) = std::fs::write(metrics_file, json_output) {
                         stderr

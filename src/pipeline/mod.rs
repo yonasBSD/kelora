@@ -85,6 +85,7 @@ pub trait LineFilter: Send {
 /// Handle multi-line log records (future feature)
 pub trait Chunker: Send {
     fn feed_line(&mut self, line: String) -> Option<String>;
+    #[allow(dead_code)] // Planned feature for handling incomplete chunks at EOF
     fn flush(&mut self) -> Option<String>;
 }
 
@@ -418,6 +419,7 @@ impl Pipeline {
     }
 
     /// Flush any remaining chunks from the chunker
+    #[allow(dead_code)] // Planned feature for handling incomplete chunks at EOF
     pub fn flush(&mut self, ctx: &mut PipelineContext) -> Result<Vec<String>> {
         if let Some(chunk) = self.chunker.flush() {
             self.process_line(chunk, ctx)
