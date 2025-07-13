@@ -183,37 +183,54 @@ impl Pipeline {
                         );
                     }
 
-                    return match ctx.config.on_error {
-                        crate::ErrorStrategy::Skip => Ok(results),
-                        crate::ErrorStrategy::Abort => Err(err),
-                        crate::ErrorStrategy::Continue => {
-                            // Check error reporting configuration before printing
+                    match ctx.config.on_error {
+                        crate::ErrorStrategy::Skip => return Ok(results),
+                        crate::ErrorStrategy::Abort => return Err(err),
+                        crate::ErrorStrategy::Quarantine => {
+                            // Create empty event with error info in meta
+                            let mut quarantined_event = crate::event::Event::default();
+                            quarantined_event.original_line = chunk.clone();
+
+                            // Set metadata from context
+                            if let Some(line_num) = ctx.meta.line_number {
+                                quarantined_event.set_metadata(line_num, ctx.meta.filename.clone());
+                            }
+
+                            // Add quarantine metadata that will be accessible via meta in Rhai
+                            // This is handled by the engine when setting up the Rhai scope
+                            quarantined_event.fields.insert(
+                                "__kelora_quarantine_parse_error".to_string(),
+                                rhai::Dynamic::from(err.to_string()),
+                            );
+
+                            // Handle error reporting
                             match ctx.config.error_report.style {
                                 crate::config::ErrorReportStyle::Off => {
                                     // Suppress error output
-                                },
+                                }
                                 crate::config::ErrorReportStyle::Print => {
                                     // Print each error immediately
                                     eprintln!(
                                         "{}",
                                         crate::config::format_error_message_auto(&format!(
-                                            "Parse error: {}",
+                                            "Parse error (quarantined): {}",
                                             err
                                         ))
                                     );
-                                },
+                                }
                                 crate::config::ErrorReportStyle::Summary => {
                                     // Track error for summary collection
                                     crate::rhai_functions::tracking::track_error(
-                                        "Medium", 
-                                        &format!("Parse error: {}", err)
+                                        "Medium",
+                                        &format!("Parse error (quarantined): {}", err),
                                     );
-                                },
+                                }
                             }
-                            Ok(results)
-                        }
-                        // Note: Old Stub behavior removed - using Skip instead
-                    };
+
+                            // Use the quarantined event and continue processing
+                            quarantined_event
+                        } // Note: Old Stub behavior removed - using Skip instead
+                    }
                 }
             };
 
@@ -239,32 +256,31 @@ impl Pipeline {
                                     return match ctx.config.on_error {
                                         crate::ErrorStrategy::Skip => Ok(results),
                                         crate::ErrorStrategy::Abort => Err(anyhow::anyhow!(msg)),
-                                        crate::ErrorStrategy::Continue => {
-                                            // Check error reporting configuration before printing
+                                        crate::ErrorStrategy::Quarantine => {
+                                            // For script errors in quarantine mode, we still treat it as an error
+                                            // since the parsing succeeded but the script failed
                                             match ctx.config.error_report.style {
                                                 crate::config::ErrorReportStyle::Off => {
                                                     // Suppress error output
-                                                },
+                                                }
                                                 crate::config::ErrorReportStyle::Print => {
                                                     eprintln!(
                                                         "{}",
-                                                        crate::config::format_error_message_auto(&format!(
-                                                            "Script error: {}",
-                                                            msg
-                                                        ))
+                                                        crate::config::format_error_message_auto(
+                                                            &format!("Script error: {}", msg)
+                                                        )
                                                     );
-                                                },
+                                                }
                                                 crate::config::ErrorReportStyle::Summary => {
                                                     // Track error for summary collection
                                                     crate::rhai_functions::tracking::track_error(
-                                                        "Hard", 
-                                                        &format!("Script error: {}", msg)
+                                                        "Hard",
+                                                        &format!("Script error: {}", msg),
                                                     );
-                                                },
+                                                }
                                             }
                                             Ok(results)
-                                        }
-                                        // Note: Old Stub behavior removed
+                                        } // Note: Old Stub behavior removed
                                     };
                                 }
                             }
@@ -367,12 +383,13 @@ impl Pipeline {
                     return match ctx.config.on_error {
                         crate::ErrorStrategy::Skip => Ok(results),
                         crate::ErrorStrategy::Abort => Err(anyhow::anyhow!(msg)),
-                        crate::ErrorStrategy::Continue => {
-                            // Check error reporting configuration before printing
+                        crate::ErrorStrategy::Quarantine => {
+                            // For script errors in quarantine mode, we still treat it as an error
+                            // since the parsing succeeded but the script failed
                             match ctx.config.error_report.style {
                                 crate::config::ErrorReportStyle::Off => {
                                     // Suppress error output
-                                },
+                                }
                                 crate::config::ErrorReportStyle::Print => {
                                     eprintln!(
                                         "{}",
@@ -381,18 +398,17 @@ impl Pipeline {
                                             msg
                                         ))
                                     );
-                                },
+                                }
                                 crate::config::ErrorReportStyle::Summary => {
                                     // Track error for summary collection
                                     crate::rhai_functions::tracking::track_error(
-                                        "Hard", 
-                                        &format!("Script error: {}", msg)
+                                        "Hard",
+                                        &format!("Script error: {}", msg),
                                     );
-                                },
+                                }
                             }
                             Ok(results)
-                        }
-                        // Note: Old Stub behavior removed
+                        } // Note: Old Stub behavior removed
                     };
                 }
             }

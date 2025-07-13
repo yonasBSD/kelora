@@ -21,9 +21,13 @@ impl AdaptiveTsParser {
         self.parse_ts_with_config(ts_str, None, None)
     }
 
-
     /// Parse timestamp with full configuration support
-    pub fn parse_ts_with_config(&mut self, ts_str: &str, custom_format: Option<&str>, default_timezone: Option<&str>) -> Option<DateTime<Utc>> {
+    pub fn parse_ts_with_config(
+        &mut self,
+        ts_str: &str,
+        custom_format: Option<&str>,
+        default_timezone: Option<&str>,
+    ) -> Option<DateTime<Utc>> {
         let ts_str = ts_str.trim();
 
         // Try custom format first if provided
@@ -93,9 +97,12 @@ impl AdaptiveTsParser {
         self.try_formats_with_reordering(ts_str, default_timezone)
     }
 
-
     /// Try formats with timezone configuration and move successful ones to front
-    fn try_formats_with_reordering(&mut self, ts_str: &str, default_timezone: Option<&str>) -> Option<DateTime<Utc>> {
+    fn try_formats_with_reordering(
+        &mut self,
+        ts_str: &str,
+        default_timezone: Option<&str>,
+    ) -> Option<DateTime<Utc>> {
         for (index, format) in self.formats.iter().enumerate() {
             if let Some(parsed) = try_parse_with_format(ts_str, format, default_timezone) {
                 // Move successful format to front if it's not already there
@@ -130,9 +137,13 @@ impl Default for AdaptiveTsParser {
 }
 
 /// Try to parse a timestamp with a specific format and timezone configuration
-fn try_parse_with_format(ts_str: &str, format: &str, default_timezone: Option<&str>) -> Option<DateTime<Utc>> {
+fn try_parse_with_format(
+    ts_str: &str,
+    format: &str,
+    default_timezone: Option<&str>,
+) -> Option<DateTime<Utc>> {
     use chrono_tz::Tz;
-    
+
     // Try timezone-aware parsing first
     if let Ok(dt) = DateTime::parse_from_str(ts_str, format) {
         return Some(dt.with_timezone(&Utc));
@@ -293,7 +304,10 @@ pub fn identify_timestamp_field(
 
 /// Parse timestamp arguments (--since, --until) in journalctl-compatible format
 /// Uses the enhanced adaptive parser with journalctl support
-pub fn parse_timestamp_arg_with_timezone(arg: &str, default_timezone: Option<&str>) -> Result<DateTime<Utc>, String> {
+pub fn parse_timestamp_arg_with_timezone(
+    arg: &str,
+    default_timezone: Option<&str>,
+) -> Result<DateTime<Utc>, String> {
     let mut parser = AdaptiveTsParser::new();
     parser
         .parse_ts_with_config(arg, None, default_timezone)

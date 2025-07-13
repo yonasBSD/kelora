@@ -1,9 +1,9 @@
 // CLI-specific types and structures
 // This module contains the command-line interface definitions and parsing logic
 
+use crate::config::ScriptStageType;
 use anyhow::Result;
 use clap::{ArgMatches, Parser};
-use crate::config::ScriptStageType;
 
 // CLI types - specific to command-line interface
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -40,7 +40,7 @@ pub enum OutputFormat {
 pub enum ErrorStrategy {
     Abort,
     Skip,
-    Continue,
+    Quarantine,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -71,11 +71,22 @@ pub struct Cli {
     pub files: Vec<String>,
 
     /// Input format
-    #[arg(short = 'f', long = "format", value_enum, default_value = "line", help_heading = "Input Options")]
+    #[arg(
+        short = 'f',
+        long = "format",
+        value_enum,
+        default_value = "line",
+        help_heading = "Input Options"
+    )]
     pub format: InputFormat,
 
     /// File processing order
-    #[arg(long = "file-order", value_enum, default_value = "none", help_heading = "Input Options")]
+    #[arg(
+        long = "file-order",
+        value_enum,
+        default_value = "none",
+        help_heading = "Input Options"
+    )]
     pub file_order: FileOrder,
 
     /// Skip the first N input lines
@@ -129,7 +140,13 @@ pub struct Cli {
     pub window_size: Option<usize>,
 
     /// What to do when errors occur: abort (stop on first error), skip (skip invalid input), continue (process all lines)
-    #[arg(short = 'x', long = "on-error", value_enum, default_value = "continue", help_heading = "Error Handling")]
+    #[arg(
+        short = 'x',
+        long = "on-error",
+        value_enum,
+        default_value = "quarantine",
+        help_heading = "Error Handling"
+    )]
     pub on_error: ErrorStrategy,
 
     /// How to report errors: off (suppress), summary (grouped), print (each error)
@@ -149,19 +166,39 @@ pub struct Cli {
     pub inject_prefix: Option<String>,
 
     /// Include only events with these log levels
-    #[arg(short = 'l', long = "levels", value_delimiter = ',', help_heading = "Filtering Options")]
+    #[arg(
+        short = 'l',
+        long = "levels",
+        value_delimiter = ',',
+        help_heading = "Filtering Options"
+    )]
     pub levels: Vec<String>,
 
     /// Exclude events with these log levels
-    #[arg(short = 'L', long = "exclude-levels", value_delimiter = ',', help_heading = "Filtering Options")]
+    #[arg(
+        short = 'L',
+        long = "exclude-levels",
+        value_delimiter = ',',
+        help_heading = "Filtering Options"
+    )]
     pub exclude_levels: Vec<String>,
 
     /// Output only specific fields
-    #[arg(short = 'k', long = "keys", value_delimiter = ',', help_heading = "Filtering Options")]
+    #[arg(
+        short = 'k',
+        long = "keys",
+        value_delimiter = ',',
+        help_heading = "Filtering Options"
+    )]
     pub keys: Vec<String>,
 
     /// Exclude specific fields from output
-    #[arg(short = 'K', long = "exclude-keys", value_delimiter = ',', help_heading = "Filtering Options")]
+    #[arg(
+        short = 'K',
+        long = "exclude-keys",
+        value_delimiter = ',',
+        help_heading = "Filtering Options"
+    )]
     pub exclude_keys: Vec<String>,
 
     /// Start showing entries on or newer than the specified date
@@ -173,7 +210,13 @@ pub struct Cli {
     pub until: Option<String>,
 
     /// Output format
-    #[arg(short = 'F', long = "output-format", value_enum, default_value = "default", help_heading = "Output Options")]
+    #[arg(
+        short = 'F',
+        long = "output-format",
+        value_enum,
+        default_value = "default",
+        help_heading = "Output Options"
+    )]
     pub output_format: OutputFormat,
 
     /// Output only core fields
@@ -208,7 +251,11 @@ pub struct Cli {
     pub parallel: bool,
 
     /// Number of worker threads
-    #[arg(long = "threads", default_value_t = 0, help_heading = "Performance Options")]
+    #[arg(
+        long = "threads",
+        default_value_t = 0,
+        help_heading = "Performance Options"
+    )]
     pub threads: usize,
 
     /// Batch size for parallel processing
@@ -216,7 +263,11 @@ pub struct Cli {
     pub batch_size: Option<usize>,
 
     /// Batch timeout in milliseconds
-    #[arg(long = "batch-timeout", default_value_t = 200, help_heading = "Performance Options")]
+    #[arg(
+        long = "batch-timeout",
+        default_value_t = 200,
+        help_heading = "Performance Options"
+    )]
     pub batch_timeout: u64,
 
     /// Disable ordered output
@@ -234,7 +285,6 @@ pub struct Cli {
     /// Disable emoji prefixes
     #[arg(long = "no-emoji", help_heading = "Display Options")]
     pub no_emoji: bool,
-
 
     /// Show processing statistics
     #[arg(short = 's', long = "stats", help_heading = "Metrics and Stats")]

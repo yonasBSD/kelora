@@ -132,7 +132,7 @@ pub enum OutputFormat {
 pub enum ErrorStrategy {
     Abort,
     Skip,
-    Continue,
+    Quarantine,
 }
 
 /// File processing order
@@ -426,7 +426,6 @@ impl KeloraConfig {
             }
         }
     }
-
 }
 
 /// Format an error message with appropriate prefix when config is not available
@@ -578,7 +577,7 @@ impl Default for KeloraConfig {
                 end: None,
                 no_inject_fields: false,
                 inject_prefix: None,
-                on_error: ErrorStrategy::Continue,
+                on_error: ErrorStrategy::Quarantine,
                 error_report: ErrorReportConfig {
                     style: ErrorReportStyle::Summary,
                     file: None,
@@ -606,10 +605,10 @@ fn create_timestamp_format_config(cli: &crate::Cli) -> TimestampFormatConfig {
     } else {
         Vec::new()
     };
-    
+
     let auto_format_all = cli.format_timestamps_local || cli.format_timestamps_utc;
     let format_as_utc = cli.format_timestamps_utc;
-    
+
     TimestampFormatConfig {
         format_fields,
         auto_format_all,
@@ -635,7 +634,7 @@ fn parse_error_report_config(cli: &crate::Cli) -> ErrorReportConfig {
             _ => ErrorReportStyle::Summary,
         }
     };
-    
+
     ErrorReportConfig {
         style,
         file: cli.error_report_file.clone(),
@@ -653,14 +652,14 @@ fn determine_default_timezone(cli: &crate::Cli) -> Option<String> {
             return Some(input_tz.clone());
         }
     }
-    
+
     // Priority 2: TZ environment variable
     if let Ok(tz) = std::env::var("TZ") {
         if !tz.is_empty() {
             return Some(tz);
         }
     }
-    
+
     // DEFAULT: UTC (per spec, --input-tz defaults to UTC)
     Some("UTC".to_string())
 }
@@ -741,7 +740,7 @@ impl From<crate::ErrorStrategy> for ErrorStrategy {
         match strategy {
             crate::ErrorStrategy::Skip => ErrorStrategy::Skip,
             crate::ErrorStrategy::Abort => ErrorStrategy::Abort,
-            crate::ErrorStrategy::Continue => ErrorStrategy::Continue,
+            crate::ErrorStrategy::Quarantine => ErrorStrategy::Quarantine,
         }
     }
 }
@@ -751,7 +750,7 @@ impl From<ErrorStrategy> for crate::ErrorStrategy {
         match strategy {
             ErrorStrategy::Skip => crate::ErrorStrategy::Skip,
             ErrorStrategy::Abort => crate::ErrorStrategy::Abort,
-            ErrorStrategy::Continue => crate::ErrorStrategy::Continue,
+            ErrorStrategy::Quarantine => crate::ErrorStrategy::Quarantine,
         }
     }
 }
@@ -775,5 +774,3 @@ impl From<FileOrder> for crate::FileOrder {
         }
     }
 }
-
-

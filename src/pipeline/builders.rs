@@ -10,7 +10,12 @@ struct TimestampConfiguredParser {
 }
 
 impl TimestampConfiguredParser {
-    fn new(inner: Box<dyn EventParser>, ts_field: Option<String>, ts_format: Option<String>, default_timezone: Option<String>) -> Self {
+    fn new(
+        inner: Box<dyn EventParser>,
+        ts_field: Option<String>,
+        ts_format: Option<String>,
+        default_timezone: Option<String>,
+    ) -> Self {
         Self {
             inner,
             ts_config: crate::timestamp::TsConfig {
@@ -68,7 +73,7 @@ impl PipelineBuilder {
     pub fn new() -> Self {
         Self {
             config: PipelineConfig {
-                on_error: crate::ErrorStrategy::Continue,
+                on_error: crate::ErrorStrategy::Quarantine,
                 error_report: crate::config::ErrorReportConfig {
                     style: crate::config::ErrorReportStyle::Summary,
                     file: None,
@@ -159,7 +164,10 @@ impl PipelineBuilder {
         };
 
         // Wrap parser with timestamp configuration if needed
-        let parser: Box<dyn EventParser> = if self.ts_field.is_some() || self.ts_format.is_some() || self.default_timezone.is_some() {
+        let parser: Box<dyn EventParser> = if self.ts_field.is_some()
+            || self.ts_format.is_some()
+            || self.default_timezone.is_some()
+        {
             Box::new(TimestampConfiguredParser::new(
                 base_parser,
                 self.ts_field.clone(),
@@ -393,7 +401,10 @@ impl PipelineBuilder {
         };
 
         // Wrap parser with timestamp configuration if needed
-        let parser: Box<dyn EventParser> = if self.ts_field.is_some() || self.ts_format.is_some() || self.default_timezone.is_some() {
+        let parser: Box<dyn EventParser> = if self.ts_field.is_some()
+            || self.ts_format.is_some()
+            || self.default_timezone.is_some()
+        {
             Box::new(TimestampConfiguredParser::new(
                 base_parser,
                 self.ts_field.clone(),

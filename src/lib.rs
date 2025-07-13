@@ -1,6 +1,6 @@
 // Core library for Kelora log analysis tool
 
-pub use config::{KeloraConfig, ScriptStageType, TimestampFilterConfig, MultilineConfig};
+pub use config::{KeloraConfig, MultilineConfig, ScriptStageType, TimestampFilterConfig};
 
 /// Core pipeline configuration - contains only what's needed for processing
 /// Separated from CLI-specific concerns like colors, stats output, etc.
@@ -65,8 +65,8 @@ impl PipelineConfig {
                 ignore_lines: config.input.ignore_lines.clone(),
                 multiline: config.input.multiline.clone(),
                 ts_field: config.input.ts_field.clone(),
-            ts_format: config.input.ts_format.clone(),
-            default_timezone: config.input.default_timezone.clone(),
+                ts_format: config.input.ts_format.clone(),
+                default_timezone: config.input.default_timezone.clone(),
             },
             processing: PipelineProcessingConfig {
                 begin: config.processing.begin.clone(),
@@ -138,7 +138,7 @@ mod unix;
 use anyhow::Result;
 
 // Re-export CLI types for convenience (they live in cli module now)
-pub use cli::{InputFormat, OutputFormat, ErrorStrategy, FileOrder, Cli};
+pub use cli::{Cli, ErrorStrategy, FileOrder, InputFormat, OutputFormat};
 
 use parallel::{ParallelConfig, ParallelProcessor};
 use pipeline::{
@@ -148,9 +148,9 @@ use stats::{
     get_thread_stats, stats_add_error, stats_add_line_filtered, stats_add_line_output,
     stats_add_line_read, stats_finish_processing, stats_start_timer, ProcessingStats,
 };
-use unix::{check_termination, SHOULD_TERMINATE};
 use std::io::{self, BufRead, Write};
 use std::sync::atomic::Ordering;
+use unix::{check_termination, SHOULD_TERMINATE};
 
 /// Result of pipeline processing
 #[derive(Debug)]
@@ -172,7 +172,7 @@ pub fn run_pipeline<W: Write + Send + 'static>(
     }
 
     let use_parallel = config.should_use_parallel();
-    
+
     let final_stats = if use_parallel {
         run_pipeline_parallel_with_config(config, output)?
     } else {
@@ -203,7 +203,7 @@ pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
     }
 
     let use_parallel = config.should_use_parallel();
-    
+
     let final_stats = if use_parallel {
         run_pipeline_parallel(config, output)?
     } else {
@@ -286,7 +286,7 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     output: W,
 ) -> Result<Option<ProcessingStats>> {
     let batch_size = config.effective_batch_size();
-    
+
     let parallel_config = ParallelConfig {
         num_workers: config.effective_threads(),
         batch_size,
@@ -324,8 +324,13 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     let parallel_tracked = processor.get_final_tracked_state();
 
     // Generate error summary before merging if in summary mode
-    if matches!(config.processing.error_report.style, crate::config::ErrorReportStyle::Summary) {
-        if let Some(summary) = crate::rhai_functions::tracking::extract_error_summary(&parallel_tracked) {
+    if matches!(
+        config.processing.error_report.style,
+        crate::config::ErrorReportStyle::Summary
+    ) {
+        if let Some(summary) =
+            crate::rhai_functions::tracking::extract_error_summary(&parallel_tracked)
+        {
             eprintln!("Error Summary:\n{}", summary);
         }
     }
@@ -426,10 +431,7 @@ pub fn run_pipeline_sequential_with_config<W: Write>(
 }
 
 /// Run pipeline in sequential mode using KeloraConfig (legacy)
-pub fn run_pipeline_sequential<W: Write>(
-    config: &KeloraConfig,
-    output: &mut W,
-) -> Result<()> {
+pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) -> Result<()> {
     let (mut pipeline, begin_stage, end_stage, mut ctx) = create_pipeline_from_config(config)?;
 
     // Execute begin stage
@@ -472,7 +474,8 @@ pub fn run_pipeline_sequential<W: Write>(
         }
     } else {
         // File processing - with filename tracking
-        let sorted_files = pipeline::builders::sort_files(&config.input.files, &config.input.file_order)?;
+        let sorted_files =
+            pipeline::builders::sort_files(&config.input.files, &config.input.file_order)?;
         let mut multi_reader = crate::readers::MultiFileReader::new(sorted_files)?;
 
         let mut line_buf = String::new();
@@ -540,8 +543,12 @@ pub fn run_pipeline_sequential<W: Write>(
     crate::rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
 
     // Generate error summary if in summary mode
-    if matches!(config.processing.error_report.style, crate::config::ErrorReportStyle::Summary) {
-        if let Some(summary) = crate::rhai_functions::tracking::extract_error_summary(&ctx.tracker) {
+    if matches!(
+        config.processing.error_report.style,
+        crate::config::ErrorReportStyle::Summary
+    ) {
+        if let Some(summary) = crate::rhai_functions::tracking::extract_error_summary(&ctx.tracker)
+        {
             eprintln!("Error Summary:\n{}", summary);
         }
     }
@@ -626,8 +633,7 @@ fn process_line_sequential<W: Write>(
         };
 
         // Initialize headers from the first line
-        let was_consumed = temp_parser
-            .initialize_headers_from_line(&line)?;
+        let was_consumed = temp_parser.initialize_headers_from_line(&line)?;
 
         // Get the initialized headers
         let headers = temp_parser.get_headers();
@@ -638,8 +644,8 @@ fn process_line_sequential<W: Write>(
         let mut pipeline_builder = create_pipeline_builder_from_config(config);
         pipeline_builder = pipeline_builder.with_csv_headers(headers);
 
-        let (new_pipeline, _new_begin_stage, _new_end_stage, new_ctx) = pipeline_builder
-            .build(config.processing.stages.clone())?;
+        let (new_pipeline, _new_begin_stage, _new_end_stage, new_ctx) =
+            pipeline_builder.build(config.processing.stages.clone())?;
 
         *pipeline = new_pipeline;
         // Keep the existing context's tracking state but update the Rhai engine
@@ -679,7 +685,7 @@ fn process_line_sequential<W: Write>(
             if config.output.stats {
                 stats_add_error();
             }
-            
+
             // Handle error based on strategy
             if let config::ErrorStrategy::Abort = config.processing.on_error {
                 return Err(e);

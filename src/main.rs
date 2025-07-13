@@ -22,15 +22,14 @@ mod unix;
 use config::KeloraConfig;
 use config_file::ConfigFile;
 use unix::{
-    ExitCode, ProcessCleanup, SafeFileOut, SafeStderr, SafeStdout,
-    SignalHandler, SHOULD_TERMINATE,
+    ExitCode, ProcessCleanup, SafeFileOut, SafeStderr, SafeStdout, SignalHandler, SHOULD_TERMINATE,
 };
 
-
-
 // Use CLI types from library
-use kelora::{InputFormat, OutputFormat, ErrorStrategy, FileOrder, Cli, run_pipeline_with_kelora_config, KeloraConfig as LibKeloraConfig, TimestampFilterConfig, MultilineConfig};
-
+use kelora::{
+    run_pipeline_with_kelora_config, Cli, ErrorStrategy, FileOrder, InputFormat,
+    KeloraConfig as LibKeloraConfig, MultilineConfig, OutputFormat, TimestampFilterConfig,
+};
 
 fn main() -> Result<()> {
     // Initialize signal handling early
@@ -105,8 +104,7 @@ fn main() -> Result<()> {
             None
         };
 
-        lib_config.processing.timestamp_filter =
-            Some(TimestampFilterConfig { since, until });
+        lib_config.processing.timestamp_filter = Some(TimestampFilterConfig { since, until });
     }
 
     // Compile ignore-lines regex if provided
@@ -177,11 +175,11 @@ fn main() -> Result<()> {
 
     let final_stats = match result {
         Ok(pipeline_result) => {
-
             // Print metrics if enabled (only if not terminated)
             if lib_config.output.metrics && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
                 let tracked = crate::rhai_functions::tracking::get_thread_tracking_state();
-                let metrics_output = crate::rhai_functions::tracking::format_metrics_output(&tracked);
+                let metrics_output =
+                    crate::rhai_functions::tracking::format_metrics_output(&tracked);
                 if !metrics_output.is_empty() && metrics_output != "No metrics tracked" {
                     stderr
                         .writeln(&lib_config.format_metrics_message(&metrics_output))
@@ -192,10 +190,15 @@ fn main() -> Result<()> {
             // Write metrics to file if configured
             if let Some(ref metrics_file) = lib_config.output.metrics_file {
                 let tracked = crate::rhai_functions::tracking::get_thread_tracking_state();
-                if let Ok(json_output) = crate::rhai_functions::tracking::format_metrics_json(&tracked) {
+                if let Ok(json_output) =
+                    crate::rhai_functions::tracking::format_metrics_json(&tracked)
+                {
                     if let Err(e) = std::fs::write(metrics_file, json_output) {
                         stderr
-                            .writeln(&lib_config.format_error_message(&format!("Failed to write metrics file: {}", e)))
+                            .writeln(&lib_config.format_error_message(&format!(
+                                "Failed to write metrics file: {}",
+                                e
+                            )))
                             .unwrap_or(());
                     }
                 }
@@ -412,11 +415,11 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
     }
 
     if let Some(on_error) = config_file.defaults.get("on_error") {
-        if matches!(cli.on_error, crate::ErrorStrategy::Continue) {
+        if matches!(cli.on_error, crate::ErrorStrategy::Quarantine) {
             cli.on_error = match on_error.as_str() {
                 "skip" => crate::ErrorStrategy::Skip,
                 "abort" => crate::ErrorStrategy::Abort,
-                "continue" => crate::ErrorStrategy::Continue,
+                "quarantine" => crate::ErrorStrategy::Quarantine,
                 _ => cli.on_error,
             };
         }
@@ -451,7 +454,6 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
             cli.brief = true;
         }
     }
-
 
     if let Some(skip_lines) = config_file.defaults.get("skip_lines") {
         if cli.skip_lines.is_none() {

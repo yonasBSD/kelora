@@ -85,7 +85,10 @@ let data = parse_json(line);
 Built-in objects:
 - `line` – raw line
 - `event` – parsed fields
-- `meta.linenum` – line number
+- `meta.line_number` – line number
+- `meta.line` – raw input line
+- `meta.parse_error` – parse error message (quarantined events only)
+- `meta.decode_error` – decode error message (quarantined events only)
 - `tracked` – global state
 - `window` – recent events (if `--window` is used)
 
@@ -136,7 +139,7 @@ kelora --show-config  # Show config file and aliases
 | `--window N`   | Enable N+1 sliding event window              |
 | `--summary`    | Show tracked key/value table                 |
 | `--stats`      | Show line counts and performance stats       |
-| `--on-error`   | How to handle bad lines (`print`, `skip`, …) |
+| `--on-error`   | How to handle bad lines (`quarantine`, `skip`, `abort`) |
 | `--ts-format`  | Custom timestamp format (chrono syntax)     |
 | `--input-tz`   | Timezone for naive timestamps (default: UTC) |
 | `--pretty-ts`  | Format specific fields as RFC3339 timestamps |
@@ -196,7 +199,7 @@ Kelora supports configuration files for setting defaults and aliases.
 [defaults]
 input-format = jsonl
 output-format = jsonl
-on-error = skip
+on-error = quarantine
 parallel = true
 stats = true
 
@@ -305,6 +308,53 @@ kelora -f jsonl api.log --window 5 \
 - `track_sum(key, value)` - Sum values
 - `track_unique(key, value)` - Count unique values
 
+## 🚨 Error Handling & Quarantine Mode
+
+Kelora provides three strategies for handling broken or invalid input lines:
+
+### Error Strategies
+
+| Strategy | Behavior | Use Case |
+|----------|----------|----------|
+| `quarantine` | Process all lines, expose broken events via `meta` (default) | Analysis and debugging |
+| `skip` | Silently discard bad input | Production pipelines |
+| `abort` | Stop on first error | Strict validation |
+
+### Working with Quarantined Events
+
+When using `--on-error quarantine` (default), broken lines become empty events with error information accessible via the `meta` object:
+
+```bash
+# Detect and count parse errors
+kelora -f jsonl mixed.log --filter 'meta.contains("parse_error")' \
+  --exec 'track_count("parse_errors"); print("Bad line: " + meta.line)'
+
+# Filter out quarantined events
+kelora -f jsonl mixed.log --filter '!meta.contains("parse_error")'
+
+# Analyze what types of errors occur
+kelora -f jsonl mixed.log --filter 'meta.contains("parse_error")' \
+  --exec 'track_unique("error_types", meta.parse_error)' --summary
+```
+
+### Error Reporting
+
+Control how errors are reported:
+
+```bash
+# Show error summary at end (default for quarantine mode)
+kelora -f jsonl mixed.log --error-report summary
+
+# Print each error immediately
+kelora -f jsonl mixed.log --error-report print
+
+# Suppress all error output
+kelora -f jsonl mixed.log --error-report off
+
+# Write errors to file
+kelora -f jsonl mixed.log --error-report summary=errors.json
+```
+
 ## 📊 Performance & Parallelization
 
 ```bash
@@ -324,7 +374,8 @@ kelora -f jsonl stream.log --batch-size 5000 --batch-timeout 100ms
 - Add `--unordered` for maximum throughput
 - Use `-F null` for performance testing
 - Adjust `--batch-size` based on memory constraints
-- Use `--on-error skip` for production pipelines
+- Use `--on-error skip` for production pipelines where broken lines should be discarded
+- Use `--on-error quarantine` (default) to expose broken lines to Rhai scripts for analysis
 
 ## 🔄 Multi-line Processing
 

@@ -289,8 +289,8 @@ impl ScriptStage for TimestampFilterStage {
                         // Filter out events without valid timestamps
                         return ScriptResult::Skip;
                     }
-                    crate::ErrorStrategy::Continue => {
-                        // Pass through but print warning
+                    crate::ErrorStrategy::Quarantine => {
+                        // Pass through but print warning (same behavior as continue for timestamp issues)
                         eprintln!(
                             "{}",
                             crate::config::format_error_message_auto(
@@ -348,7 +348,7 @@ mod tests {
         // Create dummy context
         let mut ctx = PipelineContext {
             config: PipelineConfig {
-                on_error: crate::ErrorStrategy::Continue,
+                on_error: crate::ErrorStrategy::Quarantine,
                 error_report: crate::config::ErrorReportConfig {
                     style: crate::config::ErrorReportStyle::Summary,
                     file: None,
@@ -396,7 +396,7 @@ mod tests {
         // Create dummy context
         let mut ctx = PipelineContext {
             config: PipelineConfig {
-                on_error: crate::ErrorStrategy::Continue,
+                on_error: crate::ErrorStrategy::Quarantine,
                 error_report: crate::config::ErrorReportConfig {
                     style: crate::config::ErrorReportStyle::Summary,
                     file: None,
@@ -443,7 +443,7 @@ mod tests {
         // Create dummy context
         let mut ctx = PipelineContext {
             config: PipelineConfig {
-                on_error: crate::ErrorStrategy::Continue,
+                on_error: crate::ErrorStrategy::Quarantine,
                 error_report: crate::config::ErrorReportConfig {
                     style: crate::config::ErrorReportStyle::Summary,
                     file: None,

@@ -163,7 +163,11 @@ pub struct DefaultFormatter {
 }
 
 impl DefaultFormatter {
-    pub fn new(use_colors: bool, brief: bool, timestamp_formatting: crate::config::TimestampFormatConfig) -> Self {
+    pub fn new(
+        use_colors: bool,
+        brief: bool,
+        timestamp_formatting: crate::config::TimestampFormatConfig,
+    ) -> Self {
         Self {
             colors: ColorScheme::new(use_colors),
             level_keys: vec![
@@ -311,22 +315,26 @@ impl DefaultFormatter {
     /// Check if a field should be formatted as a timestamp
     fn should_format_as_timestamp(&self, key: &str) -> bool {
         // Check if this field is explicitly listed in format_fields
-        if self.timestamp_formatting.format_fields.contains(&key.to_string()) {
+        if self
+            .timestamp_formatting
+            .format_fields
+            .contains(&key.to_string())
+        {
             return true;
         }
-        
+
         // Check if auto-formatting is enabled and this is a known timestamp field
         if self.timestamp_formatting.auto_format_all {
             return crate::event::TIMESTAMP_FIELD_NAMES.contains(&key);
         }
-        
+
         false
     }
 
     /// Try to format a value as a timestamp, returning formatted string if successful
     fn try_format_timestamp(&self, value: &Dynamic) -> Option<String> {
         use chrono::{DateTime, Local, Utc};
-        
+
         // First, try if it's already a DateTime value
         if let Some(dt) = value.clone().try_cast::<DateTime<Utc>>() {
             return Some(if self.timestamp_formatting.format_as_utc {
@@ -335,7 +343,7 @@ impl DefaultFormatter {
                 dt.with_timezone(&Local).to_rfc3339()
             });
         }
-        
+
         // Otherwise, try to parse it as a string timestamp
         if let Ok(ts_str) = value.clone().into_string() {
             let mut parser = crate::timestamp::AdaptiveTsParser::new();
@@ -347,7 +355,7 @@ impl DefaultFormatter {
                 });
             }
         }
-        
+
         None
     }
 }
@@ -701,7 +709,11 @@ mod tests {
         event.set_field("user".to_string(), Dynamic::from("alice".to_string()));
         event.set_field("count".to_string(), Dynamic::from(42i64));
 
-        let formatter = DefaultFormatter::new(false, false, crate::config::TimestampFormatConfig::default()); // No colors, no brief mode
+        let formatter = DefaultFormatter::new(
+            false,
+            false,
+            crate::config::TimestampFormatConfig::default(),
+        ); // No colors, no brief mode
         let result = formatter.format(&event);
 
         // Check that all fields are present with proper formatting
@@ -719,7 +731,8 @@ mod tests {
         event.set_field("level".to_string(), Dynamic::from("info".to_string()));
         event.set_field("msg".to_string(), Dynamic::from("test message".to_string()));
 
-        let formatter = DefaultFormatter::new(false, true, crate::config::TimestampFormatConfig::default()); // No colors, brief mode
+        let formatter =
+            DefaultFormatter::new(false, true, crate::config::TimestampFormatConfig::default()); // No colors, brief mode
         let result = formatter.format(&event);
 
         // Brief mode should output only values, space-separated

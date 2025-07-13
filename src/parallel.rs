@@ -238,9 +238,9 @@ impl GlobalTracker {
                         {
                             let mut merged = existing_arr;
                             for item in new_arr {
-                                if merged.len() < 3 && !merged.iter().any(|v| {
-                                    v.to_string() == item.to_string()
-                                }) {
+                                if merged.len() < 3
+                                    && !merged.iter().any(|v| v.to_string() == item.to_string())
+                                {
                                     merged.push(item);
                                 }
                             }
@@ -1020,7 +1020,7 @@ impl ParallelProcessor {
                         // based on the ctx.config.on_error strategy
                         match ctx.config.on_error {
                             crate::ErrorStrategy::Abort => return Err(e),
-                            _ => continue, // Skip, Continue all continue
+                            _ => continue, // Skip, Quarantine all continue
                         }
                     }
                 }

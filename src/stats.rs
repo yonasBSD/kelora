@@ -101,41 +101,42 @@ impl ProcessingStats {
         }
     }
 
+    /// Format stats according to the specification
     pub fn format_stats(&self, _multiline_enabled: bool) -> String {
         let mut output = String::new();
 
-        // Always show both lines and events for consistency and accuracy
-        // This clearly separates line-level filtering (ignore-lines) from event-level filtering (filter expressions)
-        if self.lines_errors > 0 {
+        // lines_in = Input lines read
+        output.push_str(&format!("lines_in   = {}\n", self.lines_read));
+
+        // lines_out = Events emitted after parsing/filtering
+        output.push_str(&format!("lines_out  = {}\n", self.events_output));
+
+        // duration = Total run time, human-readable
+        let duration_secs = self.processing_time.as_secs_f64();
+        if duration_secs < 1.0 {
             output.push_str(&format!(
-                "Lines processed: {} total, {} filtered, {} errors; Events created: {} total, {} output, {} filtered",
-                self.lines_read, self.lines_filtered, self.lines_errors, self.events_created, self.events_output, self.events_filtered
+                "duration   = {:.0}ms\n",
+                self.processing_time.as_millis()
             ));
         } else {
-            output.push_str(&format!(
-                "Lines processed: {} total, {} filtered; Events created: {} total, {} output, {} filtered",
-                self.lines_read, self.lines_filtered, self.events_created, self.events_output, self.events_filtered
-            ));
+            output.push_str(&format!("duration   = {:.2}s\n", duration_secs));
         }
 
-        if self.files_processed > 0 {
-            output.push_str(&format!(", {} files", self.files_processed));
+        // throughput = Processing rate
+        if duration_secs > 0.0 && self.lines_read > 0 {
+            let throughput = self.lines_read as f64 / duration_secs;
+            if throughput >= 1000.0 {
+                output.push_str(&format!("throughput = {:.1}k/s\n", throughput / 1000.0));
+            } else {
+                output.push_str(&format!("throughput = {:.0}/s\n", throughput));
+            }
         }
 
-        // Don't show generic errors count anymore since it's already in the main stats line
+        // TODO: levels and keys will be populated from discovered field names
+        // For now, leave them as placeholders
+        output.push_str("levels     = \n");
+        output.push_str("keys       = \n");
 
-        let processing_time_ms = self.processing_time.as_millis();
-        output.push_str(&format!(" in {}ms", processing_time_ms));
-
-        if processing_time_ms > 0 && self.lines_read > 0 {
-            let lines_per_sec = (self.lines_read as f64 * 1000.0) / processing_time_ms as f64;
-            output.push_str(&format!(" ({:.0} lines/s)", lines_per_sec));
-        }
-
-        if self.script_executions > 0 {
-            output.push_str(&format!(", {} script executions", self.script_executions));
-        }
-
-        output
+        output.trim_end().to_string()
     }
 }

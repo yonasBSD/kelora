@@ -66,16 +66,14 @@ Empty lines are handled differently based on input format:
 ### Error Handling Patterns
 
 **On-Error Strategies:**
+- `quarantine` - Process all lines, isolate broken events, expose via `meta` to Rhai scripts (default)
 - `skip` - Skip invalid lines, continue processing
-- `print` - Print error and original line, continue processing (default)
 - `abort` - Stop processing on first error
-- `stub` - Insert placeholder event for invalid lines
 
 **Error Strategy Selection:**
-- Use `skip` for production pipelines where data quality varies
-- Use `print` for debugging and log analysis
-- Use `abort` for strict validation scenarios
-- Use `stub` when maintaining line count is important
+- Use `quarantine` (default) for analysis and debugging - broken lines become events accessible to Rhai scripts
+- Use `skip` for production pipelines where data quality varies and broken lines should be discarded
+- Use `abort` for strict validation scenarios where any error should stop processing
 
 ### Performance Considerations
 

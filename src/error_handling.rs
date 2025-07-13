@@ -1,15 +1,15 @@
+use serde_json::json;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
-use serde_json::json;
 
 /// Error severity levels according to the specification
 #[derive(Debug, Clone, PartialEq)]
 pub enum ErrorSeverity {
-    Fatal,   // I/O failure, panic
-    Hard,    // Rhai error, CLI misuse, bad regex  
-    Medium,  // Parse failure, CSV mismatch
-    Soft,    // Missing field, null, coercion fail
+    Fatal,  // I/O failure, panic
+    Hard,   // Rhai error, CLI misuse, bad regex
+    Medium, // Parse failure, CSV mismatch
+    Soft,   // Missing field, null, coercion fail
 }
 
 /// Error information for tracking and reporting
@@ -45,12 +45,18 @@ impl ErrorReporter {
         let should_continue = match (&self.config.style, &error.severity) {
             // Fatal errors always printed and cause exit
             (_, ErrorSeverity::Fatal) => {
-                eprintln!("{}", crate::config::format_error_message_auto(&error.message));
+                eprintln!(
+                    "{}",
+                    crate::config::format_error_message_auto(&error.message)
+                );
                 false
             }
-            // Hard errors always printed and cause exit  
+            // Hard errors always printed and cause exit
             (_, ErrorSeverity::Hard) => {
-                eprintln!("{}", crate::config::format_error_message_auto(&error.message));
+                eprintln!(
+                    "{}",
+                    crate::config::format_error_message_auto(&error.message)
+                );
                 false
             }
             // Medium and Soft errors depend on reporting style
@@ -61,7 +67,10 @@ impl ErrorReporter {
             }
             (crate::config::ErrorReportStyle::Print, _) => {
                 // Print each error immediately
-                eprintln!("{}", crate::config::format_error_message_auto(&error.message));
+                eprintln!(
+                    "{}",
+                    crate::config::format_error_message_auto(&error.message)
+                );
                 self.track_error(&error);
                 true
             }
@@ -80,8 +89,11 @@ impl ErrorReporter {
     fn track_error(&mut self, error: &ErrorInfo) {
         let error_type = format!("{:?}", error.severity);
         *self.error_counts.entry(error_type.clone()).or_insert(0) += 1;
-        
-        let examples = self.error_examples.entry(error_type).or_insert_with(Vec::new);
+
+        let examples = self
+            .error_examples
+            .entry(error_type)
+            .or_insert_with(Vec::new);
         if examples.len() < 3 {
             examples.push(error.message.clone());
         }
@@ -96,17 +108,23 @@ impl ErrorReporter {
         match self.config.style {
             crate::config::ErrorReportStyle::Summary => {
                 let mut summary = json!({});
-                
+
                 for (error_type, count) in &self.error_counts {
                     let empty_examples = Vec::new();
-                    let examples = self.error_examples.get(error_type).unwrap_or(&empty_examples);
+                    let examples = self
+                        .error_examples
+                        .get(error_type)
+                        .unwrap_or(&empty_examples);
                     summary[error_type] = json!({
                         "count": count,
                         "examples": examples
                     });
                 }
-                
-                Some(serde_json::to_string_pretty(&summary).unwrap_or_else(|_| "Error serializing summary".to_string()))
+
+                Some(
+                    serde_json::to_string_pretty(&summary)
+                        .unwrap_or_else(|_| "Error serializing summary".to_string()),
+                )
             }
             _ => None,
         }
@@ -125,7 +143,9 @@ impl ErrorReporter {
 
     /// Check if any fatal or hard errors occurred (for exit code determination)
     pub fn has_fatal_or_hard_errors(&self) -> bool {
-        self.errors.iter().any(|e| matches!(e.severity, ErrorSeverity::Fatal | ErrorSeverity::Hard))
+        self.errors
+            .iter()
+            .any(|e| matches!(e.severity, ErrorSeverity::Fatal | ErrorSeverity::Hard))
     }
 
     /// Check if any errors occurred at all
