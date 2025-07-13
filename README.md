@@ -345,15 +345,20 @@ Control how errors are reported:
 # Show error summary at end (default for quarantine mode)
 kelora -f jsonl mixed.log --error-report summary
 
-# Print each error immediately
+# Print each error immediately (default for abort mode)
 kelora -f jsonl mixed.log --error-report print
 
-# Suppress all error output
+# Suppress all error output (default for skip mode)
 kelora -f jsonl mixed.log --error-report off
 
 # Write errors to file
 kelora -f jsonl mixed.log --error-report summary=errors.json
 ```
+
+**Default behaviors:**
+- `--on-error abort` → `--error-report print` (show reason before exit)
+- `--on-error skip` → `--error-report off` (silent operation)
+- `--on-error quarantine` → `--error-report summary` (show what was quarantined)
 
 ## 📊 Performance & Parallelization
 

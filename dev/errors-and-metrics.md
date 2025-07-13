@@ -270,7 +270,7 @@ OUTPUT FORMAT CONTROL
 | `--on-error` | `--error-report` Options            | Recommended Defaults + Notes                                                                                                                                  |
 | ------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `abort`      | `print` (default), `summary`, `off` | ✅ Default `print` — show fatal reason before exit. <br>✅ Allow `summary` for grouped pre-exit info.<br>⚠️ `off` dangerous; user gets no explanation on abort. |
-| `skip`       | `summary` (default), `print`, `off` | ✅ Default `off` — skip silently.<br>✅ Allow `summary` for final counts.<br>✅ Allow `print` for live tracking.                                                 |
+| `skip`       | `off` (default), `summary`, `print` | ✅ Default `off` — skip silently.<br>✅ Allow `summary` for final counts.<br>✅ Allow `print` for live tracking.                                                 |
 | `quarantine` | `summary` (default), `print`, `off` | ✅ Default `summary` — see grouped error info.<br>✅ Allow `print` to watch live quarantine events.<br>✅ Allow `off` for silent run + only Rhai handling.       |
 
 ---
