@@ -649,7 +649,10 @@ fn process_line_sequential<W: Write>(
         let mut pipeline_builder = create_pipeline_builder_from_config(config);
         pipeline_builder = pipeline_builder.with_csv_headers(headers);
 
-        let (new_pipeline, _new_begin_stage, _new_end_stage, new_ctx) =
+        // Note: We rebuild the entire pipeline including begin/end stages, but only use
+        // the pipeline and context. The begin stage was already executed at session start
+        // and the end stage will be executed when the original session completes.
+        let (new_pipeline, _unused_begin_stage, _unused_end_stage, new_ctx) =
             pipeline_builder.build(config.processing.stages.clone())?;
 
         *pipeline = new_pipeline;
