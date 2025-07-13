@@ -433,17 +433,17 @@ mod tests {
 
         match &components[0] {
             PathComponent::Key(key) => assert_eq!(key, "user"),
-            _ => panic!("Expected key component"),
+            _ => assert!(false, "Expected key component"),
         }
 
         match &components[1] {
             PathComponent::Key(key) => assert_eq!(key, "scores"),
-            _ => panic!("Expected key component"),
+            _ => assert!(false, "Expected key component"),
         }
 
         match &components[2] {
             PathComponent::Index(index) => assert_eq!(*index, 0),
-            _ => panic!("Expected index component"),
+            _ => assert!(false, "Expected index component"),
         }
     }
 
@@ -454,12 +454,12 @@ mod tests {
 
         match &components[0] {
             PathComponent::Key(key) => assert_eq!(key, "items"),
-            _ => panic!("Expected key component"),
+            _ => assert!(false, "Expected key component"),
         }
 
         match &components[1] {
             PathComponent::Index(index) => assert_eq!(*index, -1),
-            _ => panic!("Expected index component"),
+            _ => assert!(false, "Expected index component"),
         }
     }
 
@@ -485,7 +485,7 @@ mod tests {
                 (PathComponent::Index(expected_index), PathComponent::Index(actual_index)) => {
                     assert_eq!(expected_index, actual_index);
                 }
-                _ => panic!("Component mismatch at index {}", i),
+                _ => assert!(false, "Component mismatch at index {}", i),
             }
         }
     }

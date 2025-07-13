@@ -28,12 +28,14 @@ pub enum ScriptResult {
 }
 
 impl ScriptResult {
-    /// Unwrap the event from Emit variant, panics if not Emit
+    /// Try to unwrap the event from Emit variant, returns error if not Emit
     #[allow(dead_code)]
-    pub fn unwrap_emit(self) -> Event {
+    pub fn try_unwrap_emit(self) -> Result<Event> {
         match self {
-            ScriptResult::Emit(event) => event,
-            _ => panic!("Expected ScriptResult::Emit"),
+            ScriptResult::Emit(event) => Ok(event),
+            ScriptResult::Skip => Err(anyhow::anyhow!("Expected ScriptResult::Emit, got Skip")),
+            ScriptResult::EmitMultiple(_) => Err(anyhow::anyhow!("Expected ScriptResult::Emit, got EmitMultiple")),
+            ScriptResult::Error(msg) => Err(anyhow::anyhow!("Expected ScriptResult::Emit, got Error: {}", msg)),
         }
     }
 }
