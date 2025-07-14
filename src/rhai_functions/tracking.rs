@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 // Thread-local storage for tracking state
 thread_local! {
-    static THREAD_TRACKING_STATE: RefCell<HashMap<String, Dynamic>> = RefCell::new(HashMap::new());
+    pub static THREAD_TRACKING_STATE: RefCell<HashMap<String, Dynamic>> = RefCell::new(HashMap::new());
 }
 
 // Error tracking for summary collection in parallel mode
@@ -521,6 +521,7 @@ pub fn set_thread_tracking_state(tracked: &HashMap<String, Dynamic>) {
 pub fn get_thread_tracking_state() -> HashMap<String, Dynamic> {
     THREAD_TRACKING_STATE.with(|state| state.borrow().clone())
 }
+
 
 /// Merge thread-local tracking state into context tracker for sequential mode
 #[allow(dead_code)] // Planned feature for parallel mode metrics merging

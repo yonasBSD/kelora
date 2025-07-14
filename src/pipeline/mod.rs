@@ -17,6 +17,81 @@ pub use defaults::*;
 pub use multiline::*;
 pub use stages::*;
 
+/// Helper function to collect discovered levels and keys from an event for stats
+fn collect_discovered_levels_and_keys(event: &Event, ctx: &mut PipelineContext) {
+    // Collect discovered level
+    for level_field_name in crate::event::LEVEL_FIELD_NAMES {
+        if let Some(value) = event.fields.get(*level_field_name) {
+            if let Ok(level_str) = value.clone().into_string() {
+                if !level_str.is_empty() {
+                    // Add to both ctx.tracker (for parallel) and thread-local tracking (for sequential)
+                    // 1. Add to ctx.tracker
+                    let key = "__kelora_stats_discovered_levels".to_string();
+                    let current = ctx.tracker.get(&key).cloned().unwrap_or_else(|| {
+                        Dynamic::from(rhai::Array::new())
+                    });
+                    
+                    if let Ok(mut arr) = current.into_array() {
+                        let level_dynamic = Dynamic::from(level_str.clone());
+                        // Check if level already exists in array
+                        if !arr.iter().any(|v| v.clone().into_string().unwrap_or_default() == level_dynamic.clone().into_string().unwrap_or_default()) {
+                            arr.push(level_dynamic);
+                        }
+                        ctx.tracker.insert(key.clone(), Dynamic::from(arr));
+                        ctx.tracker.insert(format!("__op_{}", key), Dynamic::from("unique"));
+                    }
+
+                    // 2. Add to thread-local tracking state (reuse existing track_unique pattern)
+                    crate::rhai_functions::tracking::THREAD_TRACKING_STATE.with(|state| {
+                        let mut state = state.borrow_mut();
+                        let key = "__kelora_stats_discovered_levels";
+                        
+                        let current = state.get(key).cloned().unwrap_or_else(|| {
+                            Dynamic::from(rhai::Array::new())
+                        });
+
+                        if let Ok(mut arr) = current.into_array() {
+                            let level_dynamic = Dynamic::from(level_str);
+                            if !arr.iter().any(|v| v.clone().into_string().unwrap_or_default() == level_dynamic.clone().into_string().unwrap_or_default()) {
+                                arr.push(level_dynamic);
+                            }
+                            state.insert(key.to_string(), Dynamic::from(arr));
+                            state.insert(format!("__op_{}", key), Dynamic::from("unique"));
+                        }
+                    });
+                    break; // Only take the first level field found
+                }
+            }
+        }
+    }
+
+    // Collect discovered keys
+    let key = "__kelora_stats_discovered_keys".to_string();
+    let current = ctx.tracker.get(&key).cloned().unwrap_or_else(|| {
+        Dynamic::from(rhai::Array::new())
+    });
+    
+    if let Ok(mut arr) = current.into_array() {
+        for field_key in event.fields.keys() {
+            let key_dynamic = Dynamic::from(field_key.clone());
+            // Check if key already exists in array
+            if !arr.iter().any(|v| v.clone().into_string().unwrap_or_default() == key_dynamic.clone().into_string().unwrap_or_default()) {
+                arr.push(key_dynamic.clone());
+            }
+        }
+        ctx.tracker.insert(key.clone(), Dynamic::from(arr.clone()));
+        ctx.tracker.insert(format!("__op_{}", key), Dynamic::from("unique"));
+
+        // Also add to thread-local tracking state
+        crate::rhai_functions::tracking::THREAD_TRACKING_STATE.with(|state| {
+            let mut state = state.borrow_mut();
+            let key = "__kelora_stats_discovered_keys";
+            state.insert(key.to_string(), Dynamic::from(arr));
+            state.insert(format!("__op_{}", key), Dynamic::from("unique"));
+        });
+    }
+}
+
 /// Core pipeline result types
 #[derive(Debug, Clone)]
 pub enum ScriptResult {
@@ -154,6 +229,9 @@ impl Pipeline {
                 Ok(mut e) => {
                     // Event was successfully created from chunk
                     crate::stats::stats_add_event_created();
+                    
+                    // Collect discovered levels and keys for stats
+                    collect_discovered_levels_and_keys(&e, ctx);
 
                     // Also track in Rhai context for parallel processing
                     ctx.tracker
@@ -177,16 +255,14 @@ impl Pipeline {
                     crate::stats::stats_add_line_error();
 
                     // Also track in Rhai context for parallel processing
-                    if !ctx.tracker.is_empty() {
-                        ctx.tracker
-                            .entry("__kelora_stats_lines_errors".to_string())
-                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
-                            .or_insert(rhai::Dynamic::from(1i64));
-                        ctx.tracker.insert(
-                            "__op___kelora_stats_lines_errors".to_string(),
-                            rhai::Dynamic::from("count"),
-                        );
-                    }
+                    ctx.tracker
+                        .entry("__kelora_stats_lines_errors".to_string())
+                        .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                        .or_insert(rhai::Dynamic::from(1i64));
+                    ctx.tracker.insert(
+                        "__op___kelora_stats_lines_errors".to_string(),
+                        rhai::Dynamic::from("count"),
+                    );
 
                     match ctx.config.on_error {
                         crate::ErrorStrategy::Skip => return Ok(results),
@@ -324,18 +400,16 @@ impl Pipeline {
                         crate::stats::stats_add_event_filtered();
 
                         // Also track in Rhai context for parallel processing
-                        if !ctx.tracker.is_empty() {
-                            ctx.tracker
-                                .entry("__kelora_stats_events_filtered".to_string())
-                                .and_modify(|v| {
-                                    *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
-                                })
-                                .or_insert(rhai::Dynamic::from(1i64));
-                            ctx.tracker.insert(
-                                "__op___kelora_stats_events_filtered".to_string(),
-                                rhai::Dynamic::from("count"),
-                            );
-                        }
+                        ctx.tracker
+                            .entry("__kelora_stats_events_filtered".to_string())
+                            .and_modify(|v| {
+                                *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
+                            })
+                            .or_insert(rhai::Dynamic::from(1i64));
+                        ctx.tracker.insert(
+                            "__op___kelora_stats_events_filtered".to_string(),
+                            rhai::Dynamic::from("count"),
+                        );
                     }
                 }
                 ScriptResult::EmitMultiple(events) => {

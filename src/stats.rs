@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
 /// Statistics collected during log processing
@@ -16,6 +17,8 @@ pub struct ProcessingStats {
     pub errors: usize, // Kept for backward compatibility, but lines_errors is more specific
     pub processing_time: Duration,
     pub start_time: Option<Instant>,
+    pub discovered_levels: BTreeSet<String>,
+    pub discovered_keys: BTreeSet<String>,
 }
 
 // Thread-local storage for statistics (following track_count pattern)
@@ -94,6 +97,7 @@ pub fn stats_finish_processing() {
     });
 }
 
+
 pub fn get_thread_stats() -> ProcessingStats {
     THREAD_STATS.with(|stats| stats.borrow().clone())
 }
@@ -106,42 +110,81 @@ impl ProcessingStats {
         }
     }
 
+
+
+    /// Extract discovered levels and keys from tracking data (for sequential processing)
+    #[allow(dead_code)] // Used in sequential processing, but clippy doesn't detect it properly
+    pub fn extract_discovered_from_tracking(&mut self, tracking_data: &std::collections::HashMap<String, rhai::Dynamic>) {
+        // Extract discovered levels from tracking data
+        if let Some(levels_dynamic) = tracking_data.get("__kelora_stats_discovered_levels") {
+            if let Ok(levels_array) = levels_dynamic.clone().into_array() {
+                for level in levels_array {
+                    if let Ok(level_str) = level.into_string() {
+                        self.discovered_levels.insert(level_str);
+                    }
+                }
+            }
+        }
+
+        // Extract discovered keys from tracking data
+        if let Some(keys_dynamic) = tracking_data.get("__kelora_stats_discovered_keys") {
+            if let Ok(keys_array) = keys_dynamic.clone().into_array() {
+                for key in keys_array {
+                    if let Ok(key_str) = key.into_string() {
+                        self.discovered_keys.insert(key_str);
+                    }
+                }
+            }
+        }
+    }
+
     /// Format stats according to the specification
     #[allow(dead_code)] // Used in main.rs when stats are enabled
     pub fn format_stats(&self, _multiline_enabled: bool) -> String {
         let mut output = String::new();
 
-        // lines_in = Input lines read
-        output.push_str(&format!("lines_in   = {}\n", self.lines_read));
+        // Lines processed: N total, N filtered, N errors
+        output.push_str(&format!(
+            "Lines processed: {} total, {} filtered, {} errors\n",
+            self.lines_read, self.lines_filtered, self.lines_errors
+        ));
 
-        // lines_out = Events emitted after parsing/filtering
-        output.push_str(&format!("lines_out  = {}\n", self.events_output));
+        // Events created: N total, N output, N filtered
+        output.push_str(&format!(
+            "Events created: {} total, {} output, {} filtered\n",
+            self.events_created, self.events_output, self.events_filtered
+        ));
 
-        // duration = Total run time, human-readable
+        // Throughput: N lines/s in Nms
         let duration_secs = self.processing_time.as_secs_f64();
-        if duration_secs < 1.0 {
-            output.push_str(&format!(
-                "duration   = {:.0}ms\n",
-                self.processing_time.as_millis()
-            ));
-        } else {
-            output.push_str(&format!("duration   = {:.2}s\n", duration_secs));
-        }
-
-        // throughput = Processing rate
         if duration_secs > 0.0 && self.lines_read > 0 {
             let throughput = self.lines_read as f64 / duration_secs;
-            if throughput >= 1000.0 {
-                output.push_str(&format!("throughput = {:.1}k/s\n", throughput / 1000.0));
+            if duration_secs < 1.0 {
+                output.push_str(&format!(
+                    "Throughput: {:.0} lines/s in {:.0}ms\n",
+                    throughput,
+                    self.processing_time.as_millis()
+                ));
             } else {
-                output.push_str(&format!("throughput = {:.0}/s\n", throughput));
+                output.push_str(&format!(
+                    "Throughput: {:.0} lines/s in {:.2}s\n",
+                    throughput,
+                    duration_secs
+                ));
             }
         }
 
-        // TODO: levels and keys will be populated from discovered field names
-        // For now, leave them as placeholders
-        output.push_str("levels     = \n");
-        output.push_str("keys       = \n");
+        // Seen levels: (only if we have discovered levels)
+        if !self.discovered_levels.is_empty() {
+            let levels: Vec<String> = self.discovered_levels.iter().cloned().collect();
+            output.push_str(&format!("Seen levels: {}\n", levels.join(",")));
+        }
+
+        // Seen keys: (only if we have discovered keys)
+        if !self.discovered_keys.is_empty() {
+            let keys: Vec<String> = self.discovered_keys.iter().cloned().collect();
+            output.push_str(&format!("Seen keys: {}\n", keys.join(",")));
+        }
 
         output.trim_end().to_string()
     }

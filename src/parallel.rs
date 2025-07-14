@@ -129,6 +129,28 @@ impl GlobalTracker {
         stats.events_output = events_output;
         stats.events_filtered = events_filtered;
 
+        // Extract discovered levels from tracking data
+        if let Some(levels_dynamic) = tracked.get("__kelora_stats_discovered_levels") {
+            if let Ok(levels_array) = levels_dynamic.clone().into_array() {
+                for level in levels_array {
+                    if let Ok(level_str) = level.into_string() {
+                        stats.discovered_levels.insert(level_str);
+                    }
+                }
+            }
+        }
+
+        // Extract discovered keys from tracking data
+        if let Some(keys_dynamic) = tracked.get("__kelora_stats_discovered_keys") {
+            if let Ok(keys_array) = keys_dynamic.clone().into_array() {
+                for key in keys_array {
+                    if let Ok(key_str) = key.into_string() {
+                        stats.discovered_keys.insert(key_str);
+                    }
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -1133,8 +1155,13 @@ impl ParallelProcessor {
             // Include thread-local tracking state (includes error tracking)
             let thread_tracking = crate::rhai_functions::tracking::get_thread_tracking_state();
             for (key, value) in thread_tracking {
-                // Include error tracking and user tracking, but not internal stats
-                if !key.starts_with("__op___kelora_stats_") && !key.starts_with("__kelora_stats_") {
+                // Include error tracking, discovered levels/keys with their operations, and user tracking, but not other internal stats
+                if (!key.starts_with("__op___kelora_stats_") || 
+                    key == "__op___kelora_stats_discovered_levels" || 
+                    key == "__op___kelora_stats_discovered_keys") && 
+                   (!key.starts_with("__kelora_stats_") || 
+                    key == "__kelora_stats_discovered_levels" || 
+                    key == "__kelora_stats_discovered_keys") {
                     deltas.insert(key, value);
                 }
             }

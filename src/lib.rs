@@ -184,13 +184,15 @@ pub fn run_pipeline<W: Write + Send + 'static>(
     } else {
         let mut output = output;
         run_pipeline_sequential_with_config(config, &mut output)?;
+        let tracking_data = crate::rhai_functions::tracking::get_thread_tracking_state();
         let final_stats = if collect_stats {
             stats_finish_processing();
-            Some(get_thread_stats())
+            let mut stats = get_thread_stats();
+            stats.extract_discovered_from_tracking(&tracking_data);
+            Some(stats)
         } else {
             None
         };
-        let tracking_data = crate::rhai_functions::tracking::get_thread_tracking_state();
         
         Ok(PipelineResult {
             stats: final_stats,
@@ -217,13 +219,15 @@ pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
     } else {
         let mut output = output;
         run_pipeline_sequential(config, &mut output)?;
+        let tracking_data = crate::rhai_functions::tracking::get_thread_tracking_state();
         let final_stats = if config.output.stats {
             stats_finish_processing();
-            Some(get_thread_stats())
+            let mut stats = get_thread_stats();
+            stats.extract_discovered_from_tracking(&tracking_data);
+            Some(stats)
         } else {
             None
         };
-        let tracking_data = crate::rhai_functions::tracking::get_thread_tracking_state();
         
         Ok(PipelineResult {
             stats: final_stats,
