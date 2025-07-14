@@ -15,13 +15,13 @@ impl ApacheParser {
         // Apache Combined Log Format pattern
         // Example: 192.168.1.1 - user [25/Dec/1995:10:00:00 +0000] "GET /index.html HTTP/1.0" 200 1234 "http://www.example.com/" "Mozilla/4.08"
         let combined_regex = Regex::new(
-            r#"^(\S+) (\S+) (\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+)(?: "([^"]*)" "([^"]*)")?$"#,
+            r#"^(\S+) (\S+) (\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+)(?: "([^"]*)" "([^"]*)")?(?:\r?\n)?$"#,
         )
         .context("Failed to compile Apache Combined Log Format regex")?;
 
         // Apache Common Log Format pattern
         // Example: 192.168.1.1 - user [25/Dec/1995:10:00:00 +0000] "GET /index.html HTTP/1.0" 200 1234
-        let common_regex = Regex::new(r#"^(\S+) (\S+) (\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+)$"#)
+        let common_regex = Regex::new(r#"^(\S+) (\S+) (\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+)(?:\r?\n)?$"#)
             .context("Failed to compile Apache Common Log Format regex")?;
 
         Ok(Self {

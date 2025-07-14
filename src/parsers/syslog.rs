@@ -13,12 +13,12 @@ pub struct SyslogParser {
 impl SyslogParser {
     pub fn new() -> Result<Self> {
         let rfc5424_regex = Regex::new(
-            r"^<(\d{1,3})>(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)(?:\s+(.*))?$",
+            r"^<(\d{1,3})>(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)(?:\s+(.*))?(?:\r?\n)?$",
         )
         .context("Failed to compile RFC5424 regex")?;
 
         let rfc3164_regex = Regex::new(
-            r"^(?:<(\d{1,3})>)?(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+([^:\[\s]+)(?:\[(\d+)\])?\s*:\s*(.*)$"
+            r"^(?:<(\d{1,3})>)?(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+([^:\[\s]+)(?:\[(\d+)\])?\s*:\s*(.*)(?:\r?\n)?$"
         ).context("Failed to compile RFC3164 regex")?;
 
         Ok(Self {

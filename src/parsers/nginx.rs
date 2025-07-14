@@ -16,12 +16,12 @@ impl NginxParser {
         // Example: 192.168.1.1 - - [25/Dec/1995:10:00:00 +0000] "GET /index.html HTTP/1.0" 200 1234 "http://www.example.com/" "Mozilla/4.08" "0.123"
         // Note: Added optional request_time at the end
         let combined_regex = Regex::new(
-            r#"^(\S+) (\S+) (\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+)(?: "([^"]*)" "([^"]*)"(?: "([^"]*)")?)?$"#
+            r#"^(\S+) (\S+) (\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+)(?: "([^"]*)" "([^"]*)"(?: "([^"]*)")?)?(?:\r?\n)?$"#
         ).context("Failed to compile NGINX Combined Log Format regex")?;
 
         // NGINX Common Log Format (basic format without referer/user agent)
         // Example: 192.168.1.1 - - [25/Dec/1995:10:00:00 +0000] "GET /index.html HTTP/1.0" 200 1234
-        let common_regex = Regex::new(r#"^(\S+) (\S+) (\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+)$"#)
+        let common_regex = Regex::new(r#"^(\S+) (\S+) (\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+)(?:\r?\n)?$"#)
             .context("Failed to compile NGINX Common Log Format regex")?;
 
         Ok(Self {
