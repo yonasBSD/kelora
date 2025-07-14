@@ -600,6 +600,7 @@ enum ProcessingResult {
     TakeLimitExhausted,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn process_line_sequential<W: Write>(
     line_result: io::Result<String>,
     line_num: &mut usize,

@@ -97,7 +97,6 @@ pub fn stats_finish_processing() {
     });
 }
 
-
 pub fn get_thread_stats() -> ProcessingStats {
     THREAD_STATS.with(|stats| stats.borrow().clone())
 }
@@ -110,11 +109,12 @@ impl ProcessingStats {
         }
     }
 
-
-
     /// Extract discovered levels and keys from tracking data (for sequential processing)
     #[allow(dead_code)] // Used in sequential processing, but clippy doesn't detect it properly
-    pub fn extract_discovered_from_tracking(&mut self, tracking_data: &std::collections::HashMap<String, rhai::Dynamic>) {
+    pub fn extract_discovered_from_tracking(
+        &mut self,
+        tracking_data: &std::collections::HashMap<String, rhai::Dynamic>,
+    ) {
         // Extract discovered levels from tracking data
         if let Some(levels_dynamic) = tracking_data.get("__kelora_stats_discovered_levels") {
             if let Ok(levels_array) = levels_dynamic.clone().into_array() {
@@ -168,22 +168,21 @@ impl ProcessingStats {
             } else {
                 output.push_str(&format!(
                     "Throughput: {:.0} lines/s in {:.2}s\n",
-                    throughput,
-                    duration_secs
+                    throughput, duration_secs
                 ));
             }
         }
 
-        // Seen levels: (only if we have discovered levels)
+        // Levels seen: (only if we have discovered levels)
         if !self.discovered_levels.is_empty() {
             let levels: Vec<String> = self.discovered_levels.iter().cloned().collect();
-            output.push_str(&format!("Seen levels: {}\n", levels.join(",")));
+            output.push_str(&format!("Levels seen: {}\n", levels.join(",")));
         }
 
-        // Seen keys: (only if we have discovered keys)
+        // Keys seen: (only if we have discovered keys)
         if !self.discovered_keys.is_empty() {
             let keys: Vec<String> = self.discovered_keys.iter().cloned().collect();
-            output.push_str(&format!("Seen keys: {}\n", keys.join(",")));
+            output.push_str(&format!("Keys seen: {}\n", keys.join(",")));
         }
 
         output.trim_end().to_string()
