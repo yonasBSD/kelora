@@ -691,7 +691,7 @@ impl RhaiEngine {
         for (k, v) in &event.fields {
             event_map.insert(k.clone().into(), v.clone());
         }
-        scope.set_value("event", event_map);
+        scope.set_value("e", event_map);
 
         // Update metadata
         let mut meta_map = rhai::Map::new();
