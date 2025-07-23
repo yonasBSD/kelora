@@ -14,7 +14,7 @@ Kelora is a command-line log analysis tool written in Rust that uses the Rhai sc
 cargo build --release
 
 # Run performance tests
-time ./target/release/kelora -f json <logfile> --filter "expression" --on-error skip > /dev/null
+time ./target/release/kelora -f json <logfile> --filter "expression" > /dev/null
 
 # Run benchmark suite to detect performance regressions
 make bench-quick              # Quick benchmarks (10k dataset)
@@ -44,7 +44,7 @@ Kelora is built around a streaming pipeline architecture:
 4. **Output Stage**: Formatting and writing results
 
 **Key Design Principles:**
-- **Fail Fast**: Invalid data or scripts should error immediately
+- **Resiliency**: Robust error recovery with context-specific handling
 - **No Magic**: Explicit behavior, predictable outcomes
 - **Composable**: Each stage can be configured independently
 - **Performance**: Parallel processing and efficient memory usage
@@ -56,30 +56,38 @@ Empty lines are handled differently based on input format:
 **Line Format (`-f line`)**:
 - Empty lines are processed as events with `line: ""`
 - Maintains line-by-line correspondence for debugging
-- Use `--filter 'line.len() > 0'` to exclude empty lines if needed
+- Use `--filter 'e.line.len() > 0'` to exclude empty lines if needed
 
 **Structured Formats** (`-f jsonl`, `-f csv`, `-f syslog`, etc.):
 - Empty lines are skipped entirely (never reach the parser)
 - This prevents noise in structured data processing
 - Statistics reflect only non-empty lines that were processed
 
-### Error Handling Patterns
+### Resiliency Model
 
-**On-Error Strategies:**
-- `quarantine` - Process all lines, isolate broken events, expose via `meta` to Rhai scripts (default)
-- `skip` - Skip invalid lines, continue processing
-- `abort` - Stop processing on first error
+**Processing Modes:**
+- **Resilient Mode (default)**: Skip errors, continue processing, show error summary
+- **Strict Mode (`--strict`)**: Fail-fast on any error, show each error immediately
 
-**Error Strategy Selection:**
-- Use `quarantine` (default) for analysis and debugging - broken lines become events accessible to Rhai scripts
-- Use `skip` for production pipelines where data quality varies and broken lines should be discarded
-- Use `abort` for strict validation scenarios where any error should stop processing
+**Context-Specific Error Handling:**
 
-**Error Reporting Defaults:**
-- `abort` mode defaults to `--error-report=print` (show each error immediately)
-- `skip` mode defaults to `--error-report=summary` (show summary of skipped errors)  
-- `quarantine` mode defaults to `--error-report=summary` (show summary of quarantined errors)
-- Override with explicit `--error-report=off` to suppress error reporting entirely
+**Input Parsing:**
+- Resilient: Skip unparseable lines automatically, continue processing
+- Strict: Abort on first parsing error
+
+**Filtering (`--filter` expressions):**
+- Resilient: Filter errors evaluate to false (event is skipped)
+- Strict: Filter errors abort processing
+
+**Transformations (`--exec` expressions):**
+- Resilient: Atomic execution with rollback - failed transformations return original event unchanged
+- Strict: Transformation errors abort processing
+
+**Error Reporting:**
+- Resilient mode: Shows error summary at end of processing
+- Strict mode: Shows each error immediately before aborting
+- Use `--error-report-file` to write detailed error logs to file
+- Use `--verbose` for additional error details
 
 ### Output Limiting
 
@@ -90,7 +98,7 @@ Empty lines are handled differently based on input format:
 - Provides early exit behavior in parallel mode for efficient processing
 - Examples:
   - `--take 10` - Output first 10 events
-  - `--take 100 --filter 'level == "ERROR"'` - First 100 error events
+  - `--take 100 --filter 'e.level == "ERROR"'` - First 100 error events
   - `--take 5 --parallel` - First 5 events using parallel processing
 
 ### Performance Considerations
@@ -157,7 +165,14 @@ Empty lines are handled differently based on input format:
 
 ### Rhai Scripting Best Practices
 
-- **Variable Declaration**: Always use "let" when using new Rhai variables (e.g. 'let myfield=line.col("1,2")' or 'let myfield=line.col(1,2)').
+- **Event Variable**: Use `e` to access the current event (renamed from `event` for brevity)
+- **Variable Declaration**: Always use "let" when using new Rhai variables (e.g. 'let myfield=e.col("1,2")' or 'let myfield=e.col(1,2)')
+- **Safety Functions**: Use defensive field access functions for robust scripts:
+  - `get_path(e, "field.subfield", default)` - Safe nested field access with fallback
+  - `has_path(e, "field.subfield")` - Check if nested path exists
+  - `path_equals(e, "field.subfield", expected)` - Safe nested field comparison
+  - `to_number(value, default)` - Safe number conversion with fallback
+  - `to_bool(value, default)` - Safe boolean conversion with fallback
 
 ### Code Quality Practices
 

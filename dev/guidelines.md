@@ -15,13 +15,13 @@ Input Formats	    JSON, logfmt, and flexible user-defined formats via -f line + 
 Multiline Support	✅ Needed; planned via pluggable chunkers (inspired by Stelp strategies)
 Emit/Fan-out	    ✅ Supported via emit_each() (suppresses original event by default)
 Flattening	        get_path() + optional flattening with dot+bracket syntax (user.roles[0])
-Error Handling	    Default: emit-errors; other modes: fail-fast, skip, default-value
+Error Handling	    Resilient by default with context-specific recovery; strict mode for fail-fast
 Script Scope	    Inject valid keys as variables, fallback to event["non_ident"], allow --script
 Parallelism	        Controlled via --serial, --unordered, --realtime, --batch-size, etc.
 Output Formats	    Minimal and clean: default, JSON, logfmt (only default formatter does styling)
 Type Coercion       Explicit only; no auto-coercion of fields
 Fan-outg	        emit_each() accepted as best name (alternatives evaluated)
-Field Access Style	event["key"], get_path("a.b[0].c") for deep/nested values
+Field Access Style	e["key"], get_path(e, "a.b[0].c") for deep/nested values with safety functions
 Strict Vars Mode	Plan to use Engine::set_strict_variables(true) for robustness
 
 ⸻
@@ -37,7 +37,7 @@ Strict Vars Mode	Plan to use Engine::set_strict_variables(true) for robustness
 	•	✅ Native track_*() functions (count, avg, unique, etc.)
 	•	✅ Benchmarking with Criterion.rs
 	•	✅ Fuzzing with cargo fuzz
-	•	✅ Error strategy flag (--on-error) with clear defaults
+	•	✅ Resiliency model with --strict flag for fail-fast behavior
 	•	✅ Clean stream modes UX table (default, serial, realtime, unordered)
 
 ⸻
@@ -46,7 +46,7 @@ Strict Vars Mode	Plan to use Engine::set_strict_variables(true) for robustness
 
 - Nom-based logfmt parser with robust edge case support
 - Finalize field extraction and flattening strategy
-- Define and inject standard kelora_std Rhai helpers
+- Define and inject standard kelora_std Rhai helpers with safety functions
 - Build standard tests for fan-out, coercion, emit logic
 - Add --config / .kelorarc for persistent options
 

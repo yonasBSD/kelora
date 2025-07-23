@@ -91,23 +91,26 @@ Field values may be:
 
 ---
 
-## 🧪 ERROR HANDLING STRATEGY
+## 🧪 RESILIENCY MODEL
 
+* **Resilient Mode (default)**: Skip errors, continue processing, show summary at end
+* **Strict Mode (`--strict`)**: Fail-fast on any error with immediate error display
 * Errors go to stderr, not mixed into stdout
-* Summary of errors is printed at the end, unless `--errors abort` is used
-* Exit code is 0, unless `--errors abort` is used
+* Context-specific error handling optimized for each stage
 
-### 🔀 Available Modes:
+### 🔀 Context-Specific Behavior:
 
-- `collect` (default): Store error message (up to 5), continue processing, and show the collected errors at the end
-- `print`: Log immediately to stderr, continue processing. 
-- `debug`: Emit additional backtraces/context info for dev/debug use
-- `skip`: Silently drop failed lines. Show summary/error stats 
-- `abort`: Log immediately and abort on first error. No summary.
+**Input Parsing:**
+- Resilient: Skip unparseable lines automatically, continue processing
+- Strict: Abort on first parsing error
 
-Maybe:
+**Filtering (`--filter` expressions):**
+- Resilient: Filter errors evaluate to false (event is skipped)
+- Strict: Filter errors abort processing
 
-- `replace`: Replace missing/invalid fields with null/`""`/`0`
+**Transformations (`--exec` expressions):**
+- Resilient: Atomic execution with rollback - failed transformations return original event unchanged
+- Strict: Transformation errors abort processing
 
 ---
 
@@ -151,6 +154,6 @@ Maybe:
 * One job per flag. Don’t overload behavior.
 * One format per stream. Don’t guess midstream.
 * Errors must be seen. But not mixed with valid output.
-* Default behavior must be safe. Never silently discard data.
+* Default behavior must be resilient. Robust error recovery with visibility.
 * Fast enough to use in CI. But correct enough to trust in prod.
 * Scriptable, composable, predictable. Always.

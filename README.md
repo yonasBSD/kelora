@@ -6,10 +6,10 @@ Scriptable log processor for the command line. Treats logs as structured events 
 
 ```bash
 # Filter JSON logs with enrichment
-kelora -f jsonl app.log --filter 'status >= 500' --exec 'let severity = "critical"'
+kelora -f jsonl app.log --filter 'e.status >= 500' --exec 'e.severity = "critical"'
 
 # Pattern detection with sliding windows  
-kelora -f jsonl auth.log --window 3 --filter 'event == "login_failed"' \
+kelora -f jsonl auth.log --window 3 --filter 'e.event == "login_failed"' \
   --exec 'if window_values(window, "user").len() >= 2 { print("Brute force detected") }'
 
 # Real-time monitoring with parallelization
@@ -17,7 +17,7 @@ kubectl logs -f app | kelora -f jsonl --parallel --levels warn,error
 
 # Time-range analysis with metrics
 kelora -f syslog /var/log/messages --since "1 hour ago" \
-  --exec 'track_count(facility); track_unique("hosts", host)' --summary
+  --exec 'track_count(e.facility); track_unique("hosts", e.host)' --stats
 ```
 
 ## Install
@@ -34,45 +34,44 @@ cargo install --path .
 **Processing**: Sliding windows, parallel/batch processing, multiline events  
 **Scripting**: Embedded Rhai with 40+ built-in functions for parsing, metrics, time handling  
 **Configuration**: Aliases and defaults via config files  
-**Error handling**: Quarantine, skip, or abort on malformed input
+**Error handling**: Resilient mode with robust error recovery, strict mode for fail-fast behavior
 
 ## Rhai Examples
 
 ```rhai
 // Filter and enrich
-level == "error" && response_time.to_int() > 1000
-let severity = if status >= 500 { "critical" } else { "warning" }
+e.level == "error" && e.response_time.to_int() > 1000
+e.severity = if e.status >= 500 { "critical" } else { "warning" }
 
 // Pattern detection
 let ips = window_values(window, "ip"); ips.contains("192.168.1.100")
 
 // Extract and transform  
-let user = line.extract_re("user=(\w+)"); 
-let masked_ip = event.ip.mask_ip(2)
+let user = e.line.extract_re("user=(\w+)"); 
+e.masked_ip = e.ip.mask_ip(2)
 
-// Track metrics
-track_count("requests"); track_max("peak_latency", duration_ms)
+// Track metrics and use safety functions
+track_count("requests"); track_max("peak_latency", get_path(e, "duration_ms", 0))
 ```
 
 ## Common Use Cases
 
 ```bash
 # Error analysis with time grouping
-kelora -f jsonl api.log --filter 'level == "error"' \
-  --exec 'track_count("errors_" + parse_timestamp(ts).format("%H"))' --summary
+kelora -f jsonl api.log --filter 'e.level == "error"' \
+  --exec 'track_count("errors_" + parse_timestamp(e.ts).format("%H"))' --stats
 
 # Convert formats with field selection  
 kelora -f syslog /var/log/messages -F csv --keys timestamp,host,message
 
-# Quarantine analysis (handle malformed data)
-kelora -f jsonl mixed.log --filter 'meta.contains("parse_error")' \
-  --exec 'track_unique("error_types", meta.parse_error)' --summary
+# Strict mode for validation (fail-fast on errors)
+kelora -f jsonl mixed.log --strict --filter 'e.level == "error"'
 
 # Performance testing with output suppression
-kelora -f jsonl huge.log --parallel -F null --filter 'status != 200'
+kelora -f jsonl huge.log --parallel -F null --filter 'e.status != 200'
 
 # Multiline processing (stack traces)  
-kelora -f line app.log --multiline indent --filter 'line.contains("Exception")'
+kelora -f line app.log --multiline indent --filter 'e.line.contains("Exception")'
 
 # Configuration aliases
 kelora -a slow-requests access.log  # From ~/.config/kelora/config.ini
@@ -84,13 +83,14 @@ kelora -a slow-requests access.log  # From ~/.config/kelora/config.ini
 |------|---------|---------|
 | `-f FORMAT` | Input format | `jsonl`, `syslog`, `csv`, `line` |
 | `-F FORMAT` | Output format | `jsonl`, `csv`, `logfmt`, `null` |
-| `--filter EXPR` | Include matching events | `level == "error"` |
-| `--exec SCRIPT` | Transform events | `let type = "slow"` |
+| `--filter EXPR` | Include matching events | `e.level == "error"` |
+| `--exec SCRIPT` | Transform events | `e.type = "slow"` |
 | `--window N` | Sliding window size | `--window 5` |
 | `--parallel` | Parallel processing | Higher throughput |
 | `--since/--until` | Time filtering | `"2024-01-01"`, `"1 hour ago"` |
 | `--keys FIELDS` | Select output fields | `timestamp,level,msg` |
-| `--on-error MODE` | Error handling | `quarantine`, `skip`, `abort` |
+| `--strict` | Fail-fast error handling | Abort on first error |
+| `--verbose` | Detailed error information | Show error details |
 
 See `kelora --help` for the complete reference.
 
@@ -98,7 +98,7 @@ See `kelora --help` for the complete reference.
 
 **Window Analysis**: Detect patterns across event sequences with `--window N`
 ```bash
-kelora -f jsonl app.log --window 2 --exec 'if window[1].status != status { print("Status changed") }'
+kelora -f jsonl app.log --window 2 --exec 'if window[1].status != e.status { print("Status changed") }'
 ```
 
 **Timezone Handling**: Parse input in one timezone, display in another  
@@ -109,13 +109,14 @@ kelora -f jsonl app.log --input-tz Europe/Berlin -Z  # Parse as Berlin, display 
 **Built-in Functions**: 40+ functions for string processing, time parsing, metrics tracking
 - String: `extract_re()`, `extract_ip()`, `mask_ip()`  
 - Time: `parse_timestamp()`, `parse_duration()`, `now_utc()`
-- Data: `parse_json()`, `parse_kv()`, `get_path()`
+- Data: `parse_json()`, `parse_kv()`, `get_path()`, `has_path()`, `path_equals()`
+- Safety: `to_number()`, `to_bool()` for robust type conversion
 - Metrics: `track_count()`, `track_max()`, `track_unique()`
 
-**Error Strategies**:
-- `quarantine` (default): Process broken lines as events accessible via `meta`
-- `skip`: Discard malformed input
-- `abort`: Stop on first error
+**Error Handling Modes**:
+- **Resilient** (default): Skip errors, continue processing, show summary at end
+- **Strict** (`--strict`): Fail-fast on any error with immediate error display
+- Context-specific: Parsing errors skip lines, filter errors skip events, exec errors roll back changes
 
 ## Help & Documentation
 
