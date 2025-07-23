@@ -88,6 +88,8 @@ pub struct ProcessingConfig {
     pub strict: bool,
     /// Show detailed error information - new resiliency model
     pub verbose: bool,
+    /// Suppress error summary (quiet mode) - new resiliency model
+    pub quiet: bool,
 }
 
 /// Performance configuration
@@ -500,6 +502,7 @@ impl KeloraConfig {
                 take_limit: cli.take,
                 strict: cli.strict,
                 verbose: cli.verbose,
+                quiet: cli.quiet,
             },
             performance: PerformanceConfig {
                 parallel: cli.parallel,
@@ -578,6 +581,7 @@ impl Default for KeloraConfig {
                 take_limit: None,
                 strict: false,
                 verbose: false,
+                quiet: false,
             },
             performance: PerformanceConfig {
                 parallel: false,

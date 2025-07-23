@@ -127,7 +127,7 @@ pub struct PipelineContext {
 /// Pipeline configuration
 #[derive(Debug, Clone)]
 pub struct PipelineConfig {
-    pub on_error: crate::ErrorStrategy,
+    #[allow(dead_code)] // LEGACY: Remove during resiliency migration (see dev/resiliency-todos.md #4)
     pub error_report: crate::config::ErrorReportConfig,
     pub brief: bool,
     #[allow(dead_code)]
@@ -140,7 +140,10 @@ pub struct PipelineConfig {
     /// Exit on first error (fail-fast behavior) - new resiliency model
     pub strict: bool,
     /// Show detailed error information - new resiliency model
+    #[allow(dead_code)] // Planned feature for verbose error reporting
     pub verbose: bool,
+    /// Suppress error summary (quiet mode) - new resiliency model
+    pub quiet: bool,
 }
 
 /// Metadata about current processing context
@@ -299,35 +302,13 @@ impl Pipeline {
                                 ScriptResult::EmitMultiple(mut es) => multi_results.append(&mut es),
                                 ScriptResult::Skip => {}
                                 ScriptResult::Error(msg) => {
-                                    return match ctx.config.on_error {
-                                        crate::ErrorStrategy::Skip => Ok(results),
-                                        crate::ErrorStrategy::Abort => Err(anyhow::anyhow!(msg)),
-                                        crate::ErrorStrategy::Quarantine => {
-                                            // For script errors in quarantine mode, we still treat it as an error
-                                            // since the parsing succeeded but the script failed
-                                            match ctx.config.error_report.style {
-                                                crate::config::ErrorReportStyle::Off => {
-                                                    // Suppress error output
-                                                }
-                                                crate::config::ErrorReportStyle::Print => {
-                                                    eprintln!(
-                                                        "{}",
-                                                        crate::config::format_error_message_auto(
-                                                            &format!("Script error: {}", msg)
-                                                        )
-                                                    );
-                                                }
-                                                crate::config::ErrorReportStyle::Summary => {
-                                                    // Track error for summary collection
-                                                    crate::rhai_functions::tracking::track_error(
-                                                        "Hard",
-                                                        &format!("Script error: {}", msg),
-                                                    );
-                                                }
-                                            }
-                                            Ok(results)
-                                        } // Note: Old Stub behavior removed
-                                    };
+                                    // New resiliency model: use strict flag
+                                    if ctx.config.strict {
+                                        return Err(anyhow::anyhow!(msg));
+                                    } else {
+                                        // Skip errors in resilient mode and continue processing
+                                        return Ok(results);
+                                    }
                                 }
                             }
                         }
@@ -345,7 +326,7 @@ impl Pipeline {
             // Handle final result
             match result {
                 ScriptResult::Emit(event) => {
-                    if self.limiter.as_mut().map_or(true, |l| l.allow()) {
+                    if self.limiter.as_mut().is_none_or(|l| l.allow()) {
                         crate::stats::stats_add_event_output();
 
                         // Also track in Rhai context for parallel processing
@@ -377,7 +358,7 @@ impl Pipeline {
                 }
                 ScriptResult::EmitMultiple(events) => {
                     for event in events {
-                        if self.limiter.as_mut().map_or(true, |l| l.allow()) {
+                        if self.limiter.as_mut().is_none_or(|l| l.allow()) {
                             crate::stats::stats_add_event_output();
 
                             // Also track in Rhai context for parallel processing
@@ -424,36 +405,13 @@ impl Pipeline {
                     );
                 }
                 ScriptResult::Error(msg) => {
-                    return match ctx.config.on_error {
-                        crate::ErrorStrategy::Skip => Ok(results),
-                        crate::ErrorStrategy::Abort => Err(anyhow::anyhow!(msg)),
-                        crate::ErrorStrategy::Quarantine => {
-                            // For script errors in quarantine mode, we still treat it as an error
-                            // since the parsing succeeded but the script failed
-                            match ctx.config.error_report.style {
-                                crate::config::ErrorReportStyle::Off => {
-                                    // Suppress error output
-                                }
-                                crate::config::ErrorReportStyle::Print => {
-                                    eprintln!(
-                                        "{}",
-                                        crate::config::format_error_message_auto(&format!(
-                                            "Script error: {}",
-                                            msg
-                                        ))
-                                    );
-                                }
-                                crate::config::ErrorReportStyle::Summary => {
-                                    // Track error for summary collection
-                                    crate::rhai_functions::tracking::track_error(
-                                        "Hard",
-                                        &format!("Script error: {}", msg),
-                                    );
-                                }
-                            }
-                            Ok(results)
-                        } // Note: Old Stub behavior removed
-                    };
+                    // New resiliency model: use strict flag
+                    if ctx.config.strict {
+                        return Err(anyhow::anyhow!(msg));
+                    } else {
+                        // Skip errors in resilient mode and continue processing
+                        return Ok(results);
+                    }
                 }
             }
         }

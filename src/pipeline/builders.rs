@@ -75,7 +75,6 @@ impl PipelineBuilder {
     pub fn new() -> Self {
         Self {
             config: PipelineConfig {
-                on_error: crate::ErrorStrategy::Quarantine,
                 error_report: crate::config::ErrorReportConfig {
                     style: crate::config::ErrorReportStyle::Summary,
                     file: None,
@@ -87,6 +86,7 @@ impl PipelineBuilder {
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
                 verbose: false,
+                quiet: false,
             },
             begin: None,
             end: None,
@@ -616,7 +616,6 @@ pub fn create_pipeline_builder_from_config(
     config: &crate::config::KeloraConfig,
 ) -> PipelineBuilder {
     let pipeline_config = PipelineConfig {
-        on_error: config.processing.on_error.clone().into(),
         error_report: config.processing.error_report.clone(),
         brief: config.output.brief,
         no_inject_fields: config.processing.no_inject_fields,
@@ -625,6 +624,7 @@ pub fn create_pipeline_builder_from_config(
         timestamp_formatting: config.output.timestamp_formatting.clone(),
         strict: config.processing.strict,
         verbose: config.processing.verbose,
+        quiet: config.processing.quiet,
     };
 
     let mut builder = PipelineBuilder::new()

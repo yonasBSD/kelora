@@ -40,7 +40,6 @@ pub struct PipelineProcessingConfig {
     pub end: Option<String>,
     pub no_inject_fields: bool,
     pub inject_prefix: Option<String>,
-    pub on_error: ErrorStrategy,
     pub error_report: config::ErrorReportConfig,
     pub levels: Vec<String>,
     pub exclude_levels: Vec<String>,
@@ -49,6 +48,7 @@ pub struct PipelineProcessingConfig {
     pub take_limit: Option<usize>,
     pub strict: bool,
     pub verbose: bool,
+    pub quiet: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -81,7 +81,6 @@ impl PipelineConfig {
                 end: config.processing.end.clone(),
                 no_inject_fields: config.processing.no_inject_fields,
                 inject_prefix: config.processing.inject_prefix.clone(),
-                on_error: config.processing.on_error.clone().into(),
                 error_report: config.processing.error_report.clone(),
                 levels: config.processing.levels.clone(),
                 exclude_levels: config.processing.exclude_levels.clone(),
@@ -90,6 +89,7 @@ impl PipelineConfig {
                 take_limit: config.processing.take_limit,
                 strict: config.processing.strict,
                 verbose: config.processing.verbose,
+                quiet: config.processing.quiet,
             },
             performance: PipelinePerformanceConfig {
                 parallel: config.performance.parallel,
@@ -147,7 +147,7 @@ mod unix;
 use anyhow::Result;
 
 // Re-export CLI types for convenience (they live in cli module now)
-pub use cli::{Cli, ErrorStrategy, FileOrder, InputFormat, OutputFormat};
+pub use cli::{Cli, FileOrder, InputFormat, OutputFormat};
 
 use parallel::{ParallelConfig, ParallelProcessor};
 use pipeline::{
@@ -224,14 +224,11 @@ pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
         let mut output = output;
         run_pipeline_sequential(config, &mut output)?;
         let tracking_data = crate::rhai_functions::tracking::get_thread_tracking_state();
-        let final_stats = if config.output.stats {
-            stats_finish_processing();
-            let mut stats = get_thread_stats();
-            stats.extract_discovered_from_tracking(&tracking_data);
-            Some(stats)
-        } else {
-            None
-        };
+        // Always collect stats for error reporting, even if --stats not used  
+        stats_finish_processing();
+        let mut stats = get_thread_stats();
+        stats.extract_discovered_from_tracking(&tracking_data);
+        let final_stats = Some(stats);
         
         Ok(PipelineResult {
             stats: final_stats,
@@ -279,7 +276,6 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
             end: config.processing.end.clone(),
             no_inject_fields: config.processing.no_inject_fields,
             inject_prefix: config.processing.inject_prefix.clone(),
-            on_error: config.processing.on_error.clone().into(),
             error_report: config.processing.error_report.clone(),
             levels: config.processing.levels.clone(),
             exclude_levels: config.processing.exclude_levels.clone(),
@@ -288,6 +284,7 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
             take_limit: config.processing.take_limit,
             strict: config.processing.strict,
             verbose: config.processing.verbose,
+            quiet: config.processing.quiet,
         },
         performance: config::PerformanceConfig {
             parallel: config.performance.parallel,
@@ -388,12 +385,9 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     }
 
     // Return both stats and tracking data
+    // Always collect stats for error reporting, even if --stats not used
     Ok(PipelineResult {
-        stats: if config.output.stats {
-            Some(processor.get_final_stats())
-        } else {
-            None
-        },
+        stats: Some(processor.get_final_stats()),
         success: !SHOULD_TERMINATE.load(Ordering::Relaxed),
         tracking_data: parallel_tracked,
     })
@@ -437,7 +431,6 @@ pub fn run_pipeline_sequential_with_config<W: Write>(
             end: config.processing.end.clone(),
             no_inject_fields: config.processing.no_inject_fields,
             inject_prefix: config.processing.inject_prefix.clone(),
-            on_error: config.processing.on_error.clone().into(),
             error_report: config.processing.error_report.clone(),
             levels: config.processing.levels.clone(),
             exclude_levels: config.processing.exclude_levels.clone(),
@@ -446,6 +439,7 @@ pub fn run_pipeline_sequential_with_config<W: Write>(
             take_limit: config.processing.take_limit,
             strict: config.processing.strict,
             verbose: config.processing.verbose,
+            quiet: config.processing.quiet,
         },
         performance: config::PerformanceConfig {
             parallel: config.performance.parallel,

@@ -140,6 +140,10 @@ pub struct Cli {
     #[arg(short = 'v', long = "verbose", help_heading = "Error Handling")]
     pub verbose: bool,
 
+    /// Suppress error summary (quiet mode)
+    #[arg(short = 'q', long = "quiet", help_heading = "Error Handling")]
+    pub quiet: bool,
+
     /// Disable field auto-injection
     #[arg(long = "no-inject", help_heading = "Processing Options")]
     pub no_inject_fields: bool,

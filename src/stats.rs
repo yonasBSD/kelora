@@ -187,4 +187,40 @@ impl ProcessingStats {
 
         output.trim_end().to_string()
     }
+
+    /// Check if any errors occurred during processing
+    pub fn has_errors(&self) -> bool {
+        self.lines_errors > 0
+    }
+
+    /// Format a concise error summary for default output (when errors occur)
+    pub fn format_error_summary(&self) -> String {
+        if !self.has_errors() {
+            return String::new();
+        }
+
+        let mut parts = Vec::new();
+
+        // Show parse errors
+        if self.lines_errors > 0 {
+            parts.push(format!("{} parse error{}", 
+                self.lines_errors, 
+                if self.lines_errors == 1 { "" } else { "s" }
+            ));
+        }
+
+        // Show events filtered (could indicate filter errors converted to false)
+        if self.events_filtered > 0 {
+            parts.push(format!("{} event{} filtered", 
+                self.events_filtered,
+                if self.events_filtered == 1 { "" } else { "s" }
+            ));
+        }
+
+        if parts.is_empty() {
+            return String::new();
+        }
+
+        format!("⚠️  Processing completed with {}", parts.join(", "))
+    }
 }

@@ -7,40 +7,6 @@ thread_local! {
     pub static THREAD_TRACKING_STATE: RefCell<HashMap<String, Dynamic>> = RefCell::new(HashMap::new());
 }
 
-// Error tracking for summary collection in parallel mode
-pub fn track_error(error_type: &str, message: &str) {
-    THREAD_TRACKING_STATE.with(|state| {
-        let mut state = state.borrow_mut();
-
-        // Track error count
-        let count_key = format!("__kelora_error_count_{}", error_type);
-        let count = state
-            .get(&count_key)
-            .cloned()
-            .unwrap_or(Dynamic::from(0i64));
-        let new_count = count.as_int().unwrap_or(0) + 1;
-        state.insert(count_key.clone(), Dynamic::from(new_count));
-        state.insert(format!("__op_{}", count_key), Dynamic::from("count"));
-
-        // Track error examples (up to 3 per type)
-        let examples_key = format!("__kelora_error_examples_{}", error_type);
-        let current = state
-            .get(&examples_key)
-            .cloned()
-            .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
-
-        if let Ok(mut arr) = current.into_array() {
-            if arr.len() < 3 {
-                arr.push(Dynamic::from(message.to_string()));
-                state.insert(examples_key.clone(), Dynamic::from(arr));
-                state.insert(
-                    format!("__op_{}", examples_key),
-                    Dynamic::from("error_examples"),
-                );
-            }
-        }
-    });
-}
 
 pub fn register_functions(engine: &mut Engine) {
     // Track functions using thread-local storage - clean user API

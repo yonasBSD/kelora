@@ -202,14 +202,22 @@ fn main() -> Result<()> {
                 }
             }
 
-            // Print stats if enabled (only if not terminated)
-            if lib_config.output.stats && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+            // Print output based on configuration (only if not terminated)
+            if !SHOULD_TERMINATE.load(Ordering::Relaxed) {
                 if let Some(ref s) = pipeline_result.stats {
-                    stderr
-                        .writeln(&lib_config.format_stats_message(
-                            &s.format_stats(lib_config.input.multiline.is_some()),
-                        ))
-                        .unwrap_or(());
+                    if lib_config.output.stats {
+                        // Full stats when --stats flag is used
+                        stderr
+                            .writeln(&lib_config.format_stats_message(
+                                &s.format_stats(lib_config.input.multiline.is_some()),
+                            ))
+                            .unwrap_or(());
+                    } else if s.has_errors() && !lib_config.processing.quiet {
+                        // Error summary by default when errors occur (unless --quiet)
+                        stderr
+                            .writeln(&lib_config.format_error_message(&s.format_error_summary()))
+                            .unwrap_or(());
+                    }
                 }
             }
             pipeline_result.stats
@@ -222,20 +230,26 @@ fn main() -> Result<()> {
         }
     };
 
-    // Check if we were terminated by a signal and print stats
+    // Check if we were terminated by a signal and print output
     if SHOULD_TERMINATE.load(Ordering::Relaxed) {
-        if lib_config.output.stats {
-            if let Some(stats) = final_stats {
+        if let Some(stats) = final_stats {
+            if lib_config.output.stats {
+                // Full stats when --stats flag is used
                 stderr
                     .writeln(&lib_config.format_stats_message(
                         &stats.format_stats(lib_config.input.multiline.is_some()),
                     ))
                     .unwrap_or(());
-            } else {
+            } else if stats.has_errors() && !lib_config.processing.quiet {
+                // Error summary by default when errors occur (unless --quiet)
                 stderr
-                    .writeln(&lib_config.format_stats_message("Processing interrupted"))
+                    .writeln(&lib_config.format_error_message(&stats.format_error_summary()))
                     .unwrap_or(());
             }
+        } else if lib_config.output.stats {
+            stderr
+                .writeln(&lib_config.format_stats_message("Processing interrupted"))
+                .unwrap_or(());
         }
         ExitCode::SignalInt.exit();
     }
