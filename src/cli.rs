@@ -157,6 +157,14 @@ pub struct Cli {
     #[arg(long = "error-report-file", help_heading = "Error Handling")]
     pub error_report_file: Option<String>,
 
+    /// Exit on first error (fail-fast behavior)
+    #[arg(long = "strict", help_heading = "Error Handling")]
+    pub strict: bool,
+
+    /// Show detailed error information
+    #[arg(short = 'v', long = "verbose", help_heading = "Error Handling")]
+    pub verbose: bool,
+
     /// Disable field auto-injection
     #[arg(long = "no-inject", help_heading = "Processing Options")]
     pub no_inject_fields: bool,

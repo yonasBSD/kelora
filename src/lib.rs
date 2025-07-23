@@ -47,6 +47,8 @@ pub struct PipelineProcessingConfig {
     pub window_size: usize,
     pub timestamp_filter: Option<config::TimestampFilterConfig>,
     pub take_limit: Option<usize>,
+    pub strict: bool,
+    pub verbose: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -86,6 +88,8 @@ impl PipelineConfig {
                 window_size: config.processing.window_size,
                 timestamp_filter: config.processing.timestamp_filter.clone(),
                 take_limit: config.processing.take_limit,
+                strict: config.processing.strict,
+                verbose: config.processing.verbose,
             },
             performance: PipelinePerformanceConfig {
                 parallel: config.performance.parallel,
@@ -282,6 +286,8 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
             window_size: config.processing.window_size,
             timestamp_filter: config.processing.timestamp_filter.clone(),
             take_limit: config.processing.take_limit,
+            strict: config.processing.strict,
+            verbose: config.processing.verbose,
         },
         performance: config::PerformanceConfig {
             parallel: config.performance.parallel,
@@ -438,6 +444,8 @@ pub fn run_pipeline_sequential_with_config<W: Write>(
             window_size: config.processing.window_size,
             timestamp_filter: config.processing.timestamp_filter.clone(),
             take_limit: config.processing.take_limit,
+            strict: config.processing.strict,
+            verbose: config.processing.verbose,
         },
         performance: config::PerformanceConfig {
             parallel: config.performance.parallel,

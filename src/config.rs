@@ -85,6 +85,10 @@ pub struct ProcessingConfig {
     pub timestamp_filter: Option<TimestampFilterConfig>,
     /// Limit output to the first N events (None = no limit)
     pub take_limit: Option<usize>,
+    /// Exit on first error (fail-fast behavior) - new resiliency model
+    pub strict: bool,
+    /// Show detailed error information - new resiliency model
+    pub verbose: bool,
 }
 
 /// Performance configuration
@@ -503,6 +507,8 @@ impl KeloraConfig {
                 window_size: cli.window_size.unwrap_or(0),
                 timestamp_filter: None, // Will be set in main() after parsing since/until
                 take_limit: cli.take,
+                strict: cli.strict,
+                verbose: cli.verbose,
             },
             performance: PerformanceConfig {
                 parallel: cli.parallel,
@@ -580,6 +586,8 @@ impl Default for KeloraConfig {
                 window_size: 0,
                 timestamp_filter: None,
                 take_limit: None,
+                strict: false,
+                verbose: false,
             },
             performance: PerformanceConfig {
                 parallel: false,
