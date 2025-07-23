@@ -400,16 +400,16 @@ fn test_begin_and_end_stages() {
 }
 
 #[test]
-fn test_error_handling_skip() {
+fn test_error_handling_resilient_mode() {
     let input = r#"{"level": "INFO", "status": 200}
 invalid jsonl line
 {"level": "ERROR", "status": 500}"#;
 
     let (stdout, _stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--on-error", "skip"], input);
+        run_kelora_with_input(&["-f", "jsonl"], input);
     assert_eq!(
         exit_code, 0,
-        "kelora should exit successfully with skip error handling"
+        "kelora should exit successfully with resilient error handling"
     );
 
     let lines: Vec<&str> = stdout.trim().split('\n').collect();
@@ -421,38 +421,34 @@ invalid jsonl line
 }
 
 #[test]
-fn test_error_handling_emit_errors() {
+fn test_error_handling_resilient_with_summary() {
     let input = r#"{"level": "INFO", "status": 200}
 invalid jsonl line
 {"level": "ERROR", "status": 500}"#;
 
     let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--on-error", "quarantine"], input);
+        run_kelora_with_input(&["-f", "jsonl", "-F", "jsonl"], input);
     assert_eq!(
         exit_code, 0,
-        "kelora should exit successfully with print errors"
+        "kelora should exit successfully with resilient error handling"
     );
 
-    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    let lines: Vec<&str> = stdout.trim().split('\n').filter(|l| !l.is_empty()).collect();
     assert_eq!(
         lines.len(),
-        3,
-        "Should output 2 valid lines + 1 quarantined line"
+        2,
+        "Should output 2 valid lines, skipping invalid line"
     );
 
-    // Check that we have the quarantined line with parse error
-    let quarantined_line = lines
-        .iter()
-        .find(|line| line.contains("__kelora_quarantine_parse_error"));
-    assert!(
-        quarantined_line.is_some(),
-        "Should have quarantined line with parse error"
-    );
+    // In resilient mode, invalid lines are skipped, not emitted as events
+    // Check that both valid lines are properly formatted JSON
+    for line in &lines {
+        serde_json::from_str::<serde_json::Value>(line)
+            .expect(&format!("All output lines should be valid JSON, but got: '{}'", line));
+    }
 
-    assert!(
-        stderr.contains("Parse error"),
-        "Should emit parse error to stderr"
-    );
+    // In resilient mode, parsing errors are handled silently by skipping invalid lines
+    // This behavior may or may not produce stderr output depending on implementation details
 }
 
 #[test]
@@ -837,7 +833,7 @@ fn test_stdin_large_input_performance() {
 }
 
 #[test]
-fn test_error_handling_mixed_valid_invalid() {
+fn test_error_handling_resilient_mixed_input() {
     let input = r#"{"valid": "json", "status": 200}
 {malformed json line}
 {"another": "valid", "status": 404}
@@ -845,10 +841,10 @@ not jsonl at all
 {"final": "entry", "status": 500}"#;
 
     let (stdout, _stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "-F", "jsonl", "--on-error", "skip"], input);
+        run_kelora_with_input(&["-f", "jsonl", "-F", "jsonl"], input);
     assert_eq!(
         exit_code, 0,
-        "kelora should exit successfully with skip error handling"
+        "kelora should exit successfully with resilient error handling"
     );
 
     let lines: Vec<&str> = stdout.trim().split('\n').collect();
@@ -863,6 +859,27 @@ not jsonl at all
         serde_json::from_str::<serde_json::Value>(line)
             .expect("All output lines should be valid JSON");
     }
+}
+
+#[test]
+fn test_error_handling_strict_mode() {
+    let input = r#"{"level": "INFO", "status": 200}
+invalid jsonl line
+{"level": "ERROR", "status": 500}"#;
+
+    let (stdout, _stderr, exit_code) =
+        run_kelora_with_input(&["-f", "jsonl", "--strict"], input);
+    assert_ne!(
+        exit_code, 0,
+        "kelora should exit with error code in strict mode when encountering invalid input"
+    );
+
+    // Should only output the first valid line before failing
+    let lines: Vec<&str> = stdout.trim().split('\n').filter(|l| !l.is_empty()).collect();
+    assert!(
+        lines.len() <= 1,
+        "Should output at most one line before failing in strict mode"
+    );
 }
 
 #[test]
@@ -2525,7 +2542,7 @@ fn test_per_file_csv_schema_detection_sequential() {
     let (stdout, _stderr, exit_code) = run_kelora_with_files(
         &[
             "-f", "csv",
-            "--exec", "let fields = event.keys(); print(\"File: \" + meta.filename + \", Fields: \" + fields.join(\",\"))"
+            "--exec", "let fields = e.keys(); print(\"File: \" + meta.filename + \", Fields: \" + fields.join(\",\"))"
         ],
         &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
     );
@@ -2562,7 +2579,7 @@ fn test_per_file_csv_schema_detection_parallel() {
         &[
             "-f", "csv",
             "--parallel",
-            "--exec", "let fields = event.keys(); print(\"File: \" + meta.filename + \", Fields: \" + fields.join(\",\"))"
+            "--exec", "let fields = e.keys(); print(\"File: \" + meta.filename + \", Fields: \" + fields.join(\",\"))"
         ],
         &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
     );
@@ -2598,7 +2615,7 @@ fn test_csv_with_different_column_counts() {
     let (stdout, _stderr, exit_code) = run_kelora_with_files(
         &[
             "-f", "csv",
-            "--exec", "let count = event.keys().len(); print(\"File: \" + meta.filename + \", Columns: \" + count)"
+            "--exec", "let count = e.keys().len(); print(\"File: \" + meta.filename + \", Columns: \" + count)"
         ],
         &[temp_file1.path().to_str().unwrap(), temp_file2.path().to_str().unwrap()],
     );

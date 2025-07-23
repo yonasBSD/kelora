@@ -312,29 +312,15 @@ impl ScriptStage for TimestampFilterStage {
         let event_timestamp = match event.parsed_ts {
             Some(ts) => ts,
             None => {
-                // No timestamp available - behavior depends on --on-error setting
-                match ctx.config.on_error {
-                    crate::ErrorStrategy::Skip => {
-                        // Filter out events without valid timestamps
-                        return ScriptResult::Skip;
-                    }
-                    crate::ErrorStrategy::Quarantine => {
-                        // Pass through but print warning (same behavior as continue for timestamp issues)
-                        eprintln!(
-                            "{}",
-                            crate::config::format_error_message_auto(
-                                "Event has no valid timestamp for --since/--until filtering (passing through)"
-                            )
-                        );
-                        return ScriptResult::Emit(event);
-                    }
-                    crate::ErrorStrategy::Abort => {
-                        // Stop processing on missing timestamp
-                        return ScriptResult::Error(
-                            "Event has no valid timestamp for --since/--until filtering"
-                                .to_string(),
-                        );
-                    }
+                // No timestamp available - use new resiliency model
+                if ctx.config.strict {
+                    // Stop processing on missing timestamp in strict mode
+                    return ScriptResult::Error(
+                        "Event has no valid timestamp for --since/--until filtering".to_string(),
+                    );
+                } else {
+                    // Filter out events without valid timestamps (resilient mode)
+                    return ScriptResult::Skip;
                 }
             }
         };
@@ -377,7 +363,6 @@ mod tests {
         // Create dummy context
         let mut ctx = PipelineContext {
             config: PipelineConfig {
-                on_error: crate::ErrorStrategy::Quarantine,
                 error_report: crate::config::ErrorReportConfig {
                     style: crate::config::ErrorReportStyle::Summary,
                     file: None,
@@ -427,7 +412,6 @@ mod tests {
         // Create dummy context
         let mut ctx = PipelineContext {
             config: PipelineConfig {
-                on_error: crate::ErrorStrategy::Quarantine,
                 error_report: crate::config::ErrorReportConfig {
                     style: crate::config::ErrorReportStyle::Summary,
                     file: None,
@@ -476,7 +460,6 @@ mod tests {
         // Create dummy context
         let mut ctx = PipelineContext {
             config: PipelineConfig {
-                on_error: crate::ErrorStrategy::Quarantine,
                 error_report: crate::config::ErrorReportConfig {
                     style: crate::config::ErrorReportStyle::Summary,
                     file: None,

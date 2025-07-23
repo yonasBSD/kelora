@@ -175,20 +175,20 @@ mod tests {
     fn test_get_path_existing() {
         let event = create_test_event();
         let result = get_path(event.clone(), "name".into(), Dynamic::from("default"));
-        assert_eq!(result.as_string().unwrap(), "alice");
+        assert_eq!(result.into_string().unwrap(), "alice");
         
         let result = get_path(event, "user.role".into(), Dynamic::from("guest"));
-        assert_eq!(result.as_string().unwrap(), "admin");
+        assert_eq!(result.into_string().unwrap(), "admin");
     }
 
     #[test]
     fn test_get_path_missing() {
         let event = create_test_event();
         let result = get_path(event.clone(), "missing".into(), Dynamic::from("default"));
-        assert_eq!(result.as_string().unwrap(), "default");
+        assert_eq!(result.into_string().unwrap(), "default");
         
         let result = get_path(event, "user.missing".into(), Dynamic::from("guest"));
-        assert_eq!(result.as_string().unwrap(), "guest");
+        assert_eq!(result.into_string().unwrap(), "guest");
     }
 
     #[test]
@@ -211,11 +211,25 @@ mod tests {
 
     #[test]
     fn test_to_number() {
-        assert_eq!(to_number(Dynamic::from(42), Dynamic::from(0)).as_int().unwrap(), 42);
-        assert_eq!(to_number(Dynamic::from(3.14), Dynamic::from(0.0)).as_float().unwrap(), 3.14);
-        assert_eq!(to_number(Dynamic::from("123"), Dynamic::from(0)).as_int().unwrap(), 123);
-        assert_eq!(to_number(Dynamic::from("12.5"), Dynamic::from(0.0)).as_float().unwrap(), 12.5);
-        assert_eq!(to_number(Dynamic::from("invalid"), Dynamic::from(999)).as_int().unwrap(), 999);
+        // Test integer input
+        let result = to_number(Dynamic::from(42i64), Dynamic::from(0i64));
+        assert_eq!(result.as_int().unwrap(), 42i64);
+        
+        // Test float input
+        let result = to_number(Dynamic::from(3.14), Dynamic::from(0.0));
+        assert_eq!(result.as_float().unwrap(), 3.14);
+        
+        // Test string integer input
+        let result = to_number(Dynamic::from("123"), Dynamic::from(0i64));
+        assert_eq!(result.as_int().unwrap(), 123i64);
+        
+        // Test string float input  
+        let result = to_number(Dynamic::from("12.5"), Dynamic::from(0.0));
+        assert_eq!(result.as_float().unwrap(), 12.5);
+        
+        // Test invalid input with default
+        let result = to_number(Dynamic::from("invalid"), Dynamic::from(999i64));
+        assert_eq!(result.as_int().unwrap(), 999i64);
     }
 
     #[test]
@@ -224,8 +238,8 @@ mod tests {
         assert_eq!(to_bool(Dynamic::from("yes"), Dynamic::from(false)).as_bool().unwrap(), true);
         assert_eq!(to_bool(Dynamic::from("1"), Dynamic::from(false)).as_bool().unwrap(), true);
         assert_eq!(to_bool(Dynamic::from("false"), Dynamic::from(true)).as_bool().unwrap(), false);
-        assert_eq!(to_bool(Dynamic::from(1), Dynamic::from(false)).as_bool().unwrap(), true);
-        assert_eq!(to_bool(Dynamic::from(0), Dynamic::from(true)).as_bool().unwrap(), false);
+        assert_eq!(to_bool(Dynamic::from(1i64), Dynamic::from(false)).as_bool().unwrap(), true);
+        assert_eq!(to_bool(Dynamic::from(0i64), Dynamic::from(true)).as_bool().unwrap(), false);
         assert_eq!(to_bool(Dynamic::from("invalid"), Dynamic::from(true)).as_bool().unwrap(), true);
     }
 }
