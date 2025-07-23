@@ -403,7 +403,7 @@ impl RhaiEngine {
 
         let mut scope_template = Scope::new();
         scope_template.push("line", "");
-        scope_template.push("event", rhai::Map::new());
+        scope_template.push("e", rhai::Map::new());
         scope_template.push("meta", rhai::Map::new());
 
         Self {
@@ -747,8 +747,8 @@ impl RhaiEngine {
     }
 
     fn update_event_from_scope(&self, event: &mut Event, scope: &Scope) {
-        // Capture mutations made directly to the `event` map
-        if let Some(obj) = scope.get_value::<Map>("event") {
+        // Capture mutations made directly to the `e` event map
+        if let Some(obj) = scope.get_value::<Map>("e") {
             for (k, v) in obj {
                 event.fields.insert(k.to_string(), v.clone());
             }
@@ -756,7 +756,7 @@ impl RhaiEngine {
 
         // Also include top-level vars (e.g. `let x = ...`)
         for (name, _constant, value) in scope.iter() {
-            if name != "line" && name != "event" && name != "meta" && name != "window" {
+            if name != "line" && name != "e" && name != "meta" && name != "window" {
                 event.fields.insert(name.to_string(), value.clone());
             }
         }
