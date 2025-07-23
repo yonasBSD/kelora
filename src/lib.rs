@@ -739,11 +739,12 @@ fn process_line_sequential<W: Write>(
                 stats_add_error();
             }
 
-            // Handle error based on strategy
-            if let config::ErrorStrategy::Abort = config.processing.on_error {
+            // Handle error based on new resiliency model
+            if config.processing.strict {
                 return Err(e);
             }
-            // For other strategies, we continue processing
+            // Default resilient mode: continue processing
+            
         }
     }
 

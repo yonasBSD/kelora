@@ -1060,11 +1060,13 @@ impl ParallelProcessor {
                     }
                     Err(e) => {
                         // Error handling and stats tracking is already done in pipeline.process_line()
-                        // based on the ctx.config.on_error strategy
-                        match ctx.config.on_error {
-                            crate::ErrorStrategy::Abort => return Err(e),
-                            _ => continue, // Skip, Quarantine all continue
+                        // New resiliency model: check strict flag
+                        if ctx.config.strict {
+                            return Err(e);
+                        } else {
+                            continue; // Skip in default resilient mode
                         }
+                        
                     }
                 }
             }

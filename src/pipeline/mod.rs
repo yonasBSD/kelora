@@ -268,56 +268,15 @@ impl Pipeline {
                         rhai::Dynamic::from("count"),
                     );
 
-                    match ctx.config.on_error {
-                        crate::ErrorStrategy::Skip => return Ok(results),
-                        crate::ErrorStrategy::Abort => return Err(err),
-                        crate::ErrorStrategy::Quarantine => {
-                            // Create empty event with error info in meta
-                            let mut quarantined_event = crate::event::Event {
-                                original_line: chunk.clone(),
-                                ..Default::default()
-                            };
-
-                            // Set metadata from context
-                            if let Some(line_num) = ctx.meta.line_number {
-                                quarantined_event.set_metadata(line_num, ctx.meta.filename.clone());
-                            }
-
-                            // Add quarantine metadata that will be accessible via meta in Rhai
-                            // This is handled by the engine when setting up the Rhai scope
-                            quarantined_event.fields.insert(
-                                "__kelora_quarantine_parse_error".to_string(),
-                                rhai::Dynamic::from(err.to_string()),
-                            );
-
-                            // Handle error reporting
-                            match ctx.config.error_report.style {
-                                crate::config::ErrorReportStyle::Off => {
-                                    // Suppress error output
-                                }
-                                crate::config::ErrorReportStyle::Print => {
-                                    // Print each error immediately
-                                    eprintln!(
-                                        "{}",
-                                        crate::config::format_error_message_auto(&format!(
-                                            "Parse error (quarantined): {}",
-                                            err
-                                        ))
-                                    );
-                                }
-                                crate::config::ErrorReportStyle::Summary => {
-                                    // Track error for summary collection
-                                    crate::rhai_functions::tracking::track_error(
-                                        "Medium",
-                                        &format!("Parse error (quarantined): {}", err),
-                                    );
-                                }
-                            }
-
-                            // Use the quarantined event and continue processing
-                            quarantined_event
-                        } // Note: Old Stub behavior removed - using Skip instead
+                    // New resiliency model: skip unparseable lines by default,
+                    // only propagate errors in strict mode
+                    if ctx.config.strict {
+                        return Err(err);
+                    } else {
+                        // Skip this line and continue processing
+                        return Ok(results);
                     }
+
                 }
             };
 
