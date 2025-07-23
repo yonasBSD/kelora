@@ -610,22 +610,11 @@ fn create_timestamp_format_config(cli: &crate::Cli) -> TimestampFormatConfig {
 
 /// Parse error report configuration from CLI
 fn parse_error_report_config(cli: &crate::Cli) -> ErrorReportConfig {
-    let style = if let Some(ref error_report) = cli.error_report {
-        // Convert CLI ErrorReportStyle to config ErrorReportStyle
-        // Using format strings to avoid module path issues
-        match format!("{:?}", error_report).as_str() {
-            "Off" => ErrorReportStyle::Off,
-            "Summary" => ErrorReportStyle::Summary,
-            "Print" => ErrorReportStyle::Print,
-            _ => ErrorReportStyle::Summary, // fallback
-        }
+    // Default error report style based on new resiliency model
+    let style = if cli.strict {
+        ErrorReportStyle::Print  // Show each error immediately in strict mode
     } else {
-        // Default error report style based on new resiliency model
-        if cli.strict {
-            ErrorReportStyle::Print  // Show each error immediately in strict mode
-        } else {
-            ErrorReportStyle::Summary  // Show summary in resilient mode
-        }
+        ErrorReportStyle::Summary  // Show summary in resilient mode
     };
 
     ErrorReportConfig {

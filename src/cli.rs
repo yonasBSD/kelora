@@ -36,19 +36,7 @@ pub enum OutputFormat {
     Null,
 }
 
-#[derive(clap::ValueEnum, Clone, Debug)]
-pub enum ErrorStrategy {
-    Abort,
-    Skip,
-    Quarantine,
-}
 
-#[derive(clap::ValueEnum, Clone, Debug)]
-pub enum ErrorReportStyle {
-    Off,
-    Summary,
-    Print,
-}
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum FileOrder {
@@ -139,21 +127,8 @@ pub struct Cli {
     #[arg(long = "window", help_heading = "Processing Options")]
     pub window_size: Option<usize>,
 
-    /// What to do when errors occur: abort (stop on first error), skip (skip invalid input), continue (process all lines)
-    #[arg(
-        short = 'x',
-        long = "on-error",
-        value_enum,
-        default_value = "quarantine",
-        help_heading = "Error Handling"
-    )]
-    pub on_error: ErrorStrategy,
 
-    /// How to report errors: off (suppress), summary (grouped), print (each error). Defaults: abort->print, skip->summary, quarantine->summary
-    #[arg(long = "error-report", value_enum, help_heading = "Error Handling")]
-    pub error_report: Option<ErrorReportStyle>,
-
-    /// File to write error reports to (used with --error-report)
+    /// File to write error reports to
     #[arg(long = "error-report-file", help_heading = "Error Handling")]
     pub error_report_file: Option<String>,
 

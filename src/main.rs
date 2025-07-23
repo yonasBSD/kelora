@@ -477,16 +477,7 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
         }
     }
 
-    if let Some(error_report) = config_file.defaults.get("error_report") {
-        if cli.error_report.is_none() {
-            cli.error_report = match error_report.as_str() {
-                "off" => Some(kelora::cli::ErrorReportStyle::Off),
-                "summary" => Some(kelora::cli::ErrorReportStyle::Summary),
-                "print" => Some(kelora::cli::ErrorReportStyle::Print),
-                _ => None,
-            };
-        }
-    }
+    // Note: error_report configuration removed in resiliency model - use --strict/--verbose flags instead
 
     if let Some(error_report_file) = config_file.defaults.get("error_report_file") {
         if cli.error_report_file.is_none() {
