@@ -330,13 +330,15 @@ fn test_events_without_timestamps() {
         stdout.contains("with timestamp"),
         "Should include event with timestamp"
     );
+    // In the new resiliency model, events without timestamps are filtered out
+    // when using --since/--until filters
     assert!(
-        stdout.contains("without timestamp"),
-        "Should include events without timestamps (pass through)"
+        !stdout.contains("without timestamp"),
+        "Should filter out events without timestamps in resilient mode"
     );
     assert!(
-        stdout.contains("also without timestamp"),
-        "Should include all events without timestamps"
+        !stdout.contains("also without timestamp"),
+        "Should filter out all events without valid timestamps"
     );
 }
 
@@ -359,14 +361,37 @@ fn test_timestamp_filtering_with_line_format() {
         "kelora should exit successfully. stderr: {}",
         stderr
     );
-    // For line format, timestamps aren't automatically parsed, so both lines should appear
+    // For line format, timestamps aren't automatically parsed to event.parsed_ts,
+    // so events without parsed timestamps are filtered out when using --since/--until
     assert!(
-        stdout.contains("old log line"),
-        "Line format doesn't parse timestamps"
+        stdout.is_empty() || stdout.trim().is_empty(),
+        "Line format without parsed timestamps should be filtered out when using --since"
     );
+}
+
+#[test]
+fn test_events_without_timestamps_strict_mode() {
+    let with_ts = get_test_timestamp_iso(-30);
+
+    let input = format!(
+        r#"{{"ts": "{}", "level": "info", "msg": "with timestamp"}}
+{{"level": "info", "msg": "without timestamp"}}"#,
+        with_ts
+    );
+
+    let since_ts = get_test_timestamp_iso(-60); // 1 hour ago
+    let (stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "jsonl", "--since", &since_ts, "--strict"], &input);
+
+    assert_ne!(
+        exit_code, 0,
+        "kelora should exit with error in strict mode when encountering event without timestamp"
+    );
+    
+    // Should process the first event with timestamp but fail on the second
     assert!(
-        stdout.contains("new log line"),
-        "Line format doesn't parse timestamps"
+        stdout.contains("with timestamp"),
+        "Should process first event with timestamp before failing"
     );
 }
 
