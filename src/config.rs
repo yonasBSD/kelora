@@ -75,7 +75,6 @@ pub struct ProcessingConfig {
     pub end: Option<String>,
     pub no_inject_fields: bool,
     pub inject_prefix: Option<String>,
-    pub on_error: ErrorStrategy,
     pub error_report: ErrorReportConfig,
     pub levels: Vec<String>,
     pub exclude_levels: Vec<String>,
@@ -133,13 +132,6 @@ pub enum OutputFormat {
     Null,
 }
 
-/// Error handling strategy
-#[derive(ValueEnum, Clone, Debug)]
-pub enum ErrorStrategy {
-    Abort,
-    Skip,
-    Quarantine,
-}
 
 /// File processing order
 #[derive(ValueEnum, Clone, Debug)]
@@ -500,7 +492,6 @@ impl KeloraConfig {
                 end: cli.end.clone(),
                 no_inject_fields: cli.no_inject_fields,
                 inject_prefix: cli.inject_prefix.clone(),
-                on_error: cli.on_error.clone().into(),
                 error_report: parse_error_report_config(cli),
                 levels: cli.levels.clone(),
                 exclude_levels: cli.exclude_levels.clone(),
@@ -576,7 +567,6 @@ impl Default for KeloraConfig {
                 end: None,
                 no_inject_fields: false,
                 inject_prefix: None,
-                on_error: ErrorStrategy::Quarantine,
                 error_report: ErrorReportConfig {
                     style: ErrorReportStyle::Summary,
                     file: None,
@@ -630,11 +620,11 @@ fn parse_error_report_config(cli: &crate::Cli) -> ErrorReportConfig {
             _ => ErrorReportStyle::Summary, // fallback
         }
     } else {
-        // Default depends on --on-error mode
-        match format!("{:?}", cli.on_error).as_str() {
-            "Abort" => ErrorReportStyle::Print,
-            "Skip" => ErrorReportStyle::Summary,
-            _ => ErrorReportStyle::Summary, // quarantine and fallback
+        // Default error report style based on new resiliency model
+        if cli.strict {
+            ErrorReportStyle::Print  // Show each error immediately in strict mode
+        } else {
+            ErrorReportStyle::Summary  // Show summary in resilient mode
         }
     };
 
@@ -738,25 +728,6 @@ impl From<OutputFormat> for crate::OutputFormat {
     }
 }
 
-impl From<crate::ErrorStrategy> for ErrorStrategy {
-    fn from(strategy: crate::ErrorStrategy) -> Self {
-        match strategy {
-            crate::ErrorStrategy::Skip => ErrorStrategy::Skip,
-            crate::ErrorStrategy::Abort => ErrorStrategy::Abort,
-            crate::ErrorStrategy::Quarantine => ErrorStrategy::Quarantine,
-        }
-    }
-}
-
-impl From<ErrorStrategy> for crate::ErrorStrategy {
-    fn from(strategy: ErrorStrategy) -> Self {
-        match strategy {
-            ErrorStrategy::Skip => crate::ErrorStrategy::Skip,
-            ErrorStrategy::Abort => crate::ErrorStrategy::Abort,
-            ErrorStrategy::Quarantine => crate::ErrorStrategy::Quarantine,
-        }
-    }
-}
 
 impl From<crate::FileOrder> for FileOrder {
     fn from(order: crate::FileOrder) -> Self {

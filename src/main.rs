@@ -27,7 +27,7 @@ use unix::{
 
 // Use CLI types from library
 use kelora::{
-    run_pipeline_with_kelora_config, Cli, ErrorStrategy, FileOrder, InputFormat,
+    run_pipeline_with_kelora_config, Cli, FileOrder, InputFormat,
     KeloraConfig as LibKeloraConfig, MultilineConfig, OutputFormat, TimestampFilterConfig,
 };
 
@@ -412,16 +412,7 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
         }
     }
 
-    if let Some(on_error) = config_file.defaults.get("on_error") {
-        if matches!(cli.on_error, crate::ErrorStrategy::Quarantine) {
-            cli.on_error = match on_error.as_str() {
-                "skip" => crate::ErrorStrategy::Skip,
-                "abort" => crate::ErrorStrategy::Abort,
-                "quarantine" => crate::ErrorStrategy::Quarantine,
-                _ => cli.on_error,
-            };
-        }
-    }
+    // Note: on_error configuration removed in resiliency model - use --strict flag instead
 
     if let Some(file_order) = config_file.defaults.get("file_order") {
         if matches!(cli.file_order, crate::FileOrder::None) {
