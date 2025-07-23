@@ -137,6 +137,10 @@ pub struct PipelineConfig {
     pub color_mode: crate::config::ColorMode,
     /// Timestamp formatting configuration (display-only)
     pub timestamp_formatting: crate::config::TimestampFormatConfig,
+    /// Exit on first error (fail-fast behavior) - new resiliency model
+    pub strict: bool,
+    /// Show detailed error information - new resiliency model
+    pub verbose: bool,
 }
 
 /// Metadata about current processing context

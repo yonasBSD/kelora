@@ -40,7 +40,15 @@ impl ScriptStage for FilterStage {
                     ScriptResult::Skip
                 }
             }
-            Err(e) => ScriptResult::Error(format!("Filter error: {}", e)),
+            Err(e) => {
+                // New resiliency model: filter errors evaluate to false (Skip)
+                // unless in strict mode, where they still propagate as errors
+                if ctx.config.strict {
+                    ScriptResult::Error(format!("Filter error: {}", e))
+                } else {
+                    ScriptResult::Skip
+                }
+            }
         }
     }
 }
@@ -58,24 +66,39 @@ impl ExecStage {
 }
 
 impl ScriptStage for ExecStage {
-    fn apply(&mut self, mut event: Event, ctx: &mut PipelineContext) -> ScriptResult {
+    fn apply(&mut self, event: Event, ctx: &mut PipelineContext) -> ScriptResult {
+        // Atomic execution: work on a copy of the event for rollback behavior
+        let mut event_copy = event.clone();
+        
         let result = if ctx.window.is_empty() {
             // No window context - use standard method
             ctx.rhai
-                .execute_compiled_exec(&self.compiled_exec, &mut event, &mut ctx.tracker)
+                .execute_compiled_exec(&self.compiled_exec, &mut event_copy, &mut ctx.tracker)
         } else {
             // Window context available - use window-aware method
             ctx.rhai.execute_compiled_exec_with_window(
                 &self.compiled_exec,
-                &mut event,
+                &mut event_copy,
                 &ctx.window,
                 &mut ctx.tracker,
             )
         };
 
         match result {
-            Ok(()) => ScriptResult::Emit(event),
-            Err(e) => ScriptResult::Error(format!("Exec error: {}", e)),
+            Ok(()) => {
+                // Success: commit the modified event
+                ScriptResult::Emit(event_copy)
+            }
+            Err(e) => {
+                // New resiliency model: atomic rollback - return original event unchanged
+                // unless in strict mode, where errors still propagate
+                if ctx.config.strict {
+                    ScriptResult::Error(format!("Exec error: {}", e))
+                } else {
+                    // Rollback: return original event unchanged
+                    ScriptResult::Emit(event)
+                }
+            }
         }
     }
 }
@@ -364,6 +387,8 @@ mod tests {
                 inject_prefix: None,
                 color_mode: crate::config::ColorMode::Auto,
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
+                strict: false,
+                verbose: false,
             },
             tracker: std::collections::HashMap::new(),
             window: Vec::new(),
@@ -412,6 +437,8 @@ mod tests {
                 inject_prefix: None,
                 color_mode: crate::config::ColorMode::Auto,
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
+                strict: false,
+                verbose: false,
             },
             tracker: std::collections::HashMap::new(),
             window: Vec::new(),
@@ -459,6 +486,8 @@ mod tests {
                 inject_prefix: None,
                 color_mode: crate::config::ColorMode::Auto,
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
+                strict: false,
+                verbose: false,
             },
             tracker: std::collections::HashMap::new(),
             window: Vec::new(),
