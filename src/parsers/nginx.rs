@@ -229,7 +229,7 @@ impl EventParser for NginxParser {
         } else if let Some(event) = self.try_parse_common(line) {
             Ok(event)
         } else {
-            Err(anyhow::anyhow!("Failed to parse NGINX log line: {}", line))
+            Err(anyhow::anyhow!("Failed to parse NGINX log line: {}", crate::config::format_error_line(line)))
         }
     }
 }

@@ -451,6 +451,17 @@ pub fn format_verbose_error(line_num: Option<usize>, error_type: &str, message: 
     }
 }
 
+/// Format input line for error messages with smart handling of special characters
+pub fn format_error_line(line: &str) -> String {
+    if line.chars().any(|c| c.is_control() && c != '\n') {
+        format!("{:?}", line) // Use Debug for control chars
+    } else if line.ends_with('\n') {
+        format!("{}⏎", line.trim_end()) // Visual newline indicator
+    } else {
+        line.to_string() // Raw for clean content
+    }
+}
+
 impl OutputConfig {
     /// Get the effective keys for filtering, combining core fields with user-specified keys
     pub fn get_effective_keys(&self) -> Vec<String> {
