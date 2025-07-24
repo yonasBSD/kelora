@@ -9,7 +9,7 @@ thread_local! {
 
 /// Unified error tracking function that handles counts, samples, and verbose output
 /// This replaces both stats-based and tracking-based error mechanisms
-pub fn track_error(error_type: &str, line_num: Option<usize>, message: &str, verbose: bool, quiet: bool) {
+pub fn track_error(error_type: &str, line_num: Option<usize>, message: &str, verbose: bool, quiet: bool, config: Option<&crate::pipeline::PipelineConfig>) {
     // Also update stats for the termination case (minimal error count only)
     if error_type == "parse" {
         crate::stats::stats_add_line_error();
@@ -27,10 +27,23 @@ pub fn track_error(error_type: &str, line_num: Option<usize>, message: &str, ver
         state.insert(count_key.clone(), Dynamic::from(new_count));
         state.insert(format!("__op_{}", count_key), Dynamic::from("count"));
         
-        // Always output immediately in verbose mode (unless quiet mode)
+        // Output verbose errors - use ordered capture system for proper interleaving
         if verbose && !quiet {
-            let formatted_error = crate::config::format_verbose_error(line_num, &format!("{} error", error_type), message);
-            crate::rhai_functions::strings::print_verbose_error(formatted_error.clone());
+            let formatted_error = crate::config::format_verbose_error_with_pipeline_config(
+                line_num, 
+                &format!("{} error", error_type), 
+                message, 
+                config
+            );
+            
+            if crate::rhai_functions::strings::is_parallel_mode() {
+                // In parallel mode, capture stderr message for ordered output later
+                crate::rhai_functions::strings::capture_stderr(formatted_error);
+            } else {
+                // In sequential mode, output immediately but also capture for consistency
+                crate::rhai_functions::strings::capture_stderr(formatted_error.clone());
+                eprintln!("{}", formatted_error);
+            }
         }
 
         // Track error samples (max 3 per type) 
@@ -42,7 +55,7 @@ pub fn track_error(error_type: &str, line_num: Option<usize>, message: &str, ver
         if let Ok(mut arr) = current_samples.into_array() {
             // Only store up to 3 samples per error type
             if arr.len() < 3 {
-                let formatted_error = crate::config::format_verbose_error(line_num, &format!("{} error", error_type), message);
+                let formatted_error = crate::config::format_verbose_error_with_pipeline_config(line_num, &format!("{} error", error_type), message, config);
                 arr.push(Dynamic::from(formatted_error));
             }
             

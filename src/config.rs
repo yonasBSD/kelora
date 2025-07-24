@@ -134,7 +134,6 @@ pub enum OutputFormat {
     Null,
 }
 
-
 /// File processing order
 #[derive(ValueEnum, Clone, Debug)]
 pub enum FileOrder {
@@ -434,15 +433,72 @@ pub fn format_error_message_auto(message: &str) -> String {
 
 /// Format a verbose error message with line number and error type
 pub fn format_verbose_error(line_num: Option<usize>, error_type: &str, message: &str) -> String {
-    let use_colors = crate::tty::should_use_colors_with_mode(&ColorMode::Auto);
-    let no_emoji = std::env::var("NO_EMOJI").is_ok();
-    let use_emoji = use_colors && !no_emoji;
+    format_verbose_error_with_config(line_num, error_type, message, None)
+}
 
-    let prefix = if use_emoji {
-        "🧱 kelora:"
+/// Format a verbose error message with explicit configuration
+pub fn format_verbose_error_with_config(line_num: Option<usize>, error_type: &str, message: &str, config: Option<&KeloraConfig>) -> String {
+    let use_colors = crate::tty::should_use_colors_with_mode(&ColorMode::Auto);
+    
+    // Check emoji settings in order of preference: config flag > NO_EMOJI env var
+    let no_emoji = if let Some(cfg) = config {
+        cfg.output.no_emoji || std::env::var("NO_EMOJI").is_ok()
     } else {
-        "kelora:"
+        std::env::var("NO_EMOJI").is_ok()
     };
+    
+    let use_emoji = use_colors && !no_emoji;
+    let prefix = if use_emoji { "🧱" } else { "kelora:" };
+
+    if let Some(line) = line_num {
+        format!("{} line {}: {} - {}", prefix, line, error_type, message)
+    } else {
+        format!("{} {} - {}", prefix, error_type, message)
+    }
+}
+
+/// Print a verbose error message to stderr with proper formatting
+/// Always goes directly to stderr, bypassing any capture mechanisms for immediate output
+pub fn print_verbose_error_to_stderr(line_num: Option<usize>, error_type: &str, message: &str, config: Option<&KeloraConfig>) {
+    // Check if output is suppressed (quiet mode)
+    if let Some(cfg) = config {
+        if cfg.processing.quiet {
+            return;
+        }
+    }
+    
+    let formatted = format_verbose_error_with_config(line_num, error_type, message, config);
+    eprintln!("{}", formatted);
+}
+
+/// Print a verbose error message to stderr with PipelineConfig
+/// Always goes directly to stderr, bypassing any capture mechanisms for immediate output
+pub fn print_verbose_error_to_stderr_pipeline(line_num: Option<usize>, error_type: &str, message: &str, config: Option<&crate::pipeline::PipelineConfig>) {
+    // Check if output is suppressed (quiet mode)
+    if let Some(cfg) = config {
+        if cfg.quiet {
+            return;
+        }
+    }
+    
+    let formatted = format_verbose_error_with_pipeline_config(line_num, error_type, message, config);
+    eprintln!("{}", formatted);
+}
+
+/// Format a verbose error message with PipelineConfig
+pub fn format_verbose_error_with_pipeline_config(line_num: Option<usize>, error_type: &str, message: &str, config: Option<&crate::pipeline::PipelineConfig>) -> String {
+    let color_mode = config.map(|c| &c.color_mode).unwrap_or(&ColorMode::Auto);
+    let use_colors = crate::tty::should_use_colors_with_mode(color_mode);
+    
+    // Check emoji settings in order of preference: config flag > NO_EMOJI env var
+    let no_emoji = if let Some(cfg) = config {
+        cfg.no_emoji || std::env::var("NO_EMOJI").is_ok()
+    } else {
+        std::env::var("NO_EMOJI").is_ok()
+    };
+    
+    let use_emoji = use_colors && !no_emoji;
+    let prefix = if use_emoji { "🧱" } else { "kelora:" };
 
     if let Some(line) = line_num {
         format!("{} line {}: {} - {}", prefix, line, error_type, message)
@@ -456,7 +512,7 @@ pub fn format_error_line(line: &str) -> String {
     if line.chars().any(|c| c.is_control() && c != '\n') {
         format!("{:?}", line) // Use Debug for control chars
     } else if line.ends_with('\n') {
-        format!("{}⏎", line.trim_end()) // Visual newline indicator
+        line.trim_end().to_string() // Suppress newlines, they are an artifact of our handling
     } else {
         line.to_string() // Raw for clean content
     }
@@ -649,9 +705,9 @@ fn create_timestamp_format_config(cli: &crate::Cli) -> TimestampFormatConfig {
 fn parse_error_report_config(cli: &crate::Cli) -> ErrorReportConfig {
     // Default error report style based on new resiliency model
     let style = if cli.strict {
-        ErrorReportStyle::Print  // Show each error immediately in strict mode
+        ErrorReportStyle::Print // Show each error immediately in strict mode
     } else {
-        ErrorReportStyle::Summary  // Show summary in resilient mode
+        ErrorReportStyle::Summary // Show summary in resilient mode
     };
 
     ErrorReportConfig {
@@ -753,7 +809,6 @@ impl From<OutputFormat> for crate::OutputFormat {
         }
     }
 }
-
 
 impl From<crate::FileOrder> for FileOrder {
     fn from(order: crate::FileOrder) -> Self {

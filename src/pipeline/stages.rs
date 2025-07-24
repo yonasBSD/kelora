@@ -47,7 +47,8 @@ impl ScriptStage for FilterStage {
                     ctx.meta.line_number,
                     &format!("Filter error: {}", e),
                     ctx.config.verbose,
-                    ctx.config.quiet
+                    ctx.config.quiet,
+                    Some(&ctx.config)
                 );
 
                 // New resiliency model: filter errors evaluate to false (Skip)
@@ -105,7 +106,8 @@ impl ScriptStage for ExecStage {
                     ctx.meta.line_number,
                     &format!("Exec error: {}", e),
                     ctx.config.verbose,
-                    ctx.config.quiet
+                    ctx.config.quiet,
+                    Some(&ctx.config)
                 );
 
                 // New resiliency model: atomic rollback - return original event unchanged
@@ -393,6 +395,7 @@ mod tests {
                 strict: false,
                 verbose: false,
                 quiet: false,
+                no_emoji: false,
             },
             tracker: std::collections::HashMap::new(),
             window: Vec::new(),
@@ -443,6 +446,7 @@ mod tests {
                 strict: false,
                 verbose: false,
                 quiet: false,
+                no_emoji: false,
             },
             tracker: std::collections::HashMap::new(),
             window: Vec::new(),
@@ -492,6 +496,7 @@ mod tests {
                 strict: false,
                 verbose: false,
                 quiet: false,
+                no_emoji: false,
             },
             tracker: std::collections::HashMap::new(),
             window: Vec::new(),

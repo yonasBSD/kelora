@@ -144,6 +144,8 @@ pub struct PipelineConfig {
     pub verbose: bool,
     /// Suppress error summary (quiet mode) - new resiliency model
     pub quiet: bool,
+    /// Disable emoji in error output
+    pub no_emoji: bool,
 }
 
 /// Metadata about current processing context
@@ -264,7 +266,8 @@ impl Pipeline {
                         ctx.meta.line_number,
                         &err.to_string(),
                         ctx.config.verbose,
-                        ctx.config.quiet
+                        ctx.config.quiet,
+                        Some(&ctx.config)
                     );
 
                     // New resiliency model: skip unparseable lines by default,
@@ -304,7 +307,8 @@ impl Pipeline {
                                         ctx.meta.line_number,
                                         &msg,
                                         ctx.config.verbose,
-                                        ctx.config.quiet
+                                        ctx.config.quiet,
+                                        Some(&ctx.config)
                                     );
 
                                     // New resiliency model: use strict flag
@@ -416,7 +420,8 @@ impl Pipeline {
                         ctx.meta.line_number,
                         &msg,
                         ctx.config.verbose,
-                        ctx.config.quiet
+                        ctx.config.quiet,
+                        Some(&ctx.config)
                     );
 
                     // New resiliency model: use strict flag

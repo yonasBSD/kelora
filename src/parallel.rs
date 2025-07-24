@@ -61,6 +61,7 @@ pub struct ProcessedEvent {
     pub event: Event,
     pub captured_prints: Vec<String>,
     pub captured_eprints: Vec<String>,
+    pub captured_messages: Vec<crate::rhai_functions::strings::CapturedMessage>,
 }
 
 /// Thread-safe statistics tracker for merging worker states
@@ -1043,15 +1044,18 @@ impl ParallelProcessor {
                             crate::rhai_functions::strings::take_captured_prints();
                         let captured_eprints =
                             crate::rhai_functions::strings::take_captured_eprints();
+                        let captured_messages =
+                            crate::rhai_functions::strings::take_captured_messages();
 
                         // If there are captured messages but no formatted results (e.g., filter errors that skip events),
                         // create a dummy event to carry the error messages
-                        if formatted_results.is_empty() && (!captured_prints.is_empty() || !captured_eprints.is_empty()) {
+                        if formatted_results.is_empty() && (!captured_prints.is_empty() || !captured_eprints.is_empty() || !captured_messages.is_empty()) {
                             let dummy_event = Event::default_with_line(String::new());
                             batch_results.push(ProcessedEvent {
                                 event: dummy_event,
                                 captured_prints,
                                 captured_eprints,
+                                captured_messages,
                             });
                         } else {
                             // Convert formatted strings back to events for the result sink
@@ -1063,23 +1067,25 @@ impl ParallelProcessor {
                                     Event::default_with_line(formatted_result.clone());
                                 dummy_event.set_metadata(current_line_num, None);
 
-                                // Each formatted result gets its own copy of the captured prints/eprints
+                                // Each formatted result gets its own copy of the captured prints/eprints/messages
                                 // since they all came from processing the same input line
                                 batch_results.push(ProcessedEvent {
                                     event: dummy_event,
                                     captured_prints: captured_prints.clone(),
                                     captured_eprints: captured_eprints.clone(),
+                                    captured_messages: captured_messages.clone(),
                                 });
                             }
                         }
                     }
                     Err(e) => {
                         // Error handling and stats tracking is already done in pipeline.process_line()
-                        // But we still need to collect any captured eprints for verbose error output
+                        // But we still need to collect any captured eprints/messages for verbose error output
                         let captured_eprints = crate::rhai_functions::strings::take_captured_eprints();
+                        let captured_messages = crate::rhai_functions::strings::take_captured_messages();
                         
                         // In verbose mode, we want to output these error messages even if the event is skipped
-                        if !captured_eprints.is_empty() {
+                        if !captured_eprints.is_empty() || !captured_messages.is_empty() {
                             // Create a dummy processed event just to carry the error messages
                             // This ensures verbose error output is preserved even when events are skipped
                             let dummy_event = Event::default_with_line(String::new());
@@ -1087,6 +1093,7 @@ impl ParallelProcessor {
                                 event: dummy_event,
                                 captured_prints: Vec::new(),
                                 captured_eprints,
+                                captured_messages,
                             });
                         }
                         
@@ -1434,14 +1441,30 @@ impl ParallelProcessor {
                 }
             }
 
-            // First output any captured prints for this specific event (to stdout, not file)
-            for print_msg in &processed.captured_prints {
-                println!("{}", print_msg);
-            }
+            // Output captured messages in order, preserving stdout/stderr streams
+            if !processed.captured_messages.is_empty() {
+                // Use the new ordered message system
+                for message in &processed.captured_messages {
+                    match message {
+                        crate::rhai_functions::strings::CapturedMessage::Stdout(msg) => {
+                            println!("{}", msg);
+                        }
+                        crate::rhai_functions::strings::CapturedMessage::Stderr(msg) => {
+                            eprintln!("{}", msg);
+                        }
+                    }
+                }
+            } else {
+                // Fallback to old system for compatibility
+                // First output any captured prints for this specific event (to stdout, not file)
+                for print_msg in &processed.captured_prints {
+                    println!("{}", print_msg);
+                }
 
-            // Output any captured eprints for this specific event (to stderr)
-            for eprint_msg in &processed.captured_eprints {
-                eprintln!("{}", eprint_msg);
+                // Output any captured eprints for this specific event (to stderr)
+                for eprint_msg in &processed.captured_eprints {
+                    eprintln!("{}", eprint_msg);
+                }
             }
 
             // Then output the event itself to the designated output, skip empty strings

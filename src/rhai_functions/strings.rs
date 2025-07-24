@@ -1,9 +1,17 @@
 use rhai::{Dynamic, Engine};
 use std::cell::RefCell;
 
+/// Represents a captured message with its target stream
+#[derive(Debug, Clone)]
+pub enum CapturedMessage {
+    Stdout(String),
+    Stderr(String),
+}
+
 thread_local! {
     static CAPTURED_PRINTS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     static CAPTURED_EPRINTS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    static CAPTURED_MESSAGES: RefCell<Vec<CapturedMessage>> = const { RefCell::new(Vec::new()) };
     static PARALLEL_MODE: RefCell<bool> = const { RefCell::new(false) };
     static SUPPRESS_SIDE_EFFECTS: RefCell<bool> = const { RefCell::new(false) };
 }
@@ -30,6 +38,28 @@ pub fn take_captured_prints() -> Vec<String> {
 /// Get all captured eprints and clear the buffer
 pub fn take_captured_eprints() -> Vec<String> {
     CAPTURED_EPRINTS.with(|eprints| std::mem::take(&mut *eprints.borrow_mut()))
+}
+
+/// Capture a message in the ordered message system for parallel processing
+pub fn capture_message(message: CapturedMessage) {
+    CAPTURED_MESSAGES.with(|messages| {
+        messages.borrow_mut().push(message);
+    });
+}
+
+/// Capture a stdout message in the ordered system
+pub fn capture_stdout(message: String) {
+    capture_message(CapturedMessage::Stdout(message));
+}
+
+/// Capture a stderr message in the ordered system  
+pub fn capture_stderr(message: String) {
+    capture_message(CapturedMessage::Stderr(message));
+}
+
+/// Get all captured messages in order and clear the buffer
+pub fn take_captured_messages() -> Vec<CapturedMessage> {
+    CAPTURED_MESSAGES.with(|messages| std::mem::take(&mut *messages.borrow_mut()))
 }
 
 /// Clear captured prints without returning them
@@ -70,19 +100,6 @@ pub fn is_suppress_side_effects() -> bool {
     SUPPRESS_SIDE_EFFECTS.with(|flag| *flag.borrow())
 }
 
-/// Print verbose error message with proper formatting and parallel mode support
-pub fn print_verbose_error(message: String) {
-    if is_suppress_side_effects() {
-        return;
-    }
-
-    if is_parallel_mode() {
-        // In parallel mode, capture for worker output (unified tracking handles the rest)
-        capture_eprint(message);
-    } else {
-        eprintln!("{}", message);
-    }
-}
 
 /// Mask IP address for privacy (replace last N octets with 'X')
 fn mask_ip_impl(ip: &str, octets_to_mask: usize) -> String {
@@ -190,7 +207,9 @@ pub fn register_functions(engine: &mut Engine) {
 
         let msg = message.to_string();
         if is_parallel_mode() {
-            capture_eprint(msg);
+            // Use both old capture system (for compatibility) and new ordered system
+            capture_eprint(msg.clone());
+            capture_stderr(msg);
         } else {
             eprintln!("{}", msg);
         }

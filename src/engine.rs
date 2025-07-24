@@ -389,7 +389,9 @@ impl RhaiEngine {
         // Note: suppress_side_effects is false by default in new()
         engine.on_print(|text| {
             if crate::rhai_functions::strings::is_parallel_mode() {
+                // Use both old capture system (for compatibility) and new ordered system
                 crate::rhai_functions::strings::capture_print(text.to_string());
+                crate::rhai_functions::strings::capture_stdout(text.to_string());
             } else {
                 println!("{}", text);
             }

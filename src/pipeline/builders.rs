@@ -87,6 +87,7 @@ impl PipelineBuilder {
                 strict: false,
                 verbose: false,
                 quiet: false,
+                no_emoji: false,
             },
             begin: None,
             end: None,
@@ -625,6 +626,7 @@ pub fn create_pipeline_builder_from_config(
         strict: config.processing.strict,
         verbose: config.processing.verbose,
         quiet: config.processing.quiet,
+        no_emoji: config.output.no_emoji,
     };
 
     let mut builder = PipelineBuilder::new()
