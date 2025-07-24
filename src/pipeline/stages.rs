@@ -41,6 +41,14 @@ impl ScriptStage for FilterStage {
                 }
             }
             Err(e) => {
+                // Track error for reporting even in resilient mode
+                crate::rhai_functions::tracking::track_error(
+                    "rhai",
+                    ctx.meta.line_number,
+                    &format!("Filter error: {}", e),
+                    ctx.config.verbose
+                );
+
                 // New resiliency model: filter errors evaluate to false (Skip)
                 // unless in strict mode, where they still propagate as errors
                 if ctx.config.strict {
@@ -90,6 +98,14 @@ impl ScriptStage for ExecStage {
                 ScriptResult::Emit(event_copy)
             }
             Err(e) => {
+                // Track error for reporting even in resilient mode
+                crate::rhai_functions::tracking::track_error(
+                    "rhai",
+                    ctx.meta.line_number,
+                    &format!("Exec error: {}", e),
+                    ctx.config.verbose
+                );
+
                 // New resiliency model: atomic rollback - return original event unchanged
                 // unless in strict mode, where errors still propagate
                 if ctx.config.strict {
@@ -374,6 +390,7 @@ mod tests {
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
                 verbose: false,
+                quiet: false,
             },
             tracker: std::collections::HashMap::new(),
             window: Vec::new(),
@@ -423,6 +440,7 @@ mod tests {
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
                 verbose: false,
+                quiet: false,
             },
             tracker: std::collections::HashMap::new(),
             window: Vec::new(),
@@ -471,6 +489,7 @@ mod tests {
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
                 verbose: false,
+                quiet: false,
             },
             tracker: std::collections::HashMap::new(),
             window: Vec::new(),

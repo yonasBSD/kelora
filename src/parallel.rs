@@ -83,8 +83,10 @@ impl GlobalTracker {
     pub fn merge_worker_stats(&self, worker_stats: &ProcessingStats) -> Result<()> {
         let mut global_stats = self.processing_stats.lock().unwrap();
         // Don't merge lines_read - that's handled by reader thread
-        // Don't merge output/filtered/errors - these are now handled by tracking system
-        // Only merge timing and other safe stats
+        // Merge error counts (needed for --stats display and termination case)
+        global_stats.lines_errors += worker_stats.lines_errors;
+        global_stats.errors += worker_stats.errors;
+        // Merge other worker stats
         global_stats.files_processed += worker_stats.files_processed;
         global_stats.script_executions += worker_stats.script_executions;
         // Calculate total processing time from global start time
@@ -1034,32 +1036,60 @@ impl ParallelProcessor {
                         // 1. Parsing errors (counted by stats_add_line_error() in pipeline)
                         // 2. Filter rejections (counted by stats_add_event_filtered() in pipeline)
                         // So we don't need to count empty results as filtered here anymore
-                        // Get any prints/eprints that were captured during processing this specific event
+                        
+                        // Always collect any prints/eprints that were captured during processing this specific event
+                        // This includes verbose error messages from filter/exec errors that result in skipped events
                         let captured_prints =
                             crate::rhai_functions::strings::take_captured_prints();
                         let captured_eprints =
                             crate::rhai_functions::strings::take_captured_eprints();
 
-                        // Convert formatted strings back to events for the result sink
-                        // Note: This is a temporary approach during the transition
-                        for formatted_result in formatted_results {
-                            // For now, we'll need to create a dummy event since the result sink expects events
-                            // In a full refactor, we'd change the result sink to handle formatted strings
-                            let mut dummy_event =
-                                Event::default_with_line(formatted_result.clone());
-                            dummy_event.set_metadata(current_line_num, None);
-
-                            // Each formatted result gets its own copy of the captured prints/eprints
-                            // since they all came from processing the same input line
+                        // If there are captured messages but no formatted results (e.g., filter errors that skip events),
+                        // create a dummy event to carry the error messages
+                        if formatted_results.is_empty() && (!captured_prints.is_empty() || !captured_eprints.is_empty()) {
+                            let dummy_event = Event::default_with_line(String::new());
                             batch_results.push(ProcessedEvent {
                                 event: dummy_event,
-                                captured_prints: captured_prints.clone(),
-                                captured_eprints: captured_eprints.clone(),
+                                captured_prints,
+                                captured_eprints,
                             });
+                        } else {
+                            // Convert formatted strings back to events for the result sink
+                            // Note: This is a temporary approach during the transition
+                            for formatted_result in formatted_results {
+                                // For now, we'll need to create a dummy event since the result sink expects events
+                                // In a full refactor, we'd change the result sink to handle formatted strings
+                                let mut dummy_event =
+                                    Event::default_with_line(formatted_result.clone());
+                                dummy_event.set_metadata(current_line_num, None);
+
+                                // Each formatted result gets its own copy of the captured prints/eprints
+                                // since they all came from processing the same input line
+                                batch_results.push(ProcessedEvent {
+                                    event: dummy_event,
+                                    captured_prints: captured_prints.clone(),
+                                    captured_eprints: captured_eprints.clone(),
+                                });
+                            }
                         }
                     }
                     Err(e) => {
                         // Error handling and stats tracking is already done in pipeline.process_line()
+                        // But we still need to collect any captured eprints for verbose error output
+                        let captured_eprints = crate::rhai_functions::strings::take_captured_eprints();
+                        
+                        // In verbose mode, we want to output these error messages even if the event is skipped
+                        if !captured_eprints.is_empty() {
+                            // Create a dummy processed event just to carry the error messages
+                            // This ensures verbose error output is preserved even when events are skipped
+                            let dummy_event = Event::default_with_line(String::new());
+                            batch_results.push(ProcessedEvent {
+                                event: dummy_event,
+                                captured_prints: Vec::new(),
+                                captured_eprints,
+                            });
+                        }
+                        
                         // New resiliency model: check strict flag
                         if ctx.config.strict {
                             return Err(e);

@@ -27,7 +27,13 @@ pub fn track_error(error_type: &str, line_num: Option<usize>, message: &str, ver
         state.insert(count_key.clone(), Dynamic::from(new_count));
         state.insert(format!("__op_{}", count_key), Dynamic::from("count"));
         
-        // Track error samples (max 3 per type)
+        // Always output immediately in verbose mode (regardless of sample storage)
+        if verbose {
+            let formatted_error = crate::config::format_verbose_error(line_num, &format!("{} error", error_type), message);
+            crate::rhai_functions::strings::print_verbose_error(formatted_error.clone());
+        }
+
+        // Track error samples (max 3 per type) 
         let samples_key = format!("__kelora_error_samples_{}", error_type);
         let current_samples = state.get(&samples_key).cloned().unwrap_or_else(|| {
             Dynamic::from(rhai::Array::new())
@@ -37,16 +43,7 @@ pub fn track_error(error_type: &str, line_num: Option<usize>, message: &str, ver
             // Only store up to 3 samples per error type
             if arr.len() < 3 {
                 let formatted_error = crate::config::format_verbose_error(line_num, &format!("{} error", error_type), message);
-                arr.push(Dynamic::from(formatted_error.clone()));
-                
-                // If verbose mode, also output immediately
-                if verbose {
-                    crate::rhai_functions::strings::print_verbose_error(formatted_error);
-                }
-            } else if verbose {
-                // Still output immediately in verbose mode even if we're not storing more samples
-                let formatted_error = crate::config::format_verbose_error(line_num, &format!("{} error", error_type), message);
-                crate::rhai_functions::strings::print_verbose_error(formatted_error);
+                arr.push(Dynamic::from(formatted_error));
             }
             
             state.insert(samples_key.clone(), Dynamic::from(arr));
