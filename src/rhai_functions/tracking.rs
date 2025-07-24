@@ -53,6 +53,7 @@ pub fn track_error(error_type: &str, line_num: Option<usize>, message: &str, ver
 }
 
 /// Check if any errors occurred based on tracking data
+#[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
 pub fn has_errors_in_tracking(tracked: &HashMap<String, Dynamic>) -> bool {
     for (key, value) in tracked {
         if let Some(_error_type) = key.strip_prefix("__kelora_error_count_") {
@@ -67,6 +68,7 @@ pub fn has_errors_in_tracking(tracked: &HashMap<String, Dynamic>) -> bool {
 }
 
 /// Extract error summary from tracking state with different verbosity levels
+#[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
 pub fn extract_error_summary_from_tracking(tracked: &HashMap<String, Dynamic>, verbose: bool) -> Option<String> {
     let mut total_errors = 0;
     let mut error_types = Vec::new();

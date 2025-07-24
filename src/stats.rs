@@ -189,11 +189,13 @@ impl ProcessingStats {
     }
 
     /// Check if any errors occurred during processing
+    #[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
     pub fn has_errors(&self) -> bool {
         self.lines_errors > 0
     }
 
     /// Format a concise error summary for default output (when errors occur)
+    #[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
     pub fn format_error_summary(&self) -> String {
         if !self.has_errors() {
             return String::new();
