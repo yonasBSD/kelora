@@ -258,28 +258,13 @@ impl Pipeline {
                     e
                 }
                 Err(err) => {
-                    // Count parsing errors in stats
-                    crate::stats::stats_add_line_error();
-
-                    // Also track in Rhai context for parallel processing
-                    ctx.tracker
-                        .entry("__kelora_stats_lines_errors".to_string())
-                        .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
-                        .or_insert(rhai::Dynamic::from(1i64));
-                    ctx.tracker.insert(
-                        "__op___kelora_stats_lines_errors".to_string(),
-                        rhai::Dynamic::from("count"),
+                    // Use unified error tracking system
+                    crate::rhai_functions::tracking::track_error(
+                        "parse",
+                        ctx.meta.line_number,
+                        &err.to_string(),
+                        ctx.config.verbose
                     );
-
-                    // Print verbose error if enabled
-                    if ctx.config.verbose {
-                        let error_msg = crate::config::format_verbose_error(
-                            ctx.meta.line_number,
-                            "parse error",
-                            &err.to_string()
-                        );
-                        crate::rhai_functions::strings::print_verbose_error(error_msg);
-                    }
 
                     // New resiliency model: skip unparseable lines by default,
                     // only propagate errors in strict mode
@@ -312,15 +297,13 @@ impl Pipeline {
                                 ScriptResult::EmitMultiple(mut es) => multi_results.append(&mut es),
                                 ScriptResult::Skip => {}
                                 ScriptResult::Error(msg) => {
-                                    // Print verbose error if enabled
-                                    if ctx.config.verbose {
-                                        let error_msg = crate::config::format_verbose_error(
-                                            ctx.meta.line_number,
-                                            "Rhai error",
-                                            &msg
-                                        );
-                                        crate::rhai_functions::strings::print_verbose_error(error_msg);
-                                    }
+                                    // Use unified error tracking system
+                                    crate::rhai_functions::tracking::track_error(
+                                        "rhai",
+                                        ctx.meta.line_number,
+                                        &msg,
+                                        ctx.config.verbose
+                                    );
 
                                     // New resiliency model: use strict flag
                                     if ctx.config.strict {
@@ -425,15 +408,13 @@ impl Pipeline {
                     );
                 }
                 ScriptResult::Error(msg) => {
-                    // Print verbose error if enabled
-                    if ctx.config.verbose {
-                        let error_msg = crate::config::format_verbose_error(
-                            ctx.meta.line_number,
-                            "Rhai error",
-                            &msg
-                        );
-                        crate::rhai_functions::strings::print_verbose_error(error_msg);
-                    }
+                    // Use unified error tracking system
+                    crate::rhai_functions::tracking::track_error(
+                        "rhai",
+                        ctx.meta.line_number,
+                        &msg,
+                        ctx.config.verbose
+                    );
 
                     // New resiliency model: use strict flag
                     if ctx.config.strict {

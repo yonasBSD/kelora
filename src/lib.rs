@@ -342,10 +342,6 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     // Merge the parallel tracked state with our pipeline context
     let parallel_tracked = processor.get_final_tracked_state();
 
-    // Output verbose errors if verbose mode is enabled (for parallel mode)
-    if config.processing.verbose {
-        crate::rhai_functions::tracking::output_verbose_errors_from_tracking(&parallel_tracked);
-    }
 
     // Write error summary to file if configured
     if let Some(ref file_path) = config.processing.error_report.file {
@@ -566,16 +562,6 @@ pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) 
     // Merge thread-local tracking state (including errors) into context for sequential mode
     crate::rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
 
-    // Generate error summary if in summary mode
-    if matches!(
-        config.processing.error_report.style,
-        crate::config::ErrorReportStyle::Summary
-    ) {
-        if let Some(summary) = crate::rhai_functions::tracking::extract_error_summary(&ctx.tracker)
-        {
-            eprintln!("Error Summary:\n{}", summary);
-        }
-    }
 
     // Write error summary to file if configured
     if let Some(ref file_path) = config.processing.error_report.file {

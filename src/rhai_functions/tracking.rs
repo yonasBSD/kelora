@@ -7,38 +7,128 @@ thread_local! {
     pub static THREAD_TRACKING_STATE: RefCell<HashMap<String, Dynamic>> = RefCell::new(HashMap::new());
 }
 
-/// Track an error message for verbose output in parallel mode
-/// This follows the MapReduce pattern used by other tracking functions
-pub fn track_verbose_error(error_msg: String) {
+/// Unified error tracking function that handles counts, samples, and verbose output
+/// This replaces both stats-based and tracking-based error mechanisms
+pub fn track_error(error_type: &str, line_num: Option<usize>, message: &str, verbose: bool) {
+    // Also update stats for the termination case (minimal error count only)
+    if error_type == "parse" {
+        crate::stats::stats_add_line_error();
+    } else {
+        crate::stats::stats_add_error();
+    }
+    
     THREAD_TRACKING_STATE.with(|state| {
         let mut state = state.borrow_mut();
-        let key = "__kelora_verbose_errors";
         
-        // Get existing error array or create new one
-        let current = state.get(key).cloned().unwrap_or_else(|| {
+        // Track error count by type
+        let count_key = format!("__kelora_error_count_{}", error_type);
+        let current_count = state.get(&count_key).cloned().unwrap_or(Dynamic::from(0i64));
+        let new_count = current_count.as_int().unwrap_or(0) + 1;
+        state.insert(count_key.clone(), Dynamic::from(new_count));
+        state.insert(format!("__op_{}", count_key), Dynamic::from("count"));
+        
+        // Track error samples (max 3 per type)
+        let samples_key = format!("__kelora_error_samples_{}", error_type);
+        let current_samples = state.get(&samples_key).cloned().unwrap_or_else(|| {
             Dynamic::from(rhai::Array::new())
         });
         
-        if let Ok(mut arr) = current.into_array() {
-            arr.push(Dynamic::from(error_msg));
-            state.insert(key.to_string(), Dynamic::from(arr));
-            // Store operation type metadata for parallel merging
-            state.insert(format!("__op_{}", key), Dynamic::from("unique"));
+        if let Ok(mut arr) = current_samples.into_array() {
+            // Only store up to 3 samples per error type
+            if arr.len() < 3 {
+                let formatted_error = crate::config::format_verbose_error(line_num, &format!("{} error", error_type), message);
+                arr.push(Dynamic::from(formatted_error.clone()));
+                
+                // If verbose mode, also output immediately
+                if verbose {
+                    crate::rhai_functions::strings::print_verbose_error(formatted_error);
+                }
+            } else if verbose {
+                // Still output immediately in verbose mode even if we're not storing more samples
+                let formatted_error = crate::config::format_verbose_error(line_num, &format!("{} error", error_type), message);
+                crate::rhai_functions::strings::print_verbose_error(formatted_error);
+            }
+            
+            state.insert(samples_key.clone(), Dynamic::from(arr));
+            state.insert(format!("__op_{}", samples_key), Dynamic::from("unique"));
         }
     });
 }
 
-/// Extract and output verbose errors from parallel tracking state
-pub fn output_verbose_errors_from_tracking(tracked: &HashMap<String, Dynamic>) {
-    if let Some(errors_dynamic) = tracked.get("__kelora_verbose_errors") {
-        if let Ok(errors_array) = errors_dynamic.clone().into_array() {
-            for error in errors_array {
-                if let Ok(error_msg) = error.into_string() {
-                    eprintln!("{}", error_msg);
+/// Extract error summary from tracking state with different verbosity levels
+pub fn extract_error_summary_from_tracking(tracked: &HashMap<String, Dynamic>, verbose: bool) -> Option<String> {
+    let mut total_errors = 0;
+    let mut error_types = Vec::new();
+    let mut samples = Vec::new();
+    
+    // Collect error counts by type
+    for (key, value) in tracked {
+        if let Some(error_type) = key.strip_prefix("__kelora_error_count_") {
+            if let Ok(count) = value.as_int() {
+                if count > 0 {
+                    total_errors += count;
+                    error_types.push((error_type.to_string(), count));
                 }
             }
         }
     }
+    
+    if total_errors == 0 {
+        return None;
+    }
+    
+    // In verbose mode, also collect samples
+    if verbose {
+        for (key, value) in tracked {
+            if let Some(_error_type) = key.strip_prefix("__kelora_error_samples_") {
+                if let Ok(sample_array) = value.clone().into_array() {
+                    for sample in sample_array {
+                        if let Ok(sample_msg) = sample.into_string() {
+                            samples.push(sample_msg);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Format summary based on verbosity
+    let mut summary = String::new();
+    
+    if error_types.len() == 1 && error_types[0].0 == "parse" {
+        // Simple case: only parse errors
+        let count = error_types[0].1;
+        if count == 1 {
+            summary.push_str("Processing completed with 1 parse error");
+        } else {
+            summary.push_str(&format!("Processing completed with {} parse errors", count));
+        }
+    } else if error_types.len() == 1 {
+        // Simple case: only one error type
+        let (error_type, count) = &error_types[0];
+        if *count == 1 {
+            summary.push_str(&format!("Processing completed with 1 {} error", error_type)); 
+        } else {
+            summary.push_str(&format!("Processing completed with {} {} errors", count, error_type));
+        }
+    } else {
+        // Multiple error types
+        summary.push_str(&format!("Processing completed with {} errors: ", total_errors));
+        let type_summaries: Vec<String> = error_types.iter()
+            .map(|(error_type, count)| format!("{} {}", count, error_type))
+            .collect();
+        summary.push_str(&type_summaries.join(", "));
+    }
+    
+    // Add samples in verbose mode
+    if verbose && !samples.is_empty() {
+        summary.push_str("\n\nError examples:");
+        for sample in samples {
+            summary.push_str(&format!("\n  {}", sample));
+        }
+    }
+    
+    Some(summary)
 }
 
 

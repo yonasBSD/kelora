@@ -77,8 +77,7 @@ pub fn print_verbose_error(message: String) {
     }
 
     if is_parallel_mode() {
-        // In parallel mode, track the error for later output and also capture for immediate worker output
-        crate::rhai_functions::tracking::track_verbose_error(message.clone());
+        // In parallel mode, capture for worker output (unified tracking handles the rest)
         capture_eprint(message);
     } else {
         eprintln!("{}", message);

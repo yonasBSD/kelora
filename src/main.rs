@@ -212,11 +212,16 @@ fn main() -> Result<()> {
                                 &s.format_stats(lib_config.input.multiline.is_some()),
                             ))
                             .unwrap_or(());
-                    } else if s.has_errors() && !lib_config.processing.quiet {
+                    } else if !lib_config.processing.quiet {
                         // Error summary by default when errors occur (unless --quiet)
-                        stderr
-                            .writeln(&lib_config.format_error_message(&s.format_error_summary()))
-                            .unwrap_or(());
+                        if let Some(error_summary) = crate::rhai_functions::tracking::extract_error_summary_from_tracking(
+                            &pipeline_result.tracking_data,
+                            lib_config.processing.verbose
+                        ) {
+                            stderr
+                                .writeln(&lib_config.format_error_message(&error_summary))
+                                .unwrap_or(());
+                        }
                     }
                 }
             }
