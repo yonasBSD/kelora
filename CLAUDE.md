@@ -32,6 +32,29 @@ cargo test --test integration_tests  # Integration tests only
 make test-full          # Comprehensive test suite
 ```
 
+### Error Handling and Automation Examples
+```bash
+# Verbose error reporting - see each error immediately
+./target/release/kelora -f jsonl --verbose suspicious.log
+
+# Quiet mode for automation - exit codes indicate success/failure
+./target/release/kelora -f jsonl --quiet input.log && echo "✓ Processing succeeded"
+
+# Test exit code behavior
+./target/release/kelora -f jsonl malformed.log; echo "Exit code: $?"
+
+# Parallel processing with verbose errors
+./target/release/kelora -f jsonl --parallel --verbose --batch-size 100 large.log
+
+# Automation pipeline example
+if ./target/release/kelora --quiet --filter 'e.level == "ERROR"' logs/*.json; then
+    echo "No critical errors found"
+else
+    echo "Critical errors detected, alerting team..."
+    # Send notification, stop deployment, etc.
+fi
+```
+
 ## Development Guidelines
 
 ### Architecture Overview
@@ -87,7 +110,63 @@ Empty lines are handled differently based on input format:
 - Resilient mode: Shows error summary at end of processing
 - Strict mode: Shows each error immediately before aborting
 - Use `--error-report-file` to write detailed error logs to file
-- Use `--verbose` for additional error details
+- Use `--verbose` for immediate verbose error output with emoji formatting
+- Use `--quiet` to suppress all kelora output while preserving script side effects
+
+**Verbose Error Output (`--verbose`):**
+- Prints each error immediately to stderr with format: `🧱 kelora: line 42: parse error - invalid JSON`
+- Works in both sequential and parallel processing modes
+- Shows enhanced error summaries with examples when errors occur
+- Compatible with all other flags (`--parallel`, `--stats`, etc.)
+
+**Quiet Mode (`--quiet`):**
+- Suppresses all kelora output: events, error messages, stats, summaries
+- Automatically enables `-F hide` output format (not `-F null`)
+- Preserves all Rhai script side effects (`print()` statements, file operations, etc.)
+- Exit codes become the primary indicator of processing success/failure
+- Essential for automation and CI/CD pipelines
+
+### Exit Codes
+
+Kelora uses standard Unix exit codes to indicate processing results:
+
+**Exit Code 0 (Success):**
+- No parsing errors or Rhai runtime errors occurred
+- Processing completed successfully
+- Filtering events is considered normal behavior (not an error)
+
+**Exit Code 1 (General Error):**
+- Parse errors occurred (invalid JSON, malformed syslog, etc.)
+- Rhai runtime errors occurred (filter errors, exec errors, script failures)
+- Applies to both strict (`--strict`) and resilient (default) modes
+- Same behavior whether using `--quiet`, `--verbose`, or normal output
+
+**Exit Code 2 (Invalid Usage):**
+- CLI argument errors, invalid flags, missing required parameters
+- Configuration file errors, invalid format specifications
+- File not found errors, permission issues
+
+**Signal Exit Codes (130+):**
+- 130: Interrupted by SIGINT (Ctrl+C)
+- 141: Broken pipe (SIGPIPE) - normal in Unix pipelines
+- 143: Terminated by SIGTERM
+
+**Automation Examples:**
+```bash
+# Detect data quality issues in scripts
+kelora --quiet input.log && echo "✓ Clean data" || echo "✗ Has errors"
+
+# CI/CD pipeline usage
+if kelora --parallel --quiet --filter 'e.level == "ERROR"' logs/*.json; then
+    echo "No errors found in logs"
+else
+    echo "Error-level events detected, exit code: $?"
+    exit 1
+fi
+
+# Combined with other Unix tools
+kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
+```
 
 ### Output Limiting
 
@@ -173,6 +252,10 @@ Empty lines are handled differently based on input format:
   - `path_equals(e, "field.subfield", expected)` - Safe nested field comparison
   - `to_number(value, default)` - Safe number conversion with fallback
   - `to_bool(value, default)` - Safe boolean conversion with fallback
+- **Side Effects**: Rhai `print()` statements and file operations are preserved in `--quiet` mode
+  - Use `print()` for debugging output that should remain visible even when kelora output is suppressed
+  - `--quiet` uses `-F hide` (not `-F null`) to maintain script behavior consistency
+  - Essential for debugging scripts in automation environments
 
 ### Code Quality Practices
 

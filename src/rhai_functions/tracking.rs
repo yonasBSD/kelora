@@ -52,6 +52,20 @@ pub fn track_error(error_type: &str, line_num: Option<usize>, message: &str, ver
     });
 }
 
+/// Check if any errors occurred based on tracking data
+pub fn has_errors_in_tracking(tracked: &HashMap<String, Dynamic>) -> bool {
+    for (key, value) in tracked {
+        if let Some(_error_type) = key.strip_prefix("__kelora_error_count_") {
+            if let Ok(count) = value.as_int() {
+                if count > 0 {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 /// Extract error summary from tracking state with different verbosity levels
 pub fn extract_error_summary_from_tracking(tracked: &HashMap<String, Dynamic>, verbose: bool) -> Option<String> {
     let mut total_errors = 0;

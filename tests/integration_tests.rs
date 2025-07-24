@@ -408,8 +408,8 @@ invalid jsonl line
     let (stdout, _stderr, exit_code) =
         run_kelora_with_input(&["-f", "jsonl"], input);
     assert_eq!(
-        exit_code, 0,
-        "kelora should exit successfully with resilient error handling"
+        exit_code, 1,
+        "kelora should exit with error code when errors occur, even in resilient mode"
     );
 
     let lines: Vec<&str> = stdout.trim().split('\n').collect();
@@ -429,8 +429,8 @@ invalid jsonl line
     let (stdout, stderr, exit_code) =
         run_kelora_with_input(&["-f", "jsonl", "-F", "jsonl"], input);
     assert_eq!(
-        exit_code, 0,
-        "kelora should exit successfully with resilient error handling"
+        exit_code, 1,
+        "kelora should exit with error code when errors occur, even in resilient mode"
     );
 
     let lines: Vec<&str> = stdout.trim().split('\n').filter(|l| !l.is_empty()).collect();
@@ -843,8 +843,8 @@ not jsonl at all
     let (stdout, _stderr, exit_code) =
         run_kelora_with_input(&["-f", "jsonl", "-F", "jsonl"], input);
     assert_eq!(
-        exit_code, 0,
-        "kelora should exit successfully with resilient error handling"
+        exit_code, 1,
+        "kelora should exit with error code when errors occur, even in resilient mode"
     );
 
     let lines: Vec<&str> = stdout.trim().split('\n').collect();

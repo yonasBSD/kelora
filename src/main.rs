@@ -173,7 +173,7 @@ fn main() -> Result<()> {
         run_pipeline_with_kelora_config(&lib_config, stdout_output)
     };
 
-    let final_stats = match result {
+    let (final_stats, tracking_data) = match result {
         Ok(pipeline_result) => {
             // Print metrics if enabled (only if not terminated)
             if lib_config.output.metrics && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
@@ -225,7 +225,7 @@ fn main() -> Result<()> {
                     }
                 }
             }
-            pipeline_result.stats
+            (pipeline_result.stats, Some(pipeline_result.tracking_data))
         }
         Err(e) => {
             stderr
@@ -259,10 +259,23 @@ fn main() -> Result<()> {
         ExitCode::SignalInt.exit();
     }
 
-    // Determine exit code based on errors and --on-error mode
-    // Note: For this implementation, we'll add error tracking in future iterations
-    // For now, maintain existing behavior but prepare for proper exit codes
-    ExitCode::Success.exit();
+    // Determine exit code based on whether any errors occurred during processing
+    let had_errors = if let Some(ref tracking) = tracking_data {
+        // Check tracking data for errors from processing
+        crate::rhai_functions::tracking::has_errors_in_tracking(tracking)
+    } else if let Some(ref stats) = final_stats {
+        // Check stats for errors from parallel processing or termination case
+        stats.has_errors()
+    } else {
+        // No processing results available, assume no errors
+        false
+    };
+
+    if had_errors {
+        ExitCode::GeneralError.exit();
+    } else {
+        ExitCode::Success.exit();
+    }
 }
 
 /// Validate CLI arguments for early error detection
