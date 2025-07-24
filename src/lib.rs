@@ -342,6 +342,11 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     // Merge the parallel tracked state with our pipeline context
     let parallel_tracked = processor.get_final_tracked_state();
 
+    // Output verbose errors if verbose mode is enabled (for parallel mode)
+    if config.processing.verbose {
+        crate::rhai_functions::tracking::output_verbose_errors_from_tracking(&parallel_tracked);
+    }
+
     // Generate error summary before merging if in summary mode
     if matches!(
         config.processing.error_report.style,

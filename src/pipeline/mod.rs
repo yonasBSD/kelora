@@ -271,6 +271,16 @@ impl Pipeline {
                         rhai::Dynamic::from("count"),
                     );
 
+                    // Print verbose error if enabled
+                    if ctx.config.verbose {
+                        let error_msg = crate::config::format_verbose_error(
+                            ctx.meta.line_number,
+                            "parse error",
+                            &err.to_string()
+                        );
+                        crate::rhai_functions::strings::print_verbose_error(error_msg);
+                    }
+
                     // New resiliency model: skip unparseable lines by default,
                     // only propagate errors in strict mode
                     if ctx.config.strict {
@@ -302,6 +312,16 @@ impl Pipeline {
                                 ScriptResult::EmitMultiple(mut es) => multi_results.append(&mut es),
                                 ScriptResult::Skip => {}
                                 ScriptResult::Error(msg) => {
+                                    // Print verbose error if enabled
+                                    if ctx.config.verbose {
+                                        let error_msg = crate::config::format_verbose_error(
+                                            ctx.meta.line_number,
+                                            "Rhai error",
+                                            &msg
+                                        );
+                                        crate::rhai_functions::strings::print_verbose_error(error_msg);
+                                    }
+
                                     // New resiliency model: use strict flag
                                     if ctx.config.strict {
                                         return Err(anyhow::anyhow!(msg));
@@ -405,6 +425,16 @@ impl Pipeline {
                     );
                 }
                 ScriptResult::Error(msg) => {
+                    // Print verbose error if enabled
+                    if ctx.config.verbose {
+                        let error_msg = crate::config::format_verbose_error(
+                            ctx.meta.line_number,
+                            "Rhai error",
+                            &msg
+                        );
+                        crate::rhai_functions::strings::print_verbose_error(error_msg);
+                    }
+
                     // New resiliency model: use strict flag
                     if ctx.config.strict {
                         return Err(anyhow::anyhow!(msg));

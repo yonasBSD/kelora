@@ -7,6 +7,40 @@ thread_local! {
     pub static THREAD_TRACKING_STATE: RefCell<HashMap<String, Dynamic>> = RefCell::new(HashMap::new());
 }
 
+/// Track an error message for verbose output in parallel mode
+/// This follows the MapReduce pattern used by other tracking functions
+pub fn track_verbose_error(error_msg: String) {
+    THREAD_TRACKING_STATE.with(|state| {
+        let mut state = state.borrow_mut();
+        let key = "__kelora_verbose_errors";
+        
+        // Get existing error array or create new one
+        let current = state.get(key).cloned().unwrap_or_else(|| {
+            Dynamic::from(rhai::Array::new())
+        });
+        
+        if let Ok(mut arr) = current.into_array() {
+            arr.push(Dynamic::from(error_msg));
+            state.insert(key.to_string(), Dynamic::from(arr));
+            // Store operation type metadata for parallel merging
+            state.insert(format!("__op_{}", key), Dynamic::from("unique"));
+        }
+    });
+}
+
+/// Extract and output verbose errors from parallel tracking state
+pub fn output_verbose_errors_from_tracking(tracked: &HashMap<String, Dynamic>) {
+    if let Some(errors_dynamic) = tracked.get("__kelora_verbose_errors") {
+        if let Ok(errors_array) = errors_dynamic.clone().into_array() {
+            for error in errors_array {
+                if let Ok(error_msg) = error.into_string() {
+                    eprintln!("{}", error_msg);
+                }
+            }
+        }
+    }
+}
+
 
 pub fn register_functions(engine: &mut Engine) {
     // Track functions using thread-local storage - clean user API

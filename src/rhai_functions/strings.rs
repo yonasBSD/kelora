@@ -70,6 +70,21 @@ pub fn is_suppress_side_effects() -> bool {
     SUPPRESS_SIDE_EFFECTS.with(|flag| *flag.borrow())
 }
 
+/// Print verbose error message with proper formatting and parallel mode support
+pub fn print_verbose_error(message: String) {
+    if is_suppress_side_effects() {
+        return;
+    }
+
+    if is_parallel_mode() {
+        // In parallel mode, track the error for later output and also capture for immediate worker output
+        crate::rhai_functions::tracking::track_verbose_error(message.clone());
+        capture_eprint(message);
+    } else {
+        eprintln!("{}", message);
+    }
+}
+
 /// Mask IP address for privacy (replace last N octets with 'X')
 fn mask_ip_impl(ip: &str, octets_to_mask: usize) -> String {
     // IPv4 pattern validation

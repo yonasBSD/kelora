@@ -432,6 +432,25 @@ pub fn format_error_message_auto(message: &str) -> String {
     }
 }
 
+/// Format a verbose error message with line number and error type
+pub fn format_verbose_error(line_num: Option<usize>, error_type: &str, message: &str) -> String {
+    let use_colors = crate::tty::should_use_colors_with_mode(&ColorMode::Auto);
+    let no_emoji = std::env::var("NO_EMOJI").is_ok();
+    let use_emoji = use_colors && !no_emoji;
+
+    let prefix = if use_emoji {
+        "🧱 kelora:"
+    } else {
+        "kelora:"
+    };
+
+    if let Some(line) = line_num {
+        format!("{} line {}: {} - {}", prefix, line, error_type, message)
+    } else {
+        format!("{} {} - {}", prefix, error_type, message)
+    }
+}
+
 impl OutputConfig {
     /// Get the effective keys for filtering, combining core fields with user-specified keys
     pub fn get_effective_keys(&self) -> Vec<String> {
