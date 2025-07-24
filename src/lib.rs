@@ -347,30 +347,17 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
         crate::rhai_functions::tracking::output_verbose_errors_from_tracking(&parallel_tracked);
     }
 
-    // Generate error summary before merging if in summary mode
-    if matches!(
-        config.processing.error_report.style,
-        crate::config::ErrorReportStyle::Summary
-    ) {
-        if let Some(summary) =
-            crate::rhai_functions::tracking::extract_error_summary(&parallel_tracked)
-        {
-            eprintln!("Error Summary:\n{}", summary);
-        }
-    }
-
     // Write error summary to file if configured
     if let Some(ref file_path) = config.processing.error_report.file {
         crate::rhai_functions::tracking::write_error_summary_to_file(&parallel_tracked, file_path)
             .unwrap_or_else(|e| eprintln!("Failed to write error summary to file: {}", e));
     }
 
-    // Extract internal stats from tracking system before merging (if stats enabled)
-    if config.output.stats {
-        processor
-            .extract_final_stats_from_tracking(&parallel_tracked)
-            .unwrap_or(());
-    }
+    // Extract internal stats from tracking system before merging
+    // This is needed for error reporting, not just when --stats is enabled
+    processor
+        .extract_final_stats_from_tracking(&parallel_tracked)
+        .unwrap_or(());
 
     // Filter out stats and errors from user-visible context and merge the rest
     for (key, dynamic_value) in &parallel_tracked {
