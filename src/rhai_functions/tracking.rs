@@ -9,7 +9,7 @@ thread_local! {
 
 /// Unified error tracking function that handles counts, samples, and verbose output
 /// This replaces both stats-based and tracking-based error mechanisms
-pub fn track_error(error_type: &str, line_num: Option<usize>, message: &str, verbose: bool) {
+pub fn track_error(error_type: &str, line_num: Option<usize>, message: &str, verbose: bool, quiet: bool) {
     // Also update stats for the termination case (minimal error count only)
     if error_type == "parse" {
         crate::stats::stats_add_line_error();
@@ -27,8 +27,8 @@ pub fn track_error(error_type: &str, line_num: Option<usize>, message: &str, ver
         state.insert(count_key.clone(), Dynamic::from(new_count));
         state.insert(format!("__op_{}", count_key), Dynamic::from("count"));
         
-        // Always output immediately in verbose mode (regardless of sample storage)
-        if verbose {
+        // Always output immediately in verbose mode (unless quiet mode)
+        if verbose && !quiet {
             let formatted_error = crate::config::format_verbose_error(line_num, &format!("{} error", error_type), message);
             crate::rhai_functions::strings::print_verbose_error(formatted_error.clone());
         }

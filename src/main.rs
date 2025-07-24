@@ -205,8 +205,8 @@ fn main() -> Result<()> {
             // Print output based on configuration (only if not terminated)
             if !SHOULD_TERMINATE.load(Ordering::Relaxed) {
                 if let Some(ref s) = pipeline_result.stats {
-                    if lib_config.output.stats {
-                        // Full stats when --stats flag is used
+                    if lib_config.output.stats && !lib_config.processing.quiet {
+                        // Full stats when --stats flag is used (unless --quiet)
                         stderr
                             .writeln(&lib_config.format_stats_message(
                                 &s.format_stats(lib_config.input.multiline.is_some()),
@@ -238,8 +238,8 @@ fn main() -> Result<()> {
     // Check if we were terminated by a signal and print output
     if SHOULD_TERMINATE.load(Ordering::Relaxed) {
         if let Some(stats) = final_stats {
-            if lib_config.output.stats {
-                // Full stats when --stats flag is used
+            if lib_config.output.stats && !lib_config.processing.quiet {
+                // Full stats when --stats flag is used (unless --quiet)
                 stderr
                     .writeln(&lib_config.format_stats_message(
                         &stats.format_stats(lib_config.input.multiline.is_some()),
@@ -251,7 +251,7 @@ fn main() -> Result<()> {
                     .writeln(&lib_config.format_error_message(&stats.format_error_summary()))
                     .unwrap_or(());
             }
-        } else if lib_config.output.stats {
+        } else if lib_config.output.stats && !lib_config.processing.quiet {
             stderr
                 .writeln(&lib_config.format_stats_message("Processing interrupted"))
                 .unwrap_or(());

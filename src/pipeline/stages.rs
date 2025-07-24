@@ -46,7 +46,8 @@ impl ScriptStage for FilterStage {
                     "rhai",
                     ctx.meta.line_number,
                     &format!("Filter error: {}", e),
-                    ctx.config.verbose
+                    ctx.config.verbose,
+                    ctx.config.quiet
                 );
 
                 // New resiliency model: filter errors evaluate to false (Skip)
@@ -103,7 +104,8 @@ impl ScriptStage for ExecStage {
                     "rhai",
                     ctx.meta.line_number,
                     &format!("Exec error: {}", e),
-                    ctx.config.verbose
+                    ctx.config.verbose,
+                    ctx.config.quiet
                 );
 
                 // New resiliency model: atomic rollback - return original event unchanged

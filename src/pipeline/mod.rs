@@ -263,7 +263,8 @@ impl Pipeline {
                         "parse",
                         ctx.meta.line_number,
                         &err.to_string(),
-                        ctx.config.verbose
+                        ctx.config.verbose,
+                        ctx.config.quiet
                     );
 
                     // New resiliency model: skip unparseable lines by default,
@@ -302,7 +303,8 @@ impl Pipeline {
                                         "rhai",
                                         ctx.meta.line_number,
                                         &msg,
-                                        ctx.config.verbose
+                                        ctx.config.verbose,
+                                        ctx.config.quiet
                                     );
 
                                     // New resiliency model: use strict flag
@@ -413,7 +415,8 @@ impl Pipeline {
                         "rhai",
                         ctx.meta.line_number,
                         &msg,
-                        ctx.config.verbose
+                        ctx.config.verbose,
+                        ctx.config.quiet
                     );
 
                     // New resiliency model: use strict flag

@@ -492,6 +492,9 @@ impl KeloraConfig {
             output: OutputConfig {
                 format: if cli.stats_only {
                     OutputFormat::Null
+                } else if cli.quiet {
+                    // Quiet mode: suppress event output but preserve script side effects
+                    OutputFormat::Hide
                 } else {
                     cli.output_format.clone().into()
                 },
