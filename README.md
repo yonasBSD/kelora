@@ -4,6 +4,8 @@ Scriptable log processor for the command line. Treats logs as structured events 
 
 ## Quick Start
 
+Scripts use `e` to access the current log event - `e.status`, `e.level`, etc. are the actual fields from your logs.
+
 ```bash
 # Filter JSON logs with enrichment
 kelora -f jsonl app.log --filter 'e.status >= 500' --exec 'e.severity = "critical"'
@@ -52,6 +54,25 @@ e.masked_ip = e.ip.mask_ip(2)
 
 // Track metrics and use safety functions
 track_count("requests"); track_max("peak_latency", get_path(e, "duration_ms", 0))
+```
+
+## Working with Events
+
+The `e` variable represents the current event. Access fields directly (`e.level`) or use bracket notation for invalid identifiers (`e["content-type"]`). Add fields by assignment (`e.severity = "critical"`).
+
+```rhai
+// Field access and modification
+e.level == "error"                        // Direct access
+e["user-agent"] = "kelora/1.0"           // Invalid identifiers need brackets
+e.processed = now_utc()                   // Add new fields
+
+// Method vs function style (both work, methods chain better)
+e.ip.mask_ip(2)                          // Method style
+mask_ip(e.ip, 2)                         // Function style (avoids conflicts)
+
+// Safety functions with fallbacks
+get_path(e, "user.profile.id", "unknown") // Safe nested access
+to_number(e.port, 80)                     // Safe conversion with default
 ```
 
 ## Common Use Cases
