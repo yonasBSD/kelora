@@ -144,13 +144,6 @@ pub struct Cli {
     #[arg(short = 'q', long = "quiet", help_heading = "Error Handling")]
     pub quiet: bool,
 
-    /// Disable field auto-injection
-    #[arg(long = "no-inject", help_heading = "Processing Options")]
-    pub no_inject_fields: bool,
-
-    /// Prefix for injected variables
-    #[arg(long = "inject-prefix", help_heading = "Processing Options")]
-    pub inject_prefix: Option<String>,
 
     /// Include only events with these log levels
     #[arg(

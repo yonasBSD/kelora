@@ -73,8 +73,6 @@ pub struct ProcessingConfig {
     pub begin: Option<String>,
     pub stages: Vec<ScriptStageType>,
     pub end: Option<String>,
-    pub no_inject_fields: bool,
-    pub inject_prefix: Option<String>,
     pub error_report: ErrorReportConfig,
     pub levels: Vec<String>,
     pub exclude_levels: Vec<String>,
@@ -581,8 +579,6 @@ impl KeloraConfig {
                 begin: cli.begin.clone(),
                 stages: Vec::new(), // Will be set by main() after CLI parsing
                 end: cli.end.clone(),
-                no_inject_fields: cli.no_inject_fields,
-                inject_prefix: cli.inject_prefix.clone(),
                 error_report: parse_error_report_config(cli),
                 levels: cli.levels.clone(),
                 exclude_levels: cli.exclude_levels.clone(),
@@ -657,8 +653,6 @@ impl Default for KeloraConfig {
                 begin: None,
                 stages: Vec::new(),
                 end: None,
-                no_inject_fields: false,
-                inject_prefix: None,
                 error_report: ErrorReportConfig {
                     style: ErrorReportStyle::Summary,
                     file: None,

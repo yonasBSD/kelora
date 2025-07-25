@@ -168,11 +168,11 @@ impl ConfigFile {
             println!("skip-lines = 0");
             println!();
             println!("[aliases]");
-            println!("errors = --filter 'level == \"error\"' --stats");
+            println!("errors = --filter 'e.level == \"error\"' --stats");
             println!(
-                "json-errors = --format jsonl --filter 'level == \"error\"' --output-format jsonl"
+                "json-errors = --format jsonl --filter 'e.level == \"error\"' --output-format jsonl"
             );
-            println!("slow-requests = --filter 'response_time.to_int() > 1000' --keys timestamp,method,path,response_time");
+            println!("slow-requests = --filter 'e.response_time.to_int() > 1000' --keys timestamp,method,path,response_time");
         }
     }
 
@@ -261,7 +261,7 @@ mod tests {
         writeln!(file, "output-format = csv").unwrap();
         writeln!(file, "").unwrap();
         writeln!(file, "[aliases]").unwrap();
-        writeln!(file, "errors = --filter 'level == \"error\"'").unwrap();
+        writeln!(file, "errors = --filter 'e.level == \"error\"'").unwrap();
         writeln!(file, "json-logs = --format jsonl --output-format jsonl").unwrap();
         file.flush().unwrap();
 
@@ -274,7 +274,7 @@ mod tests {
         );
         assert_eq!(
             config.aliases.get("errors"),
-            Some(&"--filter 'level == \"error\"'".to_string())
+            Some(&"--filter 'e.level == \"error\"'".to_string())
         );
         assert_eq!(
             config.aliases.get("json-logs"),
@@ -287,7 +287,7 @@ mod tests {
         let mut config = ConfigFile::default();
         config.aliases.insert(
             "errors".to_string(),
-            "--filter 'level == \"error\"'".to_string(),
+            "--filter 'e.level == \"error\"'".to_string(),
         );
         config.aliases.insert(
             "json-errors".to_string(),
@@ -299,7 +299,7 @@ mod tests {
 
         assert_eq!(
             resolved,
-            vec!["--format", "jsonl", "--filter", "level == \"error\""]
+            vec!["--format", "jsonl", "--filter", "e.level == \"error\""]
         );
     }
 
@@ -328,7 +328,7 @@ mod tests {
         let mut config = ConfigFile::default();
         config.aliases.insert(
             "errors".to_string(),
-            "--filter 'level == \"error\"' --stats".to_string(),
+            "--filter 'e.level == \"error\"' --stats".to_string(),
         );
 
         let args = vec![
@@ -346,7 +346,7 @@ mod tests {
             vec![
                 "kelora",
                 "--filter",
-                "level == \"error\"",
+                "e.level == \"error\"",
                 "--stats",
                 "--format",
                 "jsonl"

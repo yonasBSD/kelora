@@ -80,8 +80,6 @@ impl PipelineBuilder {
                     file: None,
                 },
                 brief: false,
-                no_inject_fields: false,
-                inject_prefix: None,
                 color_mode: crate::config::ColorMode::Auto,
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
@@ -619,8 +617,6 @@ pub fn create_pipeline_builder_from_config(
     let pipeline_config = PipelineConfig {
         error_report: config.processing.error_report.clone(),
         brief: config.output.brief,
-        no_inject_fields: config.processing.no_inject_fields,
-        inject_prefix: config.processing.inject_prefix.clone(),
         color_mode: config.output.color.clone(),
         timestamp_formatting: config.output.timestamp_formatting.clone(),
         strict: config.processing.strict,

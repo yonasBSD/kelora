@@ -45,7 +45,7 @@ kelora [ARGS...] --save-alias <alias_name>
    ```
    ✅ Alias 'errors' saved to ~/.config/kelora/config.ini
    ℹ️ Replaced previous alias:
-       errors = --filter 'level == "error"' --stats --brief
+       errors = --filter 'e.level == "error"' --stats --brief
    ```
 
 4. **Output Suggestions**:
@@ -63,14 +63,14 @@ kelora [ARGS...] --save-alias <alias_name>
 Given:
 
 ```bash
-kelora -f jsonl app.log --filter 'level == "error"' --stats --save-alias errors
+kelora -f jsonl app.log --filter 'e.level == "error"' --stats --save-alias errors
 ```
 
 Will write:
 
 ```ini
 [aliases]
-errors = -f jsonl app.log --filter 'level == "error"' --stats
+errors = -f jsonl app.log --filter 'e.level == "error"' --stats
 ```
 
 If `errors` existed before, its value is replaced, and the old value is shown in the terminal — **not** kept in the config.
@@ -99,7 +99,7 @@ kelora -a errors logs.jsonl
 expands to:
 
 ```bash
-kelora -f jsonl app.log --filter 'level == "error"' --stats logs.jsonl
+kelora -f jsonl app.log --filter 'e.level == "error"' --stats logs.jsonl
 ```
 
 ---

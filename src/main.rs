@@ -592,11 +592,6 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
         }
     }
 
-    if let Some(inject_prefix) = config_file.defaults.get("inject_prefix") {
-        if cli.inject_prefix.is_none() {
-            cli.inject_prefix = Some(inject_prefix.clone());
-        }
-    }
 
     // Apply list values (only if CLI lists are empty)
     if let Some(filters) = config_file.defaults.get("filters") {

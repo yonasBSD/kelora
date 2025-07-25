@@ -30,7 +30,7 @@ Stream logs from tail, kubectl, or stdin for live triage.
 tail -f /var/log/syslog | kelora -f syslog -l warn,error
 
 # Live triage from Kubernetes, summary printed after CTRL-C
-kubectl logs -f mypod | kelora -f logfmt --exec 'track_count(level)' --summary
+kubectl logs -f mypod | kelora -f logfmt --exec 'track_count(e.level)' --summary
 ```
 
 Kelora works naturally in UNIX pipelines. Its stream-first design makes it well-suited for continuous log monitoring and alerting logic.
@@ -43,7 +43,7 @@ Start simple: filtering logs, selecting fields, and formatting output.
 
 ```bash
 # Show only server errors (status 500+)
-kelora -f jsonl app.log --filter 'status >= 500'
+kelora -f jsonl app.log --filter 'e.status >= 500'
 
 # Limit to warning and error levels
 kelora -f jsonl app.log -l warn,error
@@ -64,17 +64,17 @@ Use `--exec` to define custom logic per event and create new fields.
 
 ```bash
 # Add a status class like "2xx", "5xx", etc.
-kelora -f jsonl app.log --exec 'let class = status_class(status)' --keys status,class
+kelora -f jsonl app.log --exec 'e.class = status_class(e.status)' --keys status,class
 ```
 
 ```bash
 # Tag slow requests with a label
 kelora -f jsonl app.log \
-  --exec 'let label = if response_time.to_int() > 1000 { "slow" } else { "ok" }' \
+  --exec 'e.label = if e.response_time.to_int() > 1000 { "slow" } else { "ok" }' \
   --keys method,path,response_time,label
 ```
 
-Rhai lets you write conditional logic or transformations inline. Any variables you declare become part of the event output if referenced via `--keys`.
+Rhai lets you write conditional logic or transformations inline. Fields you assign to the `e` object become part of the event output if referenced via `--keys`.
 
 ---
 
@@ -84,7 +84,7 @@ Use filters and scripts to spot suspicious patterns in your logs.
 
 ```bash
 # Show login attempts from public IPs
-kelora -f jsonl auth.log --filter 'ip.is_private_ip() == false'
+kelora -f jsonl auth.log --filter 'e.ip.is_private_ip() == false'
 ```
 
 ```bash
@@ -104,13 +104,13 @@ Work with times and durations using built-in parsing and arithmetic.
 ```bash
 # Filter events during business hours
 kelora -f jsonl app.log \
-  --exec 'let dt = parse_timestamp(ts); if dt.hour() >= 9 && dt.hour() < 17 { print("Work hour") }'
+  --exec 'let dt = parse_timestamp(e.ts); if dt.hour() >= 9 && dt.hour() < 17 { print("Work hour") }'
 ```
 
 ```bash
 # Flag requests taking longer than 1 second
 kelora -f jsonl access.log \
-  --exec 'let dur = parse_duration(latency); if dur > duration_from_seconds(1) { print("Slow: " + dur.as_milliseconds() + "ms") }'
+  --exec 'let dur = parse_duration(e.latency); if dur > duration_from_seconds(1) { print("Slow: " + dur.as_milliseconds() + "ms") }'
 ```
 
 You can parse ISO timestamps or human-friendly durations and apply full arithmetic or formatting.
@@ -124,7 +124,7 @@ Enable context-aware event logic with `--window`.
 ```bash
 # Detect 3 consecutive errors
 kelora -f jsonl app.log --window 3 \
-  --filter 'message.contains("error")' \
+  --filter 'e.message.contains("error")' \
   --exec 'if window.len() > 2 { eprint("3 errors in a row") }'
 ```
 
@@ -146,10 +146,10 @@ Use `track_*()` functions for counting, bucketing, and summarizing.
 
 ```bash
 # Count events by log level
-kelora -f jsonl app.log --exec 'track_count(level)' --summary
+kelora -f jsonl app.log --exec 'track_count(e.level)' --summary
 
 # Track unique users
-kelora -f jsonl app.log --exec 'track_unique("users", user)' --summary
+kelora -f jsonl app.log --exec 'track_unique("users", e.user)' --summary
 ```
 
 The `--summary` flag shows tracked data after processing. These are global analytics — not per event.
@@ -165,7 +165,7 @@ Scale up with batching, file-ordering, and parallelism.
 kelora -f jsonl --file-order mtime logs/*.jsonl
 
 # Run in parallel mode with summary counts
-kelora -f jsonl app.log --parallel --exec 'track_count(level)' --summary
+kelora -f jsonl app.log --parallel --exec 'track_count(e.level)' --summary
 ```
 
 Parallel mode improves throughput and allows real-time batch analysis. Use `--unordered` for maximum performance if order doesn't matter.
@@ -181,7 +181,7 @@ Preprocess logs to remove headers, comments, or irrelevant lines.
 kelora -f line config.log --ignore-lines '^#|^\s*$'
 
 # Raw regex-style filtering on text input
-kelora -f line access.log --filter 'line.contains("404")'
+kelora -f line access.log --filter 'e.line.contains("404")'
 ```
 
 Use `--ignore-lines` as a preprocessing step, especially for mixed or semi-structured formats.
@@ -197,7 +197,7 @@ Show how to validate scripts and run fast, silent benchmarks.
 kelora --exec-file script.rhai -F null < /dev/null
 
 # Measure speed of a filtering expression
-time kelora -f jsonl huge.log --filter 'status >= 500' -F null
+time kelora -f jsonl huge.log --filter 'e.status >= 500' -F null
 ```
 
 Using `-F null` disables all event output — useful for script linting or performance checks.

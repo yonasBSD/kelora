@@ -678,12 +678,6 @@ impl RhaiEngine {
     fn create_scope_for_event(&self, event: &Event) -> Scope {
         let mut scope = self.scope_template.clone();
 
-        // Inject event fields as variables
-        for (key, value) in &event.fields {
-            if self.is_valid_identifier(key) {
-                scope.push(key, value.clone());
-            }
-        }
 
         // Update built-in variables
         scope.set_value("line", event.original_line.clone());
@@ -756,18 +750,6 @@ impl RhaiEngine {
             }
         }
 
-        // Also include top-level vars (e.g. `let x = ...`)
-        for (name, _constant, value) in scope.iter() {
-            if name != "line" && name != "e" && name != "meta" && name != "window" {
-                event.fields.insert(name.to_string(), value.clone());
-            }
-        }
     }
 
-    fn is_valid_identifier(&self, name: &str) -> bool {
-        name.chars()
-            .next()
-            .is_some_and(|c| c.is_alphabetic() || c == '_')
-            && name.chars().all(|c| c.is_alphanumeric() || c == '_')
-    }
 }

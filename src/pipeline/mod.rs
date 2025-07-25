@@ -130,10 +130,6 @@ pub struct PipelineConfig {
     #[allow(dead_code)] // LEGACY: Remove during resiliency migration (see dev/resiliency-todos.md #4)
     pub error_report: crate::config::ErrorReportConfig,
     pub brief: bool,
-    #[allow(dead_code)]
-    pub no_inject_fields: bool,
-    #[allow(dead_code)]
-    pub inject_prefix: Option<String>,
     pub color_mode: crate::config::ColorMode,
     /// Timestamp formatting configuration (display-only)
     pub timestamp_formatting: crate::config::TimestampFormatConfig,
