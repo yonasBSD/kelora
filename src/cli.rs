@@ -36,8 +36,6 @@ pub enum OutputFormat {
     Null,
 }
 
-
-
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum FileOrder {
     None,
@@ -127,7 +125,6 @@ pub struct Cli {
     #[arg(long = "window", help_heading = "Processing Options")]
     pub window_size: Option<usize>,
 
-
     /// File to write error reports to
     #[arg(long = "error-report-file", help_heading = "Error Handling")]
     pub error_report_file: Option<String>,
@@ -143,7 +140,6 @@ pub struct Cli {
     /// Suppress all kelora output (events, errors, stats) but preserve script side effects
     #[arg(short = 'q', long = "quiet", help_heading = "Error Handling")]
     pub quiet: bool,
-
 
     /// Include only events with these log levels
     #[arg(
@@ -204,7 +200,7 @@ pub struct Cli {
     pub output_format: OutputFormat,
 
     /// Output only core fields
-    #[arg(short = 'm', long = "core", help_heading = "Output Options")]
+    #[arg(short = 'c', long = "core", help_heading = "Output Options")]
     pub core: bool,
 
     /// Output only field values

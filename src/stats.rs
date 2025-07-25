@@ -205,15 +205,17 @@ impl ProcessingStats {
 
         // Show parse errors
         if self.lines_errors > 0 {
-            parts.push(format!("{} parse error{}", 
-                self.lines_errors, 
+            parts.push(format!(
+                "{} parse error{}",
+                self.lines_errors,
                 if self.lines_errors == 1 { "" } else { "s" }
             ));
         }
 
         // Show events filtered (could indicate filter errors converted to false)
         if self.events_filtered > 0 {
-            parts.push(format!("{} event{} filtered", 
+            parts.push(format!(
+                "{} event{} filtered",
                 self.events_filtered,
                 if self.events_filtered == 1 { "" } else { "s" }
             ));

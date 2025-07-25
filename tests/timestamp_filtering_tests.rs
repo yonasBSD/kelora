@@ -380,14 +380,14 @@ fn test_events_without_timestamps_strict_mode() {
     );
 
     let since_ts = get_test_timestamp_iso(-60); // 1 hour ago
-    let (stdout, stderr, exit_code) =
+    let (stdout, _stderr, exit_code) =
         run_kelora_with_input(&["-f", "jsonl", "--since", &since_ts, "--strict"], &input);
 
     assert_ne!(
         exit_code, 0,
         "kelora should exit with error in strict mode when encountering event without timestamp"
     );
-    
+
     // Should process the first event with timestamp but fail on the second
     assert!(
         stdout.contains("with timestamp"),

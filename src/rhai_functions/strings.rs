@@ -100,7 +100,6 @@ pub fn is_suppress_side_effects() -> bool {
     SUPPRESS_SIDE_EFFECTS.with(|flag| *flag.borrow())
 }
 
-
 /// Mask IP address for privacy (replace last N octets with 'X')
 fn mask_ip_impl(ip: &str, octets_to_mask: usize) -> String {
     // IPv4 pattern validation

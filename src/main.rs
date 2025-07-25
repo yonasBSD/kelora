@@ -27,8 +27,8 @@ use unix::{
 
 // Use CLI types from library
 use kelora::{
-    run_pipeline_with_kelora_config, Cli, FileOrder, InputFormat,
-    KeloraConfig as LibKeloraConfig, MultilineConfig, OutputFormat, TimestampFilterConfig,
+    run_pipeline_with_kelora_config, Cli, FileOrder, InputFormat, KeloraConfig as LibKeloraConfig,
+    MultilineConfig, OutputFormat, TimestampFilterConfig,
 };
 
 fn main() -> Result<()> {
@@ -177,8 +177,9 @@ fn main() -> Result<()> {
         Ok(pipeline_result) => {
             // Print metrics if enabled (only if not terminated)
             if lib_config.output.metrics && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
-                let metrics_output =
-                    crate::rhai_functions::tracking::format_metrics_output(&pipeline_result.tracking_data);
+                let metrics_output = crate::rhai_functions::tracking::format_metrics_output(
+                    &pipeline_result.tracking_data,
+                );
                 if !metrics_output.is_empty() && metrics_output != "No metrics tracked" {
                     stderr
                         .writeln(&lib_config.format_metrics_message(&metrics_output))
@@ -188,9 +189,9 @@ fn main() -> Result<()> {
 
             // Write metrics to file if configured
             if let Some(ref metrics_file) = lib_config.output.metrics_file {
-                if let Ok(json_output) =
-                    crate::rhai_functions::tracking::format_metrics_json(&pipeline_result.tracking_data)
-                {
+                if let Ok(json_output) = crate::rhai_functions::tracking::format_metrics_json(
+                    &pipeline_result.tracking_data,
+                ) {
                     if let Err(e) = std::fs::write(metrics_file, json_output) {
                         stderr
                             .writeln(&lib_config.format_error_message(&format!(
@@ -214,10 +215,12 @@ fn main() -> Result<()> {
                             .unwrap_or(());
                     } else if !lib_config.processing.quiet {
                         // Error summary by default when errors occur (unless --quiet)
-                        if let Some(error_summary) = crate::rhai_functions::tracking::extract_error_summary_from_tracking(
-                            &pipeline_result.tracking_data,
-                            lib_config.processing.verbose
-                        ) {
+                        if let Some(error_summary) =
+                            crate::rhai_functions::tracking::extract_error_summary_from_tracking(
+                                &pipeline_result.tracking_data,
+                                lib_config.processing.verbose,
+                            )
+                        {
                             stderr
                                 .writeln(&lib_config.format_error_message(&error_summary))
                                 .unwrap_or(());
@@ -591,7 +594,6 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
             cli.end = Some(end.clone());
         }
     }
-
 
     // Apply list values (only if CLI lists are empty)
     if let Some(filters) = config_file.defaults.get("filters") {

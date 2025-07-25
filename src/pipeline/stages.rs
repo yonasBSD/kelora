@@ -48,7 +48,7 @@ impl ScriptStage for FilterStage {
                     &format!("Filter error: {}", e),
                     ctx.config.verbose,
                     ctx.config.quiet,
-                    Some(&ctx.config)
+                    Some(&ctx.config),
                 );
 
                 // New resiliency model: filter errors evaluate to false (Skip)
@@ -79,7 +79,7 @@ impl ScriptStage for ExecStage {
     fn apply(&mut self, event: Event, ctx: &mut PipelineContext) -> ScriptResult {
         // Atomic execution: work on a copy of the event for rollback behavior
         let mut event_copy = event.clone();
-        
+
         let result = if ctx.window.is_empty() {
             // No window context - use standard method
             ctx.rhai
@@ -107,7 +107,7 @@ impl ScriptStage for ExecStage {
                     &format!("Exec error: {}", e),
                     ctx.config.verbose,
                     ctx.config.quiet,
-                    Some(&ctx.config)
+                    Some(&ctx.config),
                 );
 
                 // New resiliency model: atomic rollback - return original event unchanged

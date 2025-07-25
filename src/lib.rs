@@ -5,7 +5,6 @@ use std::collections::HashMap;
 
 pub use config::{KeloraConfig, MultilineConfig, ScriptStageType, TimestampFilterConfig};
 
-
 /// Core pipeline configuration - contains only what's needed for processing
 /// Separated from CLI-specific concerns like colors, stats output, etc.
 #[derive(Debug, Clone)]
@@ -193,7 +192,7 @@ pub fn run_pipeline<W: Write + Send + 'static>(
         } else {
             None
         };
-        
+
         Ok(PipelineResult {
             stats: final_stats,
             success: !SHOULD_TERMINATE.load(Ordering::Relaxed),
@@ -220,12 +219,12 @@ pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
         let mut output = output;
         run_pipeline_sequential(config, &mut output)?;
         let tracking_data = crate::rhai_functions::tracking::get_thread_tracking_state();
-        // Always collect stats for error reporting, even if --stats not used  
+        // Always collect stats for error reporting, even if --stats not used
         stats_finish_processing();
         let mut stats = get_thread_stats();
         stats.extract_discovered_from_tracking(&tracking_data);
         let final_stats = Some(stats);
-        
+
         Ok(PipelineResult {
             stats: final_stats,
             success: !SHOULD_TERMINATE.load(Ordering::Relaxed),
@@ -335,7 +334,6 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
 
     // Merge the parallel tracked state with our pipeline context
     let parallel_tracked = processor.get_final_tracked_state();
-
 
     // Write error summary to file if configured
     if let Some(ref file_path) = config.processing.error_report.file {
@@ -554,7 +552,6 @@ pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) 
     // Merge thread-local tracking state (including errors) into context for sequential mode
     crate::rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
 
-
     // Write error summary to file if configured
     if let Some(ref file_path) = config.processing.error_report.file {
         crate::rhai_functions::tracking::write_error_summary_to_file(&ctx.tracker, file_path)
@@ -708,7 +705,6 @@ fn process_line_sequential<W: Write>(
                 return Err(e);
             }
             // Default resilient mode: continue processing
-            
         }
     }
 

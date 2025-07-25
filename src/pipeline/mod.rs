@@ -27,32 +27,42 @@ fn collect_discovered_levels_and_keys(event: &Event, ctx: &mut PipelineContext) 
                     // Add to both ctx.tracker (for parallel) and thread-local tracking (for sequential)
                     // 1. Add to ctx.tracker
                     let key = "__kelora_stats_discovered_levels".to_string();
-                    let current = ctx.tracker.get(&key).cloned().unwrap_or_else(|| {
-                        Dynamic::from(rhai::Array::new())
-                    });
-                    
+                    let current = ctx
+                        .tracker
+                        .get(&key)
+                        .cloned()
+                        .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
+
                     if let Ok(mut arr) = current.into_array() {
                         let level_dynamic = Dynamic::from(level_str.clone());
                         // Check if level already exists in array
-                        if !arr.iter().any(|v| v.clone().into_string().unwrap_or_default() == level_dynamic.clone().into_string().unwrap_or_default()) {
+                        if !arr.iter().any(|v| {
+                            v.clone().into_string().unwrap_or_default()
+                                == level_dynamic.clone().into_string().unwrap_or_default()
+                        }) {
                             arr.push(level_dynamic);
                         }
                         ctx.tracker.insert(key.clone(), Dynamic::from(arr));
-                        ctx.tracker.insert(format!("__op_{}", key), Dynamic::from("unique"));
+                        ctx.tracker
+                            .insert(format!("__op_{}", key), Dynamic::from("unique"));
                     }
 
                     // 2. Add to thread-local tracking state (reuse existing track_unique pattern)
                     crate::rhai_functions::tracking::THREAD_TRACKING_STATE.with(|state| {
                         let mut state = state.borrow_mut();
                         let key = "__kelora_stats_discovered_levels";
-                        
-                        let current = state.get(key).cloned().unwrap_or_else(|| {
-                            Dynamic::from(rhai::Array::new())
-                        });
+
+                        let current = state
+                            .get(key)
+                            .cloned()
+                            .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
 
                         if let Ok(mut arr) = current.into_array() {
                             let level_dynamic = Dynamic::from(level_str);
-                            if !arr.iter().any(|v| v.clone().into_string().unwrap_or_default() == level_dynamic.clone().into_string().unwrap_or_default()) {
+                            if !arr.iter().any(|v| {
+                                v.clone().into_string().unwrap_or_default()
+                                    == level_dynamic.clone().into_string().unwrap_or_default()
+                            }) {
                                 arr.push(level_dynamic);
                             }
                             state.insert(key.to_string(), Dynamic::from(arr));
@@ -67,20 +77,26 @@ fn collect_discovered_levels_and_keys(event: &Event, ctx: &mut PipelineContext) 
 
     // Collect discovered keys
     let key = "__kelora_stats_discovered_keys".to_string();
-    let current = ctx.tracker.get(&key).cloned().unwrap_or_else(|| {
-        Dynamic::from(rhai::Array::new())
-    });
-    
+    let current = ctx
+        .tracker
+        .get(&key)
+        .cloned()
+        .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
+
     if let Ok(mut arr) = current.into_array() {
         for field_key in event.fields.keys() {
             let key_dynamic = Dynamic::from(field_key.clone());
             // Check if key already exists in array
-            if !arr.iter().any(|v| v.clone().into_string().unwrap_or_default() == key_dynamic.clone().into_string().unwrap_or_default()) {
+            if !arr.iter().any(|v| {
+                v.clone().into_string().unwrap_or_default()
+                    == key_dynamic.clone().into_string().unwrap_or_default()
+            }) {
                 arr.push(key_dynamic.clone());
             }
         }
         ctx.tracker.insert(key.clone(), Dynamic::from(arr.clone()));
-        ctx.tracker.insert(format!("__op_{}", key), Dynamic::from("unique"));
+        ctx.tracker
+            .insert(format!("__op_{}", key), Dynamic::from("unique"));
 
         // Also add to thread-local tracking state
         crate::rhai_functions::tracking::THREAD_TRACKING_STATE.with(|state| {
@@ -109,8 +125,13 @@ impl ScriptResult {
         match self {
             ScriptResult::Emit(event) => Ok(event),
             ScriptResult::Skip => Err(anyhow::anyhow!("Expected ScriptResult::Emit, got Skip")),
-            ScriptResult::EmitMultiple(_) => Err(anyhow::anyhow!("Expected ScriptResult::Emit, got EmitMultiple")),
-            ScriptResult::Error(msg) => Err(anyhow::anyhow!("Expected ScriptResult::Emit, got Error: {}", msg)),
+            ScriptResult::EmitMultiple(_) => Err(anyhow::anyhow!(
+                "Expected ScriptResult::Emit, got EmitMultiple"
+            )),
+            ScriptResult::Error(msg) => Err(anyhow::anyhow!(
+                "Expected ScriptResult::Emit, got Error: {}",
+                msg
+            )),
         }
     }
 }
@@ -127,7 +148,8 @@ pub struct PipelineContext {
 /// Pipeline configuration
 #[derive(Debug, Clone)]
 pub struct PipelineConfig {
-    #[allow(dead_code)] // LEGACY: Remove during resiliency migration (see dev/resiliency-todos.md #4)
+    #[allow(dead_code)]
+    // LEGACY: Remove during resiliency migration (see dev/resiliency-todos.md #4)
     pub error_report: crate::config::ErrorReportConfig,
     pub brief: bool,
     pub color_mode: crate::config::ColorMode,
@@ -234,7 +256,7 @@ impl Pipeline {
                 Ok(mut e) => {
                     // Event was successfully created from chunk
                     crate::stats::stats_add_event_created();
-                    
+
                     // Collect discovered levels and keys for stats
                     collect_discovered_levels_and_keys(&e, ctx);
 
@@ -263,7 +285,7 @@ impl Pipeline {
                         &err.to_string(),
                         ctx.config.verbose,
                         ctx.config.quiet,
-                        Some(&ctx.config)
+                        Some(&ctx.config),
                     );
 
                     // New resiliency model: skip unparseable lines by default,
@@ -274,7 +296,6 @@ impl Pipeline {
                         // Skip this line and continue processing
                         return Ok(results);
                     }
-
                 }
             };
 
@@ -304,7 +325,7 @@ impl Pipeline {
                                         &msg,
                                         ctx.config.verbose,
                                         ctx.config.quiet,
-                                        Some(&ctx.config)
+                                        Some(&ctx.config),
                                     );
 
                                     // New resiliency model: use strict flag
@@ -351,9 +372,7 @@ impl Pipeline {
                         // Also track in Rhai context for parallel processing
                         ctx.tracker
                             .entry("__kelora_stats_events_filtered".to_string())
-                            .and_modify(|v| {
-                                *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
-                            })
+                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
                             .or_insert(rhai::Dynamic::from(1i64));
                         ctx.tracker.insert(
                             "__op___kelora_stats_events_filtered".to_string(),
@@ -417,7 +436,7 @@ impl Pipeline {
                         &msg,
                         ctx.config.verbose,
                         ctx.config.quiet,
-                        Some(&ctx.config)
+                        Some(&ctx.config),
                     );
 
                     // New resiliency model: use strict flag

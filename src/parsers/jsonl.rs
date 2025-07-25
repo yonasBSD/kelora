@@ -33,8 +33,12 @@ impl JsonlParser {
 
 impl EventParser for JsonlParser {
     fn parse(&self, line: &str) -> Result<Event> {
-        let json_value: serde_json::Value = serde_json::from_str(line)
-            .with_context(|| format!("Failed to parse JSON: {}", crate::config::format_error_line(line)))?;
+        let json_value: serde_json::Value = serde_json::from_str(line).with_context(|| {
+            format!(
+                "Failed to parse JSON: {}",
+                crate::config::format_error_line(line)
+            )
+        })?;
 
         if let serde_json::Value::Object(ref map) = json_value {
             // Pre-allocate HashMap with capacity based on JSON object size

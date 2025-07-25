@@ -198,8 +198,12 @@ impl EventParser for CsvParser {
         }
 
         // Parse data line using pre-initialized headers
-        self.parse_data_line(line)
-            .with_context(|| format!("Failed to parse CSV line: {}", crate::config::format_error_line(line)))
+        self.parse_data_line(line).with_context(|| {
+            format!(
+                "Failed to parse CSV line: {}",
+                crate::config::format_error_line(line)
+            )
+        })
     }
 }
 

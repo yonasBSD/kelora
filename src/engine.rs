@@ -678,7 +678,6 @@ impl RhaiEngine {
     fn create_scope_for_event(&self, event: &Event) -> Scope {
         let mut scope = self.scope_template.clone();
 
-
         // Update built-in variables
         scope.set_value("line", event.original_line.clone());
 
@@ -749,7 +748,5 @@ impl RhaiEngine {
                 event.fields.insert(k.to_string(), v.clone());
             }
         }
-
     }
-
 }

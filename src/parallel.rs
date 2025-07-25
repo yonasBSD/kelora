@@ -1037,7 +1037,7 @@ impl ParallelProcessor {
                         // 1. Parsing errors (counted by stats_add_line_error() in pipeline)
                         // 2. Filter rejections (counted by stats_add_event_filtered() in pipeline)
                         // So we don't need to count empty results as filtered here anymore
-                        
+
                         // Always collect any prints/eprints that were captured during processing this specific event
                         // This includes verbose error messages from filter/exec errors that result in skipped events
                         let captured_prints =
@@ -1049,7 +1049,11 @@ impl ParallelProcessor {
 
                         // If there are captured messages but no formatted results (e.g., filter errors that skip events),
                         // create a dummy event to carry the error messages
-                        if formatted_results.is_empty() && (!captured_prints.is_empty() || !captured_eprints.is_empty() || !captured_messages.is_empty()) {
+                        if formatted_results.is_empty()
+                            && (!captured_prints.is_empty()
+                                || !captured_eprints.is_empty()
+                                || !captured_messages.is_empty())
+                        {
                             let dummy_event = Event::default_with_line(String::new());
                             batch_results.push(ProcessedEvent {
                                 event: dummy_event,
@@ -1081,9 +1085,11 @@ impl ParallelProcessor {
                     Err(e) => {
                         // Error handling and stats tracking is already done in pipeline.process_line()
                         // But we still need to collect any captured eprints/messages for verbose error output
-                        let captured_eprints = crate::rhai_functions::strings::take_captured_eprints();
-                        let captured_messages = crate::rhai_functions::strings::take_captured_messages();
-                        
+                        let captured_eprints =
+                            crate::rhai_functions::strings::take_captured_eprints();
+                        let captured_messages =
+                            crate::rhai_functions::strings::take_captured_messages();
+
                         // In verbose mode, we want to output these error messages even if the event is skipped
                         if !captured_eprints.is_empty() || !captured_messages.is_empty() {
                             // Create a dummy processed event just to carry the error messages
@@ -1096,14 +1102,13 @@ impl ParallelProcessor {
                                 captured_messages,
                             });
                         }
-                        
+
                         // New resiliency model: check strict flag
                         if ctx.config.strict {
                             return Err(e);
                         } else {
                             continue; // Skip in default resilient mode
                         }
-                        
                     }
                 }
             }
@@ -1195,12 +1200,13 @@ impl ParallelProcessor {
             let thread_tracking = crate::rhai_functions::tracking::get_thread_tracking_state();
             for (key, value) in thread_tracking {
                 // Include error tracking, discovered levels/keys with their operations, and user tracking, but not other internal stats
-                if (!key.starts_with("__op___kelora_stats_") || 
-                    key == "__op___kelora_stats_discovered_levels" || 
-                    key == "__op___kelora_stats_discovered_keys") && 
-                   (!key.starts_with("__kelora_stats_") || 
-                    key == "__kelora_stats_discovered_levels" || 
-                    key == "__kelora_stats_discovered_keys") {
+                if (!key.starts_with("__op___kelora_stats_")
+                    || key == "__op___kelora_stats_discovered_levels"
+                    || key == "__op___kelora_stats_discovered_keys")
+                    && (!key.starts_with("__kelora_stats_")
+                        || key == "__kelora_stats_discovered_levels"
+                        || key == "__kelora_stats_discovered_keys")
+                {
                     deltas.insert(key, value);
                 }
             }

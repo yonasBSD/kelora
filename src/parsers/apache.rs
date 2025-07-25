@@ -21,8 +21,9 @@ impl ApacheParser {
 
         // Apache Common Log Format pattern
         // Example: 192.168.1.1 - user [25/Dec/1995:10:00:00 +0000] "GET /index.html HTTP/1.0" 200 1234
-        let common_regex = Regex::new(r#"^(\S+) (\S+) (\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+)(?:\r?\n)?$"#)
-            .context("Failed to compile Apache Common Log Format regex")?;
+        let common_regex =
+            Regex::new(r#"^(\S+) (\S+) (\S+) \[([^\]]+)\] "([^"]*)" (\d+) (\S+)(?:\r?\n)?$"#)
+                .context("Failed to compile Apache Common Log Format regex")?;
 
         Ok(Self {
             combined_regex,
@@ -214,7 +215,10 @@ impl EventParser for ApacheParser {
         } else if let Some(event) = self.try_parse_common(line) {
             Ok(event)
         } else {
-            Err(anyhow::anyhow!("Failed to parse Apache log line: {}", crate::config::format_error_line(line)))
+            Err(anyhow::anyhow!(
+                "Failed to parse Apache log line: {}",
+                crate::config::format_error_line(line)
+            ))
         }
     }
 }

@@ -9,33 +9,43 @@ thread_local! {
 
 /// Unified error tracking function that handles counts, samples, and verbose output
 /// This replaces both stats-based and tracking-based error mechanisms
-pub fn track_error(error_type: &str, line_num: Option<usize>, message: &str, verbose: bool, quiet: bool, config: Option<&crate::pipeline::PipelineConfig>) {
+pub fn track_error(
+    error_type: &str,
+    line_num: Option<usize>,
+    message: &str,
+    verbose: bool,
+    quiet: bool,
+    config: Option<&crate::pipeline::PipelineConfig>,
+) {
     // Also update stats for the termination case (minimal error count only)
     if error_type == "parse" {
         crate::stats::stats_add_line_error();
     } else {
         crate::stats::stats_add_error();
     }
-    
+
     THREAD_TRACKING_STATE.with(|state| {
         let mut state = state.borrow_mut();
-        
+
         // Track error count by type
         let count_key = format!("__kelora_error_count_{}", error_type);
-        let current_count = state.get(&count_key).cloned().unwrap_or(Dynamic::from(0i64));
+        let current_count = state
+            .get(&count_key)
+            .cloned()
+            .unwrap_or(Dynamic::from(0i64));
         let new_count = current_count.as_int().unwrap_or(0) + 1;
         state.insert(count_key.clone(), Dynamic::from(new_count));
         state.insert(format!("__op_{}", count_key), Dynamic::from("count"));
-        
+
         // Output verbose errors - use ordered capture system for proper interleaving
         if verbose && !quiet {
             let formatted_error = crate::config::format_verbose_error_with_pipeline_config(
-                line_num, 
-                &format!("{} error", error_type), 
-                message, 
-                config
+                line_num,
+                &format!("{} error", error_type),
+                message,
+                config,
             );
-            
+
             if crate::rhai_functions::strings::is_parallel_mode() {
                 // In parallel mode, capture stderr message for ordered output later
                 crate::rhai_functions::strings::capture_stderr(formatted_error);
@@ -46,19 +56,25 @@ pub fn track_error(error_type: &str, line_num: Option<usize>, message: &str, ver
             }
         }
 
-        // Track error samples (max 3 per type) 
+        // Track error samples (max 3 per type)
         let samples_key = format!("__kelora_error_samples_{}", error_type);
-        let current_samples = state.get(&samples_key).cloned().unwrap_or_else(|| {
-            Dynamic::from(rhai::Array::new())
-        });
-        
+        let current_samples = state
+            .get(&samples_key)
+            .cloned()
+            .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
+
         if let Ok(mut arr) = current_samples.into_array() {
             // Only store up to 3 samples per error type
             if arr.len() < 3 {
-                let formatted_error = crate::config::format_verbose_error_with_pipeline_config(line_num, &format!("{} error", error_type), message, config);
+                let formatted_error = crate::config::format_verbose_error_with_pipeline_config(
+                    line_num,
+                    &format!("{} error", error_type),
+                    message,
+                    config,
+                );
                 arr.push(Dynamic::from(formatted_error));
             }
-            
+
             state.insert(samples_key.clone(), Dynamic::from(arr));
             state.insert(format!("__op_{}", samples_key), Dynamic::from("unique"));
         }
@@ -82,11 +98,14 @@ pub fn has_errors_in_tracking(tracked: &HashMap<String, Dynamic>) -> bool {
 
 /// Extract error summary from tracking state with different verbosity levels
 #[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
-pub fn extract_error_summary_from_tracking(tracked: &HashMap<String, Dynamic>, verbose: bool) -> Option<String> {
+pub fn extract_error_summary_from_tracking(
+    tracked: &HashMap<String, Dynamic>,
+    verbose: bool,
+) -> Option<String> {
     let mut total_errors = 0;
     let mut error_types = Vec::new();
     let mut samples = Vec::new();
-    
+
     // Collect error counts by type
     for (key, value) in tracked {
         if let Some(error_type) = key.strip_prefix("__kelora_error_count_") {
@@ -98,11 +117,11 @@ pub fn extract_error_summary_from_tracking(tracked: &HashMap<String, Dynamic>, v
             }
         }
     }
-    
+
     if total_errors == 0 {
         return None;
     }
-    
+
     // In verbose mode, also collect samples
     if verbose {
         for (key, value) in tracked {
@@ -117,10 +136,10 @@ pub fn extract_error_summary_from_tracking(tracked: &HashMap<String, Dynamic>, v
             }
         }
     }
-    
+
     // Format summary based on verbosity
     let mut summary = String::new();
-    
+
     if error_types.len() == 1 && error_types[0].0 == "parse" {
         // Simple case: only parse errors
         let count = error_types[0].1;
@@ -133,19 +152,26 @@ pub fn extract_error_summary_from_tracking(tracked: &HashMap<String, Dynamic>, v
         // Simple case: only one error type
         let (error_type, count) = &error_types[0];
         if *count == 1 {
-            summary.push_str(&format!("Processing completed with 1 {} error", error_type)); 
+            summary.push_str(&format!("Processing completed with 1 {} error", error_type));
         } else {
-            summary.push_str(&format!("Processing completed with {} {} errors", count, error_type));
+            summary.push_str(&format!(
+                "Processing completed with {} {} errors",
+                count, error_type
+            ));
         }
     } else {
         // Multiple error types
-        summary.push_str(&format!("Processing completed with {} errors: ", total_errors));
-        let type_summaries: Vec<String> = error_types.iter()
+        summary.push_str(&format!(
+            "Processing completed with {} errors: ",
+            total_errors
+        ));
+        let type_summaries: Vec<String> = error_types
+            .iter()
             .map(|(error_type, count)| format!("{} {}", count, error_type))
             .collect();
         summary.push_str(&type_summaries.join(", "));
     }
-    
+
     // Add samples in verbose mode
     if verbose && !samples.is_empty() {
         summary.push_str("\n\nError examples:");
@@ -153,10 +179,9 @@ pub fn extract_error_summary_from_tracking(tracked: &HashMap<String, Dynamic>, v
             summary.push_str(&format!("\n  {}", sample));
         }
     }
-    
+
     Some(summary)
 }
-
 
 pub fn register_functions(engine: &mut Engine) {
     // Track functions using thread-local storage - clean user API
@@ -637,7 +662,6 @@ pub fn set_thread_tracking_state(tracked: &HashMap<String, Dynamic>) {
 pub fn get_thread_tracking_state() -> HashMap<String, Dynamic> {
     THREAD_TRACKING_STATE.with(|state| state.borrow().clone())
 }
-
 
 /// Merge thread-local tracking state into context tracker for sequential mode
 #[allow(dead_code)] // Planned feature for parallel mode metrics merging
