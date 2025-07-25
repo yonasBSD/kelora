@@ -283,9 +283,15 @@ fn main() -> Result<()> {
 
 /// Validate CLI arguments for early error detection
 fn validate_cli_args(cli: &Cli) -> Result<()> {
-    // Check if input files exist (if specified)
+    // Check if input files exist (if specified), skip "-" which represents stdin
+    let mut stdin_count = 0;
     for file_path in &cli.files {
-        if !std::path::Path::new(file_path).exists() {
+        if file_path == "-" {
+            stdin_count += 1;
+            if stdin_count > 1 {
+                return Err(anyhow::anyhow!("stdin (\"-\") can only be specified once"));
+            }
+        } else if !std::path::Path::new(file_path).exists() {
             return Err(anyhow::anyhow!("File not found: {}", file_path));
         }
     }
@@ -400,7 +406,7 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
         }
     };
 
-    // Show usage if on TTY and no input files provided
+    // Show usage if on TTY and no input files provided (but not if "-" is explicitly specified)
     if crate::tty::is_stdin_tty() && cli.files.is_empty() {
         // Print brief usage with description and help hint
         println!("{}", Cli::command().render_usage());

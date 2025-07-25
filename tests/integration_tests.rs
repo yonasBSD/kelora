@@ -791,6 +791,81 @@ fn test_print_function_output() {
 }
 
 #[test]
+fn test_explicit_stdin_with_dash() {
+    let input = r#"{"level": "info", "message": "test1"}
+{"level": "error", "message": "test2"}
+{"level": "info", "message": "test3"}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl", "-"], input);
+
+    assert_eq!(exit_code, 0);
+    assert!(stdout.contains("test1"));
+    assert!(stdout.contains("test2"));
+    assert!(stdout.contains("test3"));
+}
+
+#[test]
+fn test_stdin_mixed_with_files() {
+    // Create a temporary file
+    let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
+    temp_file
+        .write_all(b"{\"level\": \"debug\", \"message\": \"from file\"}\n")
+        .expect("Failed to write to temp file");
+
+    let stdin_input = r#"{"level": "info", "message": "from stdin"}"#;
+
+    // Test file first, then stdin
+    let mut cmd = Command::new(if cfg!(debug_assertions) {
+        "./target/debug/kelora"
+    } else {
+        "./target/release/kelora"
+    })
+    .args(&["-f", "jsonl", temp_file.path().to_str().unwrap(), "-"])
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .spawn()
+    .expect("Failed to start kelora");
+
+    if let Some(stdin) = cmd.stdin.as_mut() {
+        stdin
+            .write_all(stdin_input.as_bytes())
+            .expect("Failed to write to stdin");
+    }
+
+    let output = cmd.wait_with_output().expect("Failed to read output");
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let exit_code = output.status.code().unwrap_or(-1);
+
+    assert_eq!(exit_code, 0);
+    assert!(stdout.contains("from file"));
+    assert!(stdout.contains("from stdin"));
+}
+
+#[test]
+fn test_multiple_stdin_rejected() {
+    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl", "-", "-"], "test");
+
+    assert_ne!(exit_code, 0);
+    assert!(stderr.contains("stdin (\"-\") can only be specified once"));
+    assert!(stdout.is_empty());
+}
+
+#[test]
+fn test_stdin_with_parallel_processing() {
+    let input = r#"{"level": "info", "message": "test1"}
+{"level": "error", "message": "test2"}
+{"level": "info", "message": "test3"}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl", "--parallel", "-"], input);
+
+    assert_eq!(exit_code, 0);
+    assert!(stdout.contains("test1"));
+    assert!(stdout.contains("test2"));
+    assert!(stdout.contains("test3"));
+}
+
+#[test]
 fn test_stdin_large_input_performance() {
     // Generate 1000 log entries to test performance
     let mut large_input = String::new();

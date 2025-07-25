@@ -53,7 +53,7 @@ pub enum FileOrder {
 #[command(version = "0.2.0")]
 #[command(author = "Dirk Loss <mail@dirk-loss.de>")]
 pub struct Cli {
-    /// Input files (stdin if not specified)
+    /// Input files (stdin if not specified, or use "-" to explicitly specify stdin)
     pub files: Vec<String>,
 
     /// Input format

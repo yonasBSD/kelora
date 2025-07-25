@@ -130,7 +130,7 @@ impl io::BufRead for ChannelStdinReader {
 pub struct MultiFileReader {
     files: Vec<String>,
     current_file_idx: usize,
-    current_reader: Option<BufReader<DecompressionReader>>,
+    current_reader: Option<Box<dyn BufRead + Send>>,
     buffer_size: usize,
 }
 
@@ -198,22 +198,43 @@ impl MultiFileReader {
         while self.current_reader.is_none() && self.current_file_idx < self.files.len() {
             let file_path = &self.files[self.current_file_idx];
 
-            match DecompressionReader::new(file_path) {
-                Ok(decompressor) => {
-                    self.current_reader =
-                        Some(BufReader::with_capacity(self.buffer_size, decompressor));
-                    return Ok(true);
+            if file_path == "-" {
+                // Handle stdin with streaming support
+                match ChannelStdinReader::new() {
+                    Ok(stdin_reader) => {
+                        self.current_reader = Some(Box::new(stdin_reader));
+                        return Ok(true);
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "{}",
+                            crate::config::format_error_message_auto(&format!(
+                                "Warning: Failed to setup stdin reader: {}",
+                                e
+                            ))
+                        );
+                        self.current_file_idx += 1;
+                        continue;
+                    }
                 }
-                Err(e) => {
-                    eprintln!(
-                        "{}",
-                        crate::config::format_error_message_auto(&format!(
-                            "Warning: Failed to open file '{}': {}",
-                            file_path, e
-                        ))
-                    );
-                    self.current_file_idx += 1;
-                    continue;
+            } else {
+                match DecompressionReader::new(file_path) {
+                    Ok(decompressor) => {
+                        self.current_reader =
+                            Some(Box::new(BufReader::with_capacity(self.buffer_size, decompressor)));
+                        return Ok(true);
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "{}",
+                            crate::config::format_error_message_auto(&format!(
+                                "Warning: Failed to open file '{}': {}",
+                                file_path, e
+                            ))
+                        );
+                        self.current_file_idx += 1;
+                        continue;
+                    }
                 }
             }
         }
