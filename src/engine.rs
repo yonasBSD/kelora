@@ -742,10 +742,21 @@ impl RhaiEngine {
     }
 
     fn update_event_from_scope(&self, event: &mut Event, scope: &Scope) {
+        // Check if entire event 'e' was set to unit () - clear all fields
+        if scope.get_value::<()>("e").is_some() {
+            event.fields.clear();
+            return;
+        }
+        
         // Capture mutations made directly to the `e` event map
         if let Some(obj) = scope.get_value::<Map>("e") {
             for (k, v) in obj {
-                event.fields.insert(k.to_string(), v.clone());
+                // Remove fields that are set to unit () - allows easy field removal
+                if v.is::<()>() {
+                    event.fields.shift_remove(&k.to_string());
+                } else {
+                    event.fields.insert(k.to_string(), v.clone());
+                }
             }
         }
     }

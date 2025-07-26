@@ -66,6 +66,10 @@ e.level == "error"                        // Direct access
 e["user-agent"] = "kelora/1.0"           // Invalid identifiers need brackets
 e.processed = now_utc()                   // Add new fields
 
+// Field and event removal with unit ()
+e.password = ()                           // Remove individual fields
+e = ()                                    // Remove entire event (clears all fields)
+
 // Method vs function style (both work, methods chain better)
 e.ip.mask_ip(2)                          // Method style
 mask_ip(e.ip, 2)                         // Function style (avoids conflicts)

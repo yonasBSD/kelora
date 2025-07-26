@@ -353,19 +353,35 @@ impl Pipeline {
             match result {
                 ScriptResult::Emit(event) => {
                     if self.limiter.as_mut().is_none_or(|l| l.allow()) {
-                        crate::stats::stats_add_event_output();
+                        // Filter out empty events before formatting
+                        if event.fields.is_empty() {
+                            // Empty events are counted as filtered
+                            crate::stats::stats_add_event_filtered();
 
-                        // Also track in Rhai context for parallel processing
-                        ctx.tracker
-                            .entry("__kelora_stats_events_output".to_string())
-                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
-                            .or_insert(rhai::Dynamic::from(1i64));
-                        ctx.tracker.insert(
-                            "__op___kelora_stats_events_output".to_string(),
-                            rhai::Dynamic::from("count"),
-                        );
+                            // Also track in Rhai context for parallel processing
+                            ctx.tracker
+                                .entry("__kelora_stats_events_filtered".to_string())
+                                .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                                .or_insert(rhai::Dynamic::from(1i64));
+                            ctx.tracker.insert(
+                                "__op___kelora_stats_events_filtered".to_string(),
+                                rhai::Dynamic::from("count"),
+                            );
+                        } else {
+                            crate::stats::stats_add_event_output();
 
-                        results.push(self.formatter.format(&event));
+                            // Also track in Rhai context for parallel processing
+                            ctx.tracker
+                                .entry("__kelora_stats_events_output".to_string())
+                                .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                                .or_insert(rhai::Dynamic::from(1i64));
+                            ctx.tracker.insert(
+                                "__op___kelora_stats_events_output".to_string(),
+                                rhai::Dynamic::from("count"),
+                            );
+
+                            results.push(self.formatter.format(&event));
+                        }
                     } else {
                         crate::stats::stats_add_event_filtered();
 
@@ -383,21 +399,39 @@ impl Pipeline {
                 ScriptResult::EmitMultiple(events) => {
                     for event in events {
                         if self.limiter.as_mut().is_none_or(|l| l.allow()) {
-                            crate::stats::stats_add_event_output();
+                            // Filter out empty events before formatting
+                            if event.fields.is_empty() {
+                                // Empty events are counted as filtered
+                                crate::stats::stats_add_event_filtered();
 
-                            // Also track in Rhai context for parallel processing
-                            ctx.tracker
-                                .entry("__kelora_stats_events_output".to_string())
-                                .and_modify(|v| {
-                                    *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
-                                })
-                                .or_insert(rhai::Dynamic::from(1i64));
-                            ctx.tracker.insert(
-                                "__op___kelora_stats_events_output".to_string(),
-                                rhai::Dynamic::from("count"),
-                            );
+                                // Also track in Rhai context for parallel processing
+                                ctx.tracker
+                                    .entry("__kelora_stats_events_filtered".to_string())
+                                    .and_modify(|v| {
+                                        *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
+                                    })
+                                    .or_insert(rhai::Dynamic::from(1i64));
+                                ctx.tracker.insert(
+                                    "__op___kelora_stats_events_filtered".to_string(),
+                                    rhai::Dynamic::from("count"),
+                                );
+                            } else {
+                                crate::stats::stats_add_event_output();
 
-                            results.push(self.formatter.format(&event));
+                                // Also track in Rhai context for parallel processing
+                                ctx.tracker
+                                    .entry("__kelora_stats_events_output".to_string())
+                                    .and_modify(|v| {
+                                        *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
+                                    })
+                                    .or_insert(rhai::Dynamic::from(1i64));
+                                ctx.tracker.insert(
+                                    "__op___kelora_stats_events_output".to_string(),
+                                    rhai::Dynamic::from("count"),
+                                );
+
+                                results.push(self.formatter.format(&event));
+                            }
                         } else {
                             crate::stats::stats_add_event_filtered();
 

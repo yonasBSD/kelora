@@ -246,6 +246,23 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
 
 - **Event Variable**: Use `e` to access the current event (renamed from `event` for brevity)
 - **Variable Declaration**: Always use "let" when using new Rhai variables (e.g. 'let myfield=e.col("1,2")' or 'let myfield=e.col(1,2)')
+- **Field and Event Removal**: Use unit `()` assignments for easy field and event removal:
+  - `e.field = ()` - Remove individual fields from events
+  - `e = ()` - Remove entire event (clears all fields, event becomes empty)
+  - Empty events are filtered out before output and counted as "filtered" in stats
+  - Empty events continue through all pipeline stages, allowing later stages to add fields back
+  - Consistent behavior across all output formats (default, JSONL, CSV, etc.)
+  - Examples:
+    ```bash
+    # Remove sensitive fields
+    kelora -e "e.password = (); e.ssn = ()"
+    
+    # Conditional event removal
+    kelora -e "if e.level != 'ERROR' { e = () }"
+    
+    # Progressive transformation (clear then rebuild)
+    kelora -e "let sum = e.a + e.b; e = ()" -e "e.total = sum; e.processed = true"
+    ```
 - **Safety Functions**: Use defensive field access functions for robust scripts:
   - `get_path(e, "field.subfield", default)` - Safe nested field access with fallback
   - `has_path(e, "field.subfield")` - Check if nested path exists
