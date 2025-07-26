@@ -654,8 +654,8 @@ mod tests {
         let result = parse_timestamp_arg_with_timezone("-1x", None);
         assert!(result.is_err());
 
-        let result = parse_timestamp_arg_with_timezone("1h", None); // Missing sign
-        assert!(result.is_err());
+        let result = parse_timestamp_arg_with_timezone("1h", None); // Unsigned defaults to past
+        assert!(result.is_ok());
     }
 
     #[test]
