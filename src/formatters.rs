@@ -800,7 +800,7 @@ mod tests {
         let mut event = Event::default();
         event.set_field("string".to_string(), Dynamic::from("hello".to_string()));
         event.set_field("integer".to_string(), Dynamic::from(42i64));
-        event.set_field("float".to_string(), Dynamic::from(3.14f64));
+        event.set_field("float".to_string(), Dynamic::from(2.5f64));
         event.set_field("bool_true".to_string(), Dynamic::from(true));
         event.set_field("bool_false".to_string(), Dynamic::from(false));
 
@@ -810,7 +810,7 @@ mod tests {
         // Numbers and booleans should not be quoted
         assert!(result.contains("string=hello"));
         assert!(result.contains("integer=42"));
-        assert!(result.contains("float=3.14"));
+        assert!(result.contains("float=2.5"));
         assert!(result.contains("bool_true=true"));
         assert!(result.contains("bool_false=false"));
     }

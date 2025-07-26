@@ -183,7 +183,7 @@ mod tests {
         let parser = LogfmtParser::new();
         let result = EventParser::parse(
             &parser,
-            r#"str="hello" int=123 float=3.14 bool_true=true bool_false=false"#,
+            r#"str="hello" int=123 float=2.5 bool_true=true bool_false=false"#,
         )
         .unwrap();
 
@@ -200,15 +200,13 @@ mod tests {
         assert_eq!(result.fields.get("int").unwrap().as_int().unwrap(), 123);
         assert_eq!(
             result.fields.get("float").unwrap().as_float().unwrap(),
-            3.14
+            2.5
         );
-        assert_eq!(
-            result.fields.get("bool_true").unwrap().as_bool().unwrap(),
-            true
+        assert!(
+            result.fields.get("bool_true").unwrap().as_bool().unwrap()
         );
-        assert_eq!(
-            result.fields.get("bool_false").unwrap().as_bool().unwrap(),
-            false
+        assert!(
+            !result.fields.get("bool_false").unwrap().as_bool().unwrap()
         );
     }
 

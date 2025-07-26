@@ -28,8 +28,7 @@ pub fn register_functions(engine: &mut Engine) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use rhai::{Engine, Map};
+    use rhai::Map;
 
 
     #[test]

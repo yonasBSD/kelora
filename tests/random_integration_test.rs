@@ -96,7 +96,7 @@ fn test_rand_int_function() {
             .expect("Should have random_id field as integer");
 
         assert!(
-            random_id >= 100 && random_id <= 999,
+            (100..=999).contains(&random_id),
             "Random ID {} should be in range [100, 999]",
             random_id
         );
@@ -162,7 +162,7 @@ fn test_random_sampling_workflow() {
     // Should be roughly 10% (allowing for randomness)
     assert!(lines.len() <= 100, "Should not have more events than input");
     assert!(
-        lines.len() >= 1,
+        !lines.is_empty(),
         "Should have at least some events (probabilistically)"
     );
 

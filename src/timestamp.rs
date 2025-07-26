@@ -317,7 +317,7 @@ pub fn parse_timestamp_arg_with_timezone(
 /// Check if a string looks like a relative time expression (e.g., "1h", "30m", "2d", "1 hour")
 fn looks_like_relative_time(arg: &str) -> bool {
     // Must start with a digit
-    if !arg.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+    if !arg.chars().next().is_some_and(|c| c.is_ascii_digit()) {
         return false;
     }
 

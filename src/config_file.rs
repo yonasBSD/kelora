@@ -258,7 +258,7 @@ mod tests {
         writeln!(file, "[defaults]").unwrap();
         writeln!(file, "format = jsonl").unwrap();
         writeln!(file, "output-format = csv").unwrap();
-        writeln!(file, "").unwrap();
+        writeln!(file).unwrap();
         writeln!(file, "[aliases]").unwrap();
         writeln!(file, "errors = --filter 'e.level == \"error\"'").unwrap();
         writeln!(file, "json-logs = --format jsonl --output-format jsonl").unwrap();

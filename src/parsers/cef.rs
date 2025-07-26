@@ -404,18 +404,16 @@ mod tests {
     fn test_cef_type_conversion() {
         let parser = CefParser::new();
         let line =
-            "CEF:0|vendor|product|1.0|100|event|10|count=42 rate=3.14 enabled=true disabled=false";
+            "CEF:0|vendor|product|1.0|100|event|10|count=42 rate=2.5 enabled=true disabled=false";
         let result = EventParser::parse(&parser, line).unwrap();
 
         assert_eq!(result.fields.get("count").unwrap().as_int().unwrap(), 42);
-        assert_eq!(result.fields.get("rate").unwrap().as_float().unwrap(), 3.14);
-        assert_eq!(
-            result.fields.get("enabled").unwrap().as_bool().unwrap(),
-            true
+        assert_eq!(result.fields.get("rate").unwrap().as_float().unwrap(), 2.5);
+        assert!(
+            result.fields.get("enabled").unwrap().as_bool().unwrap()
         );
-        assert_eq!(
-            result.fields.get("disabled").unwrap().as_bool().unwrap(),
-            false
+        assert!(
+            !result.fields.get("disabled").unwrap().as_bool().unwrap()
         );
     }
 }

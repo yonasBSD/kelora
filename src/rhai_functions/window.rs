@@ -329,7 +329,7 @@ mod tests {
 
         // Mix of different numeric types
         window.push(create_test_event(vec![("value", Dynamic::from(42i64))])); // int
-        window.push(create_test_event(vec![("value", Dynamic::from(3.14))])); // float
+        window.push(create_test_event(vec![("value", Dynamic::from(2.5))])); // float
         window.push(create_test_event(vec![("value", Dynamic::from(true))])); // bool -> 1.0
         window.push(create_test_event(vec![("value", Dynamic::from(false))])); // bool -> 0.0
 
@@ -337,7 +337,7 @@ mod tests {
 
         assert_eq!(result.len(), 4);
         assert_eq!(result[0].as_float().unwrap(), 42.0);
-        assert_eq!(result[1].as_float().unwrap(), 3.14);
+        assert_eq!(result[1].as_float().unwrap(), 2.5);
         assert_eq!(result[2].as_float().unwrap(), 1.0);
         assert_eq!(result[3].as_float().unwrap(), 0.0);
     }
@@ -396,14 +396,14 @@ mod tests {
     fn test_percentile_mixed_types() {
         let mut arr = Array::new();
         arr.push(Dynamic::from(42i64)); // int
-        arr.push(Dynamic::from(3.14)); // float
+        arr.push(Dynamic::from(2.5)); // float
         arr.push(Dynamic::from("123.5")); // string number
         arr.push(Dynamic::from(true)); // bool -> 1.0
         arr.push(Dynamic::from(false)); // bool -> 0.0
 
         let median = percentile(arr, 50.0).unwrap();
-        // Sorted: [0.0, 1.0, 3.14, 42.0, 123.5] -> median = 3.14
-        assert_eq!(median, 3.14);
+        // Sorted: [0.0, 1.0, 2.5, 42.0, 123.5] -> median = 2.5
+        assert_eq!(median, 2.5);
     }
 
     #[test]
