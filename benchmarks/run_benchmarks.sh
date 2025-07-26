@@ -31,7 +31,7 @@ get_test_cmd() {
             echo "benchmarks/bench_500k.jsonl --filter \"response_time.sub_string(0,2).to_int() > 100\" --parallel --threads 4"
             ;;
         "sequential_throughput")
-            echo "benchmarks/bench_500k.jsonl --on-error skip"
+            echo "benchmarks/bench_500k.jsonl"
             ;;
         *)
             echo ""

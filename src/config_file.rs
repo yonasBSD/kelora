@@ -164,7 +164,6 @@ impl ConfigFile {
             println!("[defaults]");
             println!("format = jsonl");
             println!("output-format = default");
-            println!("on-error = skip");
             println!("skip-lines = 0");
             println!();
             println!("[aliases]");

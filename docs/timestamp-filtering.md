@@ -39,12 +39,11 @@ Supported units: `s` (seconds), `m` (minutes), `h` (hours), `d` (days), `w` (wee
 
 ## Error Handling
 
-When events don't have valid timestamps, behavior depends on the `--on-error` option:
+When events don't have valid timestamps, kelora uses resilient processing by default:
 
-- `--on-error skip` (default) - Filter out events without timestamps
-- `--on-error print` - Pass through with warning message
-- `--on-error abort` - Stop processing on missing timestamps
-- `--on-error stub` - Pass through silently
+- Events without timestamps are filtered out (default behavior)
+- Use `--strict` to abort processing on missing timestamps
+- Use `--verbose` to see detailed error messages
 
 ## Examples
 
@@ -55,8 +54,8 @@ kelora -f jsonl --since "-1h" app.log
 # Show today's events only
 kelora --since "today" --until "tomorrow" access.log
 
-# Show events with error handling
-kelora --since "2023-12-01" --on-error skip mixed.log
+# Show events with strict error handling
+kelora --since "2023-12-01" --strict mixed.log
 
 # Combine with other filters
 kelora --since "-2h" --levels error --filter 'msg.contains("timeout")' app.log
@@ -67,5 +66,5 @@ kelora --since "-2h" --levels error --filter 'msg.contains("timeout")' app.log
 - Timestamp filtering works with all log formats that have timestamp fields
 - Common timestamp field names are automatically detected: `ts`, `timestamp`, `time`, `@timestamp`, etc.
 - Custom timestamp fields via `--ts-field` are not yet fully supported
-- Events without timestamps are handled according to `--on-error` strategy
+- Events without timestamps are filtered out by default (resilient processing)
 - Filtered events are counted in statistics output (`--stats`)
