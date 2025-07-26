@@ -1230,6 +1230,66 @@ impl ParallelProcessor {
             });
         }
 
+        // Flush any remaining chunks in the worker's pipeline
+        match pipeline.flush(&mut ctx) {
+            Ok(flush_results) => {
+                if !flush_results.is_empty() {
+                    // Convert flush results to ProcessedEvent format
+                    let mut flush_batch_results = Vec::with_capacity(flush_results.len());
+                    
+                    for formatted_result in flush_results {
+                        // Create a dummy event for the flush result
+                        let mut dummy_event = Event::default_with_line(formatted_result.clone());
+                        dummy_event.set_metadata(0, None); // No specific line number for flushed events
+                        
+                        flush_batch_results.push(ProcessedEvent {
+                            event: dummy_event,
+                            captured_prints: Vec::new(),
+                            captured_eprints: Vec::new(),
+                            captured_messages: Vec::new(),
+                        });
+                    }
+                    
+                    // Capture tracking updates from the flush operation
+                    let mut flush_tracking_updates = HashMap::new();
+                    
+                    // Include stats tracking updates for the flushed events
+                    for (key, value) in &ctx.tracker {
+                        if key.starts_with("__kelora_stats_") || key.starts_with("__op___kelora_stats_") {
+                            flush_tracking_updates.insert(key.clone(), value.clone());
+                        }
+                    }
+                    
+                    // Include thread-local tracking state for flush
+                    let thread_tracking = crate::rhai_functions::tracking::get_thread_tracking_state();
+                    for (key, value) in thread_tracking {
+                        flush_tracking_updates.insert(key, value);
+                    }
+                    
+                    // Send flush results as a special batch
+                    let flush_batch_result = BatchResult {
+                        batch_id: u64::MAX - 1, // Special ID for flush batches
+                        results: flush_batch_results,
+                        internal_tracked_updates: flush_tracking_updates,
+                        worker_stats: ProcessingStats::new(),
+                    };
+                    
+                    // Try to send flush results, but don't fail if channel is closed
+                    let _ = result_sender.send(flush_batch_result);
+                }
+            }
+            Err(e) => {
+                // If flush fails and we're in strict mode, we should report the error
+                // In resilient mode, we'll log it but continue
+                if ctx.config.strict {
+                    stats_finish_processing();
+                    return Err(e);
+                } else {
+                    eprintln!("Warning: Failed to flush worker pipeline: {}", e);
+                }
+            }
+        }
+
         stats_finish_processing();
 
         Ok(())
@@ -1321,13 +1381,31 @@ impl ParallelProcessor {
             global_tracker.merge_worker_state(internal_tracked_updates)?;
             global_tracker.merge_worker_stats(&batch_result.worker_stats)?;
 
-            // Handle special final stats batch (don't store for ordering)
+            // Handle special batches
             if batch_id == u64::MAX {
                 // This is a final stats batch from a terminated worker
                 // If we're terminating, we might want to exit soon after collecting these
                 if termination_detected {
                     // Continue processing a bit more to collect other final stats
                     continue;
+                }
+                continue;
+            } else if batch_id == u64::MAX - 1 {
+                // This is a flush batch from a worker - process it immediately
+                if !termination_detected {
+                    let remaining_limit = take_limit.map(|limit| limit.saturating_sub(events_output));
+                    let events_this_batch =
+                        Self::pipeline_output_batch_results(output, &batch_result.results, remaining_limit)?;
+                    events_output += events_this_batch;
+                    
+                    // Check if we've reached the take limit
+                    if let Some(limit) = take_limit {
+                        if events_output >= limit {
+                            // Set termination signal to stop further processing
+                            SHOULD_TERMINATE.store(true, Ordering::Relaxed);
+                            break;
+                        }
+                    }
                 }
                 continue;
             }
@@ -1395,12 +1473,33 @@ impl ParallelProcessor {
             global_tracker.merge_worker_state(batch_result.internal_tracked_updates)?;
             global_tracker.merge_worker_stats(&batch_result.worker_stats)?;
 
-            // Handle special final stats batch (don't output)
+            // Handle special batches
             if batch_result.batch_id == u64::MAX {
                 // This is a final stats batch from a terminated worker
                 if termination_detected {
                     // Continue processing a bit more to collect other final stats
                     continue;
+                }
+                continue;
+            } else if batch_result.batch_id == u64::MAX - 1 {
+                // This is a flush batch from a worker - process it immediately
+                if !termination_detected {
+                    let remaining_limit = take_limit.map(|limit| limit.saturating_sub(events_output));
+                    let events_this_batch = Self::pipeline_output_batch_results(
+                        output,
+                        &batch_result.results,
+                        remaining_limit,
+                    )?;
+                    events_output += events_this_batch;
+
+                    // Check if we've reached the take limit
+                    if let Some(limit) = take_limit {
+                        if events_output >= limit {
+                            // Set termination signal to stop further processing
+                            SHOULD_TERMINATE.store(true, Ordering::Relaxed);
+                            break;
+                        }
+                    }
                 }
                 continue;
             }
