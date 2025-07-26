@@ -5,6 +5,7 @@ pub mod columns;
 pub mod datetime;
 pub mod maps;
 pub mod math;
+pub mod random;
 pub mod safety;
 pub mod strings;
 pub mod tracking;
@@ -17,6 +18,7 @@ pub fn register_all_functions(engine: &mut Engine) {
     columns::register_functions(engine);
     maps::register_functions(engine);
     math::register_functions(engine);
+    random::register_functions(engine);
     datetime::register_functions(engine);
     window::register_functions(engine);
     safety::register_functions(engine);
