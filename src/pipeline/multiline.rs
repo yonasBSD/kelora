@@ -149,7 +149,7 @@ impl Chunker for MultilineChunker {
         if let MultilineStrategy::Backslash { .. } = &self.config.strategy {
             // Add the line to buffer first
             self.buffer.push(line);
-            
+
             // Check if this line (the one we just added) ends the event
             if let Some(last_line) = self.buffer.last() {
                 if self.ends_current_event(last_line) {
@@ -157,7 +157,7 @@ impl Chunker for MultilineChunker {
                     return self.flush_buffer();
                 }
             }
-            
+
             // Event continues, return None
             return None;
         }

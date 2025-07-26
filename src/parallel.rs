@@ -1236,12 +1236,12 @@ impl ParallelProcessor {
                 if !flush_results.is_empty() {
                     // Convert flush results to ProcessedEvent format
                     let mut flush_batch_results = Vec::with_capacity(flush_results.len());
-                    
+
                     for formatted_result in flush_results {
                         // Create a dummy event for the flush result
                         let mut dummy_event = Event::default_with_line(formatted_result.clone());
                         dummy_event.set_metadata(0, None); // No specific line number for flushed events
-                        
+
                         flush_batch_results.push(ProcessedEvent {
                             event: dummy_event,
                             captured_prints: Vec::new(),
@@ -1249,23 +1249,26 @@ impl ParallelProcessor {
                             captured_messages: Vec::new(),
                         });
                     }
-                    
+
                     // Capture tracking updates from the flush operation
                     let mut flush_tracking_updates = HashMap::new();
-                    
+
                     // Include stats tracking updates for the flushed events
                     for (key, value) in &ctx.tracker {
-                        if key.starts_with("__kelora_stats_") || key.starts_with("__op___kelora_stats_") {
+                        if key.starts_with("__kelora_stats_")
+                            || key.starts_with("__op___kelora_stats_")
+                        {
                             flush_tracking_updates.insert(key.clone(), value.clone());
                         }
                     }
-                    
+
                     // Include thread-local tracking state for flush
-                    let thread_tracking = crate::rhai_functions::tracking::get_thread_tracking_state();
+                    let thread_tracking =
+                        crate::rhai_functions::tracking::get_thread_tracking_state();
                     for (key, value) in thread_tracking {
                         flush_tracking_updates.insert(key, value);
                     }
-                    
+
                     // Send flush results as a special batch
                     let flush_batch_result = BatchResult {
                         batch_id: u64::MAX - 1, // Special ID for flush batches
@@ -1273,7 +1276,7 @@ impl ParallelProcessor {
                         internal_tracked_updates: flush_tracking_updates,
                         worker_stats: ProcessingStats::new(),
                     };
-                    
+
                     // Try to send flush results, but don't fail if channel is closed
                     let _ = result_sender.send(flush_batch_result);
                 }
@@ -1393,11 +1396,15 @@ impl ParallelProcessor {
             } else if batch_id == u64::MAX - 1 {
                 // This is a flush batch from a worker - process it immediately
                 if !termination_detected {
-                    let remaining_limit = take_limit.map(|limit| limit.saturating_sub(events_output));
-                    let events_this_batch =
-                        Self::pipeline_output_batch_results(output, &batch_result.results, remaining_limit)?;
+                    let remaining_limit =
+                        take_limit.map(|limit| limit.saturating_sub(events_output));
+                    let events_this_batch = Self::pipeline_output_batch_results(
+                        output,
+                        &batch_result.results,
+                        remaining_limit,
+                    )?;
                     events_output += events_this_batch;
-                    
+
                     // Check if we've reached the take limit
                     if let Some(limit) = take_limit {
                         if events_output >= limit {
@@ -1484,7 +1491,8 @@ impl ParallelProcessor {
             } else if batch_result.batch_id == u64::MAX - 1 {
                 // This is a flush batch from a worker - process it immediately
                 if !termination_detected {
-                    let remaining_limit = take_limit.map(|limit| limit.saturating_sub(events_output));
+                    let remaining_limit =
+                        take_limit.map(|limit| limit.saturating_sub(events_output));
                     let events_this_batch = Self::pipeline_output_batch_results(
                         output,
                         &batch_result.results,

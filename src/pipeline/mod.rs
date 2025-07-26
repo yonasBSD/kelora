@@ -360,7 +360,9 @@ impl Pipeline {
                             // Also track in Rhai context for parallel processing
                             ctx.tracker
                                 .entry("__kelora_stats_events_filtered".to_string())
-                                .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                                .and_modify(|v| {
+                                    *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
+                                })
                                 .or_insert(rhai::Dynamic::from(1i64));
                             ctx.tracker.insert(
                                 "__op___kelora_stats_events_filtered".to_string(),
@@ -372,7 +374,9 @@ impl Pipeline {
                             // Also track in Rhai context for parallel processing
                             ctx.tracker
                                 .entry("__kelora_stats_events_output".to_string())
-                                .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                                .and_modify(|v| {
+                                    *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
+                                })
                                 .or_insert(rhai::Dynamic::from(1i64));
                             ctx.tracker.insert(
                                 "__op___kelora_stats_events_output".to_string(),
@@ -497,9 +501,13 @@ impl Pipeline {
     }
 
     /// Process a chunk directly without going through the chunker
-    fn process_chunk_directly(&mut self, chunk: String, ctx: &mut PipelineContext) -> Result<Vec<String>> {
+    fn process_chunk_directly(
+        &mut self,
+        chunk: String,
+        ctx: &mut PipelineContext,
+    ) -> Result<Vec<String>> {
         let mut results = Vec::new();
-        
+
         // This is the same logic as in process_line starting from the "Parse stage" comment
         let event = match self.parser.parse(&chunk) {
             Ok(mut e) => {
@@ -610,9 +618,7 @@ impl Pipeline {
                         // Also track in Rhai context for parallel processing
                         ctx.tracker
                             .entry("__kelora_stats_events_filtered".to_string())
-                            .and_modify(|v| {
-                                *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
-                            })
+                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
                             .or_insert(rhai::Dynamic::from(1i64));
                         ctx.tracker.insert(
                             "__op___kelora_stats_events_filtered".to_string(),
@@ -624,9 +630,7 @@ impl Pipeline {
                         // Also track in Rhai context for parallel processing
                         ctx.tracker
                             .entry("__kelora_stats_events_output".to_string())
-                            .and_modify(|v| {
-                                *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
-                            })
+                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
                             .or_insert(rhai::Dynamic::from(1i64));
                         ctx.tracker.insert(
                             "__op___kelora_stats_events_output".to_string(),
