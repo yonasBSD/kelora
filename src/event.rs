@@ -4,6 +4,41 @@ use indexmap::IndexMap;
 use rhai::Dynamic;
 use serde::{Deserialize, Serialize};
 
+/// Convert serde_json::Value to rhai::Dynamic recursively
+/// This is the single source of truth for JSON to Rhai conversion
+pub fn json_to_dynamic(value: &serde_json::Value) -> Dynamic {
+    match value {
+        serde_json::Value::String(s) => Dynamic::from(s.clone()),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Dynamic::from(i)
+            } else if let Some(f) = n.as_f64() {
+                Dynamic::from(f)
+            } else {
+                Dynamic::from(n.to_string())
+            }
+        }
+        serde_json::Value::Bool(b) => Dynamic::from(*b),
+        serde_json::Value::Null => Dynamic::UNIT,
+        serde_json::Value::Array(arr) => {
+            // Convert JSON array to Rhai array recursively
+            let mut rhai_array = rhai::Array::new();
+            for item in arr {
+                rhai_array.push(json_to_dynamic(item));
+            }
+            Dynamic::from(rhai_array)
+        }
+        serde_json::Value::Object(obj) => {
+            // Convert JSON object to Rhai map recursively
+            let mut rhai_map = rhai::Map::new();
+            for (key, val) in obj {
+                rhai_map.insert(key.clone().into(), json_to_dynamic(val));
+            }
+            Dynamic::from(rhai_map)
+        }
+    }
+}
+
 /// Core field name constants to ensure consistency across the codebase
 pub const TIMESTAMP_FIELD_NAMES: &[&str] = &[
     "ts",

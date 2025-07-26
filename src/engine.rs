@@ -201,7 +201,6 @@ impl RhaiEngine {
             "extract_domain",
             "parse_json",
             "parse_kv",
-            "get_path",
             "col",
             "cols",
             "status_class",
@@ -250,7 +249,6 @@ impl RhaiEngine {
             "is_private_ip" | "is_digit" => "string".to_string(),
             "parse_json" => "json_string".to_string(),
             "parse_kv" => "string, optional_separator, optional_kv_separator".to_string(),
-            "get_path" => "map_or_json_string, path, optional_default".to_string(),
             "col" => "string, column_selector".to_string(),
             "cols" => "string, column_selectors...".to_string(),
             "status_class" => "status_code_number".to_string(),
@@ -329,7 +327,6 @@ impl RhaiEngine {
             // Our custom functions
             "parse_json",
             "parse_kv",
-            "get_path",
             "col",
             "cols",
             "status_class",

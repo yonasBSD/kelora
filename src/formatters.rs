@@ -73,7 +73,7 @@ fn format_quoted_logfmt_value(value: &str, output: &mut String) {
     }
 }
 
-/// Convert rhai::Dynamic to serde_json::Value
+/// Convert rhai::Dynamic to serde_json::Value recursively
 fn dynamic_to_json(value: &Dynamic) -> serde_json::Value {
     if value.is_string() {
         if let Ok(s) = value.clone().into_string() {
@@ -103,8 +103,21 @@ fn dynamic_to_json(value: &Dynamic) -> serde_json::Value {
         }
     } else if value.is_unit() {
         serde_json::Value::Null
+    } else if let Some(arr) = value.clone().try_cast::<rhai::Array>() {
+        // Convert Rhai array to JSON array recursively
+        let json_array: Vec<serde_json::Value> = arr.iter()
+            .map(dynamic_to_json)
+            .collect();
+        serde_json::Value::Array(json_array)
+    } else if let Some(map) = value.clone().try_cast::<rhai::Map>() {
+        // Convert Rhai map to JSON object recursively
+        let mut json_obj = serde_json::Map::new();
+        for (key, val) in map {
+            json_obj.insert(key.to_string(), dynamic_to_json(&val));
+        }
+        serde_json::Value::Object(json_obj)
     } else {
-        // For other types, convert to string
+        // For any remaining types, convert to string
         serde_json::Value::String(value.to_string())
     }
 }

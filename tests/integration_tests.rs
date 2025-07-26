@@ -2315,7 +2315,7 @@ fn test_ignore_lines_with_specific_pattern() {
 // }
 
 #[test]
-fn test_get_path_function_basic_usage() {
+fn test_direct_field_access_basic_usage() {
     let input = r#"{"user": {"name": "alice", "age": 25, "scores": [100, 200, 300]}}"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
@@ -2323,7 +2323,7 @@ fn test_get_path_function_basic_usage() {
             "-f",
             "jsonl",
             "--exec",
-            "let name = get_path(e.user, \"name\", \"unknown\"); print(\"Name: \" + name)",
+            "let name = e.user.name; print(\"Name: \" + name)",
         ],
         input,
     );
@@ -2337,7 +2337,7 @@ fn test_get_path_function_basic_usage() {
 }
 
 #[test]
-fn test_get_path_function_array_access() {
+fn test_direct_field_access_array_access() {
     let input = r#"{"user": {"name": "bob", "scores": [100, 200, 300]}}"#;
 
     let (stdout, _, exit_code) = run_kelora_with_input(
@@ -2345,7 +2345,7 @@ fn test_get_path_function_array_access() {
             "-f",
             "jsonl",
             "--exec",
-            "let score = get_path(e.user, \"scores[1]\", 0); print(\"Second score: \" + score)",
+            "let score = e.user.scores[1]; print(\"Second score: \" + score)",
         ],
         input,
     );
@@ -2359,11 +2359,11 @@ fn test_get_path_function_array_access() {
 }
 
 #[test]
-fn test_get_path_function_negative_indexing() {
+fn test_direct_field_access_negative_indexing() {
     let input = r#"{"user": {"name": "charlie", "scores": [100, 200, 300]}}"#;
 
     let (stdout, _, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--exec", "let last_score = get_path(e.user, \"scores[-1]\", 0); print(\"Last score: \" + last_score)"],
+        &["-f", "jsonl", "--exec", "let last_score = e.user.scores[-1]; print(\"Last score: \" + last_score)"],
         input,
     );
 
@@ -2376,11 +2376,11 @@ fn test_get_path_function_negative_indexing() {
 }
 
 #[test]
-fn test_get_path_function_deeply_nested() {
+fn test_direct_field_access_deeply_nested() {
     let input = r#"{"data": {"items": [{"id": 1, "meta": {"tags": ["urgent", "review"]}}]}}"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--exec", "let tag = get_path(e.data, \"items[0].meta.tags[0]\", \"none\"); print(\"First tag: \" + tag)"],
+        &["-f", "jsonl", "--exec", "let tag = e.data.items[0].meta.tags[0]; print(\"First tag: \" + tag)"],
         input,
     );
 
@@ -2393,7 +2393,7 @@ fn test_get_path_function_deeply_nested() {
 }
 
 #[test]
-fn test_get_path_function_with_default() {
+fn test_direct_field_access_with_optional_chaining() {
     let input = r#"{"user": {"name": "david"}}"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
@@ -2401,7 +2401,7 @@ fn test_get_path_function_with_default() {
             "-f",
             "jsonl",
             "--exec",
-            "let age = get_path(e.user, \"age\", \"unknown\"); print(\"Age: \" + age)",
+            "let age = if \"age\" in e.user { e.user.age } else { \"unknown\" }; print(\"Age: \" + age)",
         ],
         input,
     );
@@ -2415,7 +2415,7 @@ fn test_get_path_function_with_default() {
 }
 
 #[test]
-fn test_get_path_function_invalid_array_index() {
+fn test_direct_field_access_bounds_checking() {
     let input = r#"{"user": {"scores": [100, 200]}}"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
@@ -2423,7 +2423,7 @@ fn test_get_path_function_invalid_array_index() {
             "-f",
             "jsonl",
             "--exec",
-            "let score = get_path(e.user, \"scores[99]\", \"not_found\"); print(\"Score: \" + score)",
+            "let score = if e.user.scores.len() > 99 { e.user.scores[99] } else { \"not_found\" }; print(\"Score: \" + score)",
         ],
         input,
     );
@@ -2437,7 +2437,7 @@ fn test_get_path_function_invalid_array_index() {
 }
 
 #[test]
-fn test_get_path_function_filtering() {
+fn test_direct_field_access_filtering() {
     let input = r#"{"level": "error", "user": {"role": "admin"}}
 {"level": "info", "user": {"role": "user"}}
 {"level": "error", "user": {"role": "user"}}"#;
@@ -2447,7 +2447,7 @@ fn test_get_path_function_filtering() {
             "-f",
             "jsonl",
             "--filter",
-            "get_path(e.user, \"role\") == \"admin\"",
+            "e.user.role == \"admin\"",
         ],
         input,
     );
@@ -2468,7 +2468,7 @@ fn test_get_path_function_filtering() {
 }
 
 #[test]
-fn test_get_path_function_with_real_world_log() {
+fn test_direct_field_access_with_real_world_log() {
     let input = r#"{"timestamp": "2023-01-01T10:00:00Z", "request": {"method": "GET", "url": "/api/users", "headers": {"user-agent": "Mozilla/5.0"}}, "response": {"status": 200, "size": 1024}}"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
@@ -2476,9 +2476,9 @@ fn test_get_path_function_with_real_world_log() {
             "-f",
             "jsonl",
             "--exec",
-            "let method = get_path(e.request, \"method\", \"unknown\"); \
-           let status = get_path(e.response, \"status\", 0); \
-           let user_agent = get_path(e.request, \"headers.user-agent\", \"unknown\"); \
+            "let method = e.request.method; \
+           let status = e.response.status; \
+           let user_agent = e.request.headers[\"user-agent\"]; \
            print(method + \" \" + status + \" \" + user_agent)",
         ],
         input,

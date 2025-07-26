@@ -2,26 +2,7 @@
 use crate::event::Event;
 use crate::pipeline::EventParser;
 use anyhow::{Context, Result};
-use rhai::Dynamic;
 
-/// Convert serde_json::Value to rhai::Dynamic
-fn json_to_dynamic(value: &serde_json::Value) -> Dynamic {
-    match value {
-        serde_json::Value::String(s) => Dynamic::from(s.clone()),
-        serde_json::Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                Dynamic::from(i)
-            } else if let Some(f) = n.as_f64() {
-                Dynamic::from(f)
-            } else {
-                Dynamic::from(n.to_string())
-            }
-        }
-        serde_json::Value::Bool(b) => Dynamic::from(*b),
-        serde_json::Value::Null => Dynamic::UNIT,
-        _ => Dynamic::from(value.to_string()), // Complex types as strings
-    }
-}
 
 pub struct JsonlParser;
 
@@ -45,8 +26,8 @@ impl EventParser for JsonlParser {
             let mut event = Event::with_capacity(line.to_string(), map.len());
 
             for (key, value) in map {
-                // Convert serde_json::Value to rhai::Dynamic
-                let dynamic_value = json_to_dynamic(value);
+                // Convert serde_json::Value to rhai::Dynamic using shared function
+                let dynamic_value = crate::event::json_to_dynamic(value);
                 event.set_field(key.clone(), dynamic_value);
             }
 

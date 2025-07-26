@@ -151,7 +151,7 @@ fn reversed_array(mut arr: Array) -> Array {
 /// let by_name = sorted_by(users, "name");    // Sorted by name: alice, bob, charlie
 ///
 /// // Use with log entries
-/// let events = get_path(parse_json(line), "events");
+/// let events = parse_json(line).events;
 /// let by_timestamp = sorted_by(events, "timestamp");  // Chronological order
 /// let by_severity = sorted_by(events, "level");       // By log level
 /// ```

@@ -1,34 +1,5 @@
 use rhai::{Dynamic, Engine, ImmutableString, Map};
 
-/// Safe field access with default value
-/// Usage: get_path(e, "user.role", "guest")
-pub fn get_path(event: Map, path: ImmutableString, default: Dynamic) -> Dynamic {
-    let path_str = path.as_str();
-    let parts: Vec<&str> = path_str.split('.').collect();
-
-    let mut current_map = event;
-
-    for (i, part) in parts.iter().enumerate() {
-        if let Some(value) = current_map.get(*part).cloned() {
-            if i == parts.len() - 1 {
-                // Last part - return the value
-                return value;
-            } else {
-                // Intermediate part - must be a map to continue
-                if let Some(nested_map) = value.read_lock::<Map>() {
-                    current_map = nested_map.clone();
-                } else {
-                    return default;
-                }
-            }
-        } else {
-            return default;
-        }
-    }
-
-    default
-}
-
 /// Check if a path exists in the event
 /// Usage: has_path(e, "user.role")
 pub fn has_path(event: Map, path: ImmutableString) -> bool {
@@ -147,7 +118,6 @@ pub fn to_bool(value: Dynamic, default: Dynamic) -> Dynamic {
 
 /// Register safety functions with the Rhai engine
 pub fn register_functions(engine: &mut Engine) {
-    engine.register_fn("get_path", get_path);
     engine.register_fn("has_path", has_path);
     engine.register_fn("path_equals", path_equals);
     engine.register_fn("to_number", to_number);
@@ -170,26 +140,6 @@ mod tests {
         event.insert("user".into(), Dynamic::from(user));
 
         event
-    }
-
-    #[test]
-    fn test_get_path_existing() {
-        let event = create_test_event();
-        let result = get_path(event.clone(), "name".into(), Dynamic::from("default"));
-        assert_eq!(result.into_string().unwrap(), "alice");
-
-        let result = get_path(event, "user.role".into(), Dynamic::from("guest"));
-        assert_eq!(result.into_string().unwrap(), "admin");
-    }
-
-    #[test]
-    fn test_get_path_missing() {
-        let event = create_test_event();
-        let result = get_path(event.clone(), "missing".into(), Dynamic::from("default"));
-        assert_eq!(result.into_string().unwrap(), "default");
-
-        let result = get_path(event, "user.missing".into(), Dynamic::from("guest"));
-        assert_eq!(result.into_string().unwrap(), "guest");
     }
 
     #[test]

@@ -246,6 +246,18 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
 
 - **Event Variable**: Use `e` to access the current event (renamed from `event` for brevity)
 - **Variable Declaration**: Always use "let" when using new Rhai variables (e.g. 'let myfield=e.col("1,2")' or 'let myfield=e.col(1,2)')
+- **Field Access**: Use direct field access for nested structures:
+  - `e.user.name` - Access nested fields directly
+  - `e.scores[1]` - Access array elements by index
+  - `e.headers["user-agent"]` - Access fields with special characters using bracket notation
+  - `if "field" in e { e.field } else { "default" }` - Safe field access with conditional checking
+- **JSON Array Handling**: JSON arrays are automatically converted to native Rhai arrays, enabling full array functionality:
+  - `sorted(e.scores)` - Sort arrays numerically or lexicographically
+  - `reversed(e.items)` - Reverse array order
+  - `unique(e.tags)` - Remove duplicate elements
+  - `dedup(e.values)` - Remove consecutive duplicates
+  - `sorted_by(e.users, "age")` - Sort arrays of objects by field
+  - Arrays maintain proper JSON types in output formats (e.g., `-F jsonl`)
 - **Field and Event Removal**: Use unit `()` assignments for easy field and event removal:
   - `e.field = ()` - Remove individual fields from events
   - `e = ()` - Remove entire event (clears all fields, event becomes empty)
@@ -264,7 +276,6 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
     kelora -e "let sum = e.a + e.b; e = ()" -e "e.total = sum; e.processed = true"
     ```
 - **Safety Functions**: Use defensive field access functions for robust scripts:
-  - `get_path(e, "field.subfield", default)` - Safe nested field access with fallback
   - `has_path(e, "field.subfield")` - Check if nested path exists
   - `path_equals(e, "field.subfield", expected)` - Safe nested field comparison
   - `to_number(value, default)` - Safe number conversion with fallback
