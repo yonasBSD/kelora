@@ -99,8 +99,9 @@ impl MultilineChunker {
                 }
             }
             MultilineStrategy::Backslash { char } => {
-                // Event continues if line ends with continuation character
-                !line.ends_with(*char)
+                // Event continues if line ends with continuation character (ignoring trailing newlines)
+                let trimmed = line.trim_end_matches('\n').trim_end_matches('\r');
+                !trimmed.ends_with(*char)
             }
             _ => false,
         }
@@ -142,16 +143,26 @@ impl MultilineChunker {
 
 impl Chunker for MultilineChunker {
     fn feed_line(&mut self, line: String) -> Option<String> {
-        // Check boundary conditions based on strategy
-        let should_flush = match &self.config.strategy {
-            MultilineStrategy::Backslash { .. } => {
-                // For backslash strategy, check if previous line ended the event
-                if let Some(last_line) = self.buffer.last() {
-                    self.ends_current_event(last_line)
-                } else {
-                    false
+        // Backslash strategy has different logic - we need to add the line first,
+        // then check if the event should end
+        if let MultilineStrategy::Backslash { .. } = &self.config.strategy {
+            // Add the line to buffer first
+            self.buffer.push(line);
+            
+            // Check if this line (the one we just added) ends the event
+            if let Some(last_line) = self.buffer.last() {
+                if self.ends_current_event(last_line) {
+                    // Event is complete, flush the buffer
+                    return self.flush_buffer();
                 }
             }
+            
+            // Event continues, return None
+            return None;
+        }
+
+        // For all other strategies, use the original logic
+        let should_flush = match &self.config.strategy {
             MultilineStrategy::End { .. } | MultilineStrategy::Boundary { .. } => {
                 // For end/boundary strategies, check if current line ends the event
                 self.ends_current_event(&line)
