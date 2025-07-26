@@ -220,8 +220,10 @@ impl MultiFileReader {
             } else {
                 match DecompressionReader::new(file_path) {
                     Ok(decompressor) => {
-                        self.current_reader =
-                            Some(Box::new(BufReader::with_capacity(self.buffer_size, decompressor)));
+                        self.current_reader = Some(Box::new(BufReader::with_capacity(
+                            self.buffer_size,
+                            decompressor,
+                        )));
                         return Ok(true);
                     }
                     Err(e) => {

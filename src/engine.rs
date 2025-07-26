@@ -747,7 +747,7 @@ impl RhaiEngine {
             event.fields.clear();
             return;
         }
-        
+
         // Capture mutations made directly to the `e` event map
         if let Some(obj) = scope.get_value::<Map>("e") {
             for (k, v) in obj {

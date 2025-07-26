@@ -857,7 +857,8 @@ fn test_stdin_with_parallel_processing() {
 {"level": "error", "message": "test2"}
 {"level": "info", "message": "test3"}"#;
 
-    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "jsonl", "--parallel", "-"], input);
+    let (stdout, _stderr, exit_code) =
+        run_kelora_with_input(&["-f", "jsonl", "--parallel", "-"], input);
 
     assert_eq!(exit_code, 0);
     assert!(stdout.contains("test1"));
