@@ -31,11 +31,6 @@ mod tests {
     use super::*;
     use rhai::{Engine, Map};
 
-    fn create_test_engine() -> Engine {
-        let mut engine = Engine::new();
-        register_functions(&mut engine);
-        engine
-    }
 
     #[test]
     fn test_json_to_dynamic_conversion() {

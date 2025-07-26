@@ -276,7 +276,6 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
     kelora -e "let sum = e.a + e.b; e = ()" -e "e.total = sum; e.processed = true"
     ```
 - **Safety Functions**: Use defensive field access functions for robust scripts:
-  - `has_path(e, "field.subfield")` - Check if nested path exists
   - `path_equals(e, "field.subfield", expected)` - Safe nested field comparison
   - `to_number(value, default)` - Safe number conversion with fallback
   - `to_bool(value, default)` - Safe boolean conversion with fallback
