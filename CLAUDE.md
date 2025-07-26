@@ -248,9 +248,18 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
 - **Variable Declaration**: Always use "let" when using new Rhai variables (e.g. 'let myfield=e.col("1,2")' or 'let myfield=e.col(1,2)')
 - **Field Access**: Use direct field access for nested structures:
   - `e.user.name` - Access nested fields directly
-  - `e.scores[1]` - Access array elements by index
+  - `e.scores[1]` - Access array elements by index (supports negative indexing: `e.scores[-1]`)
   - `e.headers["user-agent"]` - Access fields with special characters using bracket notation
-  - `if "field" in e { e.field } else { "default" }` - Safe field access with conditional checking
+  - `e.data.items[0].metadata.tags[0]` - Deep nested access through arrays and objects
+  - **Safe Field Access Patterns**:
+    - `if "field" in e { e.field } else { "default" }` - Check field existence before access
+    - `if e.scores.len() > 1 { e.scores[1] } else { 0 }` - Safe array bounds checking
+    - `if "user" in e && "role" in e.user { e.user.role } else { "guest" }` - Nested field safety
+  - **Field Existence Checking**:
+    - `"field" in e` - Check if top-level field exists
+    - `"user" in e && "role" in e.user` - Check nested field existence
+    - `e.scores.len() > 0` - Check if array has elements
+    - `type_of(e.field) != "()"` - Check if field has a value (not unit type)
 - **JSON Array Handling**: JSON arrays are automatically converted to native Rhai arrays, enabling full array functionality:
   - `sorted(e.scores)` - Sort arrays numerically or lexicographically
   - `reversed(e.items)` - Reverse array order
@@ -258,6 +267,17 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
   - `dedup(e.values)` - Remove consecutive duplicates
   - `sorted_by(e.users, "age")` - Sort arrays of objects by field
   - Arrays maintain proper JSON types in output formats (e.g., `-F jsonl`)
+  - **Array Processing Examples**:
+    ```bash
+    # Get top 3 highest scores
+    kelora -e "e.top_scores = sorted(e.scores)[-3:]"
+    
+    # Process tags and create summary
+    kelora -e "e.unique_tags = unique(e.tags); e.tag_count = e.tags.len()"
+    
+    # Sort users by score and extract names
+    kelora -e "let sorted_users = sorted_by(e.users, 'score'); e.winner = sorted_users[-1].name"
+    ```
 - **Field and Event Removal**: Use unit `()` assignments for easy field and event removal:
   - `e.field = ()` - Remove individual fields from events
   - `e = ()` - Remove entire event (clears all fields, event becomes empty)
@@ -275,6 +295,28 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
     # Progressive transformation (clear then rebuild)
     kelora -e "let sum = e.a + e.b; e = ()" -e "e.total = sum; e.processed = true"
     ```
+- **Common Log Analysis Patterns**:
+  ```bash
+  # Extract HTTP request details safely
+  kelora -f jsonl --exec '
+    let method = if "request" in e && "method" in e.request { e.request.method } else { "unknown" };
+    let status = if "response" in e && "status" in e.response { e.response.status } else { 0 };
+    e.summary = method + " " + status
+  '
+  
+  # Process user activity arrays
+  kelora -f jsonl --filter 'e.events.len() > 0' --exec '
+    e.event_count = e.events.len();
+    e.latest_event = e.events[-1];
+    e.event_types = unique(e.events.map(|event| event.type))
+  '
+  
+  # Safe nested field extraction with defaults
+  kelora -f jsonl --exec '
+    e.user_role = if "user" in e && "role" in e.user { e.user.role } else { "guest" };
+    e.permissions = if "user" in e && "permissions" in e.user { e.user.permissions } else { [] }
+  '
+  ```
 - **Safety Functions**: Use defensive field access functions for robust scripts:
   - `path_equals(e, "field.subfield", expected)` - Safe nested field comparison
   - `to_number(value, default)` - Safe number conversion with fallback
