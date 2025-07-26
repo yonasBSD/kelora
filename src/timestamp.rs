@@ -320,22 +320,36 @@ fn looks_like_relative_time(arg: &str) -> bool {
     if !arg.chars().next().map_or(false, |c| c.is_ascii_digit()) {
         return false;
     }
-    
+
     // Find where numbers end (may have spaces before unit)
     let num_end = arg.find(|c: char| !c.is_ascii_digit()).unwrap_or(arg.len());
     let remainder = &arg[num_end..].trim_start();
-    
+
     if remainder.is_empty() {
         return false;
     }
-    
+
     // Check if it's a valid time unit
-    matches!(*remainder, 
-        "s" | "sec" | "secs" | "second" | "seconds" |
-        "m" | "min" | "mins" | "minute" | "minutes" |
-        "h" | "hour" | "hours" |
-        "d" | "day" | "days" |
-        "w" | "week" | "weeks"
+    matches!(
+        *remainder,
+        "s" | "sec"
+            | "secs"
+            | "second"
+            | "seconds"
+            | "m"
+            | "min"
+            | "mins"
+            | "minute"
+            | "minutes"
+            | "h"
+            | "hour"
+            | "hours"
+            | "d"
+            | "day"
+            | "days"
+            | "w"
+            | "week"
+            | "weeks"
     )
 }
 
