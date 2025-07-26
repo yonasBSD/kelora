@@ -134,7 +134,8 @@ impl MultilineChunker {
         if self.buffer.is_empty() {
             None
         } else {
-            let result = Some(self.buffer.join("\n"));
+            // Lines already contain newlines, so join with empty string to avoid double newlines
+            let result = Some(self.buffer.join(""));
             self.buffer.clear();
             result
         }
