@@ -61,8 +61,8 @@ impl AdaptiveTsParser {
             _ => {}
         }
 
-        // Handle relative times (e.g., "-1h", "+30m", "-2d")
-        if ts_str.starts_with('-') || ts_str.starts_with('+') {
+        // Handle relative times (e.g., "-1h", "+30m", "-2d", "1h", "30m")
+        if ts_str.starts_with('-') || ts_str.starts_with('+') || looks_like_relative_time(ts_str) {
             if let Ok(dt) = parse_relative_time(ts_str) {
                 return Some(dt);
             }
@@ -314,23 +314,55 @@ pub fn parse_timestamp_arg_with_timezone(
         .ok_or_else(|| format!("Could not parse timestamp: {}", arg))
 }
 
-/// Parse relative time expressions like "-1h", "+30m", "-2d"
+/// Check if a string looks like a relative time expression (e.g., "1h", "30m", "2d", "1 hour")
+fn looks_like_relative_time(arg: &str) -> bool {
+    // Must start with a digit
+    if !arg.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+        return false;
+    }
+    
+    // Find where numbers end (may have spaces before unit)
+    let num_end = arg.find(|c: char| !c.is_ascii_digit()).unwrap_or(arg.len());
+    let remainder = &arg[num_end..].trim_start();
+    
+    if remainder.is_empty() {
+        return false;
+    }
+    
+    // Check if it's a valid time unit
+    matches!(*remainder, 
+        "s" | "sec" | "secs" | "second" | "seconds" |
+        "m" | "min" | "mins" | "minute" | "minutes" |
+        "h" | "hour" | "hours" |
+        "d" | "day" | "days" |
+        "w" | "week" | "weeks"
+    )
+}
+
+/// Parse relative time expressions like "-1h", "+30m", "-2d", "1h", "30m"
+/// Unsigned times default to past (e.g., "1h" means "1 hour ago")
 fn parse_relative_time(arg: &str) -> Result<DateTime<Utc>, String> {
     let (sign, rest) = if let Some(stripped) = arg.strip_prefix('-') {
         (-1, stripped)
     } else if let Some(stripped) = arg.strip_prefix('+') {
         (1, stripped)
     } else {
-        return Err("Relative time must start with + or -".to_string());
+        // Unsigned times default to past (e.g., "1h" means "1 hour ago")
+        (-1, arg)
     };
 
     if rest.is_empty() {
         return Err("Empty relative time".to_string());
     }
 
-    // Parse number and unit
-    let (num_str, unit) = if let Some(pos) = rest.find(|c: char| c.is_alphabetic()) {
-        (&rest[..pos], &rest[pos..])
+    // Parse number and unit (handle spaces between them)
+    let (num_str, unit) = if let Some(pos) = rest.find(|c: char| !c.is_ascii_digit()) {
+        let num_part = &rest[..pos];
+        let unit_part = rest[pos..].trim_start();
+        if unit_part.is_empty() || !unit_part.chars().next().unwrap().is_alphabetic() {
+            return Err("Relative time must have a valid unit (h, m, d, etc.)".to_string());
+        }
+        (num_part, unit_part)
     } else {
         return Err("Relative time must have a unit (h, m, d, etc.)".to_string());
     };
