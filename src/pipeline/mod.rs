@@ -189,7 +189,6 @@ pub trait LineFilter: Send {
 /// Handle multi-line log records (future feature)
 pub trait Chunker: Send {
     fn feed_line(&mut self, line: String) -> Option<String>;
-    #[allow(dead_code)] // Planned feature for handling incomplete chunks at EOF
     fn flush(&mut self) -> Option<String>;
 }
 
@@ -488,13 +487,254 @@ impl Pipeline {
     }
 
     /// Flush any remaining chunks from the chunker
-    #[allow(dead_code)] // Planned feature for handling incomplete chunks at EOF
     pub fn flush(&mut self, ctx: &mut PipelineContext) -> Result<Vec<String>> {
         if let Some(chunk) = self.chunker.flush() {
-            self.process_line(chunk, ctx)
+            // Process chunk directly, not through feed_line
+            self.process_chunk_directly(chunk, ctx)
         } else {
             Ok(Vec::new())
         }
+    }
+
+    /// Process a chunk directly without going through the chunker
+    fn process_chunk_directly(&mut self, chunk: String, ctx: &mut PipelineContext) -> Result<Vec<String>> {
+        let mut results = Vec::new();
+        
+        // This is the same logic as in process_line starting from the "Parse stage" comment
+        let event = match self.parser.parse(&chunk) {
+            Ok(mut e) => {
+                // Event was successfully created from chunk
+                crate::stats::stats_add_event_created();
+
+                // Collect discovered levels and keys for stats
+                collect_discovered_levels_and_keys(&e, ctx);
+
+                // Also track in Rhai context for parallel processing
+                ctx.tracker
+                    .entry("__kelora_stats_events_created".to_string())
+                    .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                    .or_insert(rhai::Dynamic::from(1i64));
+                ctx.tracker.insert(
+                    "__op___kelora_stats_events_created".to_string(),
+                    rhai::Dynamic::from("count"),
+                );
+
+                // Copy metadata from context to event
+                if let Some(line_num) = ctx.meta.line_number {
+                    e.set_metadata(line_num, ctx.meta.filename.clone());
+                }
+
+                e
+            }
+            Err(err) => {
+                // Use unified error tracking system
+                crate::rhai_functions::tracking::track_error(
+                    "parse",
+                    ctx.meta.line_number,
+                    &err.to_string(),
+                    ctx.config.verbose,
+                    ctx.config.quiet,
+                    Some(&ctx.config),
+                );
+
+                // New resiliency model: skip unparseable lines by default,
+                // only propagate errors in strict mode
+                if ctx.config.strict {
+                    return Err(err);
+                } else {
+                    // Skip this line and continue processing
+                    return Ok(results);
+                }
+            }
+        };
+
+        // Update window manager
+        self.window_manager.update(&event);
+        ctx.window = self.window_manager.get_window();
+
+        // Apply script stages (filters, execs, etc.)
+        let mut result = ScriptResult::Emit(event);
+
+        for stage in &mut self.script_stages {
+            result = match result {
+                ScriptResult::Emit(event) => stage.apply(event, ctx),
+                ScriptResult::EmitMultiple(events) => {
+                    // Process each event through remaining stages
+                    let mut multi_results = Vec::new();
+                    for event in events {
+                        match stage.apply(event, ctx) {
+                            ScriptResult::Emit(e) => multi_results.push(e),
+                            ScriptResult::EmitMultiple(mut es) => multi_results.append(&mut es),
+                            ScriptResult::Skip => {}
+                            ScriptResult::Error(msg) => {
+                                // Use unified error tracking system
+                                crate::rhai_functions::tracking::track_error(
+                                    "rhai",
+                                    ctx.meta.line_number,
+                                    &msg,
+                                    ctx.config.verbose,
+                                    ctx.config.quiet,
+                                    Some(&ctx.config),
+                                );
+
+                                // New resiliency model: use strict flag
+                                if ctx.config.strict {
+                                    return Err(anyhow::anyhow!(msg));
+                                } else {
+                                    // Skip errors in resilient mode and continue processing
+                                    return Ok(results);
+                                }
+                            }
+                        }
+                    }
+                    ScriptResult::EmitMultiple(multi_results)
+                }
+                other => other, // Skip or Error, stop processing
+            };
+
+            match &result {
+                ScriptResult::Skip | ScriptResult::Error(_) => break,
+                _ => {}
+            }
+        }
+
+        // Handle final result
+        match result {
+            ScriptResult::Emit(event) => {
+                if self.limiter.as_mut().is_none_or(|l| l.allow()) {
+                    // Filter out empty events before formatting
+                    if event.fields.is_empty() {
+                        // Empty events are counted as filtered
+                        crate::stats::stats_add_event_filtered();
+
+                        // Also track in Rhai context for parallel processing
+                        ctx.tracker
+                            .entry("__kelora_stats_events_filtered".to_string())
+                            .and_modify(|v| {
+                                *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
+                            })
+                            .or_insert(rhai::Dynamic::from(1i64));
+                        ctx.tracker.insert(
+                            "__op___kelora_stats_events_filtered".to_string(),
+                            rhai::Dynamic::from("count"),
+                        );
+                    } else {
+                        crate::stats::stats_add_event_output();
+
+                        // Also track in Rhai context for parallel processing
+                        ctx.tracker
+                            .entry("__kelora_stats_events_output".to_string())
+                            .and_modify(|v| {
+                                *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
+                            })
+                            .or_insert(rhai::Dynamic::from(1i64));
+                        ctx.tracker.insert(
+                            "__op___kelora_stats_events_output".to_string(),
+                            rhai::Dynamic::from("count"),
+                        );
+
+                        results.push(self.formatter.format(&event));
+                    }
+                } else {
+                    crate::stats::stats_add_event_filtered();
+
+                    // Also track in Rhai context for parallel processing
+                    ctx.tracker
+                        .entry("__kelora_stats_events_filtered".to_string())
+                        .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                        .or_insert(rhai::Dynamic::from(1i64));
+                    ctx.tracker.insert(
+                        "__op___kelora_stats_events_filtered".to_string(),
+                        rhai::Dynamic::from("count"),
+                    );
+                }
+            }
+            ScriptResult::EmitMultiple(events) => {
+                for event in events {
+                    if self.limiter.as_mut().is_none_or(|l| l.allow()) {
+                        // Filter out empty events before formatting
+                        if event.fields.is_empty() {
+                            // Empty events are counted as filtered
+                            crate::stats::stats_add_event_filtered();
+
+                            // Also track in Rhai context for parallel processing
+                            ctx.tracker
+                                .entry("__kelora_stats_events_filtered".to_string())
+                                .and_modify(|v| {
+                                    *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
+                                })
+                                .or_insert(rhai::Dynamic::from(1i64));
+                            ctx.tracker.insert(
+                                "__op___kelora_stats_events_filtered".to_string(),
+                                rhai::Dynamic::from("count"),
+                            );
+                        } else {
+                            crate::stats::stats_add_event_output();
+
+                            // Also track in Rhai context for parallel processing
+                            ctx.tracker
+                                .entry("__kelora_stats_events_output".to_string())
+                                .and_modify(|v| {
+                                    *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
+                                })
+                                .or_insert(rhai::Dynamic::from(1i64));
+                            ctx.tracker.insert(
+                                "__op___kelora_stats_events_output".to_string(),
+                                rhai::Dynamic::from("count"),
+                            );
+
+                            results.push(self.formatter.format(&event));
+                        }
+                    } else {
+                        crate::stats::stats_add_event_filtered();
+
+                        // Also track in Rhai context for parallel processing
+                        ctx.tracker
+                            .entry("__kelora_stats_events_filtered".to_string())
+                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                            .or_insert(rhai::Dynamic::from(1i64));
+                        ctx.tracker.insert(
+                            "__op___kelora_stats_events_filtered".to_string(),
+                            rhai::Dynamic::from("count"),
+                        );
+                    }
+                }
+            }
+            ScriptResult::Skip => {
+                crate::stats::stats_add_event_filtered();
+
+                // Also track in Rhai context for parallel processing
+                ctx.tracker
+                    .entry("__kelora_stats_events_filtered".to_string())
+                    .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                    .or_insert(rhai::Dynamic::from(1i64));
+                ctx.tracker.insert(
+                    "__op___kelora_stats_events_filtered".to_string(),
+                    rhai::Dynamic::from("count"),
+                );
+            }
+            ScriptResult::Error(msg) => {
+                // Use unified error tracking system
+                crate::rhai_functions::tracking::track_error(
+                    "rhai",
+                    ctx.meta.line_number,
+                    &msg,
+                    ctx.config.verbose,
+                    ctx.config.quiet,
+                    Some(&ctx.config),
+                );
+
+                // New resiliency model: use strict flag
+                if ctx.config.strict {
+                    return Err(anyhow::anyhow!(msg));
+                } else {
+                    // Skip errors in resilient mode and continue processing
+                    return Ok(results);
+                }
+            }
+        }
+
+        Ok(results)
     }
 
     /// Check if the event limiter (--take N) is exhausted
