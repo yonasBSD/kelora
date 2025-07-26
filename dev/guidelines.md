@@ -33,7 +33,7 @@ Strict Vars Mode	Plan to use Engine::set_strict_variables(true) for robustness
 	•	✅ Formatter cleanup (formatter_utils.rs)
 	•	✅ run_parallel() / run_sequential() refactor in main.rs
 	•	✅ Input format sniffing (--format auto)
-	•	✅ Summary tables (--summary)
+	•	✅ Metrics tables (--metrics/-m)
 	•	✅ Native track_*() functions (count, avg, unique, etc.)
 	•	✅ Benchmarking with Criterion.rs
 	•	✅ Fuzzing with cargo fuzz

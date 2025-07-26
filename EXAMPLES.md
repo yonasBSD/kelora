@@ -30,7 +30,7 @@ Stream logs from tail, kubectl, or stdin for live triage.
 tail -f /var/log/syslog | kelora -f syslog -l warn,error
 
 # Live triage from Kubernetes, summary printed after CTRL-C
-kubectl logs -f mypod | kelora -f logfmt --exec 'track_count(e.level)' --summary
+kubectl logs -f mypod | kelora -f logfmt --exec 'track_count(e.level)' --metrics
 ```
 
 Kelora works naturally in UNIX pipelines. Its stream-first design makes it well-suited for continuous log monitoring and alerting logic.
@@ -146,13 +146,13 @@ Use `track_*()` functions for counting, bucketing, and summarizing.
 
 ```bash
 # Count events by log level
-kelora -f jsonl app.log --exec 'track_count(e.level)' --summary
+kelora -f jsonl app.log --exec 'track_count(e.level)' --metrics
 
 # Track unique users
-kelora -f jsonl app.log --exec 'track_unique("users", e.user)' --summary
+kelora -f jsonl app.log --exec 'track_unique("users", e.user)' --metrics
 ```
 
-The `--summary` flag shows tracked data after processing. These are global analytics — not per event.
+The `--metrics` flag shows tracked data after processing. These are global analytics — not per event.
 
 ---
 
@@ -165,7 +165,7 @@ Scale up with batching, file-ordering, and parallelism.
 kelora -f jsonl --file-order mtime logs/*.jsonl
 
 # Run in parallel mode with summary counts
-kelora -f jsonl app.log --parallel --exec 'track_count(e.level)' --summary
+kelora -f jsonl app.log --parallel --exec 'track_count(e.level)' --metrics
 ```
 
 Parallel mode improves throughput and allows real-time batch analysis. Use `--unordered` for maximum performance if order doesn't matter.

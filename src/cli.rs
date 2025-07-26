@@ -274,8 +274,8 @@ pub struct Cli {
     #[arg(short = 'S', long = "stats-only", help_heading = "Metrics and Stats")]
     pub stats_only: bool,
 
-    /// Show values tracked in Rhai via track_*()
-    #[arg(long = "metrics", help_heading = "Metrics and Stats")]
+    /// Show tracked metrics
+    #[arg(short = 'm', long = "metrics", help_heading = "Metrics and Stats")]
     pub metrics: bool,
 
     /// Write metrics to file (JSON format)

@@ -407,9 +407,9 @@ impl KeloraConfig {
             let use_emoji = use_colors && !self.output.no_emoji;
 
             if use_emoji {
-                format!("📊 === Kelora Metrics ===\n{}", message)
+                format!("📊 === Tracked metrics ===\n{}", message)
             } else {
-                format!("=== Kelora Metrics ===\n{}", message)
+                format!("=== Tracked metrics ===\n{}", message)
             }
         }
     }
