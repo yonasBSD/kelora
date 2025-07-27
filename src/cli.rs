@@ -101,7 +101,14 @@ pub struct Cli {
     #[arg(short = 'M', long = "multiline", help_heading = "Input Options")]
     pub multiline: Option<String>,
 
-    /// Run once before processing
+    /// Pre-run a Rhai script. Use it to populate the global `init` map
+    /// with shared, read-only data.
+    ///
+    /// Functions (usable only here):
+    ///   read_lines(path) → Array<String>  # UTF-8, one element per line
+    ///   read_file(path)  → String         # UTF-8, full file
+    ///
+    /// Data written to `init` becomes read-only for the rest of the run.
     #[arg(long = "begin", help_heading = "Processing Options")]
     pub begin: Option<String>,
 

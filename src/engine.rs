@@ -22,6 +22,7 @@ pub struct RhaiEngine {
     compiled_end: Option<CompiledExpression>,
     scope_template: Scope<'static>,
     suppress_side_effects: bool,
+    init_map: Option<rhai::Map>,
 }
 
 impl Clone for RhaiEngine {
@@ -54,6 +55,7 @@ impl Clone for RhaiEngine {
             compiled_end: self.compiled_end.clone(),
             scope_template: self.scope_template.clone(),
             suppress_side_effects,
+            init_map: self.init_map.clone(),
         }
     }
 }
@@ -404,6 +406,7 @@ impl RhaiEngine {
         scope_template.push("line", "");
         scope_template.push("e", rhai::Map::new());
         scope_template.push("meta", rhai::Map::new());
+        scope_template.push("init", rhai::Map::new());
 
         Self {
             engine,
@@ -413,6 +416,7 @@ impl RhaiEngine {
             compiled_end: None,
             scope_template,
             suppress_side_effects: false,
+            init_map: None,
         }
     }
 
@@ -532,8 +536,12 @@ impl RhaiEngine {
         &mut self,
         compiled: &CompiledExpression,
         tracked: &mut HashMap<String, Dynamic>,
-    ) -> Result<()> {
+    ) -> Result<rhai::Map> {
         Self::set_thread_tracking_state(tracked);
+
+        // Set begin phase flag to allow read_file/read_lines
+        crate::rhai_functions::init::set_begin_phase(true);
+
         let mut scope = self.scope_template.clone();
 
         let _ = self
@@ -544,8 +552,21 @@ impl RhaiEngine {
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 
+        // Reset begin phase flag
+        crate::rhai_functions::init::set_begin_phase(false);
+
         *tracked = Self::get_thread_tracking_state();
-        Ok(())
+
+        // Extract the init map from scope and store it
+        let mut init_map = scope.get_value::<rhai::Map>("init").unwrap_or_default();
+
+        // Deep freeze the init map to make it read-only
+        crate::rhai_functions::init::deep_freeze_map(&mut init_map);
+
+        // Store the frozen init map
+        self.init_map = Some(init_map.clone());
+
+        Ok(init_map)
     }
 
     pub fn execute_compiled_end(
@@ -706,6 +727,11 @@ impl RhaiEngine {
         }
 
         scope.set_value("meta", meta_map);
+
+        // Set the frozen init map
+        if let Some(ref init_map) = self.init_map {
+            scope.set_value("init", init_map.clone());
+        }
 
         scope
     }

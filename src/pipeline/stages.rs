@@ -143,7 +143,10 @@ impl BeginStage {
     #[allow(dead_code)] // Used by sequential processing pipeline
     pub fn execute(&self, ctx: &mut PipelineContext) -> Result<()> {
         if let Some(ref compiled) = self.compiled_begin {
-            ctx.rhai.execute_compiled_begin(compiled, &mut ctx.tracker)
+            let _init_map = ctx
+                .rhai
+                .execute_compiled_begin(compiled, &mut ctx.tracker)?;
+            Ok(())
         } else {
             Ok(())
         }

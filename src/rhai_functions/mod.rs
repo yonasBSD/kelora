@@ -3,6 +3,7 @@ use rhai::Engine;
 pub mod arrays;
 pub mod columns;
 pub mod datetime;
+pub mod init;
 pub mod maps;
 pub mod math;
 pub mod random;
@@ -22,4 +23,5 @@ pub fn register_all_functions(engine: &mut Engine) {
     datetime::register_functions(engine);
     window::register_functions(engine);
     safety::register_functions(engine);
+    init::register_functions(engine);
 }
