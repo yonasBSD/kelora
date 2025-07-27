@@ -297,9 +297,14 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
         // For parallel mode, we need to detect format first
         let detected_format = detect_format_for_parallel_mode(&config.input.files)?;
 
-        // Report detected format in verbose mode
-        if config.processing.verbose {
-            eprintln!("🔍 kelora: auto-detected format: {:?}", detected_format);
+        // Report detected format
+        if !config.processing.quiet {
+            let format_name = format!("{:?}", detected_format).to_lowercase();
+            let use_colors = crate::tty::should_use_colors_with_mode(&crate::config::ColorMode::Auto);
+            let no_emoji = std::env::var("NO_EMOJI").is_ok();
+            let use_emoji = use_colors && !no_emoji;
+            let prefix = if use_emoji { "🧱" } else { "kelora:" };
+            eprintln!("{} auto-detected format: {}", prefix, format_name);
         }
 
         // Create new config with detected format
@@ -671,9 +676,11 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         // Detect format from first line
         let detected_format = detect_format_from_peekable_reader(&mut peekable_reader)?;
 
-        // Report detected format in verbose mode
-        if config.processing.verbose {
-            eprintln!("🔍 kelora: auto-detected format: {:?}", detected_format);
+        // Report detected format
+        if !config.processing.quiet {
+            let format_name = format!("{:?}", detected_format).to_lowercase();
+            let message = config.format_error_message(&format!("auto-detected format: {}", format_name));
+            eprintln!("{}", message);
         }
 
         // Create config with detected format
@@ -730,9 +737,11 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
             detect_format_from_peekable_reader(&mut peekable_reader)?
         };
 
-        // Report detected format in verbose mode
-        if config.processing.verbose {
-            eprintln!("🔍 kelora: auto-detected format: {:?}", detected_format);
+        // Report detected format
+        if !config.processing.quiet {
+            let format_name = format!("{:?}", detected_format).to_lowercase();
+            let message = config.format_error_message(&format!("auto-detected format: {}", format_name));
+            eprintln!("{}", message);
         }
 
         // Create config with detected format
