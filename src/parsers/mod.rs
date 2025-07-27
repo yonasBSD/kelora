@@ -10,6 +10,7 @@ pub mod nginx;
 pub mod syslog;
 
 pub use apache::ApacheParser;
+#[allow(unused_imports)] // Used by lib.rs for format auto-detection
 pub use auto_detect::detect_format;
 pub use cef::CefParser;
 pub use cols::ColsParser;

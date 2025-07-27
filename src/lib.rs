@@ -139,8 +139,8 @@ mod timestamp;
 mod tty;
 mod unix;
 
-use anyhow::Result;
 use crate::decompression::DecompressionReader;
+use anyhow::Result;
 
 // Re-export CLI types for convenience (they live in cli module now)
 pub use cli::{Cli, FileOrder, InputFormat, OutputFormat};
@@ -148,7 +148,7 @@ pub use cli::{Cli, FileOrder, InputFormat, OutputFormat};
 /// Detect format from a peekable reader
 /// Returns the detected format without consuming the first line
 fn detect_format_from_peekable_reader<R: BufRead>(
-    reader: &mut crate::readers::PeekableLineReader<R>
+    reader: &mut crate::readers::PeekableLineReader<R>,
 ) -> Result<config::InputFormat> {
     match reader.peek_first_line()? {
         None => {
@@ -173,7 +173,7 @@ fn detect_format_for_parallel_mode(files: &[String]) -> Result<InputFormat> {
         let stdin = io::stdin();
         let stdin_lock = stdin.lock();
         let mut peekable_reader = crate::readers::PeekableLineReader::new(stdin_lock);
-        
+
         match detect_format_from_peekable_reader(&mut peekable_reader)? {
             config::InputFormat::Auto => Ok(InputFormat::Line), // Fallback
             format => Ok(format.into()),
@@ -181,15 +181,15 @@ fn detect_format_for_parallel_mode(files: &[String]) -> Result<InputFormat> {
     } else {
         // For files, read first line from first file
         let sorted_files = pipeline::builders::sort_files(files, &config::FileOrder::None)?;
-        
+
         if sorted_files.is_empty() {
             return Ok(InputFormat::Line);
         }
-        
+
         let first_file = &sorted_files[0];
         let decompressed = DecompressionReader::new(first_file)?;
         let mut peekable_reader = crate::readers::PeekableLineReader::new(decompressed);
-        
+
         match detect_format_from_peekable_reader(&mut peekable_reader)? {
             config::InputFormat::Auto => Ok(InputFormat::Line), // Fallback
             format => Ok(format.into()),
@@ -295,12 +295,12 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
     let final_config = if matches!(config.input.format, InputFormat::Auto) {
         // For parallel mode, we need to detect format first
         let detected_format = detect_format_for_parallel_mode(&config.input.files)?;
-        
+
         // Report detected format in verbose mode
         if config.processing.verbose {
             eprintln!("🔍 kelora: auto-detected format: {:?}", detected_format);
         }
-        
+
         // Create new config with detected format
         let mut new_config = config.clone();
         new_config.input.format = detected_format;
@@ -308,7 +308,7 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
     } else {
         config.clone()
     };
-    
+
     // Convert to KeloraConfig temporarily - will be removed when all core functions are updated
     let kelora_config = KeloraConfig {
         input: config::InputConfig {
@@ -508,7 +508,7 @@ pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) 
     if matches!(config.input.format, config::InputFormat::Auto) {
         return run_pipeline_sequential_with_auto_detection(config, output);
     }
-    
+
     let (mut pipeline, begin_stage, end_stage, mut ctx) = create_pipeline_from_config(config)?;
 
     // Execute begin stage
@@ -656,34 +656,38 @@ pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) 
 }
 
 /// Run pipeline in sequential mode with auto-detection support
-fn run_pipeline_sequential_with_auto_detection<W: Write>(config: &KeloraConfig, output: &mut W) -> Result<()> {
+fn run_pipeline_sequential_with_auto_detection<W: Write>(
+    config: &KeloraConfig,
+    output: &mut W,
+) -> Result<()> {
     // Handle auto-detection based on input source
     if config.input.files.is_empty() {
         // Stdin processing with auto-detection
         let stdin = io::stdin();
         let stdin_lock = stdin.lock();
         let mut peekable_reader = crate::readers::PeekableLineReader::new(stdin_lock);
-        
+
         // Detect format from first line
         let detected_format = detect_format_from_peekable_reader(&mut peekable_reader)?;
-        
+
         // Report detected format in verbose mode
         if config.processing.verbose {
             eprintln!("🔍 kelora: auto-detected format: {:?}", detected_format);
         }
-        
+
         // Create config with detected format
         let mut final_config = config.clone();
         final_config.input.format = detected_format;
-        
+
         // Build pipeline with detected format
-        let (mut pipeline, begin_stage, end_stage, mut ctx) = create_pipeline_from_config(&final_config)?;
-        
+        let (mut pipeline, begin_stage, end_stage, mut ctx) =
+            create_pipeline_from_config(&final_config)?;
+
         // Execute begin stage
         if let Err(e) = begin_stage.execute(&mut ctx) {
             return Err(anyhow::anyhow!("Begin stage error: {}", e));
         }
-        
+
         // Process stdin using peekable reader (which will return the first line correctly)
         run_sequential_with_reader(
             &mut peekable_reader,
@@ -693,12 +697,12 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(config: &KeloraConfig, 
             output,
             None, // No filename for stdin
         )?;
-        
+
         // Execute end stage
         if let Err(e) = end_stage.execute(&ctx) {
             return Err(anyhow::anyhow!("End stage error: {}", e));
         }
-        
+
         // Merge thread-local tracking state
         crate::rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
 
@@ -707,16 +711,16 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(config: &KeloraConfig, 
             crate::rhai_functions::tracking::write_error_summary_to_file(&ctx.tracker, file_path)
                 .unwrap_or_else(|e| eprintln!("Failed to write error summary to file: {}", e));
         }
-        
     } else {
         // File processing with auto-detection
         // For files, we can just read the first line and then re-open
-        let sorted_files = pipeline::builders::sort_files(&config.input.files, &config.input.file_order)?;
-        
+        let sorted_files =
+            pipeline::builders::sort_files(&config.input.files, &config.input.file_order)?;
+
         if sorted_files.is_empty() {
             return Ok(());
         }
-        
+
         // Read first line from first file for detection
         let first_file = &sorted_files[0];
         let detected_format = {
@@ -724,24 +728,25 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(config: &KeloraConfig, 
             let mut peekable_reader = crate::readers::PeekableLineReader::new(decompressed);
             detect_format_from_peekable_reader(&mut peekable_reader)?
         };
-        
+
         // Report detected format in verbose mode
         if config.processing.verbose {
             eprintln!("🔍 kelora: auto-detected format: {:?}", detected_format);
         }
-        
+
         // Create config with detected format
         let mut final_config = config.clone();
         final_config.input.format = detected_format;
-        
+
         // Build pipeline with detected format
-        let (mut pipeline, begin_stage, end_stage, mut ctx) = create_pipeline_from_config(&final_config)?;
-        
+        let (mut pipeline, begin_stage, end_stage, mut ctx) =
+            create_pipeline_from_config(&final_config)?;
+
         // Execute begin stage
         if let Err(e) = begin_stage.execute(&mut ctx) {
             return Err(anyhow::anyhow!("Begin stage error: {}", e));
         }
-        
+
         // Process all files normally (re-opening them)
         let mut multi_reader = crate::readers::MultiFileReader::new(sorted_files)?;
         run_sequential_with_multi_reader(
@@ -751,12 +756,12 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(config: &KeloraConfig, 
             &final_config,
             output,
         )?;
-        
+
         // Execute end stage
         if let Err(e) = end_stage.execute(&ctx) {
             return Err(anyhow::anyhow!("End stage error: {}", e));
         }
-        
+
         // Merge thread-local tracking state
         crate::rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
 
@@ -766,7 +771,7 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(config: &KeloraConfig, 
                 .unwrap_or_else(|e| eprintln!("Failed to write error summary to file: {}", e));
         }
     }
-    
+
     Ok(())
 }
 
@@ -800,7 +805,9 @@ fn run_sequential_with_reader<W: Write, R: BufRead>(
             Ok(n) => n,
             Err(e) => {
                 let line_result = Err(e);
-                let current_filename = multi_reader.as_ref().and_then(|mr| mr.current_filename().map(|s| s.to_string()));
+                let current_filename = multi_reader
+                    .as_ref()
+                    .and_then(|mr| mr.current_filename().map(|s| s.to_string()));
                 match process_line_sequential(
                     line_result,
                     &mut line_num,
@@ -827,7 +834,9 @@ fn run_sequential_with_reader<W: Write, R: BufRead>(
         };
 
         if bytes_read > 0 {
-            let current_filename = multi_reader.as_ref().and_then(|mr| mr.current_filename().map(|s| s.to_string()));
+            let current_filename = multi_reader
+                .as_ref()
+                .and_then(|mr| mr.current_filename().map(|s| s.to_string()));
             match process_line_sequential(
                 Ok(line_buf.clone()),
                 &mut line_num,

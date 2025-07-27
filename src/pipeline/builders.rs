@@ -123,7 +123,9 @@ impl PipelineBuilder {
         // Create parser
         let base_parser: Box<dyn EventParser> = match self.input_format {
             crate::InputFormat::Auto => {
-                return Err(anyhow::anyhow!("Auto format should be resolved before pipeline creation"));
+                return Err(anyhow::anyhow!(
+                    "Auto format should be resolved before pipeline creation"
+                ));
             }
             crate::InputFormat::Jsonl => Box::new(crate::parsers::JsonlParser::new()),
             crate::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
@@ -367,7 +369,9 @@ impl PipelineBuilder {
         // Create parser (with pre-processed CSV headers if available)
         let base_parser: Box<dyn EventParser> = match self.input_format {
             crate::InputFormat::Auto => {
-                return Err(anyhow::anyhow!("Auto format should be resolved before pipeline creation"));
+                return Err(anyhow::anyhow!(
+                    "Auto format should be resolved before pipeline creation"
+                ));
             }
             crate::InputFormat::Jsonl => Box::new(crate::parsers::JsonlParser::new()),
             crate::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),

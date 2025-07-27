@@ -14,6 +14,7 @@ pub struct PeekableLineReader<R: BufRead> {
 }
 
 impl<R: BufRead> PeekableLineReader<R> {
+    #[allow(dead_code)] // Used by lib.rs for format auto-detection
     pub fn new(reader: R) -> Self {
         Self {
             inner: reader,
@@ -23,6 +24,7 @@ impl<R: BufRead> PeekableLineReader<R> {
     }
 
     /// Peek at the first line without consuming it
+    #[allow(dead_code)] // Used by lib.rs for format auto-detection
     pub fn peek_first_line(&mut self) -> io::Result<Option<String>> {
         if self.peeked_line.is_some() {
             return Ok(self.peeked_line.clone());
