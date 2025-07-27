@@ -3,6 +3,7 @@
 pub enum Category {
     StringProcessing,
     DataParsing,
+    EncodingDecoding,
     SafetyFunctions,
     ArrayFunctions,
     Utility,
@@ -14,6 +15,7 @@ impl Category {
         match self {
             Category::StringProcessing => "STRING PROCESSING",
             Category::DataParsing => "DATA PARSING",
+            Category::EncodingDecoding => "ENCODING/DECODING",
             Category::SafetyFunctions => "SAFETY FUNCTIONS",
             Category::ArrayFunctions => "ARRAY FUNCTIONS",
             Category::Utility => "UTILITY",
@@ -25,9 +27,10 @@ impl Category {
         match self {
             Category::StringProcessing => 1,
             Category::DataParsing => 2,
-            Category::SafetyFunctions => 3,
-            Category::ArrayFunctions => 4,
-            Category::Utility => 5,
+            Category::EncodingDecoding => 3,
+            Category::SafetyFunctions => 4,
+            Category::ArrayFunctions => 5,
+            Category::Utility => 6,
         }
     }
 }
@@ -185,6 +188,60 @@ pub fn get_all_function_docs() -> Vec<FunctionDoc> {
             signature: "map.unflatten([separator])",
             doc: "Reconstruct nested structures from flat keys",
             category: Category::DataParsing,
+        },
+    ]);
+
+    // ENCODING/DECODING
+    docs.extend(vec![
+        FunctionDoc {
+            signature: "decode_b64(text)",
+            doc: "Decode base64 string to text",
+            category: Category::EncodingDecoding,
+        },
+        FunctionDoc {
+            signature: "decode_hex(text)",
+            doc: "Decode hexadecimal string to text",
+            category: Category::EncodingDecoding,
+        },
+        FunctionDoc {
+            signature: "decode_url(text)",
+            doc: "Decode URL-encoded string",
+            category: Category::EncodingDecoding,
+        },
+        FunctionDoc {
+            signature: "encode_b64(text)",
+            doc: "Encode text to base64 string",
+            category: Category::EncodingDecoding,
+        },
+        FunctionDoc {
+            signature: "encode_hex(text)",
+            doc: "Encode text to hexadecimal string",
+            category: Category::EncodingDecoding,
+        },
+        FunctionDoc {
+            signature: "encode_url(text)",
+            doc: "URL-encode text (percent encoding)",
+            category: Category::EncodingDecoding,
+        },
+        FunctionDoc {
+            signature: "escape_html(text)",
+            doc: "Escape HTML special characters",
+            category: Category::EncodingDecoding,
+        },
+        FunctionDoc {
+            signature: "escape_json(text)",
+            doc: "Escape JSON special characters",
+            category: Category::EncodingDecoding,
+        },
+        FunctionDoc {
+            signature: "unescape_html(text)",
+            doc: "Unescape HTML entities",
+            category: Category::EncodingDecoding,
+        },
+        FunctionDoc {
+            signature: "unescape_json(text)",
+            doc: "Unescape JSON escape sequences",
+            category: Category::EncodingDecoding,
         },
     ]);
 
