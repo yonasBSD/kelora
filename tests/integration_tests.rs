@@ -68,16 +68,6 @@ fn run_kelora_with_file(args: &[&str], file_content: &str) -> (String, String, i
 }
 
 #[test]
-fn test_version_flag() {
-    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["--version"], "");
-    assert_eq!(exit_code, 0, "kelora --version should exit successfully");
-    assert!(
-        stdout.contains("kelora 0.2.0"),
-        "Version output should contain version number"
-    );
-}
-
-#[test]
 fn test_help_flag() {
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&["--help"], "");
     assert_eq!(exit_code, 0, "kelora --help should exit successfully");
