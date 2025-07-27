@@ -1,6 +1,6 @@
-use rhai::{Engine, Map, Dynamic};
 use crate::event::{flatten_dynamic, FlattenStyle};
 use indexmap::IndexMap;
+use rhai::{Dynamic, Engine, Map};
 
 /// Registers map merge/enrich operators to the Rhai engine.
 pub fn register_functions(engine: &mut Engine) {
@@ -26,7 +26,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     // Flattening functions
-    
+
     // Default flatten() - uses bracket style, unlimited depth
     engine.register_fn("flatten", |map: Map| -> Map {
         let dynamic_map = Dynamic::from(map);
@@ -34,7 +34,7 @@ pub fn register_functions(engine: &mut Engine) {
         convert_indexmap_to_rhai_map(flattened)
     });
 
-    // flatten(style) - specify style, unlimited depth  
+    // flatten(style) - specify style, unlimited depth
     engine.register_fn("flatten", |map: Map, style: &str| -> Map {
         let flatten_style = match style {
             "dot" => FlattenStyle::Dot,
@@ -64,7 +64,7 @@ pub fn register_functions(engine: &mut Engine) {
     // flatten_field(field_name) - flatten just one field from the map
     engine.register_fn("flatten_field", |map: &Map, field_name: &str| -> Map {
         let mut result = Map::new();
-        
+
         if let Some(field_value) = map.get(field_name) {
             let flattened = flatten_dynamic(field_value, FlattenStyle::default(), 0);
             for (key, value) in flattened {
@@ -76,10 +76,9 @@ pub fn register_functions(engine: &mut Engine) {
                 result.insert(full_key.into(), value);
             }
         }
-        
+
         result
     });
-
 }
 
 /// Convert IndexMap<String, Dynamic> to rhai::Map
@@ -91,11 +90,9 @@ fn convert_indexmap_to_rhai_map(indexmap: IndexMap<String, Dynamic>) -> Map {
     map
 }
 
-
 #[cfg(test)]
 mod tests {
     use rhai::Map;
-
 
     #[test]
     fn test_json_to_dynamic_conversion() {
@@ -116,7 +113,7 @@ mod tests {
             assert_eq!(map.get("number").unwrap().clone().cast::<i64>(), 42);
             assert_eq!(map.get("boolean").unwrap().clone().cast::<bool>(), true);
             assert!(map.get("null").unwrap().is_unit());
-            
+
             // Test array conversion
             if let Some(array) = map.get("array").unwrap().clone().try_cast::<rhai::Array>() {
                 assert_eq!(array.len(), 3);
@@ -124,10 +121,13 @@ mod tests {
             } else {
                 panic!("Array field is not a proper Rhai array");
             }
-            
+
             // Test nested object conversion
             if let Some(nested_map) = map.get("object").unwrap().clone().try_cast::<Map>() {
-                assert_eq!(nested_map.get("nested").unwrap().clone().cast::<String>(), "value");
+                assert_eq!(
+                    nested_map.get("nested").unwrap().clone().cast::<String>(),
+                    "value"
+                );
             } else {
                 panic!("Object field is not a proper Rhai map");
             }

@@ -2363,7 +2363,12 @@ fn test_direct_field_access_negative_indexing() {
     let input = r#"{"user": {"name": "charlie", "scores": [100, 200, 300]}}"#;
 
     let (stdout, _, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--exec", "let last_score = e.user.scores[-1]; print(\"Last score: \" + last_score)"],
+        &[
+            "-f",
+            "jsonl",
+            "--exec",
+            "let last_score = e.user.scores[-1]; print(\"Last score: \" + last_score)",
+        ],
         input,
     );
 
@@ -2380,7 +2385,12 @@ fn test_direct_field_access_deeply_nested() {
     let input = r#"{"data": {"items": [{"id": 1, "meta": {"tags": ["urgent", "review"]}}]}}"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--exec", "let tag = e.data.items[0].meta.tags[0]; print(\"First tag: \" + tag)"],
+        &[
+            "-f",
+            "jsonl",
+            "--exec",
+            "let tag = e.data.items[0].meta.tags[0]; print(\"First tag: \" + tag)",
+        ],
         input,
     );
 
@@ -2443,12 +2453,7 @@ fn test_direct_field_access_filtering() {
 {"level": "error", "user": {"role": "user"}}"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &[
-            "-f",
-            "jsonl",
-            "--filter",
-            "e.user.role == \"admin\"",
-        ],
+        &["-f", "jsonl", "--filter", "e.user.role == \"admin\""],
         input,
     );
 

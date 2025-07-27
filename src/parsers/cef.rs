@@ -409,11 +409,7 @@ mod tests {
 
         assert_eq!(result.fields.get("count").unwrap().as_int().unwrap(), 42);
         assert_eq!(result.fields.get("rate").unwrap().as_float().unwrap(), 2.5);
-        assert!(
-            result.fields.get("enabled").unwrap().as_bool().unwrap()
-        );
-        assert!(
-            !result.fields.get("disabled").unwrap().as_bool().unwrap()
-        );
+        assert!(result.fields.get("enabled").unwrap().as_bool().unwrap());
+        assert!(!result.fields.get("disabled").unwrap().as_bool().unwrap());
     }
 }

@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use crate::colors::ColorScheme;
-use crate::event::{Event, flatten_dynamic, FlattenStyle};
+use crate::event::{flatten_dynamic, Event, FlattenStyle};
 use crate::pipeline;
 use rhai::Dynamic;
 use std::collections::HashMap;
@@ -105,9 +105,7 @@ fn dynamic_to_json(value: &Dynamic) -> serde_json::Value {
         serde_json::Value::Null
     } else if let Some(arr) = value.clone().try_cast::<rhai::Array>() {
         // Convert Rhai array to JSON array recursively
-        let json_array: Vec<serde_json::Value> = arr.iter()
-            .map(dynamic_to_json)
-            .collect();
+        let json_array: Vec<serde_json::Value> = arr.iter().map(dynamic_to_json).collect();
         serde_json::Value::Array(json_array)
     } else if let Some(map) = value.clone().try_cast::<rhai::Map>() {
         // Convert Rhai map to JSON object recursively
@@ -372,10 +370,12 @@ impl DefaultFormatter {
     /// Format a Dynamic value for default output, flattening nested structures with dot notation
     fn format_default_value(&self, value: &Dynamic) -> (String, bool) {
         // Check if this is a complex nested structure
-        if value.clone().try_cast::<rhai::Map>().is_some() || value.clone().try_cast::<rhai::Array>().is_some() {
+        if value.clone().try_cast::<rhai::Map>().is_some()
+            || value.clone().try_cast::<rhai::Array>().is_some()
+        {
             // Flatten nested structures using dot style for human readability
             let flattened = flatten_dynamic(value, FlattenStyle::Dot, 0);
-            
+
             if flattened.len() == 1 {
                 // Single flattened value - use it directly
                 let val = flattened.values().next().unwrap().to_string();
@@ -510,7 +510,7 @@ impl LogfmtFormatter {
     fn format_dynamic_value_into(&self, value: &Dynamic, output: &mut String) {
         let string_val = self.format_logfmt_value(value);
         let is_string = value.is_string();
-        
+
         if is_string {
             format_quoted_logfmt_value(&string_val, output);
         } else {
@@ -521,10 +521,12 @@ impl LogfmtFormatter {
     /// Format a Dynamic value for logfmt output, flattening nested structures
     fn format_logfmt_value(&self, value: &Dynamic) -> String {
         // Check if this is a complex nested structure
-        if value.clone().try_cast::<rhai::Map>().is_some() || value.clone().try_cast::<rhai::Array>().is_some() {
+        if value.clone().try_cast::<rhai::Map>().is_some()
+            || value.clone().try_cast::<rhai::Array>().is_some()
+        {
             // Flatten nested structures using underscore style for logfmt safety
             let flattened = flatten_dynamic(value, FlattenStyle::Underscore, 0);
-            
+
             if flattened.len() == 1 {
                 // Single flattened value - use it directly
                 flattened.values().next().unwrap().to_string()
@@ -727,10 +729,12 @@ impl CsvFormatter {
     /// Format a Dynamic value for CSV output, flattening nested structures
     fn format_csv_value(&self, value: &Dynamic) -> String {
         // Check if this is a complex nested structure
-        if value.clone().try_cast::<rhai::Map>().is_some() || value.clone().try_cast::<rhai::Array>().is_some() {
+        if value.clone().try_cast::<rhai::Map>().is_some()
+            || value.clone().try_cast::<rhai::Array>().is_some()
+        {
             // Flatten nested structures using underscore style for CSV safety
             let flattened = flatten_dynamic(value, FlattenStyle::Underscore, 0);
-            
+
             if flattened.len() == 1 {
                 // Single flattened value - use it directly
                 flattened.values().next().unwrap().to_string()

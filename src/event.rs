@@ -10,7 +10,7 @@ pub enum FlattenStyle {
     /// Use dots for objects and brackets for arrays: "user.name", "items[0].value"
     #[default]
     Bracket,
-    /// Use dots everywhere: "user.name", "items.0.value" 
+    /// Use dots everywhere: "user.name", "items.0.value"
     Dot,
     /// Use underscores everywhere: "user_name", "items_0_value"
     Underscore,
@@ -66,11 +66,11 @@ impl FlattenStyle {
 }
 
 /// Flatten a Dynamic value into a flat map of key-value pairs
-/// 
+///
 /// This function recursively traverses nested maps and arrays, generating
 /// flat keys according to the specified style. It respects max_depth to
 /// prevent infinite recursion and memory issues.
-/// 
+///
 /// # Arguments
 /// * `value` - The Dynamic value to flatten
 /// * `style` - The flattening style (Bracket, Dot, Underscore)
@@ -82,7 +82,11 @@ pub fn flatten_dynamic(
 ) -> IndexMap<String, Dynamic> {
     let mut result = IndexMap::new();
     // Convert max_depth=0 to unlimited
-    let effective_max_depth = if max_depth == 0 { usize::MAX } else { max_depth };
+    let effective_max_depth = if max_depth == 0 {
+        usize::MAX
+    } else {
+        max_depth
+    };
     flatten_dynamic_recursive(value, "", style, 0, effective_max_depth, &mut result);
     result
 }
@@ -120,7 +124,14 @@ fn flatten_dynamic_recursive(
         } else {
             for (key, val) in map {
                 let new_key = style.format_object_key(prefix, key.as_ref());
-                flatten_dynamic_recursive(&val, &new_key, style, current_depth + 1, max_depth, result);
+                flatten_dynamic_recursive(
+                    &val,
+                    &new_key,
+                    style,
+                    current_depth + 1,
+                    max_depth,
+                    result,
+                );
             }
         }
     } else if let Some(array) = value.clone().try_cast::<rhai::Array>() {
@@ -136,7 +147,14 @@ fn flatten_dynamic_recursive(
         } else {
             for (index, val) in array.iter().enumerate() {
                 let new_key = style.format_array_key(prefix, index);
-                flatten_dynamic_recursive(val, &new_key, style, current_depth + 1, max_depth, result);
+                flatten_dynamic_recursive(
+                    val,
+                    &new_key,
+                    style,
+                    current_depth + 1,
+                    max_depth,
+                    result,
+                );
             }
         }
     } else {
@@ -157,7 +175,7 @@ pub fn flatten_event_fields(
     max_depth: usize,
 ) -> IndexMap<String, Dynamic> {
     let mut result = IndexMap::new();
-    
+
     for (key, value) in &event.fields {
         if value.clone().try_cast::<rhai::Map>().is_some() {
             // Flatten nested objects
@@ -182,7 +200,7 @@ pub fn flatten_event_fields(
             result.insert(key.clone(), value.clone());
         }
     }
-    
+
     result
 }
 
@@ -404,10 +422,10 @@ mod tests {
         let mut map = Map::new();
         map.insert("name".into(), Dynamic::from("alice"));
         map.insert("age".into(), Dynamic::from(25i64));
-        
+
         let dynamic_map = Dynamic::from(map);
         let flattened = flatten_dynamic(&dynamic_map, FlattenStyle::Bracket, 10);
-        
+
         assert_eq!(flattened.get("name").unwrap().to_string(), "alice");
         assert_eq!(flattened.get("age").unwrap().to_string(), "25");
     }
@@ -417,16 +435,19 @@ mod tests {
         let mut inner_map = Map::new();
         inner_map.insert("street".into(), Dynamic::from("123 Main St"));
         inner_map.insert("city".into(), Dynamic::from("Boston"));
-        
+
         let mut outer_map = Map::new();
         outer_map.insert("name".into(), Dynamic::from("alice"));
         outer_map.insert("address".into(), Dynamic::from(inner_map));
-        
+
         let dynamic_map = Dynamic::from(outer_map);
         let flattened = flatten_dynamic(&dynamic_map, FlattenStyle::Bracket, 10);
-        
+
         assert_eq!(flattened.get("name").unwrap().to_string(), "alice");
-        assert_eq!(flattened.get("address.street").unwrap().to_string(), "123 Main St");
+        assert_eq!(
+            flattened.get("address.street").unwrap().to_string(),
+            "123 Main St"
+        );
         assert_eq!(flattened.get("address.city").unwrap().to_string(), "Boston");
     }
 
@@ -436,10 +457,10 @@ mod tests {
         array.push(Dynamic::from("item1"));
         array.push(Dynamic::from("item2"));
         array.push(Dynamic::from(42i64));
-        
+
         let dynamic_array = Dynamic::from(array);
         let flattened = flatten_dynamic(&dynamic_array, FlattenStyle::Bracket, 10);
-        
+
         assert_eq!(flattened.get("[0]").unwrap().to_string(), "item1");
         assert_eq!(flattened.get("[1]").unwrap().to_string(), "item2");
         assert_eq!(flattened.get("[2]").unwrap().to_string(), "42");
@@ -450,50 +471,53 @@ mod tests {
         let mut item1 = Map::new();
         item1.insert("id".into(), Dynamic::from(1i64));
         item1.insert("name".into(), Dynamic::from("first"));
-        
+
         let mut item2 = Map::new();
         item2.insert("id".into(), Dynamic::from(2i64));
         item2.insert("name".into(), Dynamic::from("second"));
-        
+
         let mut array = Array::new();
         array.push(Dynamic::from(item1));
         array.push(Dynamic::from(item2));
-        
+
         let mut root = Map::new();
         root.insert("user".into(), Dynamic::from("alice"));
         root.insert("items".into(), Dynamic::from(array));
-        
+
         let dynamic_root = Dynamic::from(root);
         let flattened = flatten_dynamic(&dynamic_root, FlattenStyle::Bracket, 10);
-        
+
         assert_eq!(flattened.get("user").unwrap().to_string(), "alice");
         assert_eq!(flattened.get("items[0].id").unwrap().to_string(), "1");
         assert_eq!(flattened.get("items[0].name").unwrap().to_string(), "first");
         assert_eq!(flattened.get("items[1].id").unwrap().to_string(), "2");
-        assert_eq!(flattened.get("items[1].name").unwrap().to_string(), "second");
+        assert_eq!(
+            flattened.get("items[1].name").unwrap().to_string(),
+            "second"
+        );
     }
 
     #[test]
     fn test_flatten_styles() {
         let mut inner = Map::new();
         inner.insert("value".into(), Dynamic::from(42i64));
-        
+
         let mut array = Array::new();
         array.push(Dynamic::from(inner));
-        
+
         let mut root = Map::new();
         root.insert("data".into(), Dynamic::from(array));
-        
+
         let dynamic_root = Dynamic::from(root);
-        
+
         // Test bracket style
         let bracket = flatten_dynamic(&dynamic_root, FlattenStyle::Bracket, 10);
         assert!(bracket.contains_key("data[0].value"));
-        
+
         // Test dot style
         let dot = flatten_dynamic(&dynamic_root, FlattenStyle::Dot, 10);
         assert!(dot.contains_key("data.0.value"));
-        
+
         // Test underscore style
         let underscore = flatten_dynamic(&dynamic_root, FlattenStyle::Underscore, 10);
         assert!(underscore.contains_key("data_0_value"));
@@ -503,21 +527,21 @@ mod tests {
     fn test_flatten_max_depth() {
         let mut deep = Map::new();
         deep.insert("level4".into(), Dynamic::from("deep"));
-        
+
         let mut level3 = Map::new();
         level3.insert("level3".into(), Dynamic::from(deep));
-        
+
         let mut level2 = Map::new();
         level2.insert("level2".into(), Dynamic::from(level3));
-        
+
         let mut level1 = Map::new();
         level1.insert("level1".into(), Dynamic::from(level2));
-        
+
         let dynamic_root = Dynamic::from(level1);
-        
+
         // With max_depth=2, should stop at level2
         let flattened = flatten_dynamic(&dynamic_root, FlattenStyle::Bracket, 2);
-        
+
         // Should have flattened up to level2 but not deeper
         assert!(flattened.contains_key("level1.level2"));
         assert!(!flattened.contains_key("level1.level2.level3.level4"));
@@ -527,14 +551,15 @@ mod tests {
     fn test_flatten_empty_structures() {
         let empty_map = Map::new();
         let empty_array = Array::new();
-        
+
         let flattened_map = flatten_dynamic(&Dynamic::from(empty_map), FlattenStyle::Bracket, 10);
-        let flattened_array = flatten_dynamic(&Dynamic::from(empty_array), FlattenStyle::Bracket, 10);
-        
+        let flattened_array =
+            flatten_dynamic(&Dynamic::from(empty_array), FlattenStyle::Bracket, 10);
+
         // Empty structures should produce a single null value
         assert_eq!(flattened_map.len(), 1);
         assert!(flattened_map.get("value").unwrap().is_unit());
-        
+
         assert_eq!(flattened_array.len(), 1);
         assert!(flattened_array.get("value").unwrap().is_unit());
     }
@@ -544,40 +569,46 @@ mod tests {
         // Create a very deeply nested structure
         let mut deep = Map::new();
         deep.insert("level8".into(), Dynamic::from("deepest"));
-        
+
         let mut level7 = Map::new();
         level7.insert("level7".into(), Dynamic::from(deep));
-        
+
         let mut level6 = Map::new();
         level6.insert("level6".into(), Dynamic::from(level7));
-        
+
         let mut level5 = Map::new();
         level5.insert("level5".into(), Dynamic::from(level6));
-        
+
         let mut level4 = Map::new();
         level4.insert("level4".into(), Dynamic::from(level5));
-        
+
         let mut level3 = Map::new();
         level3.insert("level3".into(), Dynamic::from(level4));
-        
+
         let mut level2 = Map::new();
         level2.insert("level2".into(), Dynamic::from(level3));
-        
+
         let mut level1 = Map::new();
         level1.insert("level1".into(), Dynamic::from(level2));
-        
+
         let dynamic_root = Dynamic::from(level1);
-        
+
         // With max_depth=0 (unlimited), should flatten completely
         let unlimited = flatten_dynamic(&dynamic_root, FlattenStyle::Bracket, 0);
-        
+
         // Should have fully flattened the deep structure
         assert!(unlimited.contains_key("level1.level2.level3.level4.level5.level6.level7.level8"));
-        assert_eq!(unlimited.get("level1.level2.level3.level4.level5.level6.level7.level8").unwrap().to_string(), "deepest");
-        
+        assert_eq!(
+            unlimited
+                .get("level1.level2.level3.level4.level5.level6.level7.level8")
+                .unwrap()
+                .to_string(),
+            "deepest"
+        );
+
         // Compare with limited depth
         let limited = flatten_dynamic(&dynamic_root, FlattenStyle::Bracket, 3);
-        
+
         // Should stop at level 3 and contain the remaining structure as a string
         assert!(limited.contains_key("level1.level2.level3"));
         assert!(!limited.contains_key("level1.level2.level3.level4.level5.level6.level7.level8"));

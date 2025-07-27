@@ -3,7 +3,6 @@ use crate::event::Event;
 use crate::pipeline::EventParser;
 use anyhow::{Context, Result};
 
-
 pub struct JsonlParser;
 
 impl JsonlParser {

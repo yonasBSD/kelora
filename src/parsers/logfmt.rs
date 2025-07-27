@@ -198,16 +198,9 @@ mod tests {
             "hello"
         );
         assert_eq!(result.fields.get("int").unwrap().as_int().unwrap(), 123);
-        assert_eq!(
-            result.fields.get("float").unwrap().as_float().unwrap(),
-            2.5
-        );
-        assert!(
-            result.fields.get("bool_true").unwrap().as_bool().unwrap()
-        );
-        assert!(
-            !result.fields.get("bool_false").unwrap().as_bool().unwrap()
-        );
+        assert_eq!(result.fields.get("float").unwrap().as_float().unwrap(), 2.5);
+        assert!(result.fields.get("bool_true").unwrap().as_bool().unwrap());
+        assert!(!result.fields.get("bool_false").unwrap().as_bool().unwrap());
     }
 
     #[test]

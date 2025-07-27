@@ -1,4 +1,4 @@
-use rhai::{Dynamic, Engine, Map, Array};
+use rhai::{Array, Dynamic, Engine, Map};
 use std::cell::RefCell;
 
 /// Represents a captured message with its target stream
@@ -632,31 +632,31 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     // Unflattening functions - reconstruct nested structures from flat keys
-    
+
     // Default unflatten() - uses underscore separator with smart heuristics
     engine.register_fn("unflatten", |map: rhai::Map| -> rhai::Map {
         unflatten_map(map, "_")
     });
 
-    // unflatten(separator) - specify separator with smart heuristics  
-    engine.register_fn("unflatten", |map: rhai::Map, separator: &str| -> rhai::Map {
-        unflatten_map(map, separator)
-    });
+    // unflatten(separator) - specify separator with smart heuristics
+    engine.register_fn(
+        "unflatten",
+        |map: rhai::Map, separator: &str| -> rhai::Map { unflatten_map(map, separator) },
+    );
 }
 
 /// Unflatten a map by reconstructing nested structures from flat keys
 /// Uses smart heuristics to determine when to create arrays vs objects
 fn unflatten_map(flat_map: Map, separator: &str) -> Map {
     let mut result = Map::new();
-    
+
     // First pass: analyze all keys to determine container types
     let mut key_analysis = std::collections::HashMap::new();
     for (flat_key, _) in &flat_map {
         let parts: Vec<&str> = flat_key.split(separator).collect();
         analyze_key_path(&parts, &mut key_analysis, separator);
     }
-    
-    
+
     // Second pass: build the nested structure
     for (flat_key, value) in flat_map {
         let parts: Vec<&str> = flat_key.split(separator).collect();
@@ -664,20 +664,24 @@ fn unflatten_map(flat_map: Map, separator: &str) -> Map {
             set_nested_value(&mut result, &parts, value, &key_analysis, separator);
         }
     }
-    
+
     result
 }
 
 /// Analyze a key path to determine what type of containers should be created
-fn analyze_key_path(parts: &[&str], analysis: &mut std::collections::HashMap<String, ContainerType>, separator: &str) {
+fn analyze_key_path(
+    parts: &[&str],
+    analysis: &mut std::collections::HashMap<String, ContainerType>,
+    separator: &str,
+) {
     let mut current_path = String::new();
-    
+
     for (i, part) in parts.iter().enumerate() {
         if i > 0 {
             current_path.push_str(separator);
         }
         current_path.push_str(part);
-        
+
         // Look at the next part to determine what container type this should be
         if i + 1 < parts.len() {
             let next_part = parts[i + 1];
@@ -686,7 +690,7 @@ fn analyze_key_path(parts: &[&str], analysis: &mut std::collections::HashMap<Str
             } else {
                 ContainerType::Object
             };
-            
+
             // If we've seen this path before, check for conflicts
             match analysis.get(&current_path) {
                 Some(existing_type) => {
@@ -739,52 +743,70 @@ fn set_nested_value_with_path(
     if parts.is_empty() {
         return;
     }
-    
+
     if parts.len() == 1 {
         // Leaf value
         container.insert(parts[0].into(), value);
         return;
     }
-    
+
     let current_key = parts[0];
     let remaining_parts = &parts[1..];
-    
+
     // Determine what kind of container we need to create/access
     // Build the full path to the current container
     let mut full_path = parent_path.to_vec();
     full_path.push(current_key);
     let lookup_key = full_path.join(separator);
-    
-    let container_type = analysis.get(&lookup_key).copied().unwrap_or(ContainerType::Object);
-    
+
+    let container_type = analysis
+        .get(&lookup_key)
+        .copied()
+        .unwrap_or(ContainerType::Object);
+
     match container_type {
         ContainerType::Object => {
             // Ensure we have a Map for this key
-            let nested_map = container.entry(current_key.into())
+            let nested_map = container
+                .entry(current_key.into())
                 .or_insert_with(|| Dynamic::from(Map::new()));
-            
+
             if let Some(mut map) = nested_map.clone().try_cast::<Map>() {
                 let mut new_path = parent_path.to_vec();
                 new_path.push(current_key);
-                set_nested_value_with_path(&mut map, remaining_parts, value, analysis, separator, &new_path);
+                set_nested_value_with_path(
+                    &mut map,
+                    remaining_parts,
+                    value,
+                    analysis,
+                    separator,
+                    &new_path,
+                );
                 *nested_map = Dynamic::from(map);
             }
         }
         ContainerType::Array => {
-            // Ensure we have an Array for this key  
-            let nested_array = container.entry(current_key.into())
+            // Ensure we have an Array for this key
+            let nested_array = container
+                .entry(current_key.into())
                 .or_insert_with(|| Dynamic::from(Array::new()));
-            
+
             if let Some(mut array) = nested_array.clone().try_cast::<Array>() {
                 let mut new_path = parent_path.to_vec();
                 new_path.push(current_key);
-                set_array_value_with_path(&mut array, remaining_parts, value, analysis, separator, &new_path);
+                set_array_value_with_path(
+                    &mut array,
+                    remaining_parts,
+                    value,
+                    analysis,
+                    separator,
+                    &new_path,
+                );
                 *nested_array = Dynamic::from(array);
             }
         }
     }
 }
-
 
 /// Set a value in an array structure with full path context
 fn set_array_value_with_path(
@@ -798,7 +820,7 @@ fn set_array_value_with_path(
     if parts.is_empty() {
         return;
     }
-    
+
     if parts.len() == 1 {
         // Leaf value - parts[0] should be an index
         if let Ok(index) = parts[0].parse::<usize>() {
@@ -810,33 +832,43 @@ fn set_array_value_with_path(
         }
         return;
     }
-    
+
     let current_index_str = parts[0];
     let remaining_parts = &parts[1..];
-    
+
     if let Ok(index) = current_index_str.parse::<usize>() {
         // Extend array if necessary
         while array.len() <= index {
             array.push(Dynamic::UNIT);
         }
-        
+
         // Determine what kind of container the next level needs
         let mut full_path = parent_path.to_vec();
         full_path.push(current_index_str);
         let lookup_key = full_path.join(separator);
-        let container_type = analysis.get(&lookup_key).copied().unwrap_or(ContainerType::Object);
-        
+        let container_type = analysis
+            .get(&lookup_key)
+            .copied()
+            .unwrap_or(ContainerType::Object);
+
         match container_type {
             ContainerType::Object => {
                 // Ensure we have a Map at this index
                 if array[index].is_unit() {
                     array[index] = Dynamic::from(Map::new());
                 }
-                
+
                 if let Some(mut map) = array[index].clone().try_cast::<Map>() {
                     let mut new_path = parent_path.to_vec();
                     new_path.push(current_index_str);
-                    set_nested_value_with_path(&mut map, remaining_parts, value, analysis, separator, &new_path);
+                    set_nested_value_with_path(
+                        &mut map,
+                        remaining_parts,
+                        value,
+                        analysis,
+                        separator,
+                        &new_path,
+                    );
                     array[index] = Dynamic::from(map);
                 }
             }
@@ -845,11 +877,18 @@ fn set_array_value_with_path(
                 if array[index].is_unit() {
                     array[index] = Dynamic::from(Array::new());
                 }
-                
+
                 if let Some(mut nested_array) = array[index].clone().try_cast::<Array>() {
                     let mut new_path = parent_path.to_vec();
                     new_path.push(current_index_str);
-                    set_array_value_with_path(&mut nested_array, remaining_parts, value, analysis, separator, &new_path);
+                    set_array_value_with_path(
+                        &mut nested_array,
+                        remaining_parts,
+                        value,
+                        analysis,
+                        separator,
+                        &new_path,
+                    );
                     array[index] = Dynamic::from(nested_array);
                 }
             }
@@ -1817,50 +1856,101 @@ mod tests {
 
         // Test basic object unflattening with default separator (underscore)
         let result: rhai::Map = engine
-            .eval_with_scope(&mut scope, r##"
+            .eval_with_scope(
+                &mut scope,
+                r##"
                 let flat = #{
                     "user_name": "alice",
                     "user_age": "30",
                     "user_settings_theme": "dark"
                 };
                 flat.unflatten()
-            "##)
+            "##,
+            )
             .unwrap();
 
-
         // Check nested structure
-        let user_map = result.get("user").unwrap().clone().try_cast::<rhai::Map>().unwrap();
-        assert_eq!(user_map.get("name").unwrap().clone().into_string().unwrap(), "alice");
-        assert_eq!(user_map.get("age").unwrap().clone().into_string().unwrap(), "30");
-        
-        let settings_map = user_map.get("settings").unwrap().clone().try_cast::<rhai::Map>().unwrap();
-        assert_eq!(settings_map.get("theme").unwrap().clone().into_string().unwrap(), "dark");
+        let user_map = result
+            .get("user")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Map>()
+            .unwrap();
+        assert_eq!(
+            user_map.get("name").unwrap().clone().into_string().unwrap(),
+            "alice"
+        );
+        assert_eq!(
+            user_map.get("age").unwrap().clone().into_string().unwrap(),
+            "30"
+        );
+
+        let settings_map = user_map
+            .get("settings")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Map>()
+            .unwrap();
+        assert_eq!(
+            settings_map
+                .get("theme")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "dark"
+        );
 
         // Test array unflattening with numeric indices
         let result: rhai::Map = engine
-            .eval_with_scope(&mut scope, r##"
+            .eval_with_scope(
+                &mut scope,
+                r##"
                 let flat = #{
                     "items_0_name": "first",
                     "items_1_name": "second",
                     "items_2_name": "third"
                 };
                 flat.unflatten()
-            "##)
+            "##,
+            )
             .unwrap();
 
-
-        let items_array = result.get("items").unwrap().clone().try_cast::<rhai::Array>().unwrap();
+        let items_array = result
+            .get("items")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Array>()
+            .unwrap();
         assert_eq!(items_array.len(), 3);
-        
+
         let first_item = items_array[0].clone().try_cast::<rhai::Map>().unwrap();
-        assert_eq!(first_item.get("name").unwrap().clone().into_string().unwrap(), "first");
-        
+        assert_eq!(
+            first_item
+                .get("name")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "first"
+        );
+
         let second_item = items_array[1].clone().try_cast::<rhai::Map>().unwrap();
-        assert_eq!(second_item.get("name").unwrap().clone().into_string().unwrap(), "second");
+        assert_eq!(
+            second_item
+                .get("name")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "second"
+        );
 
         // Test mixed array and object structures
         let result: rhai::Map = engine
-            .eval_with_scope(&mut scope, r##"
+            .eval_with_scope(
+                &mut scope,
+                r##"
                 let flat = #{
                     "users_0_name": "alice",
                     "users_0_roles_0": "admin",
@@ -1869,58 +1959,108 @@ mod tests {
                     "users_1_roles_0": "user"
                 };
                 flat.unflatten()
-            "##)
+            "##,
+            )
             .unwrap();
 
-        let users_array = result.get("users").unwrap().clone().try_cast::<rhai::Array>().unwrap();
+        let users_array = result
+            .get("users")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Array>()
+            .unwrap();
         assert_eq!(users_array.len(), 2);
-        
+
         let alice = users_array[0].clone().try_cast::<rhai::Map>().unwrap();
-        assert_eq!(alice.get("name").unwrap().clone().into_string().unwrap(), "alice");
-        
-        let alice_roles = alice.get("roles").unwrap().clone().try_cast::<rhai::Array>().unwrap();
+        assert_eq!(
+            alice.get("name").unwrap().clone().into_string().unwrap(),
+            "alice"
+        );
+
+        let alice_roles = alice
+            .get("roles")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Array>()
+            .unwrap();
         assert_eq!(alice_roles.len(), 2);
         assert_eq!(alice_roles[0].clone().into_string().unwrap(), "admin");
         assert_eq!(alice_roles[1].clone().into_string().unwrap(), "user");
 
         // Test custom separator
         let result: rhai::Map = engine
-            .eval_with_scope(&mut scope, r##"
+            .eval_with_scope(
+                &mut scope,
+                r##"
                 let flat = #{
                     "user.name": "alice",
                     "user.settings.theme": "dark"
                 };
                 flat.unflatten(".")
-            "##)
+            "##,
+            )
             .unwrap();
 
-        let user_map = result.get("user").unwrap().clone().try_cast::<rhai::Map>().unwrap();
-        assert_eq!(user_map.get("name").unwrap().clone().into_string().unwrap(), "alice");
-        
-        let settings_map = user_map.get("settings").unwrap().clone().try_cast::<rhai::Map>().unwrap();
-        assert_eq!(settings_map.get("theme").unwrap().clone().into_string().unwrap(), "dark");
+        let user_map = result
+            .get("user")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Map>()
+            .unwrap();
+        assert_eq!(
+            user_map.get("name").unwrap().clone().into_string().unwrap(),
+            "alice"
+        );
+
+        let settings_map = user_map
+            .get("settings")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Map>()
+            .unwrap();
+        assert_eq!(
+            settings_map
+                .get("theme")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "dark"
+        );
 
         // Test edge cases - empty map
         let result: rhai::Map = engine
-            .eval_with_scope(&mut scope, r##"
+            .eval_with_scope(
+                &mut scope,
+                r##"
                 let flat = #{};
                 flat.unflatten()
-            "##)
+            "##,
+            )
             .unwrap();
         assert!(result.is_empty());
 
         // Test single level keys (no unflattening needed)
         let result: rhai::Map = engine
-            .eval_with_scope(&mut scope, r##"
+            .eval_with_scope(
+                &mut scope,
+                r##"
                 let flat = #{
                     "name": "alice",
                     "age": "30"
                 };
                 flat.unflatten()
-            "##)
+            "##,
+            )
             .unwrap();
-        assert_eq!(result.get("name").unwrap().clone().into_string().unwrap(), "alice");
-        assert_eq!(result.get("age").unwrap().clone().into_string().unwrap(), "30");
+        assert_eq!(
+            result.get("name").unwrap().clone().into_string().unwrap(),
+            "alice"
+        );
+        assert_eq!(
+            result.get("age").unwrap().clone().into_string().unwrap(),
+            "30"
+        );
     }
 
     #[test]
@@ -1932,42 +2072,72 @@ mod tests {
 
         // Test sparse arrays (gaps in indices)
         let result: rhai::Map = engine
-            .eval_with_scope(&mut scope, r##"
+            .eval_with_scope(
+                &mut scope,
+                r##"
                 let flat = #{
                     "items_0": "first",
                     "items_2": "third",
                     "items_5": "sixth"
                 };
                 flat.unflatten()
-            "##)
+            "##,
+            )
             .unwrap();
 
-        let items_array = result.get("items").unwrap().clone().try_cast::<rhai::Array>().unwrap();
+        let items_array = result
+            .get("items")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Array>()
+            .unwrap();
         assert_eq!(items_array.len(), 6); // Should extend to highest index + 1
         assert_eq!(items_array[0].clone().into_string().unwrap(), "first");
         assert!(items_array[1].is_unit()); // Gap filled with unit
         assert_eq!(items_array[2].clone().into_string().unwrap(), "third");
         assert!(items_array[3].is_unit()); // Gap
-        assert!(items_array[4].is_unit()); // Gap  
+        assert!(items_array[4].is_unit()); // Gap
         assert_eq!(items_array[5].clone().into_string().unwrap(), "sixth");
 
         // Test array with non-numeric keys mixed in (should default to object)
         let result: rhai::Map = engine
-            .eval_with_scope(&mut scope, r##"
+            .eval_with_scope(
+                &mut scope,
+                r##"
                 let flat = #{
                     "mixed_0": "zero",
                     "mixed_name": "alice",
                     "mixed_1": "one"
                 };
                 flat.unflatten()
-            "##)
+            "##,
+            )
             .unwrap();
 
         // Should be treated as object due to mixed keys
-        let mixed_map = result.get("mixed").unwrap().clone().try_cast::<rhai::Map>().unwrap();
-        assert_eq!(mixed_map.get("0").unwrap().clone().into_string().unwrap(), "zero");
-        assert_eq!(mixed_map.get("name").unwrap().clone().into_string().unwrap(), "alice"); 
-        assert_eq!(mixed_map.get("1").unwrap().clone().into_string().unwrap(), "one");
+        let mixed_map = result
+            .get("mixed")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Map>()
+            .unwrap();
+        assert_eq!(
+            mixed_map.get("0").unwrap().clone().into_string().unwrap(),
+            "zero"
+        );
+        assert_eq!(
+            mixed_map
+                .get("name")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "alice"
+        );
+        assert_eq!(
+            mixed_map.get("1").unwrap().clone().into_string().unwrap(),
+            "one"
+        );
     }
 
     #[test]
@@ -1979,7 +2149,9 @@ mod tests {
 
         // Test deeply nested structures
         let result: rhai::Map = engine
-            .eval_with_scope(&mut scope, r##"
+            .eval_with_scope(
+                &mut scope,
+                r##"
                 let flat = #{
                     "app_config_database_host": "localhost",
                     "app_config_database_port": "5432",
@@ -1991,30 +2163,89 @@ mod tests {
                     "app_features_1_enabled": "false"
                 };
                 flat.unflatten()
-            "##)
+            "##,
+            )
             .unwrap();
 
         // Navigate the nested structure
-        let app_map = result.get("app").unwrap().clone().try_cast::<rhai::Map>().unwrap();
-        let config_map = app_map.get("config").unwrap().clone().try_cast::<rhai::Map>().unwrap();
-        
+        let app_map = result
+            .get("app")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Map>()
+            .unwrap();
+        let config_map = app_map
+            .get("config")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Map>()
+            .unwrap();
+
         // Check database config
-        let db_map = config_map.get("database").unwrap().clone().try_cast::<rhai::Map>().unwrap();
-        assert_eq!(db_map.get("host").unwrap().clone().into_string().unwrap(), "localhost");
-        assert_eq!(db_map.get("port").unwrap().clone().into_string().unwrap(), "5432");
-        
+        let db_map = config_map
+            .get("database")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Map>()
+            .unwrap();
+        assert_eq!(
+            db_map.get("host").unwrap().clone().into_string().unwrap(),
+            "localhost"
+        );
+        assert_eq!(
+            db_map.get("port").unwrap().clone().into_string().unwrap(),
+            "5432"
+        );
+
         // Check cache config
-        let cache_map = config_map.get("cache").unwrap().clone().try_cast::<rhai::Map>().unwrap();
-        assert_eq!(cache_map.get("ttl").unwrap().clone().into_string().unwrap(), "3600");
-        let redis_map = cache_map.get("redis").unwrap().clone().try_cast::<rhai::Map>().unwrap();
-        assert_eq!(redis_map.get("url").unwrap().clone().into_string().unwrap(), "redis://localhost");
-        
+        let cache_map = config_map
+            .get("cache")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Map>()
+            .unwrap();
+        assert_eq!(
+            cache_map.get("ttl").unwrap().clone().into_string().unwrap(),
+            "3600"
+        );
+        let redis_map = cache_map
+            .get("redis")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Map>()
+            .unwrap();
+        assert_eq!(
+            redis_map.get("url").unwrap().clone().into_string().unwrap(),
+            "redis://localhost"
+        );
+
         // Check features array
-        let features_array = app_map.get("features").unwrap().clone().try_cast::<rhai::Array>().unwrap();
+        let features_array = app_map
+            .get("features")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Array>()
+            .unwrap();
         assert_eq!(features_array.len(), 2);
-        
+
         let auth_feature = features_array[0].clone().try_cast::<rhai::Map>().unwrap();
-        assert_eq!(auth_feature.get("name").unwrap().clone().into_string().unwrap(), "auth");
-        assert_eq!(auth_feature.get("enabled").unwrap().clone().into_string().unwrap(), "true");
+        assert_eq!(
+            auth_feature
+                .get("name")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "auth"
+        );
+        assert_eq!(
+            auth_feature
+                .get("enabled")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "true"
+        );
     }
 }
