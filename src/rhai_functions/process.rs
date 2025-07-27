@@ -26,7 +26,14 @@ pub fn exit_process(code: i64, msg: Dynamic) -> Dynamic {
     // Set exit flag
     EXIT_REQUESTED.with(|er| er.set(true));
 
-    // Return unit to indicate function completed
+    // In testing, don't actually exit - just set the flags
+    #[cfg(not(test))]
+    {
+        std::process::exit(exit_code);
+    }
+
+    // Return unit to indicate function completed (only reached in tests)
+    #[cfg(test)]
     Dynamic::UNIT
 }
 
@@ -47,10 +54,15 @@ pub fn reset_exit_state() {
     EXIT_CODE.with(|ec| ec.set(0));
 }
 
+/// Rhai function wrapper for single parameter: exit(code)
+pub fn exit_process_single(code: i64) -> Dynamic {
+    exit_process(code, Dynamic::UNIT)
+}
+
 /// Register process control functions with the Rhai engine
 pub fn register_functions(engine: &mut Engine) {
+    engine.register_fn("exit", exit_process_single);
     engine.register_fn("exit", exit_process);
-    engine.register_fn("kelora_exit", exit_process); // Alternative name for testing
 }
 
 #[cfg(test)]
@@ -103,16 +115,16 @@ mod tests {
         let mut engine = Engine::new();
         register_functions(&mut engine);
 
-        // Test exit with code only - try with custom name first
-        let result = engine.eval::<Dynamic>("kelora_exit(123)");
+        // Test exit with code only
+        let result = engine.eval::<Dynamic>("exit(123)");
         if let Err(e) = &result {
             eprintln!("Rhai error: {}", e);
         }
         assert!(result.is_ok());
-        
+
         eprintln!("Exit requested: {}", is_exit_requested());
         eprintln!("Exit code: {}", get_exit_code());
-        
+
         assert!(is_exit_requested());
         assert_eq!(get_exit_code(), 123);
 
