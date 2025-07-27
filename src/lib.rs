@@ -267,7 +267,8 @@ pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
     let use_parallel = config.should_use_parallel();
 
     if use_parallel {
-        run_pipeline_parallel(config, output)
+        let pipeline_config = PipelineConfig::from_kelora_config(config);
+        run_pipeline_parallel_with_config(&pipeline_config, output)
     } else {
         let mut output = output;
         run_pipeline_sequential(config, &mut output)?;
