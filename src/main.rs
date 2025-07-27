@@ -12,16 +12,16 @@ mod formatters;
 mod parallel;
 mod parsers;
 mod pipeline;
+mod platform;
 mod readers;
 mod rhai_functions;
 mod stats;
 mod timestamp;
 mod tty;
-mod unix;
 
 use config::KeloraConfig;
 use config_file::ConfigFile;
-use unix::{
+use platform::{
     ExitCode, ProcessCleanup, SafeFileOut, SafeStderr, SafeStdout, SignalHandler, SHOULD_TERMINATE,
 };
 

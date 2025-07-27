@@ -12,7 +12,7 @@ use std::thread;
 use signal_hook::{consts::SIGINT, consts::SIGPIPE, consts::SIGTERM, iterator::Signals};
 
 #[cfg(windows)]
-use signal_hook::{consts::SIGINT, iterator::Signals};
+use signal_hook::{consts::SIGINT, flag};
 
 /// Standard Unix exit codes
 #[derive(Debug, Clone, Copy)]
@@ -43,55 +43,73 @@ impl SignalHandler {
     /// Initialize signal handling - cross-platform
     pub fn new() -> Result<Self> {
         #[cfg(unix)]
-        let signals_to_handle = vec![SIGINT, SIGPIPE, SIGTERM];
+        {
+            let signals_to_handle = vec![SIGINT, SIGPIPE, SIGTERM];
+            let mut signals = Signals::new(&signals_to_handle)?;
+
+            let handle = thread::spawn(move || {
+                for sig in signals.forever() {
+                    match sig {
+                        SIGINT => {
+                            SHOULD_TERMINATE.store(true, Ordering::Relaxed);
+                            // Give main thread a moment to handle graceful shutdown
+                            thread::sleep(std::time::Duration::from_millis(200));
+                            // If still running after grace period, exit immediately
+                            ExitCode::SignalInt.exit();
+                        }
+                        SIGPIPE => {
+                            // Broken pipe - exit quietly (normal for Unix pipes)
+                            SHOULD_TERMINATE.store(true, Ordering::Relaxed);
+                            ExitCode::SignalPipe.exit();
+                        }
+                        SIGTERM => {
+                            eprintln!(
+                                "{}",
+                                crate::config::format_error_message_auto(
+                                    "Received SIGTERM, shutting down gracefully..."
+                                )
+                            );
+                            SHOULD_TERMINATE.store(true, Ordering::Relaxed);
+                            ExitCode::SignalTerm.exit();
+                        }
+                        _ => {
+                            // Unknown signal - should not happen with our registration
+                            eprintln!(
+                                "{}",
+                                crate::config::format_error_message_auto(&format!(
+                                    "Received unexpected signal: {}",
+                                    sig
+                                ))
+                            );
+                        }
+                    }
+                }
+            });
+
+            Ok(SignalHandler { _handle: handle })
+        }
 
         #[cfg(windows)]
-        let signals_to_handle = vec![SIGINT]; // Windows only supports SIGINT reliably
+        {
+            // Windows signal handling using flag-based approach
+            let term_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            flag::register(SIGINT, std::sync::Arc::clone(&term_flag))?;
 
-        let mut signals = Signals::new(&signals_to_handle)?;
-
-        let handle = thread::spawn(move || {
-            for sig in signals.forever() {
-                match sig {
-                    SIGINT => {
+            let handle = thread::spawn(move || {
+                loop {
+                    thread::sleep(std::time::Duration::from_millis(100));
+                    if term_flag.load(Ordering::Relaxed) {
                         SHOULD_TERMINATE.store(true, Ordering::Relaxed);
                         // Give main thread a moment to handle graceful shutdown
                         thread::sleep(std::time::Duration::from_millis(200));
                         // If still running after grace period, exit immediately
                         ExitCode::SignalInt.exit();
                     }
-                    #[cfg(unix)]
-                    SIGPIPE => {
-                        // Broken pipe - exit quietly (normal for Unix pipes)
-                        SHOULD_TERMINATE.store(true, Ordering::Relaxed);
-                        ExitCode::SignalPipe.exit();
-                    }
-                    #[cfg(unix)]
-                    SIGTERM => {
-                        eprintln!(
-                            "{}",
-                            crate::config::format_error_message_auto(
-                                "Received SIGTERM, shutting down gracefully..."
-                            )
-                        );
-                        SHOULD_TERMINATE.store(true, Ordering::Relaxed);
-                        ExitCode::SignalTerm.exit();
-                    }
-                    _ => {
-                        // Unknown signal - should not happen with our registration
-                        eprintln!(
-                            "{}",
-                            crate::config::format_error_message_auto(&format!(
-                                "Received unexpected signal: {}",
-                                sig
-                            ))
-                        );
-                    }
                 }
-            }
-        });
+            });
 
-        Ok(SignalHandler { _handle: handle })
+            Ok(SignalHandler { _handle: handle })
+        }
     }
 
     /// Check if we should terminate processing

@@ -11,8 +11,8 @@ use std::time::{Duration, Instant};
 
 use crate::event::Event;
 use crate::pipeline::PipelineBuilder;
+use crate::platform::SHOULD_TERMINATE;
 use crate::stats::{get_thread_stats, stats_finish_processing, stats_start_timer, ProcessingStats};
-use crate::unix::SHOULD_TERMINATE;
 
 /// Configuration for parallel processing
 #[derive(Debug, Clone)]

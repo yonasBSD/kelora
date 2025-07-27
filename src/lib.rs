@@ -132,12 +132,12 @@ mod formatters;
 mod parallel;
 mod parsers;
 pub mod pipeline;
+mod platform;
 mod readers;
 mod rhai_functions;
 mod stats;
 mod timestamp;
 mod tty;
-mod unix;
 
 use crate::decompression::DecompressionReader;
 use anyhow::Result;
@@ -201,13 +201,13 @@ use parallel::{ParallelConfig, ParallelProcessor};
 use pipeline::{
     create_input_reader, create_pipeline_builder_from_config, create_pipeline_from_config,
 };
+use platform::{check_termination, SHOULD_TERMINATE};
 use stats::{
     get_thread_stats, stats_add_error, stats_add_line_filtered, stats_add_line_output,
     stats_add_line_read, stats_finish_processing, stats_start_timer, ProcessingStats,
 };
 use std::io::{self, BufRead, Write};
 use std::sync::atomic::Ordering;
-use unix::{check_termination, SHOULD_TERMINATE};
 
 /// Result of pipeline processing
 #[derive(Debug)]
