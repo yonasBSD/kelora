@@ -13,6 +13,12 @@ pub fn register_functions(engine: &mut Engine) {
     // Register sorted_by function - sort objects/maps by field name
     engine.register_fn("sorted_by", sorted_by_field);
 
+    // Register contains_any function - check if array contains any of the specified values
+    engine.register_fn("contains_any", contains_any_array);
+
+    // Register starts_with_any function - check if array starts with any of the specified values
+    engine.register_fn("starts_with_any", starts_with_any_array);
+
     // Array flattening functions
 
     // Default flatten() for arrays - uses bracket style, unlimited depth
@@ -264,6 +270,95 @@ fn compare_dynamic_values(a: &Dynamic, b: &Dynamic) -> std::cmp::Ordering {
     let a_str = a.to_string();
     let b_str = b.to_string();
     a_str.cmp(&b_str)
+}
+
+/// Check if an array contains any of the specified values
+///
+/// Takes an array and a search array, returns true if the array contains
+/// any of the values from the search array.
+///
+/// # Arguments
+/// * `arr` - The array to search in
+/// * `search_values` - Array of values to search for
+///
+/// # Returns
+/// true if any search value is found in the array, false otherwise
+///
+/// # Examples
+/// ```rhai
+/// let tags = ["urgent", "bug", "frontend"];
+/// let critical_tags = ["urgent", "critical", "blocker"];
+/// let has_critical = contains_any(tags, critical_tags);  // true (contains "urgent")
+///
+/// let numbers = [1, 2, 3, 4, 5];
+/// let target_numbers = [6, 7, 8];
+/// let has_target = contains_any(numbers, target_numbers);  // false
+///
+/// // Mixed types work too
+/// let mixed = [1, "hello", true, 3.14];
+/// let search = ["hello", 99];
+/// let found = contains_any(mixed, search);  // true (contains "hello")
+/// ```
+///
+/// # Comparison Behavior
+/// - Uses string comparison for all values (converts to string first)
+/// - Numbers are compared as their string representation
+/// - Booleans are compared as "true"/"false" strings
+/// - Null values are compared as empty strings
+fn contains_any_array(arr: Array, search_values: Array) -> bool {
+    // Convert search values to strings for comparison
+    let search_strings: Vec<String> = search_values.iter().map(|v| v.to_string()).collect();
+
+    // Check if any element in arr matches any search value
+    arr.iter().any(|item| {
+        let item_str = item.to_string();
+        search_strings.contains(&item_str)
+    })
+}
+
+/// Check if an array starts with any of the specified values
+///
+/// Takes an array and a search array, returns true if the array starts
+/// with any of the values from the search array. Only checks the first element.
+///
+/// # Arguments
+/// * `arr` - The array to check
+/// * `search_values` - Array of values to check against the first element
+///
+/// # Returns
+/// true if the first element matches any search value, false otherwise
+///
+/// # Examples
+/// ```rhai
+/// let log_levels = ["ERROR", "Database connection failed"];
+/// let error_levels = ["ERROR", "FATAL", "CRITICAL"];
+/// let is_error = starts_with_any(log_levels, error_levels);  // true
+///
+/// let commands = ["GET", "/api/users", "200"];
+/// let read_methods = ["GET", "HEAD", "OPTIONS"];
+/// let is_read = starts_with_any(commands, read_methods);  // true
+///
+/// let empty_array = [];
+/// let search = ["any", "value"];
+/// let starts = starts_with_any(empty_array, search);  // false (empty array)
+/// ```
+///
+/// # Edge Cases
+/// - Returns false for empty arrays
+/// - Returns false if search_values is empty
+/// - Uses string comparison (same as contains_any)
+fn starts_with_any_array(arr: Array, search_values: Array) -> bool {
+    // Return false if either array is empty
+    if arr.is_empty() || search_values.is_empty() {
+        return false;
+    }
+
+    // Convert search values to strings for comparison
+    let search_strings: Vec<String> = search_values.iter().map(|v| v.to_string()).collect();
+
+    // Check if the first element matches any search value
+    let first_element_str = arr[0].to_string();
+    search_strings.contains(&first_element_str)
 }
 
 /// Convert IndexMap<String, Dynamic> to rhai::Map
@@ -615,5 +710,194 @@ mod tests {
         // Test underscore style
         let underscore = flatten_dynamic(&dynamic_array, FlattenStyle::Underscore, 10);
         assert!(underscore.contains_key("0_value"));
+    }
+
+    #[test]
+    fn test_contains_any_basic() {
+        let mut arr = Array::new();
+        arr.push(Dynamic::from("urgent"));
+        arr.push(Dynamic::from("bug"));
+        arr.push(Dynamic::from("frontend"));
+
+        let mut search = Array::new();
+        search.push(Dynamic::from("urgent"));
+        search.push(Dynamic::from("critical"));
+
+        assert!(contains_any_array(arr, search));
+    }
+
+    #[test]
+    fn test_contains_any_no_match() {
+        let mut arr = Array::new();
+        arr.push(Dynamic::from("info"));
+        arr.push(Dynamic::from("debug"));
+
+        let mut search = Array::new();
+        search.push(Dynamic::from("error"));
+        search.push(Dynamic::from("warning"));
+
+        assert!(!contains_any_array(arr, search));
+    }
+
+    #[test]
+    fn test_contains_any_numbers() {
+        let mut arr = Array::new();
+        arr.push(Dynamic::from(1i64));
+        arr.push(Dynamic::from(2i64));
+        arr.push(Dynamic::from(3i64));
+
+        let mut search = Array::new();
+        search.push(Dynamic::from(2i64));
+        search.push(Dynamic::from(5i64));
+
+        assert!(contains_any_array(arr, search));
+    }
+
+    #[test]
+    fn test_contains_any_mixed_types() {
+        let mut arr = Array::new();
+        arr.push(Dynamic::from(1i64));
+        arr.push(Dynamic::from("hello"));
+        arr.push(Dynamic::from(true));
+
+        let mut search = Array::new();
+        search.push(Dynamic::from("hello"));
+        search.push(Dynamic::from(99i64));
+
+        assert!(contains_any_array(arr, search));
+    }
+
+    #[test]
+    fn test_contains_any_string_number_conversion() {
+        let mut arr = Array::new();
+        arr.push(Dynamic::from(42i64));
+
+        let mut search = Array::new();
+        search.push(Dynamic::from("42"));
+
+        assert!(contains_any_array(arr, search));
+    }
+
+    #[test]
+    fn test_contains_any_boolean_conversion() {
+        let mut arr = Array::new();
+        arr.push(Dynamic::from(true));
+        arr.push(Dynamic::from(false));
+
+        let mut search = Array::new();
+        search.push(Dynamic::from("true"));
+
+        assert!(contains_any_array(arr, search));
+    }
+
+    #[test]
+    fn test_contains_any_empty_arrays() {
+        let arr = Array::new();
+        let search = Array::new();
+        assert!(!contains_any_array(arr, search));
+
+        let mut arr = Array::new();
+        arr.push(Dynamic::from("test"));
+        let search = Array::new();
+        assert!(!contains_any_array(arr, search));
+
+        let arr = Array::new();
+        let mut search = Array::new();
+        search.push(Dynamic::from("test"));
+        assert!(!contains_any_array(arr, search));
+    }
+
+    #[test]
+    fn test_starts_with_any_basic() {
+        let mut arr = Array::new();
+        arr.push(Dynamic::from("ERROR"));
+        arr.push(Dynamic::from("Database connection failed"));
+
+        let mut search = Array::new();
+        search.push(Dynamic::from("ERROR"));
+        search.push(Dynamic::from("FATAL"));
+
+        assert!(starts_with_any_array(arr, search));
+    }
+
+    #[test]
+    fn test_starts_with_any_no_match() {
+        let mut arr = Array::new();
+        arr.push(Dynamic::from("INFO"));
+        arr.push(Dynamic::from("System started"));
+
+        let mut search = Array::new();
+        search.push(Dynamic::from("ERROR"));
+        search.push(Dynamic::from("WARNING"));
+
+        assert!(!starts_with_any_array(arr, search));
+    }
+
+    #[test]
+    fn test_starts_with_any_numbers() {
+        let mut arr = Array::new();
+        arr.push(Dynamic::from(200i64));
+        arr.push(Dynamic::from("OK"));
+
+        let mut search = Array::new();
+        search.push(Dynamic::from(200i64));
+        search.push(Dynamic::from(404i64));
+
+        assert!(starts_with_any_array(arr, search));
+    }
+
+    #[test]
+    fn test_starts_with_any_string_number_conversion() {
+        let mut arr = Array::new();
+        arr.push(Dynamic::from(500i64));
+
+        let mut search = Array::new();
+        search.push(Dynamic::from("500"));
+
+        assert!(starts_with_any_array(arr, search));
+    }
+
+    #[test]
+    fn test_starts_with_any_empty_array() {
+        let arr = Array::new();
+        let mut search = Array::new();
+        search.push(Dynamic::from("test"));
+
+        assert!(!starts_with_any_array(arr, search));
+    }
+
+    #[test]
+    fn test_starts_with_any_empty_search() {
+        let mut arr = Array::new();
+        arr.push(Dynamic::from("test"));
+        let search = Array::new();
+
+        assert!(!starts_with_any_array(arr, search));
+    }
+
+    #[test]
+    fn test_starts_with_any_only_first_element() {
+        let mut arr = Array::new();
+        arr.push(Dynamic::from("INFO"));
+        arr.push(Dynamic::from("ERROR")); // This should be ignored
+
+        let mut search = Array::new();
+        search.push(Dynamic::from("ERROR"));
+
+        // Should return false because only first element is checked
+        assert!(!starts_with_any_array(arr, search));
+    }
+
+    #[test]
+    fn test_starts_with_any_mixed_types() {
+        let mut arr = Array::new();
+        arr.push(Dynamic::from(true));
+        arr.push(Dynamic::from("second"));
+
+        let mut search = Array::new();
+        search.push(Dynamic::from("true"));
+        search.push(Dynamic::from("false"));
+
+        assert!(starts_with_any_array(arr, search));
     }
 }
