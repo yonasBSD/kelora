@@ -300,7 +300,8 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
         // Report detected format
         if !config.processing.quiet {
             let format_name = format!("{:?}", detected_format).to_lowercase();
-            let use_colors = crate::tty::should_use_colors_with_mode(&crate::config::ColorMode::Auto);
+            let use_colors =
+                crate::tty::should_use_colors_with_mode(&crate::config::ColorMode::Auto);
             let no_emoji = std::env::var("NO_EMOJI").is_ok();
             let use_emoji = use_colors && !no_emoji;
             let prefix = if use_emoji { "🧱" } else { "kelora:" };
@@ -679,7 +680,8 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         // Report detected format
         if !config.processing.quiet {
             let format_name = format!("{:?}", detected_format).to_lowercase();
-            let message = config.format_error_message(&format!("auto-detected format: {}", format_name));
+            let message =
+                config.format_error_message(&format!("auto-detected format: {}", format_name));
             eprintln!("{}", message);
         }
 
@@ -740,7 +742,8 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         // Report detected format
         if !config.processing.quiet {
             let format_name = format!("{:?}", detected_format).to_lowercase();
-            let message = config.format_error_message(&format!("auto-detected format: {}", format_name));
+            let message =
+                config.format_error_message(&format!("auto-detected format: {}", format_name));
             eprintln!("{}", message);
         }
 
