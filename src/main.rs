@@ -366,6 +366,12 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
         std::process::exit(0);
     }
 
+    // Check for --help-rhai
+    if raw_args.iter().any(|arg| arg == "--help-rhai") {
+        print_rhai_help();
+        std::process::exit(0);
+    }
+
     // Check for --ignore-config
     let ignore_config = raw_args.iter().any(|arg| arg == "--ignore-config");
 
@@ -719,5 +725,97 @@ https://docs.rs/chrono/latest/chrono/format/strftime/index.html
 /// Print available Rhai functions help
 fn print_functions_help() {
     let help_text = rhai_functions::docs::generate_help_text();
+    println!("{}", help_text);
+}
+
+/// Print Rhai scripting guide
+fn print_rhai_help() {
+    let help_text = r#"
+Rhai Scripting Guide for Kelora:
+
+BASIC CONCEPTS:
+  e                                    Current event (renamed from 'event')
+  e.field                              Access field directly
+  e.nested.field                       Access nested fields
+  e.scores[1]                          Array access (supports negative indexing)
+  e.headers["user-agent"]              Field access with special characters
+
+VARIABLE DECLARATION:
+  let myfield = e.col("1,2")           Always use 'let' for new variables
+  let result = e.user.name.lower()     Chain operations and store result
+
+FIELD EXISTENCE AND SAFETY:
+  "field" in e                         Check if field exists
+  "user" in e && "role" in e.user      Check nested field existence
+  e.scores.len() > 0                   Check if array has elements
+  type_of(e.field) != "()"             Check if field has a value
+
+FIELD AND EVENT REMOVAL:
+  e.field = ()                         Remove individual field
+  e = ()                               Remove entire event (filters out)
+
+KELORA-SPECIFIC FUNCTIONS:
+  Use --help-functions to see all available functions for log processing:
+  regex operations, IP handling, text manipulation, JSON parsing, 
+  key-value extraction, array processing, safe field access, and utilities.
+
+METHOD CHAINING EXAMPLES:
+  e.message.extract_re("user=(\\w+)").upper()
+  e.client_ip.mask_ip(2)
+  e.url.extract_domain().lower()
+  e.timestamp.parse_ts().format("%H:%M")
+
+FUNCTION VS METHOD SYNTAX:
+  extract_re(e.line, "\\d+")           Function style (avoids conflicts)
+  e.line.extract_re("\\d+")            Method style (better for chaining)
+
+Both syntaxes work identically. Use method syntax for readability and chaining,
+function syntax when method names conflict with field names.
+
+COMMON PATTERNS:
+  # Safe field access with defaults
+  let user_role = if "user" in e && "role" in e.user { e.user.role } else { "guest" };
+  
+  # Process arrays safely
+  if e.events.len() > 0 {
+      e.latest_event = e.events[-1];
+      e.event_types = unique(e.events.map(|event| event.type));
+  }
+  
+  # Conditional event removal
+  if e.level != "ERROR" { e = (); }
+  
+  # Field cleanup and transformation
+  e.password = (); e.ssn = ();  // Remove sensitive fields
+  e.summary = e.method + " " + e.status;
+
+ARRAY PROCESSING:
+  sorted(e.scores)                     Sort array numerically/lexicographically
+  reversed(e.items)                    Reverse array order
+  unique(e.tags)                       Remove duplicate elements
+  sorted_by(e.users, "age")            Sort array of objects by field
+  e.tags.join(", ")                    Join array elements
+
+JSON ARRAY HANDLING:
+  JSON arrays are automatically converted to native Rhai arrays with full
+  functionality (sorted, reversed, unique, etc.) while maintaining proper
+  JSON types in output formats.
+
+SIDE EFFECTS IN QUIET MODE:
+  print("debug info")                  Remains visible even with --quiet
+  eprint("error details")              Stderr output preserved with --quiet
+  # File operations also preserved in --quiet mode
+
+ERROR HANDLING:
+  Kelora uses resilient processing by default:
+  • Parse errors: Skip malformed lines, continue processing
+  • Filter errors: Evaluate to false, skip event
+  • Transform errors: Return original event unchanged
+  Use --strict for fail-fast behavior on any error.
+
+For complete function reference: kelora --help-functions
+For usage examples: kelora --help (see examples section)
+For time format help: kelora --help-time
+"#;
     println!("{}", help_text);
 }

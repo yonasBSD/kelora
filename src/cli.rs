@@ -313,6 +313,10 @@ pub struct Cli {
     /// Show available Rhai functions and exit
     #[arg(long = "help-functions", help_heading = "Help Options")]
     pub help_functions: bool,
+
+    /// Show Rhai scripting guide and exit
+    #[arg(long = "help-rhai", help_heading = "Help Options")]
+    pub help_rhai: bool,
 }
 
 impl Cli {

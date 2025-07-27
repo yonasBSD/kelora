@@ -159,7 +159,7 @@ fn detect_format_from_peekable_reader<R: BufRead>(
             // Remove newline for detection
             let trimmed_line = line.trim_end_matches(&['\r', '\n'][..]);
             let detected = crate::parsers::detect_format(trimmed_line)?;
-            Ok(detected.into())
+            Ok(detected)
         }
     }
 }
