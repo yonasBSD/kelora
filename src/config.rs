@@ -116,6 +116,7 @@ pub enum InputFormat {
     Apache,
     Nginx,
     Cols,
+    Docker,
 }
 
 /// Output format enumeration
@@ -772,6 +773,7 @@ impl From<crate::InputFormat> for InputFormat {
             crate::InputFormat::Apache => InputFormat::Apache,
             crate::InputFormat::Nginx => InputFormat::Nginx,
             crate::InputFormat::Cols => InputFormat::Cols,
+            crate::InputFormat::Docker => InputFormat::Docker,
         }
     }
 }
@@ -792,6 +794,7 @@ impl From<InputFormat> for crate::InputFormat {
             InputFormat::Apache => crate::InputFormat::Apache,
             InputFormat::Nginx => crate::InputFormat::Nginx,
             InputFormat::Cols => crate::InputFormat::Cols,
+            InputFormat::Docker => crate::InputFormat::Docker,
         }
     }
 }

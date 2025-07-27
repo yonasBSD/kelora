@@ -171,6 +171,7 @@ impl PipelineBuilder {
             crate::InputFormat::Apache => Box::new(crate::parsers::ApacheParser::new()?),
             crate::InputFormat::Nginx => Box::new(crate::parsers::NginxParser::new()?),
             crate::InputFormat::Cols => Box::new(crate::parsers::ColsParser::new()),
+            crate::InputFormat::Docker => Box::new(crate::parsers::DockerParser::new()),
         };
 
         // Wrap parser with timestamp configuration if needed
@@ -417,6 +418,7 @@ impl PipelineBuilder {
             crate::InputFormat::Apache => Box::new(crate::parsers::ApacheParser::new()?),
             crate::InputFormat::Nginx => Box::new(crate::parsers::NginxParser::new()?),
             crate::InputFormat::Cols => Box::new(crate::parsers::ColsParser::new()),
+            crate::InputFormat::Docker => Box::new(crate::parsers::DockerParser::new()),
         };
 
         // Wrap parser with timestamp configuration if needed

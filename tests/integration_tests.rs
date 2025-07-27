@@ -3955,3 +3955,222 @@ fn test_metrics_parallel_consistency() {
         "Batch-size 2 should count warn events"
     );
 }
+
+#[test]
+fn test_docker_compose_format_parsing() {
+    let input = r#"web_1    | 2024-07-27T12:34:56.123456789Z GET /health 200
+db_1     | Connection established
+api_1    | 2024-07-27T12:35:00Z Starting server on port 8080
+cache_1  | Memory usage: 45%"#;
+
+    let (stdout, _stderr, exit_code) =
+        run_kelora_with_input(&["-f", "docker", "-F", "jsonl"], input);
+    assert_eq!(exit_code, 0, "Docker parsing should succeed");
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 4, "Should parse 4 Docker Compose log lines");
+
+    // Parse the JSON output
+    let parsed: Vec<serde_json::Value> = lines
+        .iter()
+        .map(|line| serde_json::from_str(line).expect("Should be valid JSON"))
+        .collect();
+
+    // Check first line (with timestamp)
+    assert_eq!(parsed[0]["src"], "web_1");
+    assert_eq!(parsed[0]["msg"], "GET /health 200");
+    assert!(parsed[0]["ts"].is_string());
+
+    // Check second line (no timestamp)
+    assert_eq!(parsed[1]["src"], "db_1");
+    assert_eq!(parsed[1]["msg"], "Connection established");
+    assert!(parsed[1]["ts"].is_null());
+
+    // Check third line (with timestamp)
+    assert_eq!(parsed[2]["src"], "api_1");
+    assert_eq!(parsed[2]["msg"], "Starting server on port 8080");
+    assert!(parsed[2]["ts"].is_string());
+
+    // Check fourth line (no timestamp)
+    assert_eq!(parsed[3]["src"], "cache_1");
+    assert_eq!(parsed[3]["msg"], "Memory usage: 45%");
+    assert!(parsed[3]["ts"].is_null());
+}
+
+#[test]
+fn test_docker_raw_format_parsing() {
+    let input = r#"2024-07-27T12:34:56Z GET /api/users
+Started app in 3.1s
+2024-07-27T12:35:10.123Z POST /api/data
+Application ready"#;
+
+    let (stdout, _stderr, exit_code) =
+        run_kelora_with_input(&["-f", "docker", "-F", "jsonl"], input);
+    assert_eq!(exit_code, 0, "Docker raw format parsing should succeed");
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 4, "Should parse 4 Docker raw log lines");
+
+    let parsed: Vec<serde_json::Value> = lines
+        .iter()
+        .map(|line| serde_json::from_str(line).expect("Should be valid JSON"))
+        .collect();
+
+    // First line (with timestamp)
+    assert!(parsed[0]["src"].is_null());
+    assert_eq!(parsed[0]["msg"], "GET /api/users");
+    assert!(parsed[0]["ts"].is_string());
+
+    // Second line (no timestamp)
+    assert!(parsed[1]["src"].is_null());
+    assert_eq!(parsed[1]["msg"], "Started app in 3.1s");
+    assert!(parsed[1]["ts"].is_null());
+
+    // Third line (with timestamp)
+    assert!(parsed[2]["src"].is_null());
+    assert_eq!(parsed[2]["msg"], "POST /api/data");
+    assert!(parsed[2]["ts"].is_string());
+
+    // Fourth line (no timestamp)
+    assert!(parsed[3]["src"].is_null());
+    assert_eq!(parsed[3]["msg"], "Application ready");
+    assert!(parsed[3]["ts"].is_null());
+}
+
+#[test]
+fn test_docker_format_with_filtering() {
+    let input = r#"web_1    | 2024-07-27T12:34:56Z GET /health 200
+db_1     | Connection failed
+api_1    | 2024-07-27T12:35:00Z GET /api/data 404
+cache_1  | Memory full"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "docker",
+            "--filter",
+            "e.msg.contains(\"failed\") || e.msg.contains(\"404\")",
+            "-F",
+            "jsonl",
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "Filtering Docker logs should succeed");
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 2, "Should filter to 2 lines");
+
+    let parsed: Vec<serde_json::Value> = lines
+        .iter()
+        .map(|line| serde_json::from_str(line).expect("Should be valid JSON"))
+        .collect();
+
+    // Check that we got the right filtered lines
+    assert_eq!(parsed[0]["src"], "db_1");
+    assert!(parsed[0]["msg"].as_str().unwrap().contains("failed"));
+
+    assert_eq!(parsed[1]["src"], "api_1");
+    assert!(parsed[1]["msg"].as_str().unwrap().contains("404"));
+}
+
+#[test]
+fn test_docker_format_with_transformation() {
+    let input = r#"web_1    | 2024-07-27T12:34:56Z GET /health 200
+db_1     | Connection established"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "docker",
+            "--exec",
+            "e.service = e.src ?? \"unknown\"; e.status = if e.msg.contains(\"200\") { \"ok\" } else { \"info\" }",
+            "-F",
+            "jsonl"
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "Transforming Docker logs should succeed");
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 2, "Should output 2 transformed lines");
+
+    let parsed: Vec<serde_json::Value> = lines
+        .iter()
+        .map(|line| serde_json::from_str(line).expect("Should be valid JSON"))
+        .collect();
+
+    // Check transformations
+    assert_eq!(parsed[0]["service"], "web_1");
+    assert_eq!(parsed[0]["status"], "ok");
+
+    assert_eq!(parsed[1]["service"], "db_1");
+    assert_eq!(parsed[1]["status"], "info");
+}
+
+#[test]
+fn test_docker_format_edge_cases() {
+    let input = r#" | Just a message
+empty_source | Message content
+service_1    | 
+2024-07-27T12:34:56Z"#;
+
+    let (stdout, _stderr, exit_code) =
+        run_kelora_with_input(&["-f", "docker", "-F", "jsonl"], input);
+    assert_eq!(exit_code, 0, "Docker edge cases should be handled");
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 4, "Should parse 4 edge case lines");
+
+    let parsed: Vec<serde_json::Value> = lines
+        .iter()
+        .map(|line| serde_json::from_str(line).expect("Should be valid JSON"))
+        .collect();
+
+    // Empty source (just pipe)
+    assert!(parsed[0]["src"].is_null());
+    assert_eq!(parsed[0]["msg"], "Just a message");
+
+    // Source with message
+    assert_eq!(parsed[1]["src"], "empty_source");
+    assert_eq!(parsed[1]["msg"], "Message content");
+
+    // Source with empty message
+    assert_eq!(parsed[2]["src"], "service_1");
+    assert_eq!(parsed[2]["msg"], "");
+
+    // Timestamp only (no source)
+    assert!(parsed[3]["src"].is_null());
+    assert_eq!(parsed[3]["msg"], "");
+    assert!(parsed[3]["ts"].is_string());
+}
+
+#[test]
+fn test_docker_format_auto_detection() {
+    let input = r#"web_1    | 2024-07-27T12:34:56.123456789Z GET /health 200
+2024-07-27T12:35:10.123Z POST /api/data"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "auto", "-F", "jsonl"], input);
+    assert_eq!(exit_code, 0, "Docker auto-detection should succeed");
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(
+        lines.len(),
+        2,
+        "Should auto-detect and parse 2 Docker log lines"
+    );
+
+    let parsed: Vec<serde_json::Value> = lines
+        .iter()
+        .map(|line| serde_json::from_str(line).expect("Should be valid JSON"))
+        .collect();
+
+    // First line (Compose format with timestamp)
+    assert_eq!(parsed[0]["src"], "web_1");
+    assert_eq!(parsed[0]["msg"], "GET /health 200");
+    assert!(parsed[0]["ts"].is_string());
+
+    // Second line (raw Docker format with timestamp)
+    assert!(parsed[1]["src"].is_null());
+    assert_eq!(parsed[1]["msg"], "POST /api/data");
+    assert!(parsed[1]["ts"].is_string());
+}

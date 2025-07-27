@@ -20,6 +20,10 @@ kubectl logs -f app | kelora -f jsonl --parallel --levels warn,error
 # Time-range analysis with metrics
 kelora -f syslog /var/log/messages --since "1 hour ago" \
   --exec 'track_count(e.facility); track_unique("hosts", e.host)' --stats
+
+# Docker container monitoring
+docker compose logs --timestamps | kelora -f docker --filter 'e.msg.contains("error")' \
+  --exec 'e.service = e.src ?? "unknown"; print(`${e.service}: ${e.msg}`)'
 ```
 
 ## Install
@@ -32,7 +36,7 @@ cargo install --path .
 
 ## Core Features
 
-**Formats**: JSON, syslog, logfmt, CEF, CSV, TSV, raw lines with `.gz` support  
+**Formats**: JSON, syslog, logfmt, CEF, CSV, TSV, Docker logs, raw lines with `.gz` support  
 **Processing**: Sliding windows, parallel/batch processing, multiline events  
 **Scripting**: Embedded Rhai with 40+ built-in functions for parsing, metrics, time handling  
 **Configuration**: Aliases and defaults via config files  
@@ -89,6 +93,10 @@ kelora -f jsonl api.log --filter 'e.level == "error"' \
 # Convert formats with field selection  
 kelora -f syslog /var/log/messages -F csv --keys timestamp,host,message
 
+# Docker container log analysis
+docker compose logs --timestamps | kelora -f docker \
+  --filter 'e.src == "web" && e.msg.contains("500")' --exec 'print(`Error in ${e.src}: ${e.msg}`)'
+
 # Strict mode for validation (fail-fast on errors)
 kelora -f jsonl mixed.log --strict --filter 'e.level == "error"'
 
@@ -106,7 +114,7 @@ kelora -a slow-requests access.log  # From ~/.config/kelora/config.ini
 
 | Flag | Purpose | Example |
 |------|---------|---------|
-| `-f FORMAT` | Input format | `jsonl`, `syslog`, `csv`, `line` |
+| `-f FORMAT` | Input format | `jsonl`, `syslog`, `csv`, `docker`, `line` |
 | `-F FORMAT` | Output format | `jsonl`, `csv`, `logfmt`, `null` |
 | `--filter EXPR` | Include matching events | `e.level == "error"` |
 | `--exec SCRIPT` | Transform events | `e.type = "slow"` |

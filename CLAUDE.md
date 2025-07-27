@@ -86,6 +86,40 @@ Empty lines are handled differently based on input format:
 - This prevents noise in structured data processing
 - Statistics reflect only non-empty lines that were processed
 
+### Docker Log Format (`-f docker`)
+
+Kelora supports parsing Docker log output from both single containers and Docker Compose multi-container setups:
+
+**Supported Docker Log Formats:**
+- **Docker Compose logs**: `service_name | message` format with optional timestamps
+- **Raw Docker logs**: Plain log messages with optional ISO8601/RFC3339 timestamps
+- **Auto-detection**: Use `-f auto` to automatically detect Docker format
+
+**Output Fields:**
+- `msg` (required): The main log message content
+- `src` (optional): Container/service name from Docker Compose prefix
+- `ts` (optional): Parsed timestamp when present
+
+**Example Usage:**
+```bash
+# Docker Compose logs with filtering
+docker compose logs --timestamps | kelora -f docker --filter 'e.src == "web" && e.msg.contains("500")'
+
+# Raw Docker logs
+docker logs myapp | kelora -f docker --filter 'e.msg.contains("timeout")'
+
+# Auto-detection
+docker compose logs | kelora -f auto --exec 'e.service_type = e.src ?? "standalone"'
+```
+
+**Input Examples:**
+```
+web_1    | 2024-07-27T12:34:56.123Z GET /health 200    → {src: "web_1", ts: "...", msg: "GET /health 200"}
+db_1     | Connection established                       → {src: "db_1", msg: "Connection established"}
+2024-07-27T12:34:56Z Starting application             → {ts: "...", msg: "Starting application"}
+Application ready                                      → {msg: "Application ready"}
+```
+
 ### Resiliency Model
 
 **Processing Modes:**

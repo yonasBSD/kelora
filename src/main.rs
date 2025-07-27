@@ -452,6 +452,7 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
                 "apache" => crate::InputFormat::Apache,
                 "nginx" => crate::InputFormat::Nginx,
                 "cols" => crate::InputFormat::Cols,
+                "docker" => crate::InputFormat::Docker,
                 _ => cli.format, // Keep original if invalid
             };
         }

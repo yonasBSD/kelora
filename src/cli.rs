@@ -21,6 +21,7 @@ pub enum InputFormat {
     Apache,
     Nginx,
     Cols,
+    Docker,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, Default)]
