@@ -70,13 +70,20 @@ impl FlattenStyle {
 /// This function recursively traverses nested maps and arrays, generating
 /// flat keys according to the specified style. It respects max_depth to
 /// prevent infinite recursion and memory issues.
+/// 
+/// # Arguments
+/// * `value` - The Dynamic value to flatten
+/// * `style` - The flattening style (Bracket, Dot, Underscore)
+/// * `max_depth` - Maximum recursion depth (0 = unlimited)
 pub fn flatten_dynamic(
     value: &Dynamic,
     style: FlattenStyle,
     max_depth: usize,
 ) -> IndexMap<String, Dynamic> {
     let mut result = IndexMap::new();
-    flatten_dynamic_recursive(value, "", style, 0, max_depth, &mut result);
+    // Convert max_depth=0 to unlimited
+    let effective_max_depth = if max_depth == 0 { usize::MAX } else { max_depth };
+    flatten_dynamic_recursive(value, "", style, 0, effective_max_depth, &mut result);
     result
 }
 
@@ -530,5 +537,49 @@ mod tests {
         
         assert_eq!(flattened_array.len(), 1);
         assert!(flattened_array.get("value").unwrap().is_unit());
+    }
+
+    #[test]
+    fn test_flatten_unlimited_depth() {
+        // Create a very deeply nested structure
+        let mut deep = Map::new();
+        deep.insert("level8".into(), Dynamic::from("deepest"));
+        
+        let mut level7 = Map::new();
+        level7.insert("level7".into(), Dynamic::from(deep));
+        
+        let mut level6 = Map::new();
+        level6.insert("level6".into(), Dynamic::from(level7));
+        
+        let mut level5 = Map::new();
+        level5.insert("level5".into(), Dynamic::from(level6));
+        
+        let mut level4 = Map::new();
+        level4.insert("level4".into(), Dynamic::from(level5));
+        
+        let mut level3 = Map::new();
+        level3.insert("level3".into(), Dynamic::from(level4));
+        
+        let mut level2 = Map::new();
+        level2.insert("level2".into(), Dynamic::from(level3));
+        
+        let mut level1 = Map::new();
+        level1.insert("level1".into(), Dynamic::from(level2));
+        
+        let dynamic_root = Dynamic::from(level1);
+        
+        // With max_depth=0 (unlimited), should flatten completely
+        let unlimited = flatten_dynamic(&dynamic_root, FlattenStyle::Bracket, 0);
+        
+        // Should have fully flattened the deep structure
+        assert!(unlimited.contains_key("level1.level2.level3.level4.level5.level6.level7.level8"));
+        assert_eq!(unlimited.get("level1.level2.level3.level4.level5.level6.level7.level8").unwrap().to_string(), "deepest");
+        
+        // Compare with limited depth
+        let limited = flatten_dynamic(&dynamic_root, FlattenStyle::Bracket, 3);
+        
+        // Should stop at level 3 and contain the remaining structure as a string
+        assert!(limited.contains_key("level1.level2.level3"));
+        assert!(!limited.contains_key("level1.level2.level3.level4.level5.level6.level7.level8"));
     }
 }

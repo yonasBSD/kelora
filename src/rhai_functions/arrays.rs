@@ -43,7 +43,7 @@ pub fn register_functions(engine: &mut Engine) {
             "underscore" => FlattenStyle::Underscore,
             _ => FlattenStyle::default(),
         };
-        let max_depth = if max_depth < 0 { 0 } else { max_depth as usize };
+        let max_depth = if max_depth < 0 { 0 } else { max_depth as usize }; // negative = unlimited
         let dynamic_array = Dynamic::from(array);
         let flattened = flatten_dynamic(&dynamic_array, flatten_style, max_depth);
         convert_indexmap_to_rhai_map(flattened)
