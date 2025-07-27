@@ -162,9 +162,13 @@ impl ConfigFile {
             println!("\nCreate a config file at any of these locations. Example:");
             println!();
             println!("[defaults]");
-            println!("format = jsonl");
+            println!("input-format = auto");
             println!("output-format = default");
             println!("skip-lines = 0");
+            println!("parallel = false");
+            println!("stats = true");
+            println!("verbose = false");
+            println!("input-tz = UTC");
             println!();
             println!("[aliases]");
             println!("errors = --filter 'e.level == \"error\"' --stats");

@@ -439,12 +439,16 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
         // Only apply if format is still at default ("line")
         if matches!(cli.format, crate::InputFormat::Line) {
             cli.format = match format.as_str() {
+                "auto" => crate::InputFormat::Auto,
                 "jsonl" => crate::InputFormat::Jsonl,
                 "line" => crate::InputFormat::Line,
                 "logfmt" => crate::InputFormat::Logfmt,
                 "syslog" => crate::InputFormat::Syslog,
                 "cef" => crate::InputFormat::Cef,
                 "csv" => crate::InputFormat::Csv,
+                "tsv" => crate::InputFormat::Tsv,
+                "csvnh" => crate::InputFormat::Csvnh,
+                "tsvnh" => crate::InputFormat::Tsvnh,
                 "apache" => crate::InputFormat::Apache,
                 "nginx" => crate::InputFormat::Nginx,
                 "cols" => crate::InputFormat::Cols,
@@ -460,6 +464,11 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
                 "default" => crate::OutputFormat::Default,
                 "logfmt" => crate::OutputFormat::Logfmt,
                 "csv" => crate::OutputFormat::Csv,
+                "tsv" => crate::OutputFormat::Tsv,
+                "csvnh" => crate::OutputFormat::Csvnh,
+                "tsvnh" => crate::OutputFormat::Tsvnh,
+                "hide" => crate::OutputFormat::Hide,
+                "null" => crate::OutputFormat::Null,
                 _ => cli.output_format,
             };
         }
@@ -662,6 +671,103 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
             if let Ok(size) = window_size.parse::<usize>() {
                 cli.window_size = Some(size);
             }
+        }
+    }
+
+    // Apply additional missing options
+    if let Some(ts_field) = config_file.defaults.get("ts_field") {
+        if cli.ts_field.is_none() {
+            cli.ts_field = Some(ts_field.clone());
+        }
+    }
+
+    if let Some(ts_format) = config_file.defaults.get("ts_format") {
+        if cli.ts_format.is_none() {
+            cli.ts_format = Some(ts_format.clone());
+        }
+    }
+
+    if let Some(input_tz) = config_file.defaults.get("input_tz") {
+        if cli.input_tz.is_none() {
+            cli.input_tz = Some(input_tz.clone());
+        }
+    }
+
+    if let Some(output_file) = config_file.defaults.get("output_file") {
+        if cli.output_file.is_none() {
+            cli.output_file = Some(output_file.clone());
+        }
+    }
+
+    if let Some(pretty_ts) = config_file.defaults.get("pretty_ts") {
+        if cli.pretty_ts.is_none() {
+            cli.pretty_ts = Some(pretty_ts.clone());
+        }
+    }
+
+    if let Some(format_timestamps_local) = config_file.defaults.get("format_timestamps_local") {
+        if !cli.format_timestamps_local && format_timestamps_local.parse::<bool>().unwrap_or(false)
+        {
+            cli.format_timestamps_local = true;
+        }
+    }
+
+    if let Some(format_timestamps_utc) = config_file.defaults.get("format_timestamps_utc") {
+        if !cli.format_timestamps_utc && format_timestamps_utc.parse::<bool>().unwrap_or(false) {
+            cli.format_timestamps_utc = true;
+        }
+    }
+
+    if let Some(no_preserve_order) = config_file.defaults.get("no_preserve_order") {
+        if !cli.no_preserve_order && no_preserve_order.parse::<bool>().unwrap_or(false) {
+            cli.no_preserve_order = true;
+        }
+    }
+
+    if let Some(strict) = config_file.defaults.get("strict") {
+        if !cli.strict && strict.parse::<bool>().unwrap_or(false) {
+            cli.strict = true;
+        }
+    }
+
+    if let Some(verbose) = config_file.defaults.get("verbose") {
+        if !cli.verbose && verbose.parse::<bool>().unwrap_or(false) {
+            cli.verbose = true;
+        }
+    }
+
+    if let Some(quiet) = config_file.defaults.get("quiet") {
+        if !cli.quiet && quiet.parse::<bool>().unwrap_or(false) {
+            cli.quiet = true;
+        }
+    }
+
+    if let Some(since) = config_file.defaults.get("since") {
+        if cli.since.is_none() {
+            cli.since = Some(since.clone());
+        }
+    }
+
+    if let Some(until) = config_file.defaults.get("until") {
+        if cli.until.is_none() {
+            cli.until = Some(until.clone());
+        }
+    }
+
+    if let Some(take) = config_file.defaults.get("take") {
+        if cli.take.is_none() {
+            if let Ok(value) = take.parse::<usize>() {
+                cli.take = Some(value);
+            }
+        }
+    }
+
+    if let Some(exec_files) = config_file.defaults.get("exec_files") {
+        if cli.exec_files.is_empty() {
+            cli.exec_files = exec_files
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .collect();
         }
     }
 
