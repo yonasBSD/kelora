@@ -1,4 +1,6 @@
-use rhai::{Array, Dynamic, Engine};
+use rhai::{Array, Dynamic, Engine, Map};
+use crate::event::{flatten_dynamic, FlattenStyle};
+use indexmap::IndexMap;
 
 /// Register array manipulation functions with the Rhai engine
 pub fn register_functions(engine: &mut Engine) {
@@ -10,6 +12,42 @@ pub fn register_functions(engine: &mut Engine) {
 
     // Register sorted_by function - sort objects/maps by field name
     engine.register_fn("sorted_by", sorted_by_field);
+
+    // Array flattening functions
+    
+    // Default flatten() for arrays - uses bracket style, max_depth=10
+    engine.register_fn("flatten", |array: Array| -> Map {
+        let dynamic_array = Dynamic::from(array);
+        let flattened = flatten_dynamic(&dynamic_array, FlattenStyle::default(), 10);
+        convert_indexmap_to_rhai_map(flattened)
+    });
+
+    // flatten(style) for arrays - specify style, max_depth=10
+    engine.register_fn("flatten", |array: Array, style: &str| -> Map {
+        let flatten_style = match style {
+            "dot" => FlattenStyle::Dot,
+            "bracket" => FlattenStyle::Bracket,
+            "underscore" => FlattenStyle::Underscore,
+            _ => FlattenStyle::default(), // Default to bracket for unknown styles
+        };
+        let dynamic_array = Dynamic::from(array);
+        let flattened = flatten_dynamic(&dynamic_array, flatten_style, 10);
+        convert_indexmap_to_rhai_map(flattened)
+    });
+
+    // flatten(style, max_depth) for arrays - full control
+    engine.register_fn("flatten", |array: Array, style: &str, max_depth: i64| -> Map {
+        let flatten_style = match style {
+            "dot" => FlattenStyle::Dot,
+            "bracket" => FlattenStyle::Bracket,
+            "underscore" => FlattenStyle::Underscore,
+            _ => FlattenStyle::default(),
+        };
+        let max_depth = if max_depth < 0 { 0 } else { max_depth as usize };
+        let dynamic_array = Dynamic::from(array);
+        let flattened = flatten_dynamic(&dynamic_array, flatten_style, max_depth);
+        convert_indexmap_to_rhai_map(flattened)
+    });
 }
 
 /// Sort an array and return a new sorted array (like Python's sorted())
@@ -223,6 +261,15 @@ fn compare_dynamic_values(a: &Dynamic, b: &Dynamic) -> std::cmp::Ordering {
     let a_str = a.to_string();
     let b_str = b.to_string();
     a_str.cmp(&b_str)
+}
+
+/// Convert IndexMap<String, Dynamic> to rhai::Map
+fn convert_indexmap_to_rhai_map(indexmap: IndexMap<String, Dynamic>) -> Map {
+    let mut map = Map::new();
+    for (key, value) in indexmap {
+        map.insert(key.into(), value);
+    }
+    map
 }
 
 #[cfg(test)]
@@ -498,5 +545,72 @@ mod tests {
         if let Some(obj) = sorted[2].clone().try_cast::<rhai::Map>() {
             assert_eq!(obj.get("name").unwrap().to_string(), "alice"); // age 30
         }
+    }
+
+    #[test]
+    fn test_array_flatten_simple() {
+        let mut arr = Array::new();
+        arr.push(Dynamic::from("item1"));
+        arr.push(Dynamic::from("item2"));
+        arr.push(Dynamic::from(42i64));
+        
+        let flattened = {
+            let dynamic_array = Dynamic::from(arr);
+            let result = flatten_dynamic(&dynamic_array, FlattenStyle::Bracket, 10);
+            convert_indexmap_to_rhai_map(result)
+        };
+        
+        assert_eq!(flattened.get("[0]").unwrap().to_string(), "item1");
+        assert_eq!(flattened.get("[1]").unwrap().to_string(), "item2");
+        assert_eq!(flattened.get("[2]").unwrap().to_string(), "42");
+    }
+
+    #[test]
+    fn test_array_flatten_nested() {
+        let mut inner1 = Map::new();
+        inner1.insert("id".into(), Dynamic::from(1i64));
+        inner1.insert("name".into(), Dynamic::from("first"));
+        
+        let mut inner2 = Map::new();
+        inner2.insert("id".into(), Dynamic::from(2i64));
+        inner2.insert("name".into(), Dynamic::from("second"));
+        
+        let mut arr = Array::new();
+        arr.push(Dynamic::from(inner1));
+        arr.push(Dynamic::from(inner2));
+        
+        let flattened = {
+            let dynamic_array = Dynamic::from(arr);
+            let result = flatten_dynamic(&dynamic_array, FlattenStyle::Bracket, 10);
+            convert_indexmap_to_rhai_map(result)
+        };
+        
+        assert_eq!(flattened.get("[0].id").unwrap().to_string(), "1");
+        assert_eq!(flattened.get("[0].name").unwrap().to_string(), "first");
+        assert_eq!(flattened.get("[1].id").unwrap().to_string(), "2");
+        assert_eq!(flattened.get("[1].name").unwrap().to_string(), "second");
+    }
+
+    #[test]
+    fn test_array_flatten_styles() {
+        let mut inner = Map::new();
+        inner.insert("value".into(), Dynamic::from(42i64));
+        
+        let mut arr = Array::new();
+        arr.push(Dynamic::from(inner));
+        
+        let dynamic_array = Dynamic::from(arr);
+        
+        // Test bracket style
+        let bracket = flatten_dynamic(&dynamic_array, FlattenStyle::Bracket, 10);
+        assert!(bracket.contains_key("[0].value"));
+        
+        // Test dot style
+        let dot = flatten_dynamic(&dynamic_array, FlattenStyle::Dot, 10);
+        assert!(dot.contains_key("0.value"));
+        
+        // Test underscore style
+        let underscore = flatten_dynamic(&dynamic_array, FlattenStyle::Underscore, 10);
+        assert!(underscore.contains_key("0_value"));
     }
 }

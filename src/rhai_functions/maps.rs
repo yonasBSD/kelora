@@ -79,6 +79,7 @@ pub fn register_functions(engine: &mut Engine) {
         
         result
     });
+
 }
 
 /// Convert IndexMap<String, Dynamic> to rhai::Map
