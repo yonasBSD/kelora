@@ -1,4 +1,6 @@
-use rhai::{Engine, Map};
+use rhai::{Engine, Map, Dynamic};
+use crate::event::{flatten_dynamic, FlattenStyle};
+use indexmap::IndexMap;
 
 /// Registers map merge/enrich operators to the Rhai engine.
 pub fn register_functions(engine: &mut Engine) {
@@ -23,6 +25,69 @@ pub fn register_functions(engine: &mut Engine) {
         }
     });
 
+    // Flattening functions
+    
+    // Default flatten() - uses bracket style, max_depth=10
+    engine.register_fn("flatten", |map: Map| -> Map {
+        let dynamic_map = Dynamic::from(map);
+        let flattened = flatten_dynamic(&dynamic_map, FlattenStyle::default(), 10);
+        convert_indexmap_to_rhai_map(flattened)
+    });
+
+    // flatten(style) - specify style, max_depth=10
+    engine.register_fn("flatten", |map: Map, style: &str| -> Map {
+        let flatten_style = match style {
+            "dot" => FlattenStyle::Dot,
+            "bracket" => FlattenStyle::Bracket,
+            "underscore" => FlattenStyle::Underscore,
+            _ => FlattenStyle::default(), // Default to bracket for unknown styles
+        };
+        let dynamic_map = Dynamic::from(map);
+        let flattened = flatten_dynamic(&dynamic_map, flatten_style, 10);
+        convert_indexmap_to_rhai_map(flattened)
+    });
+
+    // flatten(style, max_depth) - full control
+    engine.register_fn("flatten", |map: Map, style: &str, max_depth: i64| -> Map {
+        let flatten_style = match style {
+            "dot" => FlattenStyle::Dot,
+            "bracket" => FlattenStyle::Bracket,
+            "underscore" => FlattenStyle::Underscore,
+            _ => FlattenStyle::default(),
+        };
+        let max_depth = if max_depth < 0 { 0 } else { max_depth as usize };
+        let dynamic_map = Dynamic::from(map);
+        let flattened = flatten_dynamic(&dynamic_map, flatten_style, max_depth);
+        convert_indexmap_to_rhai_map(flattened)
+    });
+
+    // flatten_field(field_name) - flatten just one field from the map
+    engine.register_fn("flatten_field", |map: &Map, field_name: &str| -> Map {
+        let mut result = Map::new();
+        
+        if let Some(field_value) = map.get(field_name) {
+            let flattened = flatten_dynamic(field_value, FlattenStyle::default(), 10);
+            for (key, value) in flattened {
+                let full_key = if key == "value" {
+                    field_name.to_string()
+                } else {
+                    format!("{}.{}", field_name, key)
+                };
+                result.insert(full_key.into(), value);
+            }
+        }
+        
+        result
+    });
+}
+
+/// Convert IndexMap<String, Dynamic> to rhai::Map
+fn convert_indexmap_to_rhai_map(indexmap: IndexMap<String, Dynamic>) -> Map {
+    let mut map = Map::new();
+    for (key, value) in indexmap {
+        map.insert(key.into(), value);
+    }
+    map
 }
 
 

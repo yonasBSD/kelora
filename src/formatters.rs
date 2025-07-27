@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use crate::colors::ColorScheme;
-use crate::event::Event;
+use crate::event::{Event, flatten_dynamic, FlattenStyle};
 use crate::pipeline;
 use rhai::Dynamic;
 use std::collections::HashMap;
@@ -228,7 +228,7 @@ impl DefaultFormatter {
         };
 
         // Format value based on type - always quote strings for default formatter
-        let (string_val, is_string) = format_dynamic_value(value);
+        let (string_val, is_string) = self.format_default_value(value);
         if is_string {
             // Add opening quote (uncolored)
             output.push('"');
@@ -289,11 +289,8 @@ impl DefaultFormatter {
         }
 
         // In brief mode, output raw value (no quotes even for strings)
-        if let Ok(s) = value.clone().into_string() {
-            output.push_str(&s);
-        } else {
-            output.push_str(&value.to_string());
-        }
+        let (formatted_val, _is_string) = self.format_default_value(value);
+        output.push_str(&formatted_val);
 
         // Reset color
         if !color.is_empty() {
@@ -370,6 +367,36 @@ impl DefaultFormatter {
         }
 
         None
+    }
+
+    /// Format a Dynamic value for default output, flattening nested structures with dot notation
+    fn format_default_value(&self, value: &Dynamic) -> (String, bool) {
+        // Check if this is a complex nested structure
+        if value.clone().try_cast::<rhai::Map>().is_some() || value.clone().try_cast::<rhai::Array>().is_some() {
+            // Flatten nested structures using dot style for human readability
+            let flattened = flatten_dynamic(value, FlattenStyle::Dot, 5);
+            
+            if flattened.len() == 1 {
+                // Single flattened value - use it directly
+                let val = flattened.values().next().unwrap().to_string();
+                (val, false) // Treat flattened structures as non-string for formatting
+            } else if flattened.is_empty() {
+                // Empty structure
+                (String::new(), true)
+            } else {
+                // Multiple flattened values - create a readable representation
+                // Format as "key1=val1 key2=val2" for logfmt-style readability
+                let formatted = flattened
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                (formatted, true) // Treat as string for proper quoting
+            }
+        } else {
+            // Use the original format_dynamic_value for scalar values
+            format_dynamic_value(value)
+        }
     }
 }
 
@@ -481,11 +508,41 @@ impl LogfmtFormatter {
 
     /// Format a Dynamic value directly into buffer for performance
     fn format_dynamic_value_into(&self, value: &Dynamic, output: &mut String) {
-        let (string_val, is_string) = format_dynamic_value(value);
+        let string_val = self.format_logfmt_value(value);
+        let is_string = value.is_string();
+        
         if is_string {
             format_quoted_logfmt_value(&string_val, output);
         } else {
             output.push_str(&string_val);
+        }
+    }
+
+    /// Format a Dynamic value for logfmt output, flattening nested structures
+    fn format_logfmt_value(&self, value: &Dynamic) -> String {
+        // Check if this is a complex nested structure
+        if value.clone().try_cast::<rhai::Map>().is_some() || value.clone().try_cast::<rhai::Array>().is_some() {
+            // Flatten nested structures using underscore style for logfmt safety
+            let flattened = flatten_dynamic(value, FlattenStyle::Underscore, 5);
+            
+            if flattened.len() == 1 {
+                // Single flattened value - use it directly
+                flattened.values().next().unwrap().to_string()
+            } else if flattened.is_empty() {
+                // Empty structure
+                String::new()
+            } else {
+                // Multiple flattened values - create a compact representation
+                // Format as "key1=val1,key2=val2" for logfmt-style readability
+                flattened
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            }
+        } else {
+            // Simple scalar value
+            value.to_string()
         }
     }
 }
@@ -657,13 +714,42 @@ impl CsvFormatter {
             .iter()
             .map(|key| {
                 if let Some(value) = event.fields.get(key) {
-                    escape_csv_value(&value.to_string(), self.delimiter)
+                    let string_value = self.format_csv_value(value);
+                    escape_csv_value(&string_value, self.delimiter)
                 } else {
                     String::new() // Empty field for missing values
                 }
             })
             .collect::<Vec<_>>()
             .join(&self.delimiter.to_string())
+    }
+
+    /// Format a Dynamic value for CSV output, flattening nested structures
+    fn format_csv_value(&self, value: &Dynamic) -> String {
+        // Check if this is a complex nested structure
+        if value.clone().try_cast::<rhai::Map>().is_some() || value.clone().try_cast::<rhai::Array>().is_some() {
+            // Flatten nested structures using underscore style for CSV safety
+            let flattened = flatten_dynamic(value, FlattenStyle::Underscore, 5);
+            
+            if flattened.len() == 1 {
+                // Single flattened value - use it directly
+                flattened.values().next().unwrap().to_string()
+            } else if flattened.is_empty() {
+                // Empty structure
+                String::new()
+            } else {
+                // Multiple flattened values - create a compact representation
+                // Format as "key1:val1,key2:val2" for readability in CSV cells
+                flattened
+                    .iter()
+                    .map(|(k, v)| format!("{}:{}", k, v))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            }
+        } else {
+            // Simple scalar value
+            value.to_string()
+        }
     }
 }
 
