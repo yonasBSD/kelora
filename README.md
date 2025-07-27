@@ -156,6 +156,8 @@ kelora -f jsonl app.log --input-tz Europe/Berlin -Z  # Parse as Berlin, display 
 ```bash
 kelora --help           # CLI reference
 kelora --help-time      # Timestamp format guide  
+kelora --help-functions # Available Rhai functions
+kelora --help-rhai      # Rhai scripting guide
 kelora --show-config    # Current configuration
 ```
 
