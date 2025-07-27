@@ -106,6 +106,20 @@ kelora -f jsonl huge.log --parallel -F null --filter 'e.status != 200'
 # Multiline processing (stack traces)  
 kelora -f line app.log --multiline indent --filter 'e.line.contains("Exception")'
 
+# Field selection and filtering
+kelora -f auto app.log -k user_id,action,ip    # Select custom fields for analysis
+kelora -f auto app.log -K password,secret      # Exclude sensitive fields
+kelora -f auto app.log -l error,warn           # Include only error/warning levels
+kelora -f auto app.log -L debug,trace          # Exclude debug/trace levels
+
+# Output formatting
+kelora -f auto app.log -c              # Core fields only
+kelora -f auto app.log -cb             # Core fields, brief format (often combined)
+kelora -f auto app.log -S              # Stats only, no events
+
+# Output control for automation
+kelora -f auto app.log --filter 'e.level == "error"' -F hide  # Suppress output, keep side effects
+
 # Configuration aliases
 kelora -a slow-requests access.log  # From ~/.config/kelora/config.ini
 ```
@@ -114,18 +128,46 @@ kelora -a slow-requests access.log  # From ~/.config/kelora/config.ini
 
 | Flag | Purpose | Example |
 |------|---------|---------|
-| `-f FORMAT` | Input format | `jsonl`, `syslog`, `csv`, `docker`, `line` |
-| `-F FORMAT` | Output format | `jsonl`, `csv`, `logfmt`, `null` |
+| `-f FORMAT` | Input format | `jsonl`, `syslog`, `csv`, `docker`, `auto` (detects from first line) |
+| `-F FORMAT` | Output format | `jsonl`, `csv`, `logfmt`, `null`, `hide` |
 | `--filter EXPR` | Include matching events | `e.level == "error"` |
 | `--exec SCRIPT` | Transform events | `e.type = "slow"` |
+| `-c, --core` | Output only core fields | Essential fields only |
+| `-b, --brief` | Output only field values | No field names, just values |
+| `-l LEVELS` | Include only these log levels | `-l error,warn` |
+| `-L LEVELS` | Exclude these log levels | `-L debug,trace` |
+| `-k FIELDS` | Output only specific fields | `-k timestamp,level,msg` |
+| `-K FIELDS` | Exclude specific fields | `-K password,secret` |
+| `-S, --stats-only` | Show stats with no output | Stats only, no events |
 | `--window N` | Sliding window size | `--window 5` |
 | `--parallel` | Parallel processing | Higher throughput |
 | `--since/--until` | Time filtering | `"2024-01-01"`, `"1 hour ago"` |
-| `--keys FIELDS` | Select output fields | `timestamp,level,msg` |
 | `--strict` | Fail-fast error handling | Abort on first error |
 | `--verbose` | Detailed error information | Show error details |
 
 See `kelora --help` for the complete reference.
+
+## Configuration
+
+Create `~/.config/kelora/config.ini` for defaults and aliases:
+
+```ini
+[defaults]
+format = auto        # Auto-detect input format from first line
+stats = true         # Always show stats
+parallel = true      # Use parallel processing
+
+[alias.errors]
+format = auto
+filter = e.level == "error"
+keys = timestamp,level,msg
+stats = true
+
+[alias.slow-requests]  
+format = auto
+filter = e.response_time.to_int() > 1000
+exec = e.severity = "slow"
+```
 
 ## Advanced Features
 
