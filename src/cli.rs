@@ -309,6 +309,10 @@ pub struct Cli {
     /// Show time format help and exit
     #[arg(long = "help-time", help_heading = "Help Options")]
     pub help_time: bool,
+
+    /// Show available Rhai functions and exit
+    #[arg(long = "help-functions", help_heading = "Help Options")]
+    pub help_functions: bool,
 }
 
 impl Cli {

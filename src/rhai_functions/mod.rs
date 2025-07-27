@@ -3,6 +3,7 @@ use rhai::Engine;
 pub mod arrays;
 pub mod columns;
 pub mod datetime;
+pub mod docs;
 pub mod init;
 pub mod maps;
 pub mod math;

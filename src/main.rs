@@ -360,6 +360,12 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
         std::process::exit(0);
     }
 
+    // Check for --help-functions
+    if raw_args.iter().any(|arg| arg == "--help-functions") {
+        print_functions_help();
+        std::process::exit(0);
+    }
+
     // Check for --ignore-config
     let ignore_config = raw_args.iter().any(|arg| arg == "--ignore-config");
 
@@ -707,5 +713,11 @@ Common Examples:
 For complete format reference, see:
 https://docs.rs/chrono/latest/chrono/format/strftime/index.html
 "#;
+    println!("{}", help_text);
+}
+
+/// Print available Rhai functions help
+fn print_functions_help() {
+    let help_text = rhai_functions::docs::generate_help_text();
     println!("{}", help_text);
 }
