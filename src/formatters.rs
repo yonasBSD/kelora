@@ -374,7 +374,7 @@ impl DefaultFormatter {
         // Check if this is a complex nested structure
         if value.clone().try_cast::<rhai::Map>().is_some() || value.clone().try_cast::<rhai::Array>().is_some() {
             // Flatten nested structures using dot style for human readability
-            let flattened = flatten_dynamic(value, FlattenStyle::Dot, 5);
+            let flattened = flatten_dynamic(value, FlattenStyle::Dot, 0);
             
             if flattened.len() == 1 {
                 // Single flattened value - use it directly
@@ -523,7 +523,7 @@ impl LogfmtFormatter {
         // Check if this is a complex nested structure
         if value.clone().try_cast::<rhai::Map>().is_some() || value.clone().try_cast::<rhai::Array>().is_some() {
             // Flatten nested structures using underscore style for logfmt safety
-            let flattened = flatten_dynamic(value, FlattenStyle::Underscore, 5);
+            let flattened = flatten_dynamic(value, FlattenStyle::Underscore, 0);
             
             if flattened.len() == 1 {
                 // Single flattened value - use it directly
@@ -729,7 +729,7 @@ impl CsvFormatter {
         // Check if this is a complex nested structure
         if value.clone().try_cast::<rhai::Map>().is_some() || value.clone().try_cast::<rhai::Array>().is_some() {
             // Flatten nested structures using underscore style for CSV safety
-            let flattened = flatten_dynamic(value, FlattenStyle::Underscore, 5);
+            let flattened = flatten_dynamic(value, FlattenStyle::Underscore, 0);
             
             if flattened.len() == 1 {
                 // Single flattened value - use it directly

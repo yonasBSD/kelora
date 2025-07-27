@@ -27,14 +27,14 @@ pub fn register_functions(engine: &mut Engine) {
 
     // Flattening functions
     
-    // Default flatten() - uses bracket style, max_depth=10
+    // Default flatten() - uses bracket style, unlimited depth
     engine.register_fn("flatten", |map: Map| -> Map {
         let dynamic_map = Dynamic::from(map);
-        let flattened = flatten_dynamic(&dynamic_map, FlattenStyle::default(), 10);
+        let flattened = flatten_dynamic(&dynamic_map, FlattenStyle::default(), 0);
         convert_indexmap_to_rhai_map(flattened)
     });
 
-    // flatten(style) - specify style, max_depth=10
+    // flatten(style) - specify style, unlimited depth  
     engine.register_fn("flatten", |map: Map, style: &str| -> Map {
         let flatten_style = match style {
             "dot" => FlattenStyle::Dot,
@@ -43,7 +43,7 @@ pub fn register_functions(engine: &mut Engine) {
             _ => FlattenStyle::default(), // Default to bracket for unknown styles
         };
         let dynamic_map = Dynamic::from(map);
-        let flattened = flatten_dynamic(&dynamic_map, flatten_style, 10);
+        let flattened = flatten_dynamic(&dynamic_map, flatten_style, 0);
         convert_indexmap_to_rhai_map(flattened)
     });
 
@@ -66,7 +66,7 @@ pub fn register_functions(engine: &mut Engine) {
         let mut result = Map::new();
         
         if let Some(field_value) = map.get(field_name) {
-            let flattened = flatten_dynamic(field_value, FlattenStyle::default(), 10);
+            let flattened = flatten_dynamic(field_value, FlattenStyle::default(), 0);
             for (key, value) in flattened {
                 let full_key = if key == "value" {
                     field_name.to_string()
