@@ -101,8 +101,9 @@ pub struct PerformanceConfig {
 }
 
 /// Input format enumeration
-#[derive(ValueEnum, Clone, Debug)]
+#[derive(ValueEnum, Clone, Debug, PartialEq)]
 pub enum InputFormat {
+    Auto,
     Jsonl,
     Line,
     Logfmt,
@@ -758,6 +759,7 @@ fn determine_default_timezone(cli: &crate::Cli) -> Option<String> {
 impl From<crate::InputFormat> for InputFormat {
     fn from(format: crate::InputFormat) -> Self {
         match format {
+            crate::InputFormat::Auto => InputFormat::Auto,
             crate::InputFormat::Jsonl => InputFormat::Jsonl,
             crate::InputFormat::Line => InputFormat::Line,
             crate::InputFormat::Logfmt => InputFormat::Logfmt,
@@ -777,6 +779,7 @@ impl From<crate::InputFormat> for InputFormat {
 impl From<InputFormat> for crate::InputFormat {
     fn from(format: InputFormat) -> Self {
         match format {
+            InputFormat::Auto => crate::InputFormat::Auto,
             InputFormat::Jsonl => crate::InputFormat::Jsonl,
             InputFormat::Line => crate::InputFormat::Line,
             InputFormat::Logfmt => crate::InputFormat::Logfmt,

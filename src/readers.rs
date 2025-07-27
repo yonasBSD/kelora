@@ -5,6 +5,71 @@ use std::thread;
 
 use crate::decompression::DecompressionReader;
 
+/// A reader that can peek at the first line without consuming it
+/// Used for format auto-detection on streams
+pub struct PeekableLineReader<R: BufRead> {
+    inner: R,
+    peeked_line: Option<String>,
+    first_line_consumed: bool,
+}
+
+impl<R: BufRead> PeekableLineReader<R> {
+    pub fn new(reader: R) -> Self {
+        Self {
+            inner: reader,
+            peeked_line: None,
+            first_line_consumed: false,
+        }
+    }
+
+    /// Peek at the first line without consuming it
+    pub fn peek_first_line(&mut self) -> io::Result<Option<String>> {
+        if self.peeked_line.is_some() {
+            return Ok(self.peeked_line.clone());
+        }
+
+        let mut line = String::new();
+        match self.inner.read_line(&mut line) {
+            Ok(0) => Ok(None), // EOF
+            Ok(_) => {
+                self.peeked_line = Some(line.clone());
+                Ok(Some(line))
+            }
+            Err(e) => Err(e),
+        }
+    }
+}
+
+impl<R: BufRead> BufRead for PeekableLineReader<R> {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        self.inner.fill_buf()
+    }
+
+    fn consume(&mut self, amt: usize) {
+        self.inner.consume(amt)
+    }
+
+    fn read_line(&mut self, buf: &mut String) -> io::Result<usize> {
+        // If we have a peeked line and it hasn't been consumed yet, return it
+        if let Some(peeked) = &self.peeked_line {
+            if !self.first_line_consumed {
+                buf.push_str(peeked);
+                self.first_line_consumed = true;
+                return Ok(peeked.len());
+            }
+        }
+
+        // Otherwise, read from the inner reader
+        self.inner.read_line(buf)
+    }
+}
+
+impl<R: BufRead> std::io::Read for PeekableLineReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.read(buf)
+    }
+}
+
 /// A channel-based stdin reader that is Send-compatible
 pub struct ChannelStdinReader {
     receiver: Receiver<String>,

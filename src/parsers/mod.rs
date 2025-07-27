@@ -1,4 +1,5 @@
 pub mod apache;
+pub mod auto_detect;
 pub mod cef;
 pub mod cols;
 pub mod csv;
@@ -9,6 +10,7 @@ pub mod nginx;
 pub mod syslog;
 
 pub use apache::ApacheParser;
+pub use auto_detect::detect_format;
 pub use cef::CefParser;
 pub use cols::ColsParser;
 pub use csv::CsvParser;

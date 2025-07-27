@@ -140,9 +140,62 @@ mod tty;
 mod unix;
 
 use anyhow::Result;
+use crate::decompression::DecompressionReader;
 
 // Re-export CLI types for convenience (they live in cli module now)
 pub use cli::{Cli, FileOrder, InputFormat, OutputFormat};
+
+/// Detect format from a peekable reader
+/// Returns the detected format without consuming the first line
+fn detect_format_from_peekable_reader<R: BufRead>(
+    reader: &mut crate::readers::PeekableLineReader<R>
+) -> Result<config::InputFormat> {
+    match reader.peek_first_line()? {
+        None => {
+            // Empty input, default to line format
+            Ok(config::InputFormat::Line)
+        }
+        Some(line) => {
+            // Remove newline for detection
+            let trimmed_line = line.trim_end_matches(&['\r', '\n'][..]);
+            let detected = crate::parsers::detect_format(trimmed_line)?;
+            Ok(detected.into())
+        }
+    }
+}
+
+/// Detect format for parallel mode processing
+/// Returns the detected format
+fn detect_format_for_parallel_mode(files: &[String]) -> Result<InputFormat> {
+    if files.is_empty() {
+        // For stdin in parallel mode, we can't peek ahead easily
+        // So we use a simple approach: read the first line from stdin
+        let stdin = io::stdin();
+        let stdin_lock = stdin.lock();
+        let mut peekable_reader = crate::readers::PeekableLineReader::new(stdin_lock);
+        
+        match detect_format_from_peekable_reader(&mut peekable_reader)? {
+            config::InputFormat::Auto => Ok(InputFormat::Line), // Fallback
+            format => Ok(format.into()),
+        }
+    } else {
+        // For files, read first line from first file
+        let sorted_files = pipeline::builders::sort_files(files, &config::FileOrder::None)?;
+        
+        if sorted_files.is_empty() {
+            return Ok(InputFormat::Line);
+        }
+        
+        let first_file = &sorted_files[0];
+        let decompressed = DecompressionReader::new(first_file)?;
+        let mut peekable_reader = crate::readers::PeekableLineReader::new(decompressed);
+        
+        match detect_format_from_peekable_reader(&mut peekable_reader)? {
+            config::InputFormat::Auto => Ok(InputFormat::Line), // Fallback
+            format => Ok(format.into()),
+        }
+    }
+}
 
 use parallel::{ParallelConfig, ParallelProcessor};
 use pipeline::{
@@ -238,21 +291,39 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
     config: &PipelineConfig,
     output: W,
 ) -> Result<PipelineResult> {
+    // Handle auto-detection for parallel mode
+    let final_config = if matches!(config.input.format, InputFormat::Auto) {
+        // For parallel mode, we need to detect format first
+        let detected_format = detect_format_for_parallel_mode(&config.input.files)?;
+        
+        // Report detected format in verbose mode
+        if config.processing.verbose {
+            eprintln!("🔍 kelora: auto-detected format: {:?}", detected_format);
+        }
+        
+        // Create new config with detected format
+        let mut new_config = config.clone();
+        new_config.input.format = detected_format;
+        new_config
+    } else {
+        config.clone()
+    };
+    
     // Convert to KeloraConfig temporarily - will be removed when all core functions are updated
     let kelora_config = KeloraConfig {
         input: config::InputConfig {
-            files: config.input.files.clone(),
-            format: config.input.format.clone().into(),
-            file_order: config.input.file_order.clone().into(),
-            skip_lines: config.input.skip_lines,
-            ignore_lines: config.input.ignore_lines.clone(),
-            multiline: config.input.multiline.clone(),
-            ts_field: config.input.ts_field.clone(),
-            ts_format: config.input.ts_format.clone(),
-            default_timezone: config.input.default_timezone.clone(),
+            files: final_config.input.files.clone(),
+            format: final_config.input.format.clone().into(),
+            file_order: final_config.input.file_order.clone().into(),
+            skip_lines: final_config.input.skip_lines,
+            ignore_lines: final_config.input.ignore_lines.clone(),
+            multiline: final_config.input.multiline.clone(),
+            ts_field: final_config.input.ts_field.clone(),
+            ts_format: final_config.input.ts_format.clone(),
+            default_timezone: final_config.input.default_timezone.clone(),
         },
         output: config::OutputConfig {
-            format: config.output_format.clone().into(),
+            format: final_config.output_format.clone().into(),
             keys: Vec::new(),
             exclude_keys: Vec::new(),
             core: false,
@@ -266,25 +337,25 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
             timestamp_formatting: config::TimestampFormatConfig::default(),
         },
         processing: config::ProcessingConfig {
-            begin: config.processing.begin.clone(),
-            stages: config.processing.stages.clone(),
-            end: config.processing.end.clone(),
-            error_report: config.processing.error_report.clone(),
-            levels: config.processing.levels.clone(),
-            exclude_levels: config.processing.exclude_levels.clone(),
-            window_size: config.processing.window_size,
-            timestamp_filter: config.processing.timestamp_filter.clone(),
-            take_limit: config.processing.take_limit,
-            strict: config.processing.strict,
-            verbose: config.processing.verbose,
-            quiet: config.processing.quiet,
+            begin: final_config.processing.begin.clone(),
+            stages: final_config.processing.stages.clone(),
+            end: final_config.processing.end.clone(),
+            error_report: final_config.processing.error_report.clone(),
+            levels: final_config.processing.levels.clone(),
+            exclude_levels: final_config.processing.exclude_levels.clone(),
+            window_size: final_config.processing.window_size,
+            timestamp_filter: final_config.processing.timestamp_filter.clone(),
+            take_limit: final_config.processing.take_limit,
+            strict: final_config.processing.strict,
+            verbose: final_config.processing.verbose,
+            quiet: final_config.processing.quiet,
         },
         performance: config::PerformanceConfig {
-            parallel: config.performance.parallel,
-            threads: config.performance.threads,
-            batch_size: config.performance.batch_size,
-            batch_timeout: config.performance.batch_timeout,
-            no_preserve_order: config.performance.no_preserve_order,
+            parallel: final_config.performance.parallel,
+            threads: final_config.performance.threads,
+            batch_size: final_config.performance.batch_size,
+            batch_timeout: final_config.performance.batch_timeout,
+            no_preserve_order: final_config.performance.no_preserve_order,
         },
     };
 
@@ -433,6 +504,11 @@ pub fn run_pipeline_sequential_with_config<W: Write>(
 
 /// Run pipeline in sequential mode using KeloraConfig (legacy)
 pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) -> Result<()> {
+    // For auto-detection, we need special handling of input sources
+    if matches!(config.input.format, config::InputFormat::Auto) {
+        return run_pipeline_sequential_with_auto_detection(config, output);
+    }
+    
     let (mut pipeline, begin_stage, end_stage, mut ctx) = create_pipeline_from_config(config)?;
 
     // Execute begin stage
@@ -574,6 +650,306 @@ pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) 
     if let Some(ref file_path) = config.processing.error_report.file {
         crate::rhai_functions::tracking::write_error_summary_to_file(&ctx.tracker, file_path)
             .unwrap_or_else(|e| eprintln!("Failed to write error summary to file: {}", e));
+    }
+
+    Ok(())
+}
+
+/// Run pipeline in sequential mode with auto-detection support
+fn run_pipeline_sequential_with_auto_detection<W: Write>(config: &KeloraConfig, output: &mut W) -> Result<()> {
+    // Handle auto-detection based on input source
+    if config.input.files.is_empty() {
+        // Stdin processing with auto-detection
+        let stdin = io::stdin();
+        let stdin_lock = stdin.lock();
+        let mut peekable_reader = crate::readers::PeekableLineReader::new(stdin_lock);
+        
+        // Detect format from first line
+        let detected_format = detect_format_from_peekable_reader(&mut peekable_reader)?;
+        
+        // Report detected format in verbose mode
+        if config.processing.verbose {
+            eprintln!("🔍 kelora: auto-detected format: {:?}", detected_format);
+        }
+        
+        // Create config with detected format
+        let mut final_config = config.clone();
+        final_config.input.format = detected_format;
+        
+        // Build pipeline with detected format
+        let (mut pipeline, begin_stage, end_stage, mut ctx) = create_pipeline_from_config(&final_config)?;
+        
+        // Execute begin stage
+        if let Err(e) = begin_stage.execute(&mut ctx) {
+            return Err(anyhow::anyhow!("Begin stage error: {}", e));
+        }
+        
+        // Process stdin using peekable reader (which will return the first line correctly)
+        run_sequential_with_reader(
+            &mut peekable_reader,
+            &mut pipeline,
+            &mut ctx,
+            &final_config,
+            output,
+            None, // No filename for stdin
+        )?;
+        
+        // Execute end stage
+        if let Err(e) = end_stage.execute(&ctx) {
+            return Err(anyhow::anyhow!("End stage error: {}", e));
+        }
+        
+        // Merge thread-local tracking state
+        crate::rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
+
+        // Write error summary to file if configured
+        if let Some(ref file_path) = final_config.processing.error_report.file {
+            crate::rhai_functions::tracking::write_error_summary_to_file(&ctx.tracker, file_path)
+                .unwrap_or_else(|e| eprintln!("Failed to write error summary to file: {}", e));
+        }
+        
+    } else {
+        // File processing with auto-detection
+        // For files, we can just read the first line and then re-open
+        let sorted_files = pipeline::builders::sort_files(&config.input.files, &config.input.file_order)?;
+        
+        if sorted_files.is_empty() {
+            return Ok(());
+        }
+        
+        // Read first line from first file for detection
+        let first_file = &sorted_files[0];
+        let detected_format = {
+            let decompressed = DecompressionReader::new(first_file)?;
+            let mut peekable_reader = crate::readers::PeekableLineReader::new(decompressed);
+            detect_format_from_peekable_reader(&mut peekable_reader)?
+        };
+        
+        // Report detected format in verbose mode
+        if config.processing.verbose {
+            eprintln!("🔍 kelora: auto-detected format: {:?}", detected_format);
+        }
+        
+        // Create config with detected format
+        let mut final_config = config.clone();
+        final_config.input.format = detected_format;
+        
+        // Build pipeline with detected format
+        let (mut pipeline, begin_stage, end_stage, mut ctx) = create_pipeline_from_config(&final_config)?;
+        
+        // Execute begin stage
+        if let Err(e) = begin_stage.execute(&mut ctx) {
+            return Err(anyhow::anyhow!("Begin stage error: {}", e));
+        }
+        
+        // Process all files normally (re-opening them)
+        let mut multi_reader = crate::readers::MultiFileReader::new(sorted_files)?;
+        run_sequential_with_multi_reader(
+            &mut multi_reader,
+            &mut pipeline,
+            &mut ctx,
+            &final_config,
+            output,
+        )?;
+        
+        // Execute end stage
+        if let Err(e) = end_stage.execute(&ctx) {
+            return Err(anyhow::anyhow!("End stage error: {}", e));
+        }
+        
+        // Merge thread-local tracking state
+        crate::rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
+
+        // Write error summary to file if configured
+        if let Some(ref file_path) = final_config.processing.error_report.file {
+            crate::rhai_functions::tracking::write_error_summary_to_file(&ctx.tracker, file_path)
+                .unwrap_or_else(|e| eprintln!("Failed to write error summary to file: {}", e));
+        }
+    }
+    
+    Ok(())
+}
+
+/// Generic sequential processing function that works with any BufRead reader
+fn run_sequential_with_reader<W: Write, R: BufRead>(
+    reader: &mut R,
+    pipeline: &mut pipeline::Pipeline,
+    ctx: &mut pipeline::PipelineContext,
+    config: &KeloraConfig,
+    output: &mut W,
+    multi_reader: Option<&mut crate::readers::MultiFileReader>, // For filename tracking
+) -> Result<()> {
+    // For CSV formats, we need to track per-file schema
+    let mut current_csv_headers: Option<Vec<String>> = None;
+    let mut last_filename: Option<String> = None;
+
+    // Process lines using pipeline
+    let mut line_num = 0;
+    let mut skipped_lines = 0;
+
+    let mut line_buf = String::new();
+    loop {
+        // Check for termination signal between lines
+        if check_termination().is_err() {
+            return Ok(());
+        }
+
+        line_buf.clear();
+        let bytes_read = match reader.read_line(&mut line_buf) {
+            Ok(0) => break, // EOF
+            Ok(n) => n,
+            Err(e) => {
+                let line_result = Err(e);
+                let current_filename = multi_reader.as_ref().and_then(|mr| mr.current_filename().map(|s| s.to_string()));
+                match process_line_sequential(
+                    line_result,
+                    &mut line_num,
+                    &mut skipped_lines,
+                    pipeline,
+                    ctx,
+                    config,
+                    output,
+                    current_filename,
+                    &mut current_csv_headers,
+                    &mut last_filename,
+                )? {
+                    ProcessingResult::Continue => {}
+                    ProcessingResult::TakeLimitExhausted => break,
+                }
+
+                // Check for exit requested from Rhai scripts
+                if crate::rhai_functions::process::is_exit_requested() {
+                    let exit_code = crate::rhai_functions::process::get_exit_code();
+                    std::process::exit(exit_code);
+                }
+                continue;
+            }
+        };
+
+        if bytes_read > 0 {
+            let current_filename = multi_reader.as_ref().and_then(|mr| mr.current_filename().map(|s| s.to_string()));
+            match process_line_sequential(
+                Ok(line_buf.clone()),
+                &mut line_num,
+                &mut skipped_lines,
+                pipeline,
+                ctx,
+                config,
+                output,
+                current_filename,
+                &mut current_csv_headers,
+                &mut last_filename,
+            )? {
+                ProcessingResult::Continue => {}
+                ProcessingResult::TakeLimitExhausted => break,
+            }
+
+            // Check for exit requested from Rhai scripts
+            if crate::rhai_functions::process::is_exit_requested() {
+                let exit_code = crate::rhai_functions::process::get_exit_code();
+                std::process::exit(exit_code);
+            }
+        }
+    }
+
+    // Flush any remaining chunks
+    let results = pipeline.flush(ctx)?;
+    for result in results {
+        if !result.is_empty() {
+            writeln!(output, "{}", result)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Sequential processing function that works with MultiFileReader for filename tracking
+fn run_sequential_with_multi_reader<W: Write>(
+    multi_reader: &mut crate::readers::MultiFileReader,
+    pipeline: &mut pipeline::Pipeline,
+    ctx: &mut pipeline::PipelineContext,
+    config: &KeloraConfig,
+    output: &mut W,
+) -> Result<()> {
+    // For CSV formats, we need to track per-file schema
+    let mut current_csv_headers: Option<Vec<String>> = None;
+    let mut last_filename: Option<String> = None;
+
+    // Process lines using pipeline
+    let mut line_num = 0;
+    let mut skipped_lines = 0;
+
+    let mut line_buf = String::new();
+    loop {
+        // Check for termination signal between lines
+        if check_termination().is_err() {
+            return Ok(());
+        }
+
+        line_buf.clear();
+        let bytes_read = match multi_reader.read_line(&mut line_buf) {
+            Ok(0) => break, // EOF
+            Ok(n) => n,
+            Err(e) => {
+                let line_result = Err(e);
+                let current_filename = multi_reader.current_filename().map(|s| s.to_string());
+                match process_line_sequential(
+                    line_result,
+                    &mut line_num,
+                    &mut skipped_lines,
+                    pipeline,
+                    ctx,
+                    config,
+                    output,
+                    current_filename,
+                    &mut current_csv_headers,
+                    &mut last_filename,
+                )? {
+                    ProcessingResult::Continue => {}
+                    ProcessingResult::TakeLimitExhausted => break,
+                }
+
+                // Check for exit requested from Rhai scripts
+                if crate::rhai_functions::process::is_exit_requested() {
+                    let exit_code = crate::rhai_functions::process::get_exit_code();
+                    std::process::exit(exit_code);
+                }
+                continue;
+            }
+        };
+
+        if bytes_read > 0 {
+            let current_filename = multi_reader.current_filename().map(|s| s.to_string());
+            match process_line_sequential(
+                Ok(line_buf.clone()),
+                &mut line_num,
+                &mut skipped_lines,
+                pipeline,
+                ctx,
+                config,
+                output,
+                current_filename,
+                &mut current_csv_headers,
+                &mut last_filename,
+            )? {
+                ProcessingResult::Continue => {}
+                ProcessingResult::TakeLimitExhausted => break,
+            }
+
+            // Check for exit requested from Rhai scripts
+            if crate::rhai_functions::process::is_exit_requested() {
+                let exit_code = crate::rhai_functions::process::get_exit_code();
+                std::process::exit(exit_code);
+            }
+        }
+    }
+
+    // Flush any remaining chunks
+    let results = pipeline.flush(ctx)?;
+    for result in results {
+        if !result.is_empty() {
+            writeln!(output, "{}", result)?;
+        }
     }
 
     Ok(())

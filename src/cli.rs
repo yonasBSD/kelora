@@ -8,6 +8,7 @@ use clap::{ArgMatches, Parser};
 // CLI types - specific to command-line interface
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum InputFormat {
+    Auto,
     Jsonl,
     Line,
     Logfmt,
