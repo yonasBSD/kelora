@@ -446,10 +446,9 @@ invalid jsonl line
     // In resilient mode, invalid lines are skipped, not emitted as events
     // Check that both valid lines are properly formatted JSON
     for line in &lines {
-        serde_json::from_str::<serde_json::Value>(line).expect(&format!(
-            "All output lines should be valid JSON, but got: '{}'",
-            line
-        ));
+        serde_json::from_str::<serde_json::Value>(line).unwrap_or_else(|_| {
+            panic!("All output lines should be valid JSON, but got: '{}'", line)
+        });
     }
 
     // In resilient mode, parsing errors are handled silently by skipping invalid lines
@@ -597,11 +596,11 @@ fn test_parallel_sequential_equivalence() {
 
     // Verify both modes processed the same data successfully
     assert!(
-        seq_lines.len() > 0,
+        !seq_lines.is_empty(),
         "Sequential mode should produce some output"
     );
     assert!(
-        par_lines.len() > 0,
+        !par_lines.is_empty(),
         "Parallel mode should produce some output"
     );
 }
@@ -820,7 +819,7 @@ fn test_stdin_mixed_with_files() {
     } else {
         "./target/release/kelora"
     })
-    .args(&["-f", "jsonl", temp_file.path().to_str().unwrap(), "-"])
+    .args(["-f", "jsonl", temp_file.path().to_str().unwrap(), "-"])
     .stdin(Stdio::piped())
     .stdout(Stdio::piped())
     .stderr(Stdio::piped())

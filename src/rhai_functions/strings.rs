@@ -652,7 +652,7 @@ fn unflatten_map(flat_map: Map, separator: &str) -> Map {
 
     // First pass: analyze all keys to determine container types
     let mut key_analysis = std::collections::HashMap::new();
-    for (flat_key, _) in &flat_map {
+    for flat_key in flat_map.keys() {
         let parts: Vec<&str> = flat_key.split(separator).collect();
         analyze_key_path(&parts, &mut key_analysis, separator);
     }
@@ -1188,22 +1188,22 @@ mod tests {
         let result: bool = engine
             .eval_with_scope(&mut scope, r#"digits.is_digit()"#)
             .unwrap();
-        assert_eq!(result, true);
+        assert!(result);
 
         let result: bool = engine
             .eval_with_scope(&mut scope, r#"mixed.is_digit()"#)
             .unwrap();
-        assert_eq!(result, false);
+        assert!(!result);
 
         let result: bool = engine
             .eval_with_scope(&mut scope, r#"empty.is_digit()"#)
             .unwrap();
-        assert_eq!(result, false);
+        assert!(!result);
 
         let result: bool = engine
             .eval_with_scope(&mut scope, r#"letters.is_digit()"#)
             .unwrap();
-        assert_eq!(result, false);
+        assert!(!result);
     }
 
     #[test]

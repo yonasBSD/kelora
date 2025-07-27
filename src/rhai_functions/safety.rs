@@ -162,47 +162,26 @@ mod tests {
 
     #[test]
     fn test_to_bool() {
-        assert_eq!(
-            to_bool(Dynamic::from(true), Dynamic::from(false))
-                .as_bool()
-                .unwrap(),
-            true
-        );
-        assert_eq!(
-            to_bool(Dynamic::from("yes"), Dynamic::from(false))
-                .as_bool()
-                .unwrap(),
-            true
-        );
-        assert_eq!(
-            to_bool(Dynamic::from("1"), Dynamic::from(false))
-                .as_bool()
-                .unwrap(),
-            true
-        );
-        assert_eq!(
-            to_bool(Dynamic::from("false"), Dynamic::from(true))
-                .as_bool()
-                .unwrap(),
-            false
-        );
-        assert_eq!(
-            to_bool(Dynamic::from(1i64), Dynamic::from(false))
-                .as_bool()
-                .unwrap(),
-            true
-        );
-        assert_eq!(
-            to_bool(Dynamic::from(0i64), Dynamic::from(true))
-                .as_bool()
-                .unwrap(),
-            false
-        );
-        assert_eq!(
-            to_bool(Dynamic::from("invalid"), Dynamic::from(true))
-                .as_bool()
-                .unwrap(),
-            true
-        );
+        assert!(to_bool(Dynamic::from(true), Dynamic::from(false))
+            .as_bool()
+            .unwrap());
+        assert!(to_bool(Dynamic::from("yes"), Dynamic::from(false))
+            .as_bool()
+            .unwrap());
+        assert!(to_bool(Dynamic::from("1"), Dynamic::from(false))
+            .as_bool()
+            .unwrap());
+        assert!(!to_bool(Dynamic::from("false"), Dynamic::from(true))
+            .as_bool()
+            .unwrap());
+        assert!(to_bool(Dynamic::from(1i64), Dynamic::from(false))
+            .as_bool()
+            .unwrap());
+        assert!(!to_bool(Dynamic::from(0i64), Dynamic::from(true))
+            .as_bool()
+            .unwrap());
+        assert!(to_bool(Dynamic::from("invalid"), Dynamic::from(true))
+            .as_bool()
+            .unwrap());
     }
 }

@@ -111,7 +111,7 @@ mod tests {
         if let Some(map) = dynamic.clone().try_cast::<Map>() {
             assert_eq!(map.get("string").unwrap().clone().cast::<String>(), "hello");
             assert_eq!(map.get("number").unwrap().clone().cast::<i64>(), 42);
-            assert_eq!(map.get("boolean").unwrap().clone().cast::<bool>(), true);
+            assert!(map.get("boolean").unwrap().clone().cast::<bool>());
             assert!(map.get("null").unwrap().is_unit());
 
             // Test array conversion

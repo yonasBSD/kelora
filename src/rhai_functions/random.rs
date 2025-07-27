@@ -37,7 +37,7 @@ mod tests {
         for _ in 0..100 {
             let val = rand_float().unwrap();
             assert!(
-                val >= 0.0 && val < 1.0,
+                (0.0..1.0).contains(&val),
                 "rand() should return value in [0.0, 1.0), got {}",
                 val
             );
@@ -50,7 +50,7 @@ mod tests {
         for _ in 0..100 {
             let val = rand_int_range(1, 10).unwrap();
             assert!(
-                val >= 1 && val <= 10,
+                (1..=10).contains(&val),
                 "rand_int(1, 10) should return value in [1, 10], got {}",
                 val
             );
@@ -64,7 +64,7 @@ mod tests {
         for _ in 0..100 {
             let val = rand_int_range(-10, -1).unwrap();
             assert!(
-                val >= -10 && val <= -1,
+                (-10..=-1).contains(&val),
                 "rand_int(-10, -1) should return value in [-10, -1], got {}",
                 val
             );
