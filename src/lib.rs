@@ -475,6 +475,12 @@ pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) 
                 ProcessingResult::Continue => {}
                 ProcessingResult::TakeLimitExhausted => break,
             }
+
+            // Check for exit requested from Rhai scripts
+            if crate::rhai_functions::process::is_exit_requested() {
+                let exit_code = crate::rhai_functions::process::get_exit_code();
+                std::process::exit(exit_code);
+            }
         }
     } else {
         // File processing - with filename tracking
@@ -511,6 +517,12 @@ pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) 
                         ProcessingResult::Continue => {}
                         ProcessingResult::TakeLimitExhausted => break,
                     }
+
+                    // Check for exit requested from Rhai scripts
+                    if crate::rhai_functions::process::is_exit_requested() {
+                        let exit_code = crate::rhai_functions::process::get_exit_code();
+                        std::process::exit(exit_code);
+                    }
                     continue;
                 }
             };
@@ -531,6 +543,12 @@ pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) 
                 )? {
                     ProcessingResult::Continue => {}
                     ProcessingResult::TakeLimitExhausted => break,
+                }
+
+                // Check for exit requested from Rhai scripts
+                if crate::rhai_functions::process::is_exit_requested() {
+                    let exit_code = crate::rhai_functions::process::get_exit_code();
+                    std::process::exit(exit_code);
                 }
             }
         }

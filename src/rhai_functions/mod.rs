@@ -6,6 +6,7 @@ pub mod datetime;
 pub mod init;
 pub mod maps;
 pub mod math;
+pub mod process;
 pub mod random;
 pub mod safety;
 pub mod strings;
@@ -19,6 +20,7 @@ pub fn register_all_functions(engine: &mut Engine) {
     columns::register_functions(engine);
     maps::register_functions(engine);
     math::register_functions(engine);
+    process::register_functions(engine);
     random::register_functions(engine);
     datetime::register_functions(engine);
     window::register_functions(engine);

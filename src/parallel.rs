@@ -1111,6 +1111,12 @@ impl ParallelProcessor {
                         }
                     }
                 }
+
+                // Check for exit requested from Rhai scripts
+                if crate::rhai_functions::process::is_exit_requested() {
+                    let exit_code = crate::rhai_functions::process::get_exit_code();
+                    std::process::exit(exit_code);
+                }
             }
 
             // Calculate deltas for this batch
