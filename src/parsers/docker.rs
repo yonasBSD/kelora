@@ -155,16 +155,28 @@ impl DockerParser {
         let upper = s.to_uppercase();
         matches!(
             upper.as_str(),
-            "DEBUG"
+            "TRACE"
+                | "FINEST"
+                | "DEBUG"
+                | "DBG"
+                | "FINER"
+                | "CONFIG"
                 | "INFO"
+                | "INFORMATIONAL"
+                | "NOTICE"
                 | "WARN"
                 | "WARNING"
-                | "ERROR"
-                | "FATAL"
-                | "TRACE"
-                | "ERR"
-                | "DBG"
                 | "WRN"
+                | "ERROR"
+                | "ERR"
+                | "FATAL"
+                | "PANIC"
+                | "ALERT"
+                | "CRIT"
+                | "CRITICAL"
+                | "EMERG"
+                | "EMERGENCY"
+                | "SEVERE"
         )
     }
 
