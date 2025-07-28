@@ -431,16 +431,16 @@ mod tests {
     #[test]
     fn test_sorted_with_floats() {
         let mut arr = Array::new();
-        arr.push(Dynamic::from(3.14));
+        arr.push(Dynamic::from(std::f64::consts::PI));
         arr.push(Dynamic::from(1.5));
-        arr.push(Dynamic::from(2.718));
+        arr.push(Dynamic::from(std::f64::consts::E));
 
         let sorted = sorted_array(arr);
 
         assert_eq!(sorted.len(), 3);
         assert_eq!(sorted[0].as_float().unwrap(), 1.5);
-        assert_eq!(sorted[1].as_float().unwrap(), 2.718);
-        assert_eq!(sorted[2].as_float().unwrap(), 3.14);
+        assert_eq!(sorted[1].as_float().unwrap(), std::f64::consts::E);
+        assert_eq!(sorted[2].as_float().unwrap(), std::f64::consts::PI);
     }
 
     #[test]

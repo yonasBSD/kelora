@@ -31,16 +31,24 @@ impl DockerParser {
 
         // Try to extract timestamp from start of payload
         let (ts_str, remaining_msg) = Self::extract_timestamp_and_message(&payload);
-        
+
         // Try to extract log level from the remaining message
         let (level, msg) = Self::extract_log_level(remaining_msg);
 
         // Create event with appropriate capacity
         let capacity = if source.is_some() && ts_str.is_some() && level.is_some() {
             4
-        } else if [source.is_some(), ts_str.is_some(), level.is_some()].iter().filter(|&&x| x).count() == 2 {
+        } else if [source.is_some(), ts_str.is_some(), level.is_some()]
+            .iter()
+            .filter(|&&x| x)
+            .count()
+            == 2
+        {
             3
-        } else if [source.is_some(), ts_str.is_some(), level.is_some()].iter().any(|&x| x) {
+        } else if [source.is_some(), ts_str.is_some(), level.is_some()]
+            .iter()
+            .any(|&x| x)
+        {
             2
         } else {
             1
@@ -115,23 +123,24 @@ impl DockerParser {
     /// Extract log level from message if present
     /// Recognizes common log level patterns at the beginning of messages:
     /// - "INFO: message" -> (Some("INFO"), "message")
-    /// - "ERROR: something failed" -> (Some("ERROR"), "something failed") 
+    /// - "ERROR: something failed" -> (Some("ERROR"), "something failed")
     /// - "INFO:     INFO     07/28/2025..." -> (Some("INFO"), "INFO     07/28/2025...")
+    ///
     /// Returns (level, remaining_message)
     fn extract_log_level(msg: &str) -> (Option<String>, &str) {
         let msg = msg.trim();
-        
+
         // Look for level followed by colon
         if let Some(colon_pos) = msg.find(':') {
             let potential_level = msg[..colon_pos].trim();
             let remaining = msg[colon_pos + 1..].trim();
-            
+
             // Check if it looks like a log level (common levels)
             if Self::looks_like_log_level(potential_level) {
                 return (Some(potential_level.to_uppercase()), remaining);
             }
         }
-        
+
         // No level found
         (None, msg)
     }
@@ -142,11 +151,20 @@ impl DockerParser {
         if s.is_empty() || s.len() > 10 {
             return false;
         }
-        
+
         let upper = s.to_uppercase();
-        matches!(upper.as_str(), 
-            "DEBUG" | "INFO" | "WARN" | "WARNING" | "ERROR" | "FATAL" | "TRACE" |
-            "ERR" | "DBG" | "WRN"
+        matches!(
+            upper.as_str(),
+            "DEBUG"
+                | "INFO"
+                | "WARN"
+                | "WARNING"
+                | "ERROR"
+                | "FATAL"
+                | "TRACE"
+                | "ERR"
+                | "DBG"
+                | "WRN"
         )
     }
 
@@ -155,13 +173,13 @@ impl DockerParser {
     fn strip_ansi_codes(input: &str) -> String {
         let mut result = String::with_capacity(input.len());
         let mut chars = input.chars().peekable();
-        
+
         while let Some(ch) = chars.next() {
-            if ch == '\x1b' || ch == '\u{001b}' {
+            if ch == '\x1b' {
                 // Found escape character, look for '[' to start ANSI sequence
                 if chars.peek() == Some(&'[') {
                     chars.next(); // consume '['
-                    
+
                     // Skip until we find a letter (which ends the ANSI sequence)
                     while let Some(&next_ch) = chars.peek() {
                         chars.next();
@@ -177,7 +195,7 @@ impl DockerParser {
                 result.push(ch);
             }
         }
-        
+
         result
     }
 }
@@ -338,21 +356,39 @@ mod tests {
     #[test]
     fn test_ansi_color_stripping() {
         let parser = DockerParser::new();
-        
+
         // Test with ANSI color codes in message
         let line = "web_1 | 2024-07-27T12:34:56Z \x1b[32mINFO\x1b[0m: Application started";
         let result = parser.parse(line).unwrap();
-        
+
         assert_eq!(
-            result.fields.get("src").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("src")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "web_1"
         );
         assert_eq!(
-            result.fields.get("msg").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("msg")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "Application started"
         );
         assert_eq!(
-            result.fields.get("level").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("level")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "INFO"
         );
         assert!(result.fields.get("ts").is_some());
@@ -361,21 +397,39 @@ mod tests {
     #[test]
     fn test_ansi_color_stripping_complex() {
         let parser = DockerParser::new();
-        
+
         // Test with complex ANSI sequences (like your example)
         let line = "docker_compose-background-1 | 2025-07-28T10:14:19.885Z INFO: \x1b[32mtasks.py\x1b[0m:85 check_for_vespa_sync_task started";
         let result = parser.parse(line).unwrap();
-        
+
         assert_eq!(
-            result.fields.get("src").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("src")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "docker_compose-background-1"
         );
         assert_eq!(
-            result.fields.get("msg").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("msg")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "tasks.py:85 check_for_vespa_sync_task started"
         );
         assert_eq!(
-            result.fields.get("level").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("level")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "INFO"
         );
         assert!(result.fields.get("ts").is_some());
@@ -385,39 +439,72 @@ mod tests {
     fn test_strip_ansi_codes_unit() {
         // Test the strip function directly
         assert_eq!(DockerParser::strip_ansi_codes("normal text"), "normal text");
-        assert_eq!(DockerParser::strip_ansi_codes("\x1b[32mgreen\x1b[0m"), "green");
-        assert_eq!(DockerParser::strip_ansi_codes("\x1b[31;1mred bold\x1b[0m"), "red bold");
-        assert_eq!(DockerParser::strip_ansi_codes("prefix \x1b[33myellow\x1b[0m suffix"), "prefix yellow suffix");
+        assert_eq!(
+            DockerParser::strip_ansi_codes("\x1b[32mgreen\x1b[0m"),
+            "green"
+        );
+        assert_eq!(
+            DockerParser::strip_ansi_codes("\x1b[31;1mred bold\x1b[0m"),
+            "red bold"
+        );
+        assert_eq!(
+            DockerParser::strip_ansi_codes("prefix \x1b[33myellow\x1b[0m suffix"),
+            "prefix yellow suffix"
+        );
         assert_eq!(DockerParser::strip_ansi_codes("\x1b[0m"), "");
     }
 
     #[test]
     fn test_log_level_extraction() {
         let parser = DockerParser::new();
-        
+
         // Test with INFO level
         let line = "web-1 | 2024-07-27T12:34:56Z INFO: Application started successfully";
         let result = parser.parse(line).unwrap();
-        
+
         assert_eq!(
-            result.fields.get("level").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("level")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "INFO"
         );
         assert_eq!(
-            result.fields.get("msg").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("msg")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "Application started successfully"
         );
-        
+
         // Test with ERROR level
         let line = "api-1 | 2024-07-27T12:34:56Z ERROR: Database connection failed";
         let result = parser.parse(line).unwrap();
-        
+
         assert_eq!(
-            result.fields.get("level").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("level")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "ERROR"
         );
         assert_eq!(
-            result.fields.get("msg").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("msg")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "Database connection failed"
         );
     }
@@ -425,30 +512,54 @@ mod tests {
     #[test]
     fn test_log_level_extraction_your_format() {
         let parser = DockerParser::new();
-        
+
         // Test with your specific log format
         let line = "docker_compose-background-1 | 2025-07-28T10:14:19.885Z INFO:     INFO     07/28/2025 10:14:19 AM        tasks.py:85";
         let result = parser.parse(line).unwrap();
-        
+
         assert_eq!(
-            result.fields.get("level").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("level")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "INFO"
         );
         assert_eq!(
-            result.fields.get("msg").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("msg")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "INFO     07/28/2025 10:14:19 AM        tasks.py:85"
         );
-        
+
         // Test with WARNING level
         let line = "docker_compose-background-1 | 2025-07-28T10:14:24.438Z WARNING:  WARNING  07/28/2025 10:14:24 AM        tasks.py:397";
         let result = parser.parse(line).unwrap();
-        
+
         assert_eq!(
-            result.fields.get("level").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("level")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "WARNING"
         );
         assert_eq!(
-            result.fields.get("msg").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("msg")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "WARNING  07/28/2025 10:14:24 AM        tasks.py:397"
         );
     }
@@ -456,14 +567,20 @@ mod tests {
     #[test]
     fn test_no_log_level_extraction() {
         let parser = DockerParser::new();
-        
+
         // Test without log level
         let line = "web-1 | 2024-07-27T12:34:56Z Starting application on port 8080";
         let result = parser.parse(line).unwrap();
-        
+
         assert!(result.fields.get("level").is_none());
         assert_eq!(
-            result.fields.get("msg").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("msg")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "Starting application on port 8080"
         );
     }
@@ -471,14 +588,32 @@ mod tests {
     #[test]
     fn test_extract_log_level_unit() {
         // Test the extract function directly
-        assert_eq!(DockerParser::extract_log_level("INFO: message"), (Some("INFO".to_string()), "message"));
-        assert_eq!(DockerParser::extract_log_level("ERROR: failed"), (Some("ERROR".to_string()), "failed"));
-        assert_eq!(DockerParser::extract_log_level("debug: trace info"), (Some("DEBUG".to_string()), "trace info"));
-        assert_eq!(DockerParser::extract_log_level("Just a message"), (None, "Just a message"));
-        assert_eq!(DockerParser::extract_log_level("NOT_A_LEVEL: message"), (None, "NOT_A_LEVEL: message"));
-        
+        assert_eq!(
+            DockerParser::extract_log_level("INFO: message"),
+            (Some("INFO".to_string()), "message")
+        );
+        assert_eq!(
+            DockerParser::extract_log_level("ERROR: failed"),
+            (Some("ERROR".to_string()), "failed")
+        );
+        assert_eq!(
+            DockerParser::extract_log_level("debug: trace info"),
+            (Some("DEBUG".to_string()), "trace info")
+        );
+        assert_eq!(
+            DockerParser::extract_log_level("Just a message"),
+            (None, "Just a message")
+        );
+        assert_eq!(
+            DockerParser::extract_log_level("NOT_A_LEVEL: message"),
+            (None, "NOT_A_LEVEL: message")
+        );
+
         // Test edge cases
         assert_eq!(DockerParser::extract_log_level(""), (None, ""));
-        assert_eq!(DockerParser::extract_log_level("WARN:"), (Some("WARN".to_string()), ""));
+        assert_eq!(
+            DockerParser::extract_log_level("WARN:"),
+            (Some("WARN".to_string()), "")
+        );
     }
 }

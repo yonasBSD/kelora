@@ -144,8 +144,8 @@ mod tests {
         assert_eq!(result.as_int().unwrap(), 42i64);
 
         // Test float input
-        let result = to_number(Dynamic::from(3.14), Dynamic::from(0.0));
-        assert_eq!(result.as_float().unwrap(), 3.14);
+        let result = to_number(Dynamic::from(std::f64::consts::PI), Dynamic::from(0.0));
+        assert_eq!(result.as_float().unwrap(), std::f64::consts::PI);
 
         // Test string integer input
         let result = to_number(Dynamic::from("123"), Dynamic::from(0i64));
