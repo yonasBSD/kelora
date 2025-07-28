@@ -286,16 +286,17 @@ impl ScriptStage for KeyFilterStage {
         // Get available keys from the event
         let available_keys: Vec<String> = event.fields.keys().cloned().collect();
 
-        // Calculate effective keys using the same logic as before
+        // Calculate effective keys preserving the order specified by self.keys
         let effective_keys = {
             let mut result_keys = if self.keys.is_empty() {
                 // If no keys specified, start with all available keys
                 available_keys
             } else {
-                // If keys specified, filter available keys to only include those
-                available_keys
+                // If keys specified, iterate through self.keys and only include those that exist in the event
+                // This preserves the order specified in self.keys rather than the original event order
+                self.keys
                     .iter()
-                    .filter(|key| self.keys.contains(key))
+                    .filter(|key| available_keys.contains(key))
                     .cloned()
                     .collect()
             };
