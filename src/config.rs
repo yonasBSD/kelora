@@ -544,8 +544,12 @@ impl OutputConfig {
     pub fn get_effective_keys(&self) -> Vec<String> {
         if self.core {
             let mut keys = KeloraConfig::get_core_field_names();
-            // Add user-specified keys to the core fields
-            keys.extend(self.keys.clone());
+            // Add user-specified keys to the core fields, avoiding duplicates
+            for key in &self.keys {
+                if !keys.contains(key) {
+                    keys.push(key.clone());
+                }
+            }
             keys
         } else {
             self.keys.clone()

@@ -49,6 +49,14 @@ fn main() -> Result<()> {
     // Process command line arguments with config file support
     let (matches, cli) = process_args_with_config(&mut stderr);
 
+    // Validate CLI argument combinations
+    if let Err(e) = validate_cli_args(&cli) {
+        stderr
+            .writeln(&format!("kelora: Error: {}", e))
+            .unwrap_or(());
+        ExitCode::InvalidUsage.exit();
+    }
+
     // Extract ordered script stages
     let ordered_stages = match cli.get_ordered_script_stages(&matches) {
         Ok(stages) => stages,
@@ -313,6 +321,35 @@ fn validate_cli_args(cli: &Cli) -> Result<()> {
     // Validate thread count
     if cli.threads > 1000 {
         return Err(anyhow::anyhow!("Thread count too high (max 1000)"));
+    }
+
+    // Check for --core with CSV/TSV formats (not allowed with these formats)
+    if cli.core {
+        match cli.output_format {
+            OutputFormat::Csv => {
+                return Err(anyhow::anyhow!(
+                    "csv output format does not support --core flag. Use --keys to specify field names"
+                ));
+            }
+            OutputFormat::Tsv => {
+                return Err(anyhow::anyhow!(
+                    "tsv output format does not support --core flag. Use --keys to specify field names"
+                ));
+            }
+            OutputFormat::Csvnh => {
+                return Err(anyhow::anyhow!(
+                    "csvnh output format does not support --core flag. Use --keys to specify field names"
+                ));
+            }
+            OutputFormat::Tsvnh => {
+                return Err(anyhow::anyhow!(
+                    "tsvnh output format does not support --core flag. Use --keys to specify field names"
+                ));
+            }
+            _ => {
+                // Other formats are fine with --core
+            }
+        }
     }
 
     Ok(())
