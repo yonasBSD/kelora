@@ -1,215 +1,229 @@
 # Kelora
 
-Scriptable log processor for the command line. Treats logs as structured events and lets you filter, transform, and analyze them using [Rhai](https://rhai.rs) scripts.
+Scriptable log processor for the command line. Treats logs as structured events and lets you filter, transform, and analyze them using embedded [Rhai](https://rhai.rs) scripts with 40+ built-in functions.
+
+## How It Works
+
+Kelora parses log lines into structured events (`e.level`, `e.timestamp`, `e.message`), then processes them through a pipeline: filters decide which events to keep, exec scripts transform the data, and formatters produce output. It's a programmable Unix pipeline for log data.
 
 ## Quick Start
 
-Scripts use `e` to access the current log event - `e.status`, `e.level`, etc. are the actual fields from your logs.
-
 ```bash
-# Filter JSON logs with enrichment
+# Find all errors in the last hour
+kelora --since 1h -l error app.log
+
+# Filter and enrich JSON logs  
 kelora -f jsonl app.log --filter 'e.status >= 500' --exec 'e.severity = "critical"'
 
-# Pattern detection with sliding windows  
-kelora -f jsonl auth.log --window 3 --filter 'e.event == "login_failed"' \
-  --exec 'if window_values(window, "user").len() >= 2 { print("Brute force detected") }'
+# Count HTTP status codes with metrics
+kelora -f apache --exec 'track_count("status_" + e.status)' --metrics access.log
 
-# Real-time monitoring with parallelization
+# Real-time monitoring with pattern detection
 kubectl logs -f app | kelora -f jsonl --parallel --levels warn,error
 
-# Time-range analysis with metrics
-kelora -f syslog /var/log/messages --since "1 hour ago" \
-  --exec 'track_count(e.facility); track_unique("hosts", e.host)' --stats
-
-# Docker container monitoring
-docker compose logs --timestamps | kelora -f docker --filter 'e.msg.contains("error")' \
-  --exec 'e.service = e.src ?? "unknown"; print(`${e.service}: ${e.msg}`)'
+# Monitor for brute force attacks using sliding windows
+kelora -f jsonl auth.log --window 3 --filter 'e.event == "login_failed"' \
+  --exec 'if window_values(window, "user").len() >= 2 { print("🚨 Brute force detected from " + e.ip) }'
 ```
 
 ## Install
 
 ```bash
+# Install from crates.io
+cargo install kelora
+
+# Or build from source
 git clone https://github.com/dloss/kelora
 cd kelora
 cargo install --path .
 ```
 
-## Core Features
+Pre-built binaries are available in the [releases section](https://github.com/dloss/kelora/releases) of this GitHub repository.
 
-**Formats**: JSON, syslog, logfmt, CEF, CSV, TSV, Docker logs, raw lines with `.gz` support  
-**Processing**: Sliding windows, parallel/batch processing, multiline events  
-**Scripting**: Embedded Rhai with 40+ built-in functions for parsing, metrics, time handling  
-**Configuration**: Aliases and defaults via config files  
-**Error handling**: Resilient mode with robust error recovery, strict mode for fail-fast behavior
+## Core Concepts
 
-## Rhai Examples
+**Events** are structured objects created from log lines. Access fields like `e.level` or `e["content-type"]`, add new ones with `e.severity = "critical"`. Works like JSON objects your scripts can read and modify.
 
-```rhai
-// Filter and enrich
-e.level == "error" && e.response_time.to_int() > 1000
-e.severity = if e.status >= 500 { "critical" } else { "warning" }
+**Pipeline** processes data through independent stages: `Input → Parse → Filter → Transform → Format → Output`. Mix any parser with any script with any formatter.
 
-// Pattern detection
-let ips = window_values(window, "ip"); ips.contains("192.168.1.100")
+**Scripts** provide programmable logic:
+- **Filters**: Boolean expressions (`e.status >= 500`) that decide which events to keep
+- **Execs**: Transform statements (`e.category = "error"`) that modify events  
+- **Windows**: Access recent events (`window[1].user`) for pattern detection
 
-// Extract and transform  
-let user = e.line.extract_re("user=(\w+)"); 
-e.masked_ip = e.ip.mask_ip(2)
+## Common Tasks
 
-// Track metrics and use safety functions
-track_count("requests"); track_max("peak_latency", get_path(e, "duration_ms", 0))
-```
+**Finding Problems**: Filter by criteria with `--filter 'e.level == "error"'`, `--filter 'e.status >= 500'`, or time ranges like `--since 1h --levels error,fatal`.
 
-## Working with Events
+**Understanding Patterns**: Count and measure with `--exec 'track_count("by_status_" + e.status)'`, track averages with `track_avg("response_time", e.duration)`. View results with `--metrics` or `--stats`.
 
-The `e` variable represents the current event. Access fields directly (`e.level`) or use bracket notation for invalid identifiers (`e["content-type"]`). Add fields by assignment (`e.severity = "critical"`).
+**Detecting Sequences**: Use `--window N` to access recent events. Detect changes with `window[0].status != window[1].status` or patterns like `window_values(window, "user").len() >= 2` for repeated users.
 
-```rhai
-// Field access and modification
-e.level == "error"                        // Direct access
-e["user-agent"] = "kelora/1.0"           // Invalid identifiers need brackets
-e.processed = now_utc()                   // Add new fields
+**Transforming Data**: Add/modify fields with `--exec 'e.severity = if e.status >= 500 { "critical" } else { "normal" }'`. Chain transformations with multiple `--exec` statements.
 
-// Field and event removal with unit ()
-e.password = ()                           // Remove individual fields
-e = ()                                    // Remove entire event (clears all fields)
+## Input Formats
 
-// Method vs function style (both work, methods chain better)
-e.ip.mask_ip(2)                          // Method style
-mask_ip(e.ip, 2)                         // Function style (avoids conflicts)
+Each parser creates events with different fields:
 
-// Safety functions with fallbacks
-get_path(e, "user.profile.id", "unknown") // Safe nested access
-to_number(e.port, 80)                     // Safe conversion with default
-```
+|Format        |Fields Created                      |Example                              |
+|--------------|------------------------------------|------------------------------------|
+|`line`        |`line`                              |Raw log files                       |
+|`jsonl`       |All JSON keys                       |`{"level":"info","msg":"started"}`  |
+|`logfmt`      |Key-value pairs                     |`level=info msg="started" user=alice`|
+|`syslog`      |`timestamp`, `host`, `facility`, `message`|`Jan 15 14:30:45 host app: message`|
+|`cef`         |`vendor`, `product`, `severity` + extensions|ArcSight CEF logs               |
+|`csv/tsv`     |Column headers as fields            |Structured data files               |
+|`apache/nginx`|`remote_addr`, `status`, `request`, `response_time`|Web server logs       |
 
-## Common Use Cases
+All formats support gzip compression. Use `-f format` to specify.
 
-```bash
-# Error analysis with time grouping
-kelora -f jsonl api.log --filter 'e.level == "error"' \
-  --exec 'track_count("errors_" + parse_timestamp(e.ts).format("%H"))' --stats
+## Built-in Functions
 
-# Convert formats with field selection  
-kelora -f syslog /var/log/messages -F csv --keys timestamp,host,message
+**Text Extraction**: `extract_re(pattern)` finds regex matches, `extract_ip()` pulls IP addresses, `parse_kv("=", ";")` converts key-value pairs to fields.
 
-# Docker container log analysis
-docker compose logs --timestamps | kelora -f docker \
-  --filter 'e.src == "web" && e.msg.contains("500")' --exec 'print(`Error in ${e.src}: ${e.msg}`)'
+**Safe Conversion**: `to_number()`, `to_bool()` safely convert types, `mask_ip(octets)` anonymizes IPs, `upper()`, `lower()`, `trim()` normalize text.
 
-# Strict mode for validation (fail-fast on errors)
-kelora -f jsonl mixed.log --strict --filter 'e.level == "error"'
+**Time Operations**: `parse_timestamp(string, format, timezone)` handles custom timestamps, `parse_duration("5m")` converts to seconds, `now_utc()` gets current time.
 
-# Performance testing with output suppression
-kelora -f jsonl huge.log --parallel -F null --filter 'e.status != 200'
-
-# Multiline processing (stack traces)  
-kelora -f line app.log --multiline indent --filter 'e.line.contains("Exception")'
-
-# Field selection and filtering
-kelora -f auto app.log -k user_id,action,ip    # Select custom fields for analysis
-kelora -f auto app.log -K password,secret      # Exclude sensitive fields
-kelora -f auto app.log -l error,warn           # Include only error/warning levels
-kelora -f auto app.log -L debug,trace          # Exclude debug/trace levels
-
-# Output formatting
-kelora -f auto app.log -c              # Core fields only
-kelora -f auto app.log -cb             # Core fields, brief format (often combined)
-kelora -f auto app.log -S              # Stats only, no events
-
-# Output control for automation
-kelora -f auto app.log --filter 'e.level == "error"' -F hide  # Suppress output, keep side effects
-
-# Configuration aliases
-kelora -a slow-requests access.log  # From ~/.config/kelora/config.ini
-```
-
-## Key Options
-
-| Flag | Purpose | Example |
-|------|---------|---------|
-| `-f FORMAT` | Input format | `jsonl`, `syslog`, `csv`, `docker`, `auto` (detects from first line) |
-| `-F FORMAT` | Output format | `jsonl`, `csv`, `logfmt`, `null`, `hide` |
-| `--filter EXPR` | Include matching events | `e.level == "error"` |
-| `--exec SCRIPT` | Transform events | `e.type = "slow"` |
-| `-c, --core` | Output only core fields | Essential fields only |
-| `-b, --brief` | Output only field values | No field names, just values |
-| `-l LEVELS` | Include only these log levels | `-l error,warn` |
-| `-L LEVELS` | Exclude these log levels | `-L debug,trace` |
-| `-k FIELDS` | Output only specific fields | `-k timestamp,level,msg` |
-| `-K FIELDS` | Exclude specific fields | `-K password,secret` |
-| `-S, --stats-only` | Show stats with no output | Stats only, no events |
-| `--window N` | Sliding window size | `--window 5` |
-| `--parallel` | Parallel processing | Higher throughput |
-| `--since/--until` | Time filtering | `"2024-01-01"`, `"1 hour ago"` |
-| `--strict` | Fail-fast error handling | Abort on first error |
-| `--verbose` | Detailed error information | Show error details |
-
-See `kelora --help` for the complete reference.
-
-## Configuration
-
-Create `~/.config/kelora/config.ini` for defaults and aliases:
-
-```ini
-[defaults]
-format = auto        # Auto-detect input format from first line
-stats = true         # Always show stats
-parallel = true      # Use parallel processing
-
-[alias.errors]
-format = auto
-filter = e.level == "error"
-keys = timestamp,level,msg
-stats = true
-
-[alias.slow-requests]  
-format = auto
-filter = e.response_time.to_int() > 1000
-exec = e.severity = "slow"
-```
+**Metrics**: `track_count(key)` increments counters, `track_sum/avg/min/max(key, value)` accumulate statistics, `track_unique(key, value)` counts distinct values. Access via `tracked` map in `--end` scripts or display with `--metrics`.
 
 ## Advanced Features
 
-**Window Analysis**: Detect patterns across event sequences with `--window N`
+### Window Analysis
+Access recent events with `--window N`. Use `window[0]` (current), `window[1]` (previous), etc. Window helper: `window_values(window, "field")` extracts field values from all events.
+
 ```bash
-kelora -f jsonl app.log --window 2 --exec 'if window[1].status != e.status { print("Status changed") }'
+# Detect status changes
+kelora --window 2 --exec 'if window[0].status != window[1].status { print("Status changed") }' app.log
+
+# Brute force detection (3+ failures from same IP)
+kelora --window 5 --filter 'e.event == "login_failed"' \
+  --exec 'let ips = window_values(window, "ip"); if ips.len() >= 3 { print("Brute force: " + e.ip) }' auth.log
 ```
 
-**Timezone Handling**: Parse input in one timezone, display in another  
+### Multi-Stage Processing
+Chain filters and execs in any order for complex pipelines:
+
 ```bash
-kelora -f jsonl app.log --input-tz Europe/Berlin -Z  # Parse as Berlin, display as UTC
+# Error analysis: filter → extract → classify → count
+kelora --filter 'e.level == "error"' \
+       --exec 'e.error_class = e.message.extract_re("(\\w+Error)")' \
+       --filter 'e.error_class != ""' \
+       --exec 'track_count("by_class_" + e.error_class)' \
+       --metrics app.log
 ```
 
-**Built-in Functions**: 40+ functions for string processing, time parsing, metrics tracking
-- String: `extract_re()`, `extract_ip()`, `mask_ip()`  
-- Time: `parse_timestamp()`, `parse_duration()`, `now_utc()`
-- Data: `parse_json()`, `parse_kv()`, `get_path()`, `has_path()`, `path_equals()`
-- Safety: `to_number()`, `to_bool()` for robust type conversion
-- Metrics: `track_count()`, `track_max()`, `track_unique()`
+### Output Control
+- **Fields**: `-k field1,field2` (include only), `-K field3` (exclude), `-c` (core fields only), `-b` (brief/values only)
+- **Levels**: `-l error,warn` (include), `-L debug,trace` (exclude)  
+- **Time**: `--since 1h`, `--until 5m`, `--since "2024-01-15 14:00"`
+- **Formats**: `-F jsonl|logfmt|csv|hide` (default is colored logfmt)
 
-**Error Handling Modes**:
-- **Resilient** (default): Skip errors, continue processing, show summary at end
-- **Strict** (`--strict`): Fail-fast on any error with immediate error display
-- Context-specific: Parsing errors skip lines, filter errors skip events, exec errors roll back changes
+### Performance & Configuration
+- **Processing**: `--parallel` for batch files (2-10x faster), `--threads N`, `--batch-size N`
+- **Timezones**: `--input-tz Europe/Berlin` (parse), `-z` (display local), `-Z` (display UTC)  
+- **Multiline**: `-M timestamp` (Java stacks), `-M indent` (continuation lines), `-M backslash` (line continuation)
+- **Scripts**: `-E script.rhai` (from file), `--begin 'init.config = ...'` (initialization), `--end 'print(tracked.total)'` (final reporting)
+- **Error Handling**: Default is resilient (skip errors), `--strict` for fail-fast, `--verbose` for details
+- **Config**: `~/.config/kelora/config.toml` for defaults and aliases, `--show-config` to view
+
+## Complete Examples
+
+### End-to-End Log Analysis Pipeline
+
+```bash
+# Real-time nginx monitoring: stdin → filter → transform → metrics → alert
+tail -f /var/log/nginx/access.log | \
+  kelora -f apache \
+    --exec 'e.status_class = if e.status >= 500 { "error" } else if e.status >= 400 { "client_error" } else { "ok" }' \
+    --filter 'e.status >= 400' \
+    --exec 'track_count("errors"); track_unique("error_ips", e.remote_addr); track_avg("error_response_time", e.response_time)' \
+    --exec 'if e.status >= 500 { print("🚨 SERVER ERROR: " + e.status + " from " + e.remote_addr + " - " + e.request) }' \
+    --metrics
+```
+
+### Security Analysis
+
+```bash
+# Comprehensive authentication monitoring
+kelora -f jsonl auth.log \
+  --exec 'track_count("total_attempts"); track_unique("attempted_users", e.username)' \
+  --filter 'e.auth_result == "failed"' \
+  --exec 'track_count("failed_attempts"); track_unique("failed_ips", e.remote_addr)' \
+  --window 5 \
+  --exec 'let recent_failures = 0;
+           for event in window { if event.auth_result == "failed" && event.remote_addr == e.remote_addr { recent_failures += 1; } }
+           if recent_failures >= 3 { print("🚨 BRUTE FORCE: " + e.remote_addr + " - " + recent_failures + " failures") }' \
+  --metrics
+```
+
+### Data Transformation
+
+```bash
+# Convert and enrich syslog to structured JSON
+kelora -f syslog -F jsonl /var/log/messages \
+  --exec 'e.severity_level = if e.severity <= 3 { "critical" } else if e.severity <= 4 { "error" } else { "info" }' \
+  --exec 'e.masked_host = e.host.mask_ip(1)' \
+  --exec 'e.processed_at = now_utc()' \
+  > structured-logs.jsonl
+```
+
+## Learning Kelora (Recommended Path)
+
+### Start Here: The Essentials
+1. **Events** - understand that logs become structured objects (`e.field`)
+2. **Parsing** - see how different formats create different fields (`-f jsonl`, `-f apache`)
+3. **Basic Scripts** - learn to filter (`--filter`) and transform (`--exec`)
+
+### Next: Real-World Usage  
+4. **Metrics** - track counts and calculations across events (`track_count`, `--metrics`)
+5. **Pipelines** - combine multiple processing steps (multiple `--filter` and `--exec`)
+6. **Output Formats** - control how results are displayed (`-F jsonl`, `-k field1,field2`)
+
+### Advanced: Pattern Detection
+7. **Windows** - access sequences of events for pattern matching (`--window N`)
+8. **Multi-stage Processing** - complex analysis pipelines with initialization (`--begin`, `--end`)
+
+**Why This Order**: Each concept builds naturally on the previous ones. You can't understand windows without understanding events, but you can use events productively without ever learning about windows.
 
 ## Help & Documentation
 
 ```bash
-kelora --help           # CLI reference
-kelora --help-rhai      # Rhai scripting guide
-kelora --help-functions # Available Rhai functions
-kelora --help-time      # Timestamp format guide
-kelora --show-config    # Current configuration
+kelora --help              # Full CLI reference
+kelora --help-time         # Timestamp format guide
+kelora --help-rhai         # Rhai scripting reference  
+kelora --help-functions    # Built-in function reference
+kelora --show-config       # Current configuration
 ```
 
-## Not a Replacement For
+## Kelora vs Other Tools (When to Use What)
 
-* Log browsing: Use `lnav` 
-* Full-text search: Use `ripgrep` 
-* Dashboards: Use Grafana/Kibana 
-* JSON pipelines: Use `jq`
+**Kelora's Purpose**: Transform and analyze structured log events with programmable logic
 
----
+**Choose Kelora When**: You need to filter, transform, or analyze log data programmatically
 
-**License**: [MIT](LICENSE)
+**Choose Other Tools When**:
+- **Browsing/Exploring** → `lnav`: Purpose is interactive log exploration with syntax highlighting
+- **Simple Text Search** → `ripgrep`: Purpose is fast pattern matching across files  
+- **Complex JSON** → `jq`: Purpose is sophisticated JSON querying and transformation
+- **Visualization** → Grafana: Purpose is creating dashboards and charts
+- **Log Collection** → Fluentd: Purpose is shipping logs between systems
+
+**The Independence Principle**: You can pipe Kelora's output to these tools - they complement rather than compete with each other.
+
+### Similar Tools in the Log Processing Space
+
+**Log Processing**:
+
+- [angle-grinder](https://github.com/rcoh/angle-grinder) - Rust-based log processor with query syntax
+- [lnav](https://github.com/tstack/lnav) - Advanced log viewer with many formats
+- [pq](https://github.com/iximiuz/pq) - Log parser and query tool
+
+**Text Processing**:
+
+- [Miller](https://github.com/johnkerl/miller) - Name-indexed data processor (CSV, JSON, etc.)
+- [jq](https://jqlang.github.io/jq/) - JSON processor and query language
+
+## License
+
+[MIT](LICENSE) - See LICENSE file for details.
