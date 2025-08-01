@@ -44,7 +44,7 @@ use super::{
     StdoutWriter, TakeNLimiter, TimestampFilterStage,
 };
 use crate::decompression::DecompressionReader;
-use crate::engine::RhaiEngine;
+use crate::engine::{RhaiEngine, DebugConfig};
 use crate::readers::{ChannelStdinReader, MultiFileReader};
 
 /// Pipeline builder for easy construction from CLI arguments
@@ -83,7 +83,8 @@ impl PipelineBuilder {
                 color_mode: crate::config::ColorMode::Auto,
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
-                verbose: false,
+                debug: false,
+                verbose: 0,
                 quiet: false,
                 no_emoji: false,
             },
@@ -119,6 +120,10 @@ impl PipelineBuilder {
         stages: Vec<crate::config::ScriptStageType>,
     ) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
+        
+        // Set up debugging if enabled
+        let debug_config = DebugConfig::new(self.config.debug, self.config.verbose);
+        rhai_engine.setup_debugging(debug_config);
 
         // Create parser
         let base_parser: Box<dyn EventParser> = match self.input_format {
@@ -366,6 +371,10 @@ impl PipelineBuilder {
         stages: Vec<crate::config::ScriptStageType>,
     ) -> Result<(Pipeline, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
+        
+        // Set up debugging if enabled
+        let debug_config = DebugConfig::new(self.config.debug, self.config.verbose);
+        rhai_engine.setup_debugging(debug_config);
 
         // Create parser (with pre-processed CSV headers if available)
         let base_parser: Box<dyn EventParser> = match self.input_format {
@@ -632,6 +641,7 @@ pub fn create_pipeline_builder_from_config(
         color_mode: config.output.color.clone(),
         timestamp_formatting: config.output.timestamp_formatting.clone(),
         strict: config.processing.strict,
+        debug: config.processing.debug,
         verbose: config.processing.verbose,
         quiet: config.processing.quiet,
         no_emoji: config.output.no_emoji,

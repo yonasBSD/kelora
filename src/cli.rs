@@ -141,9 +141,13 @@ pub struct Cli {
     #[arg(long = "strict", help_heading = "Error Handling")]
     pub strict: bool,
 
-    /// Show detailed error information
-    #[arg(short = 'v', long = "verbose", help_heading = "Error Handling")]
-    pub verbose: bool,
+    /// Enable debug output
+    #[arg(long = "debug", help_heading = "Error Handling")]
+    pub debug: bool,
+
+    /// Show detailed error information (use multiple times for more verbosity: -v, -vv, -vvv)
+    #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count, help_heading = "Error Handling")]
+    pub verbose: u8,
 
     /// Suppress all kelora output (events, errors, stats) but preserve script side effects
     #[arg(short = 'q', long = "quiet", help_heading = "Error Handling")]

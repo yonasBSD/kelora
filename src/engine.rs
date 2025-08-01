@@ -3,10 +3,135 @@ use anyhow::{Context, Result};
 use rhai::{Dynamic, Engine, EvalAltResult, Scope, AST};
 use std::collections::HashMap;
 
+use rhai::debugger::{DebuggerCommand, DebuggerEvent};
+
 use crate::event::Event;
 use crate::rhai_functions;
 
 use rhai::Map;
+
+// Temporary debug types until module structure is fixed
+#[derive(Debug, Clone)]
+pub struct DebugConfig {
+    pub enabled: bool,
+    pub verbosity: u8,
+    pub show_timing: bool,
+    pub trace_events: bool,
+}
+
+impl DebugConfig {
+    pub fn new(debug: bool, verbose_count: u8) -> Self {
+        DebugConfig {
+            enabled: debug,
+            verbosity: if debug { verbose_count } else { 0 },
+            show_timing: debug,
+            trace_events: verbose_count >= 2,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ExecutionContext {
+    pub position: Option<rhai::Position>,
+    pub source_snippet: Option<String>,
+    pub last_operation: Option<String>,
+    pub error_location: Option<String>,
+}
+
+use std::sync::{Arc, Mutex};
+pub struct DebugTracker {
+    pub config: DebugConfig,
+    context: Arc<Mutex<ExecutionContext>>,
+    event_count: Arc<Mutex<u64>>,
+    error_count: Arc<Mutex<u64>>,
+}
+
+impl DebugTracker {
+    pub fn new(config: DebugConfig) -> Self {
+        DebugTracker {
+            config,
+            context: Arc::new(Mutex::new(ExecutionContext::default())),
+            event_count: Arc::new(Mutex::new(0)),
+            error_count: Arc::new(Mutex::new(0)),
+        }
+    }
+    
+    pub fn log_basic(&self, message: &str) {
+        if self.config.enabled {
+            eprintln!("Debug: {}", message);
+        }
+    }
+    
+    pub fn update_context(&self, position: Option<rhai::Position>, source: Option<&str>) {
+        if self.config.enabled {
+            if let Ok(mut ctx) = self.context.lock() {
+                ctx.position = position;
+                ctx.source_snippet = source.map(|s| s.to_string());
+            }
+        }
+    }
+    
+    pub fn get_context(&self) -> ExecutionContext {
+        if let Ok(ctx) = self.context.lock() {
+            ctx.clone()
+        } else {
+            ExecutionContext::default()
+        }
+    }
+}
+
+impl Clone for DebugTracker {
+    fn clone(&self) -> Self {
+        DebugTracker {
+            config: self.config.clone(),
+            context: Arc::clone(&self.context),
+            event_count: Arc::clone(&self.event_count),
+            error_count: Arc::clone(&self.error_count),
+        }
+    }
+}
+
+pub struct ErrorEnhancer {
+    debug_config: DebugConfig,
+}
+
+impl ErrorEnhancer {
+    pub fn new(debug_config: DebugConfig) -> Self {
+        ErrorEnhancer { debug_config }
+    }
+    
+    pub fn enhance_error(&self, 
+        error: &EvalAltResult, 
+        scope: &Scope, 
+        script: &str,
+        stage: &str,
+        _execution_context: &ExecutionContext
+    ) -> String {
+        let mut output = String::new();
+        
+        // Basic error info
+        output.push_str(&format!("❌ Stage {} failed\n", stage));
+        output.push_str(&format!("   Code: {}\n", script.trim()));
+        output.push_str(&format!("   Error: {}\n", error));
+        
+        // Show scope information if debug enabled
+        if self.debug_config.enabled {
+            output.push_str("\n   Variables in scope:\n");
+            for (name, _is_const, value) in scope.iter() {
+                let preview = format!("{:?}", value);
+                let preview = if preview.len() > 50 {
+                    format!("{}...", &preview[..47])
+                } else {
+                    preview
+                };
+                output.push_str(&format!("   • {}: {} = {}\n", 
+                    name, value.type_name(), preview));
+            }
+        }
+        
+        output
+    }
+}
 
 #[derive(Clone)]
 pub struct CompiledExpression {
@@ -23,6 +148,7 @@ pub struct RhaiEngine {
     scope_template: Scope<'static>,
     suppress_side_effects: bool,
     init_map: Option<rhai::Map>,
+    debug_tracker: Option<DebugTracker>,
 }
 
 impl Clone for RhaiEngine {
@@ -56,6 +182,7 @@ impl Clone for RhaiEngine {
             scope_template: self.scope_template.clone(),
             suppress_side_effects,
             init_map: self.init_map.clone(),
+            debug_tracker: self.debug_tracker.clone(),
         }
     }
 }
@@ -417,7 +544,42 @@ impl RhaiEngine {
             scope_template,
             suppress_side_effects: false,
             init_map: None,
+            debug_tracker: None,
         }
+    }
+
+    /// Set up debugging with the provided configuration
+    pub fn setup_debugging(&mut self, debug_config: DebugConfig) {
+        if !debug_config.enabled {
+            return;
+        }
+
+        self.debug_tracker = Some(DebugTracker::new(debug_config.clone()));
+
+        let debug_tracker = self.debug_tracker.as_ref().unwrap().clone();
+        self.engine.register_debugger(
+            |_engine, debugger| {
+                // Initialize debugger - no breakpoints for now in Phase 1
+                debugger
+            },
+            move |_context, event, _node, source, pos| {
+                // Update execution context
+                debug_tracker.update_context(Some(pos), source);
+                
+                // Basic event logging for Phase 1
+                match event {
+                    DebuggerEvent::Start => {
+                        debug_tracker.log_basic("Script execution started");
+                    },
+                    DebuggerEvent::End => {
+                        debug_tracker.log_basic("Script execution completed");
+                    },
+                    _ => {} // Handle more events in later phases
+                }
+                
+                Ok(DebuggerCommand::Continue)
+            }
+        );
     }
 
     /// Set whether to suppress side effects (print, eprint, etc.)
@@ -502,7 +664,13 @@ impl RhaiEngine {
             .engine
             .eval_expression_with_scope::<bool>(&mut scope, &compiled.expr)
             .map_err(|e| {
-                let detailed_msg = Self::format_rhai_error(e, "filter expression", &compiled.expr);
+                let detailed_msg = if let Some(ref debug_tracker) = self.debug_tracker {
+                    let enhancer = ErrorEnhancer::new(debug_tracker.config.clone());
+                    let context = debug_tracker.get_context();
+                    enhancer.enhance_error(&e, &scope, &compiled.expr, "filter", &context)
+                } else {
+                    Self::format_rhai_error(e, "filter expression", &compiled.expr)
+                };
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 
@@ -523,7 +691,13 @@ impl RhaiEngine {
             .engine
             .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
             .map_err(|e| {
-                let detailed_msg = Self::format_rhai_error(e, "exec script", &compiled.expr);
+                let detailed_msg = if let Some(ref debug_tracker) = self.debug_tracker {
+                    let enhancer = ErrorEnhancer::new(debug_tracker.config.clone());
+                    let context = debug_tracker.get_context();
+                    enhancer.enhance_error(&e, &scope, &compiled.expr, "exec", &context)
+                } else {
+                    Self::format_rhai_error(e, "exec script", &compiled.expr)
+                };
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 

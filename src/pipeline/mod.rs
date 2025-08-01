@@ -157,9 +157,11 @@ pub struct PipelineConfig {
     pub timestamp_formatting: crate::config::TimestampFormatConfig,
     /// Exit on first error (fail-fast behavior) - new resiliency model
     pub strict: bool,
-    /// Show detailed error information - new resiliency model
+    /// Enable debug output
+    pub debug: bool,
+    /// Show detailed error information - new resiliency model (levels: 0-3)
     #[allow(dead_code)] // Planned feature for verbose error reporting
-    pub verbose: bool,
+    pub verbose: u8,
     /// Suppress error summary (quiet mode) - new resiliency model
     pub quiet: bool,
     /// Disable emoji in error output

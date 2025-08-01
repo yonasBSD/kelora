@@ -17,7 +17,7 @@ chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10"
 regex = "1.10"
 anyhow = "1.0"
-rhai = { version = "1.22", features = ["sync"] }
+rhai = { version = "1.22", features = ["sync", "debugging"] }
 crossbeam-channel = "0.5"
 num_cpus = "1.16"
 is-terminal = "0.4"
@@ -37,3 +37,5 @@ html-escape = "0.2"
 
 [dev-dependencies]
 tempfile = "3.8"
+
+

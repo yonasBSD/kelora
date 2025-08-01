@@ -13,7 +13,7 @@ pub fn track_error(
     error_type: &str,
     line_num: Option<usize>,
     message: &str,
-    verbose: bool,
+    verbose: u8,
     quiet: bool,
     config: Option<&crate::pipeline::PipelineConfig>,
 ) {
@@ -38,7 +38,7 @@ pub fn track_error(
         state.insert(format!("__op_{}", count_key), Dynamic::from("count"));
 
         // Output verbose errors - use ordered capture system for proper interleaving
-        if verbose && !quiet {
+        if verbose > 0 && !quiet {
             let formatted_error = crate::config::format_verbose_error_with_pipeline_config(
                 line_num,
                 &format!("{} error", error_type),
@@ -100,7 +100,7 @@ pub fn has_errors_in_tracking(tracked: &HashMap<String, Dynamic>) -> bool {
 #[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
 pub fn extract_error_summary_from_tracking(
     tracked: &HashMap<String, Dynamic>,
-    verbose: bool,
+    verbose: u8,
 ) -> Option<String> {
     let mut total_errors = 0;
     let mut error_types = Vec::new();
@@ -123,7 +123,7 @@ pub fn extract_error_summary_from_tracking(
     }
 
     // In verbose mode, also collect samples
-    if verbose {
+    if verbose > 0 {
         for (key, value) in tracked {
             if let Some(_error_type) = key.strip_prefix("__kelora_error_samples_") {
                 if let Ok(sample_array) = value.clone().into_array() {
@@ -173,7 +173,7 @@ pub fn extract_error_summary_from_tracking(
     }
 
     // Add samples in verbose mode
-    if verbose && !samples.is_empty() {
+    if verbose > 0 && !samples.is_empty() {
         summary.push_str("\n\nError examples:");
         for sample in samples {
             summary.push_str(&format!("\n  {}", sample));

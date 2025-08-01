@@ -44,7 +44,8 @@ pub struct PipelineProcessingConfig {
     pub timestamp_filter: Option<config::TimestampFilterConfig>,
     pub take_limit: Option<usize>,
     pub strict: bool,
-    pub verbose: bool,
+    pub debug: bool,
+    pub verbose: u8,
     pub quiet: bool,
 }
 
@@ -83,6 +84,7 @@ impl PipelineConfig {
                 timestamp_filter: config.processing.timestamp_filter.clone(),
                 take_limit: config.processing.take_limit,
                 strict: config.processing.strict,
+                debug: config.processing.debug,
                 verbose: config.processing.verbose,
                 quiet: config.processing.quiet,
             },
@@ -125,6 +127,7 @@ pub mod cli;
 mod colors;
 mod config;
 mod config_file;
+pub mod debug;
 mod decompression;
 mod engine;
 mod event;
@@ -354,6 +357,7 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
             timestamp_filter: final_config.processing.timestamp_filter.clone(),
             take_limit: final_config.processing.take_limit,
             strict: final_config.processing.strict,
+            debug: final_config.processing.debug,
             verbose: final_config.processing.verbose,
             quiet: final_config.processing.quiet,
         },
@@ -494,6 +498,7 @@ pub fn run_pipeline_sequential_with_config<W: Write>(
             timestamp_filter: config.processing.timestamp_filter.clone(),
             take_limit: config.processing.take_limit,
             strict: config.processing.strict,
+            debug: config.processing.debug,
             verbose: config.processing.verbose,
             quiet: config.processing.quiet,
         },

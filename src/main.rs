@@ -769,8 +769,8 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
     }
 
     if let Some(verbose) = config_file.defaults.get("verbose") {
-        if !cli.verbose && verbose.parse::<bool>().unwrap_or(false) {
-            cli.verbose = true;
+        if cli.verbose == 0 && verbose.parse::<bool>().unwrap_or(false) {
+            cli.verbose = 1;
         }
     }
 
