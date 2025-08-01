@@ -54,7 +54,7 @@ impl DebugTracker {
     }
     
     pub fn log_basic(&self, message: &str) {
-        if self.config.enabled {
+        if self.config.enabled && self.config.verbosity >= 1 {
             eprintln!("Debug: {}", message);
         }
     }

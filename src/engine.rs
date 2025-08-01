@@ -321,7 +321,7 @@ impl ErrorEnhancer {
     fn has_common_prefix(&self, s1: &str, s2: &str) -> bool {
         if s1.len() < 2 || s2.len() < 2 { return false; }
         let prefix_len = 2.min(s1.len()).min(s2.len());
-        &s1[..prefix_len] == &s2[..prefix_len]
+        s1[..prefix_len] == s2[..prefix_len]
     }
     
     fn get_stage_help(&self, stage: &str, error: &EvalAltResult) -> String {
@@ -335,11 +335,8 @@ impl ErrorEnhancer {
                 help.push_str("   • Use 'e[\"field-with-special-chars\"]' for complex field names\n");
                 help.push_str("   • Use 'if \"field\" in e { ... }' to check field existence\n");
                 
-                match error {
-                    EvalAltResult::ErrorMismatchDataType(_, _, _) => {
-                        help.push_str("   • Remember: filters need boolean results, not strings or numbers\n");
-                    },
-                    _ => {}
+                if let EvalAltResult::ErrorMismatchDataType(_, _, _) = error {
+                    help.push_str("   • Remember: filters need boolean results, not strings or numbers\n");
                 }
             },
             "exec" => {
