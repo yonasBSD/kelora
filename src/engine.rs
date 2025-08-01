@@ -57,8 +57,59 @@ impl DebugTracker {
     }
     
     pub fn log_basic(&self, message: &str) {
-        if self.config.enabled {
+        if self.config.enabled && self.config.verbosity >= 1 {
             eprintln!("Debug: {}", message);
+        }
+    }
+    
+    pub fn log_detailed(&self, stage: &str, event_num: u64, operation: &str) {
+        if self.config.enabled && self.config.verbosity >= 2 {
+            eprintln!("Trace: Event #{} {} → {}", event_num, stage, operation);
+        }
+    }
+    
+    pub fn log_step(&self, step_info: &str, result: &str) {
+        if self.config.enabled && self.config.verbosity >= 3 {
+            eprintln!("  → {} → {}", step_info, result);
+        }
+    }
+    
+    pub fn log_execution_start(&self, stage: &str, script: &str, event_data: &str) {
+        match self.config.verbosity {
+            1 => {
+                if self.config.enabled {
+                    eprintln!("Debug: Executing {} stage", stage);
+                }
+            },
+            2 => {
+                if self.config.enabled {
+                    eprintln!("Debug: {} execution started", stage);
+                    eprintln!("  Script: {}", self.truncate_for_display(script, 100));
+                }
+            },
+            3.. => {
+                if self.config.enabled {
+                    eprintln!("Debug: {} execution trace:", stage);
+                    eprintln!("  Script: {}", script.trim());
+                    eprintln!("  Event: {}", self.truncate_for_display(event_data, 150));
+                }
+            },
+            _ => {}
+        }
+    }
+    
+    pub fn log_execution_result(&self, stage: &str, success: bool, result_info: &str) {
+        if self.config.enabled && self.config.verbosity >= 2 {
+            let status = if success { "✓" } else { "✗" };
+            eprintln!("Debug: {} {} ({})", stage, status, result_info);
+        }
+    }
+    
+    fn truncate_for_display(&self, text: &str, max_len: usize) -> String {
+        if text.len() > max_len {
+            format!("{}...", &text[..max_len-3])
+        } else {
+            text.to_string()
         }
     }
     
@@ -105,7 +156,7 @@ impl ErrorEnhancer {
         scope: &Scope, 
         script: &str,
         stage: &str,
-        _execution_context: &ExecutionContext
+        execution_context: &ExecutionContext
     ) -> String {
         let mut output = String::new();
         
@@ -113,6 +164,11 @@ impl ErrorEnhancer {
         output.push_str(&format!("❌ Stage {} failed\n", stage));
         output.push_str(&format!("   Code: {}\n", script.trim()));
         output.push_str(&format!("   Error: {}\n", error));
+        
+        // Add execution context if available
+        if let Some(pos) = &execution_context.position {
+            output.push_str(&format!("   Position: {}\n", pos));
+        }
         
         // Show scope information if debug enabled
         if self.debug_config.enabled {
@@ -127,9 +183,189 @@ impl ErrorEnhancer {
                 output.push_str(&format!("   • {}: {} = {}\n", 
                     name, value.type_name(), preview));
             }
+            
+            // Add suggestions based on error type
+            if let Some(suggestions) = self.generate_suggestions(error, scope) {
+                output.push_str(&format!("\n   💡 {}\n", suggestions));
+            }
+            
+            // Add stage-specific help
+            output.push_str(&self.get_stage_help(stage, error));
         }
         
         output
+    }
+    
+    fn generate_suggestions(&self, error: &EvalAltResult, scope: &Scope) -> Option<String> {
+        match error {
+            EvalAltResult::ErrorVariableNotFound(var_name, _) => {
+                let similar = self.find_similar_variables(var_name, scope);
+                if !similar.is_empty() {
+                    Some(format!("Did you mean: {}?", similar.join(", ")))
+                } else {
+                    // Check for common patterns
+                    if var_name.contains('.') {
+                        Some("Check if the field exists and use safe access like 'if \"field\" in e { e.field } else { \"default\" }'".to_string())
+                    } else if var_name.starts_with("e.") {
+                        Some("Try using bracket notation for special characters: e[\"field-name\"] or e[\"field.with.dots\"]".to_string())
+                    } else {
+                        Some("Available variables: e (event), meta (metadata), init (initialization data), line (raw line)".to_string())
+                    }
+                }
+            },
+            EvalAltResult::ErrorPropertyNotFound(prop_name, _) => {
+                Some(format!("Property '{}' not found. Use 'if \"{}\" in e {{ ... }}' to check existence first", prop_name, prop_name))
+            },
+            EvalAltResult::ErrorIndexNotFound(index, _) => {
+                Some(format!("Index '{}' not found. Check array bounds with 'if e.array.len() > {} {{ ... }}'", index, index))
+            },
+            EvalAltResult::ErrorFunctionNotFound(func_sig, _) => {
+                self.suggest_function_alternatives(func_sig)
+            },
+            EvalAltResult::ErrorMismatchDataType(expected, actual, _) => {
+                Some(format!("Type mismatch: expected {}, got {}. Use type_of() to check types or to_string(), to_number() for conversion", expected, actual))
+            },
+            _ => None
+        }
+    }
+    
+    fn suggest_function_alternatives(&self, func_sig: &str) -> Option<String> {
+        let func_name = func_sig.split('(').next().unwrap_or(func_sig).trim();
+        
+        // Common function alternatives
+        match func_name {
+            "length" => Some("Use 'len()' instead of 'length()'".to_string()),
+            "size" => Some("Use 'len()' instead of 'size()'".to_string()),
+            "substr" | "substring" => Some("Use string slicing: s[start..end] or extract_re() for pattern matching".to_string()),
+            "indexOf" | "index_of" => Some("Use 'contains()' to check existence or 'split()' to find positions".to_string()),
+            "push_back" | "append" => Some("Use 'push()' to add elements to arrays".to_string()),
+            "to_int" | "parseInt" => Some("Use 'parse()' or to_number() for type conversion".to_string()),
+            "to_str" | "toString" => Some("Use 'to_string()' for string conversion".to_string()),
+            "match" => Some("Use 'extract_re()' for regex matching or 'contains()' for simple checks".to_string()),
+            name if name.ends_with("_re") => Some("Regex functions: extract_re(), extract_all_re(), split_re(), replace_re()".to_string()),
+            _ => None
+        }
+    }
+    
+    fn find_similar_variables(&self, target: &str, scope: &Scope) -> Vec<String> {
+        let mut suggestions = Vec::new();
+        let target_lower = target.to_lowercase();
+        
+        for (name, _is_const, _value) in scope.iter() {
+            let name_lower = name.to_lowercase();
+            let similarity = self.calculate_similarity(&target_lower, &name_lower);
+            
+            // Include variables with good similarity or common patterns
+            if similarity > 0.6 || 
+               name_lower.contains(&target_lower) || 
+               target_lower.contains(&name_lower) ||
+               self.has_common_prefix(&target_lower, &name_lower) {
+                suggestions.push(name.to_string());
+            }
+        }
+        
+        // Sort by similarity (best matches first)
+        suggestions.sort_by(|a, b| {
+            let sim_a = self.calculate_similarity(&target_lower, &a.to_lowercase());
+            let sim_b = self.calculate_similarity(&target_lower, &b.to_lowercase());
+            sim_b.partial_cmp(&sim_a).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        
+        // Return top 3 suggestions
+        suggestions.truncate(3);
+        suggestions
+    }
+    
+    fn calculate_similarity(&self, s1: &str, s2: &str) -> f64 {
+        if s1 == s2 { return 1.0; }
+        if s1.is_empty() || s2.is_empty() { return 0.0; }
+        
+        // Simple Levenshtein-based similarity
+        let len1 = s1.len();
+        let len2 = s2.len();
+        let max_len = len1.max(len2);
+        
+        let distance = self.levenshtein_distance(s1, s2);
+        1.0 - (distance as f64 / max_len as f64)
+    }
+    
+    fn levenshtein_distance(&self, s1: &str, s2: &str) -> usize {
+        let chars1: Vec<char> = s1.chars().collect();
+        let chars2: Vec<char> = s2.chars().collect();
+        let len1 = chars1.len();
+        let len2 = chars2.len();
+        
+        if len1 == 0 { return len2; }
+        if len2 == 0 { return len1; }
+        
+        let mut prev_row: Vec<usize> = (0..=len2).collect();
+        
+        for i in 1..=len1 {
+            let mut curr_row = vec![i];
+            
+            for j in 1..=len2 {
+                let cost = if chars1[i-1] == chars2[j-1] { 0 } else { 1 };
+                curr_row.push(
+                    (curr_row[j-1] + 1)  // insertion
+                    .min(prev_row[j] + 1)  // deletion
+                    .min(prev_row[j-1] + cost)  // substitution
+                );
+            }
+            
+            prev_row = curr_row;
+        }
+        
+        prev_row[len2]
+    }
+    
+    fn has_common_prefix(&self, s1: &str, s2: &str) -> bool {
+        if s1.len() < 2 || s2.len() < 2 { return false; }
+        let prefix_len = 2.min(s1.len()).min(s2.len());
+        &s1[..prefix_len] == &s2[..prefix_len]
+    }
+    
+    fn get_stage_help(&self, stage: &str, error: &EvalAltResult) -> String {
+        let mut help = String::new();
+        
+        match stage {
+            "filter" => {
+                help.push_str("\n   🎯 Filter stage tips:\n");
+                help.push_str("   • Filters must return true/false (boolean values)\n");
+                help.push_str("   • Use 'e.field_name' to access event fields\n");
+                help.push_str("   • Use 'e[\"field-with-special-chars\"]' for complex field names\n");
+                help.push_str("   • Use 'if \"field\" in e { ... }' to check field existence\n");
+                
+                match error {
+                    EvalAltResult::ErrorMismatchDataType(_, _, _) => {
+                        help.push_str("   • Remember: filters need boolean results, not strings or numbers\n");
+                    },
+                    _ => {}
+                }
+            },
+            "exec" => {
+                help.push_str("\n   🎯 Exec stage tips:\n");
+                help.push_str("   • Use 'e.new_field = value' to add fields to events\n");
+                help.push_str("   • Use 'e.field = ()' to remove fields from events\n");
+                help.push_str("   • Use 'e = ()' to remove entire event (filter out)\n");
+                help.push_str("   • Use 'let variable = value' for temporary variables\n");
+                help.push_str("   • Use 'print(\"debug: \" + value)' for debugging output\n");
+            },
+            "begin" => {
+                help.push_str("\n   🎯 Begin stage tips:\n");
+                help.push_str("   • Use 'init.field = value' to set global initialization data\n");
+                help.push_str("   • Use 'read_file(\"path\")' to load external data\n");
+                help.push_str("   • Variables set here are available in all event processing\n");
+            },
+            "end" => {
+                help.push_str("\n   🎯 End stage tips:\n");
+                help.push_str("   • Use 'tracked.key' to access accumulated tracking data\n");
+                help.push_str("   • Use 'print()' to output final results\n");
+                help.push_str("   • This runs after all events are processed\n");
+            },
+            _ => {}
+        }
+        
+        help
     }
 }
 
@@ -566,19 +802,50 @@ impl RhaiEngine {
                 // Initialize debugger - no breakpoints for now in Phase 1
                 debugger
             },
-            move |_context, event, _node, source, pos| {
+            move |_context, event, node, source, pos| {
                 // Update execution context
                 debug_tracker.update_context(Some(pos), source);
                 
-                // Basic event logging for Phase 1
+                // Enhanced event logging with verbosity levels
                 match event {
                     DebuggerEvent::Start => {
                         debug_tracker.log_basic("Script execution started");
+                        if debug_tracker.config.verbosity >= 3 {
+                            if let Some(src) = source {
+                                debug_tracker.log_step("Starting script", &format!("\"{}\"", src.trim()));
+                            }
+                        }
                     },
                     DebuggerEvent::End => {
                         debug_tracker.log_basic("Script execution completed");
                     },
-                    _ => {} // Handle more events in later phases
+                    DebuggerEvent::Step => {
+                        if debug_tracker.config.verbosity >= 3 {
+                            let step_info = format!("Step at {}", pos);
+                            let node_info = format!("{:?}", node);
+                            debug_tracker.log_step(&step_info, &node_info);
+                        }
+                    },
+                    DebuggerEvent::BreakPoint(_) => {
+                        if debug_tracker.config.verbosity >= 2 {
+                            debug_tracker.log_detailed("breakpoint", 0, &format!("hit at {}", pos));
+                        }
+                    },
+                    _ => {
+                        if debug_tracker.config.verbosity >= 3 {
+                            debug_tracker.log_step("Debug event", &format!("{:?}", event));
+                        }
+                    }
+                }
+                
+                // Update execution context with more details
+                if debug_tracker.config.verbosity >= 2 {
+                    if let Ok(mut ctx) = debug_tracker.context.lock() {
+                        ctx.last_operation = Some(format!("{:?}", event));
+                        if let Some(src) = source {
+                            ctx.source_snippet = Some(src.to_string());
+                        }
+                    }
                 }
                 
                 Ok(DebuggerCommand::Continue)
