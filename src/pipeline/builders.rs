@@ -250,18 +250,23 @@ impl PipelineBuilder {
             }
         };
 
-        // Create script stages
+        // Create script stages with numbering
         let mut script_stages: Vec<Box<dyn ScriptStage>> = Vec::new();
+        let mut stage_number = 1;
 
         for stage in stages {
             match stage {
                 crate::config::ScriptStageType::Filter(filter) => {
-                    let filter_stage = FilterStage::new(filter, &mut rhai_engine)?;
+                    let filter_stage = FilterStage::new(filter, &mut rhai_engine)?
+                        .with_stage_number(stage_number);
                     script_stages.push(Box::new(filter_stage));
+                    stage_number += 1;
                 }
                 crate::config::ScriptStageType::Exec(exec) => {
-                    let exec_stage = ExecStage::new(exec, &mut rhai_engine)?;
+                    let exec_stage = ExecStage::new(exec, &mut rhai_engine)?
+                        .with_stage_number(stage_number);
                     script_stages.push(Box::new(exec_stage));
+                    stage_number += 1;
                 }
             }
         }
@@ -505,18 +510,23 @@ impl PipelineBuilder {
             }
         };
 
-        // Create script stages
+        // Create script stages with numbering
         let mut script_stages: Vec<Box<dyn ScriptStage>> = Vec::new();
+        let mut stage_number = 1;
 
         for stage in stages {
             match stage {
                 crate::config::ScriptStageType::Filter(filter) => {
-                    let filter_stage = FilterStage::new(filter, &mut rhai_engine)?;
+                    let filter_stage = FilterStage::new(filter, &mut rhai_engine)?
+                        .with_stage_number(stage_number);
                     script_stages.push(Box::new(filter_stage));
+                    stage_number += 1;
                 }
                 crate::config::ScriptStageType::Exec(exec) => {
-                    let exec_stage = ExecStage::new(exec, &mut rhai_engine)?;
+                    let exec_stage = ExecStage::new(exec, &mut rhai_engine)?
+                        .with_stage_number(stage_number);
                     script_stages.push(Box::new(exec_stage));
+                    stage_number += 1;
                 }
             }
         }

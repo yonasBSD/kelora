@@ -7,17 +7,28 @@ use anyhow::Result;
 /// Filter stage implementation
 pub struct FilterStage {
     compiled_filter: crate::engine::CompiledExpression,
+    stage_number: usize,
 }
 
 impl FilterStage {
     pub fn new(filter: String, engine: &mut RhaiEngine) -> Result<Self> {
         let compiled_filter = engine.compile_filter(&filter)?;
-        Ok(Self { compiled_filter })
+        Ok(Self { compiled_filter, stage_number: 0 })
+    }
+    
+    pub fn with_stage_number(mut self, stage_number: usize) -> Self {
+        self.stage_number = stage_number;
+        self
     }
 }
 
 impl ScriptStage for FilterStage {
     fn apply(&mut self, event: Event, ctx: &mut PipelineContext) -> ScriptResult {
+        // Add stage-specific tracing
+        if let Some(ref tracer) = ctx.rhai.get_execution_tracer() {
+            tracer.trace_stage_execution(self.stage_number, "filter");
+        }
+        
         let result = if ctx.window.is_empty() {
             // No window context - use standard method
             ctx.rhai
@@ -66,17 +77,28 @@ impl ScriptStage for FilterStage {
 /// Exec stage implementation
 pub struct ExecStage {
     compiled_exec: crate::engine::CompiledExpression,
+    stage_number: usize,
 }
 
 impl ExecStage {
     pub fn new(exec: String, engine: &mut RhaiEngine) -> Result<Self> {
         let compiled_exec = engine.compile_exec(&exec)?;
-        Ok(Self { compiled_exec })
+        Ok(Self { compiled_exec, stage_number: 0 })
+    }
+    
+    pub fn with_stage_number(mut self, stage_number: usize) -> Self {
+        self.stage_number = stage_number;
+        self
     }
 }
 
 impl ScriptStage for ExecStage {
     fn apply(&mut self, event: Event, ctx: &mut PipelineContext) -> ScriptResult {
+        // Add stage-specific tracing
+        if let Some(ref tracer) = ctx.rhai.get_execution_tracer() {
+            tracer.trace_stage_execution(self.stage_number, "exec");
+        }
+        
         // Atomic execution: work on a copy of the event for rollback behavior
         let mut event_copy = event.clone();
 
