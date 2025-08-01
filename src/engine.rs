@@ -369,10 +369,11 @@ impl ErrorEnhancer {
     }
 }
 
-// Phase 3: Execution Tracer for step-by-step debugging
+// Execution Tracer for step-by-step debugging
 pub struct ExecutionTracer {
     config: DebugConfig,
     current_event: Arc<Mutex<u64>>,
+    step_counter: Arc<Mutex<u32>>,
 }
 
 impl ExecutionTracer {
@@ -380,6 +381,7 @@ impl ExecutionTracer {
         ExecutionTracer {
             config,
             current_event: Arc::new(Mutex::new(0)),
+            step_counter: Arc::new(Mutex::new(0)),
         }
     }
     
@@ -430,6 +432,59 @@ impl ExecutionTracer {
         }
     }
     
+    // Enhanced detailed tracing for -vvv level
+    pub fn trace_detailed_step(&self, 
+        context: &str,
+        operation: &str, 
+        input: &str,
+        output: &str,
+        step_type: &str
+    ) {
+        if self.config.verbosity >= 3 {
+            let step_num = {
+                let mut counter = self.step_counter.lock().unwrap();
+                *counter += 1;
+                *counter
+            };
+            
+            eprintln!("    [Step {}:{}] {}: {} → {}", 
+                step_num, context, operation, 
+                self.truncate_for_display(input, 30),
+                self.truncate_for_display(output, 30));
+            
+            if step_type != "default" {
+                eprintln!("      Type: {}", step_type);
+            }
+        }
+    }
+    
+    pub fn trace_scope_inspection(&self, scope: &rhai::Scope) {
+        if self.config.verbosity >= 3 {
+            eprintln!("    Scope contents:");
+            for (name, _is_const, value) in scope.iter() {
+                let type_info = value.type_name();
+                let preview = self.format_value_preview(&value);
+                eprintln!("      {} ({}): {}", name, type_info, preview);
+            }
+        }
+    }
+    
+    pub fn trace_ast_node(&self, node_type: &str, position: &str, source: &str) {
+        if self.config.verbosity >= 3 {
+            eprintln!("    AST: {} at {} → \"{}\"", 
+                node_type, position, self.truncate_for_display(source, 40));
+        }
+    }
+    
+    fn format_value_preview(&self, value: &rhai::Dynamic) -> String {
+        let preview = format!("{:?}", value);
+        if preview.len() > 40 {
+            format!("{}...", &preview[..37])
+        } else {
+            preview
+        }
+    }
+    
     fn truncate_for_display(&self, text: &str, max_len: usize) -> String {
         if text.len() > max_len {
             format!("{}...", &text[..max_len-3])
@@ -446,6 +501,12 @@ impl ExecutionTracer {
             0
         }
     }
+    
+    pub fn reset_step_counter(&self) {
+        if let Ok(mut counter) = self.step_counter.lock() {
+            *counter = 0;
+        }
+    }
 }
 
 impl Clone for ExecutionTracer {
@@ -453,6 +514,184 @@ impl Clone for ExecutionTracer {
         ExecutionTracer {
             config: self.config.clone(),
             current_event: Arc::clone(&self.current_event),
+            step_counter: Arc::clone(&self.step_counter),
+        }
+    }
+}
+
+// Interactive Debugger (opt-in via environment variable)
+pub struct InteractiveDebugger {
+    config: DebugConfig,
+    interactive_enabled: bool,
+}
+
+impl InteractiveDebugger {
+    pub fn new(config: DebugConfig) -> Self {
+        InteractiveDebugger {
+            config,
+            interactive_enabled: std::env::var("KELORA_DEBUG_INTERACTIVE").is_ok(),
+        }
+    }
+    
+    pub fn maybe_interactive_break(&self, 
+        context: &ExecutionContext,
+        scope: &rhai::Scope,
+        error: Option<&EvalAltResult>
+    ) -> DebuggerCommand {
+        if self.interactive_enabled && self.config.verbosity >= 3 && (error.is_some() || self.should_break_for_inspection()) {
+            return self.interactive_session(context, scope);
+        }
+        DebuggerCommand::Continue
+    }
+    
+    fn interactive_session(&self, 
+        _context: &ExecutionContext, 
+        scope: &rhai::Scope
+    ) -> DebuggerCommand {
+        use std::io::{self, Write};
+        
+        println!("\n🔍 Interactive Debug Session");
+        println!("Variables in scope:");
+        for (name, _is_const, value) in scope.iter() {
+            println!("  {}: {:?}", name, value);
+        }
+        
+        loop {
+            print!("Debug> (s)tep, (c)ontinue, (i)nspect <var>, (q)uit? ");
+            io::stdout().flush().unwrap();
+            
+            let mut input = String::new();
+            if io::stdin().read_line(&mut input).is_err() {
+                return DebuggerCommand::Continue;
+            }
+            
+            match input.trim().to_lowercase().as_str() {
+                "s" | "step" => return DebuggerCommand::StepInto,
+                "c" | "continue" => return DebuggerCommand::Continue,
+                "q" | "quit" => {
+                    println!("Exiting debug session.");
+                    std::process::exit(0);
+                },
+                cmd if cmd.starts_with("i ") => {
+                    let var_name = &cmd[2..];
+                    self.inspect_variable(var_name, scope);
+                },
+                _ => println!("Unknown command. Use (s)tep, (c)ontinue, (i)nspect <var>, (q)uit"),
+            }
+        }
+    }
+    
+    fn inspect_variable(&self, var_name: &str, scope: &rhai::Scope) {
+        for (name, _is_const, value) in scope.iter() {
+            if name == var_name {
+                println!("Variable '{}': {:?} (type: {})", name, value, value.type_name());
+                return;
+            }
+        }
+        println!("Variable '{}' not found", var_name);
+    }
+    
+    fn should_break_for_inspection(&self) -> bool {
+        // Could implement smart breakpoint logic here
+        // For now, only break on errors or explicit requests
+        false
+    }
+}
+
+impl Clone for InteractiveDebugger {
+    fn clone(&self) -> Self {
+        InteractiveDebugger {
+            config: self.config.clone(),
+            interactive_enabled: self.interactive_enabled,
+        }
+    }
+}
+
+// Performance and Statistics Tracking using thread-local storage
+// This integrates with kelora's parallel processing infrastructure like track_count()
+
+use std::cell::RefCell;
+
+#[derive(Debug, Clone, Default)]
+pub struct DebugStatistics {
+    pub start_time: Option<std::time::Instant>,
+    pub events_processed: u64,
+    pub events_passed: u64,
+    pub errors_encountered: u64,
+    pub script_executions: u64,
+}
+
+impl DebugStatistics {
+    pub fn new() -> Self {
+        DebugStatistics {
+            start_time: Some(std::time::Instant::now()),
+            events_processed: 0,
+            events_passed: 0,
+            errors_encountered: 0,
+            script_executions: 0,
+        }
+    }
+}
+
+// Thread-local storage for debug statistics (following track_count pattern)
+thread_local! {
+    static THREAD_DEBUG_STATS: RefCell<DebugStatistics> = RefCell::new(DebugStatistics::new());
+}
+
+// Debug statistics collection functions (following stats.rs pattern)
+pub fn debug_stats_increment_events_processed() {
+    THREAD_DEBUG_STATS.with(|stats| {
+        stats.borrow_mut().events_processed += 1;
+    });
+}
+
+pub fn debug_stats_increment_events_passed() {
+    THREAD_DEBUG_STATS.with(|stats| {
+        stats.borrow_mut().events_passed += 1;
+    });
+}
+
+pub fn debug_stats_increment_errors() {
+    THREAD_DEBUG_STATS.with(|stats| {
+        stats.borrow_mut().errors_encountered += 1;
+    });
+}
+
+pub fn debug_stats_increment_script_executions() {
+    THREAD_DEBUG_STATS.with(|stats| {
+        stats.borrow_mut().script_executions += 1;
+    });
+}
+
+pub fn debug_stats_get_thread_state() -> DebugStatistics {
+    THREAD_DEBUG_STATS.with(|stats| stats.borrow().clone())
+}
+
+pub fn debug_stats_set_thread_state(stats: &DebugStatistics) {
+    THREAD_DEBUG_STATS.with(|local_stats| {
+        *local_stats.borrow_mut() = stats.clone();
+    });
+}
+
+pub fn debug_stats_report(config: &DebugConfig) {
+    if config.enabled {
+        let stats = debug_stats_get_thread_state();
+        if let Some(start_time) = stats.start_time {
+            let duration = start_time.elapsed();
+            
+            eprintln!("Debug: Processing completed in {:?}", duration);
+            eprintln!("Debug: {} events processed, {} passed filter", 
+                stats.events_processed, stats.events_passed);
+            eprintln!("Debug: {} script executions performed", stats.script_executions);
+            
+            if stats.errors_encountered > 0 {
+                eprintln!("Debug: {} errors encountered", stats.errors_encountered);
+            }
+            
+            if config.show_timing && duration.as_secs_f64() > 0.0 {
+                eprintln!("Debug: {:.2} events/sec", 
+                    stats.events_processed as f64 / duration.as_secs_f64());
+            }
         }
     }
 }
@@ -474,6 +713,7 @@ pub struct RhaiEngine {
     init_map: Option<rhai::Map>,
     debug_tracker: Option<DebugTracker>,
     execution_tracer: Option<ExecutionTracer>,
+    interactive_debugger: Option<InteractiveDebugger>,
 }
 
 impl Clone for RhaiEngine {
@@ -509,6 +749,7 @@ impl Clone for RhaiEngine {
             init_map: self.init_map.clone(),
             debug_tracker: self.debug_tracker.clone(),
             execution_tracer: self.execution_tracer.clone(),
+            interactive_debugger: self.interactive_debugger.clone(),
         }
     }
 }
@@ -872,6 +1113,7 @@ impl RhaiEngine {
             init_map: None,
             debug_tracker: None,
             execution_tracer: None,
+            interactive_debugger: None,
         }
     }
 
@@ -887,6 +1129,7 @@ impl RhaiEngine {
 
         self.debug_tracker = Some(DebugTracker::new(debug_config.clone()));
         self.execution_tracer = Some(ExecutionTracer::new(debug_config.clone()));
+        self.interactive_debugger = Some(InteractiveDebugger::new(debug_config.clone()));
 
         let debug_tracker = self.debug_tracker.as_ref().unwrap().clone();
         let execution_tracer = self.execution_tracer.as_ref().unwrap().clone();
@@ -896,7 +1139,7 @@ impl RhaiEngine {
         #[allow(deprecated)]
         self.engine.register_debugger(
             move |_engine, debugger| {
-                // Phase 3: Set up breakpoint-based tracing for enhanced debugging
+                // Set up breakpoint-based tracing for enhanced debugging
                 if debug_config.trace_events {
                     // Enable step-by-step debugging mode for detailed tracing
                     // Note: Specific breakpoint methods may not be available in current Rhai version
@@ -922,7 +1165,7 @@ impl RhaiEngine {
                         debug_tracker.log_basic("Script execution completed");
                     },
                     DebuggerEvent::Step => {
-                        // Phase 3: Enhanced step-by-step tracing
+                        // Enhanced step-by-step tracing
                         if debug_tracker.config.verbosity >= 2 {
                             // Use execution tracer for step-level tracing
                             let step_info = format!("Step at {}", pos);
@@ -957,7 +1200,7 @@ impl RhaiEngine {
                     // Note: Specific function call events may not be available in current Rhai version
                     // We handle function call tracing through Step events and other mechanisms
                     _ => {
-                        // Enhanced event tracing for Phase 3
+                        // Enhanced event tracing
                         if debug_tracker.config.verbosity >= 3 {
                             let event_name = format!("{:?}", event);
                             debug_tracker.log_step("Debug event", &event_name);
@@ -1063,7 +1306,11 @@ impl RhaiEngine {
         Self::set_thread_tracking_state(tracked);
         let mut scope = self.create_scope_for_event(event);
 
-        // Phase 3: Add execution tracing for filter execution
+        // Debug statistics tracking
+        debug_stats_increment_events_processed();
+        debug_stats_increment_script_executions();
+
+        // Add execution tracing for filter execution
         if let Some(ref tracer) = self.execution_tracer {
             let event_num = tracer.next_event();
             let event_data = format!("{:?}", event.fields);
@@ -1073,12 +1320,21 @@ impl RhaiEngine {
                 tracer.trace_event_start(event_num, &event_data);
                 eprintln!("  Script: {}", compiled.expr.trim());
             }
+            
+            // Enhanced detailed tracing for -vvv
+            if tracer.config.verbosity >= 3 {
+                tracer.trace_scope_inspection(&scope);
+                tracer.trace_detailed_step("filter", "evaluation", &compiled.expr, "starting", "script");
+            }
         }
 
         let result = self
             .engine
             .eval_expression_with_scope::<bool>(&mut scope, &compiled.expr)
             .map_err(|e| {
+                // Track errors in debug statistics
+                debug_stats_increment_errors();
+                
                 let detailed_msg = if let Some(ref debug_tracker) = self.debug_tracker {
                     let enhancer = ErrorEnhancer::new(debug_tracker.config.clone());
                     let context = debug_tracker.get_context();
@@ -1089,10 +1345,21 @@ impl RhaiEngine {
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 
-        // Phase 3: Add execution result tracing
+        // Add execution result tracing
         if let Some(ref tracer) = self.execution_tracer {
             let action = if result { "passed" } else { "filtered out" };
             tracer.trace_event_result(result, action);
+            
+            // Enhanced detailed result tracing
+            if tracer.config.verbosity >= 3 {
+                let result_str = if result { "true" } else { "false" };
+                tracer.trace_detailed_step("filter", "result", &compiled.expr, result_str, "boolean");
+            }
+        }
+
+        // Track successful events in debug statistics
+        if result {
+            debug_stats_increment_events_passed();
         }
 
         *tracked = Self::get_thread_tracking_state();
@@ -1108,7 +1375,10 @@ impl RhaiEngine {
         Self::set_thread_tracking_state(tracked);
         let mut scope = self.create_scope_for_event(event);
 
-        // Phase 3: Add execution tracing for exec execution
+        // Debug statistics tracking
+        debug_stats_increment_script_executions();
+
+        // Add execution tracing for exec execution
         if let Some(ref tracer) = self.execution_tracer {
             let event_num = tracer.next_event();
             let event_data = format!("{:?}", event.fields);
@@ -1118,12 +1388,21 @@ impl RhaiEngine {
                 tracer.trace_event_start(event_num, &event_data);
                 eprintln!("  Script: {}", compiled.expr.trim());
             }
+            
+            // Enhanced detailed tracing for -vvv
+            if tracer.config.verbosity >= 3 {
+                tracer.trace_scope_inspection(&scope);
+                tracer.trace_detailed_step("exec", "transformation", &compiled.expr, "starting", "script");
+            }
         }
 
         let _ = self
             .engine
             .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
             .map_err(|e| {
+                // Track errors in debug statistics
+                debug_stats_increment_errors();
+                
                 let detailed_msg = if let Some(ref debug_tracker) = self.debug_tracker {
                     let enhancer = ErrorEnhancer::new(debug_tracker.config.clone());
                     let context = debug_tracker.get_context();
@@ -1134,9 +1413,14 @@ impl RhaiEngine {
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 
-        // Phase 3: Add execution result tracing
+        // Add execution result tracing
         if let Some(ref tracer) = self.execution_tracer {
             tracer.trace_event_result(true, "executed successfully");
+            
+            // Enhanced detailed result tracing
+            if tracer.config.verbosity >= 3 {
+                tracer.trace_detailed_step("exec", "result", &compiled.expr, "success", "execution");
+            }
         }
 
         self.update_event_from_scope(event, &scope);
@@ -1270,7 +1554,11 @@ impl RhaiEngine {
         Self::set_thread_tracking_state(tracked);
         let mut scope = self.create_scope_for_event_with_window(event, window);
 
-        // Phase 3: Add execution tracing for windowed filter execution
+        // Debug statistics tracking
+        debug_stats_increment_events_processed();
+        debug_stats_increment_script_executions();
+
+        // Add execution tracing for windowed filter execution
         if let Some(ref tracer) = self.execution_tracer {
             let event_num = tracer.next_event();
             let event_data = format!("{:?}", event.fields);
@@ -1280,20 +1568,41 @@ impl RhaiEngine {
                 tracer.trace_event_start(event_num, &event_data);
                 eprintln!("  Script (windowed, size {}): {}", window.len(), compiled.expr.trim());
             }
+            
+            // Enhanced detailed tracing for -vvv
+            if tracer.config.verbosity >= 3 {
+                tracer.trace_scope_inspection(&scope);
+                tracer.trace_detailed_step("windowed-filter", "evaluation", &compiled.expr, "starting", "script");
+                tracer.trace_detailed_step("windowed-filter", "window-size", &window.len().to_string(), &window.len().to_string(), "size");
+            }
         }
 
         let result = self
             .engine
             .eval_expression_with_scope::<bool>(&mut scope, &compiled.expr)
             .map_err(|e| {
+                // Track errors in debug statistics
+                debug_stats_increment_errors();
+                
                 let detailed_msg = Self::format_rhai_error(e, "filter expression", &compiled.expr);
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 
-        // Phase 3: Add execution result tracing
+        // Add execution result tracing
         if let Some(ref tracer) = self.execution_tracer {
             let action = if result { "passed" } else { "filtered out" };
             tracer.trace_event_result(result, action);
+            
+            // Enhanced detailed result tracing
+            if tracer.config.verbosity >= 3 {
+                let result_str = if result { "true" } else { "false" };
+                tracer.trace_detailed_step("windowed-filter", "result", &compiled.expr, result_str, "boolean");
+            }
+        }
+
+        // Track successful events in debug statistics
+        if result {
+            debug_stats_increment_events_passed();
         }
 
         *tracked = Self::get_thread_tracking_state();
@@ -1310,7 +1619,10 @@ impl RhaiEngine {
         Self::set_thread_tracking_state(tracked);
         let mut scope = self.create_scope_for_event_with_window(event, window);
 
-        // Phase 3: Add execution tracing for windowed exec execution
+        // Debug statistics tracking
+        debug_stats_increment_script_executions();
+
+        // Add execution tracing for windowed exec execution
         if let Some(ref tracer) = self.execution_tracer {
             let event_num = tracer.next_event();
             let event_data = format!("{:?}", event.fields);
@@ -1320,19 +1632,34 @@ impl RhaiEngine {
                 tracer.trace_event_start(event_num, &event_data);
                 eprintln!("  Script (windowed, size {}): {}", window.len(), compiled.expr.trim());
             }
+            
+            // Enhanced detailed tracing for -vvv
+            if tracer.config.verbosity >= 3 {
+                tracer.trace_scope_inspection(&scope);
+                tracer.trace_detailed_step("windowed-exec", "transformation", &compiled.expr, "starting", "script");
+                tracer.trace_detailed_step("windowed-exec", "window-size", &window.len().to_string(), &window.len().to_string(), "size");
+            }
         }
 
         let _ = self
             .engine
             .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
             .map_err(|e| {
+                // Track errors in debug statistics
+                debug_stats_increment_errors();
+                
                 let detailed_msg = Self::format_rhai_error(e, "exec script", &compiled.expr);
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 
-        // Phase 3: Add execution result tracing
+        // Add execution result tracing
         if let Some(ref tracer) = self.execution_tracer {
             tracer.trace_event_result(true, "executed successfully");
+            
+            // Enhanced detailed result tracing
+            if tracer.config.verbosity >= 3 {
+                tracer.trace_detailed_step("windowed-exec", "result", &compiled.expr, "success", "execution");
+            }
         }
 
         self.update_event_from_scope(event, &scope);
