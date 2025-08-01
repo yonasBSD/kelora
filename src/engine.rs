@@ -1057,9 +1057,15 @@ impl RhaiEngine {
         if let Some(ref tracer) = self.execution_tracer {
             let event_num = tracer.next_event();
             let event_data = format!("{:?}", event.fields);
-            tracer.trace_event_start(event_num, &event_data);
             
+            // Level 1: Basic execution logging
+            if tracer.config.verbosity >= 1 {
+                eprintln!("Debug: Executing filter stage");
+            }
+            
+            // Level 2+: Detailed execution tracing  
             if tracer.config.verbosity >= 2 {
+                tracer.trace_event_start(event_num, &event_data);
                 eprintln!("Debug: Executing filter: {}", compiled.expr.trim());
             }
         }
@@ -1101,9 +1107,15 @@ impl RhaiEngine {
         if let Some(ref tracer) = self.execution_tracer {
             let event_num = tracer.next_event();
             let event_data = format!("{:?}", event.fields);
-            tracer.trace_event_start(event_num, &event_data);
             
+            // Level 1: Basic execution logging
+            if tracer.config.verbosity >= 1 {
+                eprintln!("Debug: Executing exec stage");
+            }
+            
+            // Level 2+: Detailed execution tracing
             if tracer.config.verbosity >= 2 {
+                tracer.trace_event_start(event_num, &event_data);
                 eprintln!("Debug: Executing exec: {}", compiled.expr.trim());
             }
         }
@@ -1262,9 +1274,15 @@ impl RhaiEngine {
         if let Some(ref tracer) = self.execution_tracer {
             let event_num = tracer.next_event();
             let event_data = format!("{:?}", event.fields);
-            tracer.trace_event_start(event_num, &event_data);
             
+            // Level 1: Basic execution logging
+            if tracer.config.verbosity >= 1 {
+                eprintln!("Debug: Executing filter stage");
+            }
+            
+            // Level 2+: Detailed execution tracing
             if tracer.config.verbosity >= 2 {
+                tracer.trace_event_start(event_num, &event_data);
                 eprintln!("Debug: Executing windowed filter (window size: {}): {}", window.len(), compiled.expr.trim());
             }
         }
@@ -1301,9 +1319,15 @@ impl RhaiEngine {
         if let Some(ref tracer) = self.execution_tracer {
             let event_num = tracer.next_event();
             let event_data = format!("{:?}", event.fields);
-            tracer.trace_event_start(event_num, &event_data);
             
+            // Level 1: Basic execution logging
+            if tracer.config.verbosity >= 1 {
+                eprintln!("Debug: Executing exec stage");
+            }
+            
+            // Level 2+: Detailed execution tracing
             if tracer.config.verbosity >= 2 {
+                tracer.trace_event_start(event_num, &event_data);
                 eprintln!("Debug: Executing windowed exec (window size: {}): {}", window.len(), compiled.expr.trim());
             }
         }
