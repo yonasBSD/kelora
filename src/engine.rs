@@ -557,6 +557,10 @@ impl RhaiEngine {
         self.debug_tracker = Some(DebugTracker::new(debug_config.clone()));
 
         let debug_tracker = self.debug_tracker.as_ref().unwrap().clone();
+        // Allow deprecated API: register_debugger is marked as volatile/experimental but is the
+        // only way to access Rhai's debugging functionality. The API is stable in practice and
+        // essential for our debugging features. We'll update when a stable replacement is available.
+        #[allow(deprecated)]
         self.engine.register_debugger(
             |_engine, debugger| {
                 // Initialize debugger - no breakpoints for now in Phase 1
