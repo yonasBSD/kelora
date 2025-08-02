@@ -281,6 +281,8 @@ impl Pipeline {
                         "parse",
                         ctx.meta.line_number,
                         &err.to_string(),
+                        Some(&chunk),
+                        ctx.meta.filename.as_deref(),
                         ctx.config.verbose,
                         ctx.config.quiet,
                         Some(&ctx.config),
@@ -311,6 +313,7 @@ impl Pipeline {
                         // Process each event through remaining stages
                         let mut multi_results = Vec::new();
                         for event in events {
+                            let original_line = event.original_line.clone(); // Capture before consuming
                             match stage.apply(event, ctx) {
                                 ScriptResult::Emit(e) => multi_results.push(e),
                                 ScriptResult::EmitMultiple(mut es) => multi_results.append(&mut es),
@@ -318,9 +321,11 @@ impl Pipeline {
                                 ScriptResult::Error(msg) => {
                                     // Use unified error tracking system
                                     crate::rhai_functions::tracking::track_error(
-                                        "rhai",
+                                        "script",
                                         ctx.meta.line_number,
                                         &msg,
+                                        Some(&original_line),
+                                        ctx.meta.filename.as_deref(),
                                         ctx.config.verbose,
                                         ctx.config.quiet,
                                         Some(&ctx.config),
@@ -467,9 +472,11 @@ impl Pipeline {
                 ScriptResult::Error(msg) => {
                     // Use unified error tracking system
                     crate::rhai_functions::tracking::track_error(
-                        "rhai",
+                        "script",
                         ctx.meta.line_number,
                         &msg,
+                        None, // Original line not available at this stage
+                        ctx.meta.filename.as_deref(),
                         ctx.config.verbose,
                         ctx.config.quiet,
                         Some(&ctx.config),
@@ -539,6 +546,8 @@ impl Pipeline {
                     "parse",
                     ctx.meta.line_number,
                     &err.to_string(),
+                    Some(&chunk),
+                    ctx.meta.filename.as_deref(),
                     ctx.config.verbose,
                     ctx.config.quiet,
                     Some(&ctx.config),
@@ -569,6 +578,7 @@ impl Pipeline {
                     // Process each event through remaining stages
                     let mut multi_results = Vec::new();
                     for event in events {
+                        let original_line = event.original_line.clone(); // Capture before consuming
                         match stage.apply(event, ctx) {
                             ScriptResult::Emit(e) => multi_results.push(e),
                             ScriptResult::EmitMultiple(mut es) => multi_results.append(&mut es),
@@ -576,9 +586,11 @@ impl Pipeline {
                             ScriptResult::Error(msg) => {
                                 // Use unified error tracking system
                                 crate::rhai_functions::tracking::track_error(
-                                    "rhai",
+                                    "script",
                                     ctx.meta.line_number,
                                     &msg,
+                                    Some(&original_line),
+                                    ctx.meta.filename.as_deref(),
                                     ctx.config.verbose,
                                     ctx.config.quiet,
                                     Some(&ctx.config),
@@ -719,9 +731,11 @@ impl Pipeline {
             ScriptResult::Error(msg) => {
                 // Use unified error tracking system
                 crate::rhai_functions::tracking::track_error(
-                    "rhai",
+                    "script",
                     ctx.meta.line_number,
                     &msg,
+                    None, // Original line not available at this stage
+                    ctx.meta.filename.as_deref(),
                     ctx.config.verbose,
                     ctx.config.quiet,
                     Some(&ctx.config),

@@ -54,9 +54,11 @@ impl ScriptStage for FilterStage {
             Err(e) => {
                 // Track error for reporting even in resilient mode
                 crate::rhai_functions::tracking::track_error(
-                    "rhai",
+                    "filter",
                     ctx.meta.line_number,
                     &format!("Filter error: {}", e),
+                    Some(&event.original_line),
+                    ctx.meta.filename.as_deref(),
                     ctx.config.verbose,
                     ctx.config.quiet,
                     Some(&ctx.config),
@@ -124,9 +126,11 @@ impl ScriptStage for ExecStage {
             Err(e) => {
                 // Track error for reporting even in resilient mode
                 crate::rhai_functions::tracking::track_error(
-                    "rhai",
+                    "exec",
                     ctx.meta.line_number,
                     &format!("Exec error: {}", e),
+                    Some(&event.original_line),
+                    ctx.meta.filename.as_deref(),
                     ctx.config.verbose,
                     ctx.config.quiet,
                     Some(&ctx.config),

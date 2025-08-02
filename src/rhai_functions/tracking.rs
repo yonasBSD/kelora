@@ -13,6 +13,8 @@ pub fn track_error(
     error_type: &str,
     line_num: Option<usize>,
     message: &str,
+    original_line: Option<&str>,
+    filename: Option<&str>,
     verbose: u8,
     quiet: bool,
     config: Option<&crate::pipeline::PipelineConfig>,
@@ -39,12 +41,24 @@ pub fn track_error(
 
         // Output verbose errors - use ordered capture system for proper interleaving
         if verbose > 0 && !quiet {
-            let formatted_error = crate::config::format_verbose_error_with_pipeline_config(
-                line_num,
-                &format!("{} error", error_type),
-                message,
-                config,
-            );
+            // Enhanced format with filename for immediate verbose output
+            let color_mode = config.map(|c| &c.color_mode).unwrap_or(&crate::config::ColorMode::Auto);
+            let use_colors = crate::tty::should_use_colors_with_mode(color_mode);
+            let no_emoji = if let Some(cfg) = config {
+                cfg.no_emoji || std::env::var("NO_EMOJI").is_ok()
+            } else {
+                std::env::var("NO_EMOJI").is_ok()
+            };
+            let use_emoji = use_colors && !no_emoji;
+            let prefix = if use_emoji { "🧱" } else { "kelora:" };
+            
+            let formatted_error = if let (Some(line), Some(fname)) = (line_num, filename) {
+                format!("{} {}:{}: {} - {}", prefix, fname, line, error_type, message)
+            } else if let Some(line) = line_num {
+                format!("{} line {}: {} - {}", prefix, line, error_type, message)
+            } else {
+                format!("{} {} - {}", prefix, error_type, message)
+            };
 
             if crate::rhai_functions::strings::is_parallel_mode() {
                 // In parallel mode, capture stderr message for ordered output later
@@ -56,7 +70,7 @@ pub fn track_error(
             }
         }
 
-        // Track error samples (max 3 per type)
+        // Track error samples (max 3 per type) - store both error message and original line
         let samples_key = format!("__kelora_error_samples_{}", error_type);
         let current_samples = state
             .get(&samples_key)
@@ -66,13 +80,20 @@ pub fn track_error(
         if let Ok(mut arr) = current_samples.into_array() {
             // Only store up to 3 samples per error type
             if arr.len() < 3 {
-                let formatted_error = crate::config::format_verbose_error_with_pipeline_config(
-                    line_num,
-                    &format!("{} error", error_type),
-                    message,
-                    config,
-                );
-                arr.push(Dynamic::from(formatted_error));
+                // Create a sample object containing error details and original line
+                let mut sample_obj = rhai::Map::new();
+                sample_obj.insert("error_type".into(), Dynamic::from(error_type.to_string()));
+                sample_obj.insert("line_num".into(), Dynamic::from(line_num.unwrap_or(0) as i64));
+                sample_obj.insert("message".into(), Dynamic::from(message.to_string()));
+                if let Some(line) = original_line {
+                    sample_obj.insert("original_line".into(), Dynamic::from(line.to_string()));
+                }
+                // Store filename if available
+                if let Some(filename) = filename {
+                    sample_obj.insert("filename".into(), Dynamic::from(filename.to_string()));
+                }
+                
+                arr.push(Dynamic::from(sample_obj));
             }
 
             state.insert(samples_key.clone(), Dynamic::from(arr));
@@ -104,7 +125,7 @@ pub fn extract_error_summary_from_tracking(
 ) -> Option<String> {
     let mut total_errors = 0;
     let mut error_types = Vec::new();
-    let mut samples = Vec::new();
+    let mut sample_objects: Vec<rhai::Map> = Vec::new();
 
     // Collect error counts by type
     for (key, value) in tracked {
@@ -122,62 +143,80 @@ pub fn extract_error_summary_from_tracking(
         return None;
     }
 
-    // In verbose mode, also collect samples
-    if verbose > 0 {
-        for (key, value) in tracked {
-            if let Some(_error_type) = key.strip_prefix("__kelora_error_samples_") {
-                if let Ok(sample_array) = value.clone().into_array() {
-                    for sample in sample_array {
-                        if let Ok(sample_msg) = sample.into_string() {
-                            samples.push(sample_msg);
-                        }
+    // Collect sample objects with structured data
+    for (key, value) in tracked {
+        if let Some(_error_type) = key.strip_prefix("__kelora_error_samples_") {
+            if let Ok(sample_array) = value.clone().into_array() {
+                for sample in sample_array {
+                    if let Some(sample_map) = sample.try_cast::<rhai::Map>() {
+                        sample_objects.push(sample_map);
                     }
                 }
             }
         }
     }
 
-    // Format summary based on verbosity
+    // Use the new concise format
     let mut summary = String::new();
-
-    if error_types.len() == 1 && error_types[0].0 == "parse" {
-        // Simple case: only parse errors
-        let count = error_types[0].1;
-        if count == 1 {
-            summary.push_str("Processing completed with 1 parse error");
-        } else {
-            summary.push_str(&format!("Processing completed with {} parse errors", count));
-        }
-    } else if error_types.len() == 1 {
-        // Simple case: only one error type
-        let (error_type, count) = &error_types[0];
-        if *count == 1 {
-            summary.push_str(&format!("Processing completed with 1 {} error", error_type));
-        } else {
-            summary.push_str(&format!(
-                "Processing completed with {} {} errors",
-                count, error_type
-            ));
-        }
+    
+    // Determine primary error type for header
+    let primary_error_type = if error_types.len() == 1 {
+        &error_types[0].0
     } else {
-        // Multiple error types
-        summary.push_str(&format!(
-            "Processing completed with {} errors: ",
-            total_errors
-        ));
-        let type_summaries: Vec<String> = error_types
-            .iter()
-            .map(|(error_type, count)| format!("{} {}", count, error_type))
-            .collect();
-        summary.push_str(&type_summaries.join(", "));
+        // For mixed types, use generic "errors"
+        "mixed"
+    };
+
+    // Format header: "🧱 parse errors: N total" or "🧱 mixed errors: N total"
+    if primary_error_type == "mixed" {
+        summary.push_str(&format!("🧱 mixed errors: {} total", total_errors));
+    } else {
+        summary.push_str(&format!("🧱 {} errors: {} total", primary_error_type, total_errors));
     }
 
-    // Add samples in verbose mode
-    if verbose > 0 && !samples.is_empty() {
-        summary.push_str("\n\nError examples:");
-        for sample in samples {
-            summary.push_str(&format!("\n  {}", sample));
+    // Show up to 3 examples with filename:line format
+    let mut shown_samples = 0;
+    for sample_obj in &sample_objects {
+        if shown_samples >= 3 {
+            break;
         }
+        
+        // Extract data from sample object
+        let line_num = sample_obj.get("line_num")
+            .and_then(|v| v.as_int().ok())
+            .unwrap_or(0);
+        let message = sample_obj.get("message")
+            .and_then(|v| v.clone().into_string().ok())
+            .unwrap_or_else(|| "unknown error".to_string());
+        let filename = sample_obj.get("filename")
+            .and_then(|v| v.clone().into_string().ok())
+            .unwrap_or_else(|| "stdin".to_string());
+        let original_line = sample_obj.get("original_line")
+            .and_then(|v| v.clone().into_string().ok());
+
+        // Format: "  filename:line: error message"
+        summary.push_str(&format!("\n  {}:{}: {}", filename, line_num, message));
+        
+        // In verbose mode, add indented original line
+        if verbose > 0 {
+            if let Some(orig_line) = original_line {
+                // Truncate very long lines for readability
+                let display_line = if orig_line.len() > 100 {
+                    format!("{}...", &orig_line[..97])
+                } else {
+                    orig_line
+                };
+                summary.push_str(&format!("\n    {}", display_line));
+            }
+        }
+        
+        shown_samples += 1;
+    }
+
+    // Add "more errors not shown" if total errors exceed samples shown
+    if total_errors as usize > shown_samples {
+        let remaining = total_errors as usize - shown_samples;
+        summary.push_str(&format!("\n  [{} more errors not shown]", remaining));
     }
 
     Some(summary)
