@@ -25,7 +25,7 @@ pub fn track_error(
     THREAD_TRACKING_STATE.with(|state| {
         let mut state = state.borrow_mut();
 
-        // Track error count by type
+        // Track error count by type - uses "count" operation for summing across workers
         let count_key = format!("__kelora_error_count_{}", error_type);
         let current_count = state
             .get(&count_key)
@@ -66,7 +66,8 @@ pub fn track_error(
             }
         }
 
-        // Track error samples (max 3 per type) - store both error message and original line
+        // Track error samples (max 3 per type) - uses "unique" operation for deduplication
+        // This stores examples for display but doesn't affect the total count
         let samples_key = format!("__kelora_error_samples_{}", error_type);
         let current_samples = state
             .get(&samples_key)
