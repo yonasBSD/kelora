@@ -651,13 +651,6 @@ pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) 
         return Err(anyhow::anyhow!("End stage error: {}", e));
     }
 
-    // Report debug statistics if debug mode is enabled
-    if config.processing.verbose > 0 {
-        let debug_config = crate::engine::DebugConfig::new(config.processing.verbose)
-            .with_emoji(!config.output.no_emoji);
-        crate::engine::debug_stats_report(&debug_config);
-    }
-
     // Merge thread-local tracking state (including errors) into context for sequential mode
     crate::rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
 
@@ -781,13 +774,6 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         // Execute end stage
         if let Err(e) = end_stage.execute(&ctx) {
             return Err(anyhow::anyhow!("End stage error: {}", e));
-        }
-
-        // Report debug statistics if debug mode is enabled (file auto-detection)
-        if final_config.processing.verbose > 0 {
-            let debug_config = crate::engine::DebugConfig::new(final_config.processing.verbose)
-                .with_emoji(!final_config.output.no_emoji);
-            crate::engine::debug_stats_report(&debug_config);
         }
 
         // Merge thread-local tracking state

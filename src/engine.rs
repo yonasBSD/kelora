@@ -681,29 +681,6 @@ pub fn debug_stats_set_thread_state(stats: &DebugStatistics) {
     });
 }
 
-pub fn debug_stats_report(config: &DebugConfig) {
-    if config.is_enabled() {
-        let stats = debug_stats_get_thread_state();
-        if let Some(start_time) = stats.start_time {
-            let duration = start_time.elapsed();
-            let prefix = if config.use_emoji { "⚡" } else { "kelora:" };
-            
-            eprintln!("{} Processing completed in {:?}", prefix, duration);
-            eprintln!("{} {} events processed, {} passed filter", prefix,
-                stats.events_processed, stats.events_passed);
-            eprintln!("{} {} script executions performed", prefix, stats.script_executions);
-            
-            if stats.errors_encountered > 0 {
-                eprintln!("{} {} errors encountered", prefix, stats.errors_encountered);
-            }
-            
-            if config.show_timing && duration.as_secs_f64() > 0.0 {
-                eprintln!("{} {:.2} events/sec", prefix,
-                    stats.events_processed as f64 / duration.as_secs_f64());
-            }
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct CompiledExpression {
