@@ -19,12 +19,8 @@ pub fn track_error(
     quiet: bool,
     config: Option<&crate::pipeline::PipelineConfig>,
 ) {
-    // Also update stats for the termination case (minimal error count only)
-    if error_type == "parse" {
-        crate::stats::stats_add_line_error();
-    } else {
-        crate::stats::stats_add_error();
-    }
+    // Use tracking infrastructure for error counting in all modes
+    // This ensures consistent mapreduce behavior and avoids double counting
 
     THREAD_TRACKING_STATE.with(|state| {
         let mut state = state.borrow_mut();
