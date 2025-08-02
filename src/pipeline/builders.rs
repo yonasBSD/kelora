@@ -83,7 +83,6 @@ impl PipelineBuilder {
                 color_mode: crate::config::ColorMode::Auto,
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
-                debug: false,
                 verbose: 0,
                 quiet: false,
                 no_emoji: false,
@@ -122,7 +121,8 @@ impl PipelineBuilder {
         let mut rhai_engine = RhaiEngine::new();
         
         // Set up debugging if enabled
-        let debug_config = DebugConfig::new(self.config.debug, self.config.verbose);
+        let debug_config = DebugConfig::new(self.config.verbose)
+            .with_emoji(!self.config.no_emoji);
         rhai_engine.setup_debugging(debug_config);
 
         // Create parser
@@ -378,7 +378,8 @@ impl PipelineBuilder {
         let mut rhai_engine = RhaiEngine::new();
         
         // Set up debugging if enabled
-        let debug_config = DebugConfig::new(self.config.debug, self.config.verbose);
+        let debug_config = DebugConfig::new(self.config.verbose)
+            .with_emoji(!self.config.no_emoji);
         rhai_engine.setup_debugging(debug_config);
 
         // Create parser (with pre-processed CSV headers if available)
@@ -651,7 +652,6 @@ pub fn create_pipeline_builder_from_config(
         color_mode: config.output.color.clone(),
         timestamp_formatting: config.output.timestamp_formatting.clone(),
         strict: config.processing.strict,
-        debug: config.processing.debug,
         verbose: config.processing.verbose,
         quiet: config.processing.quiet,
         no_emoji: config.output.no_emoji,

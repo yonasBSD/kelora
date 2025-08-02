@@ -13,20 +13,29 @@ use rhai::Map;
 // Temporary debug types until module structure is fixed
 #[derive(Debug, Clone)]
 pub struct DebugConfig {
-    pub enabled: bool,
     pub verbosity: u8,
     pub show_timing: bool,
     pub trace_events: bool,
+    pub use_emoji: bool,
 }
 
 impl DebugConfig {
-    pub fn new(debug: bool, verbose_count: u8) -> Self {
+    pub fn new(verbose_count: u8) -> Self {
         DebugConfig {
-            enabled: debug,
-            verbosity: if debug { verbose_count } else { 0 },
-            show_timing: debug,
+            verbosity: verbose_count,
+            show_timing: verbose_count >= 1,
             trace_events: verbose_count >= 2,
+            use_emoji: true, // Default to true, will be overridden
         }
+    }
+    
+    pub fn with_emoji(mut self, use_emoji: bool) -> Self {
+        self.use_emoji = use_emoji;
+        self
+    }
+    
+    pub fn is_enabled(&self) -> bool {
+        self.verbosity > 0
     }
 }
 
@@ -57,19 +66,19 @@ impl DebugTracker {
     }
     
     pub fn log_basic(&self, message: &str) {
-        if self.config.enabled && self.config.verbosity >= 1 {
-            eprintln!("Debug: {}", message);
+        if self.config.is_enabled() && self.config.verbosity >= 1 {
+            eprintln!("{}", message);
         }
     }
     
     pub fn log_detailed(&self, stage: &str, event_num: u64, operation: &str) {
-        if self.config.enabled && self.config.verbosity >= 2 {
+        if self.config.is_enabled() && self.config.verbosity >= 2 {
             eprintln!("Trace: Event #{} {} → {}", event_num, stage, operation);
         }
     }
     
     pub fn log_step(&self, step_info: &str, result: &str) {
-        if self.config.enabled && self.config.verbosity >= 3 {
+        if self.config.is_enabled() && self.config.verbosity >= 3 {
             eprintln!("  → {} → {}", step_info, result);
         }
     }
@@ -77,19 +86,20 @@ impl DebugTracker {
     pub fn log_execution_start(&self, stage: &str, script: &str, event_data: &str) {
         match self.config.verbosity {
             1 => {
-                if self.config.enabled {
-                    eprintln!("Debug: Executing {} stage", stage);
+                if self.config.is_enabled() {
+                    let prefix = if self.config.use_emoji { "⚡" } else { "kelora:" };
+                    eprintln!("{} Executing {} stage", prefix, stage);
                 }
             },
             2 => {
-                if self.config.enabled {
-                    eprintln!("Debug: {} execution started", stage);
+                if self.config.is_enabled() {
+                    eprintln!("{} execution started", stage);
                     eprintln!("  Script: {}", self.truncate_for_display(script, 100));
                 }
             },
             3.. => {
-                if self.config.enabled {
-                    eprintln!("Debug: {} execution trace:", stage);
+                if self.config.is_enabled() {
+                    eprintln!("{} execution trace:", stage);
                     eprintln!("  Script: {}", script.trim());
                     eprintln!("  Event: {}", self.truncate_for_display(event_data, 150));
                 }
@@ -99,9 +109,9 @@ impl DebugTracker {
     }
     
     pub fn log_execution_result(&self, stage: &str, success: bool, result_info: &str) {
-        if self.config.enabled && self.config.verbosity >= 2 {
+        if self.config.is_enabled() && self.config.verbosity >= 2 {
             let status = if success { "✓" } else { "✗" };
-            eprintln!("Debug: {} {} ({})", stage, status, result_info);
+            eprintln!("{} {} ({})", stage, status, result_info);
         }
     }
     
@@ -114,7 +124,7 @@ impl DebugTracker {
     }
     
     pub fn update_context(&self, position: Option<rhai::Position>, source: Option<&str>) {
-        if self.config.enabled {
+        if self.config.is_enabled() {
             if let Ok(mut ctx) = self.context.lock() {
                 ctx.position = position;
                 ctx.source_snippet = source.map(|s| s.to_string());
@@ -171,7 +181,7 @@ impl ErrorEnhancer {
         }
         
         // Show scope information if debug enabled
-        if self.debug_config.enabled {
+        if self.debug_config.is_enabled() {
             output.push_str("\n   Variables in scope:\n");
             for (name, _is_const, value) in scope.iter() {
                 let preview = format!("{:?}", value);
@@ -384,7 +394,8 @@ impl ExecutionTracer {
     
     pub fn trace_stage_execution(&self, stage_number: usize, stage_type: &str) {
         if self.config.verbosity >= 1 {
-            eprintln!("Debug: Executing stage {} ({})", stage_number, stage_type);
+            let prefix = if self.config.use_emoji { "⚡" } else { "kelora:" };
+            eprintln!("{} Executing stage {} ({})", prefix, stage_number, stage_type);
         }
     }
     
@@ -400,7 +411,7 @@ impl ExecutionTracer {
     
     pub fn trace_event_start(&self, event_num: u64, event_data: &str) {
         if self.config.verbosity >= 2 {
-            eprintln!("Debug: Filter execution trace for event {}:", event_num);
+            eprintln!("Filter execution trace for event {}:", event_num);
             eprintln!("  Event: {}", self.truncate_for_display(event_data, 100));
         }
     }
@@ -671,22 +682,23 @@ pub fn debug_stats_set_thread_state(stats: &DebugStatistics) {
 }
 
 pub fn debug_stats_report(config: &DebugConfig) {
-    if config.enabled {
+    if config.is_enabled() {
         let stats = debug_stats_get_thread_state();
         if let Some(start_time) = stats.start_time {
             let duration = start_time.elapsed();
+            let prefix = if config.use_emoji { "⚡" } else { "kelora:" };
             
-            eprintln!("Debug: Processing completed in {:?}", duration);
-            eprintln!("Debug: {} events processed, {} passed filter", 
+            eprintln!("{} Processing completed in {:?}", prefix, duration);
+            eprintln!("{} {} events processed, {} passed filter", prefix,
                 stats.events_processed, stats.events_passed);
-            eprintln!("Debug: {} script executions performed", stats.script_executions);
+            eprintln!("{} {} script executions performed", prefix, stats.script_executions);
             
             if stats.errors_encountered > 0 {
-                eprintln!("Debug: {} errors encountered", stats.errors_encountered);
+                eprintln!("{} {} errors encountered", prefix, stats.errors_encountered);
             }
             
             if config.show_timing && duration.as_secs_f64() > 0.0 {
-                eprintln!("Debug: {:.2} events/sec", 
+                eprintln!("{} {:.2} events/sec", prefix,
                     stats.events_processed as f64 / duration.as_secs_f64());
             }
         }
@@ -1120,7 +1132,7 @@ impl RhaiEngine {
 
     /// Set up debugging with the provided configuration
     pub fn setup_debugging(&mut self, debug_config: DebugConfig) {
-        if !debug_config.enabled {
+        if !debug_config.is_enabled() {
             return;
         }
 

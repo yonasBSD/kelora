@@ -84,8 +84,6 @@ pub struct ProcessingConfig {
     pub take_limit: Option<usize>,
     /// Exit on first error (fail-fast behavior) - new resiliency model
     pub strict: bool,
-    /// Enable debug output
-    pub debug: bool,
     /// Show detailed error information (levels: 0-3) - new resiliency model
     pub verbose: u8,
     /// Suppress error summary (quiet mode) - new resiliency model
@@ -615,7 +613,6 @@ impl KeloraConfig {
                 timestamp_filter: None, // Will be set in main() after parsing since/until
                 take_limit: cli.take,
                 strict: cli.strict,
-                debug: cli.debug,
                 verbose: cli.verbose,
                 quiet: cli.quiet,
             },
@@ -693,7 +690,6 @@ impl Default for KeloraConfig {
                 timestamp_filter: None,
                 take_limit: None,
                 strict: false,
-                debug: false,
                 verbose: 0,
                 quiet: false,
             },

@@ -3,28 +3,30 @@ use rhai::{EvalAltResult, Scope, Position};
 
 #[derive(Debug, Clone)]
 pub struct DebugConfig {
-    pub enabled: bool,
     pub verbosity: u8,  // 0-3 for debug levels
     pub show_timing: bool,
     pub trace_events: bool,
 }
 
 impl DebugConfig {
-    pub fn new(debug: bool, verbose_count: u8) -> Self {
+    pub fn new(verbose_count: u8) -> Self {
         DebugConfig {
-            enabled: debug,
-            verbosity: if debug { verbose_count } else { 0 },
-            show_timing: debug,
+            verbosity: verbose_count,
+            show_timing: verbose_count >= 1,
             trace_events: verbose_count >= 2,
         }
     }
     
     pub fn should_trace(&self) -> bool {
-        self.enabled && self.verbosity >= 2
+        self.verbosity >= 2
     }
     
     pub fn should_show_context(&self) -> bool {
-        self.enabled && self.verbosity >= 1
+        self.verbosity >= 2
+    }
+    
+    pub fn is_enabled(&self) -> bool {
+        self.verbosity > 0
     }
 }
 
@@ -54,13 +56,13 @@ impl DebugTracker {
     }
     
     pub fn log_basic(&self, message: &str) {
-        if self.config.enabled && self.config.verbosity >= 1 {
-            eprintln!("Debug: {}", message);
+        if self.config.verbosity >= 1 {
+            eprintln!("{}", message);
         }
     }
     
     pub fn update_context(&self, position: Option<Position>, source: Option<&str>) {
-        if self.config.enabled {
+        if self.config.is_enabled() {
             if let Ok(mut ctx) = self.context.lock() {
                 ctx.position = position;
                 ctx.source_snippet = source.map(|s| s.to_string());

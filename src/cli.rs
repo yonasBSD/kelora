@@ -141,10 +141,6 @@ pub struct Cli {
     #[arg(long = "strict", help_heading = "Error Handling")]
     pub strict: bool,
 
-    /// Enable debug output
-    #[arg(long = "debug", help_heading = "Error Handling")]
-    pub debug: bool,
-
     /// Show detailed error information (use multiple times for more verbosity: -v, -vv, -vvv)
     #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count, help_heading = "Error Handling")]
     pub verbose: u8,

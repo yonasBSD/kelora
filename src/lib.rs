@@ -44,7 +44,6 @@ pub struct PipelineProcessingConfig {
     pub timestamp_filter: Option<config::TimestampFilterConfig>,
     pub take_limit: Option<usize>,
     pub strict: bool,
-    pub debug: bool,
     pub verbose: u8,
     pub quiet: bool,
 }
@@ -84,8 +83,7 @@ impl PipelineConfig {
                 timestamp_filter: config.processing.timestamp_filter.clone(),
                 take_limit: config.processing.take_limit,
                 strict: config.processing.strict,
-                debug: config.processing.debug,
-                verbose: config.processing.verbose,
+                    verbose: config.processing.verbose,
                 quiet: config.processing.quiet,
             },
             performance: PipelinePerformanceConfig {
@@ -357,7 +355,6 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
             timestamp_filter: final_config.processing.timestamp_filter.clone(),
             take_limit: final_config.processing.take_limit,
             strict: final_config.processing.strict,
-            debug: final_config.processing.debug,
             verbose: final_config.processing.verbose,
             quiet: final_config.processing.quiet,
         },
@@ -498,7 +495,6 @@ pub fn run_pipeline_sequential_with_config<W: Write>(
             timestamp_filter: config.processing.timestamp_filter.clone(),
             take_limit: config.processing.take_limit,
             strict: config.processing.strict,
-            debug: config.processing.debug,
             verbose: config.processing.verbose,
             quiet: config.processing.quiet,
         },
@@ -656,8 +652,9 @@ pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) 
     }
 
     // Report debug statistics if debug mode is enabled
-    if config.processing.debug {
-        let debug_config = crate::engine::DebugConfig::new(config.processing.debug, config.processing.verbose);
+    if config.processing.verbose > 0 {
+        let debug_config = crate::engine::DebugConfig::new(config.processing.verbose)
+            .with_emoji(!config.output.no_emoji);
         crate::engine::debug_stats_report(&debug_config);
     }
 
@@ -787,8 +784,9 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         }
 
         // Report debug statistics if debug mode is enabled (file auto-detection)
-        if final_config.processing.debug {
-            let debug_config = crate::engine::DebugConfig::new(final_config.processing.debug, final_config.processing.verbose);
+        if final_config.processing.verbose > 0 {
+            let debug_config = crate::engine::DebugConfig::new(final_config.processing.verbose)
+                .with_emoji(!final_config.output.no_emoji);
             crate::engine::debug_stats_report(&debug_config);
         }
 
