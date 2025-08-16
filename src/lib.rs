@@ -83,7 +83,7 @@ impl PipelineConfig {
                 timestamp_filter: config.processing.timestamp_filter.clone(),
                 take_limit: config.processing.take_limit,
                 strict: config.processing.strict,
-                    verbose: config.processing.verbose,
+                verbose: config.processing.verbose,
                 quiet: config.processing.quiet,
             },
             performance: PipelinePerformanceConfig {

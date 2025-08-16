@@ -38,7 +38,9 @@ pub fn track_error(
         // Output verbose errors - use ordered capture system for proper interleaving
         if verbose > 0 && !quiet {
             // Enhanced format with filename for immediate verbose output
-            let color_mode = config.map(|c| &c.color_mode).unwrap_or(&crate::config::ColorMode::Auto);
+            let color_mode = config
+                .map(|c| &c.color_mode)
+                .unwrap_or(&crate::config::ColorMode::Auto);
             let use_colors = crate::tty::should_use_colors_with_mode(color_mode);
             let no_emoji = if let Some(cfg) = config {
                 cfg.no_emoji || std::env::var("NO_EMOJI").is_ok()
@@ -47,9 +49,12 @@ pub fn track_error(
             };
             let use_emoji = use_colors && !no_emoji;
             let prefix = if use_emoji { "🧱" } else { "kelora:" };
-            
+
             let formatted_error = if let (Some(line), Some(fname)) = (line_num, filename) {
-                format!("{} {}:{}: {} - {}", prefix, fname, line, error_type, message)
+                format!(
+                    "{} {}:{}: {} - {}",
+                    prefix, fname, line, error_type, message
+                )
             } else if let Some(line) = line_num {
                 format!("{} line {}: {} - {}", prefix, line, error_type, message)
             } else {
@@ -80,7 +85,10 @@ pub fn track_error(
                 // Create a sample object containing error details and original line
                 let mut sample_obj = rhai::Map::new();
                 sample_obj.insert("error_type".into(), Dynamic::from(error_type.to_string()));
-                sample_obj.insert("line_num".into(), Dynamic::from(line_num.unwrap_or(0) as i64));
+                sample_obj.insert(
+                    "line_num".into(),
+                    Dynamic::from(line_num.unwrap_or(0) as i64),
+                );
                 sample_obj.insert("message".into(), Dynamic::from(message.to_string()));
                 if let Some(line) = original_line {
                     sample_obj.insert("original_line".into(), Dynamic::from(line.to_string()));
@@ -89,7 +97,7 @@ pub fn track_error(
                 if let Some(filename) = filename {
                     sample_obj.insert("filename".into(), Dynamic::from(filename.to_string()));
                 }
-                
+
                 arr.push(Dynamic::from(sample_obj));
             }
 
@@ -155,7 +163,7 @@ pub fn extract_error_summary_from_tracking(
 
     // Use the new concise format
     let mut summary = String::new();
-    
+
     // Determine primary error type for header
     let primary_error_type = if error_types.len() == 1 {
         &error_types[0].0
@@ -168,7 +176,10 @@ pub fn extract_error_summary_from_tracking(
     if primary_error_type == "mixed" {
         summary.push_str(&format!("🧱 mixed errors: {} total", total_errors));
     } else {
-        summary.push_str(&format!("🧱 {} errors: {} total", primary_error_type, total_errors));
+        summary.push_str(&format!(
+            "🧱 {} errors: {} total",
+            primary_error_type, total_errors
+        ));
     }
 
     // Show up to 3 examples with filename:line format
@@ -177,23 +188,27 @@ pub fn extract_error_summary_from_tracking(
         if shown_samples >= 3 {
             break;
         }
-        
+
         // Extract data from sample object
-        let line_num = sample_obj.get("line_num")
+        let line_num = sample_obj
+            .get("line_num")
             .and_then(|v| v.as_int().ok())
             .unwrap_or(0);
-        let message = sample_obj.get("message")
+        let message = sample_obj
+            .get("message")
             .and_then(|v| v.clone().into_string().ok())
             .unwrap_or_else(|| "unknown error".to_string());
-        let filename = sample_obj.get("filename")
+        let filename = sample_obj
+            .get("filename")
             .and_then(|v| v.clone().into_string().ok())
             .unwrap_or_else(|| "stdin".to_string());
-        let original_line = sample_obj.get("original_line")
+        let original_line = sample_obj
+            .get("original_line")
             .and_then(|v| v.clone().into_string().ok());
 
         // Format: "  filename:line: error message"
         summary.push_str(&format!("\n  {}:{}: {}", filename, line_num, message));
-        
+
         // In verbose mode, add indented original line
         if verbose > 0 {
             if let Some(orig_line) = original_line {
@@ -206,7 +221,7 @@ pub fn extract_error_summary_from_tracking(
                 summary.push_str(&format!("\n    {}", display_line));
             }
         }
-        
+
         shown_samples += 1;
     }
 

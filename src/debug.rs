@@ -1,9 +1,9 @@
+use rhai::{EvalAltResult, Position, Scope};
 use std::sync::{Arc, Mutex};
-use rhai::{EvalAltResult, Scope, Position};
 
 #[derive(Debug, Clone)]
 pub struct DebugConfig {
-    pub verbosity: u8,  // 0-3 for debug levels
+    pub verbosity: u8, // 0-3 for debug levels
     pub show_timing: bool,
     pub trace_events: bool,
 }
@@ -16,15 +16,15 @@ impl DebugConfig {
             trace_events: verbose_count >= 2,
         }
     }
-    
+
     pub fn should_trace(&self) -> bool {
         self.verbosity >= 2
     }
-    
+
     pub fn should_show_context(&self) -> bool {
         self.verbosity >= 2
     }
-    
+
     pub fn is_enabled(&self) -> bool {
         self.verbosity > 0
     }
@@ -54,13 +54,13 @@ impl DebugTracker {
             error_count: Arc::new(Mutex::new(0)),
         }
     }
-    
+
     pub fn log_basic(&self, message: &str) {
         if self.config.verbosity >= 1 {
             eprintln!("{}", message);
         }
     }
-    
+
     pub fn update_context(&self, position: Option<Position>, source: Option<&str>) {
         if self.config.is_enabled() {
             if let Ok(mut ctx) = self.context.lock() {
@@ -69,7 +69,7 @@ impl DebugTracker {
             }
         }
     }
-    
+
     pub fn get_context(&self) -> ExecutionContext {
         if let Ok(ctx) = self.context.lock() {
             ctx.clone()
@@ -98,47 +98,52 @@ impl ErrorEnhancer {
     pub fn new(debug_config: DebugConfig) -> Self {
         ErrorEnhancer { debug_config }
     }
-    
-    pub fn enhance_error(&self, 
-        error: &EvalAltResult, 
-        scope: &Scope, 
+
+    pub fn enhance_error(
+        &self,
+        error: &EvalAltResult,
+        scope: &Scope,
         script: &str,
         stage: &str,
-        execution_context: &ExecutionContext
+        execution_context: &ExecutionContext,
     ) -> String {
         let mut output = String::new();
-        
+
         // Basic error info
         output.push_str(&format!("❌ Stage {} failed\n", stage));
         output.push_str(&format!("   Code: {}\n", script.trim()));
         output.push_str(&format!("   Error: {}\n", error));
-        
+
         // Add execution context if available
         if let Some(pos) = &execution_context.position {
             output.push_str(&format!("   Position: {}\n", pos));
         }
-        
+
         // Show scope information
         if self.debug_config.should_show_context() {
             output.push_str("\n   Variables in scope:\n");
             for (name, _is_const, value) in scope.iter() {
                 let preview = self.format_value_preview(&value);
-                output.push_str(&format!("   • {}: {} = {}\n", 
-                    name, value.type_name(), preview));
+                output.push_str(&format!(
+                    "   • {}: {} = {}\n",
+                    name,
+                    value.type_name(),
+                    preview
+                ));
             }
-            
+
             // Add suggestions based on error type
             if let Some(suggestions) = self.generate_suggestions(error, scope) {
                 output.push_str(&format!("\n   💡 {}\n", suggestions));
             }
-            
+
             // Add stage-specific help
             output.push_str(&self.get_stage_help(stage, error));
         }
-        
+
         output
     }
-    
+
     fn format_value_preview(&self, value: &rhai::Dynamic) -> String {
         let preview = format!("{:?}", value);
         if preview.len() > 50 {
@@ -147,7 +152,7 @@ impl ErrorEnhancer {
             preview
         }
     }
-    
+
     fn generate_suggestions(&self, error: &EvalAltResult, scope: &Scope) -> Option<String> {
         match error {
             EvalAltResult::ErrorVariableNotFound(var_name, _) => {
@@ -157,27 +162,27 @@ impl ErrorEnhancer {
                 } else {
                     None
                 }
-            },
-            _ => None
+            }
+            _ => None,
         }
     }
-    
+
     fn find_similar_variables(&self, target: &str, scope: &Scope) -> Vec<String> {
         let mut suggestions = Vec::new();
         let target_lower = target.to_lowercase();
-        
+
         for (name, _is_const, _value) in scope.iter() {
             let name_lower = name.to_lowercase();
-            
+
             // Simple similarity check
             if name_lower.contains(&target_lower) || target_lower.contains(&name_lower) {
                 suggestions.push(name.to_string());
             }
         }
-        
+
         suggestions
     }
-    
+
     fn get_stage_help(&self, stage: &str, _error: &EvalAltResult) -> String {
         match stage {
             "filter" => "   🎯 Filter tip: Use 'e.field_name' to access event fields\n".to_string(),

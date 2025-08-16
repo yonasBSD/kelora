@@ -28,12 +28,12 @@ impl DebugConfig {
             use_emoji: true, // Default to true, will be overridden
         }
     }
-    
+
     pub fn with_emoji(mut self, use_emoji: bool) -> Self {
         self.use_emoji = use_emoji;
         self
     }
-    
+
     pub fn is_enabled(&self) -> bool {
         self.verbosity > 0
     }
@@ -64,65 +64,69 @@ impl DebugTracker {
             error_count: Arc::new(Mutex::new(0)),
         }
     }
-    
+
     pub fn log_basic(&self, message: &str) {
         if self.config.is_enabled() && self.config.verbosity >= 1 {
             eprintln!("{}", message);
         }
     }
-    
+
     pub fn log_detailed(&self, stage: &str, event_num: u64, operation: &str) {
         if self.config.is_enabled() && self.config.verbosity >= 2 {
             eprintln!("Trace: Event #{} {} → {}", event_num, stage, operation);
         }
     }
-    
+
     pub fn log_step(&self, step_info: &str, result: &str) {
         if self.config.is_enabled() && self.config.verbosity >= 3 {
             eprintln!("  → {} → {}", step_info, result);
         }
     }
-    
+
     pub fn log_execution_start(&self, stage: &str, script: &str, event_data: &str) {
         match self.config.verbosity {
             1 => {
                 if self.config.is_enabled() {
-                    let prefix = if self.config.use_emoji { "⚡" } else { "kelora:" };
+                    let prefix = if self.config.use_emoji {
+                        "⚡"
+                    } else {
+                        "kelora:"
+                    };
                     eprintln!("{} Executing {} stage", prefix, stage);
                 }
-            },
+            }
             2 => {
                 if self.config.is_enabled() {
                     eprintln!("{} execution started", stage);
                     eprintln!("  Script: {}", self.truncate_for_display(script, 100));
                 }
-            },
+            }
             3.. => {
                 if self.config.is_enabled() {
                     eprintln!("{} execution trace:", stage);
                     eprintln!("  Script: {}", script.trim());
                     eprintln!("  Event: {}", self.truncate_for_display(event_data, 150));
                 }
-            },
+            }
             _ => {}
         }
     }
-    
+
     pub fn log_execution_result(&self, stage: &str, success: bool, result_info: &str) {
         if self.config.is_enabled() && self.config.verbosity >= 2 {
             let status = if success { "✓" } else { "✗" };
             eprintln!("{} {} ({})", stage, status, result_info);
         }
     }
-    
+
     fn truncate_for_display(&self, text: &str, max_len: usize) -> String {
         if text.len() > max_len {
-            format!("{}...", &text[..max_len-3])
+            format!("{}...", &text[..max_len - 3])
         } else {
             text.to_string()
         }
     }
-    
+
     pub fn update_context(&self, position: Option<rhai::Position>, source: Option<&str>) {
         if self.config.is_enabled() {
             if let Ok(mut ctx) = self.context.lock() {
@@ -131,7 +135,7 @@ impl DebugTracker {
             }
         }
     }
-    
+
     pub fn get_context(&self) -> ExecutionContext {
         if let Ok(ctx) = self.context.lock() {
             ctx.clone()
@@ -160,26 +164,27 @@ impl ErrorEnhancer {
     pub fn new(debug_config: DebugConfig) -> Self {
         ErrorEnhancer { debug_config }
     }
-    
-    pub fn enhance_error(&self, 
-        error: &EvalAltResult, 
-        scope: &Scope, 
+
+    pub fn enhance_error(
+        &self,
+        error: &EvalAltResult,
+        scope: &Scope,
         script: &str,
         stage: &str,
-        execution_context: &ExecutionContext
+        execution_context: &ExecutionContext,
     ) -> String {
         let mut output = String::new();
-        
+
         // Basic error info
         output.push_str(&format!("❌ Stage {} failed\n", stage));
         output.push_str(&format!("   Code: {}\n", script.trim()));
         output.push_str(&format!("   Error: {}\n", error));
-        
+
         // Add execution context if available
         if let Some(pos) = &execution_context.position {
             output.push_str(&format!("   Position: {}\n", pos));
         }
-        
+
         // Show scope information if debug enabled
         if self.debug_config.is_enabled() {
             output.push_str("\n   Variables in scope:\n");
@@ -190,22 +195,26 @@ impl ErrorEnhancer {
                 } else {
                     preview
                 };
-                output.push_str(&format!("   • {}: {} = {}\n", 
-                    name, value.type_name(), preview));
+                output.push_str(&format!(
+                    "   • {}: {} = {}\n",
+                    name,
+                    value.type_name(),
+                    preview
+                ));
             }
-            
+
             // Add suggestions based on error type
             if let Some(suggestions) = self.generate_suggestions(error, scope) {
                 output.push_str(&format!("\n   💡 {}\n", suggestions));
             }
-            
+
             // Add stage-specific help
             output.push_str(&self.get_stage_help(stage, error));
         }
-        
+
         output
     }
-    
+
     fn generate_suggestions(&self, error: &EvalAltResult, scope: &Scope) -> Option<String> {
         match error {
             EvalAltResult::ErrorVariableNotFound(var_name, _) => {
@@ -238,117 +247,147 @@ impl ErrorEnhancer {
             _ => None
         }
     }
-    
+
     fn suggest_function_alternatives(&self, func_sig: &str) -> Option<String> {
         let func_name = func_sig.split('(').next().unwrap_or(func_sig).trim();
-        
+
         // Common function alternatives
         match func_name {
             "length" => Some("Use 'len()' instead of 'length()'".to_string()),
             "size" => Some("Use 'len()' instead of 'size()'".to_string()),
-            "substr" | "substring" => Some("Use string slicing: s[start..end] or extract_re() for pattern matching".to_string()),
-            "indexOf" | "index_of" => Some("Use 'contains()' to check existence or 'split()' to find positions".to_string()),
+            "substr" | "substring" => Some(
+                "Use string slicing: s[start..end] or extract_re() for pattern matching"
+                    .to_string(),
+            ),
+            "indexOf" | "index_of" => Some(
+                "Use 'contains()' to check existence or 'split()' to find positions".to_string(),
+            ),
             "push_back" | "append" => Some("Use 'push()' to add elements to arrays".to_string()),
-            "to_int" | "parseInt" => Some("Use 'parse()' or to_number() for type conversion".to_string()),
+            "to_int" | "parseInt" => {
+                Some("Use 'parse()' or to_number() for type conversion".to_string())
+            }
             "to_str" | "toString" => Some("Use 'to_string()' for string conversion".to_string()),
-            "match" => Some("Use 'extract_re()' for regex matching or 'contains()' for simple checks".to_string()),
-            name if name.ends_with("_re") => Some("Regex functions: extract_re(), extract_all_re(), split_re(), replace_re()".to_string()),
-            _ => None
+            "match" => Some(
+                "Use 'extract_re()' for regex matching or 'contains()' for simple checks"
+                    .to_string(),
+            ),
+            name if name.ends_with("_re") => Some(
+                "Regex functions: extract_re(), extract_all_re(), split_re(), replace_re()"
+                    .to_string(),
+            ),
+            _ => None,
         }
     }
-    
+
     fn find_similar_variables(&self, target: &str, scope: &Scope) -> Vec<String> {
         let mut suggestions = Vec::new();
         let target_lower = target.to_lowercase();
-        
+
         for (name, _is_const, _value) in scope.iter() {
             let name_lower = name.to_lowercase();
             let similarity = self.calculate_similarity(&target_lower, &name_lower);
-            
+
             // Include variables with good similarity or common patterns
-            if similarity > 0.6 || 
-               name_lower.contains(&target_lower) || 
-               target_lower.contains(&name_lower) ||
-               self.has_common_prefix(&target_lower, &name_lower) {
+            if similarity > 0.6
+                || name_lower.contains(&target_lower)
+                || target_lower.contains(&name_lower)
+                || self.has_common_prefix(&target_lower, &name_lower)
+            {
                 suggestions.push(name.to_string());
             }
         }
-        
+
         // Sort by similarity (best matches first)
         suggestions.sort_by(|a, b| {
             let sim_a = self.calculate_similarity(&target_lower, &a.to_lowercase());
             let sim_b = self.calculate_similarity(&target_lower, &b.to_lowercase());
-            sim_b.partial_cmp(&sim_a).unwrap_or(std::cmp::Ordering::Equal)
+            sim_b
+                .partial_cmp(&sim_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
-        
+
         // Return top 3 suggestions
         suggestions.truncate(3);
         suggestions
     }
-    
+
     fn calculate_similarity(&self, s1: &str, s2: &str) -> f64 {
-        if s1 == s2 { return 1.0; }
-        if s1.is_empty() || s2.is_empty() { return 0.0; }
-        
+        if s1 == s2 {
+            return 1.0;
+        }
+        if s1.is_empty() || s2.is_empty() {
+            return 0.0;
+        }
+
         // Simple Levenshtein-based similarity
         let len1 = s1.len();
         let len2 = s2.len();
         let max_len = len1.max(len2);
-        
+
         let distance = self.levenshtein_distance(s1, s2);
         1.0 - (distance as f64 / max_len as f64)
     }
-    
+
     fn levenshtein_distance(&self, s1: &str, s2: &str) -> usize {
         let chars1: Vec<char> = s1.chars().collect();
         let chars2: Vec<char> = s2.chars().collect();
         let len1 = chars1.len();
         let len2 = chars2.len();
-        
-        if len1 == 0 { return len2; }
-        if len2 == 0 { return len1; }
-        
+
+        if len1 == 0 {
+            return len2;
+        }
+        if len2 == 0 {
+            return len1;
+        }
+
         let mut prev_row: Vec<usize> = (0..=len2).collect();
-        
+
         for i in 1..=len1 {
             let mut curr_row = vec![i];
-            
+
             for j in 1..=len2 {
-                let cost = if chars1[i-1] == chars2[j-1] { 0 } else { 1 };
+                let cost = if chars1[i - 1] == chars2[j - 1] { 0 } else { 1 };
                 curr_row.push(
-                    (curr_row[j-1] + 1)  // insertion
-                    .min(prev_row[j] + 1)  // deletion
-                    .min(prev_row[j-1] + cost)  // substitution
+                    (curr_row[j - 1] + 1) // insertion
+                        .min(prev_row[j] + 1) // deletion
+                        .min(prev_row[j - 1] + cost), // substitution
                 );
             }
-            
+
             prev_row = curr_row;
         }
-        
+
         prev_row[len2]
     }
-    
+
     fn has_common_prefix(&self, s1: &str, s2: &str) -> bool {
-        if s1.len() < 2 || s2.len() < 2 { return false; }
+        if s1.len() < 2 || s2.len() < 2 {
+            return false;
+        }
         let prefix_len = 2.min(s1.len()).min(s2.len());
         s1[..prefix_len] == s2[..prefix_len]
     }
-    
+
     fn get_stage_help(&self, stage: &str, error: &EvalAltResult) -> String {
         let mut help = String::new();
-        
+
         match stage {
             "filter" => {
                 help.push_str("\n   🎯 Filter stage tips:\n");
                 help.push_str("   • Filters must return true/false (boolean values)\n");
                 help.push_str("   • Use 'e.field_name' to access event fields\n");
-                help.push_str("   • Use 'e[\"field-with-special-chars\"]' for complex field names\n");
+                help.push_str(
+                    "   • Use 'e[\"field-with-special-chars\"]' for complex field names\n",
+                );
                 help.push_str("   • Use 'if \"field\" in e { ... }' to check field existence\n");
-                
+
                 if let EvalAltResult::ErrorMismatchDataType(_, _, _) = error {
-                    help.push_str("   • Remember: filters need boolean results, not strings or numbers\n");
+                    help.push_str(
+                        "   • Remember: filters need boolean results, not strings or numbers\n",
+                    );
                 }
-            },
+            }
             "exec" => {
                 help.push_str("\n   🎯 Exec stage tips:\n");
                 help.push_str("   • Use 'e.new_field = value' to add fields to events\n");
@@ -356,22 +395,22 @@ impl ErrorEnhancer {
                 help.push_str("   • Use 'e = ()' to remove entire event (filter out)\n");
                 help.push_str("   • Use 'let variable = value' for temporary variables\n");
                 help.push_str("   • Use 'print(\"debug: \" + value)' for debugging output\n");
-            },
+            }
             "begin" => {
                 help.push_str("\n   🎯 Begin stage tips:\n");
                 help.push_str("   • Use 'init.field = value' to set global initialization data\n");
                 help.push_str("   • Use 'read_file(\"path\")' to load external data\n");
                 help.push_str("   • Variables set here are available in all event processing\n");
-            },
+            }
             "end" => {
                 help.push_str("\n   🎯 End stage tips:\n");
                 help.push_str("   • Use 'tracked.key' to access accumulated tracking data\n");
                 help.push_str("   • Use 'print()' to output final results\n");
                 help.push_str("   • This runs after all events are processed\n");
-            },
+            }
             _ => {}
         }
-        
+
         help
     }
 }
@@ -391,62 +430,75 @@ impl ExecutionTracer {
             step_counter: Arc::new(Mutex::new(0)),
         }
     }
-    
+
     pub fn trace_stage_execution(&self, stage_number: usize, stage_type: &str) {
         if self.config.verbosity >= 1 {
-            let prefix = if self.config.use_emoji { "⚡" } else { "kelora:" };
-            eprintln!("{} Executing stage {} ({})", prefix, stage_number, stage_type);
+            let prefix = if self.config.use_emoji {
+                "⚡"
+            } else {
+                "kelora:"
+            };
+            eprintln!(
+                "{} Executing stage {} ({})",
+                prefix, stage_number, stage_type
+            );
         }
     }
-    
-    pub fn trace_step(&self, 
-        _event_num: u64,
-        step_info: &str, 
-        result: &str
-    ) {
+
+    pub fn trace_step(&self, _event_num: u64, step_info: &str, result: &str) {
         if self.config.verbosity >= 2 {
             eprintln!("  → {} → {}", step_info, result);
         }
     }
-    
+
     pub fn trace_event_start(&self, event_num: u64, event_data: &str) {
         if self.config.verbosity >= 2 {
             eprintln!("Filter execution trace for event {}:", event_num);
             eprintln!("  Event: {}", self.truncate_for_display(event_data, 100));
         }
     }
-    
+
     pub fn trace_event_result(&self, result: bool, action: &str) {
         if self.config.verbosity >= 2 {
             eprintln!("  Result: {} ({})", result, action);
         }
     }
-    
+
     pub fn trace_expression_evaluation(&self, expression: &str, intermediate_result: &str) {
         if self.config.verbosity >= 3 {
             eprintln!("    Eval: {} → {}", expression, intermediate_result);
         }
     }
-    
+
     pub fn trace_variable_access(&self, var_name: &str, value: &str) {
         if self.config.verbosity >= 3 {
-            eprintln!("    Access: {} = {}", var_name, self.truncate_for_display(value, 30));
+            eprintln!(
+                "    Access: {} = {}",
+                var_name,
+                self.truncate_for_display(value, 30)
+            );
         }
     }
-    
+
     pub fn trace_function_call(&self, func_name: &str, args: &str, result: &str) {
         if self.config.verbosity >= 3 {
-            eprintln!("    Call: {}({}) → {}", func_name, args, self.truncate_for_display(result, 30));
+            eprintln!(
+                "    Call: {}({}) → {}",
+                func_name,
+                args,
+                self.truncate_for_display(result, 30)
+            );
         }
     }
-    
+
     // Enhanced detailed tracing for -vvv level
-    pub fn trace_detailed_step(&self, 
+    pub fn trace_detailed_step(
+        &self,
         context: &str,
-        operation: &str, 
+        operation: &str,
         input: &str,
         output: &str,
-        step_type: &str
+        step_type: &str,
     ) {
         if self.config.verbosity >= 3 {
             let step_num = {
@@ -454,18 +506,22 @@ impl ExecutionTracer {
                 *counter += 1;
                 *counter
             };
-            
-            eprintln!("    [Step {}:{}] {}: {} → {}", 
-                step_num, context, operation, 
+
+            eprintln!(
+                "    [Step {}:{}] {}: {} → {}",
+                step_num,
+                context,
+                operation,
                 self.truncate_for_display(input, 30),
-                self.truncate_for_display(output, 30));
-            
+                self.truncate_for_display(output, 30)
+            );
+
             if step_type != "default" {
                 eprintln!("      Type: {}", step_type);
             }
         }
     }
-    
+
     pub fn trace_scope_inspection(&self, scope: &rhai::Scope) {
         if self.config.verbosity >= 3 {
             eprintln!("    Scope contents:");
@@ -476,14 +532,18 @@ impl ExecutionTracer {
             }
         }
     }
-    
+
     pub fn trace_ast_node(&self, node_type: &str, position: &str, source: &str) {
         if self.config.verbosity >= 3 {
-            eprintln!("    AST: {} at {} → \"{}\"", 
-                node_type, position, self.truncate_for_display(source, 40));
+            eprintln!(
+                "    AST: {} at {} → \"{}\"",
+                node_type,
+                position,
+                self.truncate_for_display(source, 40)
+            );
         }
     }
-    
+
     fn format_value_preview(&self, value: &rhai::Dynamic) -> String {
         let preview = format!("{:?}", value);
         if preview.len() > 40 {
@@ -492,15 +552,15 @@ impl ExecutionTracer {
             preview
         }
     }
-    
+
     fn truncate_for_display(&self, text: &str, max_len: usize) -> String {
         if text.len() > max_len {
-            format!("{}...", &text[..max_len-3])
+            format!("{}...", &text[..max_len - 3])
         } else {
             text.to_string()
         }
     }
-    
+
     pub fn next_event(&self) -> u64 {
         if let Ok(mut counter) = self.current_event.lock() {
             *counter += 1;
@@ -509,7 +569,7 @@ impl ExecutionTracer {
             0
         }
     }
-    
+
     pub fn reset_step_counter(&self) {
         if let Ok(mut counter) = self.step_counter.lock() {
             *counter = 0;
@@ -540,65 +600,75 @@ impl InteractiveDebugger {
             interactive_enabled: std::env::var("KELORA_DEBUG_INTERACTIVE").is_ok(),
         }
     }
-    
-    pub fn maybe_interactive_break(&self, 
+
+    pub fn maybe_interactive_break(
+        &self,
         context: &ExecutionContext,
         scope: &rhai::Scope,
-        error: Option<&EvalAltResult>
+        error: Option<&EvalAltResult>,
     ) -> DebuggerCommand {
-        if self.interactive_enabled && self.config.verbosity >= 3 && (error.is_some() || self.should_break_for_inspection()) {
+        if self.interactive_enabled
+            && self.config.verbosity >= 3
+            && (error.is_some() || self.should_break_for_inspection())
+        {
             return self.interactive_session(context, scope);
         }
         DebuggerCommand::Continue
     }
-    
-    fn interactive_session(&self, 
-        _context: &ExecutionContext, 
-        scope: &rhai::Scope
+
+    fn interactive_session(
+        &self,
+        _context: &ExecutionContext,
+        scope: &rhai::Scope,
     ) -> DebuggerCommand {
         use std::io::{self, Write};
-        
+
         println!("\n🔍 Interactive Debug Session");
         println!("Variables in scope:");
         for (name, _is_const, value) in scope.iter() {
             println!("  {}: {:?}", name, value);
         }
-        
+
         loop {
             print!("Debug> (s)tep, (c)ontinue, (i)nspect <var>, (q)uit? ");
             io::stdout().flush().unwrap();
-            
+
             let mut input = String::new();
             if io::stdin().read_line(&mut input).is_err() {
                 return DebuggerCommand::Continue;
             }
-            
+
             match input.trim().to_lowercase().as_str() {
                 "s" | "step" => return DebuggerCommand::StepInto,
                 "c" | "continue" => return DebuggerCommand::Continue,
                 "q" | "quit" => {
                     println!("Exiting debug session.");
                     std::process::exit(0);
-                },
+                }
                 cmd if cmd.starts_with("i ") => {
                     let var_name = &cmd[2..];
                     self.inspect_variable(var_name, scope);
-                },
+                }
                 _ => println!("Unknown command. Use (s)tep, (c)ontinue, (i)nspect <var>, (q)uit"),
             }
         }
     }
-    
+
     fn inspect_variable(&self, var_name: &str, scope: &rhai::Scope) {
         for (name, _is_const, value) in scope.iter() {
             if name == var_name {
-                println!("Variable '{}': {:?} (type: {})", name, value, value.type_name());
+                println!(
+                    "Variable '{}': {:?} (type: {})",
+                    name,
+                    value,
+                    value.type_name()
+                );
                 return;
             }
         }
         println!("Variable '{}' not found", var_name);
     }
-    
+
     fn should_break_for_inspection(&self) -> bool {
         // Could implement smart breakpoint logic here
         // For now, only break on errors or explicit requests
@@ -680,7 +750,6 @@ pub fn debug_stats_set_thread_state(stats: &DebugStatistics) {
         *local_stats.borrow_mut() = stats.clone();
     });
 }
-
 
 #[derive(Clone)]
 pub struct CompiledExpression {
@@ -1136,20 +1205,21 @@ impl RhaiEngine {
             move |_context, event, node, source, pos| {
                 // Update execution context
                 debug_tracker.update_context(Some(pos), source);
-                
+
                 // Enhanced event logging with verbosity levels
                 match event {
                     DebuggerEvent::Start => {
                         debug_tracker.log_basic("Script execution started");
                         if debug_tracker.config.verbosity >= 3 {
                             if let Some(src) = source {
-                                debug_tracker.log_step("Starting script", &format!("\"{}\"", src.trim()));
+                                debug_tracker
+                                    .log_step("Starting script", &format!("\"{}\"", src.trim()));
                             }
                         }
-                    },
+                    }
                     DebuggerEvent::End => {
                         debug_tracker.log_basic("Script execution completed");
-                    },
+                    }
                     DebuggerEvent::Step => {
                         // Enhanced step-by-step tracing
                         if debug_tracker.config.verbosity >= 2 {
@@ -1161,19 +1231,19 @@ impl RhaiEngine {
                                 execution_tracer.trace_step(0, &step_info, "unknown");
                             }
                         }
-                        
+
                         if debug_tracker.config.verbosity >= 3 {
                             // Even more detailed tracing for -vvv
                             let step_info = format!("Step at {}", pos);
                             let node_info = format!("{:?}", node);
                             debug_tracker.log_step(&step_info, &node_info);
-                            
+
                             // Use execution tracer for expression-level details
                             if let Some(src) = source {
                                 execution_tracer.trace_expression_evaluation(src, "evaluating");
                             }
                         }
-                    },
+                    }
                     DebuggerEvent::BreakPoint(_) => {
                         if debug_tracker.config.verbosity >= 2 {
                             debug_tracker.log_detailed("breakpoint", 0, &format!("hit at {}", pos));
@@ -1182,7 +1252,7 @@ impl RhaiEngine {
                                 execution_tracer.trace_step(0, "Breakpoint hit", src);
                             }
                         }
-                    },
+                    }
                     // Note: Specific function call events may not be available in current Rhai version
                     // We handle function call tracing through Step events and other mechanisms
                     _ => {
@@ -1190,7 +1260,7 @@ impl RhaiEngine {
                         if debug_tracker.config.verbosity >= 3 {
                             let event_name = format!("{:?}", event);
                             debug_tracker.log_step("Debug event", &event_name);
-                            
+
                             // Use execution tracer for detailed event tracking
                             if let Some(src) = source {
                                 execution_tracer.trace_step(0, &event_name, src);
@@ -1198,7 +1268,7 @@ impl RhaiEngine {
                         }
                     }
                 }
-                
+
                 // Update execution context with more details
                 if debug_tracker.config.verbosity >= 2 {
                     if let Ok(mut ctx) = debug_tracker.context.lock() {
@@ -1208,9 +1278,9 @@ impl RhaiEngine {
                         }
                     }
                 }
-                
+
                 Ok(DebuggerCommand::Continue)
-            }
+            },
         );
     }
 
@@ -1300,17 +1370,23 @@ impl RhaiEngine {
         if let Some(ref tracer) = self.execution_tracer {
             let event_num = tracer.next_event();
             let event_data = format!("{:?}", event.fields);
-            
-            // Level 2+: Detailed execution tracing  
+
+            // Level 2+: Detailed execution tracing
             if tracer.config.verbosity >= 2 {
                 tracer.trace_event_start(event_num, &event_data);
                 eprintln!("  Script: {}", compiled.expr.trim());
             }
-            
+
             // Enhanced detailed tracing for -vvv
             if tracer.config.verbosity >= 3 {
                 tracer.trace_scope_inspection(&scope);
-                tracer.trace_detailed_step("filter", "evaluation", &compiled.expr, "starting", "script");
+                tracer.trace_detailed_step(
+                    "filter",
+                    "evaluation",
+                    &compiled.expr,
+                    "starting",
+                    "script",
+                );
             }
         }
 
@@ -1320,7 +1396,7 @@ impl RhaiEngine {
             .map_err(|e| {
                 // Track errors in debug statistics
                 debug_stats_increment_errors();
-                
+
                 let detailed_msg = if let Some(ref debug_tracker) = self.debug_tracker {
                     let enhancer = ErrorEnhancer::new(debug_tracker.config.clone());
                     let context = debug_tracker.get_context();
@@ -1335,11 +1411,17 @@ impl RhaiEngine {
         if let Some(ref tracer) = self.execution_tracer {
             let action = if result { "passed" } else { "filtered out" };
             tracer.trace_event_result(result, action);
-            
+
             // Enhanced detailed result tracing
             if tracer.config.verbosity >= 3 {
                 let result_str = if result { "true" } else { "false" };
-                tracer.trace_detailed_step("filter", "result", &compiled.expr, result_str, "boolean");
+                tracer.trace_detailed_step(
+                    "filter",
+                    "result",
+                    &compiled.expr,
+                    result_str,
+                    "boolean",
+                );
             }
         }
 
@@ -1368,17 +1450,23 @@ impl RhaiEngine {
         if let Some(ref tracer) = self.execution_tracer {
             let event_num = tracer.next_event();
             let event_data = format!("{:?}", event.fields);
-            
+
             // Level 2+: Detailed execution tracing
             if tracer.config.verbosity >= 2 {
                 tracer.trace_event_start(event_num, &event_data);
                 eprintln!("  Script: {}", compiled.expr.trim());
             }
-            
+
             // Enhanced detailed tracing for -vvv
             if tracer.config.verbosity >= 3 {
                 tracer.trace_scope_inspection(&scope);
-                tracer.trace_detailed_step("exec", "transformation", &compiled.expr, "starting", "script");
+                tracer.trace_detailed_step(
+                    "exec",
+                    "transformation",
+                    &compiled.expr,
+                    "starting",
+                    "script",
+                );
             }
         }
 
@@ -1388,7 +1476,7 @@ impl RhaiEngine {
             .map_err(|e| {
                 // Track errors in debug statistics
                 debug_stats_increment_errors();
-                
+
                 let detailed_msg = if let Some(ref debug_tracker) = self.debug_tracker {
                     let enhancer = ErrorEnhancer::new(debug_tracker.config.clone());
                     let context = debug_tracker.get_context();
@@ -1402,10 +1490,16 @@ impl RhaiEngine {
         // Add execution result tracing
         if let Some(ref tracer) = self.execution_tracer {
             tracer.trace_event_result(true, "executed successfully");
-            
+
             // Enhanced detailed result tracing
             if tracer.config.verbosity >= 3 {
-                tracer.trace_detailed_step("exec", "result", &compiled.expr, "success", "execution");
+                tracer.trace_detailed_step(
+                    "exec",
+                    "result",
+                    &compiled.expr,
+                    "success",
+                    "execution",
+                );
             }
         }
 
@@ -1548,18 +1642,34 @@ impl RhaiEngine {
         if let Some(ref tracer) = self.execution_tracer {
             let event_num = tracer.next_event();
             let event_data = format!("{:?}", event.fields);
-            
+
             // Level 2+: Detailed execution tracing
             if tracer.config.verbosity >= 2 {
                 tracer.trace_event_start(event_num, &event_data);
-                eprintln!("  Script (windowed, size {}): {}", window.len(), compiled.expr.trim());
+                eprintln!(
+                    "  Script (windowed, size {}): {}",
+                    window.len(),
+                    compiled.expr.trim()
+                );
             }
-            
+
             // Enhanced detailed tracing for -vvv
             if tracer.config.verbosity >= 3 {
                 tracer.trace_scope_inspection(&scope);
-                tracer.trace_detailed_step("windowed-filter", "evaluation", &compiled.expr, "starting", "script");
-                tracer.trace_detailed_step("windowed-filter", "window-size", &window.len().to_string(), &window.len().to_string(), "size");
+                tracer.trace_detailed_step(
+                    "windowed-filter",
+                    "evaluation",
+                    &compiled.expr,
+                    "starting",
+                    "script",
+                );
+                tracer.trace_detailed_step(
+                    "windowed-filter",
+                    "window-size",
+                    &window.len().to_string(),
+                    &window.len().to_string(),
+                    "size",
+                );
             }
         }
 
@@ -1569,7 +1679,7 @@ impl RhaiEngine {
             .map_err(|e| {
                 // Track errors in debug statistics
                 debug_stats_increment_errors();
-                
+
                 let detailed_msg = Self::format_rhai_error(e, "filter expression", &compiled.expr);
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
@@ -1578,11 +1688,17 @@ impl RhaiEngine {
         if let Some(ref tracer) = self.execution_tracer {
             let action = if result { "passed" } else { "filtered out" };
             tracer.trace_event_result(result, action);
-            
+
             // Enhanced detailed result tracing
             if tracer.config.verbosity >= 3 {
                 let result_str = if result { "true" } else { "false" };
-                tracer.trace_detailed_step("windowed-filter", "result", &compiled.expr, result_str, "boolean");
+                tracer.trace_detailed_step(
+                    "windowed-filter",
+                    "result",
+                    &compiled.expr,
+                    result_str,
+                    "boolean",
+                );
             }
         }
 
@@ -1612,18 +1728,34 @@ impl RhaiEngine {
         if let Some(ref tracer) = self.execution_tracer {
             let event_num = tracer.next_event();
             let event_data = format!("{:?}", event.fields);
-            
+
             // Level 2+: Detailed execution tracing
             if tracer.config.verbosity >= 2 {
                 tracer.trace_event_start(event_num, &event_data);
-                eprintln!("  Script (windowed, size {}): {}", window.len(), compiled.expr.trim());
+                eprintln!(
+                    "  Script (windowed, size {}): {}",
+                    window.len(),
+                    compiled.expr.trim()
+                );
             }
-            
+
             // Enhanced detailed tracing for -vvv
             if tracer.config.verbosity >= 3 {
                 tracer.trace_scope_inspection(&scope);
-                tracer.trace_detailed_step("windowed-exec", "transformation", &compiled.expr, "starting", "script");
-                tracer.trace_detailed_step("windowed-exec", "window-size", &window.len().to_string(), &window.len().to_string(), "size");
+                tracer.trace_detailed_step(
+                    "windowed-exec",
+                    "transformation",
+                    &compiled.expr,
+                    "starting",
+                    "script",
+                );
+                tracer.trace_detailed_step(
+                    "windowed-exec",
+                    "window-size",
+                    &window.len().to_string(),
+                    &window.len().to_string(),
+                    "size",
+                );
             }
         }
 
@@ -1633,7 +1765,7 @@ impl RhaiEngine {
             .map_err(|e| {
                 // Track errors in debug statistics
                 debug_stats_increment_errors();
-                
+
                 let detailed_msg = Self::format_rhai_error(e, "exec script", &compiled.expr);
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
@@ -1641,10 +1773,16 @@ impl RhaiEngine {
         // Add execution result tracing
         if let Some(ref tracer) = self.execution_tracer {
             tracer.trace_event_result(true, "executed successfully");
-            
+
             // Enhanced detailed result tracing
             if tracer.config.verbosity >= 3 {
-                tracer.trace_detailed_step("windowed-exec", "result", &compiled.expr, "success", "execution");
+                tracer.trace_detailed_step(
+                    "windowed-exec",
+                    "result",
+                    &compiled.expr,
+                    "success",
+                    "execution",
+                );
             }
         }
 

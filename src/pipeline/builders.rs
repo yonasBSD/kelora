@@ -44,7 +44,7 @@ use super::{
     StdoutWriter, TakeNLimiter, TimestampFilterStage,
 };
 use crate::decompression::DecompressionReader;
-use crate::engine::{RhaiEngine, DebugConfig};
+use crate::engine::{DebugConfig, RhaiEngine};
 use crate::readers::{ChannelStdinReader, MultiFileReader};
 
 /// Pipeline builder for easy construction from CLI arguments
@@ -119,10 +119,9 @@ impl PipelineBuilder {
         stages: Vec<crate::config::ScriptStageType>,
     ) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
-        
+
         // Set up debugging if enabled
-        let debug_config = DebugConfig::new(self.config.verbose)
-            .with_emoji(!self.config.no_emoji);
+        let debug_config = DebugConfig::new(self.config.verbose).with_emoji(!self.config.no_emoji);
         rhai_engine.setup_debugging(debug_config);
 
         // Create parser
@@ -257,14 +256,14 @@ impl PipelineBuilder {
         for stage in stages {
             match stage {
                 crate::config::ScriptStageType::Filter(filter) => {
-                    let filter_stage = FilterStage::new(filter, &mut rhai_engine)?
-                        .with_stage_number(stage_number);
+                    let filter_stage =
+                        FilterStage::new(filter, &mut rhai_engine)?.with_stage_number(stage_number);
                     script_stages.push(Box::new(filter_stage));
                     stage_number += 1;
                 }
                 crate::config::ScriptStageType::Exec(exec) => {
-                    let exec_stage = ExecStage::new(exec, &mut rhai_engine)?
-                        .with_stage_number(stage_number);
+                    let exec_stage =
+                        ExecStage::new(exec, &mut rhai_engine)?.with_stage_number(stage_number);
                     script_stages.push(Box::new(exec_stage));
                     stage_number += 1;
                 }
@@ -376,10 +375,9 @@ impl PipelineBuilder {
         stages: Vec<crate::config::ScriptStageType>,
     ) -> Result<(Pipeline, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
-        
+
         // Set up debugging if enabled
-        let debug_config = DebugConfig::new(self.config.verbose)
-            .with_emoji(!self.config.no_emoji);
+        let debug_config = DebugConfig::new(self.config.verbose).with_emoji(!self.config.no_emoji);
         rhai_engine.setup_debugging(debug_config);
 
         // Create parser (with pre-processed CSV headers if available)
@@ -518,14 +516,14 @@ impl PipelineBuilder {
         for stage in stages {
             match stage {
                 crate::config::ScriptStageType::Filter(filter) => {
-                    let filter_stage = FilterStage::new(filter, &mut rhai_engine)?
-                        .with_stage_number(stage_number);
+                    let filter_stage =
+                        FilterStage::new(filter, &mut rhai_engine)?.with_stage_number(stage_number);
                     script_stages.push(Box::new(filter_stage));
                     stage_number += 1;
                 }
                 crate::config::ScriptStageType::Exec(exec) => {
-                    let exec_stage = ExecStage::new(exec, &mut rhai_engine)?
-                        .with_stage_number(stage_number);
+                    let exec_stage =
+                        ExecStage::new(exec, &mut rhai_engine)?.with_stage_number(stage_number);
                     script_stages.push(Box::new(exec_stage));
                     stage_number += 1;
                 }
