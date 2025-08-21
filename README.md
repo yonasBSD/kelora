@@ -2,6 +2,9 @@
 
 Scriptable log processor for the command line. Treats logs as structured events and lets you filter, transform, and analyze them using embedded [Rhai](https://rhai.rs) scripts with 40+ built-in functions.
 
+> [!WARNING]  
+> Experimental tool. [Vibe-coded](https://en.wikipedia.org/wiki/Vibe_coding). APIs may change without notice.
+
 ## How It Works
 
 Kelora parses log lines into structured events (`e.level`, `e.timestamp`, `e.message`), then processes them through a pipeline: filters decide which events to keep, exec scripts transform the data, and formatters produce output. It's a programmable Unix pipeline for log data.
