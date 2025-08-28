@@ -53,6 +53,7 @@ pub enum FileOrder {
     long_about = "A command-line log analysis tool with embedded Rhai scripting\n\nMODES:\n  (default)   Sequential processing - best for streaming/interactive use\n  --parallel  Parallel processing - best for high-throughput batch analysis"
 )]
 #[command(author = "Dirk Loss <mail@dirk-loss.de>")]
+#[command(version)]
 pub struct Cli {
     /// Input files (stdin if not specified, or use "-" to explicitly specify stdin)
     pub files: Vec<String>,
