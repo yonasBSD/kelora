@@ -681,10 +681,7 @@ mod tests {
         inner2.insert("id".into(), Dynamic::from(2i64));
         inner2.insert("name".into(), Dynamic::from("second"));
 
-        let arr = vec![
-            Dynamic::from(inner1),
-            Dynamic::from(inner2),
-        ];
+        let arr = vec![Dynamic::from(inner1), Dynamic::from(inner2)];
 
         let flattened = {
             let dynamic_array = Dynamic::from(arr);
@@ -728,25 +725,16 @@ mod tests {
             Dynamic::from("frontend"),
         ];
 
-        let search = vec![
-            Dynamic::from("urgent"),
-            Dynamic::from("critical"),
-        ];
+        let search = vec![Dynamic::from("urgent"), Dynamic::from("critical")];
 
         assert!(contains_any_array(arr, search));
     }
 
     #[test]
     fn test_contains_any_no_match() {
-        let arr = vec![
-            Dynamic::from("info"),
-            Dynamic::from("debug"),
-        ];
+        let arr = vec![Dynamic::from("info"), Dynamic::from("debug")];
 
-        let search = vec![
-            Dynamic::from("error"),
-            Dynamic::from("warning"),
-        ];
+        let search = vec![Dynamic::from("error"), Dynamic::from("warning")];
 
         assert!(!contains_any_array(arr, search));
     }
@@ -759,10 +747,7 @@ mod tests {
             Dynamic::from(3i64),
         ];
 
-        let search = vec![
-            Dynamic::from(2i64),
-            Dynamic::from(5i64),
-        ];
+        let search = vec![Dynamic::from(2i64), Dynamic::from(5i64)];
 
         assert!(contains_any_array(arr, search));
     }
@@ -775,10 +760,7 @@ mod tests {
             Dynamic::from(true),
         ];
 
-        let search = vec![
-            Dynamic::from("hello"),
-            Dynamic::from(99i64),
-        ];
+        let search = vec![Dynamic::from("hello"), Dynamic::from(99i64)];
 
         assert!(contains_any_array(arr, search));
     }
@@ -794,10 +776,7 @@ mod tests {
 
     #[test]
     fn test_contains_any_boolean_conversion() {
-        let arr = vec![
-            Dynamic::from(true),
-            Dynamic::from(false),
-        ];
+        let arr = vec![Dynamic::from(true), Dynamic::from(false)];
 
         let search = vec![Dynamic::from("true")];
 
@@ -826,40 +805,25 @@ mod tests {
             Dynamic::from("Database connection failed"),
         ];
 
-        let search = vec![
-            Dynamic::from("ERROR"),
-            Dynamic::from("FATAL"),
-        ];
+        let search = vec![Dynamic::from("ERROR"), Dynamic::from("FATAL")];
 
         assert!(starts_with_any_array(arr, search));
     }
 
     #[test]
     fn test_starts_with_any_no_match() {
-        let arr = vec![
-            Dynamic::from("INFO"),
-            Dynamic::from("System started"),
-        ];
+        let arr = vec![Dynamic::from("INFO"), Dynamic::from("System started")];
 
-        let search = vec![
-            Dynamic::from("ERROR"),
-            Dynamic::from("WARNING"),
-        ];
+        let search = vec![Dynamic::from("ERROR"), Dynamic::from("WARNING")];
 
         assert!(!starts_with_any_array(arr, search));
     }
 
     #[test]
     fn test_starts_with_any_numbers() {
-        let arr = vec![
-            Dynamic::from(200i64),
-            Dynamic::from("OK"),
-        ];
+        let arr = vec![Dynamic::from(200i64), Dynamic::from("OK")];
 
-        let search = vec![
-            Dynamic::from(200i64),
-            Dynamic::from(404i64),
-        ];
+        let search = vec![Dynamic::from(200i64), Dynamic::from(404i64)];
 
         assert!(starts_with_any_array(arr, search));
     }
@@ -904,15 +868,9 @@ mod tests {
 
     #[test]
     fn test_starts_with_any_mixed_types() {
-        let arr = vec![
-            Dynamic::from(true),
-            Dynamic::from("second"),
-        ];
+        let arr = vec![Dynamic::from(true), Dynamic::from("second")];
 
-        let search = vec![
-            Dynamic::from("true"),
-            Dynamic::from("false"),
-        ];
+        let search = vec![Dynamic::from("true"), Dynamic::from("false")];
 
         assert!(starts_with_any_array(arr, search));
     }

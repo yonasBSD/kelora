@@ -477,10 +477,7 @@ mod tests {
         item2.insert("id".into(), Dynamic::from(2i64));
         item2.insert("name".into(), Dynamic::from("second"));
 
-        let array = vec![
-            Dynamic::from(item1),
-            Dynamic::from(item2),
-        ];
+        let array = vec![Dynamic::from(item1), Dynamic::from(item2)];
 
         let mut root = Map::new();
         root.insert("user".into(), Dynamic::from("alice"));

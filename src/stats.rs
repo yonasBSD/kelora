@@ -49,7 +49,6 @@ pub fn stats_add_line_filtered() {
     });
 }
 
-
 pub fn stats_add_event_created() {
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().events_created += 1;

@@ -285,18 +285,9 @@ mod tests {
     fn test_window_numbers_basic() {
         // Add events with numeric fields
         let window = vec![
-            create_test_event(vec![(
-                "response_time",
-                Dynamic::from(0.15),
-            )]),
-            create_test_event(vec![(
-                "response_time",
-                Dynamic::from(0.23),
-            )]),
-            create_test_event(vec![(
-                "response_time",
-                Dynamic::from(0.89),
-            )]),
+            create_test_event(vec![("response_time", Dynamic::from(0.15))]),
+            create_test_event(vec![("response_time", Dynamic::from(0.23))]),
+            create_test_event(vec![("response_time", Dynamic::from(0.89))]),
         ];
 
         let result = window_numbers(window, "response_time".to_string()).unwrap();
@@ -328,8 +319,8 @@ mod tests {
         // Mix of different numeric types
         let window = vec![
             create_test_event(vec![("value", Dynamic::from(42i64))]), // int
-            create_test_event(vec![("value", Dynamic::from(2.5))]), // float
-            create_test_event(vec![("value", Dynamic::from(true))]), // bool -> 1.0
+            create_test_event(vec![("value", Dynamic::from(2.5))]),   // float
+            create_test_event(vec![("value", Dynamic::from(true))]),  // bool -> 1.0
             create_test_event(vec![("value", Dynamic::from(false))]), // bool -> 0.0
         ];
 
@@ -397,11 +388,11 @@ mod tests {
     #[test]
     fn test_percentile_mixed_types() {
         let arr = vec![
-            Dynamic::from(42i64), // int
-            Dynamic::from(2.5), // float
+            Dynamic::from(42i64),   // int
+            Dynamic::from(2.5),     // float
             Dynamic::from("123.5"), // string number
-            Dynamic::from(true), // bool -> 1.0
-            Dynamic::from(false), // bool -> 0.0
+            Dynamic::from(true),    // bool -> 1.0
+            Dynamic::from(false),   // bool -> 0.0
         ];
 
         let median = percentile(arr, 50.0).unwrap();
@@ -428,10 +419,7 @@ mod tests {
         let empty_arr = Array::new();
         assert!(percentile(empty_arr, 50.0).is_err());
 
-        let non_numeric_arr = vec![
-            Dynamic::from("text"),
-            Dynamic::from("more_text"),
-        ];
+        let non_numeric_arr = vec![Dynamic::from("text"), Dynamic::from("more_text")];
         assert!(percentile(non_numeric_arr, 50.0).is_err());
 
         let valid_arr = vec![Dynamic::from(1.0)];
