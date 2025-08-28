@@ -49,13 +49,6 @@ pub fn stats_add_line_filtered() {
     });
 }
 
-pub fn stats_add_line_error() {
-    THREAD_STATS.with(|stats| {
-        let mut stats = stats.borrow_mut();
-        stats.lines_errors += 1;
-        stats.errors += 1; // Keep both for backward compatibility
-    });
-}
 
 pub fn stats_add_event_created() {
     THREAD_STATS.with(|stats| {

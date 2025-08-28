@@ -250,12 +250,12 @@ mod tests {
 
     #[test]
     fn test_window_values_basic() {
-        let mut window = Array::new();
-
         // Add events with status field
-        window.push(create_test_event(vec![("status", Dynamic::from("200"))]));
-        window.push(create_test_event(vec![("status", Dynamic::from("404"))]));
-        window.push(create_test_event(vec![("status", Dynamic::from("500"))]));
+        let window = vec![
+            create_test_event(vec![("status", Dynamic::from("200"))]),
+            create_test_event(vec![("status", Dynamic::from("404"))]),
+            create_test_event(vec![("status", Dynamic::from("500"))]),
+        ];
 
         let result = window_values(window, "status".to_string()).unwrap();
 
@@ -267,12 +267,12 @@ mod tests {
 
     #[test]
     fn test_window_values_missing_fields() {
-        let mut window = Array::new();
-
         // Mix of events with and without status field
-        window.push(create_test_event(vec![("status", Dynamic::from("200"))]));
-        window.push(create_test_event(vec![("message", Dynamic::from("error"))])); // no status
-        window.push(create_test_event(vec![("status", Dynamic::from("404"))]));
+        let window = vec![
+            create_test_event(vec![("status", Dynamic::from("200"))]),
+            create_test_event(vec![("message", Dynamic::from("error"))]), // no status
+            create_test_event(vec![("status", Dynamic::from("404"))]),
+        ];
 
         let result = window_values(window, "status".to_string()).unwrap();
 
@@ -283,21 +283,21 @@ mod tests {
 
     #[test]
     fn test_window_numbers_basic() {
-        let mut window = Array::new();
-
         // Add events with numeric fields
-        window.push(create_test_event(vec![(
-            "response_time",
-            Dynamic::from(0.15),
-        )]));
-        window.push(create_test_event(vec![(
-            "response_time",
-            Dynamic::from(0.23),
-        )]));
-        window.push(create_test_event(vec![(
-            "response_time",
-            Dynamic::from(0.89),
-        )]));
+        let window = vec![
+            create_test_event(vec![(
+                "response_time",
+                Dynamic::from(0.15),
+            )]),
+            create_test_event(vec![(
+                "response_time",
+                Dynamic::from(0.23),
+            )]),
+            create_test_event(vec![(
+                "response_time",
+                Dynamic::from(0.89),
+            )]),
+        ];
 
         let result = window_numbers(window, "response_time".to_string()).unwrap();
 
@@ -309,12 +309,12 @@ mod tests {
 
     #[test]
     fn test_window_numbers_string_parsing() {
-        let mut window = Array::new();
-
         // Add events with string numeric values
-        window.push(create_test_event(vec![("count", Dynamic::from("123"))]));
-        window.push(create_test_event(vec![("count", Dynamic::from("45.67"))]));
-        window.push(create_test_event(vec![("count", Dynamic::from("invalid"))])); // should be skipped
+        let window = vec![
+            create_test_event(vec![("count", Dynamic::from("123"))]),
+            create_test_event(vec![("count", Dynamic::from("45.67"))]),
+            create_test_event(vec![("count", Dynamic::from("invalid"))]), // should be skipped
+        ];
 
         let result = window_numbers(window, "count".to_string()).unwrap();
 
@@ -325,13 +325,13 @@ mod tests {
 
     #[test]
     fn test_window_numbers_mixed_types() {
-        let mut window = Array::new();
-
         // Mix of different numeric types
-        window.push(create_test_event(vec![("value", Dynamic::from(42i64))])); // int
-        window.push(create_test_event(vec![("value", Dynamic::from(2.5))])); // float
-        window.push(create_test_event(vec![("value", Dynamic::from(true))])); // bool -> 1.0
-        window.push(create_test_event(vec![("value", Dynamic::from(false))])); // bool -> 0.0
+        let window = vec![
+            create_test_event(vec![("value", Dynamic::from(42i64))]), // int
+            create_test_event(vec![("value", Dynamic::from(2.5))]), // float
+            create_test_event(vec![("value", Dynamic::from(true))]), // bool -> 1.0
+            create_test_event(vec![("value", Dynamic::from(false))]), // bool -> 0.0
+        ];
 
         let result = window_numbers(window, "value".to_string()).unwrap();
 
@@ -355,12 +355,13 @@ mod tests {
 
     #[test]
     fn test_percentile_basic() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(1.0));
-        arr.push(Dynamic::from(2.0));
-        arr.push(Dynamic::from(3.0));
-        arr.push(Dynamic::from(4.0));
-        arr.push(Dynamic::from(5.0));
+        let arr = vec![
+            Dynamic::from(1.0),
+            Dynamic::from(2.0),
+            Dynamic::from(3.0),
+            Dynamic::from(4.0),
+            Dynamic::from(5.0),
+        ];
 
         // Test median (50th percentile)
         let median = percentile(arr.clone(), 50.0).unwrap();
@@ -377,11 +378,12 @@ mod tests {
 
     #[test]
     fn test_percentile_interpolation() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(1.0));
-        arr.push(Dynamic::from(2.0));
-        arr.push(Dynamic::from(3.0));
-        arr.push(Dynamic::from(4.0));
+        let arr = vec![
+            Dynamic::from(1.0),
+            Dynamic::from(2.0),
+            Dynamic::from(3.0),
+            Dynamic::from(4.0),
+        ];
 
         // Test 25th percentile (should interpolate between 1 and 2)
         let p25 = percentile(arr.clone(), 25.0).unwrap();
@@ -394,12 +396,13 @@ mod tests {
 
     #[test]
     fn test_percentile_mixed_types() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(42i64)); // int
-        arr.push(Dynamic::from(2.5)); // float
-        arr.push(Dynamic::from("123.5")); // string number
-        arr.push(Dynamic::from(true)); // bool -> 1.0
-        arr.push(Dynamic::from(false)); // bool -> 0.0
+        let arr = vec![
+            Dynamic::from(42i64), // int
+            Dynamic::from(2.5), // float
+            Dynamic::from("123.5"), // string number
+            Dynamic::from(true), // bool -> 1.0
+            Dynamic::from(false), // bool -> 0.0
+        ];
 
         let median = percentile(arr, 50.0).unwrap();
         // Sorted: [0.0, 1.0, 2.5, 42.0, 123.5] -> median = 2.5
@@ -408,11 +411,12 @@ mod tests {
 
     #[test]
     fn test_percentile_filters_non_numeric() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(1.0));
-        arr.push(Dynamic::from("not_a_number"));
-        arr.push(Dynamic::from(3.0));
-        arr.push(Dynamic::from(5.0));
+        let arr = vec![
+            Dynamic::from(1.0),
+            Dynamic::from("not_a_number"),
+            Dynamic::from(3.0),
+            Dynamic::from(5.0),
+        ];
 
         let median = percentile(arr, 50.0).unwrap();
         // Should ignore "not_a_number", work with [1.0, 3.0, 5.0] -> median = 3.0
@@ -424,21 +428,20 @@ mod tests {
         let empty_arr = Array::new();
         assert!(percentile(empty_arr, 50.0).is_err());
 
-        let mut non_numeric_arr = Array::new();
-        non_numeric_arr.push(Dynamic::from("text"));
-        non_numeric_arr.push(Dynamic::from("more_text"));
+        let non_numeric_arr = vec![
+            Dynamic::from("text"),
+            Dynamic::from("more_text"),
+        ];
         assert!(percentile(non_numeric_arr, 50.0).is_err());
 
-        let mut valid_arr = Array::new();
-        valid_arr.push(Dynamic::from(1.0));
+        let valid_arr = vec![Dynamic::from(1.0)];
         assert!(percentile(valid_arr.clone(), -1.0).is_err()); // Invalid percentile
         assert!(percentile(valid_arr, 101.0).is_err()); // Invalid percentile
     }
 
     #[test]
     fn test_percentile_single_value() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(42.0));
+        let arr = vec![Dynamic::from(42.0)];
 
         // All percentiles should return the single value
         assert_eq!(percentile(arr.clone(), 0.0).unwrap(), 42.0);

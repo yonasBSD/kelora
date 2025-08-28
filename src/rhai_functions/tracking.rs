@@ -9,6 +9,10 @@ thread_local! {
 
 /// Unified error tracking function that handles counts, samples, and verbose output
 /// This replaces both stats-based and tracking-based error mechanisms
+/// Note: This function has 8 parameters because it needs to handle diverse error contexts:
+/// location info (line_num, filename), content (message, original_line), error classification (error_type),
+/// and output control (verbose, quiet, config). Grouping these would add complexity without benefit.
+#[allow(clippy::too_many_arguments)]
 pub fn track_error(
     error_type: &str,
     line_num: Option<usize>,

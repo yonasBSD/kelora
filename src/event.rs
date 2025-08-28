@@ -453,10 +453,11 @@ mod tests {
 
     #[test]
     fn test_flatten_dynamic_array() {
-        let mut array = Array::new();
-        array.push(Dynamic::from("item1"));
-        array.push(Dynamic::from("item2"));
-        array.push(Dynamic::from(42i64));
+        let array = vec![
+            Dynamic::from("item1"),
+            Dynamic::from("item2"),
+            Dynamic::from(42i64),
+        ];
 
         let dynamic_array = Dynamic::from(array);
         let flattened = flatten_dynamic(&dynamic_array, FlattenStyle::Bracket, 10);
@@ -476,9 +477,10 @@ mod tests {
         item2.insert("id".into(), Dynamic::from(2i64));
         item2.insert("name".into(), Dynamic::from("second"));
 
-        let mut array = Array::new();
-        array.push(Dynamic::from(item1));
-        array.push(Dynamic::from(item2));
+        let array = vec![
+            Dynamic::from(item1),
+            Dynamic::from(item2),
+        ];
 
         let mut root = Map::new();
         root.insert("user".into(), Dynamic::from("alice"));
@@ -502,8 +504,7 @@ mod tests {
         let mut inner = Map::new();
         inner.insert("value".into(), Dynamic::from(42i64));
 
-        let mut array = Array::new();
-        array.push(Dynamic::from(inner));
+        let array = vec![Dynamic::from(inner)];
 
         let mut root = Map::new();
         root.insert("data".into(), Dynamic::from(array));

@@ -377,12 +377,13 @@ mod tests {
 
     #[test]
     fn test_sorted_numbers() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(3i64));
-        arr.push(Dynamic::from(1i64));
-        arr.push(Dynamic::from(4i64));
-        arr.push(Dynamic::from(1i64));
-        arr.push(Dynamic::from(5i64));
+        let arr = vec![
+            Dynamic::from(3i64),
+            Dynamic::from(1i64),
+            Dynamic::from(4i64),
+            Dynamic::from(1i64),
+            Dynamic::from(5i64),
+        ];
 
         let sorted = sorted_array(arr);
 
@@ -396,10 +397,11 @@ mod tests {
 
     #[test]
     fn test_sorted_strings() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from("banana"));
-        arr.push(Dynamic::from("apple"));
-        arr.push(Dynamic::from("cherry"));
+        let arr = vec![
+            Dynamic::from("banana"),
+            Dynamic::from("apple"),
+            Dynamic::from("cherry"),
+        ];
 
         let sorted = sorted_array(arr);
 
@@ -411,11 +413,12 @@ mod tests {
 
     #[test]
     fn test_sorted_mixed_types() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(3i64));
-        arr.push(Dynamic::from("banana"));
-        arr.push(Dynamic::from(1i64));
-        arr.push(Dynamic::from("apple"));
+        let arr = vec![
+            Dynamic::from(3i64),
+            Dynamic::from("banana"),
+            Dynamic::from(1i64),
+            Dynamic::from("apple"),
+        ];
 
         let sorted = sorted_array(arr);
 
@@ -430,10 +433,11 @@ mod tests {
 
     #[test]
     fn test_sorted_with_floats() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(std::f64::consts::PI));
-        arr.push(Dynamic::from(1.5));
-        arr.push(Dynamic::from(std::f64::consts::E));
+        let arr = vec![
+            Dynamic::from(std::f64::consts::PI),
+            Dynamic::from(1.5),
+            Dynamic::from(std::f64::consts::E),
+        ];
 
         let sorted = sorted_array(arr);
 
@@ -445,10 +449,11 @@ mod tests {
 
     #[test]
     fn test_sorted_with_string_numbers() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from("10"));
-        arr.push(Dynamic::from("2"));
-        arr.push(Dynamic::from("100"));
+        let arr = vec![
+            Dynamic::from("10"),
+            Dynamic::from("2"),
+            Dynamic::from("100"),
+        ];
 
         let sorted = sorted_array(arr);
 
@@ -468,8 +473,7 @@ mod tests {
 
     #[test]
     fn test_sorted_single_element() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from("single"));
+        let arr = vec![Dynamic::from("single")];
 
         let sorted = sorted_array(arr);
 
@@ -479,10 +483,11 @@ mod tests {
 
     #[test]
     fn test_sorted_with_booleans() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(true));
-        arr.push(Dynamic::from(false));
-        arr.push(Dynamic::from("apple"));
+        let arr = vec![
+            Dynamic::from(true),
+            Dynamic::from(false),
+            Dynamic::from("apple"),
+        ];
 
         let sorted = sorted_array(arr);
 
@@ -495,12 +500,13 @@ mod tests {
 
     #[test]
     fn test_reversed_basic() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(1i64));
-        arr.push(Dynamic::from(2i64));
-        arr.push(Dynamic::from(3i64));
-        arr.push(Dynamic::from(4i64));
-        arr.push(Dynamic::from(5i64));
+        let arr = vec![
+            Dynamic::from(1i64),
+            Dynamic::from(2i64),
+            Dynamic::from(3i64),
+            Dynamic::from(4i64),
+            Dynamic::from(5i64),
+        ];
 
         let reversed = reversed_array(arr);
 
@@ -514,10 +520,11 @@ mod tests {
 
     #[test]
     fn test_reversed_strings() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from("first"));
-        arr.push(Dynamic::from("second"));
-        arr.push(Dynamic::from("third"));
+        let arr = vec![
+            Dynamic::from("first"),
+            Dynamic::from("second"),
+            Dynamic::from("third"),
+        ];
 
         let reversed = reversed_array(arr);
 
@@ -647,10 +654,11 @@ mod tests {
 
     #[test]
     fn test_array_flatten_simple() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from("item1"));
-        arr.push(Dynamic::from("item2"));
-        arr.push(Dynamic::from(42i64));
+        let arr = vec![
+            Dynamic::from("item1"),
+            Dynamic::from("item2"),
+            Dynamic::from(42i64),
+        ];
 
         let flattened = {
             let dynamic_array = Dynamic::from(arr);
@@ -673,9 +681,10 @@ mod tests {
         inner2.insert("id".into(), Dynamic::from(2i64));
         inner2.insert("name".into(), Dynamic::from("second"));
 
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(inner1));
-        arr.push(Dynamic::from(inner2));
+        let arr = vec![
+            Dynamic::from(inner1),
+            Dynamic::from(inner2),
+        ];
 
         let flattened = {
             let dynamic_array = Dynamic::from(arr);
@@ -694,8 +703,7 @@ mod tests {
         let mut inner = Map::new();
         inner.insert("value".into(), Dynamic::from(42i64));
 
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(inner));
+        let arr = vec![Dynamic::from(inner)];
 
         let dynamic_array = Dynamic::from(arr);
 
@@ -714,78 +722,84 @@ mod tests {
 
     #[test]
     fn test_contains_any_basic() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from("urgent"));
-        arr.push(Dynamic::from("bug"));
-        arr.push(Dynamic::from("frontend"));
+        let arr = vec![
+            Dynamic::from("urgent"),
+            Dynamic::from("bug"),
+            Dynamic::from("frontend"),
+        ];
 
-        let mut search = Array::new();
-        search.push(Dynamic::from("urgent"));
-        search.push(Dynamic::from("critical"));
+        let search = vec![
+            Dynamic::from("urgent"),
+            Dynamic::from("critical"),
+        ];
 
         assert!(contains_any_array(arr, search));
     }
 
     #[test]
     fn test_contains_any_no_match() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from("info"));
-        arr.push(Dynamic::from("debug"));
+        let arr = vec![
+            Dynamic::from("info"),
+            Dynamic::from("debug"),
+        ];
 
-        let mut search = Array::new();
-        search.push(Dynamic::from("error"));
-        search.push(Dynamic::from("warning"));
+        let search = vec![
+            Dynamic::from("error"),
+            Dynamic::from("warning"),
+        ];
 
         assert!(!contains_any_array(arr, search));
     }
 
     #[test]
     fn test_contains_any_numbers() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(1i64));
-        arr.push(Dynamic::from(2i64));
-        arr.push(Dynamic::from(3i64));
+        let arr = vec![
+            Dynamic::from(1i64),
+            Dynamic::from(2i64),
+            Dynamic::from(3i64),
+        ];
 
-        let mut search = Array::new();
-        search.push(Dynamic::from(2i64));
-        search.push(Dynamic::from(5i64));
+        let search = vec![
+            Dynamic::from(2i64),
+            Dynamic::from(5i64),
+        ];
 
         assert!(contains_any_array(arr, search));
     }
 
     #[test]
     fn test_contains_any_mixed_types() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(1i64));
-        arr.push(Dynamic::from("hello"));
-        arr.push(Dynamic::from(true));
+        let arr = vec![
+            Dynamic::from(1i64),
+            Dynamic::from("hello"),
+            Dynamic::from(true),
+        ];
 
-        let mut search = Array::new();
-        search.push(Dynamic::from("hello"));
-        search.push(Dynamic::from(99i64));
+        let search = vec![
+            Dynamic::from("hello"),
+            Dynamic::from(99i64),
+        ];
 
         assert!(contains_any_array(arr, search));
     }
 
     #[test]
     fn test_contains_any_string_number_conversion() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(42i64));
+        let arr = vec![Dynamic::from(42i64)];
 
-        let mut search = Array::new();
-        search.push(Dynamic::from("42"));
+        let search = vec![Dynamic::from("42")];
 
         assert!(contains_any_array(arr, search));
     }
 
     #[test]
     fn test_contains_any_boolean_conversion() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(true));
-        arr.push(Dynamic::from(false));
+        let arr = vec![
+            Dynamic::from(true),
+            Dynamic::from(false),
+        ];
 
-        let mut search = Array::new();
-        search.push(Dynamic::from("true"));
+        let search = vec![Dynamic::from("true")];
 
         assert!(contains_any_array(arr, search));
     }
@@ -796,63 +810,65 @@ mod tests {
         let search = Array::new();
         assert!(!contains_any_array(arr, search));
 
-        let mut arr = Array::new();
-        arr.push(Dynamic::from("test"));
+        let arr = vec![Dynamic::from("test")];
         let search = Array::new();
         assert!(!contains_any_array(arr, search));
 
         let arr = Array::new();
-        let mut search = Array::new();
-        search.push(Dynamic::from("test"));
+        let search = vec![Dynamic::from("test")];
         assert!(!contains_any_array(arr, search));
     }
 
     #[test]
     fn test_starts_with_any_basic() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from("ERROR"));
-        arr.push(Dynamic::from("Database connection failed"));
+        let arr = vec![
+            Dynamic::from("ERROR"),
+            Dynamic::from("Database connection failed"),
+        ];
 
-        let mut search = Array::new();
-        search.push(Dynamic::from("ERROR"));
-        search.push(Dynamic::from("FATAL"));
+        let search = vec![
+            Dynamic::from("ERROR"),
+            Dynamic::from("FATAL"),
+        ];
 
         assert!(starts_with_any_array(arr, search));
     }
 
     #[test]
     fn test_starts_with_any_no_match() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from("INFO"));
-        arr.push(Dynamic::from("System started"));
+        let arr = vec![
+            Dynamic::from("INFO"),
+            Dynamic::from("System started"),
+        ];
 
-        let mut search = Array::new();
-        search.push(Dynamic::from("ERROR"));
-        search.push(Dynamic::from("WARNING"));
+        let search = vec![
+            Dynamic::from("ERROR"),
+            Dynamic::from("WARNING"),
+        ];
 
         assert!(!starts_with_any_array(arr, search));
     }
 
     #[test]
     fn test_starts_with_any_numbers() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(200i64));
-        arr.push(Dynamic::from("OK"));
+        let arr = vec![
+            Dynamic::from(200i64),
+            Dynamic::from("OK"),
+        ];
 
-        let mut search = Array::new();
-        search.push(Dynamic::from(200i64));
-        search.push(Dynamic::from(404i64));
+        let search = vec![
+            Dynamic::from(200i64),
+            Dynamic::from(404i64),
+        ];
 
         assert!(starts_with_any_array(arr, search));
     }
 
     #[test]
     fn test_starts_with_any_string_number_conversion() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(500i64));
+        let arr = vec![Dynamic::from(500i64)];
 
-        let mut search = Array::new();
-        search.push(Dynamic::from("500"));
+        let search = vec![Dynamic::from("500")];
 
         assert!(starts_with_any_array(arr, search));
     }
@@ -860,16 +876,14 @@ mod tests {
     #[test]
     fn test_starts_with_any_empty_array() {
         let arr = Array::new();
-        let mut search = Array::new();
-        search.push(Dynamic::from("test"));
+        let search = vec![Dynamic::from("test")];
 
         assert!(!starts_with_any_array(arr, search));
     }
 
     #[test]
     fn test_starts_with_any_empty_search() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from("test"));
+        let arr = vec![Dynamic::from("test")];
         let search = Array::new();
 
         assert!(!starts_with_any_array(arr, search));
@@ -877,12 +891,12 @@ mod tests {
 
     #[test]
     fn test_starts_with_any_only_first_element() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from("INFO"));
-        arr.push(Dynamic::from("ERROR")); // This should be ignored
+        let arr = vec![
+            Dynamic::from("INFO"),
+            Dynamic::from("ERROR"), // This should be ignored
+        ];
 
-        let mut search = Array::new();
-        search.push(Dynamic::from("ERROR"));
+        let search = vec![Dynamic::from("ERROR")];
 
         // Should return false because only first element is checked
         assert!(!starts_with_any_array(arr, search));
@@ -890,13 +904,15 @@ mod tests {
 
     #[test]
     fn test_starts_with_any_mixed_types() {
-        let mut arr = Array::new();
-        arr.push(Dynamic::from(true));
-        arr.push(Dynamic::from("second"));
+        let arr = vec![
+            Dynamic::from(true),
+            Dynamic::from("second"),
+        ];
 
-        let mut search = Array::new();
-        search.push(Dynamic::from("true"));
-        search.push(Dynamic::from("false"));
+        let search = vec![
+            Dynamic::from("true"),
+            Dynamic::from("false"),
+        ];
 
         assert!(starts_with_any_array(arr, search));
     }
