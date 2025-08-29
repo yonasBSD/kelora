@@ -515,9 +515,9 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
     // Note: on_error configuration removed in resiliency model - use --strict flag instead
 
     if let Some(file_order) = config_file.defaults.get("file_order") {
-        if matches!(cli.file_order, crate::FileOrder::None) {
+        if matches!(cli.file_order, crate::FileOrder::Cli) {
             cli.file_order = match file_order.as_str() {
-                "none" => crate::FileOrder::None,
+                "cli" => crate::FileOrder::Cli,
                 "name" => crate::FileOrder::Name,
                 "mtime" => crate::FileOrder::Mtime,
                 _ => cli.file_order,

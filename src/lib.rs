@@ -181,7 +181,7 @@ fn detect_format_for_parallel_mode(files: &[String]) -> Result<InputFormat> {
         }
     } else {
         // For files, read first line from first file
-        let sorted_files = pipeline::builders::sort_files(files, &config::FileOrder::None)?;
+        let sorted_files = pipeline::builders::sort_files(files, &config::FileOrder::Cli)?;
 
         if sorted_files.is_empty() {
             return Ok(InputFormat::Line);

@@ -136,7 +136,7 @@ pub enum OutputFormat {
 /// File processing order
 #[derive(ValueEnum, Clone, Debug)]
 pub enum FileOrder {
-    None,
+    Cli,
     Name,
     Mtime,
 }
@@ -650,7 +650,7 @@ impl Default for KeloraConfig {
             input: InputConfig {
                 files: Vec::new(),
                 format: InputFormat::Jsonl,
-                file_order: FileOrder::None,
+                file_order: FileOrder::Cli,
                 skip_lines: 0,
                 ignore_lines: None,
                 multiline: None,
@@ -833,7 +833,7 @@ impl From<OutputFormat> for crate::OutputFormat {
 impl From<crate::FileOrder> for FileOrder {
     fn from(order: crate::FileOrder) -> Self {
         match order {
-            crate::FileOrder::None => FileOrder::None,
+            crate::FileOrder::Cli => FileOrder::Cli,
             crate::FileOrder::Name => FileOrder::Name,
             crate::FileOrder::Mtime => FileOrder::Mtime,
         }
@@ -843,7 +843,7 @@ impl From<crate::FileOrder> for FileOrder {
 impl From<FileOrder> for crate::FileOrder {
     fn from(order: FileOrder) -> Self {
         match order {
-            FileOrder::None => crate::FileOrder::None,
+            FileOrder::Cli => crate::FileOrder::Cli,
             FileOrder::Name => crate::FileOrder::Name,
             FileOrder::Mtime => crate::FileOrder::Mtime,
         }

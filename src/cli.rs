@@ -40,7 +40,7 @@ pub enum OutputFormat {
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum FileOrder {
-    None,
+    Cli,
     Name,
     Mtime,
 }
@@ -80,7 +80,7 @@ pub struct Cli {
     #[arg(
         long = "file-order",
         value_enum,
-        default_value = "none",
+        default_value = "cli",
         help_heading = "Input Options"
     )]
     pub file_order: FileOrder,

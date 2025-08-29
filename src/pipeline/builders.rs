@@ -732,7 +732,7 @@ pub fn sort_files(files: &[String], order: &crate::config::FileOrder) -> Result<
     let mut sorted_files = files.to_vec();
 
     match order {
-        crate::config::FileOrder::None => {
+        crate::config::FileOrder::Cli => {
             // Keep CLI order - no sorting needed
         }
         crate::config::FileOrder::Name => {
