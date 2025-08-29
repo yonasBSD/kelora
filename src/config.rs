@@ -38,7 +38,6 @@ pub struct OutputConfig {
     pub brief: bool,
     pub color: ColorMode,
     pub no_emoji: bool,
-    pub no_section_headers: bool,
     pub stats: bool,
     pub metrics: bool,
     pub metrics_file: Option<String>,
@@ -386,33 +385,25 @@ impl KeloraConfig {
 
     /// Format a stats message with appropriate prefix (emoji or "Stats:")
     pub fn format_stats_message(&self, message: &str) -> String {
-        if self.output.no_section_headers {
-            message.to_string()
-        } else {
-            let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
-            let use_emoji = use_colors && !self.output.no_emoji;
+        let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
+        let use_emoji = use_colors && !self.output.no_emoji;
 
-            if use_emoji {
-                format!("📈 === Kelora Stats ===\n{}", message)
-            } else {
-                format!("=== Kelora Stats ===\n{}", message)
-            }
+        if use_emoji {
+            format!("📈 === Kelora Stats ===\n{}", message)
+        } else {
+            format!("=== Kelora Stats ===\n{}", message)
         }
     }
 
     /// Format a metrics message with appropriate prefix (emoji or "Metrics:")
     pub fn format_metrics_message(&self, message: &str) -> String {
-        if self.output.no_section_headers {
-            message.to_string()
-        } else {
-            let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
-            let use_emoji = use_colors && !self.output.no_emoji;
+        let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
+        let use_emoji = use_colors && !self.output.no_emoji;
 
-            if use_emoji {
-                format!("📊 === Tracked metrics ===\n{}", message)
-            } else {
-                format!("=== Tracked metrics ===\n{}", message)
-            }
+        if use_emoji {
+            format!("📊 === Tracked metrics ===\n{}", message)
+        } else {
+            format!("=== Tracked metrics ===\n{}", message)
         }
     }
 }
@@ -602,7 +593,6 @@ impl KeloraConfig {
                 brief: cli.brief,
                 color: color_mode,
                 no_emoji: cli.no_emoji,
-                no_section_headers: cli.no_section_headers,
                 stats: cli.stats || cli.stats_only,
                 metrics: cli.metrics,
                 metrics_file: cli.metrics_file.clone(),
@@ -676,7 +666,6 @@ impl Default for KeloraConfig {
                 brief: false,
                 color: ColorMode::Auto,
                 no_emoji: false,
-                no_section_headers: false,
                 stats: false,
                 metrics: false,
                 metrics_file: None,

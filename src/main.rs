@@ -585,11 +585,6 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
         }
     }
 
-    if let Some(no_section_headers) = config_file.defaults.get("no_section_headers") {
-        if !cli.no_section_headers && no_section_headers.parse::<bool>().unwrap_or(false) {
-            cli.no_section_headers = true;
-        }
-    }
 
     if let Some(no_emoji) = config_file.defaults.get("no_emoji") {
         if !cli.no_emoji && no_emoji.parse::<bool>().unwrap_or(false) {

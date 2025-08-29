@@ -307,9 +307,6 @@ pub struct Cli {
     #[arg(long = "metrics-file", help_heading = "Metrics and Stats")]
     pub metrics_file: Option<String>,
 
-    /// Suppress emoji + section headers from stderr output
-    #[arg(long = "no-section-headers", help_heading = "Output Format Control")]
-    pub no_section_headers: bool,
 
     /// Use alias from configuration file
     #[arg(short = 'a', long = "alias", help_heading = "Configuration Options")]

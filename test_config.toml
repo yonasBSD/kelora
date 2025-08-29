@@ -1,4 +1,3 @@
 [defaults]
 metrics = true
 stats = true
-no_section_headers = true

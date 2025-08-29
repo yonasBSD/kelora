@@ -338,7 +338,6 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
             brief: false,
             color: config::ColorMode::Auto,
             no_emoji: false,
-            no_section_headers: false,
             stats: false, // Stats handled at higher level
             metrics: false,
             metrics_file: None,
@@ -478,7 +477,6 @@ pub fn run_pipeline_sequential_with_config<W: Write>(
             brief: false,
             color: config::ColorMode::Auto,
             no_emoji: false,
-            no_section_headers: false,
             stats: false, // Stats handled at higher level
             metrics: false,
             metrics_file: None,
