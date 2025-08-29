@@ -68,6 +68,14 @@ pub struct Cli {
     )]
     pub format: InputFormat,
 
+    /// Shortcut for -f jsonl
+    #[arg(
+        short = 'j',
+        help_heading = "Input Options",
+        conflicts_with = "format"
+    )]
+    pub jsonl_input: bool,
+
     /// File processing order
     #[arg(
         long = "file-order",
@@ -207,6 +215,14 @@ pub struct Cli {
         help_heading = "Output Options"
     )]
     pub output_format: OutputFormat,
+
+    /// Shortcut for -F jsonl
+    #[arg(
+        short = 'J',
+        help_heading = "Output Options",
+        conflicts_with = "output_format"
+    )]
+    pub jsonl_output: bool,
 
     /// Output only core fields
     #[arg(short = 'c', long = "core", help_heading = "Output Options")]

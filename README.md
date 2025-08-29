@@ -22,10 +22,10 @@ kelora -f jsonl app.log --filter 'e.status >= 500' --exec 'e.severity = "critica
 kelora -f apache --exec 'track_count("status_" + e.status)' --metrics access.log
 
 # Real-time monitoring with pattern detection
-kubectl logs -f app | kelora -f jsonl --parallel --levels warn,error
+kubectl logs -f app | kelora -j --parallel --levels warn,error
 
 # Monitor for brute force attacks using sliding windows
-kelora -f jsonl auth.log --window 3 --filter 'e.event == "login_failed"' \
+kelora -j auth.log --window 3 --filter 'e.event == "login_failed"' \
   --exec 'if window_values(window, "user").len() >= 2 { print("🚨 Brute force detected from " + e.ip) }'
 ```
 
@@ -78,7 +78,7 @@ Each parser creates events with different fields:
 |`csv/tsv`     |Column headers as fields            |Structured data files               |
 |`apache/nginx`|`remote_addr`, `status`, `request`, `response_time`|Web server logs       |
 
-All formats support gzip compression. Use `-f format` to specify.
+All formats support gzip compression. Use `-f format` to specify (`-j` is a shortcut for `-f jsonl`).
 
 ## Built-in Functions
 
@@ -120,7 +120,7 @@ kelora --filter 'e.level == "error"' \
 - **Fields**: `-k field1,field2` (include only), `-K field3` (exclude), `-c` (core fields only), `-b` (brief/values only)
 - **Levels**: `-l error,warn` (include), `-L debug,trace` (exclude)  
 - **Time**: `--since 1h`, `--until 5m`, `--since "2024-01-15 14:00"`
-- **Formats**: `-F jsonl|logfmt|csv|hide` (default is colored logfmt)
+- **Formats**: `-F jsonl|logfmt|csv|hide` (default is colored logfmt), `-J` (jsonl shortcut)
 
 ### Performance & Configuration
 - **Processing**: `--parallel` for batch files (2-10x faster), `--threads N`, `--batch-size N`
@@ -149,7 +149,7 @@ tail -f /var/log/nginx/access.log | \
 
 ```bash
 # Comprehensive authentication monitoring
-kelora -f jsonl auth.log \
+kelora -j auth.jsonl \
   --exec 'track_count("total_attempts"); track_unique("attempted_users", e.username)' \
   --filter 'e.auth_result == "failed"' \
   --exec 'track_count("failed_attempts"); track_unique("failed_ips", e.remote_addr)' \
@@ -164,7 +164,7 @@ kelora -f jsonl auth.log \
 
 ```bash
 # Convert and enrich syslog to structured JSON
-kelora -f syslog -F jsonl /var/log/messages \
+kelora -f syslog -J /var/log/messages \
   --exec 'e.severity_level = if e.severity <= 3 { "critical" } else if e.severity <= 4 { "error" } else { "info" }' \
   --exec 'e.masked_host = e.host.mask_ip(1)' \
   --exec 'e.processed_at = now_utc()' \

@@ -572,7 +572,11 @@ impl KeloraConfig {
         Self {
             input: InputConfig {
                 files: cli.files.clone(),
-                format: cli.format.clone().into(),
+                format: if cli.jsonl_input {
+                    InputFormat::Jsonl
+                } else {
+                    cli.format.clone().into()
+                },
                 file_order: cli.file_order.clone().into(),
                 skip_lines: cli.skip_lines.unwrap_or(0),
                 ignore_lines: None, // Will be set after CLI parsing
@@ -587,6 +591,8 @@ impl KeloraConfig {
                 } else if cli.quiet {
                     // Quiet mode: suppress event output but preserve script side effects
                     OutputFormat::Hide
+                } else if cli.jsonl_output {
+                    OutputFormat::Jsonl
                 } else {
                     cli.output_format.clone().into()
                 },
