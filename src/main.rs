@@ -487,7 +487,6 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
                 "csvnh" => crate::InputFormat::Csvnh,
                 "tsvnh" => crate::InputFormat::Tsvnh,
                 "combined" => crate::InputFormat::Combined,
-                "docker" => crate::InputFormat::Docker,
                 _ => cli.format, // Keep original if invalid
             };
         }

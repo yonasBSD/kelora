@@ -9,12 +9,16 @@ use crate::event::Event;
 pub mod builders;
 pub mod defaults;
 pub mod multiline;
+pub mod prefix_extractor;
+pub mod prefix_parser;
 pub mod stages;
 
 // Re-export main types for convenience
 pub use builders::*;
 pub use defaults::*;
 pub use multiline::*;
+pub use prefix_extractor::*;
+pub use prefix_parser::*;
 pub use stages::*;
 
 /// Helper function to collect discovered levels and keys from an event for stats

@@ -30,6 +30,8 @@ pub struct PipelineInputConfig {
     pub ts_field: Option<String>,
     pub ts_format: Option<String>,
     pub default_timezone: Option<String>,
+    pub extract_prefix: Option<String>,
+    pub prefix_sep: String,
 }
 
 #[derive(Debug, Clone)]
@@ -71,6 +73,8 @@ impl PipelineConfig {
                 ts_field: config.input.ts_field.clone(),
                 ts_format: config.input.ts_format.clone(),
                 default_timezone: config.input.default_timezone.clone(),
+                extract_prefix: config.input.extract_prefix.clone(),
+                prefix_sep: config.input.prefix_sep.clone(),
             },
             processing: PipelineProcessingConfig {
                 begin: config.processing.begin.clone(),
@@ -329,6 +333,8 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
             ts_field: final_config.input.ts_field.clone(),
             ts_format: final_config.input.ts_format.clone(),
             default_timezone: final_config.input.default_timezone.clone(),
+            extract_prefix: final_config.input.extract_prefix.clone(),
+            prefix_sep: final_config.input.prefix_sep.clone(),
         },
         output: config::OutputConfig {
             format: final_config.output_format.clone().into(),
@@ -468,6 +474,8 @@ pub fn run_pipeline_sequential_with_config<W: Write>(
             ts_field: config.input.ts_field.clone(),
             ts_format: config.input.ts_format.clone(),
             default_timezone: config.input.default_timezone.clone(),
+            extract_prefix: config.input.extract_prefix.clone(),
+            prefix_sep: config.input.prefix_sep.clone(),
         },
         output: config::OutputConfig {
             format: config.output_format.clone().into(),

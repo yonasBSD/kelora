@@ -8,11 +8,10 @@ use anyhow::Result;
 /// 1. JSONL - starts with '{' and valid JSON
 /// 2. CEF - starts with "CEF:"
 /// 3. Syslog - matches RFC5424 or RFC3164 patterns
-/// 4. Docker - matches Docker Compose format (service | message) or Docker timestamps
-/// 5. Combined - contains common Apache/Nginx log patterns
-/// 6. Logfmt - contains key=value pairs
-/// 7. CSV/TSV - contains delimiters with reasonable structure
-/// 8. Line - fallback for everything else
+/// 4. Combined - contains common Apache/Nginx log patterns
+/// 5. Logfmt - contains key=value pairs
+/// 6. CSV/TSV - contains delimiters with reasonable structure
+/// 7. Line - fallback for everything else
 #[allow(dead_code)] // Used by lib.rs for format auto-detection
 pub fn detect_format(sample_line: &str) -> Result<ConfigInputFormat> {
     let trimmed = sample_line.trim();
@@ -37,12 +36,7 @@ pub fn detect_format(sample_line: &str) -> Result<ConfigInputFormat> {
         return Ok(ConfigInputFormat::Syslog);
     }
 
-    // 4. Docker detection - Compose format or Docker timestamps
-    if detect_docker(trimmed) {
-        return Ok(ConfigInputFormat::Docker);
-    }
-
-    // 5. Combined log format detection (Apache/Nginx)
+    // 4. Combined log format detection (Apache/Nginx)
     if detect_combined_logs(trimmed) {
         return Ok(ConfigInputFormat::Combined);
     }
@@ -124,49 +118,6 @@ fn detect_syslog(line: &str) -> bool {
     false
 }
 
-/// Detect Docker log formats (Compose and raw Docker logs)
-#[allow(dead_code)] // Used by detect_format function
-fn detect_docker(line: &str) -> bool {
-    // Docker Compose logs: "service_name | message"
-    // Look for pattern with container name/service followed by pipe separator
-    if let Some(pipe_pos) = line.find('|') {
-        let before_pipe = line[..pipe_pos].trim();
-        // Service names are typically alphanumeric with underscores/hyphens
-        // and don't contain spaces (common in Docker Compose)
-        if !before_pipe.is_empty()
-            && before_pipe.len() <= 50  // Reasonable service name length (Docker Compose services are typically short)
-            && !before_pipe.contains(' ')  // Service names typically don't have spaces
-            && before_pipe.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-')
-        {
-            return true;
-        }
-    }
-
-    // Raw Docker logs with timestamps: "2024-07-27T12:34:56Z message"
-    // Check if line starts with what looks like an ISO8601/RFC3339 timestamp
-    if line.len() >= 19
-        && line.starts_with("20")  // Years 2000-2099
-        && line.chars().nth(4) == Some('-')  // Year separator
-        && line.chars().nth(7) == Some('-')  // Month separator
-        && line.chars().nth(10) == Some('T')  // Date/time separator
-        && (line.contains('Z') || line.contains('+') || line.contains('-'))
-    // Timezone indicator
-    {
-        // Make sure there's either a space after timestamp or it's the whole line
-        if let Some(space_pos) = line.find(' ') {
-            let potential_ts = &line[..space_pos];
-            if potential_ts.len() >= 19 && potential_ts.len() <= 35 {
-                // Reasonable timestamp length
-                return true;
-            }
-        } else if line.len() >= 19 && line.len() <= 35 {
-            // Timestamp-only line
-            return true;
-        }
-    }
-
-    false
-}
 
 /// Detect combined log formats (Apache/Nginx compatible)
 #[allow(dead_code)] // Used by detect_format function
@@ -368,55 +319,6 @@ mod tests {
         // All numeric, no headers
     }
 
-    #[test]
-    fn test_detect_docker() {
-        // Docker Compose format with service names
-        assert_eq!(
-            detect_format("web_1    | 2024-07-27T12:34:56.123456789Z GET /health 200").unwrap(),
-            ConfigInputFormat::Docker
-        );
-        assert_eq!(
-            detect_format("db_1     | Connection established").unwrap(),
-            ConfigInputFormat::Docker
-        );
-        assert_eq!(
-            detect_format("api-service | Starting server").unwrap(),
-            ConfigInputFormat::Docker
-        );
-
-        // Raw Docker logs with timestamps
-        assert_eq!(
-            detect_format("2024-07-27T12:34:56Z GET /api/users").unwrap(),
-            ConfigInputFormat::Docker
-        );
-        assert_eq!(
-            detect_format("2024-07-27T12:35:10.123Z POST /api/data").unwrap(),
-            ConfigInputFormat::Docker
-        );
-
-        // Timestamp-only lines
-        assert_eq!(
-            detect_format("2024-07-27T12:34:56Z").unwrap(),
-            ConfigInputFormat::Docker
-        );
-
-        // Should NOT detect as Docker:
-        // - Pipe with spaces in service name (more likely to be shell output)
-        assert_eq!(
-            detect_format("some command | output").unwrap(),
-            ConfigInputFormat::Line
-        );
-        // - Pipe with very long service name
-        assert_eq!(
-            detect_format("this_is_a_very_long_service_name_that_exceeds_reasonable_limits_for_docker_compose_service_names | message").unwrap(),
-            ConfigInputFormat::Line
-        );
-        // - Non-Docker timestamp format
-        assert_eq!(
-            detect_format("2023-04-15 10:00:00 Regular log message").unwrap(),
-            ConfigInputFormat::Line
-        );
-    }
 
     #[test]
     fn test_detect_line_fallback() {

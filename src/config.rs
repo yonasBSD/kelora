@@ -26,6 +26,10 @@ pub struct InputConfig {
     pub ts_format: Option<String>,
     /// Default timezone for naive timestamps (None = local time)
     pub default_timezone: Option<String>,
+    /// Extract text before separator to specified field (runs before parsing)
+    pub extract_prefix: Option<String>,
+    /// Separator string for prefix extraction (default: pipe '|')
+    pub prefix_sep: String,
 }
 
 /// Output configuration
@@ -113,7 +117,6 @@ pub enum InputFormat {
     Csvnh,
     Tsvnh,
     Combined,
-    Docker,
 }
 
 /// Output format enumeration
@@ -573,6 +576,8 @@ impl KeloraConfig {
                 ts_field: cli.ts_field.clone(),
                 ts_format: cli.ts_format.clone(),
                 default_timezone: determine_default_timezone(cli),
+                extract_prefix: cli.extract_prefix.clone(),
+                prefix_sep: cli.prefix_sep.clone(),
             },
             output: OutputConfig {
                 format: if cli.stats_only {
@@ -655,6 +660,8 @@ impl Default for KeloraConfig {
                 ts_field: None,
                 ts_format: None,
                 default_timezone: None,
+                extract_prefix: None,
+                prefix_sep: "|".to_string(),
             },
             output: OutputConfig {
                 format: OutputFormat::Default,
@@ -768,7 +775,6 @@ impl From<crate::InputFormat> for InputFormat {
             crate::InputFormat::Csvnh => InputFormat::Csvnh,
             crate::InputFormat::Tsvnh => InputFormat::Tsvnh,
             crate::InputFormat::Combined => InputFormat::Combined,
-            crate::InputFormat::Docker => InputFormat::Docker,
         }
     }
 }
@@ -787,7 +793,6 @@ impl From<InputFormat> for crate::InputFormat {
             InputFormat::Csvnh => crate::InputFormat::Csvnh,
             InputFormat::Tsvnh => crate::InputFormat::Tsvnh,
             InputFormat::Combined => crate::InputFormat::Combined,
-            InputFormat::Docker => crate::InputFormat::Docker,
         }
     }
 }

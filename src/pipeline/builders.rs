@@ -69,6 +69,8 @@ pub struct PipelineBuilder {
     ts_field: Option<String>,
     ts_format: Option<String>,
     default_timezone: Option<String>,
+    extract_prefix: Option<String>,
+    prefix_sep: String,
 }
 
 impl PipelineBuilder {
@@ -103,6 +105,8 @@ impl PipelineBuilder {
             ts_field: None,
             ts_format: None,
             default_timezone: None,
+            extract_prefix: None,
+            prefix_sep: "|".to_string(),
         }
     }
 
@@ -173,7 +177,20 @@ impl PipelineBuilder {
                 }
             }
             crate::InputFormat::Combined => Box::new(crate::parsers::CombinedParser::new()?),
-            crate::InputFormat::Docker => Box::new(crate::parsers::DockerParser::new()),
+        };
+
+        // Wrap parser with prefix extraction if needed
+        let parser_with_prefix: Box<dyn EventParser> = if self.extract_prefix.is_some() {
+            let prefix_extractor = super::PrefixExtractor::new(
+                self.extract_prefix.clone().unwrap(),
+                self.prefix_sep.clone(),
+            );
+            Box::new(super::PrefixExtractingParser::new(
+                base_parser,
+                Some(prefix_extractor),
+            ))
+        } else {
+            base_parser
         };
 
         // Wrap parser with timestamp configuration if needed
@@ -182,13 +199,13 @@ impl PipelineBuilder {
             || self.default_timezone.is_some()
         {
             Box::new(TimestampConfiguredParser::new(
-                base_parser,
+                parser_with_prefix,
                 self.ts_field.clone(),
                 self.ts_format.clone(),
                 self.default_timezone.clone(),
             ))
         } else {
-            base_parser
+            parser_with_prefix
         };
 
         // Create formatter
@@ -427,7 +444,20 @@ impl PipelineBuilder {
                 }
             }
             crate::InputFormat::Combined => Box::new(crate::parsers::CombinedParser::new()?),
-            crate::InputFormat::Docker => Box::new(crate::parsers::DockerParser::new()),
+        };
+
+        // Wrap parser with prefix extraction if needed
+        let parser_with_prefix: Box<dyn EventParser> = if self.extract_prefix.is_some() {
+            let prefix_extractor = super::PrefixExtractor::new(
+                self.extract_prefix.clone().unwrap(),
+                self.prefix_sep.clone(),
+            );
+            Box::new(super::PrefixExtractingParser::new(
+                base_parser,
+                Some(prefix_extractor),
+            ))
+        } else {
+            base_parser
         };
 
         // Wrap parser with timestamp configuration if needed
@@ -436,13 +466,13 @@ impl PipelineBuilder {
             || self.default_timezone.is_some()
         {
             Box::new(TimestampConfiguredParser::new(
-                base_parser,
+                parser_with_prefix,
                 self.ts_field.clone(),
                 self.ts_format.clone(),
                 self.default_timezone.clone(),
             ))
         } else {
-            base_parser
+            parser_with_prefix
         };
 
         // Create formatter (workers still need formatters for output)
@@ -618,6 +648,18 @@ impl PipelineBuilder {
         self.default_timezone = default_timezone;
         self
     }
+
+    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
+    pub fn with_extract_prefix(mut self, extract_prefix: Option<String>) -> Self {
+        self.extract_prefix = extract_prefix;
+        self
+    }
+
+    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
+    pub fn with_prefix_sep(mut self, prefix_sep: String) -> Self {
+        self.prefix_sep = prefix_sep;
+        self
+    }
 }
 
 impl Default for PipelineBuilder {
@@ -667,6 +709,8 @@ pub fn create_pipeline_builder_from_config(
     builder.ts_field = config.input.ts_field.clone();
     builder.ts_format = config.input.ts_format.clone();
     builder.default_timezone = config.input.default_timezone.clone();
+    builder.extract_prefix = config.input.extract_prefix.clone();
+    builder.prefix_sep = config.input.prefix_sep.clone();
     builder.take_limit = config.processing.take_limit;
     builder
 }

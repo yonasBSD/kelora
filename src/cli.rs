@@ -19,7 +19,6 @@ pub enum InputFormat {
     Csvnh,
     Tsvnh,
     Combined,
-    Docker,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, Default)]
@@ -104,6 +103,14 @@ pub struct Cli {
     /// Multi-line event detection strategy
     #[arg(short = 'M', long = "multiline", help_heading = "Input Options")]
     pub multiline: Option<String>,
+
+    /// Extract text before separator to specified field (runs before parsing)
+    #[arg(long = "extract-prefix", help_heading = "Input Options")]
+    pub extract_prefix: Option<String>,
+
+    /// Separator string for prefix extraction (default: pipe '|')
+    #[arg(long = "prefix-sep", default_value = "|", help_heading = "Input Options")]
+    pub prefix_sep: String,
 
     /// Pre-run a Rhai script. Use it to populate the global `init` map
     /// with shared, read-only data.
