@@ -86,38 +86,53 @@ Empty lines are handled differently based on input format:
 - This prevents noise in structured data processing
 - Statistics reflect only non-empty lines that were processed
 
-### Docker Log Format (`-f docker`)
+### Prefix Extraction
 
-Kelora supports parsing Docker log output from both single containers and Docker Compose multi-container setups:
+Kelora supports extracting prefixed text from log lines before parsing using `--extract-prefix FIELD` and `--prefix-sep SEPARATOR`:
 
-**Supported Docker Log Formats:**
-- **Docker Compose logs**: `service_name | message` format with optional timestamps
-- **Raw Docker logs**: Plain log messages with optional ISO8601/RFC3339 timestamps
-- **Auto-detection**: Use `-f auto` to automatically detect Docker format
+**Configuration Options:**
+- `--extract-prefix FIELD`: Extract text before separator to the specified field name
+- `--prefix-sep STRING`: Separator string (default: `|`), can be multiple characters
 
-**Output Fields:**
-- `msg` (required): The main log message content
-- `src` (optional): Container/service name from Docker Compose prefix
-- `ts` (optional): Parsed timestamp when present
+**How it works:**
+1. Extracts text before the first occurrence of the separator
+2. Trims whitespace from both the prefix and remaining line
+3. Adds the prefix as a field to the parsed event  
+4. Passes the remaining line to the selected format parser
 
 **Example Usage:**
 ```bash
-# Docker Compose logs with filtering
-docker compose logs --timestamps | kelora -f docker --filter 'e.src == "web" && e.msg.contains("500")'
+# Docker Compose logs with pipe separator
+docker compose logs | kelora --extract-prefix service --filter 'e.service == "web_1"'
 
-# Raw Docker logs
-docker logs myapp | kelora -f docker --filter 'e.msg.contains("timeout")'
+# Custom separator for service logs
+kelora --extract-prefix service --prefix-sep " :: " --filter 'e.service.contains("auth")' app.log
 
-# Auto-detection
-docker compose logs | kelora -f auto --exec 'e.service_type = e.src ?? "standalone"'
+# Combined with any format parser
+kelora -f jsonl --extract-prefix container input.log
+
+# Multi-character separators
+kelora --extract-prefix node --prefix-sep " >>> " cluster.log
 ```
 
-**Input Examples:**
+**Input/Output Examples:**
 ```
-web_1    | 2024-07-27T12:34:56.123Z GET /health 200    → {src: "web_1", ts: "...", msg: "GET /health 200"}
-db_1     | Connection established                       → {src: "db_1", msg: "Connection established"}
-2024-07-27T12:34:56Z Starting application             → {ts: "...", msg: "Starting application"}
-Application ready                                      → {msg: "Application ready"}
+web_1    | GET /health 200           → {service: "web_1", line: "GET /health 200"}
+db_1     | Connection established    → {service: "db_1", line: "Connection established"}
+auth-svc :: User login successful    → {service: "auth-svc", line: "User login successful"}
+no-separator-here                    → {line: "no-separator-here"} (no prefix extracted)
+ | Empty prefix message              → {line: "Empty prefix message"} (empty prefix ignored)
+```
+
+**Integration with Formats:**
+Prefix extraction works with any format parser. The prefix becomes a field in the event, and the remaining line is parsed by the specified format:
+
+```bash
+# Extract container name, then parse remaining JSON
+echo 'web_1 | {"level": "info", "msg": "started"}' | \
+  kelora --extract-prefix container -f jsonl
+
+# Output: {"container": "web_1", "level": "info", "msg": "started"}
 ```
 
 ### Combined Log Format (`-f combined`)

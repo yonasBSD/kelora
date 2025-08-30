@@ -80,6 +80,23 @@ Each parser creates events with different fields:
 
 All formats support gzip compression. Use `-f format` to specify (`-j` is a shortcut for `-f jsonl`).
 
+### Prefix Extraction
+
+Extract prefixed text from logs before parsing with `--extract-prefix FIELD`. Useful for Docker Compose logs, service-prefixed logs, and any format with separators:
+
+```bash
+# Docker Compose logs: "web_1 | message"
+docker compose logs | kelora --extract-prefix service --filter 'e.service == "web_1"'
+
+# Custom separator: "auth-service :: message" 
+kelora --extract-prefix service --prefix-sep " :: " --filter 'e.service.contains("auth")' app.log
+
+# Works with any format
+kelora -f jsonl --extract-prefix container input.log
+```
+
+Prefix extraction runs before parsing, so the extracted prefix becomes a field in the parsed event. Default separator is `|`, configurable with `--prefix-sep`.
+
 ## Built-in Functions
 
 **Text Extraction**: `extract_re(pattern)` finds regex matches, `extract_ip()` pulls IP addresses, `parse_kv("=", ";")` converts key-value pairs to fields.
