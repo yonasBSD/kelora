@@ -72,6 +72,34 @@ Kelora is built around a streaming pipeline architecture:
 - **Composable**: Each stage can be configured independently
 - **Performance**: Parallel processing and efficient memory usage
 
+### Field Selection and Output Formatting
+
+**Default Formatter Bracket Notation:**
+The default formatter uses bracket notation for arrays to maintain consistency with `get_path()` syntax:
+- Arrays: `scores[0]=85 scores[1]=92` (not `scores.0=85 scores.1=92`)
+- Objects: `user.name=alice user.age=25`
+- Mixed: `user.scores[0]=85 user.details.items[1].name=item2`
+
+This ensures that field access patterns in the output match the path syntax used in `get_path()` functions.
+
+**--keys Parameter Design:**
+The `--keys` parameter operates only on **top-level field names** in the final processed event, not on nested field paths:
+
+✅ **Supported**: `--keys user,timestamp` (selects top-level fields)  
+❌ **Not Supported**: `--keys user.name,user.scores[0]` (nested field paths)
+
+**Rationale**: This design keeps `--keys` simple and predictable, while users can achieve nested field selection through the scripting interface:
+
+```bash
+# Extract specific nested fields using get_path() + --keys
+kelora -f jsonl \
+  --exec 'e.user_name = get_path(e, "user.name", "")' \
+  --exec 'e.first_score = get_path(e, "user.scores[0]", 0)' \
+  --keys user_name,first_score
+```
+
+This approach provides full flexibility while maintaining implementation simplicity.
+
 ### Empty Line Handling
 
 Empty lines are handled differently based on input format:

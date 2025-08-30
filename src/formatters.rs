@@ -456,8 +456,8 @@ impl DefaultFormatter {
         if value.clone().try_cast::<rhai::Map>().is_some()
             || value.clone().try_cast::<rhai::Array>().is_some()
         {
-            // Flatten nested structures using dot style for human readability
-            let flattened = flatten_dynamic(value, FlattenStyle::Dot, 0);
+            // Flatten nested structures using bracket style for consistency with get_path()
+            let flattened = flatten_dynamic(value, FlattenStyle::Bracket, 0);
 
             if flattened.len() == 1 {
                 // Single flattened value - use it directly
