@@ -173,7 +173,6 @@ impl PipelineBuilder {
                 }
             }
             crate::InputFormat::Combined => Box::new(crate::parsers::CombinedParser::new()?),
-            crate::InputFormat::Cols => Box::new(crate::parsers::ColsParser::new()),
             crate::InputFormat::Docker => Box::new(crate::parsers::DockerParser::new()),
         };
 
@@ -428,7 +427,6 @@ impl PipelineBuilder {
                 }
             }
             crate::InputFormat::Combined => Box::new(crate::parsers::CombinedParser::new()?),
-            crate::InputFormat::Cols => Box::new(crate::parsers::ColsParser::new()),
             crate::InputFormat::Docker => Box::new(crate::parsers::DockerParser::new()),
         };
 

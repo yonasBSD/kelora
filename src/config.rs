@@ -113,7 +113,6 @@ pub enum InputFormat {
     Csvnh,
     Tsvnh,
     Combined,
-    Cols,
     Docker,
 }
 
@@ -769,7 +768,6 @@ impl From<crate::InputFormat> for InputFormat {
             crate::InputFormat::Csvnh => InputFormat::Csvnh,
             crate::InputFormat::Tsvnh => InputFormat::Tsvnh,
             crate::InputFormat::Combined => InputFormat::Combined,
-            crate::InputFormat::Cols => InputFormat::Cols,
             crate::InputFormat::Docker => InputFormat::Docker,
         }
     }
@@ -789,7 +787,6 @@ impl From<InputFormat> for crate::InputFormat {
             InputFormat::Csvnh => crate::InputFormat::Csvnh,
             InputFormat::Tsvnh => crate::InputFormat::Tsvnh,
             InputFormat::Combined => crate::InputFormat::Combined,
-            InputFormat::Cols => crate::InputFormat::Cols,
             InputFormat::Docker => crate::InputFormat::Docker,
         }
     }

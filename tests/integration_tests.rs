@@ -184,125 +184,8 @@ fn test_text_output_format() {
     );
 }
 
-#[test]
-fn test_cols_input_format() {
-    let input = "field1 field2 field3\none    two\tthree\nfour five six seven";
 
-    let (stdout, _stderr, exit_code) =
-        run_kelora_with_input(&["-f", "cols", "-k", "c1,c2,c3"], input);
-    assert_eq!(exit_code, 0, "kelora should exit successfully");
 
-    let lines: Vec<&str> = stdout.trim().split('\n').collect();
-    assert_eq!(lines.len(), 3, "Should have 3 output lines");
-
-    // First line: field1 field2 field3
-    assert!(
-        lines[0].contains("c1='field1'"),
-        "First line should contain c1='field1'"
-    );
-    assert!(
-        lines[0].contains("c2='field2'"),
-        "First line should contain c2='field2'"
-    );
-    assert!(
-        lines[0].contains("c3='field3'"),
-        "First line should contain c3='field3'"
-    );
-
-    // Second line: one two three (handles mixed whitespace)
-    assert!(
-        lines[1].contains("c1='one'"),
-        "Second line should contain c1='one'"
-    );
-    assert!(
-        lines[1].contains("c2='two'"),
-        "Second line should contain c2='two'"
-    );
-    assert!(
-        lines[1].contains("c3='three'"),
-        "Second line should contain c3='three'"
-    );
-
-    // Third line: four five six seven (has more than 3 fields)
-    assert!(
-        lines[2].contains("c1='four'"),
-        "Third line should contain c1='four'"
-    );
-    assert!(
-        lines[2].contains("c2='five'"),
-        "Third line should contain c2='five'"
-    );
-    assert!(
-        lines[2].contains("c3='six'"),
-        "Third line should contain c3='six'"
-    );
-}
-
-#[test]
-fn test_cols_format_with_filtering() {
-    let input = "2023-01-01 10:30:00 ERROR database connection_failed\n2023-01-01 10:31:00 INFO user login_success";
-
-    let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &[
-            "-f",
-            "cols",
-            "--filter",
-            "e.c3 == \"ERROR\"",
-            "-k",
-            "c1,c2,c3,c4",
-        ],
-        input,
-    );
-    assert_eq!(exit_code, 0, "kelora should exit successfully");
-
-    let lines: Vec<&str> = stdout.trim().split('\n').collect();
-    assert_eq!(lines.len(), 1, "Should have 1 output line (ERROR only)");
-
-    // Should only have the ERROR line
-    assert!(
-        lines[0].contains("c1='2023-01-01'"),
-        "Should contain the date"
-    );
-    assert!(
-        lines[0].contains("c2='10:30:00'"),
-        "Should contain the time"
-    );
-    assert!(lines[0].contains("c3='ERROR'"), "Should contain the level");
-    assert!(
-        lines[0].contains("c4='database'"),
-        "Should contain the component"
-    );
-}
-
-#[test]
-fn test_cols_format_with_exec() {
-    let input = "user1 200 1.23\nuser2 404 0.45\nuser3 200 2.10";
-
-    let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &[
-            "-f",
-            "cols",
-            "--exec",
-            "print(e.c1 + \" status=\" + e.c2 + \" time=\" + e.c3)",
-        ],
-        input,
-    );
-    assert_eq!(exit_code, 0, "kelora should exit successfully");
-
-    // Should contain both the print output and the formatted event
-    assert!(
-        stdout.contains("user1 status=200 time=1.23"),
-        "Should contain exec print output for user1"
-    );
-    assert!(
-        stdout.contains("user2 status=404 time=0.45"),
-        "Should contain exec print output for user2"
-    );
-    assert!(
-        stdout.contains("user3 status=200 time=2.10"),
-        "Should contain exec print output for user3"
-    );
-}
 
 #[test]
 fn test_keys_filtering() {
@@ -3351,24 +3234,6 @@ fn test_empty_line_handling_consistency_across_formats() {
         "Line format should process 4 lines including empty ones"
     );
 
-    // Structured format (cols) should skip empty lines
-    let (stdout_cols, _stderr_cols, exit_code_cols) = run_kelora_with_input(
-        &[
-            "-f",
-            "cols",
-            "--exec",
-            "print(\"[\" + e.c1 + \"]\")",
-            "-F",
-            "hide",
-        ],
-        input,
-    );
-    assert_eq!(exit_code_cols, 0, "Cols format should exit successfully");
-    let cols_count = stdout_cols.trim().split('\n').collect::<Vec<&str>>().len();
-    assert_eq!(
-        cols_count, 2,
-        "Cols format should process 2 lines, skipping empty ones"
-    );
 }
 
 #[test]

@@ -19,7 +19,6 @@ pub enum InputFormat {
     Csvnh,
     Tsvnh,
     Combined,
-    Cols,
     Docker,
 }
 
