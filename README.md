@@ -26,7 +26,7 @@ kubectl logs -f app | kelora -j --parallel --levels warn,error
 
 # Monitor for brute force attacks using sliding windows
 kelora -j auth.log --window 3 --filter 'e.event == "login_failed"' \
-  --exec 'if window_values(window, "user").len() >= 2 { print("🚨 Brute force detected from " + e.ip) }'
+  --exec 'if window_values(window, "user").len() >= 2 { eprint("🚨 Brute force detected from " + e.ip) }'
 ```
 
 ## Install
@@ -90,6 +90,8 @@ All formats support gzip compression. Use `-f format` to specify (`-j` is a shor
 
 **Metrics**: `track_count(key)` increments counters, `track_sum/avg/min/max(key, value)` accumulate statistics, `track_unique(key, value)` counts distinct values. Access via `tracked` map in `--end` scripts or display with `--metrics`.
 
+**Output**: Use `eprint()` for alerts and diagnostics (writes to stderr), `print()` for data output (writes to stdout). Since kelora's processed events go to stdout, `eprint()` prevents interference with the data pipeline.
+
 ## Advanced Features
 
 ### Window Analysis
@@ -97,11 +99,11 @@ Access recent events with `--window N`. Use `window[0]` (current), `window[1]` (
 
 ```bash
 # Detect status changes
-kelora --window 2 --exec 'if window[0].status != window[1].status { print("Status changed") }' app.log
+kelora --window 2 --exec 'if window[0].status != window[1].status { eprint("Status changed") }' app.log
 
 # Brute force detection (3+ failures from same IP)
 kelora --window 5 --filter 'e.event == "login_failed"' \
-  --exec 'let ips = window_values(window, "ip"); if ips.len() >= 3 { print("Brute force: " + e.ip) }' auth.log
+  --exec 'let ips = window_values(window, "ip"); if ips.len() >= 3 { eprint("Brute force: " + e.ip) }' auth.log
 ```
 
 ### Multi-Stage Processing
@@ -141,7 +143,7 @@ tail -f /var/log/nginx/access.log | \
     --exec 'e.status_class = if e.status >= 500 { "error" } else if e.status >= 400 { "client_error" } else { "ok" }' \
     --filter 'e.status >= 400' \
     --exec 'track_count("errors"); track_unique("error_ips", e.ip); track_avg("error_response_time", e.request_time)' \
-    --exec 'if e.status >= 500 { print("🚨 SERVER ERROR: " + e.status + " from " + e.ip + " - " + e.request) }' \
+    --exec 'if e.status >= 500 { eprint("🚨 SERVER ERROR: " + e.status + " from " + e.ip + " - " + e.request) }' \
     --metrics
 ```
 
@@ -156,7 +158,7 @@ kelora -j auth.jsonl \
   --window 5 \
   --exec 'let recent_failures = 0;
            for event in window { if event.auth_result == "failed" && event.remote_addr == e.remote_addr { recent_failures += 1; } }
-           if recent_failures >= 3 { print("🚨 BRUTE FORCE: " + e.remote_addr + " - " + recent_failures + " failures") }' \
+           if recent_failures >= 3 { eprint("🚨 BRUTE FORCE: " + e.remote_addr + " - " + recent_failures + " failures") }' \
   --metrics
 ```
 
