@@ -16,6 +16,25 @@ static CSV_FORMATTER_HEADER_REGISTRY: Lazy<Mutex<HashMap<String, bool>>> =
 #[cfg(test)]
 use crate::pipeline::Formatter;
 
+/// Utility function for single-quote string escaping for default formatter
+/// Escapes single quotes, backslashes, newlines, tabs, and carriage returns
+fn escape_single_quote_string(input: &str) -> String {
+    let mut output = String::with_capacity(input.len() + 10); // Some extra space for escapes
+
+    for ch in input.chars() {
+        match ch {
+            '\'' => output.push_str("\\'"),
+            '\\' => output.push_str("\\\\"),
+            '\n' => output.push_str("\\n"),
+            '\t' => output.push_str("\\t"),
+            '\r' => output.push_str("\\r"),
+            _ => output.push(ch),
+        }
+    }
+
+    output
+}
+
 /// Utility function for logfmt-compliant string escaping
 /// Escapes quotes, backslashes, newlines, tabs, and carriage returns
 fn escape_logfmt_string(input: &str) -> String {
@@ -33,6 +52,18 @@ fn escape_logfmt_string(input: &str) -> String {
     }
 
     output
+}
+
+/// Check if a string value needs to be quoted with single quotes for default formatter
+fn needs_single_quote_quoting(value: &str) -> bool {
+    // Quote values that contain spaces, tabs, newlines, single quotes, equals, or are empty
+    value.is_empty()
+        || value.contains(' ')
+        || value.contains('\t')
+        || value.contains('\n')
+        || value.contains('\r')
+        || value.contains('\'')
+        || value.contains('=')
 }
 
 /// Check if a string value needs to be quoted per logfmt rules
@@ -204,9 +235,9 @@ impl DefaultFormatter {
                 if !self.colors.string.is_empty() {
                     output.push_str(self.colors.string);
                 }
-                output.push('"');
-                output.push_str(&escape_logfmt_string(&formatted_ts));
-                output.push('"');
+                output.push('\'');
+                output.push_str(&escape_single_quote_string(&formatted_ts));
+                output.push('\'');
                 if !self.colors.string.is_empty() {
                     output.push_str(self.colors.reset);
                 }
@@ -229,18 +260,18 @@ impl DefaultFormatter {
         let (string_val, is_string) = self.format_default_value(value);
         if is_string {
             // Add opening quote (uncolored)
-            output.push('"');
+            output.push('\'');
             // Apply color to content only
             if !color.is_empty() {
                 output.push_str(color);
             }
-            output.push_str(&escape_logfmt_string(&string_val));
+            output.push_str(&escape_single_quote_string(&string_val));
             // Reset color before closing quote
             if !color.is_empty() {
                 output.push_str(self.colors.reset);
             }
             // Add closing quote (uncolored)
-            output.push('"');
+            output.push('\'')
         } else {
             // For non-strings, color the entire value
             if !color.is_empty() {
@@ -818,9 +849,9 @@ mod tests {
         let result = formatter.format(&event);
 
         // Check that all fields are present with proper formatting
-        // Strings should be quoted, numbers should not be
-        assert!(result.contains("level=\"INFO\""));
-        assert!(result.contains("user=\"alice\""));
+        // Strings should be quoted with single quotes, numbers should not be
+        assert!(result.contains("level='INFO'"));
+        assert!(result.contains("user='alice'"));
         assert!(result.contains("count=42"));
         // Fields should be space-separated
         assert!(result.contains(" "));

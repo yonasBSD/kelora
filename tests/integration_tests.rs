@@ -171,15 +171,15 @@ fn test_text_output_format() {
 
     // Text format should be key=value pairs
     assert!(
-        stdout.contains("level=\"INFO\""),
-        "Text output should contain level=\"INFO\""
+        stdout.contains("level='INFO'"),
+        "Text output should contain level='INFO'"
     );
     assert!(
         stdout.contains("status=200"),
         "Text output should contain status=200"
     );
     assert!(
-        stdout.contains("message=\"Hello world\""),
+        stdout.contains("message='Hello world'"),
         "Text output should contain quoted message"
     );
 }
@@ -197,44 +197,44 @@ fn test_cols_input_format() {
 
     // First line: field1 field2 field3
     assert!(
-        lines[0].contains("c1=\"field1\""),
-        "First line should contain c1=\"field1\""
+        lines[0].contains("c1='field1'"),
+        "First line should contain c1='field1'"
     );
     assert!(
-        lines[0].contains("c2=\"field2\""),
-        "First line should contain c2=\"field2\""
+        lines[0].contains("c2='field2'"),
+        "First line should contain c2='field2'"
     );
     assert!(
-        lines[0].contains("c3=\"field3\""),
-        "First line should contain c3=\"field3\""
+        lines[0].contains("c3='field3'"),
+        "First line should contain c3='field3'"
     );
 
     // Second line: one two three (handles mixed whitespace)
     assert!(
-        lines[1].contains("c1=\"one\""),
-        "Second line should contain c1=\"one\""
+        lines[1].contains("c1='one'"),
+        "Second line should contain c1='one'"
     );
     assert!(
-        lines[1].contains("c2=\"two\""),
-        "Second line should contain c2=\"two\""
+        lines[1].contains("c2='two'"),
+        "Second line should contain c2='two'"
     );
     assert!(
-        lines[1].contains("c3=\"three\""),
-        "Second line should contain c3=\"three\""
+        lines[1].contains("c3='three'"),
+        "Second line should contain c3='three'"
     );
 
     // Third line: four five six seven (has more than 3 fields)
     assert!(
-        lines[2].contains("c1=\"four\""),
-        "Third line should contain c1=\"four\""
+        lines[2].contains("c1='four'"),
+        "Third line should contain c1='four'"
     );
     assert!(
-        lines[2].contains("c2=\"five\""),
-        "Third line should contain c2=\"five\""
+        lines[2].contains("c2='five'"),
+        "Third line should contain c2='five'"
     );
     assert!(
-        lines[2].contains("c3=\"six\""),
-        "Third line should contain c3=\"six\""
+        lines[2].contains("c3='six'"),
+        "Third line should contain c3='six'"
     );
 }
 
@@ -260,19 +260,19 @@ fn test_cols_format_with_filtering() {
 
     // Should only have the ERROR line
     assert!(
-        lines[0].contains("c1=\"2023-01-01\""),
+        lines[0].contains("c1='2023-01-01'"),
         "Should contain the date"
     );
     assert!(
-        lines[0].contains("c2=\"10:30:00\""),
+        lines[0].contains("c2='10:30:00'"),
         "Should contain the time"
     );
     assert!(
-        lines[0].contains("c3=\"ERROR\""),
+        lines[0].contains("c3='ERROR'"),
         "Should contain the level"
     );
     assert!(
-        lines[0].contains("c4=\"database\""),
+        lines[0].contains("c4='database'"),
         "Should contain the component"
     );
 }
@@ -1880,7 +1880,7 @@ fn test_ordered_filter_exec_stages() {
     assert_eq!(exit_code, 0);
     assert_eq!(stderr, "");
     assert!(stdout.contains("status=200"));
-    assert!(stdout.contains("level=\"info\""));
+    assert!(stdout.contains("level='info'"));
 
     // Test wrong order: filter before conversion should fail
     let (stdout2, _stderr2, _exit_code2) = run_kelora_with_input(
@@ -1933,12 +1933,12 @@ fn test_complex_ordered_pipeline() {
     // Check first line (value=15, doubled=30, status="medium")
     assert!(lines[0].contains("value=15"));
     assert!(lines[0].contains("doubled=30"));
-    assert!(lines[0].contains("status=\"medium\""));
+    assert!(lines[0].contains("status='medium'"));
 
     // Check second line (value=25, doubled=50, status="high")
     assert!(lines[1].contains("value=25"));
     assert!(lines[1].contains("doubled=50"));
-    assert!(lines[1].contains("status=\"high\""));
+    assert!(lines[1].contains("status='high'"));
 }
 
 // Regression tests for parallel mode statistics counting (GitHub issue #XXX)
@@ -3747,11 +3747,11 @@ fn test_metrics_sequential_mode_basic() {
 
     // Check that main output still appears in stdout
     assert!(
-        stdout.contains("level=\"info\""),
+        stdout.contains("level='info'"),
         "Should output processed events"
     );
     assert!(
-        stdout.contains("level=\"error\""),
+        stdout.contains("level='error'"),
         "Should output processed events"
     );
 }
@@ -3803,15 +3803,15 @@ fn test_metrics_parallel_mode_basic() {
 
     // Check that main output still appears in stdout
     assert!(
-        stdout.contains("level=\"info\""),
+        stdout.contains("level='info'"),
         "Should output processed events"
     );
     assert!(
-        stdout.contains("level=\"error\""),
+        stdout.contains("level='error'"),
         "Should output processed events"
     );
     assert!(
-        stdout.contains("level=\"warn\""),
+        stdout.contains("level='warn'"),
         "Should output processed events"
     );
 }
