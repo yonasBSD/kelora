@@ -217,6 +217,6 @@ impl ProcessingStats {
             return String::new();
         }
 
-        format!("⚠️  Processing completed with {}", parts.join(", "))
+        format!("Processing completed with {}", parts.join(", "))
     }
 }

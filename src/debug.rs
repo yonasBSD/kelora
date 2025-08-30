@@ -110,7 +110,7 @@ impl ErrorEnhancer {
         let mut output = String::new();
 
         // Basic error info
-        output.push_str(&format!("❌ Stage {} failed\n", stage));
+        output.push_str(&format!("🔸 Stage {} failed\n", stage));
         output.push_str(&format!("   Code: {}\n", script.trim()));
         output.push_str(&format!("   Error: {}\n", error));
 
@@ -185,8 +185,8 @@ impl ErrorEnhancer {
 
     fn get_stage_help(&self, stage: &str, _error: &EvalAltResult) -> String {
         match stage {
-            "filter" => "   🎯 Filter tip: Use 'e.field_name' to access event fields\n".to_string(),
-            "exec" => "   🎯 Exec tip: Use 'e.field_name = value' to set fields\n".to_string(),
+            "filter" => "   🔹 Filter tip: Use 'e.field_name' to access event fields\n".to_string(),
+            "exec" => "   🔹 Exec tip: Use 'e.field_name = value' to set fields\n".to_string(),
             _ => String::new(),
         }
     }

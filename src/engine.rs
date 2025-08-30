@@ -88,7 +88,7 @@ impl DebugTracker {
             1 => {
                 if self.config.is_enabled() {
                     let prefix = if self.config.use_emoji {
-                        "⚡"
+                        "🔹"
                     } else {
                         "kelora:"
                     };
@@ -176,7 +176,7 @@ impl ErrorEnhancer {
         let mut output = String::new();
 
         // Basic error info
-        output.push_str(&format!("❌ Stage {} failed\n", stage));
+        output.push_str(&format!("🔸 Stage {} failed\n", stage));
         output.push_str(&format!("   Code: {}\n", script.trim()));
         output.push_str(&format!("   Error: {}\n", error));
 
@@ -374,7 +374,7 @@ impl ErrorEnhancer {
 
         match stage {
             "filter" => {
-                help.push_str("\n   🎯 Filter stage tips:\n");
+                help.push_str("\n   🔹 Filter stage tips:\n");
                 help.push_str("   • Filters must return true/false (boolean values)\n");
                 help.push_str("   • Use 'e.field_name' to access event fields\n");
                 help.push_str(
@@ -389,7 +389,7 @@ impl ErrorEnhancer {
                 }
             }
             "exec" => {
-                help.push_str("\n   🎯 Exec stage tips:\n");
+                help.push_str("\n   🔹 Exec stage tips:\n");
                 help.push_str("   • Use 'e.new_field = value' to add fields to events\n");
                 help.push_str("   • Use 'e.field = ()' to remove fields from events\n");
                 help.push_str("   • Use 'e = ()' to remove entire event (filter out)\n");
@@ -397,13 +397,13 @@ impl ErrorEnhancer {
                 help.push_str("   • Use 'print(\"debug: \" + value)' for debugging output\n");
             }
             "begin" => {
-                help.push_str("\n   🎯 Begin stage tips:\n");
+                help.push_str("\n   🔹 Begin stage tips:\n");
                 help.push_str("   • Use 'init.field = value' to set global initialization data\n");
                 help.push_str("   • Use 'read_file(\"path\")' to load external data\n");
                 help.push_str("   • Variables set here are available in all event processing\n");
             }
             "end" => {
-                help.push_str("\n   🎯 End stage tips:\n");
+                help.push_str("\n   🔹 End stage tips:\n");
                 help.push_str("   • Use 'tracked.key' to access accumulated tracking data\n");
                 help.push_str("   • Use 'print()' to output final results\n");
                 help.push_str("   • This runs after all events are processed\n");
@@ -434,7 +434,7 @@ impl ExecutionTracer {
     pub fn trace_stage_execution(&self, stage_number: usize, stage_type: &str) {
         if self.config.verbosity >= 1 {
             let prefix = if self.config.use_emoji {
-                "⚡"
+                "🔹"
             } else {
                 "kelora:"
             };
@@ -623,7 +623,7 @@ impl InteractiveDebugger {
     ) -> DebuggerCommand {
         use std::io::{self, Write};
 
-        println!("\n🔍 Interactive Debug Session");
+        println!("\n🔹 Interactive Debug Session");
         println!("Variables in scope:");
         for (name, _is_const, value) in scope.iter() {
             println!("  {}: {:?}", name, value);

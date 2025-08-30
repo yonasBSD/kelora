@@ -52,7 +52,7 @@ pub fn track_error(
                 std::env::var("NO_EMOJI").is_ok()
             };
             let use_emoji = use_colors && !no_emoji;
-            let prefix = if use_emoji { "🧱" } else { "kelora:" };
+            let prefix = if use_emoji { "🔸" } else { "kelora:" };
 
             let formatted_error = if let (Some(line), Some(fname)) = (line_num, filename) {
                 format!(
@@ -176,12 +176,12 @@ pub fn extract_error_summary_from_tracking(
         "mixed"
     };
 
-    // Format header: "🧱 parse errors: N total" or "🧱 mixed errors: N total"
+    // Format header: "parse errors: N total" or "mixed errors: N total"
     if primary_error_type == "mixed" {
-        summary.push_str(&format!("🧱 mixed errors: {} total", total_errors));
+        summary.push_str(&format!("mixed errors: {} total", total_errors));
     } else {
         summary.push_str(&format!(
-            "🧱 {} errors: {} total",
+            "{} errors: {} total",
             primary_error_type, total_errors
         ));
     }

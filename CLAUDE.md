@@ -194,10 +194,11 @@ cat webserver.log | kelora -f auto --exec 'e.slow_request = e.request_time > 0.5
 - Use `--quiet` to suppress all kelora output while preserving script side effects
 
 **Verbose Error Output (`--verbose`):**
-- Prints each error immediately to stderr with format: `🧱 kelora: line 42: parse error - invalid JSON`
+- Prints each error immediately to stderr with format: `🔸 kelora: line 42: parse error - invalid JSON`
 - Works in both sequential and parallel processing modes
 - Shows enhanced error summaries with examples when errors occur
 - Compatible with all other flags (`--parallel`, `--stats`, etc.)
+- Uses standardized emoji prefixes: 🔹 (blue diamond) for general output, 🔸 (orange diamond) for errors
 
 **Quiet Mode (`--quiet`):**
 - Suppresses all kelora output: events, error messages, stats, summaries
@@ -413,3 +414,8 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
 - Write unit tests for new functionality
 - Document public APIs with examples
 - Use descriptive variable names and comments for complex logic
+- **Emoji Standardization**: Use consistent emoji prefixes in output
+  - 🔹 (small blue diamond) for general output: stats, metrics, processing messages, help tips
+  - 🔸 (small orange diamond) for errors: error messages, warnings, failures
+  - Avoid doubled emoji by ensuring only the final formatting function adds the prefix
+  - Use `--no-emoji` flag to disable emoji output when needed

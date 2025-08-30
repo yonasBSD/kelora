@@ -375,7 +375,7 @@ impl KeloraConfig {
         let use_emoji = use_colors && !self.output.no_emoji;
 
         if use_emoji {
-            format!("🧱 {}", message)
+            format!("🔸 {}", message)
         } else {
             format!("kelora: {}", message)
         }
@@ -387,7 +387,7 @@ impl KeloraConfig {
         let use_emoji = use_colors && !self.output.no_emoji;
 
         if use_emoji {
-            format!("📈 === Kelora Stats ===\n{}", message)
+            format!("🔹 === Kelora Stats ===\n{}", message)
         } else {
             format!("=== Kelora Stats ===\n{}", message)
         }
@@ -399,7 +399,7 @@ impl KeloraConfig {
         let use_emoji = use_colors && !self.output.no_emoji;
 
         if use_emoji {
-            format!("📊 === Tracked metrics ===\n{}", message)
+            format!("🔹 === Tracked metrics ===\n{}", message)
         } else {
             format!("=== Tracked metrics ===\n{}", message)
         }
@@ -414,7 +414,7 @@ pub fn format_error_message_auto(message: &str) -> String {
     let use_emoji = use_colors && !no_emoji;
 
     if use_emoji {
-        format!("🧱 {}", message)
+        format!("🔸 {}", message)
     } else {
         format!("kelora: {}", message)
     }
@@ -442,7 +442,7 @@ pub fn format_verbose_error_with_config(
     };
 
     let use_emoji = use_colors && !no_emoji;
-    let prefix = if use_emoji { "🧱" } else { "kelora:" };
+    let prefix = if use_emoji { "🔸" } else { "kelora:" };
 
     if let Some(line) = line_num {
         format!("{} line {}: {} - {}", prefix, line, error_type, message)
@@ -508,7 +508,7 @@ pub fn format_verbose_error_with_pipeline_config(
     };
 
     let use_emoji = use_colors && !no_emoji;
-    let prefix = if use_emoji { "🧱" } else { "kelora:" };
+    let prefix = if use_emoji { "🔸" } else { "kelora:" };
 
     if let Some(line) = line_num {
         format!("{} line {}: {} - {}", prefix, line, error_type, message)

@@ -305,7 +305,7 @@ pub fn run_pipeline_parallel_with_config<W: Write + Send + 'static>(
                 crate::tty::should_use_colors_with_mode(&crate::config::ColorMode::Auto);
             let no_emoji = std::env::var("NO_EMOJI").is_ok();
             let use_emoji = use_colors && !no_emoji;
-            let prefix = if use_emoji { "🧱" } else { "kelora:" };
+            let prefix = if use_emoji { "🔸" } else { "kelora:" };
             eprintln!("{} auto-detected format: {}", prefix, format_name);
         }
 
