@@ -267,10 +267,7 @@ fn test_cols_format_with_filtering() {
         lines[0].contains("c2='10:30:00'"),
         "Should contain the time"
     );
-    assert!(
-        lines[0].contains("c3='ERROR'"),
-        "Should contain the level"
-    );
+    assert!(lines[0].contains("c3='ERROR'"), "Should contain the level");
     assert!(
         lines[0].contains("c4='database'"),
         "Should contain the component"
@@ -1467,7 +1464,7 @@ fn test_apache_combined_format_parsing() {
 10.0.0.1 - admin [25/Dec/1995:10:00:02 +0000] "GET /admin/dashboard HTTP/1.1" 403 - "https://admin.example.com/" "Mozilla/5.0""#;
 
     let (stdout, _stderr, exit_code) =
-        run_kelora_with_input(&["-f", "apache", "-F", "jsonl"], input);
+        run_kelora_with_input(&["-f", "combined", "-F", "jsonl"], input);
     assert_eq!(exit_code, 0, "Apache parsing should succeed");
 
     let lines: Vec<&str> = stdout.trim().lines().collect();
@@ -1512,7 +1509,7 @@ fn test_apache_common_format_parsing() {
 127.0.0.1 - - [25/Dec/1995:10:00:01 +0000] "POST /api/data HTTP/1.1" 201 456"#;
 
     let (stdout, _stderr, exit_code) =
-        run_kelora_with_input(&["-f", "apache", "-F", "jsonl"], input);
+        run_kelora_with_input(&["-f", "combined", "-F", "jsonl"], input);
     assert_eq!(exit_code, 0, "Apache common format parsing should succeed");
 
     let lines: Vec<&str> = stdout.trim().lines().collect();
@@ -1543,7 +1540,7 @@ fn test_apache_filtering_and_analysis() {
 192.168.1.50 - - [25/Dec/1995:10:00:03 +0000] "GET /favicon.ico HTTP/1.1" 500 1024 "http://www.site.com/" "Safari/537.36""#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "apache",
+        "-f", "combined",
         "--filter", "e.status >= 400",
         "--exec", "track_count(\"errors\"); track_bucket(\"methods\", e.method);",
         "--end", "let methods = tracked[\"methods\"]; print(`Total errors: ${tracked[\"errors\"]}, GET: ${methods.get(\"GET\") ?? 0}, POST: ${methods.get(\"POST\") ?? 0}`);"
@@ -1567,7 +1564,7 @@ fn test_apache_status_code_analysis() {
 192.168.1.50 - - [25/Dec/1995:10:00:03 +0000] "GET /favicon.ico HTTP/1.1" 500 1024 "http://www.site.com/" "Safari/537.36""#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "apache",
+        "-f", "combined",
         "--exec", "e.class = if e.status < 300 { \"2xx\" } else if e.status < 400 { \"3xx\" } else if e.status < 500 { \"4xx\" } else { \"5xx\" }; track_bucket(\"status_classes\", e.class);",
         "--end", "let classes = tracked[\"status_classes\"]; print(`2xx: ${classes.get(\"2xx\") ?? 0}, 4xx: ${classes.get(\"4xx\") ?? 0}, 5xx: ${classes.get(\"5xx\") ?? 0}`);"
     ], input);

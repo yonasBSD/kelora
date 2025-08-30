@@ -19,7 +19,7 @@ kelora --since 1h -l error app.log
 kelora -f jsonl app.log --filter 'e.status >= 500' --exec 'e.severity = "critical"'
 
 # Count HTTP status codes with metrics
-kelora -f apache --exec 'track_count("status_" + e.status)' --metrics access.log
+kelora -f combined --exec 'track_count("status_" + e.status)' --metrics access.log
 
 # Real-time monitoring with pattern detection
 kubectl logs -f app | kelora -j --parallel --levels warn,error
@@ -76,7 +76,7 @@ Each parser creates events with different fields:
 |`syslog`      |`timestamp`, `host`, `facility`, `message`|`Jan 15 14:30:45 host app: message`|
 |`cef`         |`vendor`, `product`, `severity` + extensions|ArcSight CEF logs               |
 |`csv/tsv`     |Column headers as fields            |Structured data files               |
-|`apache/nginx`|`remote_addr`, `status`, `request`, `response_time`|Web server logs       |
+|`combined`    |`ip`, `status`, `request`, `method`, `path`, `request_time`|Apache/NGINX web server logs|
 
 All formats support gzip compression. Use `-f format` to specify (`-j` is a shortcut for `-f jsonl`).
 
@@ -137,11 +137,11 @@ kelora --filter 'e.level == "error"' \
 ```bash
 # Real-time nginx monitoring: stdin → filter → transform → metrics → alert
 tail -f /var/log/nginx/access.log | \
-  kelora -f apache \
+  kelora -f combined \
     --exec 'e.status_class = if e.status >= 500 { "error" } else if e.status >= 400 { "client_error" } else { "ok" }' \
     --filter 'e.status >= 400' \
-    --exec 'track_count("errors"); track_unique("error_ips", e.remote_addr); track_avg("error_response_time", e.response_time)' \
-    --exec 'if e.status >= 500 { print("🚨 SERVER ERROR: " + e.status + " from " + e.remote_addr + " - " + e.request) }' \
+    --exec 'track_count("errors"); track_unique("error_ips", e.ip); track_avg("error_response_time", e.request_time)' \
+    --exec 'if e.status >= 500 { print("🚨 SERVER ERROR: " + e.status + " from " + e.ip + " - " + e.request) }' \
     --metrics
 ```
 
@@ -175,7 +175,7 @@ kelora -f syslog -J /var/log/messages \
 
 ### Start Here: The Essentials
 1. **Events** - understand that logs become structured objects (`e.field`)
-2. **Parsing** - see how different formats create different fields (`-f jsonl`, `-f apache`)
+2. **Parsing** - see how different formats create different fields (`-f jsonl`, `-f combined`)
 3. **Basic Scripts** - learn to filter (`--filter`) and transform (`--exec`)
 
 ### Next: Real-World Usage  

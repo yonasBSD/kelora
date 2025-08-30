@@ -18,8 +18,7 @@ pub enum InputFormat {
     Tsv,
     Csvnh,
     Tsvnh,
-    Apache,
-    Nginx,
+    Combined,
     Cols,
     Docker,
 }
@@ -69,11 +68,7 @@ pub struct Cli {
     pub format: InputFormat,
 
     /// Shortcut for -f jsonl
-    #[arg(
-        short = 'j',
-        help_heading = "Input Options",
-        conflicts_with = "format"
-    )]
+    #[arg(short = 'j', help_heading = "Input Options", conflicts_with = "format")]
     pub jsonl_input: bool,
 
     /// File processing order
@@ -306,7 +301,6 @@ pub struct Cli {
     /// Write metrics to file (JSON format)
     #[arg(long = "metrics-file", help_heading = "Metrics and Stats")]
     pub metrics_file: Option<String>,
-
 
     /// Use alias from configuration file
     #[arg(short = 'a', long = "alias", help_heading = "Configuration Options")]

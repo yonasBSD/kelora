@@ -112,8 +112,7 @@ pub enum InputFormat {
     Tsv,
     Csvnh,
     Tsvnh,
-    Apache,
-    Nginx,
+    Combined,
     Cols,
     Docker,
 }
@@ -769,8 +768,7 @@ impl From<crate::InputFormat> for InputFormat {
             crate::InputFormat::Tsv => InputFormat::Tsv,
             crate::InputFormat::Csvnh => InputFormat::Csvnh,
             crate::InputFormat::Tsvnh => InputFormat::Tsvnh,
-            crate::InputFormat::Apache => InputFormat::Apache,
-            crate::InputFormat::Nginx => InputFormat::Nginx,
+            crate::InputFormat::Combined => InputFormat::Combined,
             crate::InputFormat::Cols => InputFormat::Cols,
             crate::InputFormat::Docker => InputFormat::Docker,
         }
@@ -790,8 +788,7 @@ impl From<InputFormat> for crate::InputFormat {
             InputFormat::Tsv => crate::InputFormat::Tsv,
             InputFormat::Csvnh => crate::InputFormat::Csvnh,
             InputFormat::Tsvnh => crate::InputFormat::Tsvnh,
-            InputFormat::Apache => crate::InputFormat::Apache,
-            InputFormat::Nginx => crate::InputFormat::Nginx,
+            InputFormat::Combined => crate::InputFormat::Combined,
             InputFormat::Cols => crate::InputFormat::Cols,
             InputFormat::Docker => crate::InputFormat::Docker,
         }

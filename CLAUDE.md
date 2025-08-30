@@ -120,6 +120,52 @@ db_1     | Connection established                       → {src: "db_1", msg: "
 Application ready                                      → {msg: "Application ready"}
 ```
 
+### Combined Log Format (`-f combined`)
+
+Kelora supports parsing web server logs from both Apache and NGINX using a unified combined format:
+
+**Supported Log Formats:**
+- **Apache Common Log Format**: `IP - - [timestamp] "request" status bytes`
+- **Apache Combined Log Format**: `IP - - [timestamp] "request" status bytes "referer" "user-agent"`
+- **NGINX Combined with request time**: `IP - - [timestamp] "request" status bytes "referer" "user-agent" "request_time"`
+
+**Output Fields:**
+- `ip` (required): Client IP address or hostname
+- `identity` (optional): RFC 1413 identity (usually omitted when `-`)
+- `user` (optional): HTTP authenticated username (omitted when `-`)
+- `timestamp` (required): Request timestamp in Apache format
+- `request` (required): Full HTTP request line
+- `method`, `path`, `protocol` (auto-extracted): Components of the request
+- `status` (required): HTTP response status code
+- `bytes` (optional): Response size in bytes (omitted when `-`, included when `0`)
+- `referer` (optional): HTTP referer header (Combined format only, omitted when `-`)
+- `user_agent` (optional): HTTP user agent header (Combined format only, omitted when `-`)
+- `request_time` (optional): Request processing time in seconds (NGINX only, omitted when `-`)
+
+**Example Usage:**
+```bash
+# Parse Apache logs
+tail -f /var/log/apache2/access.log | kelora -f combined --filter 'e.status >= 400'
+
+# Parse NGINX logs with request time
+tail -f /var/log/nginx/access.log | kelora -f combined --filter 'e.request_time > 1.0'
+
+# Auto-detection works for both
+cat webserver.log | kelora -f auto --exec 'e.slow_request = e.request_time > 0.5'
+```
+
+**Format Examples:**
+```
+# Apache Common
+192.168.1.1 - - [25/Dec/1995:10:00:00 +0000] "GET /index.html HTTP/1.0" 200 1234
+
+# Apache Combined  
+192.168.1.1 - user [25/Dec/1995:10:00:00 +0000] "GET /index.html HTTP/1.0" 200 1234 "http://example.com/" "Mozilla/4.08"
+
+# NGINX with request time
+192.168.1.1 - - [25/Dec/1995:10:00:00 +0000] "GET /api/test HTTP/1.1" 200 1234 "-" "curl/7.68.0" "0.123"
+```
+
 ### Resiliency Model
 
 **Processing Modes:**

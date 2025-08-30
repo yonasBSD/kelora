@@ -486,8 +486,7 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
                 "tsv" => crate::InputFormat::Tsv,
                 "csvnh" => crate::InputFormat::Csvnh,
                 "tsvnh" => crate::InputFormat::Tsvnh,
-                "apache" => crate::InputFormat::Apache,
-                "nginx" => crate::InputFormat::Nginx,
+                "combined" => crate::InputFormat::Combined,
                 "cols" => crate::InputFormat::Cols,
                 "docker" => crate::InputFormat::Docker,
                 _ => cli.format, // Keep original if invalid
@@ -584,7 +583,6 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
             cli.error_report_file = Some(error_report_file.clone());
         }
     }
-
 
     if let Some(no_emoji) = config_file.defaults.get("no_emoji") {
         if !cli.no_emoji && no_emoji.parse::<bool>().unwrap_or(false) {

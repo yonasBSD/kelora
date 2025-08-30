@@ -9,7 +9,7 @@ use anyhow::Result;
 /// 2. CEF - starts with "CEF:"
 /// 3. Syslog - matches RFC5424 or RFC3164 patterns
 /// 4. Docker - matches Docker Compose format (service | message) or Docker timestamps
-/// 5. Apache/Nginx - contains common log patterns
+/// 5. Combined - contains common Apache/Nginx log patterns
 /// 6. Logfmt - contains key=value pairs
 /// 7. CSV/TSV - contains delimiters with reasonable structure
 /// 8. Line - fallback for everything else
@@ -42,9 +42,9 @@ pub fn detect_format(sample_line: &str) -> Result<ConfigInputFormat> {
         return Ok(ConfigInputFormat::Docker);
     }
 
-    // 5. Apache/Nginx log detection
-    if let Some(web_format) = detect_web_logs(trimmed) {
-        return Ok(web_format);
+    // 5. Combined log format detection (Apache/Nginx)
+    if detect_combined_logs(trimmed) {
+        return Ok(ConfigInputFormat::Combined);
     }
 
     // 6. Logfmt detection - key=value patterns
@@ -168,12 +168,12 @@ fn detect_docker(line: &str) -> bool {
     false
 }
 
-/// Detect web server log formats (Apache, Nginx)
+/// Detect combined log formats (Apache/Nginx compatible)
 #[allow(dead_code)] // Used by detect_format function
-fn detect_web_logs(line: &str) -> Option<ConfigInputFormat> {
+fn detect_combined_logs(line: &str) -> bool {
     // Common patterns in web logs:
-    // Apache: IP - - [timestamp] "REQUEST" status size "referer" "user-agent"
-    // Nginx: Similar but may have different ordering
+    // Combined: IP - - [timestamp] "REQUEST" status size "referer" "user-agent" [request_time]
+    // Common: IP - - [timestamp] "REQUEST" status size
 
     // Look for IP address at start
     if let Some(first_space) = line.find(' ') {
@@ -188,19 +188,18 @@ fn detect_web_logs(line: &str) -> Option<ConfigInputFormat> {
                     || line.contains("\"DELETE ")
                     || line.contains("\" ")
                 {
-                    // Any quoted request
-                    // Could be either Apache or Nginx, default to Apache (more common)
-                    return Some(ConfigInputFormat::Apache);
+                    // Any quoted request - fits combined log format pattern
+                    return true;
                 }
             }
         }
     }
 
-    None
+    false
 }
 
 /// Check if a string looks like an IP address (v4 or v6, or hostname)
-#[allow(dead_code)] // Used by detect_web_logs function
+#[allow(dead_code)] // Used by detect_combined_logs function
 fn is_likely_ip_address(s: &str) -> bool {
     // IPv4 pattern (rough check)
     if s.chars().all(|c| c.is_ascii_digit() || c == '.') && s.contains('.') {
@@ -328,13 +327,13 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_apache() {
+    fn test_detect_combined() {
         assert_eq!(
             detect_format(
                 r#"192.168.1.1 - - [15/Apr/2023:10:00:00 +0000] "GET /path HTTP/1.1" 200 1234"#
             )
             .unwrap(),
-            ConfigInputFormat::Apache
+            ConfigInputFormat::Combined
         );
     }
 
