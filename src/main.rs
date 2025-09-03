@@ -1,17 +1,21 @@
 use anyhow::Result;
 use clap::{ArgMatches, CommandFactory, FromArgMatches};
+use rhai::Dynamic;
+use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 
+mod cli;
 mod colors;
 mod config;
 mod config_file;
+pub mod debug;
 mod decompression;
 mod engine;
 mod event;
 mod formatters;
 mod parallel;
 mod parsers;
-mod pipeline;
+pub mod pipeline;
 mod platform;
 mod readers;
 mod rhai_functions;
@@ -22,14 +26,839 @@ mod tty;
 use config::KeloraConfig;
 use config_file::ConfigFile;
 use platform::{
-    ExitCode, ProcessCleanup, SafeFileOut, SafeStderr, SafeStdout, SignalHandler, SHOULD_TERMINATE,
+    ExitCode, ProcessCleanup, SafeFileOut, SafeStderr, SafeStdout, SignalHandler, SHOULD_TERMINATE, TERMINATED_BY_SIGNAL,
 };
 
-// Use CLI types from library
-use kelora::{
-    run_pipeline_with_kelora_config, Cli, FileOrder, InputFormat, KeloraConfig as LibKeloraConfig,
-    MultilineConfig, OutputFormat, TimestampFilterConfig,
+// Re-export CLI types for convenience  
+pub use cli::{Cli, FileOrder, InputFormat, OutputFormat};
+pub use config::{KeloraConfig as LibKeloraConfig, MultilineConfig, ScriptStageType, TimestampFilterConfig};
+
+
+/// Detect format from a peekable reader
+/// Returns the detected format without consuming the first line
+fn detect_format_from_peekable_reader<R: std::io::BufRead>(
+    reader: &mut readers::PeekableLineReader<R>,
+) -> Result<config::InputFormat> {
+    match reader.peek_first_line()? {
+        None => {
+            // Empty input, default to line format
+            Ok(config::InputFormat::Line)
+        }
+        Some(line) => {
+            // Remove newline for detection
+            let trimmed_line = line.trim_end_matches(&['\r', '\n'][..]);
+            let detected = parsers::detect_format(trimmed_line)?;
+            Ok(detected)
+        }
+    }
+}
+
+/// Detect format for parallel mode processing
+/// Returns the detected format
+fn detect_format_for_parallel_mode(files: &[String]) -> Result<config::InputFormat> {
+    use std::io;
+    
+    if files.is_empty() {
+        // For stdin in parallel mode, we can't peek ahead easily
+        // So we use a simple approach: read the first line from stdin
+        let stdin = io::stdin();
+        let stdin_lock = stdin.lock();
+        let mut peekable_reader = readers::PeekableLineReader::new(stdin_lock);
+
+        match detect_format_from_peekable_reader(&mut peekable_reader)? {
+            config::InputFormat::Auto => Ok(config::InputFormat::Line), // Fallback
+            format => Ok(format),
+        }
+    } else {
+        // For files, read first line from first file
+        let sorted_files = pipeline::builders::sort_files(files, &config::FileOrder::Cli)?;
+
+        if sorted_files.is_empty() {
+            return Ok(config::InputFormat::Line);
+        }
+
+        let first_file = &sorted_files[0];
+        let decompressed = decompression::DecompressionReader::new(first_file)?;
+        let mut peekable_reader = readers::PeekableLineReader::new(decompressed);
+
+        match detect_format_from_peekable_reader(&mut peekable_reader)? {
+            config::InputFormat::Auto => Ok(config::InputFormat::Line), // Fallback
+            format => Ok(format),
+        }
+    }
+}
+
+use parallel::{ParallelConfig, ParallelProcessor};
+use pipeline::{
+    create_input_reader, create_pipeline_builder_from_config, create_pipeline_from_config,
 };
+use platform::check_termination;
+use stats::{
+    get_thread_stats, stats_add_error, stats_add_line_filtered, stats_add_line_output,
+    stats_add_line_read, stats_finish_processing, stats_start_timer, ProcessingStats,
+};
+use std::io::{self, BufRead, Write};
+
+/// Result of pipeline processing
+#[derive(Debug)]
+pub struct PipelineResult {
+    pub stats: Option<ProcessingStats>,
+    pub success: bool,
+    pub tracking_data: HashMap<String, Dynamic>,
+}
+
+/// Core pipeline processing function using KeloraConfig  
+pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
+    config: &KeloraConfig,
+    output: W,
+) -> Result<PipelineResult> {
+    // Start statistics collection if enabled
+    if config.output.stats {
+        stats_start_timer();
+    }
+
+    let use_parallel = config.should_use_parallel();
+
+    if use_parallel {
+        run_pipeline_parallel(config, output)
+    } else {
+        let mut output = output;
+        run_pipeline_sequential(config, &mut output)?;
+        let tracking_data = rhai_functions::tracking::get_thread_tracking_state();
+        // Always collect stats for error reporting, even if --stats not used
+        stats_finish_processing();
+        let mut stats = get_thread_stats();
+        stats.extract_discovered_from_tracking(&tracking_data);
+        let final_stats = Some(stats);
+
+        Ok(PipelineResult {
+            stats: final_stats,
+            success: !SHOULD_TERMINATE.load(Ordering::Relaxed),
+            tracking_data,
+        })
+    }
+}
+
+/// Run pipeline in parallel mode using KeloraConfig
+pub fn run_pipeline_parallel<W: Write + Send + 'static>(
+    config: &KeloraConfig,
+    output: W,
+) -> Result<PipelineResult> {
+    // Handle auto-detection for parallel mode
+    let final_config = if matches!(config.input.format, config::InputFormat::Auto) {
+        // For parallel mode, we need to detect format first
+        let detected_format = detect_format_for_parallel_mode(&config.input.files)?;
+
+        // Report detected format
+        if !config.processing.quiet {
+            let format_name = format!("{:?}", detected_format).to_lowercase();
+            let message =
+                config.format_error_message(&format!("auto-detected format: {}", format_name));
+            eprintln!("{}", message);
+        }
+
+        // Create new config with detected format
+        let mut new_config = config.clone();
+        new_config.input.format = detected_format;
+        new_config
+    } else {
+        config.clone()
+    };
+    
+    let config = &final_config;
+    let batch_size = config.effective_batch_size();
+
+    let parallel_config = ParallelConfig {
+        num_workers: config.effective_threads(),
+        batch_size,
+        batch_timeout_ms: config.performance.batch_timeout,
+        preserve_order: !config.performance.no_preserve_order,
+        buffer_size: Some(10000),
+    };
+
+    let processor =
+        ParallelProcessor::new(parallel_config).with_take_limit(config.processing.take_limit);
+
+    // Create pipeline builder and components for begin/end stages
+    let pipeline_builder = create_pipeline_builder_from_config(config);
+    let (_pipeline, begin_stage, end_stage, mut ctx) = pipeline_builder
+        .clone()
+        .build(config.processing.stages.clone())?;
+
+    // Execute begin stage sequentially if provided
+    if let Err(e) = begin_stage.execute(&mut ctx) {
+        return Err(anyhow::anyhow!("Begin stage error: {}", e));
+    }
+
+    // Get reader using pipeline builder
+    let reader = create_input_reader(config)?;
+
+    // Process stages in parallel
+    processor.process_with_pipeline(
+        reader,
+        pipeline_builder,
+        config.processing.stages.clone(),
+        config,
+        output,
+    )?;
+
+    // Merge the parallel tracked state with our pipeline context
+    let parallel_tracked = processor.get_final_tracked_state();
+
+    // Write error summary to file if configured
+    if let Some(ref file_path) = config.processing.error_report.file {
+        rhai_functions::tracking::write_error_summary_to_file(&parallel_tracked, file_path)
+            .unwrap_or_else(|e| eprintln!("Failed to write error summary to file: {}", e));
+    }
+
+    // Extract internal stats from tracking system before merging
+    // This is needed for error reporting, not just when --stats is enabled
+    processor
+        .extract_final_stats_from_tracking(&parallel_tracked)
+        .unwrap_or(());
+
+    // Filter out stats and errors from user-visible context and merge the rest
+    for (key, dynamic_value) in &parallel_tracked {
+        if !key.starts_with("__internal_")
+            && !key.starts_with("__kelora_stats_")
+            && !key.starts_with("__op___kelora_stats_")
+            && !key.starts_with("__kelora_error_")
+            && !key.starts_with("__op___kelora_error_")
+        {
+            ctx.tracker.insert(key.clone(), dynamic_value.clone());
+        }
+    }
+
+    // Execute end stage sequentially with merged state
+    if let Err(e) = end_stage.execute(&ctx) {
+        return Err(anyhow::anyhow!("End stage error: {}", e));
+    }
+
+    // Return both stats and tracking data
+    // Always collect stats for error reporting, even if --stats not used
+    Ok(PipelineResult {
+        stats: Some(processor.get_final_stats()),
+        success: !SHOULD_TERMINATE.load(Ordering::Relaxed),
+        tracking_data: parallel_tracked,
+    })
+}
+
+/// Run pipeline in sequential mode using KeloraConfig
+pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) -> Result<()> {
+    // For auto-detection, we need special handling of input sources
+    if matches!(config.input.format, config::InputFormat::Auto) {
+        return run_pipeline_sequential_with_auto_detection(config, output);
+    }
+
+    let (mut pipeline, begin_stage, end_stage, mut ctx) = create_pipeline_from_config(config)?;
+
+    // Execute begin stage
+    if let Err(e) = begin_stage.execute(&mut ctx) {
+        return Err(anyhow::anyhow!("Begin stage error: {}", e));
+    }
+
+    // For CSV formats, we need to track per-file schema
+    let mut current_csv_headers: Option<Vec<String>> = None;
+    let mut last_filename: Option<String> = None;
+
+    // Process lines using pipeline
+    let mut line_num = 0;
+    let mut skipped_lines = 0;
+
+    // Handle filename tracking by creating the appropriate reader
+    if config.input.files.is_empty() {
+        // Stdin processing - no filename tracking
+        let stdin = io::stdin();
+        let reader = stdin.lock();
+
+        for line_result in reader.lines() {
+            // Check for termination signal between lines
+            if check_termination().is_err() {
+                return Ok(());
+            }
+
+            match process_line_sequential(
+                line_result,
+                &mut line_num,
+                &mut skipped_lines,
+                &mut pipeline,
+                &mut ctx,
+                config,
+                output,
+                None,
+                &mut current_csv_headers,
+                &mut last_filename,
+            )? {
+                ProcessingResult::Continue => {}
+                ProcessingResult::TakeLimitExhausted => break,
+            }
+
+            // Check for exit requested from Rhai scripts
+            if rhai_functions::process::is_exit_requested() {
+                let exit_code = rhai_functions::process::get_exit_code();
+                std::process::exit(exit_code);
+            }
+        }
+    } else {
+        // File processing - with filename tracking
+        let sorted_files =
+            pipeline::builders::sort_files(&config.input.files, &config.input.file_order)?;
+        let mut multi_reader = readers::MultiFileReader::new(sorted_files)?;
+
+        let mut line_buf = String::new();
+        loop {
+            // Check for termination signal between lines
+            if check_termination().is_err() {
+                return Ok(());
+            }
+
+            line_buf.clear();
+            let bytes_read = match multi_reader.read_line(&mut line_buf) {
+                Ok(0) => break, // EOF
+                Ok(n) => n,
+                Err(e) => {
+                    let line_result = Err(e);
+                    let current_filename = multi_reader.current_filename().map(|s| s.to_string());
+                    match process_line_sequential(
+                        line_result,
+                        &mut line_num,
+                        &mut skipped_lines,
+                        &mut pipeline,
+                        &mut ctx,
+                        config,
+                        output,
+                        current_filename,
+                        &mut current_csv_headers,
+                        &mut last_filename,
+                    )? {
+                        ProcessingResult::Continue => {}
+                        ProcessingResult::TakeLimitExhausted => break,
+                    }
+
+                    // Check for exit requested from Rhai scripts
+                    if rhai_functions::process::is_exit_requested() {
+                        let exit_code = rhai_functions::process::get_exit_code();
+                        std::process::exit(exit_code);
+                    }
+                    continue;
+                }
+            };
+
+            if bytes_read > 0 {
+                let current_filename = multi_reader.current_filename().map(|s| s.to_string());
+                match process_line_sequential(
+                    Ok(line_buf.clone()),
+                    &mut line_num,
+                    &mut skipped_lines,
+                    &mut pipeline,
+                    &mut ctx,
+                    config,
+                    output,
+                    current_filename,
+                    &mut current_csv_headers,
+                    &mut last_filename,
+                )? {
+                    ProcessingResult::Continue => {}
+                    ProcessingResult::TakeLimitExhausted => break,
+                }
+
+                // Check for exit requested from Rhai scripts
+                if rhai_functions::process::is_exit_requested() {
+                    let exit_code = rhai_functions::process::get_exit_code();
+                    std::process::exit(exit_code);
+                }
+            }
+        }
+    }
+
+    // Flush any remaining chunks
+    let results = pipeline.flush(&mut ctx)?;
+    for result in results {
+        if !result.is_empty() {
+            writeln!(output, "{}", result)?;
+        }
+    }
+
+    // Execute end stage
+    if let Err(e) = end_stage.execute(&ctx) {
+        return Err(anyhow::anyhow!("End stage error: {}", e));
+    }
+
+    // Merge thread-local tracking state (including errors) into context for sequential mode
+    rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
+
+    // Write error summary to file if configured
+    if let Some(ref file_path) = config.processing.error_report.file {
+        rhai_functions::tracking::write_error_summary_to_file(&ctx.tracker, file_path)
+            .unwrap_or_else(|e| eprintln!("Failed to write error summary to file: {}", e));
+    }
+
+    Ok(())
+}
+
+/// Run pipeline in sequential mode with auto-detection support
+fn run_pipeline_sequential_with_auto_detection<W: Write>(
+    config: &KeloraConfig,
+    output: &mut W,
+) -> Result<()> {
+    // Handle auto-detection based on input source
+    if config.input.files.is_empty() {
+        // Stdin processing with auto-detection
+        let stdin = io::stdin();
+        let stdin_lock = stdin.lock();
+        let mut peekable_reader = readers::PeekableLineReader::new(stdin_lock);
+
+        // Detect format from first line
+        let detected_format = detect_format_from_peekable_reader(&mut peekable_reader)?;
+
+        // Report detected format
+        if !config.processing.quiet {
+            let format_name = format!("{:?}", detected_format).to_lowercase();
+            let message =
+                config.format_error_message(&format!("auto-detected format: {}", format_name));
+            eprintln!("{}", message);
+        }
+
+        // Create config with detected format
+        let mut final_config = config.clone();
+        final_config.input.format = detected_format;
+
+        // Build pipeline with detected format
+        let (mut pipeline, begin_stage, end_stage, mut ctx) =
+            create_pipeline_from_config(&final_config)?;
+
+        // Execute begin stage
+        if let Err(e) = begin_stage.execute(&mut ctx) {
+            return Err(anyhow::anyhow!("Begin stage error: {}", e));
+        }
+
+        // Process stdin using peekable reader (which will return the first line correctly)
+        run_sequential_with_reader(
+            &mut peekable_reader,
+            &mut pipeline,
+            &mut ctx,
+            &final_config,
+            output,
+            None, // No filename for stdin
+        )?;
+
+        // Execute end stage
+        if let Err(e) = end_stage.execute(&ctx) {
+            return Err(anyhow::anyhow!("End stage error: {}", e));
+        }
+
+        // Merge thread-local tracking state
+        rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
+
+        // Write error summary to file if configured
+        if let Some(ref file_path) = final_config.processing.error_report.file {
+            rhai_functions::tracking::write_error_summary_to_file(&ctx.tracker, file_path)
+                .unwrap_or_else(|e| eprintln!("Failed to write error summary to file: {}", e));
+        }
+    } else {
+        // File processing with auto-detection
+        // For files, we can just read the first line and then re-open
+        let sorted_files =
+            pipeline::builders::sort_files(&config.input.files, &config.input.file_order)?;
+
+        if sorted_files.is_empty() {
+            return Ok(());
+        }
+
+        // Read first line from first file for detection
+        let first_file = &sorted_files[0];
+        let detected_format = {
+            let decompressed = decompression::DecompressionReader::new(first_file)?;
+            let mut peekable_reader = readers::PeekableLineReader::new(decompressed);
+            detect_format_from_peekable_reader(&mut peekable_reader)?
+        };
+
+        // Report detected format
+        if !config.processing.quiet {
+            let format_name = format!("{:?}", detected_format).to_lowercase();
+            let message =
+                config.format_error_message(&format!("auto-detected format: {}", format_name));
+            eprintln!("{}", message);
+        }
+
+        // Create config with detected format
+        let mut final_config = config.clone();
+        final_config.input.format = detected_format;
+
+        // Build pipeline with detected format
+        let (mut pipeline, begin_stage, end_stage, mut ctx) =
+            create_pipeline_from_config(&final_config)?;
+
+        // Execute begin stage
+        if let Err(e) = begin_stage.execute(&mut ctx) {
+            return Err(anyhow::anyhow!("Begin stage error: {}", e));
+        }
+
+        // Process all files normally (re-opening them)
+        let mut multi_reader = readers::MultiFileReader::new(sorted_files)?;
+        run_sequential_with_multi_reader(
+            &mut multi_reader,
+            &mut pipeline,
+            &mut ctx,
+            &final_config,
+            output,
+        )?;
+
+        // Execute end stage
+        if let Err(e) = end_stage.execute(&ctx) {
+            return Err(anyhow::anyhow!("End stage error: {}", e));
+        }
+
+        // Merge thread-local tracking state
+        rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
+
+        // Write error summary to file if configured
+        if let Some(ref file_path) = final_config.processing.error_report.file {
+            rhai_functions::tracking::write_error_summary_to_file(&ctx.tracker, file_path)
+                .unwrap_or_else(|e| eprintln!("Failed to write error summary to file: {}", e));
+        }
+    }
+
+    Ok(())
+}
+
+/// Generic sequential processing function that works with any BufRead reader
+fn run_sequential_with_reader<W: Write, R: BufRead>(
+    reader: &mut R,
+    pipeline: &mut pipeline::Pipeline,
+    ctx: &mut pipeline::PipelineContext,
+    config: &KeloraConfig,
+    output: &mut W,
+    multi_reader: Option<&mut readers::MultiFileReader>, // For filename tracking
+) -> Result<()> {
+    // For CSV formats, we need to track per-file schema
+    let mut current_csv_headers: Option<Vec<String>> = None;
+    let mut last_filename: Option<String> = None;
+
+    // Process lines using pipeline
+    let mut line_num = 0;
+    let mut skipped_lines = 0;
+
+    let mut line_buf = String::new();
+    loop {
+        // Check for termination signal between lines
+        if check_termination().is_err() {
+            return Ok(());
+        }
+
+        line_buf.clear();
+        let bytes_read = match reader.read_line(&mut line_buf) {
+            Ok(0) => break, // EOF
+            Ok(n) => n,
+            Err(e) => {
+                let line_result = Err(e);
+                let current_filename = multi_reader
+                    .as_ref()
+                    .and_then(|mr| mr.current_filename().map(|s| s.to_string()));
+                match process_line_sequential(
+                    line_result,
+                    &mut line_num,
+                    &mut skipped_lines,
+                    pipeline,
+                    ctx,
+                    config,
+                    output,
+                    current_filename,
+                    &mut current_csv_headers,
+                    &mut last_filename,
+                )? {
+                    ProcessingResult::Continue => {}
+                    ProcessingResult::TakeLimitExhausted => break,
+                }
+
+                // Check for exit requested from Rhai scripts
+                if rhai_functions::process::is_exit_requested() {
+                    let exit_code = rhai_functions::process::get_exit_code();
+                    std::process::exit(exit_code);
+                }
+                continue;
+            }
+        };
+
+        if bytes_read > 0 {
+            let current_filename = multi_reader
+                .as_ref()
+                .and_then(|mr| mr.current_filename().map(|s| s.to_string()));
+            match process_line_sequential(
+                Ok(line_buf.clone()),
+                &mut line_num,
+                &mut skipped_lines,
+                pipeline,
+                ctx,
+                config,
+                output,
+                current_filename,
+                &mut current_csv_headers,
+                &mut last_filename,
+            )? {
+                ProcessingResult::Continue => {}
+                ProcessingResult::TakeLimitExhausted => break,
+            }
+
+            // Check for exit requested from Rhai scripts
+            if rhai_functions::process::is_exit_requested() {
+                let exit_code = rhai_functions::process::get_exit_code();
+                std::process::exit(exit_code);
+            }
+        }
+    }
+
+    // Flush any remaining chunks
+    let results = pipeline.flush(ctx)?;
+    for result in results {
+        if !result.is_empty() {
+            writeln!(output, "{}", result)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Sequential processing function that works with MultiFileReader for filename tracking
+fn run_sequential_with_multi_reader<W: Write>(
+    multi_reader: &mut readers::MultiFileReader,
+    pipeline: &mut pipeline::Pipeline,
+    ctx: &mut pipeline::PipelineContext,
+    config: &KeloraConfig,
+    output: &mut W,
+) -> Result<()> {
+    // For CSV formats, we need to track per-file schema
+    let mut current_csv_headers: Option<Vec<String>> = None;
+    let mut last_filename: Option<String> = None;
+
+    // Process lines using pipeline
+    let mut line_num = 0;
+    let mut skipped_lines = 0;
+
+    let mut line_buf = String::new();
+    loop {
+        // Check for termination signal between lines
+        if check_termination().is_err() {
+            return Ok(());
+        }
+
+        line_buf.clear();
+        let bytes_read = match multi_reader.read_line(&mut line_buf) {
+            Ok(0) => break, // EOF
+            Ok(n) => n,
+            Err(e) => {
+                let line_result = Err(e);
+                let current_filename = multi_reader.current_filename().map(|s| s.to_string());
+                match process_line_sequential(
+                    line_result,
+                    &mut line_num,
+                    &mut skipped_lines,
+                    pipeline,
+                    ctx,
+                    config,
+                    output,
+                    current_filename,
+                    &mut current_csv_headers,
+                    &mut last_filename,
+                )? {
+                    ProcessingResult::Continue => {}
+                    ProcessingResult::TakeLimitExhausted => break,
+                }
+
+                // Check for exit requested from Rhai scripts
+                if rhai_functions::process::is_exit_requested() {
+                    let exit_code = rhai_functions::process::get_exit_code();
+                    std::process::exit(exit_code);
+                }
+                continue;
+            }
+        };
+
+        if bytes_read > 0 {
+            let current_filename = multi_reader.current_filename().map(|s| s.to_string());
+            match process_line_sequential(
+                Ok(line_buf.clone()),
+                &mut line_num,
+                &mut skipped_lines,
+                pipeline,
+                ctx,
+                config,
+                output,
+                current_filename,
+                &mut current_csv_headers,
+                &mut last_filename,
+            )? {
+                ProcessingResult::Continue => {}
+                ProcessingResult::TakeLimitExhausted => break,
+            }
+
+            // Check for exit requested from Rhai scripts
+            if rhai_functions::process::is_exit_requested() {
+                let exit_code = rhai_functions::process::get_exit_code();
+                std::process::exit(exit_code);
+            }
+        }
+    }
+
+    // Flush any remaining chunks
+    let results = pipeline.flush(ctx)?;
+    for result in results {
+        if !result.is_empty() {
+            writeln!(output, "{}", result)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Processing result for sequential pipeline
+enum ProcessingResult {
+    Continue,
+    TakeLimitExhausted,
+}
+
+/// Process a single line in sequential mode with filename tracking and CSV schema detection
+#[allow(clippy::too_many_arguments)]
+fn process_line_sequential<W: Write>(
+    line_result: io::Result<String>,
+    line_num: &mut usize,
+    skipped_lines: &mut usize,
+    pipeline: &mut pipeline::Pipeline,
+    ctx: &mut pipeline::PipelineContext,
+    config: &KeloraConfig,
+    output: &mut W,
+    current_filename: Option<String>,
+    current_csv_headers: &mut Option<Vec<String>>,
+    last_filename: &mut Option<String>,
+) -> Result<ProcessingResult> {
+    let line = line_result?;
+    *line_num += 1;
+
+    // Count line read for stats
+    if config.output.stats {
+        stats_add_line_read();
+    }
+
+    // Skip the first N lines if configured (applied before ignore-lines and parsing)
+    if *skipped_lines < config.input.skip_lines {
+        *skipped_lines += 1;
+        // Count skipped line for stats
+        if config.output.stats {
+            stats_add_line_filtered();
+        }
+        return Ok(ProcessingResult::Continue);
+    }
+
+    // Apply ignore-lines filter if configured (early filtering before parsing)
+    if let Some(ref ignore_regex) = config.input.ignore_lines {
+        if ignore_regex.is_match(&line) {
+            // Count filtered line for stats
+            if config.output.stats {
+                stats_add_line_filtered();
+            }
+            return Ok(ProcessingResult::Continue);
+        }
+    }
+
+    if line.trim().is_empty() {
+        // Only skip empty lines for structured formats, not for line format
+        if !matches!(config.input.format, config::InputFormat::Line) {
+            return Ok(ProcessingResult::Continue);
+        }
+        // For line format, continue processing the empty line
+    }
+
+    // For CSV formats, detect file changes and reinitialize parser, or handle first line for stdin
+    if matches!(
+        config.input.format,
+        config::InputFormat::Csv
+            | config::InputFormat::Tsv
+            | config::InputFormat::Csvnh
+            | config::InputFormat::Tsvnh
+    ) && (current_filename != *last_filename
+        || (current_filename.is_none() && current_csv_headers.is_none()))
+    {
+        // File changed, reinitialize CSV parser for this file
+        let mut temp_parser = match config.input.format {
+            config::InputFormat::Csv => parsers::CsvParser::new_csv(),
+            config::InputFormat::Tsv => parsers::CsvParser::new_tsv(),
+            config::InputFormat::Csvnh => parsers::CsvParser::new_csv_no_headers(),
+            config::InputFormat::Tsvnh => parsers::CsvParser::new_tsv_no_headers(),
+            _ => unreachable!(),
+        };
+
+        // Initialize headers from the first line
+        let was_consumed = temp_parser.initialize_headers_from_line(&line)?;
+
+        // Get the initialized headers
+        let headers = temp_parser.get_headers();
+        *current_csv_headers = Some(headers.clone());
+        *last_filename = current_filename.clone();
+
+        // Rebuild the pipeline with new headers
+        let mut pipeline_builder = create_pipeline_builder_from_config(config);
+        pipeline_builder = pipeline_builder.with_csv_headers(headers);
+
+        // Note: We rebuild the entire pipeline including begin/end stages, but only use
+        // the pipeline and context. The begin stage was already executed at session start
+        // and the end stage will be executed when the original session completes.
+        let (new_pipeline, _unused_begin_stage, _unused_end_stage, new_ctx) =
+            pipeline_builder.build(config.processing.stages.clone())?;
+
+        *pipeline = new_pipeline;
+        // Keep the existing context's tracking state but update the Rhai engine
+        ctx.rhai = new_ctx.rhai;
+
+        // If the first line was consumed as a header, don't process it as data
+        if was_consumed {
+            return Ok(ProcessingResult::Continue);
+        }
+    }
+
+    // Update metadata with filename tracking
+    ctx.meta.line_number = Some(*line_num);
+    ctx.meta.filename = current_filename;
+
+    // Process line through pipeline
+    match pipeline.process_line(line, ctx) {
+        Ok(results) => {
+            // Count output lines for stats
+            if config.output.stats && !results.is_empty() {
+                stats_add_line_output();
+            }
+            // Note: Empty results are now counted as either:
+            // 1. Parsing errors (counted by stats_add_line_error() in pipeline)
+            // 2. Filter rejections (counted by stats_add_event_filtered() in pipeline)
+            // So we don't need to count empty results as filtered here anymore
+
+            // Output all results (usually just one), skip empty strings
+            for result in results {
+                if !result.is_empty() {
+                    writeln!(output, "{}", result)?;
+                }
+            }
+
+            // Check if take limit is exhausted after processing
+            if pipeline.is_take_limit_exhausted() {
+                return Ok(ProcessingResult::TakeLimitExhausted);
+            }
+        }
+        Err(e) => {
+            // Count errors for stats
+            if config.output.stats {
+                stats_add_error();
+            }
+
+            // Handle error based on new resiliency model
+            if config.processing.strict {
+                return Err(e);
+            }
+            // Default resilient mode: continue processing
+        }
+    }
+
+    Ok(ProcessingResult::Continue)
+}
 
 fn main() -> Result<()> {
     // Initialize signal handling early
@@ -247,7 +1076,7 @@ fn main() -> Result<()> {
     };
 
     // Check if we were terminated by a signal and print output
-    if SHOULD_TERMINATE.load(Ordering::Relaxed) {
+    if TERMINATED_BY_SIGNAL.load(Ordering::Relaxed) {
         if let Some(stats) = final_stats {
             if lib_config.output.stats && !lib_config.processing.quiet {
                 // Full stats when --stats flag is used (unless --quiet)

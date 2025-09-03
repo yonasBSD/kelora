@@ -33,6 +33,7 @@ impl ExitCode {
 
 /// Global termination flag for graceful shutdown
 pub static SHOULD_TERMINATE: AtomicBool = AtomicBool::new(false);
+pub static TERMINATED_BY_SIGNAL: AtomicBool = AtomicBool::new(false);
 
 /// Signal handler for graceful shutdown
 pub struct SignalHandler {
@@ -52,6 +53,7 @@ impl SignalHandler {
                     match sig {
                         SIGINT => {
                             SHOULD_TERMINATE.store(true, Ordering::Relaxed);
+                            TERMINATED_BY_SIGNAL.store(true, Ordering::Relaxed);
                             // Give main thread a moment to handle graceful shutdown
                             thread::sleep(std::time::Duration::from_millis(200));
                             // If still running after grace period, exit immediately
@@ -60,6 +62,7 @@ impl SignalHandler {
                         SIGPIPE => {
                             // Broken pipe - exit quietly (normal for Unix pipes)
                             SHOULD_TERMINATE.store(true, Ordering::Relaxed);
+                            TERMINATED_BY_SIGNAL.store(true, Ordering::Relaxed);
                             ExitCode::SignalPipe.exit();
                         }
                         SIGTERM => {
@@ -70,6 +73,7 @@ impl SignalHandler {
                                 )
                             );
                             SHOULD_TERMINATE.store(true, Ordering::Relaxed);
+                            TERMINATED_BY_SIGNAL.store(true, Ordering::Relaxed);
                             ExitCode::SignalTerm.exit();
                         }
                         _ => {
@@ -100,6 +104,7 @@ impl SignalHandler {
                     thread::sleep(std::time::Duration::from_millis(100));
                     if term_flag.load(Ordering::Relaxed) {
                         SHOULD_TERMINATE.store(true, Ordering::Relaxed);
+                        TERMINATED_BY_SIGNAL.store(true, Ordering::Relaxed);
                         // Give main thread a moment to handle graceful shutdown
                         thread::sleep(std::time::Duration::from_millis(200));
                         // If still running after grace period, exit immediately

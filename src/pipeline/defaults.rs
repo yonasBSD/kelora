@@ -112,7 +112,7 @@ impl SlidingWindowManager {
     ///
     /// # Examples
     /// ```
-    /// use kelora::pipeline::defaults::SlidingWindowManager;
+    /// use crate::pipeline::defaults::SlidingWindowManager;
     /// // Keep current + 2 previous events (window[0], window[1], window[2])
     /// let manager = SlidingWindowManager::new(2);
     /// ```
