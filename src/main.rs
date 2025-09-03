@@ -8,14 +8,14 @@ mod cli;
 mod colors;
 mod config;
 mod config_file;
-pub mod debug;
+mod debug;
 mod decompression;
 mod engine;
 mod event;
 mod formatters;
 mod parallel;
 mod parsers;
-pub mod pipeline;
+mod pipeline;
 mod platform;
 mod readers;
 mod rhai_functions;
@@ -29,9 +29,9 @@ use platform::{
     ExitCode, ProcessCleanup, SafeFileOut, SafeStderr, SafeStdout, SignalHandler, SHOULD_TERMINATE, TERMINATED_BY_SIGNAL,
 };
 
-// Re-export CLI types for convenience  
-pub use cli::{Cli, FileOrder, InputFormat, OutputFormat};
-pub use config::{KeloraConfig as LibKeloraConfig, MultilineConfig, ScriptStageType, TimestampFilterConfig};
+// Internal CLI imports
+use cli::{Cli, FileOrder, InputFormat, OutputFormat};
+use config::{MultilineConfig, TimestampFilterConfig};
 
 
 /// Detect format from a peekable reader
@@ -101,14 +101,13 @@ use std::io::{self, BufRead, Write};
 
 /// Result of pipeline processing
 #[derive(Debug)]
-pub struct PipelineResult {
+struct PipelineResult {
     pub stats: Option<ProcessingStats>,
-    pub success: bool,
     pub tracking_data: HashMap<String, Dynamic>,
 }
 
 /// Core pipeline processing function using KeloraConfig  
-pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
+fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
     config: &KeloraConfig,
     output: W,
 ) -> Result<PipelineResult> {
@@ -133,14 +132,13 @@ pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
 
         Ok(PipelineResult {
             stats: final_stats,
-            success: !SHOULD_TERMINATE.load(Ordering::Relaxed),
             tracking_data,
         })
     }
 }
 
 /// Run pipeline in parallel mode using KeloraConfig
-pub fn run_pipeline_parallel<W: Write + Send + 'static>(
+fn run_pipeline_parallel<W: Write + Send + 'static>(
     config: &KeloraConfig,
     output: W,
 ) -> Result<PipelineResult> {
@@ -238,13 +236,12 @@ pub fn run_pipeline_parallel<W: Write + Send + 'static>(
     // Always collect stats for error reporting, even if --stats not used
     Ok(PipelineResult {
         stats: Some(processor.get_final_stats()),
-        success: !SHOULD_TERMINATE.load(Ordering::Relaxed),
         tracking_data: parallel_tracked,
     })
 }
 
 /// Run pipeline in sequential mode using KeloraConfig
-pub fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) -> Result<()> {
+fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) -> Result<()> {
     // For auto-detection, we need special handling of input sources
     if matches!(config.input.format, config::InputFormat::Auto) {
         return run_pipeline_sequential_with_auto_detection(config, output);
@@ -898,21 +895,21 @@ fn main() -> Result<()> {
     };
 
     // Create configuration from CLI and set stages (using lib config directly)
-    let mut lib_config = LibKeloraConfig::from_cli(&cli);
+    let mut config = KeloraConfig::from_cli(&cli);
     // Set the ordered stages directly
-    lib_config.processing.stages = ordered_stages;
+    config.processing.stages = ordered_stages;
 
     // Parse timestamp filter arguments if provided
     if cli.since.is_some() || cli.until.is_some() {
         // Use the same timezone logic as the main configuration
-        let cli_timezone = lib_config.input.default_timezone.as_deref();
+        let cli_timezone = config.input.default_timezone.as_deref();
 
         let since = if let Some(ref since_str) = cli.since {
             match crate::timestamp::parse_timestamp_arg_with_timezone(since_str, cli_timezone) {
                 Ok(dt) => Some(dt),
                 Err(e) => {
                     stderr
-                        .writeln(&lib_config.format_error_message(&format!(
+                        .writeln(&config.format_error_message(&format!(
                             "Invalid --since timestamp '{}': {}",
                             since_str, e
                         )))
@@ -929,7 +926,7 @@ fn main() -> Result<()> {
                 Ok(dt) => Some(dt),
                 Err(e) => {
                     stderr
-                        .writeln(&lib_config.format_error_message(&format!(
+                        .writeln(&config.format_error_message(&format!(
                             "Invalid --until timestamp '{}': {}",
                             until_str, e
                         )))
@@ -941,18 +938,18 @@ fn main() -> Result<()> {
             None
         };
 
-        lib_config.processing.timestamp_filter = Some(TimestampFilterConfig { since, until });
+        config.processing.timestamp_filter = Some(TimestampFilterConfig { since, until });
     }
 
     // Compile ignore-lines regex if provided
     if let Some(ignore_pattern) = &cli.ignore_lines {
         match regex::Regex::new(ignore_pattern) {
             Ok(regex) => {
-                lib_config.input.ignore_lines = Some(regex);
+                config.input.ignore_lines = Some(regex);
             }
             Err(e) => {
                 stderr
-                    .writeln(&lib_config.format_error_message(&format!(
+                    .writeln(&config.format_error_message(&format!(
                         "Invalid ignore-lines regex pattern '{}': {}",
                         ignore_pattern, e
                     )))
@@ -966,11 +963,11 @@ fn main() -> Result<()> {
     if let Some(multiline_str) = &cli.multiline {
         match MultilineConfig::parse(multiline_str) {
             Ok(multiline_config) => {
-                lib_config.input.multiline = Some(multiline_config);
+                config.input.multiline = Some(multiline_config);
             }
             Err(e) => {
                 stderr
-                    .writeln(&lib_config.format_error_message(&format!(
+                    .writeln(&config.format_error_message(&format!(
                         "Invalid multiline configuration '{}': {}",
                         multiline_str, e
                     )))
@@ -980,13 +977,13 @@ fn main() -> Result<()> {
         }
     } else {
         // Apply format-specific default multiline configuration
-        lib_config.input.multiline = lib_config.input.format.default_multiline();
+        config.input.multiline = config.input.format.default_multiline();
     }
 
     // Validate arguments early
     if let Err(e) = validate_cli_args(&cli) {
         stderr
-            .writeln(&lib_config.format_error_message(&format!("Error: {}", e)))
+            .writeln(&config.format_error_message(&format!("Error: {}", e)))
             .unwrap_or(());
         ExitCode::InvalidUsage.exit();
     }
@@ -998,40 +995,40 @@ fn main() -> Result<()> {
             Ok(file) => file,
             Err(e) => {
                 stderr
-                    .writeln(&lib_config.format_error_message(&e.to_string()))
+                    .writeln(&config.format_error_message(&e.to_string()))
                     .unwrap_or(());
                 ExitCode::GeneralError.exit();
             }
         };
-        run_pipeline_with_kelora_config(&lib_config, file_output)
+        run_pipeline_with_kelora_config(&config, file_output)
     } else {
         // Use stdout output
         let stdout_output = SafeStdout::new();
-        run_pipeline_with_kelora_config(&lib_config, stdout_output)
+        run_pipeline_with_kelora_config(&config, stdout_output)
     };
 
     let (final_stats, tracking_data) = match result {
         Ok(pipeline_result) => {
             // Print metrics if enabled (only if not terminated)
-            if lib_config.output.metrics && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+            if config.output.metrics && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
                 let metrics_output = crate::rhai_functions::tracking::format_metrics_output(
                     &pipeline_result.tracking_data,
                 );
                 if !metrics_output.is_empty() && metrics_output != "No metrics tracked" {
                     stderr
-                        .writeln(&lib_config.format_metrics_message(&metrics_output))
+                        .writeln(&config.format_metrics_message(&metrics_output))
                         .unwrap_or(());
                 }
             }
 
             // Write metrics to file if configured
-            if let Some(ref metrics_file) = lib_config.output.metrics_file {
+            if let Some(ref metrics_file) = config.output.metrics_file {
                 if let Ok(json_output) = crate::rhai_functions::tracking::format_metrics_json(
                     &pipeline_result.tracking_data,
                 ) {
                     if let Err(e) = std::fs::write(metrics_file, json_output) {
                         stderr
-                            .writeln(&lib_config.format_error_message(&format!(
+                            .writeln(&config.format_error_message(&format!(
                                 "Failed to write metrics file: {}",
                                 e
                             )))
@@ -1043,23 +1040,23 @@ fn main() -> Result<()> {
             // Print output based on configuration (only if not terminated)
             if !SHOULD_TERMINATE.load(Ordering::Relaxed) {
                 if let Some(ref s) = pipeline_result.stats {
-                    if lib_config.output.stats && !lib_config.processing.quiet {
+                    if config.output.stats && !config.processing.quiet {
                         // Full stats when --stats flag is used (unless --quiet)
                         stderr
-                            .writeln(&lib_config.format_stats_message(
-                                &s.format_stats(lib_config.input.multiline.is_some()),
+                            .writeln(&config.format_stats_message(
+                                &s.format_stats(config.input.multiline.is_some()),
                             ))
                             .unwrap_or(());
-                    } else if !lib_config.processing.quiet {
+                    } else if !config.processing.quiet {
                         // Error summary by default when errors occur (unless --quiet)
                         if let Some(error_summary) =
                             crate::rhai_functions::tracking::extract_error_summary_from_tracking(
                                 &pipeline_result.tracking_data,
-                                lib_config.processing.verbose,
+                                config.processing.verbose,
                             )
                         {
                             stderr
-                                .writeln(&lib_config.format_error_message(&error_summary))
+                                .writeln(&config.format_error_message(&error_summary))
                                 .unwrap_or(());
                         }
                     }
@@ -1069,7 +1066,7 @@ fn main() -> Result<()> {
         }
         Err(e) => {
             stderr
-                .writeln(&lib_config.format_error_message(&format!("Pipeline error: {}", e)))
+                .writeln(&config.format_error_message(&format!("Pipeline error: {}", e)))
                 .unwrap_or(());
             ExitCode::GeneralError.exit();
         }
@@ -1078,22 +1075,22 @@ fn main() -> Result<()> {
     // Check if we were terminated by a signal and print output
     if TERMINATED_BY_SIGNAL.load(Ordering::Relaxed) {
         if let Some(stats) = final_stats {
-            if lib_config.output.stats && !lib_config.processing.quiet {
+            if config.output.stats && !config.processing.quiet {
                 // Full stats when --stats flag is used (unless --quiet)
                 stderr
-                    .writeln(&lib_config.format_stats_message(
-                        &stats.format_stats(lib_config.input.multiline.is_some()),
+                    .writeln(&config.format_stats_message(
+                        &stats.format_stats(config.input.multiline.is_some()),
                     ))
                     .unwrap_or(());
-            } else if stats.has_errors() && !lib_config.processing.quiet {
+            } else if stats.has_errors() && !config.processing.quiet {
                 // Error summary by default when errors occur (unless --quiet)
                 stderr
-                    .writeln(&lib_config.format_error_message(&stats.format_error_summary()))
+                    .writeln(&config.format_error_message(&stats.format_error_summary()))
                     .unwrap_or(());
             }
-        } else if lib_config.output.stats && !lib_config.processing.quiet {
+        } else if config.output.stats && !config.processing.quiet {
             stderr
-                .writeln(&lib_config.format_stats_message("Processing interrupted"))
+                .writeln(&config.format_stats_message("Processing interrupted"))
                 .unwrap_or(());
         }
         ExitCode::SignalInt.exit();
