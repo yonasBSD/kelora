@@ -31,8 +31,7 @@ pub enum OutputFormat {
     Tsv,
     Csvnh,
     Tsvnh,
-    Hide,
-    Null,
+    None,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]

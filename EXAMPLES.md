@@ -194,10 +194,10 @@ Show how to validate scripts and run fast, silent benchmarks.
 
 ```bash
 # Validate Rhai script with no input
-kelora --exec-file script.rhai -F null < /dev/null
+kelora --exec-file script.rhai -F none < /dev/null
 
 # Measure speed of a filtering expression
-time kelora -f jsonl huge.log --filter 'e.status >= 500' -F null
+time kelora -f jsonl huge.log --filter 'e.status >= 500' -F none
 ```
 
-Using `-F null` disables all event output — useful for script linting or performance checks.
+Using `-F none` disables all event output — useful for script linting or performance checks.

@@ -245,7 +245,7 @@ cat webserver.log | kelora -f auto --exec 'e.slow_request = e.request_time > 0.5
 
 **Quiet Mode (`--quiet`):**
 - Suppresses all kelora output: events, error messages, stats, summaries
-- Automatically enables `-F hide` output format (not `-F null`)
+- Automatically enables `-F none` output format
 - Preserves all Rhai script side effects (`print()` statements, file operations, etc.)
 - Exit codes become the primary indicator of processing success/failure
 - Essential for automation and CI/CD pipelines
@@ -447,7 +447,7 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
   - `to_bool(value, default)` - Safe boolean conversion with fallback
 - **Side Effects**: Rhai `print()` statements and file operations are preserved in `--quiet` mode
   - Use `print()` for debugging output that should remain visible even when kelora output is suppressed
-  - `--quiet` uses `-F hide` (not `-F null`) to maintain script behavior consistency
+  - `--quiet` uses `-F none` to maintain script behavior consistency
   - Essential for debugging scripts in automation environments
 
 ### Code Quality Practices

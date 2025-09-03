@@ -3086,7 +3086,7 @@ fn test_empty_line_handling_line_format() {
             "--exec",
             "print(\"Line: [\" + line + \"]\")",
             "-F",
-            "hide",
+            "none",
         ],
         input,
     );
@@ -3162,7 +3162,7 @@ fn test_empty_line_handling_line_format_with_filter() {
             "--exec",
             "print(\"Non-empty: \" + line)",
             "-F",
-            "hide",
+            "none",
         ],
         input,
     );
@@ -3220,7 +3220,7 @@ fn test_empty_line_handling_consistency_across_formats() {
             "--exec",
             "print(\"[\" + line + \"]\")",
             "-F",
-            "hide",
+            "none",
         ],
         input,
     );
@@ -3247,7 +3247,7 @@ fn test_empty_line_handling_parallel_mode_line_format() {
             "--exec",
             "print(\"Line: [\" + line + \"]\")",
             "-F",
-            "hide",
+            "none",
         ],
         input,
     );

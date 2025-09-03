@@ -139,7 +139,7 @@ kelora --filter 'e.level == "error"' \
 - **Fields**: `-k field1,field2` (include only), `-K field3` (exclude), `-c` (core fields only), `-b` (brief/values only)
 - **Levels**: `-l error,warn` (include), `-L debug,trace` (exclude)  
 - **Time**: `--since 1h`, `--until 5m`, `--since "2024-01-15 14:00"`
-- **Formats**: `-F jsonl|logfmt|csv|hide` (default is colored logfmt), `-J` (jsonl shortcut)
+- **Formats**: `-F jsonl|logfmt|csv|none` (default is colored logfmt), `-J` (jsonl shortcut)
 
 ### Performance & Configuration
 - **Processing**: `--parallel` for batch files (2-10x faster), `--threads N`, `--batch-size N`

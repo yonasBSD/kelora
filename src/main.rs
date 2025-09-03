@@ -502,8 +502,7 @@ fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
                 "tsv" => crate::OutputFormat::Tsv,
                 "csvnh" => crate::OutputFormat::Csvnh,
                 "tsvnh" => crate::OutputFormat::Tsvnh,
-                "hide" => crate::OutputFormat::Hide,
-                "null" => crate::OutputFormat::Null,
+                "none" => crate::OutputFormat::None,
                 _ => cli.output_format,
             };
         }

@@ -130,8 +130,7 @@ pub enum OutputFormat {
     Tsv,
     Csvnh,
     Tsvnh,
-    Hide,
-    Null,
+    None,
 }
 
 /// File processing order
@@ -581,10 +580,10 @@ impl KeloraConfig {
             },
             output: OutputConfig {
                 format: if cli.stats_only {
-                    OutputFormat::Null
+                    OutputFormat::None
                 } else if cli.quiet {
                     // Quiet mode: suppress event output but preserve script side effects
-                    OutputFormat::Hide
+                    OutputFormat::None
                 } else if cli.jsonl_output {
                     OutputFormat::Jsonl
                 } else {
@@ -807,8 +806,7 @@ impl From<crate::OutputFormat> for OutputFormat {
             crate::OutputFormat::Tsv => OutputFormat::Tsv,
             crate::OutputFormat::Csvnh => OutputFormat::Csvnh,
             crate::OutputFormat::Tsvnh => OutputFormat::Tsvnh,
-            crate::OutputFormat::Hide => OutputFormat::Hide,
-            crate::OutputFormat::Null => OutputFormat::Null,
+            crate::OutputFormat::None => OutputFormat::None,
         }
     }
 }
@@ -823,8 +821,7 @@ impl From<OutputFormat> for crate::OutputFormat {
             OutputFormat::Tsv => crate::OutputFormat::Tsv,
             OutputFormat::Csvnh => crate::OutputFormat::Csvnh,
             OutputFormat::Tsvnh => crate::OutputFormat::Tsvnh,
-            OutputFormat::Hide => crate::OutputFormat::Hide,
-            OutputFormat::Null => crate::OutputFormat::Null,
+            OutputFormat::None => crate::OutputFormat::None,
         }
     }
 }
