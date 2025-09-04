@@ -8,7 +8,6 @@ mod cli;
 mod colors;
 mod config;
 mod config_file;
-mod debug;
 mod decompression;
 mod engine;
 mod event;
