@@ -502,9 +502,17 @@ impl ExecutionTracer {
     ) {
         if self.config.verbosity >= 3 {
             let step_num = {
-                let mut counter = self.step_counter.lock().unwrap();
-                *counter += 1;
-                *counter
+                match self.step_counter.lock() {
+                    Ok(mut counter) => {
+                        *counter += 1;
+                        *counter
+                    }
+                    Err(_) => {
+                        // If mutex is poisoned, continue with a default value
+                        eprintln!("Warning: Step counter mutex poisoned, using default");
+                        0
+                    }
+                }
             };
 
             eprintln!(
@@ -631,7 +639,9 @@ impl InteractiveDebugger {
 
         loop {
             print!("Debug> (s)tep, (c)ontinue, (i)nspect <var>, (q)uit? ");
-            io::stdout().flush().unwrap();
+            if io::stdout().flush().is_err() {
+                eprintln!("Warning: Failed to flush stdout");
+            }
 
             let mut input = String::new();
             if io::stdin().read_line(&mut input).is_err() {
@@ -1186,8 +1196,9 @@ impl RhaiEngine {
         self.execution_tracer = Some(ExecutionTracer::new(debug_config.clone()));
         self.interactive_debugger = Some(InteractiveDebugger::new(debug_config.clone()));
 
-        let debug_tracker = self.debug_tracker.as_ref().unwrap().clone();
-        let execution_tracer = self.execution_tracer.as_ref().unwrap().clone();
+        // These unwraps are safe because we just created the debug components above
+        let debug_tracker = self.debug_tracker.as_ref().expect("debug_tracker should be initialized").clone();
+        let execution_tracer = self.execution_tracer.as_ref().expect("execution_tracer should be initialized").clone();
         // Allow deprecated API: register_debugger is marked as volatile/experimental but is the
         // only way to access Rhai's debugging functionality. The API is stable in practice and
         // essential for our debugging features. We'll update when a stable replacement is available.

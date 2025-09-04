@@ -858,12 +858,13 @@ fn process_line_sequential<W: Write>(
 
 fn main() -> Result<()> {
     // Initialize signal handling early
-    let _signal_handler = SignalHandler::new()
-        .map_err(|e| {
+    let _signal_handler = match SignalHandler::new() {
+        Ok(handler) => handler,
+        Err(e) => {
             eprintln!("Failed to initialize signal handling: {}", e);
             ExitCode::GeneralError.exit();
-        })
-        .unwrap();
+        }
+    };
 
     // Initialize process cleanup
     let _cleanup = ProcessCleanup::new();
