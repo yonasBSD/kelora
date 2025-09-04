@@ -7,7 +7,7 @@ use std::path::PathBuf;
 /// Configuration file handler for kelora
 #[derive(Default)]
 pub struct ConfigFile {
-    pub defaults: HashMap<String, String>,
+    pub defaults: Option<String>,
     pub aliases: HashMap<String, String>,
 }
 
@@ -65,6 +65,18 @@ impl ConfigFile {
         }
     }
 
+    /// Load configuration with optional custom config file path
+    pub fn load_with_custom_path(custom_path: Option<&str>) -> Result<Self> {
+        if let Some(path) = custom_path {
+            // Use custom path
+            let path_buf = std::path::PathBuf::from(path);
+            Self::load_from_path(&path_buf)
+        } else {
+            // Use default loading logic
+            Self::load()
+        }
+    }
+
     /// Load configuration from a specific path
     pub fn load_from_path(path: &PathBuf) -> Result<Self> {
         use std::fs;
@@ -81,7 +93,7 @@ impl ConfigFile {
 
     /// Parse INI content from string
     fn parse_ini_content(content: &str) -> Result<Self> {
-        let mut defaults = HashMap::new();
+        let mut defaults = None;
         let mut aliases = HashMap::new();
         let mut current_section = String::new();
 
@@ -104,17 +116,20 @@ impl ConfigFile {
                 let key = line[..eq_pos].trim();
                 let value = line[eq_pos + 1..].trim();
 
-                match current_section.as_str() {
-                    "defaults" => {
-                        // Convert kebab-case to underscore for internal consistency
-                        let normalized_key = key.replace('-', "_");
-                        defaults.insert(normalized_key, value.to_string());
+                if current_section.is_empty() {
+                    // Root-level configuration
+                    if key == "defaults" {
+                        defaults = Some(value.to_string());
                     }
-                    "aliases" => {
-                        aliases.insert(key.to_string(), value.to_string());
-                    }
-                    _ => {
-                        // Ignore unknown sections
+                    // Ignore unknown root-level keys
+                } else {
+                    match current_section.as_str() {
+                        "aliases" => {
+                            aliases.insert(key.to_string(), value.to_string());
+                        }
+                        _ => {
+                            // Ignore unknown sections
+                        }
                     }
                 }
             }
@@ -132,13 +147,9 @@ impl ConfigFile {
                 Ok(config) => {
                     println!("Configuration loaded from: {}", path.display());
 
-                    if !config.defaults.is_empty() {
+                    if let Some(defaults) = &config.defaults {
                         println!("\nDefaults:");
-                        let mut sorted_defaults: Vec<_> = config.defaults.iter().collect();
-                        sorted_defaults.sort_by_key(|(k, _)| k.as_str());
-                        for (key, value) in sorted_defaults {
-                            println!("  {} = {}", key, value);
-                        }
+                        println!("  defaults = {}", defaults);
                     }
 
                     if !config.aliases.is_empty() {
@@ -161,14 +172,8 @@ impl ConfigFile {
             }
             println!("\nCreate a config file at any of these locations. Example:");
             println!();
-            println!("[defaults]");
-            println!("input-format = auto");
-            println!("output-format = default");
-            println!("skip-lines = 0");
-            println!("parallel = false");
-            println!("stats = true");
-            println!("verbose = false");
-            println!("input-tz = UTC");
+            println!("# Set default arguments applied to every kelora command");
+            println!("defaults = --format auto --stats --input-tz UTC");
             println!();
             println!("[aliases]");
             println!("errors = --filter 'e.level == \"error\"' --stats");
@@ -230,23 +235,44 @@ impl ConfigFile {
 
     /// Process command line arguments, expanding aliases and applying defaults
     pub fn process_args(&self, args: Vec<String>) -> Result<Vec<String>> {
+        // First, apply defaults if they exist
         let mut result = Vec::new();
+        
+        // Add defaults at the beginning, but preserve the program name
+        if let Some(defaults) = &self.defaults {
+            if !args.is_empty() {
+                result.push(args[0].clone()); // Keep program name
+            }
+            
+            // Parse defaults using shell_words and add them
+            let default_args = shell_words::split(defaults)
+                .with_context(|| "Invalid defaults: failed to parse arguments".to_string())?;
+            result.extend(default_args);
+            
+            // Add remaining user args (skip program name)
+            result.extend(args.into_iter().skip(1));
+        } else {
+            result = args;
+        }
+        
+        // Then expand aliases
+        let mut final_result = Vec::new();
         let mut i = 0;
 
-        while i < args.len() {
-            if (args[i] == "-a" || args[i] == "--alias") && i + 1 < args.len() {
-                let name = &args[i + 1];
+        while i < result.len() {
+            if (result[i] == "-a" || result[i] == "--alias") && i + 1 < result.len() {
+                let name = &result[i + 1];
                 let mut seen = std::collections::HashSet::new();
                 let resolved = self.resolve_alias(name, &mut seen, 0)?;
-                result.extend(resolved);
+                final_result.extend(resolved);
                 i += 2;
             } else {
-                result.push(args[i].clone());
+                final_result.push(result[i].clone());
                 i += 1;
             }
         }
 
-        Ok(result)
+        Ok(final_result)
     }
 }
 
@@ -259,9 +285,7 @@ mod tests {
     #[test]
     fn test_load_config_file() {
         let mut file = NamedTempFile::new().unwrap();
-        writeln!(file, "[defaults]").unwrap();
-        writeln!(file, "format = jsonl").unwrap();
-        writeln!(file, "output-format = csv").unwrap();
+        writeln!(file, "defaults = --format jsonl --output-format csv").unwrap();
         writeln!(file).unwrap();
         writeln!(file, "[aliases]").unwrap();
         writeln!(file, "errors = --filter 'e.level == \"error\"'").unwrap();
@@ -270,11 +294,7 @@ mod tests {
 
         let config = ConfigFile::load_from_path(&file.path().to_path_buf()).unwrap();
 
-        assert_eq!(config.defaults.get("format"), Some(&"jsonl".to_string()));
-        assert_eq!(
-            config.defaults.get("output_format"),
-            Some(&"csv".to_string())
-        );
+        assert_eq!(config.defaults, Some("--format jsonl --output-format csv".to_string()));
         assert_eq!(
             config.aliases.get("errors"),
             Some(&"--filter 'e.level == \"error\"'".to_string())
@@ -351,6 +371,65 @@ mod tests {
                 "--filter",
                 "e.level == \"error\"",
                 "--stats",
+                "--format",
+                "jsonl"
+            ]
+        );
+    }
+
+    #[test]
+    fn test_process_args_with_defaults() {
+        let mut config = ConfigFile::default();
+        config.defaults = Some("--stats --parallel".to_string());
+
+        let args = vec![
+            "kelora".to_string(),
+            "--format".to_string(),
+            "jsonl".to_string(),
+            "input.log".to_string(),
+        ];
+
+        let processed = config.process_args(args).unwrap();
+
+        assert_eq!(
+            processed,
+            vec![
+                "kelora",
+                "--stats", 
+                "--parallel",
+                "--format",
+                "jsonl",
+                "input.log"
+            ]
+        );
+    }
+
+    #[test]
+    fn test_process_args_with_defaults_and_aliases() {
+        let mut config = ConfigFile::default();
+        config.defaults = Some("--stats".to_string());
+        config.aliases.insert(
+            "errors".to_string(),
+            "--filter 'e.level == \"error\"'".to_string(),
+        );
+
+        let args = vec![
+            "kelora".to_string(),
+            "-a".to_string(),
+            "errors".to_string(),
+            "--format".to_string(),
+            "jsonl".to_string(),
+        ];
+
+        let processed = config.process_args(args).unwrap();
+
+        assert_eq!(
+            processed,
+            vec![
+                "kelora",
+                "--stats",
+                "--filter",
+                "e.level == \"error\"",
                 "--format",
                 "jsonl"
             ]

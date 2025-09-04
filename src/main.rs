@@ -1206,6 +1206,16 @@ fn validate_config(config: &KeloraConfig) -> Result<()> {
     Ok(())
 }
 
+/// Extract --config-file argument from raw args
+fn extract_config_file_arg(args: &[String]) -> Option<String> {
+    for i in 0..args.len() {
+        if args[i] == "--config-file" && i + 1 < args.len() {
+            return Some(args[i + 1].clone());
+        }
+    }
+    None
+}
+
 /// Process command line arguments with config file support
 fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
     // Get raw command line arguments
@@ -1237,13 +1247,16 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
 
     // Check for --ignore-config
     let ignore_config = raw_args.iter().any(|arg| arg == "--ignore-config");
+    
+    // Extract --config-file argument if present
+    let config_file_path = extract_config_file_arg(&raw_args);
 
     let processed_args = if ignore_config {
         // Skip config file processing
         raw_args
     } else {
         // Load config file and process aliases
-        match ConfigFile::load() {
+        match ConfigFile::load_with_custom_path(config_file_path.as_deref()) {
             Ok(config_file) => match config_file.process_args(raw_args) {
                 Ok(processed) => processed,
                 Err(e) => {
@@ -1264,22 +1277,17 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
 
     // Parse with potentially modified arguments
     let matches = Cli::command().get_matches_from(processed_args);
-    let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| {
+    let mut cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| {
         stderr
             .writeln(&format!("kelora: Error: {}", e))
             .unwrap_or(());
         std::process::exit(1);
     });
+    
+    // Resolve inverted boolean flags
+    cli.resolve_boolean_flags();
 
-    // Apply config file defaults to CLI if not ignoring config
-    let cli = if ignore_config {
-        cli
-    } else {
-        match ConfigFile::load() {
-            Ok(config_file) => apply_config_defaults(cli, &config_file),
-            Err(_) => cli, // Already handled error above
-        }
-    };
+    // Config file defaults and aliases are already applied in process_args above
 
     // Show usage if on TTY and no input files provided (but not if "-" is explicitly specified)
     if crate::tty::is_stdin_tty() && cli.files.is_empty() {
@@ -1291,341 +1299,6 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
     }
 
     (matches, cli)
-}
-
-/// Apply configuration file defaults to CLI arguments
-fn apply_config_defaults(mut cli: Cli, config_file: &ConfigFile) -> Cli {
-    // Apply defaults only if the CLI value is still at its default
-    // This ensures CLI arguments take precedence over config file
-
-    if let Some(format) = config_file.defaults.get("input_format") {
-        // Only apply if format is still at default ("line")
-        if matches!(cli.format, crate::InputFormat::Line) {
-            cli.format = match format.as_str() {
-                "auto" => crate::InputFormat::Auto,
-                "jsonl" => crate::InputFormat::Jsonl,
-                "line" => crate::InputFormat::Line,
-                "logfmt" => crate::InputFormat::Logfmt,
-                "syslog" => crate::InputFormat::Syslog,
-                "cef" => crate::InputFormat::Cef,
-                "csv" => crate::InputFormat::Csv,
-                "tsv" => crate::InputFormat::Tsv,
-                "csvnh" => crate::InputFormat::Csvnh,
-                "tsvnh" => crate::InputFormat::Tsvnh,
-                "combined" => crate::InputFormat::Combined,
-                _ => cli.format, // Keep original if invalid
-            };
-        }
-    }
-
-    if let Some(output_format) = config_file.defaults.get("output_format") {
-        if matches!(cli.output_format, crate::OutputFormat::Default) {
-            cli.output_format = match output_format.as_str() {
-                "jsonl" => crate::OutputFormat::Jsonl,
-                "default" => crate::OutputFormat::Default,
-                "logfmt" => crate::OutputFormat::Logfmt,
-                "csv" => crate::OutputFormat::Csv,
-                "tsv" => crate::OutputFormat::Tsv,
-                "csvnh" => crate::OutputFormat::Csvnh,
-                "tsvnh" => crate::OutputFormat::Tsvnh,
-                "none" => crate::OutputFormat::None,
-                _ => cli.output_format,
-            };
-        }
-    }
-
-    // Note: on_error configuration removed in resiliency model - use --strict flag instead
-
-    if let Some(file_order) = config_file.defaults.get("file_order") {
-        if matches!(cli.file_order, crate::FileOrder::Cli) {
-            cli.file_order = match file_order.as_str() {
-                "cli" => crate::FileOrder::Cli,
-                "name" => crate::FileOrder::Name,
-                "mtime" => crate::FileOrder::Mtime,
-                _ => cli.file_order,
-            };
-        }
-    }
-
-    // Apply boolean flags from config if they weren't explicitly set
-    if let Some(parallel) = config_file.defaults.get("parallel") {
-        if !cli.parallel && parallel.parse::<bool>().unwrap_or(false) {
-            cli.parallel = true;
-        }
-    }
-
-    if let Some(core) = config_file.defaults.get("core") {
-        if !cli.core && core.parse::<bool>().unwrap_or(false) {
-            cli.core = true;
-        }
-    }
-
-    if let Some(brief) = config_file.defaults.get("brief") {
-        if !cli.brief && brief.parse::<bool>().unwrap_or(false) {
-            cli.brief = true;
-        }
-    }
-
-    if let Some(skip_lines) = config_file.defaults.get("skip_lines") {
-        if cli.skip_lines.is_none() {
-            if let Ok(value) = skip_lines.parse::<usize>() {
-                cli.skip_lines = Some(value);
-            }
-        }
-    }
-
-    if let Some(stats) = config_file.defaults.get("stats") {
-        if !cli.stats && stats.parse::<bool>().unwrap_or(false) {
-            cli.stats = true;
-        }
-    }
-
-    if let Some(stats_only) = config_file.defaults.get("stats_only") {
-        if !cli.stats_only && stats_only.parse::<bool>().unwrap_or(false) {
-            cli.stats_only = true;
-        }
-    }
-
-    // Add support for new metrics and error reporting options
-    if let Some(metrics) = config_file.defaults.get("metrics") {
-        if !cli.metrics && metrics.parse::<bool>().unwrap_or(false) {
-            cli.metrics = true;
-        }
-    }
-
-    if let Some(metrics_file) = config_file.defaults.get("metrics_file") {
-        if cli.metrics_file.is_none() {
-            cli.metrics_file = Some(metrics_file.clone());
-        }
-    }
-
-    // Note: error_report configuration removed in resiliency model - use --strict/--verbose flags instead
-
-    if let Some(error_report_file) = config_file.defaults.get("error_report_file") {
-        if cli.error_report_file.is_none() {
-            cli.error_report_file = Some(error_report_file.clone());
-        }
-    }
-
-    if let Some(no_emoji) = config_file.defaults.get("no_emoji") {
-        if !cli.no_emoji && no_emoji.parse::<bool>().unwrap_or(false) {
-            cli.no_emoji = true;
-        }
-    }
-
-    if let Some(force_color) = config_file.defaults.get("force_color") {
-        if !cli.force_color && force_color.parse::<bool>().unwrap_or(false) {
-            cli.force_color = true;
-        }
-    }
-
-    if let Some(no_color) = config_file.defaults.get("no_color") {
-        if !cli.no_color && no_color.parse::<bool>().unwrap_or(false) {
-            cli.no_color = true;
-        }
-    }
-
-    // Apply numeric values
-    if let Some(threads) = config_file.defaults.get("threads") {
-        if cli.threads == 0 {
-            if let Ok(thread_count) = threads.parse::<usize>() {
-                cli.threads = thread_count;
-            }
-        }
-    }
-
-    if let Some(batch_size) = config_file.defaults.get("batch_size") {
-        if cli.batch_size.is_none() {
-            if let Ok(size) = batch_size.parse::<usize>() {
-                cli.batch_size = Some(size);
-            }
-        }
-    }
-
-    if let Some(batch_timeout) = config_file.defaults.get("batch_timeout") {
-        if cli.batch_timeout == 200 {
-            // default value
-            if let Ok(timeout) = batch_timeout.parse::<u64>() {
-                cli.batch_timeout = timeout;
-            }
-        }
-    }
-
-    // Apply string values
-    if let Some(ignore_lines) = config_file.defaults.get("ignore_lines") {
-        if cli.ignore_lines.is_none() {
-            cli.ignore_lines = Some(ignore_lines.clone());
-        }
-    }
-
-    if let Some(multiline) = config_file.defaults.get("multiline") {
-        if cli.multiline.is_none() {
-            cli.multiline = Some(multiline.clone());
-        }
-    }
-
-    if let Some(begin) = config_file.defaults.get("begin") {
-        if cli.begin.is_none() {
-            cli.begin = Some(begin.clone());
-        }
-    }
-
-    if let Some(end) = config_file.defaults.get("end") {
-        if cli.end.is_none() {
-            cli.end = Some(end.clone());
-        }
-    }
-
-    // Apply list values (only if CLI lists are empty)
-    if let Some(filters) = config_file.defaults.get("filters") {
-        if cli.filters.is_empty() {
-            cli.filters = filters.split(',').map(|s| s.trim().to_string()).collect();
-        }
-    }
-
-    if let Some(execs) = config_file.defaults.get("execs") {
-        if cli.execs.is_empty() {
-            cli.execs = execs.split(',').map(|s| s.trim().to_string()).collect();
-        }
-    }
-
-    if let Some(levels) = config_file.defaults.get("levels") {
-        if cli.levels.is_empty() {
-            cli.levels = levels.split(',').map(|s| s.trim().to_string()).collect();
-        }
-    }
-
-    if let Some(exclude_levels) = config_file.defaults.get("exclude_levels") {
-        if cli.exclude_levels.is_empty() {
-            cli.exclude_levels = exclude_levels
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .collect();
-        }
-    }
-
-    if let Some(keys) = config_file.defaults.get("keys") {
-        if cli.keys.is_empty() {
-            cli.keys = keys.split(',').map(|s| s.trim().to_string()).collect();
-        }
-    }
-
-    if let Some(exclude_keys) = config_file.defaults.get("exclude_keys") {
-        if cli.exclude_keys.is_empty() {
-            cli.exclude_keys = exclude_keys
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .collect();
-        }
-    }
-
-    // Apply window_size from config if not explicitly set
-    if let Some(window_size) = config_file.defaults.get("window_size") {
-        if cli.window_size.is_none() {
-            if let Ok(size) = window_size.parse::<usize>() {
-                cli.window_size = Some(size);
-            }
-        }
-    }
-
-    // Apply additional missing options
-    if let Some(ts_field) = config_file.defaults.get("ts_field") {
-        if cli.ts_field.is_none() {
-            cli.ts_field = Some(ts_field.clone());
-        }
-    }
-
-    if let Some(ts_format) = config_file.defaults.get("ts_format") {
-        if cli.ts_format.is_none() {
-            cli.ts_format = Some(ts_format.clone());
-        }
-    }
-
-    if let Some(input_tz) = config_file.defaults.get("input_tz") {
-        if cli.input_tz.is_none() {
-            cli.input_tz = Some(input_tz.clone());
-        }
-    }
-
-    if let Some(output_file) = config_file.defaults.get("output_file") {
-        if cli.output_file.is_none() {
-            cli.output_file = Some(output_file.clone());
-        }
-    }
-
-    if let Some(pretty_ts) = config_file.defaults.get("pretty_ts") {
-        if cli.pretty_ts.is_none() {
-            cli.pretty_ts = Some(pretty_ts.clone());
-        }
-    }
-
-    if let Some(format_timestamps_local) = config_file.defaults.get("format_timestamps_local") {
-        if !cli.format_timestamps_local && format_timestamps_local.parse::<bool>().unwrap_or(false)
-        {
-            cli.format_timestamps_local = true;
-        }
-    }
-
-    if let Some(format_timestamps_utc) = config_file.defaults.get("format_timestamps_utc") {
-        if !cli.format_timestamps_utc && format_timestamps_utc.parse::<bool>().unwrap_or(false) {
-            cli.format_timestamps_utc = true;
-        }
-    }
-
-    if let Some(no_preserve_order) = config_file.defaults.get("no_preserve_order") {
-        if !cli.no_preserve_order && no_preserve_order.parse::<bool>().unwrap_or(false) {
-            cli.no_preserve_order = true;
-        }
-    }
-
-    if let Some(strict) = config_file.defaults.get("strict") {
-        if !cli.strict && strict.parse::<bool>().unwrap_or(false) {
-            cli.strict = true;
-        }
-    }
-
-    if let Some(verbose) = config_file.defaults.get("verbose") {
-        if cli.verbose == 0 && verbose.parse::<bool>().unwrap_or(false) {
-            cli.verbose = 1;
-        }
-    }
-
-    if let Some(quiet) = config_file.defaults.get("quiet") {
-        if !cli.quiet && quiet.parse::<bool>().unwrap_or(false) {
-            cli.quiet = true;
-        }
-    }
-
-    if let Some(since) = config_file.defaults.get("since") {
-        if cli.since.is_none() {
-            cli.since = Some(since.clone());
-        }
-    }
-
-    if let Some(until) = config_file.defaults.get("until") {
-        if cli.until.is_none() {
-            cli.until = Some(until.clone());
-        }
-    }
-
-    if let Some(take) = config_file.defaults.get("take") {
-        if cli.take.is_none() {
-            if let Ok(value) = take.parse::<usize>() {
-                cli.take = Some(value);
-            }
-        }
-    }
-
-    if let Some(exec_files) = config_file.defaults.get("exec_files") {
-        if cli.exec_files.is_empty() {
-            cli.exec_files = exec_files
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .collect();
-        }
-    }
-
-    cli
 }
 
 /// Print time format help message adapted for Rust/chrono

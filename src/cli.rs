@@ -50,6 +50,7 @@ pub enum FileOrder {
 )]
 #[command(author = "Dirk Loss <mail@dirk-loss.de>")]
 #[command(version)]
+#[command(args_override_self = true)]
 pub struct Cli {
     /// Input files (stdin if not specified, or use "-" to explicitly specify stdin)
     pub files: Vec<String>,
@@ -150,6 +151,10 @@ pub struct Cli {
     #[arg(long = "strict", help_heading = "Error Handling")]
     pub strict: bool,
 
+    /// Disable strict error handling (resilient mode)
+    #[arg(long = "no-strict", help_heading = "Error Handling", overrides_with = "strict")]
+    pub no_strict: bool,
+
     /// Show detailed error information (use multiple times for more verbosity: -v, -vv, -vvv)
     #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count, help_heading = "Error Handling")]
     pub verbose: u8,
@@ -157,6 +162,10 @@ pub struct Cli {
     /// Suppress all kelora output (events, errors, stats) but preserve script side effects
     #[arg(short = 'q', long = "quiet", help_heading = "Error Handling")]
     pub quiet: bool,
+
+    /// Enable normal output (opposite of quiet)
+    #[arg(long = "no-quiet", help_heading = "Error Handling", overrides_with = "quiet")]
+    pub no_quiet: bool,
 
     /// Include only events with these log levels
     #[arg(
@@ -255,6 +264,10 @@ pub struct Cli {
     #[arg(long = "parallel", help_heading = "Performance Options")]
     pub parallel: bool,
 
+    /// Disable parallel processing
+    #[arg(long = "no-parallel", help_heading = "Performance Options", overrides_with = "parallel")]
+    pub no_parallel: bool,
+
     /// Number of worker threads
     #[arg(
         long = "threads",
@@ -295,6 +308,10 @@ pub struct Cli {
     #[arg(short = 's', long = "stats", help_heading = "Metrics and Stats")]
     pub stats: bool,
 
+    /// Disable processing statistics
+    #[arg(long = "no-stats", help_heading = "Metrics and Stats", overrides_with = "stats")]
+    pub no_stats: bool,
+
     /// Show processing statistics with no output
     #[arg(short = 'S', long = "stats-only", help_heading = "Metrics and Stats")]
     pub stats_only: bool,
@@ -303,6 +320,10 @@ pub struct Cli {
     #[arg(short = 'm', long = "metrics", help_heading = "Metrics and Stats")]
     pub metrics: bool,
 
+    /// Disable tracked metrics
+    #[arg(long = "no-metrics", help_heading = "Metrics and Stats", overrides_with = "metrics")]
+    pub no_metrics: bool,
+
     /// Write metrics to file (JSON format)
     #[arg(long = "metrics-file", help_heading = "Metrics and Stats")]
     pub metrics_file: Option<String>,
@@ -310,6 +331,10 @@ pub struct Cli {
     /// Use alias from configuration file
     #[arg(short = 'a', long = "alias", help_heading = "Configuration Options")]
     pub alias: Vec<String>,
+
+    /// Specify custom configuration file path
+    #[arg(long = "config-file", help_heading = "Configuration Options")]
+    pub config_file: Option<String>,
 
     /// Show configuration file and exit
     #[arg(long = "show-config", help_heading = "Configuration Options")]
@@ -330,6 +355,36 @@ pub struct Cli {
     /// Show time format help and exit
     #[arg(long = "help-time", help_heading = "Help Options")]
     pub help_time: bool,
+}
+
+impl Cli {
+    /// Resolve inverted boolean flags to their actual values
+    pub fn resolve_boolean_flags(&mut self) {
+        // Handle stats/no-stats
+        if self.no_stats {
+            self.stats = false;
+        }
+        
+        // Handle parallel/no-parallel  
+        if self.no_parallel {
+            self.parallel = false;
+        }
+        
+        // Handle metrics/no-metrics
+        if self.no_metrics {
+            self.metrics = false;
+        }
+        
+        // Handle strict/no-strict
+        if self.no_strict {
+            self.strict = false;
+        }
+        
+        // Handle quiet/no-quiet
+        if self.no_quiet {
+            self.quiet = false;
+        }
+    }
 }
 
 impl Cli {

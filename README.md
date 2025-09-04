@@ -148,7 +148,7 @@ kelora --filter 'e.level == "error"' \
 - **Scripts**: `-E script.rhai` (from file), `--begin 'init.config = ...'` (initialization), `--end 'print(tracked.total)'` (final reporting)
 - **Error Handling**: Default is resilient (skip errors), `--strict` for fail-fast, `--verbose` for details, `--no-emoji` to disable emoji prefixes
 - **Verbose Output**: Uses standardized emoji prefixes - 🔹 (blue diamond) for general output like stats and processing messages, 🔸 (orange diamond) for errors and warnings
-- **Config**: `~/.config/kelora/config.toml` for defaults and aliases, `--show-config` to view
+- **Config**: `~/.config/kelora/config.ini` for defaults and aliases, `--config-file path/to/config.ini` for custom config, `--show-config` to view
 
 ## Complete Examples
 
@@ -217,6 +217,27 @@ kelora --help-time         # Timestamp format guide
 kelora --help-rhai         # Rhai scripting reference  
 kelora --help-functions    # Built-in function reference
 kelora --show-config       # Current configuration
+```
+
+### Configuration File Example
+
+Create `~/.config/kelora/config.ini`:
+```ini
+# Set default arguments for all kelora commands  
+defaults = --format auto --stats --parallel --input-tz UTC
+
+[aliases]
+errors = --filter 'e.level == "error"' 
+warnings = --filter 'e.level == "warn" || e.level == "warning"'
+slow-queries = --filter 'e.duration > 1000' --exec 'e.slow = true' --keys timestamp,query,duration
+```
+
+Usage:
+```bash
+kelora app.log                          # Uses defaults: auto format, stats, parallel processing
+kelora --config-file custom.ini app.log # Uses custom config  
+kelora --no-stats app.log               # Overrides defaults: no stats
+kelora -a errors app.log                # Uses 'errors' alias from config
 ```
 
 ## Kelora vs Other Tools (When to Use What)
