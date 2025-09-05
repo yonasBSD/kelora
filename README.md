@@ -56,7 +56,7 @@ Pre-built binaries are available in the [releases section](https://github.com/dl
 
 ## Common Tasks
 
-**Finding Problems**: Filter by criteria with `--filter 'e.level == "error"'`, `--filter 'e.status >= 500'`, or time ranges like `--since 1h --levels error,fatal`.
+**Finding Problems**: Filter by criteria with `-l error`, `--filter 'e.status >= 500'`, or time ranges like `--since 1h --levels error,fatal`.
 
 **Understanding Patterns**: Count and measure with `--exec 'track_count("by_status_" + e.status)'`, track averages with `track_avg("response_time", e.duration)`. View results with `--metrics` or `--stats`.
 
@@ -128,7 +128,7 @@ Chain filters and execs in any order for complex pipelines:
 
 ```bash
 # Error analysis: filter → extract → classify → count
-kelora --filter 'e.level == "error"' \
+kelora -l error \
        --exec 'e.error_class = e.message.extract_re("(\\w+Error)")' \
        --filter 'e.error_class != ""' \
        --exec 'track_count("by_class_" + e.error_class)' \
@@ -227,7 +227,7 @@ Create `~/.config/kelora/config.ini`:
 defaults = --format auto --stats --parallel --input-tz UTC
 
 [aliases]
-errors = --filter 'e.level == "error"' 
+errors = -l error --since 1h --stats 
 warnings = --filter 'e.level == "warn" || e.level == "warning"'
 slow-queries = --filter 'e.duration > 1000' --exec 'e.slow = true' --keys timestamp,query,duration
 ```

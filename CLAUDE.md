@@ -47,7 +47,7 @@ make test-full          # Comprehensive test suite
 ./target/release/kelora -f jsonl --parallel --verbose --batch-size 100 large.log
 
 # Automation pipeline example
-if ./target/release/kelora --quiet --filter 'e.level == "ERROR"' logs/*.json; then
+if ./target/release/kelora --quiet -l error logs/*.json; then
     echo "No critical errors found"
 else
     echo "Critical errors detected, alerting team..."
@@ -281,7 +281,7 @@ Kelora uses standard Unix exit codes to indicate processing results:
 kelora --quiet input.log && echo "✓ Clean data" || echo "✗ Has errors"
 
 # CI/CD pipeline usage
-if kelora --parallel --quiet --filter 'e.level == "ERROR"' logs/*.json; then
+if kelora --parallel --quiet -l error logs/*.json; then
     echo "No errors found in logs"
 else
     echo "Error-level events detected, exit code: $?"
@@ -301,7 +301,7 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
 - Provides early exit behavior in parallel mode for efficient processing
 - Examples:
   - `--take 10` - Output first 10 events
-  - `--take 100 --filter 'e.level == "ERROR"'` - First 100 error events
+  - `--take 100 -l error` - First 100 error events
   - `--take 5 --parallel` - First 5 events using parallel processing
 
 ### Performance Considerations
