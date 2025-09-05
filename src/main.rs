@@ -1366,6 +1366,8 @@ fn print_rhai_help() {
     let help_text = r#"
 Rhai Scripting Guide for Kelora:
 
+For complete Rhai language documentation, visit: https://rhai.rs
+
 BASIC CONCEPTS:
   e                                    Current event (renamed from 'event')
   e.field                              Access field directly
