@@ -55,6 +55,71 @@ else
 fi
 ```
 
+## Configuration System
+
+Kelora uses a simple, clear configuration precedence system:
+
+**Configuration Precedence (highest to lowest):**
+1. **CLI arguments** - Always take highest priority
+2. **Project `.kelorarc`** - Found by walking up directory tree from current working directory
+3. **User configuration** - Located in standard user config directories
+4. **Built-in defaults** - Fallback values
+
+### Configuration File Locations
+
+**Project Configuration:**
+- Kelora searches for `.kelorarc` starting from the current working directory
+- Walks up the directory tree until it finds `.kelorarc` or reaches the filesystem root
+- This allows project-specific defaults that work anywhere within the project structure
+
+**User Configuration (searched in order):**
+- Unix: `$XDG_CONFIG_HOME/kelora/config.ini`, `~/.config/kelora/config.ini`, `~/.kelorarc`
+- Windows: `%APPDATA%\kelora\config.ini`, `%USERPROFILE%\.kelorarc`
+
+### Configuration File Format
+
+Configuration files use INI format with two main sections:
+
+```ini
+# Global defaults applied to every kelora command
+defaults = --format auto --stats --input-tz UTC
+
+[aliases]
+# Command aliases for common operations
+errors = --filter 'e.level == "error"' --stats
+json-errors = --format jsonl --filter 'e.level == "error"' --output-format jsonl
+slow-requests = --filter 'e.response_time.to_int() > 1000' --keys timestamp,method,path,response_time
+```
+
+### Configuration Commands
+
+```bash
+# View current configuration with precedence information
+kelora --show-config
+
+# Show help for all available options
+kelora --help
+```
+
+### Example Usage
+
+**Project Setup:**
+```bash
+# Create project-specific defaults in your project root
+echo 'defaults = --format jsonl --stats --parallel' > .kelorarc
+
+# All kelora commands in this project (and subdirectories) will use these defaults
+kelora input.log                    # Uses project defaults
+cd subproject/logs && kelora *.log  # Still finds and uses project defaults
+```
+
+**User Setup:**
+```bash
+# Set personal defaults for all projects
+mkdir -p ~/.config/kelora
+echo 'defaults = --input-tz America/New_York --stats' > ~/.config/kelora/config.ini
+```
+
 ## Development Guidelines
 
 ### Architecture Overview
