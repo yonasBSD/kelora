@@ -61,20 +61,20 @@ Kelora uses a simple, clear configuration precedence system:
 
 **Configuration Precedence (highest to lowest):**
 1. **CLI arguments** - Always take highest priority
-2. **Project `.kelorarc`** - Found by walking up directory tree from current working directory
-3. **User configuration** - Located in standard user config directories
+2. **Project `.kelora.ini`** - Found by walking up directory tree from current working directory
+3. **User `kelora.ini`** - Located in user's config directory
 4. **Built-in defaults** - Fallback values
 
 ### Configuration File Locations
 
 **Project Configuration:**
-- Kelora searches for `.kelorarc` starting from the current working directory
-- Walks up the directory tree until it finds `.kelorarc` or reaches the filesystem root
+- Kelora searches for `.kelora.ini` starting from the current working directory
+- Walks up the directory tree until it finds `.kelora.ini` or reaches the filesystem root
 - This allows project-specific defaults that work anywhere within the project structure
 
-**User Configuration (searched in order):**
-- Unix: `$XDG_CONFIG_HOME/kelora/config.ini`, `~/.config/kelora/config.ini`, `~/.kelorarc`
-- Windows: `%APPDATA%\kelora\config.ini`, `%USERPROFILE%\.kelorarc`
+**User Configuration:**
+- Unix: `$XDG_CONFIG_HOME/kelora.ini` (fallback to `~/.config/kelora.ini`)
+- Windows: `%APPDATA%\kelora.ini`
 
 ### Configuration File Format
 
@@ -106,7 +106,7 @@ kelora --help
 **Project Setup:**
 ```bash
 # Create project-specific defaults in your project root
-echo 'defaults = --format jsonl --stats --parallel' > .kelorarc
+echo 'defaults = --format jsonl --stats --parallel' > .kelora.ini
 
 # All kelora commands in this project (and subdirectories) will use these defaults
 kelora input.log                    # Uses project defaults
@@ -116,8 +116,8 @@ cd subproject/logs && kelora *.log  # Still finds and uses project defaults
 **User Setup:**
 ```bash
 # Set personal defaults for all projects
-mkdir -p ~/.config/kelora
-echo 'defaults = --input-tz America/New_York --stats' > ~/.config/kelora/config.ini
+mkdir -p ~/.config
+echo 'defaults = --input-tz America/New_York --stats' > ~/.config/kelora.ini
 ```
 
 ## Development Guidelines

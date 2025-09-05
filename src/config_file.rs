@@ -12,11 +12,11 @@ pub struct ConfigFile {
 }
 
 impl ConfigFile {
-    /// Find project-level .kelorarc by walking up directory tree
+    /// Find project-level .kelora.ini by walking up directory tree
     pub fn find_project_config() -> Option<PathBuf> {
         let mut current = std::env::current_dir().ok()?;
         loop {
-            let config_path = current.join(".kelorarc");
+            let config_path = current.join(".kelora.ini");
             if config_path.exists() {
                 return Some(config_path);
             }
@@ -28,26 +28,18 @@ impl ConfigFile {
         None
     }
 
-    /// Get list of user config file locations in order of preference
+    /// Get user config file location with XDG compliance
     pub fn get_user_config_paths() -> Vec<PathBuf> {
         let mut paths = Vec::new();
 
         if cfg!(windows) {
-            // Windows paths in order of preference:
-            // 1. %APPDATA%\kelora\config.ini
-            // 2. %USERPROFILE%\.kelorarc (legacy/compatibility)
+            // Windows: %APPDATA%\kelora.ini
             if let Ok(appdata) = env::var("APPDATA") {
-                paths.push(PathBuf::from(appdata).join("kelora").join("config.ini"));
-            }
-            if let Ok(userprofile) = env::var("USERPROFILE") {
-                paths.push(PathBuf::from(userprofile).join(".kelorarc"));
+                paths.push(PathBuf::from(appdata).join("kelora.ini"));
             }
         } else {
-            // Unix paths in order of preference:
-            // 1. $XDG_CONFIG_HOME/kelora/config.ini
-            // 2. ~/.config/kelora/config.ini (XDG fallback)
-            // 3. ~/.kelorarc (legacy/compatibility)
-            let xdg_config = env::var("XDG_CONFIG_HOME")
+            // Unix: $XDG_CONFIG_HOME/kelora.ini or ~/.config/kelora.ini
+            let config_dir = env::var("XDG_CONFIG_HOME")
                 .map(PathBuf::from)
                 .unwrap_or_else(|_| {
                     env::var("HOME")
@@ -55,18 +47,14 @@ impl ConfigFile {
                         .unwrap_or_else(|_| PathBuf::from(".config"))
                 });
 
-            paths.push(xdg_config.join("kelora").join("config.ini"));
-
-            if let Ok(home) = env::var("HOME") {
-                paths.push(PathBuf::from(home).join(".kelorarc"));
-            }
+            paths.push(config_dir.join("kelora.ini"));
         }
 
         paths
     }
 
     /// Get list of all config file locations in precedence order
-    /// Order: project .kelorarc > user config files
+    /// Order: project .kelora.ini > user kelora.ini
     pub fn get_config_paths() -> Vec<PathBuf> {
         let mut paths = Vec::new();
 
@@ -197,7 +185,7 @@ impl ConfigFile {
 
     /// Show configuration information with precedence details
     pub fn show_config() {
-        println!("Configuration precedence: CLI > project .kelorarc > user config > defaults\n");
+        println!("Configuration precedence: CLI > project .kelora.ini > user kelora.ini > defaults\n");
 
         let project_config_path = Self::find_project_config();
         let user_config_paths = Self::get_user_config_paths();
@@ -259,7 +247,7 @@ impl ConfigFile {
                 }
             );
         } else {
-            println!("  1. Project: .kelorarc (searched up directory tree, not found)");
+            println!("  1. Project: .kelora.ini (searched up directory tree, not found)");
         }
 
         for (i, path) in user_config_paths.iter().enumerate() {
@@ -273,7 +261,7 @@ impl ConfigFile {
 
         // Show example configuration
         if project_config_path.is_none() && user_config_path.is_none() {
-            println!("\nExample configuration file (.kelorarc):");
+            println!("\nExample configuration file (.kelora.ini):");
             println!();
             println!("# Set default arguments applied to every kelora command");
             println!("defaults = --format auto --stats --input-tz UTC");
@@ -552,8 +540,8 @@ mod tests {
         let subdir = project_root.join("src").join("deep");
         std::fs::create_dir_all(&subdir).unwrap();
 
-        // Create .kelorarc in project root
-        let config_path = project_root.join(".kelorarc");
+        // Create .kelora.ini in project root
+        let config_path = project_root.join(".kelora.ini");
         std::fs::write(&config_path, "defaults = --project-test").unwrap();
 
         // Change to subdirectory and test discovery
@@ -641,7 +629,7 @@ mod tests {
     fn test_project_config_not_found() {
         use tempfile::TempDir;
 
-        // Create a temporary directory without .kelorarc
+        // Create a temporary directory without .kelora.ini
         let temp_dir = TempDir::new().unwrap();
         let subdir = temp_dir.path().join("no-config");
         std::fs::create_dir_all(&subdir).unwrap();
@@ -663,35 +651,25 @@ mod tests {
         // Should have at least one path
         assert!(!paths.is_empty());
 
-        // Check that user paths are appropriate user-level configurations
+        // Check that user paths use the new kelora.ini naming
         for path in &paths {
             let file_name = path.file_name().unwrap().to_string_lossy();
 
-            // Should be either config.ini in a config directory or legacy .kelorarc
-            let is_config_ini = file_name == "config.ini";
-            let is_legacy_kelorarc = file_name == ".kelorarc";
-
-            assert!(
-                is_config_ini || is_legacy_kelorarc,
+            // Should be kelora.ini in user config directory
+            assert_eq!(
+                file_name, "kelora.ini",
                 "Unexpected user config filename: {}",
                 file_name
             );
 
-            // .kelorarc should be in a user directory (not project directory)
-            if is_legacy_kelorarc {
-                let parent_path = path.parent().unwrap().to_string_lossy();
-                // On Unix systems, user home is under /Users, /home, or contains HOME var
-                // On Windows, it contains USERPROFILE
-                let is_user_dir = parent_path.contains("/Users/")
-                    || parent_path.contains("/home/")
-                    || parent_path.contains("USERPROFILE")
-                    || parent_path.contains(&std::env::var("HOME").unwrap_or_default());
-                assert!(
-                    is_user_dir,
-                    "Legacy .kelorarc not in user directory: {}",
-                    parent_path
-                );
-            }
+            // Path should be in user config directory
+            let parent_path = path.parent().unwrap().to_string_lossy();
+            let is_config_dir = parent_path.contains("config") || parent_path.contains("APPDATA");
+            assert!(
+                is_config_dir,
+                "User config not in expected config directory: {}",
+                parent_path
+            );
         }
     }
 
@@ -699,10 +677,10 @@ mod tests {
     fn test_get_config_paths_precedence() {
         use tempfile::TempDir;
 
-        // Create temp project with .kelorarc
+        // Create temp project with .kelora.ini
         let temp_dir = TempDir::new().unwrap();
         let project_root = temp_dir.path().canonicalize().unwrap();
-        let config_path = project_root.join(".kelorarc");
+        let config_path = project_root.join(".kelora.ini");
         std::fs::write(&config_path, "test").unwrap();
 
         let original_dir = std::env::current_dir().unwrap();
