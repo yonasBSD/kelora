@@ -86,8 +86,8 @@ defaults = --format auto --stats --input-tz UTC
 
 [aliases]
 # Command aliases for common operations
-errors = --filter 'e.level == "error"' --stats
-json-errors = --format jsonl --filter 'e.level == "error"' --output-format jsonl
+errors = -l error --stats
+json-errors = --format jsonl -l error --output-format jsonl
 slow-requests = --filter 'e.response_time.to_int() > 1000' --keys timestamp,method,path,response_time
 ```
 

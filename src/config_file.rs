@@ -185,7 +185,9 @@ impl ConfigFile {
 
     /// Show configuration information with precedence details
     pub fn show_config() {
-        println!("Configuration precedence: CLI > project .kelora.ini > user kelora.ini > defaults\n");
+        println!(
+            "Configuration precedence: CLI > project .kelora.ini > user kelora.ini > defaults\n"
+        );
 
         let project_config_path = Self::find_project_config();
         let user_config_paths = Self::get_user_config_paths();
@@ -267,10 +269,8 @@ impl ConfigFile {
             println!("defaults = --format auto --stats --input-tz UTC");
             println!();
             println!("[aliases]");
-            println!("errors = --filter 'e.level == \"error\"' --stats");
-            println!(
-                "json-errors = --format jsonl --filter 'e.level == \"error\"' --output-format jsonl"
-            );
+            println!("errors = -l error --since 1h --stats");
+            println!("json-errors = --format jsonl -l error --output-format jsonl");
             println!("slow-requests = --filter 'e.response_time.to_int() > 1000' --keys timestamp,method,path,response_time");
         }
     }
@@ -379,7 +379,7 @@ mod tests {
         writeln!(file, "defaults = --format jsonl --output-format csv").unwrap();
         writeln!(file).unwrap();
         writeln!(file, "[aliases]").unwrap();
-        writeln!(file, "errors = --filter 'e.level == \"error\"'").unwrap();
+        writeln!(file, "errors = -l error").unwrap();
         writeln!(file, "json-logs = --format jsonl --output-format jsonl").unwrap();
         file.flush().unwrap();
 
@@ -389,10 +389,7 @@ mod tests {
             config.defaults,
             Some("--format jsonl --output-format csv".to_string())
         );
-        assert_eq!(
-            config.aliases.get("errors"),
-            Some(&"--filter 'e.level == \"error\"'".to_string())
-        );
+        assert_eq!(config.aliases.get("errors"), Some(&"-l error".to_string()));
         assert_eq!(
             config.aliases.get("json-logs"),
             Some(&"--format jsonl --output-format jsonl".to_string())
@@ -402,10 +399,9 @@ mod tests {
     #[test]
     fn test_resolve_alias() {
         let mut config = ConfigFile::default();
-        config.aliases.insert(
-            "errors".to_string(),
-            "--filter 'e.level == \"error\"'".to_string(),
-        );
+        config
+            .aliases
+            .insert("errors".to_string(), "-l error".to_string());
         config.aliases.insert(
             "json-errors".to_string(),
             "--format jsonl -a errors".to_string(),
@@ -414,10 +410,7 @@ mod tests {
         let mut seen = std::collections::HashSet::new();
         let resolved = config.resolve_alias("json-errors", &mut seen, 0).unwrap();
 
-        assert_eq!(
-            resolved,
-            vec!["--format", "jsonl", "--filter", "e.level == \"error\""]
-        );
+        assert_eq!(resolved, vec!["--format", "jsonl", "-l", "error"]);
     }
 
     #[test]
@@ -443,10 +436,9 @@ mod tests {
     #[test]
     fn test_process_args() {
         let mut config = ConfigFile::default();
-        config.aliases.insert(
-            "errors".to_string(),
-            "--filter 'e.level == \"error\"' --stats".to_string(),
-        );
+        config
+            .aliases
+            .insert("errors".to_string(), "-l error --stats".to_string());
 
         let args = vec![
             "kelora".to_string(),
@@ -460,14 +452,7 @@ mod tests {
 
         assert_eq!(
             processed,
-            vec![
-                "kelora",
-                "--filter",
-                "e.level == \"error\"",
-                "--stats",
-                "--format",
-                "jsonl"
-            ]
+            vec!["kelora", "-l", "error", "--stats", "--format", "jsonl"]
         );
     }
 
@@ -502,10 +487,9 @@ mod tests {
     fn test_process_args_with_defaults_and_aliases() {
         let mut config = ConfigFile::default();
         config.defaults = Some("--stats".to_string());
-        config.aliases.insert(
-            "errors".to_string(),
-            "--filter 'e.level == \"error\"'".to_string(),
-        );
+        config
+            .aliases
+            .insert("errors".to_string(), "-l error".to_string());
 
         let args = vec![
             "kelora".to_string(),
@@ -519,14 +503,7 @@ mod tests {
 
         assert_eq!(
             processed,
-            vec![
-                "kelora",
-                "--stats",
-                "--filter",
-                "e.level == \"error\"",
-                "--format",
-                "jsonl"
-            ]
+            vec!["kelora", "--stats", "-l", "error", "--format", "jsonl"]
         );
     }
 
