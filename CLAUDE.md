@@ -378,10 +378,10 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
   - **Safe Field Access Patterns**:
     - `if "field" in e { e.field } else { "default" }` - Check field existence before access
     - `if e.scores.len() > 1 { e.scores[1] } else { 0 }` - Safe array bounds checking
-    - `if "user" in e && "role" in e.user { e.user.role } else { "guest" }` - Nested field safety
+    - `e.get_path("user.role", "guest")` - Safe nested field access with default
   - **Field Existence Checking**:
     - `"field" in e` - Check if top-level field exists
-    - `"user" in e && "role" in e.user` - Check nested field existence
+    - `e.has_path("user.role")` - Check nested field existence
     - `e.scores.len() > 0` - Check if array has elements
     - `type_of(e.field) != "()"` - Check if field has a value (not unit type)
 - **JSON Array Handling**: JSON arrays are automatically converted to native Rhai arrays, enabling full array functionality:
@@ -423,8 +423,8 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
   ```bash
   # Extract HTTP request details safely
   kelora -f jsonl --exec '
-    let method = if "request" in e && "method" in e.request { e.request.method } else { "unknown" };
-    let status = if "response" in e && "status" in e.response { e.response.status } else { 0 };
+    let method = e.get_path("request.method", "unknown");
+    let status = e.get_path("response.status", 0);
     e.summary = method + " " + status
   '
   
@@ -437,8 +437,8 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
   
   # Safe nested field extraction with defaults
   kelora -f jsonl --exec '
-    e.user_role = if "user" in e && "role" in e.user { e.user.role } else { "guest" };
-    e.permissions = if "user" in e && "permissions" in e.user { e.user.permissions } else { [] }
+    e.user_role = e.get_path("user.role", "guest");
+    e.permissions = e.get_path("user.permissions", [])
   '
   ```
 - **Safety Functions**: Use defensive field access functions for robust scripts:

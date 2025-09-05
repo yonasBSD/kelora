@@ -1379,7 +1379,7 @@ VARIABLE DECLARATION:
 
 FIELD EXISTENCE AND SAFETY:
   "field" in e                         Check if field exists
-  "user" in e && "role" in e.user      Check nested field existence
+  e.has_path("user.role")               Check nested field existence
   e.scores.len() > 0                   Check if array has elements
   type_of(e.field) != "()"             Check if field has a value
 
@@ -1407,7 +1407,7 @@ function syntax when method names conflict with field names.
 
 COMMON PATTERNS:
   # Safe field access with defaults
-  let user_role = if "user" in e && "role" in e.user { e.user.role } else { "guest" };
+  let user_role = e.get_path("user.role", "guest");
   
   # Process arrays safely
   if e.events.len() > 0 {
