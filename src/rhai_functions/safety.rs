@@ -72,7 +72,11 @@ pub fn get_path(event: Map, path: ImmutableString) -> Dynamic {
 
 /// Extract value from a JSON string with default fallback
 /// Usage: get_path(json_string, "user.role", "guest")
-pub fn get_path_json_with_default(json_string: ImmutableString, path: ImmutableString, default: Dynamic) -> Dynamic {
+pub fn get_path_json_with_default(
+    json_string: ImmutableString,
+    path: ImmutableString,
+    default: Dynamic,
+) -> Dynamic {
     if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(json_string.as_str()) {
         let dynamic = crate::event::json_to_dynamic(&parsed);
         extract_path_value(&dynamic, path.as_str()).unwrap_or(default)
@@ -102,10 +106,10 @@ pub fn has_path(event: Map, path: ImmutableString) -> bool {
 /// Supports dot notation (user.name) and bracket notation (scores[0], scores[-1])
 fn extract_path_value(value: &Dynamic, path: &str) -> Option<Dynamic> {
     let mut current = value.clone();
-    
+
     // Parse the path into tokens
     let tokens = parse_path_tokens(path);
-    
+
     for token in tokens {
         match token {
             PathToken::Field(field_name) => {
@@ -120,11 +124,11 @@ fn extract_path_value(value: &Dynamic, path: &str) -> Option<Dynamic> {
                     let array = current.read_lock::<Array>()?;
                     let array_len = array.len() as i64;
                     let actual_index = if index < 0 {
-                        array_len + index  // Negative indexing
+                        array_len + index // Negative indexing
                     } else {
                         index
                     };
-                    
+
                     if actual_index >= 0 && (actual_index as usize) < array.len() {
                         array[actual_index as usize].clone()
                     } else {
@@ -135,7 +139,7 @@ fn extract_path_value(value: &Dynamic, path: &str) -> Option<Dynamic> {
             }
         }
     }
-    
+
     Some(current)
 }
 
@@ -155,7 +159,7 @@ fn parse_path_tokens(path: &str) -> Vec<PathToken> {
     let mut tokens = Vec::new();
     let mut current_token = String::new();
     let mut chars = path.chars().peekable();
-    
+
     while let Some(ch) = chars.next() {
         match ch {
             '.' => {
@@ -170,7 +174,7 @@ fn parse_path_tokens(path: &str) -> Vec<PathToken> {
                     tokens.push(PathToken::Field(current_token.clone()));
                     current_token.clear();
                 }
-                
+
                 // Parse the index
                 let mut index_str = String::new();
                 for inner_ch in chars.by_ref() {
@@ -179,7 +183,7 @@ fn parse_path_tokens(path: &str) -> Vec<PathToken> {
                     }
                     index_str.push(inner_ch);
                 }
-                
+
                 if let Ok(index) = index_str.parse::<i64>() {
                     tokens.push(PathToken::Index(index));
                 }
@@ -189,12 +193,12 @@ fn parse_path_tokens(path: &str) -> Vec<PathToken> {
             }
         }
     }
-    
+
     // Add final token if any
     if !current_token.is_empty() {
         tokens.push(PathToken::Field(current_token));
     }
-    
+
     tokens
 }
 
@@ -236,7 +240,7 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("get_path", get_path_json);
     engine.register_fn("get_path", get_path_json_with_default);
     engine.register_fn("has_path", has_path);
-    
+
     // Other safety functions
     engine.register_fn("path_equals", path_equals);
     engine.register_fn("to_number", to_number);
@@ -258,11 +262,7 @@ mod tests {
         user.insert("active".into(), Dynamic::from(true));
 
         // Add arrays for testing
-        let scores_array = vec![
-            Dynamic::from(100),
-            Dynamic::from(85),
-            Dynamic::from(92),
-        ];
+        let scores_array = vec![Dynamic::from(100), Dynamic::from(85), Dynamic::from(92)];
         event.insert("scores".into(), Dynamic::from(scores_array));
 
         // Add nested structure with arrays
@@ -393,11 +393,13 @@ mod tests {
         assert_eq!(role.cast::<String>(), "admin");
 
         // Test missing field returns default
-        let missing = get_path_with_default(event.clone(), "missing".into(), Dynamic::from("default"));
+        let missing =
+            get_path_with_default(event.clone(), "missing".into(), Dynamic::from("default"));
         assert_eq!(missing.cast::<String>(), "default");
 
         // Test missing nested field returns default
-        let missing_nested = get_path_with_default(event, "user.missing".into(), Dynamic::from("guest"));
+        let missing_nested =
+            get_path_with_default(event, "user.missing".into(), Dynamic::from("guest"));
         assert_eq!(missing_nested.cast::<String>(), "guest");
     }
 
@@ -455,9 +457,9 @@ mod tests {
 
         // Test with default for missing nested array item
         let missing_item = get_path_with_default(
-            event, 
-            "user.details.items[10].name".into(), 
-            Dynamic::from("unknown")
+            event,
+            "user.details.items[10].name".into(),
+            Dynamic::from("unknown"),
         );
         assert_eq!(missing_item.cast::<String>(), "unknown");
     }
@@ -481,18 +483,16 @@ mod tests {
 
     #[test]
     fn test_get_path_json() {
-        let json_string: ImmutableString = r#"{"user": {"role": "admin"}, "scores": [100, 85, 92]}"#.into();
+        let json_string: ImmutableString =
+            r#"{"user": {"role": "admin"}, "scores": [100, 85, 92]}"#.into();
 
         // Test JSON parsing with path access
         let role = get_path_json(json_string.clone(), "user.role".into());
         assert_eq!(role.cast::<String>(), "admin");
 
         // Test with default for missing path
-        let missing = get_path_json_with_default(
-            json_string, 
-            "missing".into(), 
-            Dynamic::from("default")
-        );
+        let missing =
+            get_path_json_with_default(json_string, "missing".into(), Dynamic::from("default"));
         assert_eq!(missing.cast::<String>(), "default");
     }
 
@@ -505,11 +505,8 @@ mod tests {
         assert!(result.is_unit());
 
         // Test invalid JSON returns default
-        let result_with_default = get_path_json_with_default(
-            invalid_json, 
-            "user.role".into(), 
-            Dynamic::from("default")
-        );
+        let result_with_default =
+            get_path_json_with_default(invalid_json, "user.role".into(), Dynamic::from("default"));
         assert_eq!(result_with_default.cast::<String>(), "default");
     }
 

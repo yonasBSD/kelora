@@ -91,7 +91,7 @@ impl PipelineBuilder {
             },
             begin: None,
             end: None,
-            input_format: crate::InputFormat::Jsonl,
+            input_format: crate::InputFormat::Json,
             output_format: crate::OutputFormat::Default,
             take_limit: None,
             keys: Vec::new(),
@@ -135,7 +135,7 @@ impl PipelineBuilder {
                     "Auto format should be resolved before pipeline creation"
                 ));
             }
-            crate::InputFormat::Jsonl => Box::new(crate::parsers::JsonlParser::new()),
+            crate::InputFormat::Json => Box::new(crate::parsers::JsonlParser::new()),
             crate::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
             crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
             crate::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
@@ -210,7 +210,7 @@ impl PipelineBuilder {
 
         // Create formatter
         let formatter: Box<dyn Formatter> = match self.output_format {
-            crate::OutputFormat::Jsonl => Box::new(crate::formatters::JsonFormatter::new()),
+            crate::OutputFormat::Json => Box::new(crate::formatters::JsonFormatter::new()),
             crate::OutputFormat::Default => {
                 let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
                 Box::new(crate::formatters::DefaultFormatter::new(
@@ -397,7 +397,7 @@ impl PipelineBuilder {
                     "Auto format should be resolved before pipeline creation"
                 ));
             }
-            crate::InputFormat::Jsonl => Box::new(crate::parsers::JsonlParser::new()),
+            crate::InputFormat::Json => Box::new(crate::parsers::JsonlParser::new()),
             crate::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
             crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
             crate::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
@@ -472,7 +472,7 @@ impl PipelineBuilder {
 
         // Create formatter (workers still need formatters for output)
         let formatter: Box<dyn Formatter> = match self.output_format {
-            crate::OutputFormat::Jsonl => Box::new(crate::formatters::JsonFormatter::new()),
+            crate::OutputFormat::Json => Box::new(crate::formatters::JsonFormatter::new()),
             crate::OutputFormat::Default => {
                 let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
                 Box::new(crate::formatters::DefaultFormatter::new(

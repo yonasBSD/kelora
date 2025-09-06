@@ -49,7 +49,7 @@ When events don't have valid timestamps, kelora uses resilient processing by def
 
 ```bash
 # Show events from the last hour
-kelora -f jsonl --since "-1h" app.log
+kelora -f json --since "-1h" app.log
 
 # Show today's events only
 kelora --since "today" --until "tomorrow" access.log

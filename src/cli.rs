@@ -9,7 +9,7 @@ use clap::{ArgMatches, Parser};
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum InputFormat {
     Auto,
-    Jsonl,
+    Json,
     Line,
     Logfmt,
     Syslog,
@@ -23,7 +23,7 @@ pub enum InputFormat {
 
 #[derive(clap::ValueEnum, Clone, Debug, Default)]
 pub enum OutputFormat {
-    Jsonl,
+    Json,
     #[default]
     Default,
     Logfmt,
@@ -65,9 +65,9 @@ pub struct Cli {
     )]
     pub format: InputFormat,
 
-    /// Shortcut for -f jsonl
+    /// Shortcut for -f json
     #[arg(short = 'j', help_heading = "Input Options", conflicts_with = "format")]
-    pub jsonl_input: bool,
+    pub json_input: bool,
 
     /// File processing order
     #[arg(
@@ -109,7 +109,11 @@ pub struct Cli {
     pub extract_prefix: Option<String>,
 
     /// Separator string for prefix extraction (default: pipe '|')
-    #[arg(long = "prefix-sep", default_value = "|", help_heading = "Input Options")]
+    #[arg(
+        long = "prefix-sep",
+        default_value = "|",
+        help_heading = "Input Options"
+    )]
     pub prefix_sep: String,
 
     /// Pre-run a Rhai script. Use it to populate the global `init` map
@@ -152,7 +156,11 @@ pub struct Cli {
     pub strict: bool,
 
     /// Disable strict error handling (resilient mode)
-    #[arg(long = "no-strict", help_heading = "Error Handling", overrides_with = "strict")]
+    #[arg(
+        long = "no-strict",
+        help_heading = "Error Handling",
+        overrides_with = "strict"
+    )]
     pub no_strict: bool,
 
     /// Show detailed error information (use multiple times for more verbosity: -v, -vv, -vvv)
@@ -164,7 +172,11 @@ pub struct Cli {
     pub quiet: bool,
 
     /// Enable normal output (opposite of quiet)
-    #[arg(long = "no-quiet", help_heading = "Error Handling", overrides_with = "quiet")]
+    #[arg(
+        long = "no-quiet",
+        help_heading = "Error Handling",
+        overrides_with = "quiet"
+    )]
     pub no_quiet: bool,
 
     /// Include only events with these log levels
@@ -225,13 +237,13 @@ pub struct Cli {
     )]
     pub output_format: OutputFormat,
 
-    /// Shortcut for -F jsonl
+    /// Shortcut for -F json
     #[arg(
         short = 'J',
         help_heading = "Output Options",
         conflicts_with = "output_format"
     )]
-    pub jsonl_output: bool,
+    pub json_output: bool,
 
     /// Output only core fields
     #[arg(short = 'c', long = "core", help_heading = "Output Options")]
@@ -265,7 +277,11 @@ pub struct Cli {
     pub parallel: bool,
 
     /// Disable parallel processing
-    #[arg(long = "no-parallel", help_heading = "Performance Options", overrides_with = "parallel")]
+    #[arg(
+        long = "no-parallel",
+        help_heading = "Performance Options",
+        overrides_with = "parallel"
+    )]
     pub no_parallel: bool,
 
     /// Number of worker threads
@@ -309,7 +325,11 @@ pub struct Cli {
     pub stats: bool,
 
     /// Disable processing statistics
-    #[arg(long = "no-stats", help_heading = "Metrics and Stats", overrides_with = "stats")]
+    #[arg(
+        long = "no-stats",
+        help_heading = "Metrics and Stats",
+        overrides_with = "stats"
+    )]
     pub no_stats: bool,
 
     /// Show processing statistics with no output
@@ -321,7 +341,11 @@ pub struct Cli {
     pub metrics: bool,
 
     /// Disable tracked metrics
-    #[arg(long = "no-metrics", help_heading = "Metrics and Stats", overrides_with = "metrics")]
+    #[arg(
+        long = "no-metrics",
+        help_heading = "Metrics and Stats",
+        overrides_with = "metrics"
+    )]
     pub no_metrics: bool,
 
     /// Write metrics to file (JSON format)
@@ -364,22 +388,22 @@ impl Cli {
         if self.no_stats {
             self.stats = false;
         }
-        
-        // Handle parallel/no-parallel  
+
+        // Handle parallel/no-parallel
         if self.no_parallel {
             self.parallel = false;
         }
-        
+
         // Handle metrics/no-metrics
         if self.no_metrics {
             self.metrics = false;
         }
-        
+
         // Handle strict/no-strict
         if self.no_strict {
             self.strict = false;
         }
-        
+
         // Handle quiet/no-quiet
         if self.no_quiet {
             self.quiet = false;

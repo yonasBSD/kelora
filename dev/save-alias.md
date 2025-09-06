@@ -63,14 +63,14 @@ kelora [ARGS...] --save-alias <alias_name>
 Given:
 
 ```bash
-kelora -f jsonl app.log -l error --stats --save-alias errors
+kelora -f json app.log -l error --stats --save-alias errors
 ```
 
 Will write:
 
 ```ini
 [aliases]
-errors = -f jsonl app.log -l error --stats
+errors = -f json app.log -l error --stats
 ```
 
 If `errors` existed before, its value is replaced, and the old value is shown in the terminal — **not** kept in the config.
@@ -93,13 +93,13 @@ If `errors` existed before, its value is replaced, and the old value is shown in
 Once saved:
 
 ```bash
-kelora -a errors logs.jsonl
+kelora -a errors logs.json
 ```
 
 expands to:
 
 ```bash
-kelora -f jsonl app.log -l error --stats logs.jsonl
+kelora -f json app.log -l error --stats logs.json
 ```
 
 ---

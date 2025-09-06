@@ -41,7 +41,7 @@ fn test_rand_function_basic() {
 
     // Filter using rand() - should pass some events through
     let (stdout, stderr, exit_code) =
-        run_kelora_with_file(&["-f", "jsonl", "--filter", "rand() < 0.8"], input);
+        run_kelora_with_file(&["-f", "json", "--filter", "rand() < 0.8"], input);
 
     assert_eq!(
         exit_code, 0,
@@ -68,9 +68,9 @@ fn test_rand_int_function() {
     let (stdout, stderr, exit_code) = run_kelora_with_file(
         &[
             "-f",
-            "jsonl",
+            "json",
             "--output-format",
-            "jsonl",
+            "json",
             "-e",
             "e.random_id = rand_int(100, 999)",
         ],
@@ -109,7 +109,7 @@ fn test_rand_int_invalid_range() {
 
     // Try to use rand_int with invalid range (min > max)
     let (_stdout, stderr, exit_code) = run_kelora_with_file(
-        &["-f", "jsonl", "-e", "e.bad_id = rand_int(999, 100)"],
+        &["-f", "json", "-e", "e.bad_id = rand_int(999, 100)"],
         input,
     );
 
@@ -138,9 +138,9 @@ fn test_random_sampling_workflow() {
     let (stdout, stderr, exit_code) = run_kelora_with_file(
         &[
             "-f",
-            "jsonl",
+            "json",
             "--output-format",
-            "jsonl",
+            "json",
             "--filter",
             "rand() < 0.1",
         ],

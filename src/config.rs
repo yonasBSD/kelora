@@ -107,7 +107,7 @@ pub struct PerformanceConfig {
 #[derive(ValueEnum, Clone, Debug, PartialEq)]
 pub enum InputFormat {
     Auto,
-    Jsonl,
+    Json,
     Line,
     Logfmt,
     Syslog,
@@ -122,7 +122,7 @@ pub enum InputFormat {
 /// Output format enumeration
 #[derive(ValueEnum, Clone, Debug, Default)]
 pub enum OutputFormat {
-    Jsonl,
+    Json,
     #[default]
     Default,
     Logfmt,
@@ -563,8 +563,8 @@ impl KeloraConfig {
         Self {
             input: InputConfig {
                 files: cli.files.clone(),
-                format: if cli.jsonl_input {
-                    InputFormat::Jsonl
+                format: if cli.json_input {
+                    InputFormat::Json
                 } else {
                     cli.format.clone().into()
                 },
@@ -584,8 +584,8 @@ impl KeloraConfig {
                 } else if cli.quiet {
                     // Quiet mode: suppress event output but preserve script side effects
                     OutputFormat::None
-                } else if cli.jsonl_output {
-                    OutputFormat::Jsonl
+                } else if cli.json_output {
+                    OutputFormat::Json
                 } else {
                     cli.output_format.clone().into()
                 },
@@ -651,7 +651,7 @@ impl Default for KeloraConfig {
         Self {
             input: InputConfig {
                 files: Vec::new(),
-                format: InputFormat::Jsonl,
+                format: InputFormat::Json,
                 file_order: FileOrder::Cli,
                 skip_lines: 0,
                 ignore_lines: None,
@@ -764,7 +764,7 @@ impl From<crate::InputFormat> for InputFormat {
     fn from(format: crate::InputFormat) -> Self {
         match format {
             crate::InputFormat::Auto => InputFormat::Auto,
-            crate::InputFormat::Jsonl => InputFormat::Jsonl,
+            crate::InputFormat::Json => InputFormat::Json,
             crate::InputFormat::Line => InputFormat::Line,
             crate::InputFormat::Logfmt => InputFormat::Logfmt,
             crate::InputFormat::Syslog => InputFormat::Syslog,
@@ -782,7 +782,7 @@ impl From<InputFormat> for crate::InputFormat {
     fn from(format: InputFormat) -> Self {
         match format {
             InputFormat::Auto => crate::InputFormat::Auto,
-            InputFormat::Jsonl => crate::InputFormat::Jsonl,
+            InputFormat::Json => crate::InputFormat::Json,
             InputFormat::Line => crate::InputFormat::Line,
             InputFormat::Logfmt => crate::InputFormat::Logfmt,
             InputFormat::Syslog => crate::InputFormat::Syslog,
@@ -799,7 +799,7 @@ impl From<InputFormat> for crate::InputFormat {
 impl From<crate::OutputFormat> for OutputFormat {
     fn from(format: crate::OutputFormat) -> Self {
         match format {
-            crate::OutputFormat::Jsonl => OutputFormat::Jsonl,
+            crate::OutputFormat::Json => OutputFormat::Json,
             crate::OutputFormat::Default => OutputFormat::Default,
             crate::OutputFormat::Logfmt => OutputFormat::Logfmt,
             crate::OutputFormat::Csv => OutputFormat::Csv,
@@ -814,7 +814,7 @@ impl From<crate::OutputFormat> for OutputFormat {
 impl From<OutputFormat> for crate::OutputFormat {
     fn from(format: OutputFormat) -> Self {
         match format {
-            OutputFormat::Jsonl => crate::OutputFormat::Jsonl,
+            OutputFormat::Json => crate::OutputFormat::Json,
             OutputFormat::Default => crate::OutputFormat::Default,
             OutputFormat::Logfmt => crate::OutputFormat::Logfmt,
             OutputFormat::Csv => crate::OutputFormat::Csv,

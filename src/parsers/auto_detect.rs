@@ -5,7 +5,7 @@ use anyhow::Result;
 /// Tries formats in order of specificity/commonality with 'line' as fallback.
 ///
 /// Format detection priority:
-/// 1. JSONL - starts with '{' and valid JSON
+/// 1. JSON - starts with '{' and valid JSON
 /// 2. CEF - starts with "CEF:"
 /// 3. Syslog - matches RFC5424 or RFC3164 patterns
 /// 4. Combined - contains common Apache/Nginx log patterns
@@ -21,9 +21,9 @@ pub fn detect_format(sample_line: &str) -> Result<ConfigInputFormat> {
         return Ok(ConfigInputFormat::Line);
     }
 
-    // 1. JSONL detection - most specific
-    if detect_jsonl(trimmed) {
-        return Ok(ConfigInputFormat::Jsonl);
+    // 1. JSON detection - most specific
+    if detect_json(trimmed) {
+        return Ok(ConfigInputFormat::Json);
     }
 
     // 2. CEF detection - very specific prefix
@@ -55,14 +55,14 @@ pub fn detect_format(sample_line: &str) -> Result<ConfigInputFormat> {
     Ok(ConfigInputFormat::Line)
 }
 
-/// Detect JSONL format - starts with '{' and is valid JSON
+/// Detect JSON format - starts with '{' and is valid JSON
 #[allow(dead_code)] // Used by detect_format function
-fn detect_jsonl(line: &str) -> bool {
+fn detect_json(line: &str) -> bool {
     if !line.starts_with('{') {
         return false;
     }
 
-    // Try to parse as JSON - if it succeeds, it's likely JSONL
+    // Try to parse as JSON - if it succeeds, it's likely JSON
     serde_json::from_str::<serde_json::Value>(line).is_ok()
 }
 
@@ -117,7 +117,6 @@ fn detect_syslog(line: &str) -> bool {
 
     false
 }
-
 
 /// Detect combined log formats (Apache/Nginx compatible)
 #[allow(dead_code)] // Used by detect_format function
@@ -246,14 +245,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_detect_jsonl() {
+    fn test_detect_json() {
         assert_eq!(
             detect_format(r#"{"key": "value", "num": 42}"#).unwrap(),
-            ConfigInputFormat::Jsonl
+            ConfigInputFormat::Json
         );
         assert_eq!(
             detect_format(r#"{"timestamp": "2023-04-15T10:00:00Z"}"#).unwrap(),
-            ConfigInputFormat::Jsonl
+            ConfigInputFormat::Json
         );
     }
 
@@ -318,7 +317,6 @@ mod tests {
         assert_eq!(detect_format("1\t2\t3").unwrap(), ConfigInputFormat::Tsvnh);
         // All numeric, no headers
     }
-
 
     #[test]
     fn test_detect_line_fallback() {

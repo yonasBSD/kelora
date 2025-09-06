@@ -55,8 +55,8 @@ check: fmt lint test
 # Run the application with sample data
 demo:
 	@echo "🎬 Running demo..."
-	@echo '{"timestamp":"2023-07-18T15:04:23.456Z","level":"ERROR","message":"Demo error","component":"test"}' | cargo run -- -f jsonl -c
-	@echo '{"timestamp":"2023-07-18T15:04:24.456Z","level":"INFO","message":"Demo info","component":"test"}' | cargo run -- -f jsonl -c
+	@echo '{"timestamp":"2023-07-18T15:04:23.456Z","level":"ERROR","message":"Demo error","component":"test"}' | cargo run -- -f json -c
+	@echo '{"timestamp":"2023-07-18T15:04:24.456Z","level":"INFO","message":"Demo info","component":"test"}' | cargo run -- -f json -c
 
 # Run performance benchmarks
 bench: build

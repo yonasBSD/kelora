@@ -16,7 +16,7 @@ Kelora parses log lines into structured events (`e.level`, `e.timestamp`, `e.mes
 kelora --since 1h -l error app.log
 
 # Filter and enrich JSON logs  
-kelora -f jsonl app.log --filter 'e.status >= 500' --exec 'e.severity = "critical"'
+kelora -f json app.log --filter 'e.status >= 500' --exec 'e.severity = "critical"'
 
 # Count HTTP status codes with metrics
 kelora -f combined --exec 'track_count("status_" + e.status)' --metrics access.log
@@ -71,14 +71,14 @@ Each parser creates events with different fields:
 |Format        |Fields Created                      |Example                              |
 |--------------|------------------------------------|------------------------------------|
 |`line`        |`line`                              |Raw log files                       |
-|`jsonl`       |All JSON keys                       |`{"level":"info","msg":"started"}`  |
+|`json`        |All JSON keys                       |`{"level":"info","msg":"started"}`  |
 |`logfmt`      |Key-value pairs                     |`level=info msg="started" user=alice`|
 |`syslog`      |`timestamp`, `host`, `facility`, `message`|`Jan 15 14:30:45 host app: message`|
 |`cef`         |`vendor`, `product`, `severity` + extensions|ArcSight CEF logs               |
 |`csv/tsv`     |Column headers as fields            |Structured data files               |
 |`combined`    |`ip`, `status`, `request`, `method`, `path`, `request_time`|Apache/NGINX web server logs|
 
-All formats support gzip compression. Use `-f format` to specify (`-j` is a shortcut for `-f jsonl`).
+All formats support gzip compression. Use `-f format` to specify (`-j` is a shortcut for `-f json`).
 
 ### Prefix Extraction
 
@@ -92,7 +92,7 @@ docker compose logs | kelora --extract-prefix service --filter 'e.service == "we
 kelora --extract-prefix service --prefix-sep " :: " --filter 'e.service.contains("auth")' app.log
 
 # Works with any format
-kelora -f jsonl --extract-prefix container input.log
+kelora -f json --extract-prefix container input.log
 ```
 
 Prefix extraction runs before parsing, so the extracted prefix becomes a field in the parsed event. Default separator is `|`, configurable with `--prefix-sep`.
@@ -139,7 +139,7 @@ kelora -l error \
 - **Fields**: `-k field1,field2` (include only), `-K field3` (exclude), `-c` (core fields only), `-b` (brief/values only)
 - **Levels**: `-l error,warn` (include), `-L debug,trace` (exclude)  
 - **Time**: `--since 1h`, `--until 5m`, `--since "2024-01-15 14:00"`
-- **Formats**: `-F jsonl|logfmt|csv|none` (default is colored logfmt), `-J` (jsonl shortcut)
+- **Formats**: `-F json|logfmt|csv|none` (default is colored logfmt), `-J` (json shortcut)
 
 ### Performance & Configuration
 - **Processing**: `--parallel` for batch files (2-10x faster), `--threads N`, `--batch-size N`
@@ -169,7 +169,7 @@ tail -f /var/log/nginx/access.log | \
 
 ```bash
 # Comprehensive authentication monitoring
-kelora -j auth.jsonl \
+kelora -j auth.json \
   --exec 'track_count("total_attempts"); track_unique("attempted_users", e.username)' \
   --filter 'e.auth_result == "failed"' \
   --exec 'track_count("failed_attempts"); track_unique("failed_ips", e.remote_addr)' \
@@ -188,20 +188,20 @@ kelora -f syslog -J /var/log/messages \
   --exec 'e.severity_level = if e.severity <= 3 { "critical" } else if e.severity <= 4 { "error" } else { "info" }' \
   --exec 'e.masked_host = e.host.mask_ip(1)' \
   --exec 'e.processed_at = now_utc()' \
-  > structured-logs.jsonl
+  > structured-logs.json
 ```
 
 ## Learning Kelora (Recommended Path)
 
 ### Start Here: The Essentials
 1. **Events** - understand that logs become structured objects (`e.field`)
-2. **Parsing** - see how different formats create different fields (`-f jsonl`, `-f combined`)
+2. **Parsing** - see how different formats create different fields (`-f json`, `-f combined`)
 3. **Basic Scripts** - learn to filter (`--filter`) and transform (`--exec`)
 
 ### Next: Real-World Usage  
 4. **Metrics** - track counts and calculations across events (`track_count`, `--metrics`)
 5. **Pipelines** - combine multiple processing steps (multiple `--filter` and `--exec`)
-6. **Output Formats** - control how results are displayed (`-F jsonl`, `-k field1,field2`)
+6. **Output Formats** - control how results are displayed (`-F json`, `-k field1,field2`)
 
 ### Advanced: Pattern Detection
 7. **Windows** - access sequences of events for pattern matching (`--window N`)

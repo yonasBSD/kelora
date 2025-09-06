@@ -77,7 +77,7 @@ gcp-logs = !gcloud logging read "logName=projects/$PROJECT/logs/$LOGNAME" --form
 ```
 
 ```bash
-PROJECT=myproject LOGNAME=syslog kelora -a gcp-logs -f jsonl --filter 'level == "ERROR"'
+PROJECT=myproject LOGNAME=syslog kelora -a gcp-logs -f json --filter 'level == "ERROR"'
 ```
 
 ---

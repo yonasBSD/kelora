@@ -15,13 +15,13 @@ Manual Testing Instructions for --error-report and --metrics
    # All should work without errors
 
 4. Test error reporting with malformed JSON:
-   echo '{"malformed json' | ./target/debug/kelora -f jsonl --error-report=print --on-error=continue
+   echo '{"malformed json' | ./target/debug/kelora -f json --error-report=print --on-error=continue
    # Should show error message: "kelora: Parse error: Failed to parse JSON: ..."
 
-   echo '{"malformed json' | ./target/debug/kelora -f jsonl --error-report=off --on-error=continue
+   echo '{"malformed json' | ./target/debug/kelora -f json --error-report=off --on-error=continue
    # Should suppress error output (no error message printed)
 
-   printf '{"malformed json1\n{"valid": "json1"}\n{"malformed json2\n' | ./target/debug/kelora -f jsonl --error-report=summary --on-error=continue
+   printf '{"malformed json1\n{"valid": "json1"}\n{"malformed json2\n' | ./target/debug/kelora -f json --error-report=summary --on-error=continue
    # Currently behaves like 'print' mode - shows each error immediately
    # TODO: Summary mode should collect errors and show grouped summary at end
 
@@ -30,7 +30,7 @@ Manual Testing Instructions for --error-report and --metrics
    # Should show metrics output at the end
 
 6. Test --error-report-file:
-   echo '{"bad": json}' | ./target/debug/kelora -f jsonl --error-report=summary --error-report-file=/tmp/errors.txt --on-error=continue
+   echo '{"bad": json}' | ./target/debug/kelora -f json --error-report=summary --error-report-file=/tmp/errors.txt --on-error=continue
    # Check if /tmp/errors.txt gets created (functionality may not be fully connected yet)
 
 7. Test configuration file support:

@@ -1,6 +1,6 @@
-use anyhow::Result;
 use crate::event::Event;
 use crate::pipeline::{EventParser, PrefixExtractor};
+use anyhow::Result;
 
 /// Wrapper parser that extracts prefix before parsing and adds it to the event
 pub struct PrefixExtractingParser {
@@ -49,13 +49,25 @@ mod tests {
         let parser = PrefixExtractingParser::new(base_parser, Some(extractor));
 
         let result = parser.parse("web_1 | Test message").unwrap();
-        
+
         assert_eq!(
-            result.fields.get("line").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("line")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "Test message"
         );
         assert_eq!(
-            result.fields.get("src").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("src")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "web_1"
         );
     }
@@ -67,9 +79,15 @@ mod tests {
         let parser = PrefixExtractingParser::new(base_parser, Some(extractor));
 
         let result = parser.parse("Just a normal message").unwrap();
-        
+
         assert_eq!(
-            result.fields.get("line").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("line")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "Just a normal message"
         );
         assert!(result.fields.get("src").is_none());
@@ -81,9 +99,15 @@ mod tests {
         let parser = PrefixExtractingParser::new(base_parser, None);
 
         let result = parser.parse("web_1 | Test message").unwrap();
-        
+
         assert_eq!(
-            result.fields.get("line").unwrap().clone().into_string().unwrap(),
+            result
+                .fields
+                .get("line")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "web_1 | Test message"
         );
         assert!(result.fields.get("src").is_none());

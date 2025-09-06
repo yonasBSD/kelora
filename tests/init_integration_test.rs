@@ -55,7 +55,7 @@ fn test_init_map_basic_functionality() {
     let (stdout, stderr, exit_code) = run_kelora_with_input(
         &[
             "-f",
-            "jsonl",
+            "json",
             "--begin",
             &begin_script,
             "--filter",
@@ -95,7 +95,7 @@ fn test_read_file_function() {
     let (stdout, stderr, exit_code) = run_kelora_with_input(
         &[
             "-f",
-            "jsonl",
+            "json",
             "--begin",
             &begin_script,
             "--exec",
@@ -133,7 +133,7 @@ fn test_init_map_immutability() {
     let (_stdout, stderr, exit_code) = run_kelora_with_input(
         &[
             "-f",
-            "jsonl",
+            "json",
             "--begin",
             &begin_script,
             "--exec",
@@ -166,7 +166,7 @@ fn test_read_functions_only_in_begin() {
     let (_stdout, stderr, exit_code) = run_kelora_with_input(
         &[
             "-f",
-            "jsonl",
+            "json",
             "--exec",
             &format!("e.data = read_file(\"{}\")", data_file.to_str().unwrap()),
         ],
@@ -206,8 +206,8 @@ fn test_empty_file_handling() {
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
         &[
-            "-f", "jsonl",
-            "-F", "jsonl",
+            "-f", "json",
+            "-F", "json",
             "--begin", &begin_script,
             "--exec", "e.empty_content_len = init.empty_content.len(); e.empty_lines_len = init.empty_lines.len()"
         ],
@@ -238,9 +238,9 @@ fn test_utf8_bom_handling() {
     let (stdout, stderr, exit_code) = run_kelora_with_input(
         &[
             "-f",
-            "jsonl",
+            "json",
             "-F",
-            "jsonl",
+            "json",
             "--begin",
             &begin_script,
             "--exec",
@@ -273,9 +273,9 @@ fn test_newline_stripping() {
     let (stdout, stderr, exit_code) = run_kelora_with_input(
         &[
             "-f",
-            "jsonl",
+            "json",
             "-F",
-            "jsonl",
+            "json",
             "--begin",
             &begin_script,
             "--exec",

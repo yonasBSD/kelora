@@ -25,13 +25,13 @@ mod tty;
 use config::KeloraConfig;
 use config_file::ConfigFile;
 use platform::{
-    ExitCode, ProcessCleanup, SafeFileOut, SafeStderr, SafeStdout, SignalHandler, SHOULD_TERMINATE, TERMINATED_BY_SIGNAL,
+    ExitCode, ProcessCleanup, SafeFileOut, SafeStderr, SafeStdout, SignalHandler, SHOULD_TERMINATE,
+    TERMINATED_BY_SIGNAL,
 };
 
 // Internal CLI imports
 use cli::{Cli, FileOrder, InputFormat, OutputFormat};
 use config::{MultilineConfig, TimestampFilterConfig};
-
 
 /// Detect format from a peekable reader
 /// Returns the detected format without consuming the first line
@@ -56,7 +56,7 @@ fn detect_format_from_peekable_reader<R: std::io::BufRead>(
 /// Returns the detected format
 fn detect_format_for_parallel_mode(files: &[String]) -> Result<config::InputFormat> {
     use std::io;
-    
+
     if files.is_empty() {
         // For stdin in parallel mode, we can't peek ahead easily
         // So we use a simple approach: read the first line from stdin
@@ -161,7 +161,7 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     } else {
         config.clone()
     };
-    
+
     let config = &final_config;
     let batch_size = config.effective_batch_size();
 
@@ -1247,7 +1247,7 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
 
     // Check for --ignore-config
     let ignore_config = raw_args.iter().any(|arg| arg == "--ignore-config");
-    
+
     // Extract --config-file argument if present
     let config_file_path = extract_config_file_arg(&raw_args);
 
@@ -1283,7 +1283,7 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
             .unwrap_or(());
         std::process::exit(1);
     });
-    
+
     // Resolve inverted boolean flags
     cli.resolve_boolean_flags();
 

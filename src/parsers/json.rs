@@ -44,7 +44,7 @@ mod tests {
     use crate::pipeline::EventParser;
 
     #[test]
-    fn test_jsonl_parser_basic() {
+    fn test_json_parser_basic() {
         let parser = JsonlParser::new();
         let result =
             EventParser::parse(&parser, r#"{"level":"info","message":"test","count":42}"#).unwrap();
@@ -74,7 +74,7 @@ mod tests {
     }
 
     #[test]
-    fn test_jsonl_parser_complex() {
+    fn test_json_parser_complex() {
         let parser = JsonlParser::new();
         let result = EventParser::parse(
             &parser,

@@ -84,7 +84,7 @@ pub enum ScriptResult {
 ### 2. Context-Specific Error Handling
 
 #### Input Parsing Context
-**Location**: All parsers in `src/parsers/` (jsonl.rs, csv.rs, syslog.rs, etc.)
+**Location**: All parsers in `src/parsers/` (json.rs, csv.rs, syslog.rs, etc.)
 
 **Current Behavior**: Parsers return `Result<Event>`, errors handled by pipeline strategy
 

@@ -91,7 +91,7 @@ fn test_since_basic_iso_format() {
 
     let since_ts = get_test_timestamp_iso(-30); // 30 minutes ago
     let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--since", &since_ts], &input);
+        run_kelora_with_input(&["-f", "json", "--since", &since_ts], &input);
 
     assert_eq!(
         exit_code, 0,
@@ -115,7 +115,7 @@ fn test_until_basic_iso_format() {
 
     let until_ts = get_test_timestamp_iso(-30); // 30 minutes ago
     let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--until", &until_ts], &input);
+        run_kelora_with_input(&["-f", "json", "--until", &until_ts], &input);
 
     assert_eq!(
         exit_code, 0,
@@ -145,7 +145,7 @@ fn test_since_and_until_combined() {
     let until_ts = get_test_timestamp_iso(-15); // 15 minutes ago
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--since", &since_ts, "--until", &until_ts],
+        &["-f", "json", "--since", &since_ts, "--until", &until_ts],
         &input,
     );
 
@@ -178,8 +178,7 @@ fn test_since_relative_time() {
     );
 
     // Test with -1h (1 hour ago)
-    let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--since=-1h"], &input);
+    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--since=-1h"], &input);
 
     assert_eq!(
         exit_code, 0,
@@ -208,8 +207,7 @@ fn test_until_relative_time() {
     );
 
     // Test with -1h (1 hour ago)
-    let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--until=-1h"], &input);
+    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--until=-1h"], &input);
 
     assert_eq!(
         exit_code, 0,
@@ -252,7 +250,7 @@ fn test_since_special_values() {
 
     // Test with "today"
     let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--since", "today"], &input);
+        run_kelora_with_input(&["-f", "json", "--since", "today"], &input);
 
     assert_eq!(
         exit_code, 0,
@@ -284,7 +282,7 @@ fn test_different_timestamp_formats() {
     // Set TZ=UTC for consistent test behavior regardless of system timezone
     std::env::set_var("TZ", "UTC");
     let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--since", &since_ts], &input);
+        run_kelora_with_input(&["-f", "json", "--since", &since_ts], &input);
     std::env::remove_var("TZ");
 
     assert_eq!(
@@ -319,7 +317,7 @@ fn test_events_without_timestamps() {
 
     let since_ts = get_test_timestamp_iso(-60); // 1 hour ago
     let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--since", &since_ts], &input);
+        run_kelora_with_input(&["-f", "json", "--since", &since_ts], &input);
 
     assert_eq!(
         exit_code, 0,
@@ -381,7 +379,7 @@ fn test_events_without_timestamps_strict_mode() {
 
     let since_ts = get_test_timestamp_iso(-60); // 1 hour ago
     let (stdout, _stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--since", &since_ts, "--strict"], &input);
+        run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--strict"], &input);
 
     assert_ne!(
         exit_code, 0,
@@ -410,7 +408,7 @@ fn test_timestamp_filtering_with_custom_field() {
 
     let since_ts = get_test_timestamp_iso(-45); // 45 minutes ago
     let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--since", &since_ts], &input);
+        run_kelora_with_input(&["-f", "json", "--since", &since_ts], &input);
 
     assert_eq!(
         exit_code, 0,
@@ -436,7 +434,7 @@ fn test_timestamp_filtering_with_other_filters() {
 
     let since_ts = get_test_timestamp_iso(-45); // 45 minutes ago
     let (stdout, stderr, exit_code) = run_kelora_with_input(
-        &["-f", "jsonl", "--since", &since_ts, "--levels", "error"],
+        &["-f", "json", "--since", &since_ts, "--levels", "error"],
         &input,
     );
 
@@ -469,7 +467,7 @@ fn test_timestamp_filtering_with_exec_script() {
     let (stdout, stderr, exit_code) = run_kelora_with_input(
         &[
             "-f",
-            "jsonl",
+            "json",
             "--since",
             &since_ts,
             "--exec",
@@ -499,7 +497,7 @@ fn test_invalid_since_timestamp() {
     let input = r#"{"ts": "2023-07-04T12:34:56Z", "level": "info", "msg": "test"}"#;
 
     let (_stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--since", "invalid-timestamp"], input);
+        run_kelora_with_input(&["-f", "json", "--since", "invalid-timestamp"], input);
 
     assert_ne!(
         exit_code, 0,
@@ -516,7 +514,7 @@ fn test_invalid_until_timestamp() {
     let input = r#"{"ts": "2023-07-04T12:34:56Z", "level": "info", "msg": "test"}"#;
 
     let (_stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--until", "not-a-date"], input);
+        run_kelora_with_input(&["-f", "json", "--until", "not-a-date"], input);
 
     assert_ne!(
         exit_code, 0,
@@ -554,7 +552,7 @@ fn test_date_only_timestamp() {
 
     let today_date = today.format("%Y-%m-%d").to_string();
     let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--since", &today_date], &input);
+        run_kelora_with_input(&["-f", "json", "--since", &today_date], &input);
 
     assert_eq!(
         exit_code, 0,
@@ -594,7 +592,7 @@ fn test_time_only_timestamp() {
     );
 
     let (_stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--since", "12:00:00"], &input);
+        run_kelora_with_input(&["-f", "json", "--since", "12:00:00"], &input);
 
     assert_eq!(
         exit_code, 0,
@@ -618,7 +616,7 @@ fn test_unix_timestamp_filtering() {
 
     let since_unix = (now - 2700).to_string(); // 45 minutes ago
     let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--since", &since_unix], &input);
+        run_kelora_with_input(&["-f", "json", "--since", &since_unix], &input);
 
     assert_eq!(
         exit_code, 0,
@@ -642,7 +640,7 @@ fn test_timestamp_filtering_parallel_mode() {
 
     let since_ts = get_test_timestamp_iso(-45);
     let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "jsonl", "--since", &since_ts, "--parallel"], &input);
+        run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--parallel"], &input);
 
     assert_eq!(
         exit_code, 0,
@@ -673,7 +671,7 @@ fn test_timestamp_filtering_parallel_mode() {
 //
 //     let since_ts = get_test_timestamp_iso(-45);
 //     let (_stdout, stderr, exit_code) =
-//         run_kelora_with_input(&["-f", "jsonl", "--since", &since_ts, "--stats"], &input);
+//         run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
 //
 //     assert_eq!(
 //         exit_code, 0,
@@ -710,7 +708,7 @@ fn test_timestamp_filtering_parallel_mode() {
 //     // Filter to only include events from the last hour
 //     let since_ts = get_test_timestamp_iso(-60); // 1 hour ago
 //     let (_stdout, stderr, exit_code) =
-//         run_kelora_with_input(&["-f", "jsonl", "--since", &since_ts, "--stats"], &input);
+//         run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
 //
 //     assert_eq!(
 //         exit_code, 0,
@@ -754,7 +752,7 @@ fn test_timestamp_filtering_parallel_mode() {
 //     // Filter to only include events from the last hour
 //     let since_ts = get_test_timestamp_iso(-60); // 1 hour ago
 //     let (_stdout, stderr, exit_code) =
-//         run_kelora_with_input(&["-f", "jsonl", "--since", &since_ts, "--stats"], &input);
+//         run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
 //
 //     assert_eq!(
 //         exit_code, 0,
@@ -790,7 +788,7 @@ fn test_timestamp_filtering_parallel_mode() {
 //     // Filter to only include events from the last 30 minutes
 //     let since_ts = get_test_timestamp_iso(-30); // 30 minutes ago
 //     let (_stdout, stderr, exit_code) =
-//         run_kelora_with_input(&["-f", "jsonl", "--since", &since_ts, "--stats"], &input);
+//         run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
 //
 //     assert_eq!(
 //         exit_code, 0,
@@ -826,7 +824,7 @@ fn test_timestamp_filtering_parallel_mode() {
 //     // Filter to include events from the last hour (should include all)
 //     let since_ts = get_test_timestamp_iso(-60); // 1 hour ago
 //     let (_stdout, stderr, exit_code) =
-//         run_kelora_with_input(&["-f", "jsonl", "--since", &since_ts, "--stats"], &input);
+//         run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
 //
 //     assert_eq!(
 //         exit_code, 0,

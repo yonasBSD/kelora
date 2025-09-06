@@ -167,7 +167,7 @@ path_equals(e, "user.role", "admin")        # Safe equality check
 Each stage adds what value it can:
 
 ```bash
-kelora -f jsonl logs \
+kelora -f json logs \
   --exec 'e.has_user = e.user != ()' \
   --exec 'e.user_type = get_path(e, "user.role", "guest")' \
   --exec 'e.session_upper = e.session.id.to_uppercase()' \
@@ -182,7 +182,7 @@ kelora -f jsonl logs \
 Detect patterns across events:
 
 ```bash
-kelora -f jsonl auth.log --window 3 \
+kelora -f json auth.log --window 3 \
   --filter 'e.user != window[1].user' \
   --exec 'e.user_changed = true' \
   --exec 'e.previous_user = get_path(window[1], "user", "unknown")'
@@ -193,7 +193,7 @@ kelora -f jsonl auth.log --window 3 \
 Build complex pipelines with confidence:
 
 ```bash
-kelora -f jsonl api.log \
+kelora -f json api.log \
   --filter 'e.method == "POST"' \
   --exec 'e.endpoint_category = e.path.split("/")[2]' \
   --exec 'e.is_api_v2 = e.path.starts_with("/api/v2/")' \
@@ -221,7 +221,7 @@ This matches how people actually explore and transform data.
 Process web logs with realistic complexity:
 
 ```bash
-kelora -f jsonl production.log \
+kelora -f json production.log \
   --filter 'e.status >= 400' \
   --exec 'e.is_client_error = e.status >= 400 && e.status < 500' \
   --exec 'e.is_server_error = e.status >= 500' \

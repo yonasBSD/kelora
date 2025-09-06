@@ -29,7 +29,7 @@
      well-thought-out implementation.
    * Clear Feature Implementation: Features described in the README.md, such as multi-format support, Rhai
      scripting, and parallel processing, are clearly implemented in their respective modules.
-   * Testing: The presence of an integration test suite (tests/) and some unit tests (e.g., in parsers/jsonl.rs
+   * Testing: The presence of an integration test suite (tests/) and some unit tests (e.g., in parsers/json.rs
      and pipeline/stages.rs) shows an attention to correctness and stability.
    * Performance Considerations: The inclusion of a dedicated parallel.rs module and options like --unordered and
      --batch-size demonstrate a clear focus on performance, which is critical for a log processing tool.

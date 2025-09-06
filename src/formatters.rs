@@ -400,7 +400,7 @@ impl DefaultFormatter {
         if let Ok(timestamp_float) = value.as_float() {
             // Handle Unix timestamps in float format by parsing directly
             use chrono::DateTime;
-            
+
             // Determine precision based on magnitude
             let parsed_dt = if timestamp_float >= 1e15 {
                 // Microseconds (16+ digits)

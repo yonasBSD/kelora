@@ -35,16 +35,16 @@ make test-full          # Comprehensive test suite
 ### Error Handling and Automation Examples
 ```bash
 # Verbose error reporting - see each error immediately
-./target/release/kelora -f jsonl --verbose suspicious.log
+./target/release/kelora -f json --verbose suspicious.log
 
 # Quiet mode for automation - exit codes indicate success/failure
-./target/release/kelora -f jsonl --quiet input.log && echo "✓ Processing succeeded"
+./target/release/kelora -f json --quiet input.log && echo "✓ Processing succeeded"
 
 # Test exit code behavior
-./target/release/kelora -f jsonl malformed.log; echo "Exit code: $?"
+./target/release/kelora -f json malformed.log; echo "Exit code: $?"
 
 # Parallel processing with verbose errors
-./target/release/kelora -f jsonl --parallel --verbose --batch-size 100 large.log
+./target/release/kelora -f json --parallel --verbose --batch-size 100 large.log
 
 # Automation pipeline example
 if ./target/release/kelora --quiet -l error logs/*.json; then
@@ -87,7 +87,7 @@ defaults = --format auto --stats --input-tz UTC
 [aliases]
 # Command aliases for common operations
 errors = -l error --stats
-json-errors = --format jsonl -l error --output-format jsonl
+json-errors = --format json -l error --output-format json
 slow-requests = --filter 'e.response_time.to_int() > 1000' --keys timestamp,method,path,response_time
 ```
 
@@ -106,7 +106,7 @@ kelora --help
 **Project Setup:**
 ```bash
 # Create project-specific defaults in your project root
-echo 'defaults = --format jsonl --stats --parallel' > .kelora.ini
+echo 'defaults = --format json --stats --parallel' > .kelora.ini
 
 # All kelora commands in this project (and subdirectories) will use these defaults
 kelora input.log                    # Uses project defaults
@@ -157,7 +157,7 @@ The `--keys` parameter operates only on **top-level field names** in the final p
 
 ```bash
 # Extract specific nested fields using get_path() + --keys
-kelora -f jsonl \
+kelora -f json \
   --exec 'e.user_name = get_path(e, "user.name", "")' \
   --exec 'e.first_score = get_path(e, "user.scores[0]", 0)' \
   --keys user_name,first_score
@@ -174,7 +174,7 @@ Empty lines are handled differently based on input format:
 - Maintains line-by-line correspondence for debugging
 - Use `--filter 'e.line.len() > 0'` to exclude empty lines if needed
 
-**Structured Formats** (`-f jsonl`, `-f csv`, `-f syslog`, etc.):
+**Structured Formats** (`-f json`, `-f csv`, `-f syslog`, etc.):
 - Empty lines are skipped entirely (never reach the parser)
 - This prevents noise in structured data processing
 - Statistics reflect only non-empty lines that were processed
@@ -202,7 +202,7 @@ docker compose logs | kelora --extract-prefix service --filter 'e.service == "we
 kelora --extract-prefix service --prefix-sep " :: " --filter 'e.service.contains("auth")' app.log
 
 # Combined with any format parser
-kelora -f jsonl --extract-prefix container input.log
+kelora -f json --extract-prefix container input.log
 
 # Multi-character separators
 kelora --extract-prefix node --prefix-sep " >>> " cluster.log
@@ -223,7 +223,7 @@ Prefix extraction works with any format parser. The prefix becomes a field in th
 ```bash
 # Extract container name, then parse remaining JSON
 echo 'web_1 | {"level": "info", "msg": "started"}' | \
-  kelora --extract-prefix container -f jsonl
+  kelora --extract-prefix container -f json
 
 # Output: {"container": "web_1", "level": "info", "msg": "started"}
 ```
@@ -455,7 +455,7 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
   - `unique(e.tags)` - Remove duplicate elements
   - `dedup(e.values)` - Remove consecutive duplicates
   - `sorted_by(e.users, "age")` - Sort arrays of objects by field
-  - Arrays maintain proper JSON types in output formats (e.g., `-F jsonl`)
+  - Arrays maintain proper JSON types in output formats (e.g., `-F json`)
   - **Array Processing Examples**:
     ```bash
     # Get top 3 highest scores
@@ -472,7 +472,7 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
   - `e = ()` - Remove entire event (clears all fields, event becomes empty)
   - Empty events are filtered out before output and counted as "filtered" in stats
   - Empty events continue through all pipeline stages, allowing later stages to add fields back
-  - Consistent behavior across all output formats (default, JSONL, CSV, etc.)
+  - Consistent behavior across all output formats (default, JSON, CSV, etc.)
   - Examples:
     ```bash
     # Remove sensitive fields
@@ -487,21 +487,21 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
 - **Common Log Analysis Patterns**:
   ```bash
   # Extract HTTP request details safely
-  kelora -f jsonl --exec '
+  kelora -f json --exec '
     let method = e.get_path("request.method", "unknown");
     let status = e.get_path("response.status", 0);
     e.summary = method + " " + status
   '
   
   # Process user activity arrays
-  kelora -f jsonl --filter 'e.events.len() > 0' --exec '
+  kelora -f json --filter 'e.events.len() > 0' --exec '
     e.event_count = e.events.len();
     e.latest_event = e.events[-1];
     e.event_types = unique(e.events.map(|event| event.type))
   '
   
   # Safe nested field extraction with defaults
-  kelora -f jsonl --exec '
+  kelora -f json --exec '
     e.user_role = e.get_path("user.role", "guest");
     e.permissions = e.get_path("user.permissions", [])
   '

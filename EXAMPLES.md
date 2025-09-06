@@ -43,13 +43,13 @@ Start simple: filtering logs, selecting fields, and formatting output.
 
 ```bash
 # Show only server errors (status 500+)
-kelora -f jsonl app.log --filter 'e.status >= 500'
+kelora -f json app.log --filter 'e.status >= 500'
 
 # Limit to warning and error levels
-kelora -f jsonl app.log -l warn,error
+kelora -f json app.log -l warn,error
 
 # Extract a subset of fields as CSV
-kelora -f jsonl app.log --keys ts,method,path -F csv
+kelora -f json app.log --keys ts,method,path -F csv
 ```
 
 These use simple conditions (`--filter`, `--levels`/`-l`) and the `--keys`/`-k` flag to narrow down both the *events* and the *fields* in your output.
@@ -64,12 +64,12 @@ Use `--exec` to define custom logic per event and create new fields.
 
 ```bash
 # Add a status class like "2xx", "5xx", etc.
-kelora -f jsonl app.log --exec 'e.class = status_class(e.status)' --keys status,class
+kelora -f json app.log --exec 'e.class = status_class(e.status)' --keys status,class
 ```
 
 ```bash
 # Tag slow requests with a label
-kelora -f jsonl app.log \
+kelora -f json app.log \
   --exec 'e.label = if e.response_time.to_int() > 1000 { "slow" } else { "ok" }' \
   --keys method,path,response_time,label
 ```
@@ -84,12 +84,12 @@ Use filters and scripts to spot suspicious patterns in your logs.
 
 ```bash
 # Show login attempts from public IPs
-kelora -f jsonl auth.log --filter 'e.ip.is_private_ip() == false'
+kelora -f json auth.log --filter 'e.ip.is_private_ip() == false'
 ```
 
 ```bash
 # Compute and print session durations
-kelora -f jsonl sessions.log \
+kelora -f json sessions.log \
   --exec 'let dur = parse_timestamp(end) - parse_timestamp(start); print("Duration: " + dur.as_seconds() + "s")'
 ```
 
@@ -103,13 +103,13 @@ Work with times and durations using built-in parsing and arithmetic.
 
 ```bash
 # Filter events during business hours
-kelora -f jsonl app.log \
+kelora -f json app.log \
   --exec 'let dt = parse_timestamp(e.ts); if dt.hour() >= 9 && dt.hour() < 17 { print("Work hour") }'
 ```
 
 ```bash
 # Flag requests taking longer than 1 second
-kelora -f jsonl access.log \
+kelora -f json access.log \
   --exec 'let dur = parse_duration(e.latency); if dur > duration_from_seconds(1) { print("Slow: " + dur.as_milliseconds() + "ms") }'
 ```
 
@@ -123,14 +123,14 @@ Enable context-aware event logic with `--window`.
 
 ```bash
 # Detect 3 consecutive errors
-kelora -f jsonl app.log --window 3 \
+kelora -f json app.log --window 3 \
   --filter 'e.message.contains("error")' \
   --exec 'if window.len() > 2 { eprint("3 errors in a row") }'
 ```
 
 ```bash
 # Identify rising CPU trend
-kelora -f jsonl metrics.log --window 4 \
+kelora -f json metrics.log --window 4 \
   --exec 'let vals = window_numbers(window, "cpu"); if vals.len() >= 3 && vals[0] > vals[1] && vals[1] > vals[2] { print("CPU rising") }'
 ```
 
@@ -146,10 +146,10 @@ Use `track_*()` functions for counting, bucketing, and summarizing.
 
 ```bash
 # Count events by log level
-kelora -f jsonl app.log --exec 'track_count(e.level)' --metrics
+kelora -f json app.log --exec 'track_count(e.level)' --metrics
 
 # Track unique users
-kelora -f jsonl app.log --exec 'track_unique("users", e.user)' --metrics
+kelora -f json app.log --exec 'track_unique("users", e.user)' --metrics
 ```
 
 The `--metrics` flag shows tracked data after processing. These are global analytics — not per event.
@@ -162,10 +162,10 @@ Scale up with batching, file-ordering, and parallelism.
 
 ```bash
 # Process files by modification time
-kelora -f jsonl --file-order mtime logs/*.jsonl
+kelora -f json --file-order mtime logs/*.json
 
 # Run in parallel mode with summary counts
-kelora -f jsonl app.log --parallel --exec 'track_count(e.level)' --metrics
+kelora -f json app.log --parallel --exec 'track_count(e.level)' --metrics
 ```
 
 Parallel mode improves throughput and allows real-time batch analysis. Use `--unordered` for maximum performance if order doesn't matter.
@@ -197,7 +197,7 @@ Show how to validate scripts and run fast, silent benchmarks.
 kelora --exec-file script.rhai -F none < /dev/null
 
 # Measure speed of a filtering expression
-time kelora -f jsonl huge.log --filter 'e.status >= 500' -F none
+time kelora -f json huge.log --filter 'e.status >= 500' -F none
 ```
 
 Using `-F none` disables all event output — useful for script linting or performance checks.

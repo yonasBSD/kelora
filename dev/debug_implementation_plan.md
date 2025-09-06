@@ -149,10 +149,10 @@ pub fn setup_debug_engine(config: &DebugConfig) -> rhai::Engine {
 ### Testing
 ```bash
 # Should show debug info
-cargo run -- --debug --filter 'e.level == "ERROR"' test.jsonl
+cargo run -- --debug --filter 'e.level == "ERROR"' test.json
 
 # Should work normally (no debug output)  
-cargo run -- --filter 'e.level == "ERROR"' test.jsonl
+cargo run -- --filter 'e.level == "ERROR"' test.json
 ```
 
 ---
@@ -330,11 +330,11 @@ engine.register_debugger(
 ### Testing
 ```bash
 # Test enhanced error reporting
-cargo run -- --debug -v --filter 'user_data.active == true' test.jsonl
+cargo run -- --debug -v --filter 'user_data.active == true' test.json
 # Should show variables in scope and suggestions
 
 # Test normal error (should be unchanged)
-cargo run -- --filter 'user_data.active == true' test.jsonl
+cargo run -- --filter 'user_data.active == true' test.json
 ```
 
 ---
@@ -451,7 +451,7 @@ pub fn process_event_with_tracing(
 ### Testing
 ```bash
 # Test execution tracing
-cargo run -- --debug -vv --filter 'e.level == "ERROR" && e.user_id > 1000' test.jsonl
+cargo run -- --debug -vv --filter 'e.level == "ERROR" && e.user_id > 1000' test.json
 # Should show step-by-step evaluation
 ```
 
@@ -611,10 +611,10 @@ impl DebugStats {
 ### Testing
 ```bash
 # Test maximum verbosity
-cargo run -- --debug -vvv --filter 'complex_function(e)' test.jsonl
+cargo run -- --debug -vvv --filter 'complex_function(e)' test.json
 
 # Test interactive mode
-KELORA_DEBUG_INTERACTIVE=1 cargo run -- --debug -vvv --filter 'e.level == "ERROR"' test.jsonl
+KELORA_DEBUG_INTERACTIVE=1 cargo run -- --debug -vvv --filter 'e.level == "ERROR"' test.json
 ```
 
 ---
