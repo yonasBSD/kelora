@@ -297,7 +297,6 @@ cat webserver.log | kelora -f auto --exec 'e.slow_request = e.request_time > 0.5
 **Error Reporting:**
 - Resilient mode: Shows error summary at end of processing
 - Strict mode: Shows each error immediately before aborting
-- Use `--error-report-file` to write detailed error logs to file
 - Use `--verbose` for immediate verbose error output with emoji formatting
 - Use `--quiet` to suppress all kelora output while preserving script side effects
 

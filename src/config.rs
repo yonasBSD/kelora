@@ -60,7 +60,6 @@ pub enum ScriptStageType {
 #[derive(Debug, Clone)]
 pub struct ErrorReportConfig {
     pub style: ErrorReportStyle,
-    pub file: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -681,7 +680,6 @@ impl Default for KeloraConfig {
                 end: None,
                 error_report: ErrorReportConfig {
                     style: ErrorReportStyle::Summary,
-                    file: None,
                 },
                 levels: Vec::new(),
                 exclude_levels: Vec::new(),
@@ -730,10 +728,7 @@ fn parse_error_report_config(cli: &crate::Cli) -> ErrorReportConfig {
         ErrorReportStyle::Summary // Show summary in resilient mode
     };
 
-    ErrorReportConfig {
-        style,
-        file: cli.error_report_file.clone(),
-    }
+    ErrorReportConfig { style }
 }
 
 /// Determine the default timezone based on CLI options and environment

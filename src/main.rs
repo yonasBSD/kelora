@@ -202,12 +202,6 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     // Merge the parallel tracked state with our pipeline context
     let parallel_tracked = processor.get_final_tracked_state();
 
-    // Write error summary to file if configured
-    if let Some(ref file_path) = config.processing.error_report.file {
-        rhai_functions::tracking::write_error_summary_to_file(&parallel_tracked, file_path)
-            .unwrap_or_else(|e| eprintln!("Failed to write error summary to file: {}", e));
-    }
-
     // Extract internal stats from tracking system before merging
     // This is needed for error reporting, not just when --stats is enabled
     processor
@@ -383,12 +377,6 @@ fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) -> R
     // Merge thread-local tracking state (including errors) into context for sequential mode
     rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
 
-    // Write error summary to file if configured
-    if let Some(ref file_path) = config.processing.error_report.file {
-        rhai_functions::tracking::write_error_summary_to_file(&ctx.tracker, file_path)
-            .unwrap_or_else(|e| eprintln!("Failed to write error summary to file: {}", e));
-    }
-
     Ok(())
 }
 
@@ -445,12 +433,6 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
 
         // Merge thread-local tracking state
         rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
-
-        // Write error summary to file if configured
-        if let Some(ref file_path) = final_config.processing.error_report.file {
-            rhai_functions::tracking::write_error_summary_to_file(&ctx.tracker, file_path)
-                .unwrap_or_else(|e| eprintln!("Failed to write error summary to file: {}", e));
-        }
     } else {
         // File processing with auto-detection
         // For files, we can just read the first line and then re-open
@@ -507,12 +489,6 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
 
         // Merge thread-local tracking state
         rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
-
-        // Write error summary to file if configured
-        if let Some(ref file_path) = final_config.processing.error_report.file {
-            rhai_functions::tracking::write_error_summary_to_file(&ctx.tracker, file_path)
-                .unwrap_or_else(|e| eprintln!("Failed to write error summary to file: {}", e));
-        }
     }
 
     Ok(())

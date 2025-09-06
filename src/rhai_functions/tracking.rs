@@ -916,18 +916,3 @@ pub fn extract_error_summary(tracked: &HashMap<String, Dynamic>) -> Option<Strin
         None
     }
 }
-
-/// Write error summary to file if configured
-#[allow(dead_code)] // Planned feature for error reporting
-pub fn write_error_summary_to_file(
-    tracked: &HashMap<String, Dynamic>,
-    file_path: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    if let Some(summary) = extract_error_summary(tracked) {
-        use std::fs::File;
-        use std::io::Write;
-        let mut file = File::create(file_path)?;
-        file.write_all(summary.as_bytes())?;
-    }
-    Ok(())
-}

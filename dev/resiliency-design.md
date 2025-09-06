@@ -38,7 +38,6 @@ This document provides comprehensive guidance for implementing the new resilienc
 ```rust
 pub struct ProcessingConfig {
     pub on_error: ErrorStrategy,  // TO BE REMOVED
-    pub error_report: ErrorReportConfig,  // TO BE REMOVED
     // ... other fields remain
 }
 ```
@@ -71,7 +70,6 @@ pub enum ScriptResult {
 **Remove These Flags:**
 - `--on-error` (src/cli.rs:142-150)
 - `--error-report` (src/cli.rs:153-154)  
-- `--error-report-file` (src/cli.rs:157-158)
 
 **Add These Flags:**
 - `--strict` - Exit on first error (replaces `--on-error=abort`)

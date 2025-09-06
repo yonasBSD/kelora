@@ -79,7 +79,6 @@ impl PipelineBuilder {
             config: PipelineConfig {
                 error_report: crate::config::ErrorReportConfig {
                     style: crate::config::ErrorReportStyle::Summary,
-                    file: None,
                 },
                 brief: false,
                 color_mode: crate::config::ColorMode::Auto,

@@ -147,10 +147,6 @@ pub struct Cli {
     #[arg(long = "window", help_heading = "Processing Options")]
     pub window_size: Option<usize>,
 
-    /// File to write error reports to
-    #[arg(long = "error-report-file", help_heading = "Error Handling")]
-    pub error_report_file: Option<String>,
-
     /// Exit on first error (fail-fast behavior)
     #[arg(long = "strict", help_heading = "Error Handling")]
     pub strict: bool,

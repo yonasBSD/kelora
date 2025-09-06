@@ -4,10 +4,6 @@ Manual Testing Instructions for --error-report and --metrics
 1. Build the binary:
    cargo build
 
-2. Test --error-report validation:
-   echo "test" | ./target/debug/kelora --error-report=invalid
-   # Should show: error: invalid value 'invalid' for '--error-report <ERROR_REPORT>'
-
 3. Test valid --error-report values:
    echo "test" | ./target/debug/kelora --error-report=off
    echo "test" | ./target/debug/kelora --error-report=summary  
@@ -29,16 +25,12 @@ Manual Testing Instructions for --error-report and --metrics
    echo '{"count": 1}' | ./target/debug/kelora --metrics -e 'track_count("requests", count)'
    # Should show metrics output at the end
 
-6. Test --error-report-file:
-   echo '{"bad": json}' | ./target/debug/kelora -f json --error-report=summary --error-report-file=/tmp/errors.txt --on-error=continue
-   # Check if /tmp/errors.txt gets created (functionality may not be fully connected yet)
-
-7. Test configuration file support:
+6. Test configuration file support:
    # Check that .kelorarc settings work:
    echo "test" | ./target/debug/kelora --stats
    # Should show stats with no section headers (due to .kelorarc setting)
 
-8. Test help text:
+7. Test help text:
    ./target/debug/kelora --help | grep -A 3 "error-report"
    # Should show possible values: off, summary, print
 
