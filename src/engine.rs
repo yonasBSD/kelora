@@ -595,106 +595,6 @@ impl Clone for ExecutionTracer {
     }
 }
 
-// Interactive Debugger (opt-in via environment variable)
-pub struct InteractiveDebugger {
-    config: DebugConfig,
-    interactive_enabled: bool,
-}
-
-impl InteractiveDebugger {
-    pub fn new(config: DebugConfig) -> Self {
-        InteractiveDebugger {
-            config,
-            interactive_enabled: std::env::var("KELORA_DEBUG_INTERACTIVE").is_ok(),
-        }
-    }
-
-    pub fn maybe_interactive_break(
-        &self,
-        context: &ExecutionContext,
-        scope: &rhai::Scope,
-        error: Option<&EvalAltResult>,
-    ) -> DebuggerCommand {
-        if self.interactive_enabled
-            && self.config.verbosity >= 3
-            && (error.is_some() || self.should_break_for_inspection())
-        {
-            return self.interactive_session(context, scope);
-        }
-        DebuggerCommand::Continue
-    }
-
-    fn interactive_session(
-        &self,
-        _context: &ExecutionContext,
-        scope: &rhai::Scope,
-    ) -> DebuggerCommand {
-        use std::io::{self, Write};
-
-        println!("\n🔹 Interactive Debug Session");
-        println!("Variables in scope:");
-        for (name, _is_const, value) in scope.iter() {
-            println!("  {}: {:?}", name, value);
-        }
-
-        loop {
-            print!("Debug> (s)tep, (c)ontinue, (i)nspect <var>, (q)uit? ");
-            if io::stdout().flush().is_err() {
-                eprintln!("Warning: Failed to flush stdout");
-            }
-
-            let mut input = String::new();
-            if io::stdin().read_line(&mut input).is_err() {
-                return DebuggerCommand::Continue;
-            }
-
-            match input.trim().to_lowercase().as_str() {
-                "s" | "step" => return DebuggerCommand::StepInto,
-                "c" | "continue" => return DebuggerCommand::Continue,
-                "q" | "quit" => {
-                    println!("Exiting debug session.");
-                    std::process::exit(0);
-                }
-                cmd if cmd.starts_with("i ") => {
-                    let var_name = &cmd[2..];
-                    self.inspect_variable(var_name, scope);
-                }
-                _ => println!("Unknown command. Use (s)tep, (c)ontinue, (i)nspect <var>, (q)uit"),
-            }
-        }
-    }
-
-    fn inspect_variable(&self, var_name: &str, scope: &rhai::Scope) {
-        for (name, _is_const, value) in scope.iter() {
-            if name == var_name {
-                println!(
-                    "Variable '{}': {:?} (type: {})",
-                    name,
-                    value,
-                    value.type_name()
-                );
-                return;
-            }
-        }
-        println!("Variable '{}' not found", var_name);
-    }
-
-    fn should_break_for_inspection(&self) -> bool {
-        // Could implement smart breakpoint logic here
-        // For now, only break on errors or explicit requests
-        false
-    }
-}
-
-impl Clone for InteractiveDebugger {
-    fn clone(&self) -> Self {
-        InteractiveDebugger {
-            config: self.config.clone(),
-            interactive_enabled: self.interactive_enabled,
-        }
-    }
-}
-
 // Performance and Statistics Tracking using thread-local storage
 // This integrates with kelora's parallel processing infrastructure like track_count()
 
@@ -778,7 +678,6 @@ pub struct RhaiEngine {
     init_map: Option<rhai::Map>,
     debug_tracker: Option<DebugTracker>,
     execution_tracer: Option<ExecutionTracer>,
-    interactive_debugger: Option<InteractiveDebugger>,
 }
 
 impl Clone for RhaiEngine {
@@ -814,7 +713,6 @@ impl Clone for RhaiEngine {
             init_map: self.init_map.clone(),
             debug_tracker: self.debug_tracker.clone(),
             execution_tracer: self.execution_tracer.clone(),
-            interactive_debugger: self.interactive_debugger.clone(),
         }
     }
 }
@@ -1178,7 +1076,6 @@ impl RhaiEngine {
             init_map: None,
             debug_tracker: None,
             execution_tracer: None,
-            interactive_debugger: None,
         }
     }
 
@@ -1194,7 +1091,6 @@ impl RhaiEngine {
 
         self.debug_tracker = Some(DebugTracker::new(debug_config.clone()));
         self.execution_tracer = Some(ExecutionTracer::new(debug_config.clone()));
-        self.interactive_debugger = Some(InteractiveDebugger::new(debug_config.clone()));
 
         // These unwraps are safe because we just created the debug components above
         let debug_tracker = self
