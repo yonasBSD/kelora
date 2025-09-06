@@ -1,8 +1,0 @@
-{"timestamp": "2024-01-01T12:00:00Z", "level": "info", "message": "System started", "user": "alice"}
-{"timestamp": "2024-01-01T12:01:00Z", "level": "error", "message": "Connection failed", "user": "bob"}
-{"timestamp": "2024-01-01T12:02:00Z", "level": "info", "message": "Processing request", "user": "alice"}
-{invalid json line}
-{"timestamp": "2024-01-01T12:03:00Z", "level": "debug", "message": "Debug info", "user": "charlie"}
-{"timestamp": "2024-01-01T12:04:00Z", "level": "warn", "message": "Warning message", "user": "alice"}
-malformed json here
-{"timestamp": "2024-01-01T12:05:00Z", "level": "info", "message": "Final message", "user": "bob"}
