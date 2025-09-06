@@ -1307,7 +1307,7 @@ fn test_syslog_severity_analysis() {
 
 #[test]
 fn test_syslog_with_file() {
-    let syslog_content = std::fs::read_to_string("test_data/sample.syslog")
+    let syslog_content = std::fs::read_to_string("example_logs/sample.syslog")
         .expect("Should be able to read sample syslog file");
 
     let (stdout, _stderr, exit_code) = run_kelora_with_file(

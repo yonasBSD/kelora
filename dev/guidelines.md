@@ -42,16 +42,6 @@ Strict Vars Mode	Plan to use Engine::set_strict_variables(true) for robustness
 
 ⸻
 
-🛠️ In Development / For Immediate Focus
-
-- Nom-based logfmt parser with robust edge case support
-- Finalize field extraction and flattening strategy
-- Define and inject standard kelora_std Rhai helpers with safety functions
-- Build standard tests for fan-out, coercion, emit logic
-- Add --config / .kelorarc for persistent options
-
-⸻
-
 🧱 Distinctive Traits vs. Other Tools
 
 Tool	        Kelora Is…
