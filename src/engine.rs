@@ -1706,7 +1706,7 @@ impl RhaiEngine {
         Ok(())
     }
 
-    fn create_scope_for_event(&self, event: &Event) -> Scope {
+    fn create_scope_for_event(&self, event: &Event) -> Scope<'_> {
         let mut scope = self.scope_template.clone();
 
         // Update built-in variables
@@ -1749,7 +1749,7 @@ impl RhaiEngine {
         scope
     }
 
-    fn create_scope_for_event_with_window(&self, event: &Event, window: &[Event]) -> Scope {
+    fn create_scope_for_event_with_window(&self, event: &Event, window: &[Event]) -> Scope<'_> {
         let mut scope = self.create_scope_for_event(event);
 
         // Add window array to scope

@@ -348,7 +348,7 @@ impl DefaultFormatter {
 
     /// Check if key is likely a log level field
     fn is_level_field(&self, key: &str) -> bool {
-        self.level_keys.iter().any(|&lk| lk == key)
+        self.level_keys.contains(&key)
     }
 
     /// Check if a field should be formatted as a timestamp
