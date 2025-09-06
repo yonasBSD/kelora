@@ -1029,6 +1029,7 @@ fn main() -> Result<()> {
                             crate::rhai_functions::tracking::extract_error_summary_from_tracking(
                                 &pipeline_result.tracking_data,
                                 config.processing.verbose,
+                                Some(&config),
                             )
                         {
                             stderr

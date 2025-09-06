@@ -131,6 +131,7 @@ pub fn has_errors_in_tracking(tracked: &HashMap<String, Dynamic>) -> bool {
 pub fn extract_error_summary_from_tracking(
     tracked: &HashMap<String, Dynamic>,
     verbose: u8,
+    config: Option<&crate::config::KeloraConfig>,
 ) -> Option<String> {
     let mut total_errors = 0;
     let mut error_types = Vec::new();
@@ -176,13 +177,15 @@ pub fn extract_error_summary_from_tracking(
         "mixed"
     };
 
-    // Format header: "parse errors: N total" or "mixed errors: N total"
+    // Format header: "Parse errors: N total" or "Mixed errors: N total"
     if primary_error_type == "mixed" {
-        summary.push_str(&format!("mixed errors: {} total", total_errors));
+        summary.push_str(&format!("Mixed errors: {} total", total_errors));
     } else {
         summary.push_str(&format!(
-            "{} errors: {} total",
-            primary_error_type, total_errors
+            "{}{} errors: {} total",
+            primary_error_type.chars().next().unwrap().to_uppercase(),
+            &primary_error_type[1..],
+            total_errors
         ));
     }
 
@@ -232,7 +235,25 @@ pub fn extract_error_summary_from_tracking(
     // Add "more errors not shown" if total errors exceed samples shown
     if total_errors as usize > shown_samples {
         let remaining = total_errors as usize - shown_samples;
-        summary.push_str(&format!("\n  [{} more errors not shown]", remaining));
+
+        // Determine prefix for consistency with error message formatting
+        let prefix = if let Some(cfg) = config {
+            let use_colors = crate::tty::should_use_colors_with_mode(&cfg.output.color);
+            let no_emoji = cfg.output.no_emoji || std::env::var("NO_EMOJI").is_ok();
+            let use_emoji = use_colors && !no_emoji;
+            if use_emoji {
+                "🔸"
+            } else {
+                "kelora:"
+            }
+        } else {
+            "kelora:"
+        };
+
+        summary.push_str(&format!(
+            "\n{} [+{} more errors. Use -v to view all of them.]",
+            prefix, remaining
+        ));
     }
 
     Some(summary)
