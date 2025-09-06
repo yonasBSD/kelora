@@ -278,6 +278,7 @@ impl CombinedParser {
 
 impl EventParser for CombinedParser {
     fn parse(&self, line: &str) -> Result<Event> {
+        let line = line.trim_end_matches('\n').trim_end_matches('\r');
         // Try Combined format with request time first (NGINX-style)
         if let Some(event) = self.try_parse_combined_with_request_time(line) {
             Ok(event)

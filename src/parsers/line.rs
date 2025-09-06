@@ -14,6 +14,7 @@ impl LineParser {
 
 impl EventParser for LineParser {
     fn parse(&self, line: &str) -> Result<Event> {
+        let line = line.trim_end_matches('\n').trim_end_matches('\r');
         // Create event with minimal capacity (just the line field)
         let mut event = Event::with_capacity(line.to_string(), 1);
 

@@ -148,6 +148,7 @@ impl CefParser {
 
 impl EventParser for CefParser {
     fn parse(&self, line: &str) -> Result<Event> {
+        let line = line.trim_end_matches('\n').trim_end_matches('\r');
         let line = line.trim();
 
         // Parse syslog prefix if present

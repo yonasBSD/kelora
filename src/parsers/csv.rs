@@ -185,6 +185,7 @@ impl CsvParser {
 
 impl EventParser for CsvParser {
     fn parse(&self, line: &str) -> Result<Event> {
+        let line = line.trim_end_matches('\n').trim_end_matches('\r');
         // Skip empty lines
         if line.trim().is_empty() {
             return Ok(self.create_skip_event(line));

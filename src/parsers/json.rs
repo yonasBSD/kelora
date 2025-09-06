@@ -13,6 +13,7 @@ impl JsonlParser {
 
 impl EventParser for JsonlParser {
     fn parse(&self, line: &str) -> Result<Event> {
+        let line = line.trim_end_matches('\n').trim_end_matches('\r');
         let json_value: serde_json::Value = serde_json::from_str(line).with_context(|| {
             format!(
                 "Failed to parse JSON: {}",

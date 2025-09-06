@@ -190,6 +190,7 @@ impl SyslogParser {
 
 impl EventParser for SyslogParser {
     fn parse(&self, line: &str) -> Result<Event> {
+        let line = line.trim_end_matches('\n').trim_end_matches('\r');
         // Try RFC5424 first, then RFC3164
         if let Some(event) = self.try_parse_rfc5424(line) {
             Ok(event)

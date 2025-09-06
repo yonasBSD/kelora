@@ -124,6 +124,7 @@ impl LogfmtParser {
 
 impl EventParser for LogfmtParser {
     fn parse(&self, line: &str) -> Result<Event> {
+        let line = line.trim_end_matches('\n').trim_end_matches('\r');
         let pairs = self
             .parse_logfmt_pairs(line.trim())
             .map_err(|e| anyhow::anyhow!("Failed to parse logfmt: {}", e))?;
