@@ -533,7 +533,9 @@ impl ExecutionTracer {
     pub fn trace_scope_inspection(&self, scope: &rhai::Scope) {
         if self.config.verbosity >= 3 {
             eprintln!("    Scope contents:");
-            for (name, _is_const, value) in scope.iter() {
+            let mut scope_items: Vec<_> = scope.iter().collect();
+            scope_items.sort_by(|a, b| a.0.cmp(b.0));
+            for (name, _is_const, value) in scope_items {
                 let type_info = value.type_name();
                 let preview = self.format_value_preview(&value);
                 eprintln!("      {} ({}): {}", name, type_info, preview);
