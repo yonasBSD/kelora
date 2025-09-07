@@ -115,7 +115,7 @@ fn test_rand_int_invalid_range() {
 
     assert_eq!(exit_code, 1, "kelora should exit with error code 1");
     assert!(
-        stderr.contains("exec errors") || stderr.contains("rhai error"),
+        stderr.contains("Exec errors") || stderr.contains("rhai error"),
         "Error message should mention exec or rhai error. stderr: {}",
         stderr
     );
