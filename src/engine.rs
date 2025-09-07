@@ -554,7 +554,7 @@ impl ExecutionTracer {
 
     fn format_value_preview(&self, value: &rhai::Dynamic) -> String {
         let preview = format!("{:?}", value);
-        if preview.len() > 40 {
+        if preview.len() > 1000 {
             format!("{}...", &preview[..37])
         } else {
             preview
