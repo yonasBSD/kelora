@@ -52,17 +52,14 @@ pub fn track_error(
                 std::env::var("NO_EMOJI").is_ok()
             };
             let use_emoji = use_colors && !no_emoji;
-            let prefix = if use_emoji { "🔸" } else { "kelora:" };
+            let prefix = if use_emoji { "🔸" } else { "kelora: " };
 
             let formatted_error = if let (Some(line), Some(fname)) = (line_num, filename) {
-                format!(
-                    "{} {}:{}: {} - {}",
-                    prefix, fname, line, error_type, message
-                )
+                format!("{}{}:{}: {} - {}", prefix, fname, line, error_type, message)
             } else if let Some(line) = line_num {
-                format!("{} line {}: {} - {}", prefix, line, error_type, message)
+                format!("{}line {}: {} - {}", prefix, line, error_type, message)
             } else {
-                format!("{} {} - {}", prefix, error_type, message)
+                format!("{}{} - {}", prefix, error_type, message)
             };
 
             if crate::rhai_functions::strings::is_parallel_mode() {
@@ -244,14 +241,14 @@ pub fn extract_error_summary_from_tracking(
             if use_emoji {
                 "🔸"
             } else {
-                "kelora:"
+                "kelora: "
             }
         } else {
-            "kelora:"
+            "kelora: "
         };
 
         summary.push_str(&format!(
-            "\n{} [+{} more errors. Use -v to view all of them.]",
+            "\n{}[+{} more errors. Use -v to view all of them.]",
             prefix, remaining
         ));
     }

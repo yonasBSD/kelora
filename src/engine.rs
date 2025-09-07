@@ -90,7 +90,7 @@ impl DebugTracker {
                     let prefix = if self.config.use_emoji {
                         "🔹"
                     } else {
-                        "kelora:"
+                        "kelora: "
                     };
                     eprintln!("{} Executing {} stage", prefix, stage);
                 }
@@ -176,9 +176,9 @@ impl ErrorEnhancer {
         let mut output = String::new();
 
         // Basic error info
-        output.push_str(&format!("🔸 Stage {} failed\n", stage));
-        output.push_str(&format!("   Code: {}\n", script.trim()));
-        output.push_str(&format!("   Error: {}\n", error));
+        output.push_str(&format!("🔸Stage {} failed\n", stage));
+        output.push_str(&format!("  Code: {}\n", script.trim()));
+        output.push_str(&format!("  Error: {}\n", error));
 
         // Add execution context if available
         if let Some(pos) = &execution_context.position {
@@ -436,10 +436,10 @@ impl ExecutionTracer {
             let prefix = if self.config.use_emoji {
                 "🔹"
             } else {
-                "kelora:"
+                "kelora: "
             };
             eprintln!(
-                "{} Executing stage {} ({})",
+                "{}Executing stage {} ({})",
                 prefix, stage_number, stage_type
             );
         }
@@ -453,14 +453,14 @@ impl ExecutionTracer {
 
     pub fn trace_event_start(&self, event_num: u64, event_data: &str) {
         if self.config.verbosity >= 2 {
-            eprintln!("Filter execution trace for event {}:", event_num);
-            eprintln!("  Event: {}", self.truncate_for_display(event_data, 100));
+            eprintln!("  Filter execution trace for event {}:", event_num);
+            eprintln!("    Event: {}", self.truncate_for_display(event_data, 100));
         }
     }
 
     pub fn trace_event_result(&self, result: bool, action: &str) {
         if self.config.verbosity >= 2 {
-            eprintln!("  Result: {} ({})", result, action);
+            eprintln!("    Result: {} ({})", result, action);
         }
     }
 
