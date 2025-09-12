@@ -788,7 +788,7 @@ fn process_line_sequential<W: Write>(
     }
 
     // Update metadata with filename tracking
-    ctx.meta.line_number = Some(*line_num);
+    ctx.meta.line_num = Some(*line_num);
     ctx.meta.filename = current_filename;
 
     // Process line through pipeline

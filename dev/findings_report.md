@@ -129,7 +129,7 @@ Capture variable state at execution time and include in error messages.
 // Before script execution:
 let mut scope = Scope::new();
 scope.push("e", event_data);
-scope.push("index", line_number);
+scope.push("index", line_num);
 
 // After error occurs:
 match engine.eval_with_scope::<Dynamic>(&mut scope, script) {

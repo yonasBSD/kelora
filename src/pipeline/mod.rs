@@ -174,7 +174,7 @@ pub struct PipelineConfig {
 pub struct MetaData {
     #[allow(dead_code)]
     pub filename: Option<String>,
-    pub line_number: Option<usize>,
+    pub line_num: Option<usize>,
 }
 
 /// Core pipeline traits
@@ -273,7 +273,7 @@ impl Pipeline {
                     );
 
                     // Copy metadata from context to event
-                    if let Some(line_num) = ctx.meta.line_number {
+                    if let Some(line_num) = ctx.meta.line_num {
                         e.set_metadata(line_num, ctx.meta.filename.clone());
                     }
 
@@ -283,7 +283,7 @@ impl Pipeline {
                     // Use unified error tracking system
                     crate::rhai_functions::tracking::track_error(
                         "parse",
-                        ctx.meta.line_number,
+                        ctx.meta.line_num,
                         &err.to_string(),
                         Some(&chunk),
                         ctx.meta.filename.as_deref(),
@@ -326,7 +326,7 @@ impl Pipeline {
                                     // Use unified error tracking system
                                     crate::rhai_functions::tracking::track_error(
                                         "script",
-                                        ctx.meta.line_number,
+                                        ctx.meta.line_num,
                                         &msg,
                                         Some(&original_line),
                                         ctx.meta.filename.as_deref(),
@@ -477,7 +477,7 @@ impl Pipeline {
                     // Use unified error tracking system
                     crate::rhai_functions::tracking::track_error(
                         "script",
-                        ctx.meta.line_number,
+                        ctx.meta.line_num,
                         &msg,
                         None, // Original line not available at this stage
                         ctx.meta.filename.as_deref(),
@@ -538,7 +538,7 @@ impl Pipeline {
                 );
 
                 // Copy metadata from context to event
-                if let Some(line_num) = ctx.meta.line_number {
+                if let Some(line_num) = ctx.meta.line_num {
                     e.set_metadata(line_num, ctx.meta.filename.clone());
                 }
 
@@ -548,7 +548,7 @@ impl Pipeline {
                 // Use unified error tracking system
                 crate::rhai_functions::tracking::track_error(
                     "parse",
-                    ctx.meta.line_number,
+                    ctx.meta.line_num,
                     &err.to_string(),
                     Some(&chunk),
                     ctx.meta.filename.as_deref(),
@@ -591,7 +591,7 @@ impl Pipeline {
                                 // Use unified error tracking system
                                 crate::rhai_functions::tracking::track_error(
                                     "script",
-                                    ctx.meta.line_number,
+                                    ctx.meta.line_num,
                                     &msg,
                                     Some(&original_line),
                                     ctx.meta.filename.as_deref(),
@@ -736,7 +736,7 @@ impl Pipeline {
                 // Use unified error tracking system
                 crate::rhai_functions::tracking::track_error(
                     "script",
-                    ctx.meta.line_number,
+                    ctx.meta.line_num,
                     &msg,
                     None, // Original line not available at this stage
                     ctx.meta.filename.as_deref(),

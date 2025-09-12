@@ -296,7 +296,7 @@ pub const MESSAGE_FIELD_NAMES: &[&str] = &[
 pub struct Event {
     pub fields: IndexMap<String, Dynamic>,
     pub original_line: String,
-    pub line_number: Option<usize>,
+    pub line_num: Option<usize>,
     pub filename: Option<String>,
     /// Parsed timestamp field for efficient timestamp operations
     /// This is populated automatically when timestamps are extracted from fields
@@ -317,7 +317,7 @@ impl Event {
         Self {
             fields: IndexMap::with_capacity(capacity),
             original_line,
-            line_number: None,
+            line_num: None,
             filename: None,
             parsed_ts: None,
         }
@@ -334,8 +334,8 @@ impl Event {
         self.fields.insert(key, value);
     }
 
-    pub fn set_metadata(&mut self, line_number: usize, filename: Option<String>) {
-        self.line_number = Some(line_number);
+    pub fn set_metadata(&mut self, line_num: usize, filename: Option<String>) {
+        self.line_num = Some(line_num);
         self.filename = filename;
     }
 

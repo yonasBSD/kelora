@@ -1723,8 +1723,8 @@ impl RhaiEngine {
 
         // Update metadata
         let mut meta_map = rhai::Map::new();
-        if let Some(line_num) = event.line_number {
-            meta_map.insert("line_number".into(), Dynamic::from(line_num as i64));
+        if let Some(line_num) = event.line_num {
+            meta_map.insert("line_num".into(), Dynamic::from(line_num as i64));
         }
         if let Some(filename) = &event.filename {
             meta_map.insert("filename".into(), Dynamic::from(filename.clone()));
@@ -1765,8 +1765,8 @@ impl RhaiEngine {
                 }
                 // Add built-in fields
                 event_map.insert("line".into(), Dynamic::from(event.original_line.clone()));
-                if let Some(line_num) = event.line_number {
-                    event_map.insert("line_number".into(), Dynamic::from(line_num as i64));
+                if let Some(line_num) = event.line_num {
+                    event_map.insert("line_num".into(), Dynamic::from(line_num as i64));
                 }
                 if let Some(filename) = &event.filename {
                     event_map.insert("filename".into(), Dynamic::from(filename.clone()));

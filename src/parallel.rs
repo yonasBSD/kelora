@@ -1012,7 +1012,7 @@ impl ParallelProcessor {
                 let current_line_num = batch.start_line_num + line_idx;
 
                 // Update metadata
-                ctx.meta.line_number = Some(current_line_num);
+                ctx.meta.line_num = Some(current_line_num);
                 ctx.meta.filename = batch.filenames.get(line_idx).cloned().flatten();
 
                 // Clear any previous captured prints/eprints before processing this event
