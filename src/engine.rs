@@ -537,7 +537,7 @@ impl ExecutionTracer {
             scope_items.sort_by(|a, b| a.0.cmp(b.0));
             for (name, _is_const, value) in scope_items {
                 let type_info = value.type_name();
-                let preview = self.format_value_preview(&value);
+                let preview = format!("{:?}", value);
                 eprintln!("      {} ({}): {}", name, type_info, preview);
             }
         }
@@ -554,14 +554,6 @@ impl ExecutionTracer {
         }
     }
 
-    fn format_value_preview(&self, value: &rhai::Dynamic) -> String {
-        let preview = format!("{:?}", value);
-        if preview.len() > 1000 {
-            format!("{}...", &preview[..37])
-        } else {
-            preview
-        }
-    }
 
     fn truncate_for_display(&self, text: &str, max_len: usize) -> String {
         if text.len() > max_len {
