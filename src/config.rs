@@ -40,6 +40,7 @@ pub struct OutputConfig {
     pub exclude_keys: Vec<String>,
     pub core: bool,
     pub brief: bool,
+    pub wrap: bool,
     pub color: ColorMode,
     pub no_emoji: bool,
     pub stats: bool,
@@ -592,6 +593,7 @@ impl KeloraConfig {
                 exclude_keys: cli.exclude_keys.clone(),
                 core: cli.core,
                 brief: cli.brief,
+                wrap: !cli.no_wrap, // Default true, disabled by --no-wrap
                 color: color_mode,
                 no_emoji: cli.no_emoji,
                 stats: cli.stats || cli.stats_only,
@@ -667,6 +669,7 @@ impl Default for KeloraConfig {
                 exclude_keys: Vec::new(),
                 core: false,
                 brief: false,
+                wrap: true, // Default to enabled
                 color: ColorMode::Auto,
                 no_emoji: false,
                 stats: false,

@@ -44,3 +44,12 @@ fn should_use_colors_auto() -> bool {
     // Default: use colors for TTY
     true
 }
+
+/// Get terminal width for word-wrapping, with fallback to default width
+pub fn get_terminal_width() -> usize {
+    if let Some((terminal_size::Width(width), _)) = terminal_size::terminal_size() {
+        width as usize
+    } else {
+        100 // Default fallback width as requested
+    }
+}

@@ -81,6 +81,7 @@ impl PipelineBuilder {
                     style: crate::config::ErrorReportStyle::Summary,
                 },
                 brief: false,
+                wrap: true, // Default to enabled
                 color_mode: crate::config::ColorMode::Auto,
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
@@ -217,10 +218,11 @@ impl PipelineBuilder {
             crate::OutputFormat::Json => Box::new(crate::formatters::JsonFormatter::new()),
             crate::OutputFormat::Default => {
                 let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
-                Box::new(crate::formatters::DefaultFormatter::new(
+                Box::new(crate::formatters::DefaultFormatter::new_with_wrapping(
                     use_colors,
                     self.config.brief,
                     self.config.timestamp_formatting.clone(),
+                    self.config.wrap,
                 ))
             }
             crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
@@ -484,10 +486,11 @@ impl PipelineBuilder {
             crate::OutputFormat::Json => Box::new(crate::formatters::JsonFormatter::new()),
             crate::OutputFormat::Default => {
                 let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
-                Box::new(crate::formatters::DefaultFormatter::new(
+                Box::new(crate::formatters::DefaultFormatter::new_with_wrapping(
                     use_colors,
                     self.config.brief,
                     self.config.timestamp_formatting.clone(),
+                    self.config.wrap,
                 ))
             }
             crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
@@ -684,6 +687,7 @@ pub fn create_pipeline_builder_from_config(
     let pipeline_config = PipelineConfig {
         error_report: config.processing.error_report.clone(),
         brief: config.output.brief,
+        wrap: config.output.wrap,
         color_mode: config.output.color.clone(),
         timestamp_formatting: config.output.timestamp_formatting.clone(),
         strict: config.processing.strict,

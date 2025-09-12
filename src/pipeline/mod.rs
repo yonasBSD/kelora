@@ -156,6 +156,7 @@ pub struct PipelineConfig {
     // LEGACY: Remove during resiliency migration (see dev/resiliency-todos.md #4)
     pub error_report: crate::config::ErrorReportConfig,
     pub brief: bool,
+    pub wrap: bool,
     pub color_mode: crate::config::ColorMode,
     /// Timestamp formatting configuration (display-only)
     pub timestamp_formatting: crate::config::TimestampFormatConfig,

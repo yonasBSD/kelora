@@ -244,6 +244,14 @@ pub struct Cli {
     #[arg(short = 'b', long = "brief", help_heading = "Output Options")]
     pub brief: bool,
 
+    /// Enable word-wrapping for default output format (default: enabled)
+    #[arg(long = "wrap", help_heading = "Output Options")]
+    pub wrap: bool,
+
+    /// Disable word-wrapping for default output format
+    #[arg(long = "no-wrap", help_heading = "Output Options", overrides_with = "wrap")]
+    pub no_wrap: bool,
+
     /// Output file for formatted events
     #[arg(short = 'o', long = "output-file", help_heading = "Output Options")]
     pub output_file: Option<String>,

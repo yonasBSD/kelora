@@ -423,6 +423,7 @@ mod tests {
                     style: crate::config::ErrorReportStyle::Summary,
                 },
                 brief: false,
+                wrap: true, // Default to enabled
                 color_mode: crate::config::ColorMode::Auto,
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
@@ -471,6 +472,7 @@ mod tests {
                     style: crate::config::ErrorReportStyle::Summary,
                 },
                 brief: false,
+                wrap: true, // Default to enabled
                 color_mode: crate::config::ColorMode::Auto,
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
@@ -518,6 +520,7 @@ mod tests {
                     style: crate::config::ErrorReportStyle::Summary,
                 },
                 brief: false,
+                wrap: true, // Default to enabled
                 color_mode: crate::config::ColorMode::Auto,
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,

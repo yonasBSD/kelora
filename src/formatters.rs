@@ -202,6 +202,8 @@ pub struct DefaultFormatter {
     level_keys: Vec<&'static str>,
     brief: bool,
     timestamp_formatting: crate::config::TimestampFormatConfig,
+    enable_wrapping: bool,
+    terminal_width: usize,
 }
 
 impl DefaultFormatter {
@@ -223,6 +225,38 @@ impl DefaultFormatter {
             ],
             brief,
             timestamp_formatting,
+            enable_wrapping: true, // Default to enabled
+            terminal_width: crate::tty::get_terminal_width(),
+        }
+    }
+
+    pub fn new_with_wrapping(
+        use_colors: bool,
+        brief: bool,
+        timestamp_formatting: crate::config::TimestampFormatConfig,
+        enable_wrapping: bool,
+    ) -> Self {
+        let terminal_width = if enable_wrapping {
+            crate::tty::get_terminal_width()
+        } else {
+            100 // Doesn't matter if wrapping is disabled
+        };
+        
+        Self {
+            colors: ColorScheme::new(use_colors),
+            level_keys: vec![
+                "level",
+                "loglevel",
+                "log_level",
+                "lvl",
+                "severity",
+                "levelname",
+                "@l",
+            ],
+            brief,
+            timestamp_formatting,
+            enable_wrapping,
+            terminal_width,
         }
     }
 
@@ -489,7 +523,83 @@ impl pipeline::Formatter for DefaultFormatter {
             return String::new();
         }
 
-        // Pre-allocate buffer with estimated capacity
+        if !self.enable_wrapping {
+            // Use original single-line formatting when wrapping is disabled
+            return self.format_single_line(event);
+        }
+
+        // Word-wrapping implementation
+        let estimated_capacity = event.fields.len() * 32;
+        let mut output = String::with_capacity(estimated_capacity);
+        let mut current_line_length = 0;
+        let mut first_on_line = true;
+        let mut first_overall = true;
+
+        for (key, value) in &event.fields {
+            // Build the field string first to measure its length
+            let mut field_output = String::new();
+            
+            if self.brief {
+                // Brief mode: only values (no keys, no quotes)
+                self.format_dynamic_value_brief_into(key, value, &mut field_output);
+            } else {
+                // Normal mode: key=value pairs
+                // Format key with color
+                if !self.colors.key.is_empty() {
+                    field_output.push_str(self.colors.key);
+                }
+                field_output.push_str(key);
+                if !self.colors.key.is_empty() {
+                    field_output.push_str(self.colors.reset);
+                }
+
+                // Add equals sign
+                if !self.colors.equals.is_empty() {
+                    field_output.push_str(self.colors.equals);
+                }
+                field_output.push('=');
+                if !self.colors.equals.is_empty() {
+                    field_output.push_str(self.colors.reset);
+                }
+
+                // Add formatted value (with proper quoting and colors)
+                self.format_dynamic_value_into(key, value, &mut field_output);
+            }
+
+            // Calculate display length (ignoring ANSI escape codes)
+            let field_display_length = self.display_length(&field_output);
+            let space_needed = if first_on_line { 0 } else { 1 }; // Space before field
+            
+            // Check if we need to wrap (but always fit first field on first line)
+            if !first_overall && current_line_length + space_needed + field_display_length > self.terminal_width {
+                // Wrap: add newline and indentation
+                output.push('\n');
+                output.push_str("  "); // 2-space indentation as requested
+                current_line_length = 2; // Account for indentation
+                first_on_line = true;
+            }
+
+            // Add space separator if not first field on this line
+            if !first_on_line {
+                output.push(' ');
+                current_line_length += 1;
+            }
+            
+            // Add the field
+            output.push_str(&field_output);
+            current_line_length += field_display_length;
+            
+            first_on_line = false;
+            first_overall = false;
+        }
+
+        output
+    }
+}
+
+impl DefaultFormatter {
+    /// Original single-line formatting for when wrapping is disabled
+    fn format_single_line(&self, event: &Event) -> String {
         let estimated_capacity = event.fields.len() * 32;
         let mut output = String::with_capacity(estimated_capacity);
         let mut first = true;
@@ -529,6 +639,24 @@ impl pipeline::Formatter for DefaultFormatter {
         }
 
         output
+    }
+
+    /// Calculate display length of a string, ignoring ANSI escape codes
+    fn display_length(&self, text: &str) -> usize {
+        let mut length = 0;
+        let mut in_escape = false;
+        
+        for ch in text.chars() {
+            if ch == '\x1b' {
+                in_escape = true;
+            } else if in_escape && ch == 'm' {
+                in_escape = false;
+            } else if !in_escape {
+                length += 1;
+            }
+        }
+        
+        length
     }
 }
 
@@ -893,11 +1021,12 @@ mod tests {
         event.set_field("user".to_string(), Dynamic::from("alice".to_string()));
         event.set_field("count".to_string(), Dynamic::from(42i64));
 
-        let formatter = DefaultFormatter::new(
+        let formatter = DefaultFormatter::new_with_wrapping(
             false,
             false,
             crate::config::TimestampFormatConfig::default(),
-        ); // No colors, no brief mode
+            false, // Disable wrapping for this test
+        ); // No colors, no brief mode, no wrapping
         let result = formatter.format(&event);
 
         // Check that all fields are present with proper formatting
@@ -915,8 +1044,12 @@ mod tests {
         event.set_field("level".to_string(), Dynamic::from("info".to_string()));
         event.set_field("msg".to_string(), Dynamic::from("test message".to_string()));
 
-        let formatter =
-            DefaultFormatter::new(false, true, crate::config::TimestampFormatConfig::default()); // No colors, brief mode
+        let formatter = DefaultFormatter::new_with_wrapping(
+            false, 
+            true, 
+            crate::config::TimestampFormatConfig::default(),
+            false, // Disable wrapping for this test
+        ); // No colors, brief mode, no wrapping
         let result = formatter.format(&event);
 
         // Brief mode should output only values, space-separated
@@ -1290,5 +1423,173 @@ mod tests {
         assert_eq!(escape_csv_value("with,comma", ','), "\"with,comma\"");
         assert_eq!(escape_csv_value("with\"quote", ','), "\"with\"\"quote\"");
         assert_eq!(escape_csv_value("", ','), "\"\"");
+    }
+
+    #[test]
+    fn test_default_formatter_wrapping_disabled() {
+        let mut event = Event::default();
+        event.set_field("level".to_string(), Dynamic::from("INFO".to_string()));
+        event.set_field("message".to_string(), Dynamic::from("This is a very long message that would normally wrap".to_string()));
+        event.set_field("user".to_string(), Dynamic::from("alice".to_string()));
+
+        let formatter = DefaultFormatter::new_with_wrapping(
+            false,
+            false,
+            crate::config::TimestampFormatConfig::default(),
+            false, // wrapping disabled
+        );
+        let result = formatter.format(&event);
+
+        // Should be single line when wrapping is disabled
+        assert!(!result.contains('\n'));
+        assert!(result.contains("level='INFO'"));
+        assert!(result.contains("message='This is a very long message that would normally wrap'"));
+        assert!(result.contains("user='alice'"));
+    }
+
+    #[test]
+    fn test_default_formatter_wrapping_enabled() {
+        let mut event = Event::default();
+        event.set_field("field1".to_string(), Dynamic::from("value1".to_string()));
+        event.set_field("field2".to_string(), Dynamic::from("value2".to_string()));
+        event.set_field("very_long_field_name".to_string(), Dynamic::from("a very long field value that will definitely cause wrapping".to_string()));
+        event.set_field("field4".to_string(), Dynamic::from("value4".to_string()));
+
+        // Override terminal width for consistent testing
+        let formatter = DefaultFormatter {
+            colors: crate::colors::ColorScheme::new(false),
+            level_keys: vec!["level"],
+            brief: false,
+            timestamp_formatting: crate::config::TimestampFormatConfig::default(),
+            enable_wrapping: true,
+            terminal_width: 50, // Small width to force wrapping
+        };
+        
+        let result = formatter.format(&event);
+
+        // Should wrap when width is exceeded
+        assert!(result.contains('\n'));
+        assert!(result.contains("  ")); // Should have indentation
+        
+        // All fields should still be present
+        assert!(result.contains("field1='value1'"));
+        assert!(result.contains("field2='value2'"));
+        assert!(result.contains("very_long_field_name='a very long field value that will definitely cause wrapping'"));
+        assert!(result.contains("field4='value4'"));
+    }
+
+    #[test]
+    fn test_default_formatter_wrapping_brief_mode() {
+        let mut event = Event::default();
+        event.set_field("field1".to_string(), Dynamic::from("short".to_string()));
+        event.set_field("field2".to_string(), Dynamic::from("this is a much longer value that should cause wrapping".to_string()));
+        event.set_field("field3".to_string(), Dynamic::from("end".to_string()));
+
+        let formatter = DefaultFormatter {
+            colors: crate::colors::ColorScheme::new(false),
+            level_keys: vec![],
+            brief: true,
+            timestamp_formatting: crate::config::TimestampFormatConfig::default(),
+            enable_wrapping: true,
+            terminal_width: 30, // Very small width
+        };
+        
+        let result = formatter.format(&event);
+
+        // Brief mode should still wrap properly
+        assert!(result.contains('\n'));
+        assert!(result.contains("  ")); // Should have indentation
+        
+        // In brief mode, only values are shown (no key= parts)
+        assert!(result.contains("short"));
+        assert!(result.contains("this is a much longer value that should cause wrapping"));
+        assert!(result.contains("end"));
+        assert!(!result.contains("field1="));
+        assert!(!result.contains("field2="));
+        assert!(!result.contains("field3="));
+    }
+
+    #[test]
+    fn test_display_length_ignores_ansi_codes() {
+        let formatter = DefaultFormatter::new_with_wrapping(
+            false,
+            false,
+            crate::config::TimestampFormatConfig::default(),
+            true,
+        );
+
+        // Test string with ANSI color codes
+        let colored_text = "\x1b[31mred text\x1b[0m";
+        assert_eq!(formatter.display_length(colored_text), 8); // "red text" = 8 chars
+
+        let plain_text = "red text";
+        assert_eq!(formatter.display_length(plain_text), 8);
+
+        // Empty string
+        assert_eq!(formatter.display_length(""), 0);
+
+        // Only ANSI codes
+        assert_eq!(formatter.display_length("\x1b[31m\x1b[0m"), 0);
+    }
+
+    #[test]
+    fn test_wrapping_preserves_field_boundaries() {
+        let mut event = Event::default();
+        event.set_field("a".to_string(), Dynamic::from("value".to_string()));
+        event.set_field("b".to_string(), Dynamic::from("value".to_string()));
+        event.set_field("c".to_string(), Dynamic::from("value".to_string()));
+
+        let formatter = DefaultFormatter {
+            colors: crate::colors::ColorScheme::new(false),
+            level_keys: vec![],
+            brief: false,
+            timestamp_formatting: crate::config::TimestampFormatConfig::default(),
+            enable_wrapping: true,
+            terminal_width: 20, // Force wrapping
+        };
+        
+        let result = formatter.format(&event);
+
+        // Should never break within a field, only between fields
+        assert!(!result.contains("a='val\n  ue'")); // Would be bad
+        assert!(result.contains("a='value'")); // Should be complete
+        
+        // Should have proper line structure
+        let lines: Vec<&str> = result.split('\n').collect();
+        assert!(lines.len() > 1); // Should have multiple lines
+        
+        // Continuation lines should be indented
+        for (i, line) in lines.iter().enumerate() {
+            if i > 0 && !line.is_empty() {
+                assert!(line.starts_with("  "), "Line {} should be indented: '{}'", i, line);
+            }
+        }
+    }
+
+    #[test]
+    fn test_default_formatter_new_constructor_enables_wrapping_by_default() {
+        let mut event = Event::default();
+        event.set_field("field1".to_string(), Dynamic::from("value1".to_string()));
+        event.set_field("very_long_field_name_that_exceeds_width".to_string(), 
+                       Dynamic::from("a very long field value that should definitely cause wrapping in most terminals".to_string()));
+        event.set_field("field3".to_string(), Dynamic::from("value3".to_string()));
+
+        // Use the basic constructor (should enable wrapping by default now)
+        let formatter = DefaultFormatter::new(
+            false,
+            false,
+            crate::config::TimestampFormatConfig::default(),
+        );
+        
+        let result = formatter.format(&event);
+
+        // Should wrap by default now
+        assert!(result.contains('\n'), "Default constructor should enable wrapping");
+        assert!(result.contains("  "), "Should have indentation when wrapping");
+        
+        // All fields should still be present
+        assert!(result.contains("field1='value1'"));
+        assert!(result.contains("very_long_field_name_that_exceeds_width="));
+        assert!(result.contains("field3='value3'"));
     }
 }
