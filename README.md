@@ -109,6 +109,8 @@ Prefix extraction runs before parsing, so the extracted prefix becomes a field i
 
 **Output**: Use `eprint()` for alerts and diagnostics (writes to stderr), `print()` for data output (writes to stdout). Since kelora's processed events go to stdout, `eprint()` prevents interference with the data pipeline.
 
+**Environment**: `get_env(var)` returns environment variable or empty string, `get_env(var, default)` with fallback. Useful for CI/CD pipelines and configuration-driven processing.
+
 ## Advanced Features
 
 ### Window Analysis

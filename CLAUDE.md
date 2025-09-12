@@ -514,6 +514,10 @@ kelora -qq suspicious.log || mail -s "Log errors detected" admin@company.com
   - `path_equals(e, "field.subfield", expected)` - Safe nested field comparison
   - `to_number(value, default)` - Safe number conversion with fallback
   - `to_bool(value, default)` - Safe boolean conversion with fallback
+- **Environment Variables**: Access environment variables for CI/CD and configuration:
+  - `get_env(var)` - Get environment variable, returns empty string if not found
+  - `get_env(var, default)` - Get environment variable with fallback default
+  - Examples: `e.branch = get_env("CI_BRANCH", "main")`, `e.build_id = get_env("BUILD_ID")`
 - **Side Effects**: Rhai `print()` statements behavior depends on quiet level
   - **Levels 1-2 (-q, -qq)**: `print()` and `eprint()` output preserved (useful for debugging)
   - **Level 3 (-qqq)**: All script side effects suppressed for complete automation silence
