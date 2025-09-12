@@ -4020,17 +4020,26 @@ api_1    | Starting server"#;
 fn test_quiet_level_0_normal_output() {
     // Test normal mode (level 0) - shows everything
     let input = r#"{"level": "info", "message": "test"}"#;
-    
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--stats", "--exec", "print(\"Script output\")"], input);
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--stats",
+            "--exec",
+            "print(\"Script output\")",
+        ],
+        input,
+    );
     assert_eq!(exit_code, 0);
-    
+
     // Should show event output
     assert!(stdout.contains("level='info'"));
     assert!(stdout.contains("message='test'"));
-    
+
     // Should show script output
     assert!(stdout.contains("Script output"));
-    
+
     // Should show stats
     assert!(stderr.contains("Stats"));
     assert!(stderr.contains("Lines processed"));
@@ -4040,17 +4049,27 @@ fn test_quiet_level_0_normal_output() {
 fn test_quiet_level_1_suppress_diagnostics() {
     // Test quiet level 1 (-q) - suppress diagnostics but show events and script output
     let input = r#"{"level": "info", "message": "test"}"#;
-    
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--stats", "--exec", "print(\"Script output\")", "-q"], input);
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--stats",
+            "--exec",
+            "print(\"Script output\")",
+            "-q",
+        ],
+        input,
+    );
     assert_eq!(exit_code, 0);
-    
+
     // Should show event output
     assert!(stdout.contains("level='info'"));
     assert!(stdout.contains("message='test'"));
-    
+
     // Should show script output
     assert!(stdout.contains("Script output"));
-    
+
     // Should NOT show stats
     assert!(!stderr.contains("Stats"));
     assert!(!stderr.contains("Lines processed"));
@@ -4060,17 +4079,27 @@ fn test_quiet_level_1_suppress_diagnostics() {
 fn test_quiet_level_2_suppress_events() {
     // Test quiet level 2 (-qq) - suppress diagnostics and events but show script output
     let input = r#"{"level": "info", "message": "test"}"#;
-    
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--stats", "--exec", "print(\"Script output\")", "-qq"], input);
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--stats",
+            "--exec",
+            "print(\"Script output\")",
+            "-qq",
+        ],
+        input,
+    );
     assert_eq!(exit_code, 0);
-    
+
     // Should NOT show event output
     assert!(!stdout.contains("level='info'"));
     assert!(!stdout.contains("message='test'"));
-    
+
     // Should still show script output
     assert!(stdout.contains("Script output"));
-    
+
     // Should NOT show stats
     assert!(!stderr.contains("Stats"));
     assert!(!stderr.contains("Lines processed"));
@@ -4080,21 +4109,31 @@ fn test_quiet_level_2_suppress_events() {
 fn test_quiet_level_3_suppress_all() {
     // Test quiet level 3 (-qqq) - suppress everything including script output
     let input = r#"{"level": "info", "message": "test"}"#;
-    
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--stats", "--exec", "print(\"Script output\")", "-qqq"], input);
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--stats",
+            "--exec",
+            "print(\"Script output\")",
+            "-qqq",
+        ],
+        input,
+    );
     assert_eq!(exit_code, 0);
-    
+
     // Should NOT show event output
     assert!(!stdout.contains("level='info'"));
     assert!(!stdout.contains("message='test'"));
-    
+
     // Should NOT show script output
     assert!(!stdout.contains("Script output"));
-    
+
     // Should NOT show stats
     assert!(!stderr.contains("Stats"));
     assert!(!stderr.contains("Lines processed"));
-    
+
     // Should have no output at all
     assert_eq!(stdout.trim(), "");
 }
@@ -4103,16 +4142,26 @@ fn test_quiet_level_3_suppress_all() {
 fn test_quiet_levels_with_errors() {
     // Test that quiet levels still preserve exit codes for errors
     let input = r#"{"level": "info", "message": "test"}"#;
-    
+
     // Test with a filter that would cause an error
-    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--filter", "e.nonexistent.field == true", "--strict", "-qqq"], input);
-    
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--filter",
+            "e.nonexistent.field == true",
+            "--strict",
+            "-qqq",
+        ],
+        input,
+    );
+
     // Should have non-zero exit code due to error
     assert_ne!(exit_code, 0);
-    
+
     // Should have no output in quiet mode
     assert_eq!(stdout.trim(), "");
-    
+
     // In strict mode with -qqq, even error messages should be suppressed
     // but exit code should still indicate failure
 }

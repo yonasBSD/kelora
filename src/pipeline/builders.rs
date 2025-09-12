@@ -126,7 +126,7 @@ impl PipelineBuilder {
         // Set up debugging if enabled
         let debug_config = DebugConfig::new(self.config.verbose).with_emoji(!self.config.no_emoji);
         rhai_engine.setup_debugging(debug_config);
-        
+
         // Set up quiet mode side effect suppression for level 3+
         if self.config.quiet_level >= 3 {
             rhai_engine.set_suppress_side_effects(true);
@@ -393,7 +393,7 @@ impl PipelineBuilder {
         // Set up debugging if enabled
         let debug_config = DebugConfig::new(self.config.verbose).with_emoji(!self.config.no_emoji);
         rhai_engine.setup_debugging(debug_config);
-        
+
         // Set up quiet mode side effect suppression for level 3+
         if self.config.quiet_level >= 3 {
             rhai_engine.set_suppress_side_effects(true);

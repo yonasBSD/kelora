@@ -394,7 +394,6 @@ impl Cli {
         if self.no_strict {
             self.strict = false;
         }
-
     }
 }
 
