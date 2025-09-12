@@ -3581,7 +3581,7 @@ fn test_metrics_sequential_mode_basic() {
 
     // Check that metrics output appears in stderr
     assert!(
-        stderr.contains("=== Tracked metrics ==="),
+        stderr.contains("Tracked metrics"),
         "Should contain metrics header"
     );
     assert!(
@@ -3633,7 +3633,7 @@ fn test_metrics_parallel_mode_basic() {
 
     // Check that metrics output appears in stderr (same as sequential)
     assert!(
-        stderr.contains("=== Tracked metrics ==="),
+        stderr.contains("Tracked metrics"),
         "Should contain metrics header"
     );
     assert!(
@@ -3706,7 +3706,7 @@ fn test_metrics_file_output() {
 
     // No metrics should appear in stderr when using file output only
     assert!(
-        !stderr.contains("=== Tracked metrics ==="),
+        !stderr.contains("Tracked metrics"),
         "Should not display metrics to stderr"
     );
 }

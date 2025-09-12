@@ -179,8 +179,8 @@ fn test_read_functions_only_in_begin() {
         "Command should fail when using read_file outside --begin"
     );
     assert!(
-        stderr.contains("rhai error") || stderr.contains("can only be called during --begin phase"),
-        "Should contain rhai error or phase restriction error. stderr: {}",
+        stderr.contains("Rhai error") || stderr.contains("can only be called during --begin phase"),
+        "Should contain Rhai error or phase restriction error. stderr: {}",
         stderr
     );
 }
