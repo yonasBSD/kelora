@@ -163,8 +163,8 @@ pub struct PipelineConfig {
     pub strict: bool,
     /// Show detailed error information - new resiliency model (levels: 0-3)
     pub verbose: u8,
-    /// Suppress error summary (quiet mode) - new resiliency model
-    pub quiet: bool,
+    /// Quiet mode level (0=normal, 1=suppress diagnostics, 2=suppress events, 3=suppress script output)
+    pub quiet_level: u8,
     /// Disable emoji in error output
     pub no_emoji: bool,
 }
@@ -288,7 +288,7 @@ impl Pipeline {
                         Some(&chunk),
                         ctx.meta.filename.as_deref(),
                         ctx.config.verbose,
-                        ctx.config.quiet,
+                        ctx.config.quiet_level,
                         Some(&ctx.config),
                     );
 
@@ -331,7 +331,7 @@ impl Pipeline {
                                         Some(&original_line),
                                         ctx.meta.filename.as_deref(),
                                         ctx.config.verbose,
-                                        ctx.config.quiet,
+                                        ctx.config.quiet_level,
                                         Some(&ctx.config),
                                     );
 
@@ -482,7 +482,7 @@ impl Pipeline {
                         None, // Original line not available at this stage
                         ctx.meta.filename.as_deref(),
                         ctx.config.verbose,
-                        ctx.config.quiet,
+                        ctx.config.quiet_level,
                         Some(&ctx.config),
                     );
 
@@ -553,7 +553,7 @@ impl Pipeline {
                     Some(&chunk),
                     ctx.meta.filename.as_deref(),
                     ctx.config.verbose,
-                    ctx.config.quiet,
+                    ctx.config.quiet_level,
                     Some(&ctx.config),
                 );
 
@@ -596,7 +596,7 @@ impl Pipeline {
                                     Some(&original_line),
                                     ctx.meta.filename.as_deref(),
                                     ctx.config.verbose,
-                                    ctx.config.quiet,
+                                    ctx.config.quiet_level,
                                     Some(&ctx.config),
                                 );
 
@@ -741,7 +741,7 @@ impl Pipeline {
                     None, // Original line not available at this stage
                     ctx.meta.filename.as_deref(),
                     ctx.config.verbose,
-                    ctx.config.quiet,
+                    ctx.config.quiet_level,
                     Some(&ctx.config),
                 );
 

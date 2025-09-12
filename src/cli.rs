@@ -163,17 +163,12 @@ pub struct Cli {
     #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count, help_heading = "Error Handling")]
     pub verbose: u8,
 
-    /// Suppress all kelora output (events, errors, stats) but preserve script side effects
-    #[arg(short = 'q', long = "quiet", help_heading = "Error Handling")]
-    pub quiet: bool,
-
-    /// Enable normal output (opposite of quiet)
-    #[arg(
-        long = "no-quiet",
-        help_heading = "Error Handling",
-        overrides_with = "quiet"
-    )]
-    pub no_quiet: bool,
+    /// Quiet mode with multiple levels:
+    /// -q: suppress kelora diagnostics (errors, stats)
+    /// -qq: additionally suppress event output (-F none)  
+    /// -qqq: additionally suppress script side effects (print/eprint)
+    #[arg(short = 'q', long = "quiet", action = clap::ArgAction::Count, help_heading = "Error Handling")]
+    pub quiet: u8,
 
     /// Include only events with these log levels
     #[arg(
@@ -400,10 +395,6 @@ impl Cli {
             self.strict = false;
         }
 
-        // Handle quiet/no-quiet
-        if self.no_quiet {
-            self.quiet = false;
-        }
     }
 }
 

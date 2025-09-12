@@ -63,7 +63,7 @@ impl ScriptStage for FilterStage {
                     Some(&event.original_line),
                     ctx.meta.filename.as_deref(),
                     ctx.config.verbose,
-                    ctx.config.quiet,
+                    ctx.config.quiet_level,
                     Some(&ctx.config),
                 );
 
@@ -138,7 +138,7 @@ impl ScriptStage for ExecStage {
                     Some(&event.original_line),
                     ctx.meta.filename.as_deref(),
                     ctx.config.verbose,
-                    ctx.config.quiet,
+                    ctx.config.quiet_level,
                     Some(&ctx.config),
                 );
 
@@ -427,7 +427,7 @@ mod tests {
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
                 verbose: 0,
-                quiet: false,
+                quiet_level: 0,
                 no_emoji: false,
             },
             tracker: std::collections::HashMap::new(),
@@ -475,7 +475,7 @@ mod tests {
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
                 verbose: 0,
-                quiet: false,
+                quiet_level: 0,
                 no_emoji: false,
             },
             tracker: std::collections::HashMap::new(),
@@ -522,7 +522,7 @@ mod tests {
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
                 verbose: 0,
-                quiet: false,
+                quiet_level: 0,
                 no_emoji: false,
             },
             tracker: std::collections::HashMap::new(),

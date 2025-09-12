@@ -37,8 +37,10 @@ make test-full          # Comprehensive test suite
 # Verbose error reporting - see each error immediately
 ./target/release/kelora -f json --verbose suspicious.log
 
-# Quiet mode for automation - exit codes indicate success/failure
-./target/release/kelora -f json --quiet input.log && echo "✓ Processing succeeded"
+# Multi-level quiet mode for automation
+./target/release/kelora -f json -q input.log       # Level 1: suppress diagnostics, show events
+./target/release/kelora -f json -qq input.log      # Level 2: suppress events too (-F none)
+./target/release/kelora -f json -qqq input.log     # Level 3: suppress script output (print/eprint)
 
 # Test exit code behavior
 ./target/release/kelora -f json malformed.log; echo "Exit code: $?"
@@ -46,13 +48,16 @@ make test-full          # Comprehensive test suite
 # Parallel processing with verbose errors
 ./target/release/kelora -f json --parallel --verbose --batch-size 100 large.log
 
-# Automation pipeline example
-if ./target/release/kelora --quiet -l error logs/*.json; then
+# Automation pipeline examples
+if ./target/release/kelora -q -l error logs/*.json; then
     echo "No critical errors found"
 else
     echo "Critical errors detected, alerting team..."
     # Send notification, stop deployment, etc.
 fi
+
+# Clean automation with complete output suppression
+./target/release/kelora -qqq --exec 'track_count("errors", 1)' logs/*.json; echo "Exit code: $?"
 ```
 
 ## Configuration System
@@ -298,7 +303,7 @@ cat webserver.log | kelora -f auto --exec 'e.slow_request = e.request_time > 0.5
 - Resilient mode: Shows error summary at end of processing
 - Strict mode: Shows each error immediately before aborting
 - Use `--verbose` for immediate verbose error output with emoji formatting
-- Use `--quiet` to suppress all kelora output while preserving script side effects
+- Use `-q`, `-qq`, or `-qqq` for graduated quiet modes (see Multi-Level Quiet Mode section)
 
 **Verbose Error Output (`--verbose`):**
 - Prints each error immediately to stderr with format: `🔸 kelora: line 42: parse error - invalid JSON`
@@ -307,12 +312,12 @@ cat webserver.log | kelora -f auto --exec 'e.slow_request = e.request_time > 0.5
 - Compatible with all other flags (`--parallel`, `--stats`, etc.)
 - Uses standardized emoji prefixes: 🔹 (blue diamond) for general output, 🔸 (orange diamond) for errors
 
-**Quiet Mode (`--quiet`):**
-- Suppresses all kelora output: events, error messages, stats, summaries
-- Automatically enables `-F none` output format
-- Preserves all Rhai script side effects (`print()` statements, file operations, etc.)
+**Multi-Level Quiet Mode (`-q`, `-qq`, `-qqq`):**
+- **Level 1 (-q)**: Suppress kelora diagnostics (error summaries, stats, format detection messages)
+- **Level 2 (-qq)**: Additionally suppress event output (automatically enables `-F none`)
+- **Level 3 (-qqq)**: Additionally suppress all Rhai script side effects (`print()`, `eprint()` statements)
 - Exit codes become the primary indicator of processing success/failure
-- Essential for automation and CI/CD pipelines
+- Essential for automation and CI/CD pipelines with graduated noise control
 
 ### Exit Codes
 
@@ -327,7 +332,7 @@ Kelora uses standard Unix exit codes to indicate processing results:
 - Parse errors occurred (invalid JSON, malformed syslog, etc.)
 - Rhai runtime errors occurred (filter errors, exec errors, script failures)
 - Applies to both strict (`--strict`) and resilient (default) modes
-- Same behavior whether using `--quiet`, `--verbose`, or normal output
+- Same behavior whether using quiet modes (`-q`, `-qq`, `-qqq`), `--verbose`, or normal output
 
 **Exit Code 2 (Invalid Usage):**
 - CLI argument errors, invalid flags, missing required parameters
@@ -342,10 +347,10 @@ Kelora uses standard Unix exit codes to indicate processing results:
 **Automation Examples:**
 ```bash
 # Detect data quality issues in scripts
-kelora --quiet input.log && echo "✓ Clean data" || echo "✗ Has errors"
+kelora -qq input.log && echo "✓ Clean data" || echo "✗ Has errors"
 
 # CI/CD pipeline usage
-if kelora --parallel --quiet -l error logs/*.json; then
+if kelora --parallel -q -l error logs/*.json; then
     echo "No errors found in logs"
 else
     echo "Error-level events detected, exit code: $?"
@@ -353,7 +358,7 @@ else
 fi
 
 # Combined with other Unix tools
-kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
+kelora -qq suspicious.log || mail -s "Log errors detected" admin@company.com
 ```
 
 ### Output Limiting
@@ -509,10 +514,11 @@ kelora --quiet suspicious.log || mail -s "Log errors detected" admin@company.com
   - `path_equals(e, "field.subfield", expected)` - Safe nested field comparison
   - `to_number(value, default)` - Safe number conversion with fallback
   - `to_bool(value, default)` - Safe boolean conversion with fallback
-- **Side Effects**: Rhai `print()` statements and file operations are preserved in `--quiet` mode
-  - Use `print()` for debugging output that should remain visible even when kelora output is suppressed
-  - `--quiet` uses `-F none` to maintain script behavior consistency
-  - Essential for debugging scripts in automation environments
+- **Side Effects**: Rhai `print()` statements behavior depends on quiet level
+  - **Levels 1-2 (-q, -qq)**: `print()` and `eprint()` output preserved (useful for debugging)
+  - **Level 3 (-qqq)**: All script side effects suppressed for complete automation silence
+  - File operations and tracking functions remain unaffected at all quiet levels
+  - Essential for graduated control in automation environments
 
 ### Code Quality Practices
 

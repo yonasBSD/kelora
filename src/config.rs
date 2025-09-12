@@ -88,8 +88,8 @@ pub struct ProcessingConfig {
     pub strict: bool,
     /// Show detailed error information (levels: 0-3) - new resiliency model
     pub verbose: u8,
-    /// Suppress error summary (quiet mode) - new resiliency model
-    pub quiet: bool,
+    /// Quiet mode level (0=normal, 1=suppress diagnostics, 2=suppress events, 3=suppress script output)
+    pub quiet_level: u8,
 }
 
 /// Performance configuration
@@ -462,7 +462,7 @@ pub fn print_verbose_error_to_stderr(
 ) {
     // Check if output is suppressed (quiet mode)
     if let Some(cfg) = config {
-        if cfg.processing.quiet {
+        if cfg.processing.quiet_level > 0 {
             return;
         }
     }
@@ -481,7 +481,7 @@ pub fn print_verbose_error_to_stderr_pipeline(
 ) {
     // Check if output is suppressed (quiet mode)
     if let Some(cfg) = config {
-        if cfg.quiet {
+        if cfg.quiet_level > 0 {
             return;
         }
     }
@@ -580,8 +580,8 @@ impl KeloraConfig {
             output: OutputConfig {
                 format: if cli.stats_only {
                     OutputFormat::None
-                } else if cli.quiet {
-                    // Quiet mode: suppress event output but preserve script side effects
+                } else if cli.quiet >= 2 {
+                    // Quiet level 2+: suppress event output
                     OutputFormat::None
                 } else if cli.json_output {
                     OutputFormat::Json
@@ -611,7 +611,7 @@ impl KeloraConfig {
                 take_limit: cli.take,
                 strict: cli.strict,
                 verbose: cli.verbose,
-                quiet: cli.quiet,
+                quiet_level: cli.quiet,
             },
             performance: PerformanceConfig {
                 parallel: cli.parallel,
@@ -688,7 +688,7 @@ impl Default for KeloraConfig {
                 take_limit: None,
                 strict: false,
                 verbose: 0,
-                quiet: false,
+                quiet_level: 0,
             },
             performance: PerformanceConfig {
                 parallel: false,

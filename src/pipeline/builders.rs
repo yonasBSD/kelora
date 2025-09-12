@@ -85,7 +85,7 @@ impl PipelineBuilder {
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
                 verbose: 0,
-                quiet: false,
+                quiet_level: 0,
                 no_emoji: false,
             },
             begin: None,
@@ -126,6 +126,11 @@ impl PipelineBuilder {
         // Set up debugging if enabled
         let debug_config = DebugConfig::new(self.config.verbose).with_emoji(!self.config.no_emoji);
         rhai_engine.setup_debugging(debug_config);
+        
+        // Set up quiet mode side effect suppression for level 3+
+        if self.config.quiet_level >= 3 {
+            rhai_engine.set_suppress_side_effects(true);
+        }
 
         // Create parser
         let base_parser: Box<dyn EventParser> = match self.input_format {
@@ -388,6 +393,11 @@ impl PipelineBuilder {
         // Set up debugging if enabled
         let debug_config = DebugConfig::new(self.config.verbose).with_emoji(!self.config.no_emoji);
         rhai_engine.setup_debugging(debug_config);
+        
+        // Set up quiet mode side effect suppression for level 3+
+        if self.config.quiet_level >= 3 {
+            rhai_engine.set_suppress_side_effects(true);
+        }
 
         // Create parser (with pre-processed CSV headers if available)
         let base_parser: Box<dyn EventParser> = match self.input_format {
@@ -678,7 +688,7 @@ pub fn create_pipeline_builder_from_config(
         timestamp_formatting: config.output.timestamp_formatting.clone(),
         strict: config.processing.strict,
         verbose: config.processing.verbose,
-        quiet: config.processing.quiet,
+        quiet_level: config.processing.quiet_level,
         no_emoji: config.output.no_emoji,
     };
 

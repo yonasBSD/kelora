@@ -147,7 +147,7 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
         let detected_format = detect_format_for_parallel_mode(&config.input.files)?;
 
         // Report detected format
-        if !config.processing.quiet {
+        if config.processing.quiet_level == 0 {
             let format_name = format!("{:?}", detected_format).to_lowercase();
             let message =
                 config.format_error_message(&format!("auto-detected format: {}", format_name));
@@ -396,7 +396,7 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         let detected_format = detect_format_from_peekable_reader(&mut peekable_reader)?;
 
         // Report detected format
-        if !config.processing.quiet {
+        if config.processing.quiet_level == 0 {
             let format_name = format!("{:?}", detected_format).to_lowercase();
             let message =
                 config.format_error_message(&format!("auto-detected format: {}", format_name));
@@ -452,7 +452,7 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         };
 
         // Report detected format
-        if !config.processing.quiet {
+        if config.processing.quiet_level == 0 {
             let format_name = format!("{:?}", detected_format).to_lowercase();
             let message =
                 config.format_error_message(&format!("auto-detected format: {}", format_name));
@@ -1016,15 +1016,15 @@ fn main() -> Result<()> {
             // Print output based on configuration (only if not terminated)
             if !SHOULD_TERMINATE.load(Ordering::Relaxed) {
                 if let Some(ref s) = pipeline_result.stats {
-                    if config.output.stats && !config.processing.quiet {
-                        // Full stats when --stats flag is used (unless --quiet)
+                    if config.output.stats && config.processing.quiet_level == 0 {
+                        // Full stats when --stats flag is used (unless quiet level > 0)
                         stderr
                             .writeln(&config.format_stats_message(
                                 &s.format_stats(config.input.multiline.is_some()),
                             ))
                             .unwrap_or(());
-                    } else if !config.processing.quiet {
-                        // Error summary by default when errors occur (unless --quiet)
+                    } else if config.processing.quiet_level == 0 {
+                        // Error summary by default when errors occur (unless quiet level > 0)
                         if let Some(error_summary) =
                             crate::rhai_functions::tracking::extract_error_summary_from_tracking(
                                 &pipeline_result.tracking_data,
@@ -1052,20 +1052,20 @@ fn main() -> Result<()> {
     // Check if we were terminated by a signal and print output
     if TERMINATED_BY_SIGNAL.load(Ordering::Relaxed) {
         if let Some(stats) = final_stats {
-            if config.output.stats && !config.processing.quiet {
-                // Full stats when --stats flag is used (unless --quiet)
+            if config.output.stats && config.processing.quiet_level == 0 {
+                // Full stats when --stats flag is used (unless quiet level > 0)
                 stderr
                     .writeln(&config.format_stats_message(
                         &stats.format_stats(config.input.multiline.is_some()),
                     ))
                     .unwrap_or(());
-            } else if stats.has_errors() && !config.processing.quiet {
-                // Error summary by default when errors occur (unless --quiet)
+            } else if stats.has_errors() && config.processing.quiet_level == 0 {
+                // Error summary by default when errors occur (unless quiet level > 0)
                 stderr
                     .writeln(&config.format_error_message(&stats.format_error_summary()))
                     .unwrap_or(());
             }
-        } else if config.output.stats && !config.processing.quiet {
+        } else if config.output.stats && config.processing.quiet_level == 0 {
             stderr
                 .writeln(&config.format_stats_message("Processing interrupted"))
                 .unwrap_or(());
@@ -1414,9 +1414,9 @@ JSON ARRAY HANDLING:
   JSON types in output formats.
 
 SIDE EFFECTS IN QUIET MODE:
-  print("debug info")                  Remains visible even with --quiet
-  eprint("error details")              Stderr output preserved with --quiet
-  # File operations also preserved in --quiet mode
+  print("debug info")                  Levels -q/-qq: visible, -qqq: suppressed
+  eprint("error details")              Levels -q/-qq: visible, -qqq: suppressed
+  # File operations preserved at all quiet levels
 
 ERROR HANDLING:
   Kelora uses resilient processing by default:

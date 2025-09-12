@@ -20,7 +20,7 @@ pub fn track_error(
     original_line: Option<&str>,
     filename: Option<&str>,
     verbose: u8,
-    quiet: bool,
+    quiet_level: u8,
     config: Option<&crate::pipeline::PipelineConfig>,
 ) {
     // Use tracking infrastructure for error counting in all modes
@@ -40,7 +40,7 @@ pub fn track_error(
         state.insert(format!("__op_{}", count_key), Dynamic::from("count"));
 
         // Output verbose errors - use ordered capture system for proper interleaving
-        if verbose > 0 && !quiet {
+        if verbose > 0 && quiet_level == 0 {
             // Enhanced format with filename for immediate verbose output
             let color_mode = config
                 .map(|c| &c.color_mode)
