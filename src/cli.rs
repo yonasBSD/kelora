@@ -382,6 +382,10 @@ pub struct Cli {
     /// Show time format help and exit
     #[arg(long = "help-time", help_heading = "Help Options")]
     pub help_time: bool,
+
+    /// Show multiline strategy help and exit
+    #[arg(long = "help-multiline", help_heading = "Help Options")]
+    pub help_multiline: bool,
 }
 
 impl Cli {

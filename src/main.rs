@@ -1222,6 +1222,12 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
         std::process::exit(0);
     }
 
+    // Check for --help-multiline
+    if raw_args.iter().any(|arg| arg == "--help-multiline") {
+        print_multiline_help();
+        std::process::exit(0);
+    }
+
     // Check for --ignore-config
     let ignore_config = raw_args.iter().any(|arg| arg == "--ignore-config");
 
@@ -1428,6 +1434,109 @@ ERROR HANDLING:
 For complete function reference: kelora --help-functions
 For usage examples: kelora --help (see examples section)
 For time format help: kelora --help-time
+For multiline strategy help: kelora --help-multiline
+"#;
+    println!("{}", help_text);
+}
+
+/// Print multiline strategy help
+fn print_multiline_help() {
+    let help_text = r#"
+Multiline Strategy Reference for --multiline:
+
+Kelora supports various strategies for detecting multi-line event boundaries.
+By default, multiline processing is disabled for all formats to avoid unexpected
+buffering behavior in streaming scenarios.
+
+AVAILABLE STRATEGIES:
+
+timestamp[:pattern=REGEX]
+  Events start with timestamp pattern (anchored to line beginning)
+  Default pattern matches ISO dates and syslog timestamps
+  Examples:
+    -M timestamp                    # Use default timestamp patterns
+    -M timestamp:pattern=^\d{4}     # Lines starting with 4 digits
+    -M timestamp:pattern=^\[.*\]    # Lines starting with bracketed content
+
+indent[:spaces=N|tabs|mixed]
+  Continuation lines are indented, new events start at column 1
+  Options:
+    spaces=N  - Require exactly N spaces minimum
+    tabs      - Only tabs count as indentation
+    mixed     - Any whitespace counts (default)
+  Examples:
+    -M indent                       # Any whitespace indentation
+    -M indent:spaces=4              # Minimum 4 spaces
+    -M indent:tabs                  # Only tab indentation
+
+start:REGEX
+  Events start when line matches pattern
+  Pattern is a regular expression
+  Examples:
+    -M start:^ERROR                 # Events start with "ERROR"
+    -M start:^\d{4}-\d{2}-\d{2}     # Events start with date format
+    -M start:^[A-Z]+:               # Events start with UPPERCASE:
+
+end:REGEX
+  Events end when line matches pattern
+  Current event completes when pattern is found
+  Examples:
+    -M end:^$                       # Events end at blank lines
+    -M end:END_OF_EVENT             # Events end with specific marker
+    -M end:^---+$                   # Events end with dashed separator
+
+boundary:start=START_REGEX:end=END_REGEX
+  Events have both start and end boundaries
+  New events start at start pattern, current events end at end pattern
+  Note: End markers become part of the next event's start
+  Examples:
+    -M boundary:start=^BEGIN:end=^END        # BEGIN...END blocks
+    -M boundary:start=^START:end=^STOP       # START...STOP blocks
+    -M boundary:start=^<log:end=^</log>      # XML-like boundaries
+
+backslash[:char=C]
+  Lines ending with continuation character continue the event
+  Default continuation character is backslash (\)
+  Examples:
+    -M backslash                    # Lines ending with \ continue
+    -M backslash:char=,             # Lines ending with comma continue
+    -M backslash:char=^             # Lines ending with caret continue
+
+whole
+  Read entire input as a single event
+  Useful for processing complete files as single records
+  Examples:
+    -M whole                        # Entire input becomes one event
+
+COMMON USE CASES:
+
+Stack Traces (Java/Python):
+  -M timestamp                      # New events start with timestamps
+  -M indent                         # Continuation lines are indented
+
+JSON Objects:
+  -M whole                          # Single large JSON file
+  -M timestamp                      # JSON logs with timestamps per entry
+
+Log Entries with Continuation:
+  -M backslash                      # Lines ending with \ continue
+  -M indent                         # Indented lines continue previous
+
+Docker/Container Logs:
+  -M timestamp --extract-prefix container  # Container-prefixed with timestamps
+
+SQL Statements:
+  -M end:;$                         # Statements end with semicolon
+  -M backslash                      # Line continuation with backslash
+
+PERFORMANCE NOTES:
+- Multiline mode buffers events in memory until boundaries are detected
+- Use --batch-size to control memory usage in parallel mode  
+- --take N applies after multiline reconstruction, not to input lines
+- Whole strategy loads entire input into memory
+
+For complete CLI reference: kelora --help
+For Rhai scripting help: kelora --help-rhai
 "#;
     println!("{}", help_text);
 }

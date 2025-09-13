@@ -243,6 +243,7 @@ kelora --help              # Full CLI reference
 kelora --help-time         # Timestamp format guide
 kelora --help-rhai         # Rhai scripting reference  
 kelora --help-functions    # Built-in function reference
+kelora --help-multiline    # Multiline strategy guide
 kelora --show-config       # Current configuration
 ```
 
