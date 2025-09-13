@@ -471,6 +471,30 @@ kelora -qq suspicious.log || mail -s "Log errors detected" admin@company.com
     # Sort users by score and extract names
     kelora -e "let sorted_users = sorted_by(e.users, 'score'); e.winner = sorted_users[-1].name"
     ```
+- **Array Fan-Out Processing**: Use `emit_each()` to convert arrays into individual events:
+  - `emit_each(e.items)` - Fan out array elements as separate events (original event suppressed)
+  - `emit_each(e.items, base_map)` - Fan out with common fields added to each event
+  - Returns count of events emitted for tracking and metrics
+  - Supports both strict and resilient error handling modes
+  - **Fan-Out Examples**:
+    ```bash
+    # Basic fan-out: each user becomes separate event
+    kelora -f json --exec "emit_each(e.users)"
+
+    # With base fields: add common context to each event
+    kelora -f json --exec "let base = #{batch_id: e.batch_id, host: 'server1'}; emit_each(e.items, base)"
+
+    # Multi-level fan-out: batches → items → active items only
+    # Input: {"batches": [{"name": "batch1", "items": [{"id": 1, "status": "active"}, {"id": 2, "status": "inactive"}]}]}
+    # Pipeline: batches become events → items become events → filter for active → preserve batch context
+    kelora -f json --exec "emit_each(e.batches)" \
+                   --exec "let batch_ctx = #{batch_name: e.name}; emit_each(e.items, batch_ctx)" \
+                   --filter "e.status == 'active'"
+    # Result: id=1 status='active' batch_name='batch1'
+
+    # Count and track emitted events
+    kelora -f json --exec "e.item_count = emit_each(e.items); track_count('total_items', e.item_count)"
+    ```
 - **Field and Event Removal**: Use unit `()` assignments for easy field and event removal:
   - `e.field = ()` - Remove individual fields from events
   - `e = ()` - Remove entire event (clears all fields, event becomes empty)
@@ -509,6 +533,10 @@ kelora -qq suspicious.log || mail -s "Log errors detected" admin@company.com
     e.user_role = e.get_path("user.role", "guest");
     e.permissions = e.get_path("user.permissions", [])
   '
+
+  # Process nested arrays with fan-out and filtering
+  kelora -f json --exec 'emit_each(e.requests)' --filter 'e.status >= 400' \
+    --exec 'let base = #{alert_time: now_utc(), severity: "high"}; emit_each(e.errors, base)'
   ```
 - **Safety Functions**: Use defensive field access functions for robust scripts:
   - `path_equals(e, "field.subfield", expected)` - Safe nested field comparison

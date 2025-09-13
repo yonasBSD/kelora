@@ -108,6 +108,8 @@ Prefix extraction runs before parsing, so the extracted prefix becomes a field i
 
 **Time Operations**: `parse_timestamp(string, format, timezone)` handles custom timestamps, `parse_duration("5m")` converts to seconds, `now_utc()` gets current time.
 
+**Array Processing**: `emit_each(array)` fans out arrays into individual events, `emit_each(array, base)` adds common fields to each. Transforms nested data like `{"users": [{"name": "alice"}, {"name": "bob"}]}` into separate events for each user. Original event is suppressed.
+
 **Metrics**: `track_count(key)` increments counters, `track_sum/avg/min/max(key, value)` accumulate statistics, `track_unique(key, value)` counts distinct values. Access via `metrics` map in `--end` scripts or display with `--metrics`.
 
 **Output**: Use `eprint()` for alerts and diagnostics (writes to stderr), `print()` for data output (writes to stdout). Since kelora's processed events go to stdout, `eprint()` prevents interference with the data pipeline.
@@ -194,6 +196,26 @@ kelora -f syslog -J /var/log/messages \
   --exec 'e.masked_host = e.host.mask_ip(1)' \
   --exec 'e.processed_at = now_utc()' \
   > structured-logs.json
+```
+
+### Array Fan-Out Processing
+
+```bash
+# Process nested JSON arrays: each user becomes a separate event
+echo '{"batch_id": "b123", "users": [{"name": "alice", "role": "admin"}, {"name": "bob", "role": "user"}]}' | \
+  kelora -f json --exec 'let base = #{batch_id: e.batch_id, processed: true}; emit_each(e.users, base)' -F json
+# Output: {"name": "alice", "role": "admin", "batch_id": "b123", "processed": true}
+#         {"name": "bob", "role": "user", "batch_id": "b123", "processed": true}
+
+# Multi-level fan-out: batches → requests → errors (only for failed requests)
+echo '{"batches": [{"id": "b1", "requests": [{"url": "/api", "status": 500, "errors": [{"type": "timeout"}, {"type": "db_error"}]}, {"url": "/health", "status": 200, "errors": []}]}]}' | \
+  kelora -f json \
+    --exec 'emit_each(e.batches)' \
+    --exec 'emit_each(e.requests)' \
+    --filter 'e.status >= 400' \
+    --exec 'let ctx = #{url: e.url, status: e.status}; emit_each(e.errors, ctx)'
+# Result: type='timeout' url='/api' status=500
+#         type='db_error' url='/api' status=500
 ```
 
 ## Learning Kelora (Recommended Path)

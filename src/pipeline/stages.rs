@@ -107,6 +107,9 @@ impl ScriptStage for ExecStage {
             tracer.trace_stage_execution(self.stage_number, "exec");
         }
 
+        // Clear any previous emission state
+        crate::rhai_functions::emit::clear_suppression_flag();
+
         // Atomic execution: work on a copy of the event for rollback behavior
         let mut event_copy = event.clone();
 
@@ -126,10 +129,51 @@ impl ScriptStage for ExecStage {
 
         match result {
             Ok(()) => {
-                // Success: commit the modified event
-                ScriptResult::Emit(event_copy)
+                // Check for deferred emissions from emit_each()
+                let pending_emissions = crate::rhai_functions::emit::get_and_clear_pending_emissions();
+                let should_suppress = crate::rhai_functions::emit::should_suppress_current_event();
+
+                if !pending_emissions.is_empty() {
+                    // Convert pending emissions to events and emit them
+                    let mut emitted_events = Vec::new();
+
+                    for emission_map in pending_emissions {
+                        let mut new_event = Event::default_with_line(event_copy.original_line.clone());
+                        new_event.line_num = event_copy.line_num;
+                        new_event.filename = event_copy.filename.clone();
+
+                        // Convert Rhai Map to Event fields
+                        for (key, value) in emission_map {
+                            new_event.fields.insert(key.to_string(), value);
+                        }
+
+                        emitted_events.push(new_event);
+                    }
+
+                    // Return multiple events - the first is primary, rest are additional
+                    if should_suppress {
+                        // Suppress original, return only emitted events
+                        ScriptResult::EmitMultiple(emitted_events)
+                    } else {
+                        // Keep original and add emitted events
+                        let mut all_events = vec![event_copy];
+                        all_events.extend(emitted_events);
+                        ScriptResult::EmitMultiple(all_events)
+                    }
+                } else if should_suppress {
+                    // emit_each was called but no events were actually emitted
+                    // Still suppress the original as per specification
+                    ScriptResult::Skip
+                } else {
+                    // Normal execution: commit the modified event
+                    ScriptResult::Emit(event_copy)
+                }
             }
             Err(e) => {
+                // Clear emission state on error
+                crate::rhai_functions::emit::clear_suppression_flag();
+                let _ = crate::rhai_functions::emit::get_and_clear_pending_emissions();
+
                 // Track error for reporting even in resilient mode
                 crate::rhai_functions::tracking::track_error(
                     "exec",

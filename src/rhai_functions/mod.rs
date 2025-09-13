@@ -5,6 +5,7 @@ pub mod columns;
 pub mod conf;
 pub mod datetime;
 pub mod docs;
+pub mod emit;
 pub mod encoding;
 pub mod environment;
 pub mod maps;
@@ -31,4 +32,5 @@ pub fn register_all_functions(engine: &mut Engine) {
     conf::register_functions(engine);
     encoding::register_functions(engine);
     environment::register_functions(engine);
+    emit::register_functions(engine);
 }
