@@ -192,6 +192,8 @@ pub enum MultilineStrategy {
     End { pattern: String },
     /// Events have both start and end boundaries
     Boundary { start: String, end: String },
+    /// Read entire input as a single event
+    Whole,
 }
 
 impl MultilineConfig {
@@ -258,6 +260,7 @@ impl MultilineConfig {
                 let (start, end) = Self::parse_boundary_options(&parts[1..])?;
                 MultilineStrategy::Boundary { start, end }
             }
+            "whole" => MultilineStrategy::Whole,
             _ => return Err(format!("Unknown multiline strategy: {}", strategy_name)),
         };
 

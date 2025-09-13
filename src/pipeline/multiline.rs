@@ -28,6 +28,7 @@ impl MultilineChunker {
                         .map_err(|e| format!("Invalid boundary start regex: {}", e))?,
                 )
             }
+            MultilineStrategy::Whole => None,
             _ => None,
         };
 
@@ -78,6 +79,10 @@ impl MultilineChunker {
                 // New events start when previous line doesn't end with continuation char
                 false // Logic handled elsewhere
             }
+            MultilineStrategy::Whole => {
+                // Whole strategy never starts new events during feed - everything gets buffered
+                false
+            }
         }
     }
 
@@ -102,6 +107,10 @@ impl MultilineChunker {
                 // Event continues if line ends with continuation character (ignoring trailing newlines)
                 let trimmed = line.trim_end_matches('\n').trim_end_matches('\r');
                 !trimmed.ends_with(*char)
+            }
+            MultilineStrategy::Whole => {
+                // Whole strategy never ends current event during feed - everything gets buffered
+                false
             }
             _ => false,
         }
@@ -134,8 +143,18 @@ impl MultilineChunker {
         if self.buffer.is_empty() {
             None
         } else {
-            // Lines already contain newlines, so join with empty string to avoid double newlines
-            let result = Some(self.buffer.join(""));
+            // For "whole" strategy, preserve line structure with newlines
+            // For other strategies, lines already contain newlines, so join with empty string to avoid double newlines
+            let result = match &self.config.strategy {
+                MultilineStrategy::Whole => {
+                    // Join with newlines to preserve line structure for whole file reading
+                    Some(self.buffer.join("\n"))
+                }
+                _ => {
+                    // Lines already contain newlines for other strategies
+                    Some(self.buffer.join(""))
+                }
+            };
             self.buffer.clear();
             result
         }
@@ -144,6 +163,12 @@ impl MultilineChunker {
 
 impl Chunker for MultilineChunker {
     fn feed_line(&mut self, line: String) -> Option<String> {
+        // Whole strategy always buffers everything and never returns content during feed
+        if let MultilineStrategy::Whole = &self.config.strategy {
+            self.buffer.push(line);
+            return None;
+        }
+
         // Backslash strategy has different logic - we need to add the line first,
         // then check if the event should end
         if let MultilineStrategy::Backslash { .. } = &self.config.strategy {

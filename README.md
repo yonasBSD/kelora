@@ -27,6 +27,9 @@ kubectl logs -f app | kelora -j --parallel --levels warn,error
 # Monitor for brute force attacks using sliding windows
 kelora -j auth.log --window 3 --filter 'e.event == "login_failed"' \
   --exec 'if window_values(window, "user").len() >= 2 { eprint("🚨 Brute force detected from " + e.ip) }'
+
+# Analyze entire JSON configuration as single document
+kelora -f json -M whole config.json --exec 'e.user_count = e.users.len(); e.admin_count = e.users.filter(|u| u.role == "admin").len()'
 ```
 
 ## Install
@@ -146,7 +149,7 @@ kelora -l error \
 ### Performance & Configuration
 - **Processing**: `--parallel` for batch files (2-10x faster), `--threads N`, `--batch-size N`
 - **Timezones**: `--input-tz Europe/Berlin` (parse), `-z` (display local), `-Z` (display UTC)  
-- **Multiline**: `-M timestamp` (Java stacks), `-M indent` (continuation lines), `-M backslash` (line continuation)
+- **Multiline**: `-M timestamp` (Java stacks), `-M indent` (continuation lines), `-M backslash` (line continuation), `-M whole` (entire input as single event)
 - **Scripts**: `-E script.rhai` (from file), `--begin 'init.config = ...'` (initialization), `--end 'print(tracked.total)'` (final reporting)
 - **Error Handling**: Default is resilient (skip errors), `--strict` for fail-fast, `--verbose` for details, `--no-emoji` to disable emoji prefixes
 - **Verbose Output**: Uses standardized emoji prefixes - 🔹 (blue diamond) for general output like stats and processing messages, 🔸 (orange diamond) for errors and warnings
