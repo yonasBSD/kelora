@@ -228,7 +228,7 @@ impl ErrorEnhancer {
                     } else if var_name.starts_with("e.") {
                         Some("Try using bracket notation for special characters: e[\"field-name\"] or e[\"field.with.dots\"]".to_string())
                     } else {
-                        Some("Available variables: e (event), meta (metadata), init (initialization data), line (raw line)".to_string())
+                        Some("Available variables: e (event), meta (metadata), conf (initialization data), line (raw line)".to_string())
                     }
                 }
             },
@@ -398,7 +398,7 @@ impl ErrorEnhancer {
             }
             "begin" => {
                 help.push_str("\n   🔹 Begin stage tips:\n");
-                help.push_str("   • Use 'init.field = value' to set global initialization data\n");
+                help.push_str("   • Use 'conf.field = value' to set global initialization data\n");
                 help.push_str("   • Use 'read_file(\"path\")' to load external data\n");
                 help.push_str("   • Variables set here are available in all event processing\n");
             }
@@ -668,7 +668,7 @@ pub struct RhaiEngine {
     compiled_end: Option<CompiledExpression>,
     scope_template: Scope<'static>,
     suppress_side_effects: bool,
-    init_map: Option<rhai::Map>,
+    conf_map: Option<rhai::Map>,
     debug_tracker: Option<DebugTracker>,
     execution_tracer: Option<ExecutionTracer>,
 }
@@ -703,7 +703,7 @@ impl Clone for RhaiEngine {
             compiled_end: self.compiled_end.clone(),
             scope_template: self.scope_template.clone(),
             suppress_side_effects,
-            init_map: self.init_map.clone(),
+            conf_map: self.conf_map.clone(),
             debug_tracker: self.debug_tracker.clone(),
             execution_tracer: self.execution_tracer.clone(),
         }
@@ -1056,7 +1056,7 @@ impl RhaiEngine {
         scope_template.push("line", "");
         scope_template.push("e", rhai::Map::new());
         scope_template.push("meta", rhai::Map::new());
-        scope_template.push("init", rhai::Map::new());
+        scope_template.push("conf", rhai::Map::new());
 
         Self {
             engine,
@@ -1066,7 +1066,7 @@ impl RhaiEngine {
             compiled_end: None,
             scope_template,
             suppress_side_effects: false,
-            init_map: None,
+            conf_map: None,
             debug_tracker: None,
             execution_tracer: None,
         }
@@ -1424,7 +1424,7 @@ impl RhaiEngine {
         Self::set_thread_tracking_state(metrics);
 
         // Set begin phase flag to allow read_file/read_lines
-        crate::rhai_functions::init::set_begin_phase(true);
+        crate::rhai_functions::conf::set_begin_phase(true);
 
         let mut scope = self.scope_template.clone();
 
@@ -1437,20 +1437,20 @@ impl RhaiEngine {
             })?;
 
         // Reset begin phase flag
-        crate::rhai_functions::init::set_begin_phase(false);
+        crate::rhai_functions::conf::set_begin_phase(false);
 
         *metrics = Self::get_thread_tracking_state();
 
-        // Extract the init map from scope and store it
-        let mut init_map = scope.get_value::<rhai::Map>("init").unwrap_or_default();
+        // Extract the conf map from scope and store it
+        let mut conf_map = scope.get_value::<rhai::Map>("conf").unwrap_or_default();
 
-        // Deep freeze the init map to make it read-only
-        crate::rhai_functions::init::deep_freeze_map(&mut init_map);
+        // Deep freeze the conf map to make it read-only
+        crate::rhai_functions::conf::deep_freeze_map(&mut conf_map);
 
-        // Store the frozen init map
-        self.init_map = Some(init_map.clone());
+        // Store the frozen conf map
+        self.conf_map = Some(conf_map.clone());
 
-        Ok(init_map)
+        Ok(conf_map)
     }
 
     pub fn execute_compiled_end(
@@ -1734,9 +1734,9 @@ impl RhaiEngine {
 
         scope.set_value("meta", meta_map);
 
-        // Set the frozen init map
-        if let Some(ref init_map) = self.init_map {
-            scope.set_value("init", init_map.clone());
+        // Set the frozen conf map
+        if let Some(ref conf_map) = self.conf_map {
+            scope.set_value("conf", conf_map.clone());
         }
 
         scope

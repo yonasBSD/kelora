@@ -44,7 +44,7 @@ fn test_init_map_basic_functionality() {
     fs::write(&data_file, "192.168.1.1\n10.0.0.1\n127.0.0.1\n").expect("Failed to write data file");
 
     let begin_script = format!(
-        "init.whitelist = read_lines(\"{}\")",
+        "conf.whitelist = read_lines(\"{}\")",
         data_file.to_str().unwrap()
     );
 
@@ -59,7 +59,7 @@ fn test_init_map_basic_functionality() {
             "--begin",
             &begin_script,
             "--filter",
-            "init.whitelist.contains(e.ip)",
+            "conf.whitelist.contains(e.ip)",
         ],
         input,
     );
@@ -85,7 +85,7 @@ fn test_read_file_function() {
     .expect("Failed to write banner file");
 
     let begin_script = format!(
-        "init.banner = read_file(\"{}\")",
+        "conf.banner = read_file(\"{}\")",
         banner_file.to_str().unwrap()
     );
 
@@ -99,7 +99,7 @@ fn test_read_file_function() {
             "--begin",
             &begin_script,
             "--exec",
-            "if e.action == \"login\" { print(init.banner) }",
+            "if e.action == \"login\" { print(conf.banner) }",
         ],
         input,
     );
@@ -123,13 +123,13 @@ fn test_init_map_immutability() {
     fs::write(&data_file, "admin\nuser\nguest\n").expect("Failed to write data file");
 
     let begin_script = format!(
-        "init.roles = read_lines(\"{}\")",
+        "conf.roles = read_lines(\"{}\")",
         data_file.to_str().unwrap()
     );
 
     let input = r#"{"user": "alice", "role": "admin"}"#;
 
-    // Try to modify init map after --begin phase
+    // Try to modify conf map after --begin phase
     let (_stdout, stderr, exit_code) = run_kelora_with_input(
         &[
             "-f",
@@ -137,7 +137,7 @@ fn test_init_map_immutability() {
             "--begin",
             &begin_script,
             "--exec",
-            "init.roles.push(\"hacker\"); e.valid = init.roles.contains(e.role)",
+            "conf.roles.push(\"hacker\"); e.valid = conf.roles.contains(e.role)",
         ],
         input,
     );
@@ -197,7 +197,7 @@ fn test_empty_file_handling() {
     fs::write(&empty_lines_file, "").expect("Failed to write empty lines file");
 
     let begin_script = format!(
-        "init.empty_content = read_file(\"{}\"); init.empty_lines = read_lines(\"{}\")",
+        "conf.empty_content = read_file(\"{}\"); conf.empty_lines = read_lines(\"{}\")",
         empty_file.to_str().unwrap(),
         empty_lines_file.to_str().unwrap()
     );
@@ -209,7 +209,7 @@ fn test_empty_file_handling() {
             "-f", "json",
             "-F", "json",
             "--begin", &begin_script,
-            "--exec", "e.empty_content_len = init.empty_content.len(); e.empty_lines_len = init.empty_lines.len()"
+            "--exec", "e.empty_content_len = conf.empty_content.len(); e.empty_lines_len = conf.empty_lines.len()"
         ],
         input,
     );
@@ -229,7 +229,7 @@ fn test_utf8_bom_handling() {
     fs::write(&bom_file, content_with_bom).expect("Failed to write BOM file");
 
     let begin_script = format!(
-        "init.lines = read_lines(\"{}\")",
+        "conf.lines = read_lines(\"{}\")",
         bom_file.to_str().unwrap()
     );
 
@@ -244,7 +244,7 @@ fn test_utf8_bom_handling() {
             "--begin",
             &begin_script,
             "--exec",
-            "e.first_line = init.lines[0]; e.lines_count = init.lines.len()",
+            "e.first_line = conf.lines[0]; e.lines_count = conf.lines.len()",
         ],
         input,
     );
@@ -264,7 +264,7 @@ fn test_newline_stripping() {
     fs::write(&newline_file, "line1\nline2\r\nline3\n").expect("Failed to write newline file");
 
     let begin_script = format!(
-        "init.lines = read_lines(\"{}\")",
+        "conf.lines = read_lines(\"{}\")",
         newline_file.to_str().unwrap()
     );
 
@@ -279,7 +279,7 @@ fn test_newline_stripping() {
             "--begin",
             &begin_script,
             "--exec",
-            "e.line1 = init.lines[0]; e.line2 = init.lines[1]; e.line3 = init.lines[2]",
+            "e.line1 = conf.lines[0]; e.line2 = conf.lines[1]; e.line3 = conf.lines[2]",
         ],
         input,
     );

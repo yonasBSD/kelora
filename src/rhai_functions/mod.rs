@@ -2,11 +2,11 @@ use rhai::Engine;
 
 pub mod arrays;
 pub mod columns;
+pub mod conf;
 pub mod datetime;
 pub mod docs;
 pub mod encoding;
 pub mod environment;
-pub mod init;
 pub mod maps;
 pub mod math;
 pub mod process;
@@ -28,7 +28,7 @@ pub fn register_all_functions(engine: &mut Engine) {
     datetime::register_functions(engine);
     window::register_functions(engine);
     safety::register_functions(engine);
-    init::register_functions(engine);
+    conf::register_functions(engine);
     encoding::register_functions(engine);
     environment::register_functions(engine);
 }

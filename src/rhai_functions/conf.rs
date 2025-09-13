@@ -7,7 +7,7 @@ thread_local! {
     static IS_BEGIN_PHASE: RwLock<bool> = const { RwLock::new(false) };
 }
 
-/// Set the init map for the current thread
+/// Set the conf map for the current thread
 pub fn set_init_map(map: rhai::Map) {
     INIT_MAP.with(|m| {
         *m.write().unwrap() = Some(map);
@@ -72,7 +72,7 @@ fn read_lines_impl(path: String) -> Result<rhai::Array, Box<rhai::EvalAltResult>
     Ok(lines)
 }
 
-/// Register init-related functions with the Rhai engine
+/// Register conf-related functions with the Rhai engine
 pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("read_file", read_file_impl);
     engine.register_fn("read_lines", read_lines_impl);
@@ -82,7 +82,7 @@ pub fn register_functions(engine: &mut Engine) {
 /// Note: In Rhai, we can't actually freeze data structures at runtime,
 /// but we can implement immutability through access control and error checking
 pub fn deep_freeze_map(map: &mut rhai::Map) {
-    // Store the frozen init map in thread-local storage for access control
+    // Store the frozen conf map in thread-local storage for access control
     set_init_map(map.clone());
 
     // Recursively process nested structures for consistency
