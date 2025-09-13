@@ -1,5 +1,5 @@
-use rhai::{Dynamic, Engine, Map, Array};
-use std::cell::{RefCell, Cell};
+use rhai::{Array, Dynamic, Engine, Map};
+use std::cell::{Cell, RefCell};
 
 // Thread-local storage for deferred event emission
 thread_local! {
@@ -35,12 +35,18 @@ pub fn emit_each_single(items: Dynamic) -> Result<Dynamic, Box<rhai::EvalAltResu
 
 /// Rhai function: emit_each(items: array<map>, base: map) -> int
 /// Fan out an array of event maps into individual events with base defaults and suppress the original.
-pub fn emit_each_with_base(items: Dynamic, base: Dynamic) -> Result<Dynamic, Box<rhai::EvalAltResult>> {
+pub fn emit_each_with_base(
+    items: Dynamic,
+    base: Dynamic,
+) -> Result<Dynamic, Box<rhai::EvalAltResult>> {
     emit_each_impl(items, base)
 }
 
 /// Core implementation for emit_each functionality
-fn emit_each_impl(items_val: Dynamic, base_val: Dynamic) -> Result<Dynamic, Box<rhai::EvalAltResult>> {
+fn emit_each_impl(
+    items_val: Dynamic,
+    base_val: Dynamic,
+) -> Result<Dynamic, Box<rhai::EvalAltResult>> {
     // Get strict mode from engine - we'll determine this from error handling patterns
     // For now, implement resilient behavior by default with proper error propagation
     let strict = false; // TODO: Get from engine configuration if available
@@ -53,10 +59,14 @@ fn emit_each_impl(items_val: Dynamic, base_val: Dynamic) -> Result<Dynamic, Box<
                 return Err(format!(
                     "emit_each(): items must be array<map>, got {}",
                     items_val.type_name()
-                ).into());
+                )
+                .into());
             } else {
                 // Log warning in resilient mode
-                eprintln!("🔸 emit_each(): items must be array<map>; got {}; returning 0", items_val.type_name());
+                eprintln!(
+                    "🔸 emit_each(): items must be array<map>; got {}; returning 0",
+                    items_val.type_name()
+                );
                 return Ok(Dynamic::from(0i64));
             }
         }
@@ -73,9 +83,13 @@ fn emit_each_impl(items_val: Dynamic, base_val: Dynamic) -> Result<Dynamic, Box<
                     return Err(format!(
                         "emit_each(): base must be map, got {}",
                         base_val.type_name()
-                    ).into());
+                    )
+                    .into());
                 } else {
-                    eprintln!("🔸 emit_each(): base must be map; got {}; treating as empty", base_val.type_name());
+                    eprintln!(
+                        "🔸 emit_each(): base must be map; got {}; treating as empty",
+                        base_val.type_name()
+                    );
                     None
                 }
             }
@@ -97,9 +111,14 @@ fn emit_each_impl(items_val: Dynamic, base_val: Dynamic) -> Result<Dynamic, Box<
                         "emit_each(): items[{}] is not a map (got {})",
                         i,
                         item.type_name()
-                    ).into());
+                    )
+                    .into());
                 } else {
-                    eprintln!("🔸 emit_each(): skipping items[{}], expected map (got {})", i, item.type_name());
+                    eprintln!(
+                        "🔸 emit_each(): skipping items[{}], expected map (got {})",
+                        i,
+                        item.type_name()
+                    );
                     continue;
                 }
             }
@@ -137,7 +156,7 @@ pub fn register_functions(engine: &mut Engine) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rhai::{Engine, Map, Array};
+    use rhai::{Array, Engine, Map};
 
     fn setup_test() {
         // Clear thread-local state
@@ -185,12 +204,18 @@ mod tests {
 
         // Verify first emission
         let first = &emissions[0];
-        assert_eq!(first.get("name").unwrap().clone().into_string().unwrap(), "alice");
+        assert_eq!(
+            first.get("name").unwrap().clone().into_string().unwrap(),
+            "alice"
+        );
         assert_eq!(first.get("age").unwrap().as_int().unwrap(), 25);
 
         // Verify second emission
         let second = &emissions[1];
-        assert_eq!(second.get("name").unwrap().clone().into_string().unwrap(), "bob");
+        assert_eq!(
+            second.get("name").unwrap().clone().into_string().unwrap(),
+            "bob"
+        );
         assert_eq!(second.get("age").unwrap().as_int().unwrap(), 30);
     }
 
@@ -226,14 +251,26 @@ mod tests {
 
         // Verify first emission (with override)
         let first = &emissions[0];
-        assert_eq!(first.get("host").unwrap().clone().into_string().unwrap(), "server1");
-        assert_eq!(first.get("app").unwrap().clone().into_string().unwrap(), "override_app");
+        assert_eq!(
+            first.get("host").unwrap().clone().into_string().unwrap(),
+            "server1"
+        );
+        assert_eq!(
+            first.get("app").unwrap().clone().into_string().unwrap(),
+            "override_app"
+        );
         assert_eq!(first.get("id").unwrap().as_int().unwrap(), 1);
 
         // Verify second emission (inherits base app)
         let second = &emissions[1];
-        assert_eq!(second.get("host").unwrap().clone().into_string().unwrap(), "server1");
-        assert_eq!(second.get("app").unwrap().clone().into_string().unwrap(), "myapp");
+        assert_eq!(
+            second.get("host").unwrap().clone().into_string().unwrap(),
+            "server1"
+        );
+        assert_eq!(
+            second.get("app").unwrap().clone().into_string().unwrap(),
+            "myapp"
+        );
         assert_eq!(second.get("id").unwrap().as_int().unwrap(), 2);
     }
 
@@ -271,7 +308,15 @@ mod tests {
 
         let emissions = get_and_clear_pending_emissions();
         assert_eq!(emissions.len(), 1);
-        assert_eq!(emissions[0].get("name").unwrap().clone().into_string().unwrap(), "alice");
+        assert_eq!(
+            emissions[0]
+                .get("name")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "alice"
+        );
     }
 
     #[test]
@@ -325,10 +370,14 @@ mod tests {
         register_functions(&mut engine);
 
         // Test single parameter version
-        let result = engine.eval::<i64>(r#"
+        let result = engine
+            .eval::<i64>(
+                r#"
             let items = [#{name: "alice"}, #{name: "bob"}];
             emit_each(items)
-        "#).unwrap();
+        "#,
+            )
+            .unwrap();
 
         assert_eq!(result, 2);
         assert!(should_suppress_current_event());
@@ -340,11 +389,15 @@ mod tests {
         clear_suppression_flag();
 
         // Test two parameter version
-        let result = engine.eval::<i64>(r#"
+        let result = engine
+            .eval::<i64>(
+                r#"
             let items = [#{id: 1}, #{id: 2}];
             let base = #{host: "server1"};
             emit_each(items, base)
-        "#).unwrap();
+        "#,
+            )
+            .unwrap();
 
         assert_eq!(result, 2);
         assert!(should_suppress_current_event());
@@ -353,8 +406,24 @@ mod tests {
         assert_eq!(emissions.len(), 2);
 
         // Both emissions should have host field from base
-        assert_eq!(emissions[0].get("host").unwrap().clone().into_string().unwrap(), "server1");
-        assert_eq!(emissions[1].get("host").unwrap().clone().into_string().unwrap(), "server1");
+        assert_eq!(
+            emissions[0]
+                .get("host")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "server1"
+        );
+        assert_eq!(
+            emissions[1]
+                .get("host")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "server1"
+        );
 
         // And their respective id values
         assert_eq!(emissions[0].get("id").unwrap().as_int().unwrap(), 1);

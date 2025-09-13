@@ -130,7 +130,8 @@ impl ScriptStage for ExecStage {
         match result {
             Ok(()) => {
                 // Check for deferred emissions from emit_each()
-                let pending_emissions = crate::rhai_functions::emit::get_and_clear_pending_emissions();
+                let pending_emissions =
+                    crate::rhai_functions::emit::get_and_clear_pending_emissions();
                 let should_suppress = crate::rhai_functions::emit::should_suppress_current_event();
 
                 if !pending_emissions.is_empty() {
@@ -138,7 +139,8 @@ impl ScriptStage for ExecStage {
                     let mut emitted_events = Vec::new();
 
                     for emission_map in pending_emissions {
-                        let mut new_event = Event::default_with_line(event_copy.original_line.clone());
+                        let mut new_event =
+                            Event::default_with_line(event_copy.original_line.clone());
                         new_event.line_num = event_copy.line_num;
                         new_event.filename = event_copy.filename.clone();
 
