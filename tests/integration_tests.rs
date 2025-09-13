@@ -224,7 +224,7 @@ fn test_global_tracking() {
             "--exec",
             "track_count(\"errors\")",
             "--end",
-            "print(`Errors: ${tracked[\"errors\"]}`)",
+            "print(`Errors: ${metrics[\"errors\"]}`)",
         ],
         input,
     );
@@ -754,7 +754,7 @@ fn test_stdin_large_input_performance() {
             "--exec",
             "track_count(\"errors\");",
             "--end",
-            "print(`Errors: ${tracked[\"errors\"]}`);",
+            "print(`Errors: ${metrics[\"errors\"]}`);",
         ],
         &large_input,
     );
@@ -843,7 +843,7 @@ fn test_tracking_with_min_max() {
             "--exec",
             "track_min(\"min_time\", e.response_time); track_max(\"max_time\", e.response_time);",
             "--end",
-            "print(`Min: ${tracked[\"min_time\"]}, Max: ${tracked[\"max_time\"]}`);",
+            "print(`Min: ${metrics[\"min_time\"]}, Max: ${metrics[\"max_time\"]}`);",
         ],
         input,
     );
@@ -902,7 +902,7 @@ fn test_track_unique_function() {
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json",
         "--exec", "track_unique(\"unique_ips\", e.ip); track_unique(\"unique_users\", e.user);",
-        "--end", "print(`IPs: ${tracked[\"unique_ips\"].len()}, Users: ${tracked[\"unique_users\"].len()}`);"
+        "--end", "print(`IPs: ${metrics[\"unique_ips\"].len()}, Users: ${metrics[\"unique_users\"].len()}`);"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
@@ -925,7 +925,7 @@ fn test_track_bucket_function() {
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json",
         "--exec", "track_bucket(\"status_counts\", e.status); track_bucket(\"method_counts\", e.method);",
-        "--end", "print(`Status 200: ${tracked[\"status_counts\"].get(\"200\") ?? 0}, GET requests: ${tracked[\"method_counts\"].get(\"GET\") ?? 0}`);"
+        "--end", "print(`Status 200: ${metrics[\"status_counts\"].get(\"200\") ?? 0}, GET requests: ${metrics[\"method_counts\"].get(\"GET\") ?? 0}`);"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
@@ -959,7 +959,7 @@ fn test_track_unique_parallel_mode() {
             "--exec",
             "track_unique(\"ips\", e.ip);",
             "--end",
-            "print(`Unique IPs: ${tracked[\"ips\"].len()}`);",
+            "print(`Unique IPs: ${metrics[\"ips\"].len()}`);",
         ],
         input,
     );
@@ -989,7 +989,7 @@ fn test_track_bucket_parallel_mode() {
         "--parallel",
         "--batch-size", "2",
         "--exec", "track_bucket(\"status_counts\", e.status);",
-        "--end", "let counts = tracked[\"status_counts\"]; print(`200: ${counts.get(\"200\") ?? 0}, 404: ${counts.get(\"404\") ?? 0}, 500: ${counts.get(\"500\") ?? 0}`);"
+        "--end", "let counts = metrics[\"status_counts\"]; print(`200: ${counts.get(\"200\") ?? 0}, 404: ${counts.get(\"404\") ?? 0}, 500: ${counts.get(\"500\") ?? 0}`);"
     ], input);
     assert_eq!(
         exit_code, 0,
@@ -1021,7 +1021,7 @@ fn test_mixed_tracking_functions() {
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json",
         "--exec", "track_count(\"total\"); track_unique(\"users\", e.user); track_bucket(\"status_dist\", e.status); track_min(\"min_time\", e.response_time); track_max(\"max_time\", e.response_time);",
-        "--end", "print(`Total: ${tracked[\"total\"]}, Users: ${tracked[\"users\"].len()}, Min: ${tracked[\"min_time\"]}, Max: ${tracked[\"max_time\"]}`);"
+        "--end", "print(`Total: ${metrics[\"total\"]}, Users: ${metrics[\"users\"].len()}, Min: ${metrics[\"min_time\"]}, Max: ${metrics[\"max_time\"]}`);"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
@@ -1050,7 +1050,7 @@ fn test_multiline_real_world_scenario() {
         "-F", "json",
         "--filter", "e.status >= 400",
         "--exec", "e.alert_level = if e.status >= 500 { \"critical\" } else { \"warning\" }; track_count(\"total_errors\");",
-        "--end", "print(`Total errors processed: ${tracked[\"total_errors\"]}`);"
+        "--end", "print(`Total errors processed: ${metrics[\"total_errors\"]}`);"
     ], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
@@ -1395,7 +1395,7 @@ Oct 11 22:14:19 server01 kernel: CPU0: Core temperature above threshold"#;
         "-f", "syslog",
         "--filter", "e.msg.matches(\"Failed|reject\")",
         "--exec", "track_count(\"errors\"); track_unique(\"programs\", e.prog);",
-        "--end", "print(`Total errors: ${tracked[\"errors\"]}, Programs: ${tracked[\"programs\"].len()}`);"
+        "--end", "print(`Total errors: ${metrics[\"errors\"]}, Programs: ${metrics[\"programs\"].len()}`);"
     ], input);
     assert_eq!(exit_code, 0, "syslog filtering should succeed");
 
@@ -1419,7 +1419,7 @@ fn test_syslog_severity_analysis() {
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "syslog",
         "--exec", "e.sev_name = if e.severity == 5 { \"notice\" } else if e.severity == 6 { \"info\" } else if e.severity == 3 { \"error\" } else { \"other\" }; track_bucket(\"severities\", e.sev_name);",
-        "--end", "let counts = tracked[\"severities\"]; print(`notice: ${counts.get(\"notice\") ?? 0}, info: ${counts.get(\"info\") ?? 0}, error: ${counts.get(\"error\") ?? 0}`);"
+        "--end", "let counts = metrics[\"severities\"]; print(`notice: ${counts.get(\"notice\") ?? 0}, info: ${counts.get(\"info\") ?? 0}, error: ${counts.get(\"error\") ?? 0}`);"
     ], input);
     assert_eq!(exit_code, 0, "syslog severity analysis should succeed");
 
@@ -1545,7 +1545,7 @@ fn test_apache_filtering_and_analysis() {
         "-f", "combined",
         "--filter", "e.status >= 400",
         "--exec", "track_count(\"errors\"); track_bucket(\"methods\", e.method);",
-        "--end", "let methods = tracked[\"methods\"]; print(`Total errors: ${tracked[\"errors\"]}, GET: ${methods.get(\"GET\") ?? 0}, POST: ${methods.get(\"POST\") ?? 0}`);"
+        "--end", "let methods = metrics[\"methods\"]; print(`Total errors: ${metrics[\"errors\"]}, GET: ${methods.get(\"GET\") ?? 0}, POST: ${methods.get(\"POST\") ?? 0}`);"
     ], input);
     assert_eq!(exit_code, 0, "Apache filtering should succeed");
 
@@ -1568,7 +1568,7 @@ fn test_apache_status_code_analysis() {
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "combined",
         "--exec", "e.class = if e.status < 300 { \"2xx\" } else if e.status < 400 { \"3xx\" } else if e.status < 500 { \"4xx\" } else { \"5xx\" }; track_bucket(\"status_classes\", e.class);",
-        "--end", "let classes = tracked[\"status_classes\"]; print(`2xx: ${classes.get(\"2xx\") ?? 0}, 4xx: ${classes.get(\"4xx\") ?? 0}, 5xx: ${classes.get(\"5xx\") ?? 0}`);"
+        "--end", "let classes = metrics[\"status_classes\"]; print(`2xx: ${classes.get(\"2xx\") ?? 0}, 4xx: ${classes.get(\"4xx\") ?? 0}, 5xx: ${classes.get(\"5xx\") ?? 0}`);"
     ], input);
     assert_eq!(exit_code, 0, "Apache status code analysis should succeed");
 

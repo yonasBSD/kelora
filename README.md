@@ -108,7 +108,7 @@ Prefix extraction runs before parsing, so the extracted prefix becomes a field i
 
 **Time Operations**: `parse_timestamp(string, format, timezone)` handles custom timestamps, `parse_duration("5m")` converts to seconds, `now_utc()` gets current time.
 
-**Metrics**: `track_count(key)` increments counters, `track_sum/avg/min/max(key, value)` accumulate statistics, `track_unique(key, value)` counts distinct values. Access via `tracked` map in `--end` scripts or display with `--metrics`.
+**Metrics**: `track_count(key)` increments counters, `track_sum/avg/min/max(key, value)` accumulate statistics, `track_unique(key, value)` counts distinct values. Access via `metrics` map in `--end` scripts or display with `--metrics`.
 
 **Output**: Use `eprint()` for alerts and diagnostics (writes to stderr), `print()` for data output (writes to stdout). Since kelora's processed events go to stdout, `eprint()` prevents interference with the data pipeline.
 
@@ -150,7 +150,7 @@ kelora -l error \
 - **Processing**: `--parallel` for batch files (2-10x faster), `--threads N`, `--batch-size N`
 - **Timezones**: `--input-tz Europe/Berlin` (parse), `-z` (display local), `-Z` (display UTC)  
 - **Multiline**: `-M timestamp` (Java stacks), `-M indent` (continuation lines), `-M backslash` (line continuation), `-M whole` (entire input as single event)
-- **Scripts**: `-E script.rhai` (from file), `--begin 'init.config = ...'` (initialization), `--end 'print(tracked.total)'` (final reporting)
+- **Scripts**: `-E script.rhai` (from file), `--begin 'init.config = ...'` (initialization), `--end 'print(metrics.total)'` (final reporting)
 - **Error Handling**: Default is resilient (skip errors), `--strict` for fail-fast, `--verbose` for details, `--no-emoji` to disable emoji prefixes
 - **Verbose Output**: Uses standardized emoji prefixes - 🔹 (blue diamond) for general output like stats and processing messages, 🔸 (orange diamond) for errors and warnings
 - **Config**: `~/.config/kelora/config.ini` for defaults and aliases, `--config-file path/to/config.ini` for custom config, `--show-config` to view

@@ -99,28 +99,28 @@ impl GlobalTracker {
 
     pub fn extract_final_stats_from_tracking(
         &self,
-        tracked: &HashMap<String, Dynamic>,
+        metrics: &HashMap<String, Dynamic>,
     ) -> Result<()> {
         let mut stats = self.processing_stats.lock().unwrap();
 
-        let output = tracked
+        let output = metrics
             .get("__kelora_stats_output")
             .and_then(|v| v.as_int().ok())
             .unwrap_or(0) as usize;
         // Note: Line-level filtering is not used - all filtering is done at event level
-        let lines_errors = tracked
+        let lines_errors = metrics
             .get("__kelora_stats_lines_errors")
             .and_then(|v| v.as_int().ok())
             .unwrap_or(0) as usize;
-        let events_created = tracked
+        let events_created = metrics
             .get("__kelora_stats_events_created")
             .and_then(|v| v.as_int().ok())
             .unwrap_or(0) as usize;
-        let events_output = tracked
+        let events_output = metrics
             .get("__kelora_stats_events_output")
             .and_then(|v| v.as_int().ok())
             .unwrap_or(0) as usize;
-        let events_filtered = tracked
+        let events_filtered = metrics
             .get("__kelora_stats_events_filtered")
             .and_then(|v| v.as_int().ok())
             .unwrap_or(0) as usize;
@@ -133,7 +133,7 @@ impl GlobalTracker {
         stats.events_filtered = events_filtered;
 
         // Extract discovered levels from tracking data
-        if let Some(levels_dynamic) = tracked.get("__kelora_stats_discovered_levels") {
+        if let Some(levels_dynamic) = metrics.get("__kelora_stats_discovered_levels") {
             if let Ok(levels_array) = levels_dynamic.clone().into_array() {
                 for level in levels_array {
                     if let Ok(level_str) = level.into_string() {
@@ -144,7 +144,7 @@ impl GlobalTracker {
         }
 
         // Extract discovered keys from tracking data
-        if let Some(keys_dynamic) = tracked.get("__kelora_stats_discovered_keys") {
+        if let Some(keys_dynamic) = metrics.get("__kelora_stats_discovered_keys") {
             if let Ok(keys_array) = keys_dynamic.clone().into_array() {
                 for key in keys_array {
                     if let Ok(key_str) = key.into_string() {

@@ -249,7 +249,11 @@ pub struct Cli {
     pub wrap: bool,
 
     /// Disable word-wrapping for default output format
-    #[arg(long = "no-wrap", help_heading = "Output Options", overrides_with = "wrap")]
+    #[arg(
+        long = "no-wrap",
+        help_heading = "Output Options",
+        overrides_with = "wrap"
+    )]
     pub no_wrap: bool,
 
     /// Output file for formatted events

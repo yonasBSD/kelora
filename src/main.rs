@@ -199,7 +199,7 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
         output,
     )?;
 
-    // Merge the parallel tracked state with our pipeline context
+    // Merge the parallel metrics state with our pipeline context
     let parallel_tracked = processor.get_final_tracked_state();
 
     // Extract internal stats from tracking system before merging

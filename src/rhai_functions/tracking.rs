@@ -110,8 +110,8 @@ pub fn track_error(
 
 /// Check if any errors occurred based on tracking data
 #[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
-pub fn has_errors_in_tracking(tracked: &HashMap<String, Dynamic>) -> bool {
-    for (key, value) in tracked {
+pub fn has_errors_in_tracking(metrics: &HashMap<String, Dynamic>) -> bool {
+    for (key, value) in metrics {
         if let Some(_error_type) = key.strip_prefix("__kelora_error_count_") {
             if let Ok(count) = value.as_int() {
                 if count > 0 {
@@ -126,7 +126,7 @@ pub fn has_errors_in_tracking(tracked: &HashMap<String, Dynamic>) -> bool {
 /// Extract error summary from tracking state with different verbosity levels
 #[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
 pub fn extract_error_summary_from_tracking(
-    tracked: &HashMap<String, Dynamic>,
+    metrics: &HashMap<String, Dynamic>,
     verbose: u8,
     config: Option<&crate::config::KeloraConfig>,
 ) -> Option<String> {
@@ -135,7 +135,7 @@ pub fn extract_error_summary_from_tracking(
     let mut sample_objects: Vec<rhai::Map> = Vec::new();
 
     // Collect error counts by type
-    for (key, value) in tracked {
+    for (key, value) in metrics {
         if let Some(error_type) = key.strip_prefix("__kelora_error_count_") {
             if let Ok(count) = value.as_int() {
                 if count > 0 {
@@ -151,7 +151,7 @@ pub fn extract_error_summary_from_tracking(
     }
 
     // Collect sample objects with structured data
-    for (key, value) in tracked {
+    for (key, value) in metrics {
         if let Some(_error_type) = key.strip_prefix("__kelora_error_samples_") {
             if let Ok(sample_array) = value.clone().into_array() {
                 for sample in sample_array {
@@ -722,11 +722,11 @@ pub fn register_functions(engine: &mut Engine) {
 }
 
 // Expose the thread-local state management functions for engine.rs
-pub fn set_thread_tracking_state(tracked: &HashMap<String, Dynamic>) {
+pub fn set_thread_tracking_state(metrics: &HashMap<String, Dynamic>) {
     THREAD_TRACKING_STATE.with(|state| {
         let mut state = state.borrow_mut();
         state.clear();
-        for (k, v) in tracked {
+        for (k, v) in metrics {
             state.insert(k.clone(), v.clone());
         }
     });
@@ -753,11 +753,11 @@ fn get_metrics_map() -> Dynamic {
 
 /// Format metrics for CLI output according to specification
 #[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
-pub fn format_metrics_output(tracked: &HashMap<String, Dynamic>) -> String {
+pub fn format_metrics_output(metrics: &HashMap<String, Dynamic>) -> String {
     let mut output = String::new();
 
     // Filter out internal keys (operation metadata and stats)
-    let mut user_values: Vec<_> = tracked
+    let mut user_values: Vec<_> = metrics
         .iter()
         .filter(|(k, _)| !k.starts_with("__op_") && !k.starts_with("__kelora_stats_"))
         .collect();
@@ -812,12 +812,12 @@ pub fn format_metrics_output(tracked: &HashMap<String, Dynamic>) -> String {
 /// Format metrics for JSON output
 #[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
 pub fn format_metrics_json(
-    tracked: &HashMap<String, Dynamic>,
+    metrics: &HashMap<String, Dynamic>,
 ) -> Result<String, serde_json::Error> {
     let mut json_obj = serde_json::Map::new();
 
     // Filter out internal keys
-    for (key, value) in tracked.iter() {
+    for (key, value) in metrics.iter() {
         if key.starts_with("__op_")
             || key.starts_with("__kelora_stats_")
             || key.starts_with("__kelora_error_")
@@ -878,13 +878,13 @@ pub fn format_metrics_json(
 
 /// Extract error summary from tracking state
 #[allow(dead_code)] // Planned feature for error reporting
-pub fn extract_error_summary(tracked: &HashMap<String, Dynamic>) -> Option<String> {
+pub fn extract_error_summary(metrics: &HashMap<String, Dynamic>) -> Option<String> {
     let mut has_errors = false;
     let mut summary = serde_json::Map::new();
 
     // Collect error types and their counts
     let mut error_types: std::collections::HashSet<String> = std::collections::HashSet::new();
-    for key in tracked.keys() {
+    for key in metrics.keys() {
         if let Some(suffix) = key.strip_prefix("__kelora_error_count_") {
             error_types.insert(suffix.to_string());
         }
@@ -894,7 +894,7 @@ pub fn extract_error_summary(tracked: &HashMap<String, Dynamic>) -> Option<Strin
         let count_key = format!("__kelora_error_count_{}", error_type);
         let examples_key = format!("__kelora_error_examples_{}", error_type);
 
-        if let Some(count_value) = tracked.get(&count_key) {
+        if let Some(count_value) = metrics.get(&count_key) {
             let count = count_value.as_int().unwrap_or(0);
             if count > 0 {
                 has_errors = true;
@@ -905,7 +905,7 @@ pub fn extract_error_summary(tracked: &HashMap<String, Dynamic>) -> Option<Strin
                 );
 
                 // Add examples if available
-                if let Some(examples_value) = tracked.get(&examples_key) {
+                if let Some(examples_value) = metrics.get(&examples_key) {
                     if let Ok(examples_array) = examples_value.clone().into_array() {
                         let examples: Vec<serde_json::Value> = examples_array
                             .iter()

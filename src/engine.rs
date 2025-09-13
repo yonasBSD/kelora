@@ -404,7 +404,7 @@ impl ErrorEnhancer {
             }
             "end" => {
                 help.push_str("\n   🔹 End stage tips:\n");
-                help.push_str("   • Use 'tracked.key' to access accumulated tracking data\n");
+                help.push_str("   • Use 'metrics.key' to access accumulated tracking data\n");
                 help.push_str("   • Use 'print()' to output final results\n");
                 help.push_str("   • This runs after all events are processed\n");
             }
@@ -553,7 +553,6 @@ impl ExecutionTracer {
             );
         }
     }
-
 
     fn truncate_for_display(&self, text: &str, max_len: usize) -> String {
         if text.len() > max_len {
@@ -713,8 +712,8 @@ impl Clone for RhaiEngine {
 
 impl RhaiEngine {
     // Thread-local state management functions
-    pub fn set_thread_tracking_state(tracked: &HashMap<String, Dynamic>) {
-        rhai_functions::tracking::set_thread_tracking_state(tracked);
+    pub fn set_thread_tracking_state(metrics: &HashMap<String, Dynamic>) {
+        rhai_functions::tracking::set_thread_tracking_state(metrics);
     }
 
     pub fn get_thread_tracking_state() -> HashMap<String, Dynamic> {
@@ -1266,9 +1265,9 @@ impl RhaiEngine {
         &mut self,
         compiled: &CompiledExpression,
         event: &Event,
-        tracked: &mut HashMap<String, Dynamic>,
+        metrics: &mut HashMap<String, Dynamic>,
     ) -> Result<bool> {
-        Self::set_thread_tracking_state(tracked);
+        Self::set_thread_tracking_state(metrics);
         let mut scope = self.create_scope_for_event(event);
 
         // Debug statistics tracking
@@ -1339,7 +1338,7 @@ impl RhaiEngine {
             debug_stats_increment_events_passed();
         }
 
-        *tracked = Self::get_thread_tracking_state();
+        *metrics = Self::get_thread_tracking_state();
         Ok(result)
     }
 
@@ -1347,9 +1346,9 @@ impl RhaiEngine {
         &mut self,
         compiled: &CompiledExpression,
         event: &mut Event,
-        tracked: &mut HashMap<String, Dynamic>,
+        metrics: &mut HashMap<String, Dynamic>,
     ) -> Result<()> {
-        Self::set_thread_tracking_state(tracked);
+        Self::set_thread_tracking_state(metrics);
         let mut scope = self.create_scope_for_event(event);
 
         // Debug statistics tracking
@@ -1413,16 +1412,16 @@ impl RhaiEngine {
         }
 
         self.update_event_from_scope(event, &scope);
-        *tracked = Self::get_thread_tracking_state();
+        *metrics = Self::get_thread_tracking_state();
         Ok(())
     }
 
     pub fn execute_compiled_begin(
         &mut self,
         compiled: &CompiledExpression,
-        tracked: &mut HashMap<String, Dynamic>,
+        metrics: &mut HashMap<String, Dynamic>,
     ) -> Result<rhai::Map> {
-        Self::set_thread_tracking_state(tracked);
+        Self::set_thread_tracking_state(metrics);
 
         // Set begin phase flag to allow read_file/read_lines
         crate::rhai_functions::init::set_begin_phase(true);
@@ -1440,7 +1439,7 @@ impl RhaiEngine {
         // Reset begin phase flag
         crate::rhai_functions::init::set_begin_phase(false);
 
-        *tracked = Self::get_thread_tracking_state();
+        *metrics = Self::get_thread_tracking_state();
 
         // Extract the init map from scope and store it
         let mut init_map = scope.get_value::<rhai::Map>("init").unwrap_or_default();
@@ -1457,16 +1456,16 @@ impl RhaiEngine {
     pub fn execute_compiled_end(
         &self,
         compiled: &CompiledExpression,
-        tracked: &HashMap<String, Dynamic>,
+        metrics: &HashMap<String, Dynamic>,
     ) -> Result<()> {
         let mut scope = self.scope_template.clone();
         let mut tracked_map = rhai::Map::new();
 
         // Convert HashMap to Rhai Map (read-only)
-        for (k, v) in tracked.iter() {
+        for (k, v) in metrics.iter() {
             tracked_map.insert(k.clone().into(), v.clone());
         }
-        scope.set_value("tracked", tracked_map);
+        scope.set_value("metrics", tracked_map);
 
         let _ = self
             .engine
@@ -1485,10 +1484,10 @@ impl RhaiEngine {
     }
 
     #[allow(dead_code)]
-    pub fn execute_begin(&mut self, tracked: &mut HashMap<String, Dynamic>) -> Result<()> {
+    pub fn execute_begin(&mut self, metrics: &mut HashMap<String, Dynamic>) -> Result<()> {
         if let Some(compiled) = &self.compiled_begin {
-            // Set thread-local state from tracked
-            Self::set_thread_tracking_state(tracked);
+            // Set thread-local state from metrics
+            Self::set_thread_tracking_state(metrics);
 
             let mut scope = self.scope_template.clone();
 
@@ -1501,24 +1500,24 @@ impl RhaiEngine {
                     anyhow::anyhow!("{}", detailed_msg)
                 })?;
 
-            // Update tracked from thread-local state
-            *tracked = Self::get_thread_tracking_state();
+            // Update metrics from thread-local state
+            *metrics = Self::get_thread_tracking_state();
         }
 
         Ok(())
     }
 
     #[allow(dead_code)]
-    pub fn execute_end(&mut self, tracked: &HashMap<String, Dynamic>) -> Result<()> {
+    pub fn execute_end(&mut self, metrics: &HashMap<String, Dynamic>) -> Result<()> {
         if let Some(compiled) = &self.compiled_end {
             let mut scope = self.scope_template.clone();
             let mut tracked_map = rhai::Map::new();
 
             // Convert HashMap to Rhai Map (read-only)
-            for (k, v) in tracked.iter() {
+            for (k, v) in metrics.iter() {
                 tracked_map.insert(k.clone().into(), v.clone());
             }
-            scope.set_value("tracked", tracked_map);
+            scope.set_value("metrics", tracked_map);
 
             let _ = self
                 .engine
@@ -1538,9 +1537,9 @@ impl RhaiEngine {
         compiled: &CompiledExpression,
         event: &Event,
         window: &[Event],
-        tracked: &mut HashMap<String, Dynamic>,
+        metrics: &mut HashMap<String, Dynamic>,
     ) -> Result<bool> {
-        Self::set_thread_tracking_state(tracked);
+        Self::set_thread_tracking_state(metrics);
         let mut scope = self.create_scope_for_event_with_window(event, window);
 
         // Debug statistics tracking
@@ -1616,7 +1615,7 @@ impl RhaiEngine {
             debug_stats_increment_events_passed();
         }
 
-        *tracked = Self::get_thread_tracking_state();
+        *metrics = Self::get_thread_tracking_state();
         Ok(result)
     }
 
@@ -1625,9 +1624,9 @@ impl RhaiEngine {
         compiled: &CompiledExpression,
         event: &mut Event,
         window: &[Event],
-        tracked: &mut HashMap<String, Dynamic>,
+        metrics: &mut HashMap<String, Dynamic>,
     ) -> Result<()> {
-        Self::set_thread_tracking_state(tracked);
+        Self::set_thread_tracking_state(metrics);
         let mut scope = self.create_scope_for_event_with_window(event, window);
 
         // Debug statistics tracking
@@ -1696,7 +1695,7 @@ impl RhaiEngine {
         }
 
         self.update_event_from_scope(event, &scope);
-        *tracked = Self::get_thread_tracking_state();
+        *metrics = Self::get_thread_tracking_state();
         Ok(())
     }
 
