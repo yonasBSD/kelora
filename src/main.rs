@@ -58,11 +58,13 @@ fn detect_format_for_parallel_mode(files: &[String]) -> Result<config::InputForm
     use std::io;
 
     if files.is_empty() {
-        // For stdin in parallel mode, we can't peek ahead easily
-        // So we use a simple approach: read the first line from stdin
-        let stdin = io::stdin();
-        let stdin_lock = stdin.lock();
-        let mut peekable_reader = readers::PeekableLineReader::new(stdin_lock);
+        // For stdin with potential gzip, we need to handle decompression first
+        // Create a binary stdin reader and apply magic bytes detection
+        let binary_stdin = readers::BinaryChannelStdinReader::new()?;
+        let processed_stdin = decompression::maybe_gzip(binary_stdin)?;
+        let mut peekable_reader = readers::PeekableLineReader::new(
+            io::BufReader::new(processed_stdin)
+        );
 
         match detect_format_from_peekable_reader(&mut peekable_reader)? {
             config::InputFormat::Auto => Ok(config::InputFormat::Line), // Fallback
@@ -257,9 +259,10 @@ fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) -> R
 
     // Handle filename tracking by creating the appropriate reader
     if config.input.files.is_empty() {
-        // Stdin processing - no filename tracking
-        let stdin = io::stdin();
-        let reader = stdin.lock();
+        // Stdin processing with gzip support - no filename tracking
+        let binary_stdin = readers::BinaryChannelStdinReader::new()?;
+        let processed_stdin = decompression::maybe_gzip(binary_stdin)?;
+        let reader = io::BufReader::new(processed_stdin);
 
         for line_result in reader.lines() {
             // Check for termination signal between lines
@@ -387,12 +390,14 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
 ) -> Result<()> {
     // Handle auto-detection based on input source
     if config.input.files.is_empty() {
-        // Stdin processing with auto-detection
-        let stdin = io::stdin();
-        let stdin_lock = stdin.lock();
-        let mut peekable_reader = readers::PeekableLineReader::new(stdin_lock);
+        // Stdin processing with auto-detection and gzip support
+        let binary_stdin = readers::BinaryChannelStdinReader::new()?;
+        let processed_stdin = decompression::maybe_gzip(binary_stdin)?;
+        let mut peekable_reader = readers::PeekableLineReader::new(
+            io::BufReader::new(processed_stdin)
+        );
 
-        // Detect format from first line
+        // Detect format from first line (now decompressed if needed)
         let detected_format = detect_format_from_peekable_reader(&mut peekable_reader)?;
 
         // Report detected format

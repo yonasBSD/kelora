@@ -1,6 +1,6 @@
 use anyhow::Result;
 use crossbeam_channel::Receiver;
-use std::io::{self, BufRead, BufReader};
+use std::io::{self, BufRead, BufReader, Read};
 use std::thread;
 
 use crate::decompression::DecompressionReader;
@@ -76,6 +76,14 @@ impl<R: BufRead> std::io::Read for PeekableLineReader<R> {
 pub struct ChannelStdinReader {
     receiver: Receiver<String>,
     current_line: Option<String>,
+    current_pos: usize,
+    eof: bool,
+}
+
+/// A channel-based binary stdin reader that handles raw bytes
+pub struct BinaryChannelStdinReader {
+    receiver: Receiver<Vec<u8>>,
+    current_buffer: Option<Vec<u8>>,
     current_pos: usize,
     eof: bool,
 }
@@ -193,6 +201,105 @@ impl io::BufRead for ChannelStdinReader {
     }
 }
 
+impl BinaryChannelStdinReader {
+    pub fn new() -> Result<Self> {
+        let (sender, receiver) = crossbeam_channel::unbounded();
+
+        // Spawn a thread to read from stdin using raw bytes
+        thread::spawn(move || {
+            let stdin = io::stdin();
+            let mut lock = stdin.lock();
+            let mut buffer = vec![0u8; 8192]; // 8KB buffer
+
+            loop {
+                match lock.read(&mut buffer) {
+                    Ok(0) => break, // EOF
+                    Ok(n) => {
+                        // Send the actual bytes read
+                        if sender.send(buffer[..n].to_vec()).is_err() {
+                            break; // Receiver dropped
+                        }
+                    }
+                    Err(_) => break, // Error reading
+                }
+            }
+        });
+        Ok(Self {
+            receiver,
+            current_buffer: None,
+            current_pos: 0,
+            eof: false,
+        })
+    }
+
+    fn ensure_current_buffer(&mut self) -> io::Result<()> {
+        if self.current_buffer.is_none() && !self.eof {
+            match self.receiver.recv() {
+                Ok(buffer) => {
+                    self.current_buffer = Some(buffer);
+                    self.current_pos = 0;
+                }
+                Err(_) => {
+                    self.eof = true;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl io::Read for BinaryChannelStdinReader {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.ensure_current_buffer()?;
+
+        if let Some(ref buffer) = self.current_buffer {
+            let remaining = &buffer[self.current_pos..];
+            let to_copy = std::cmp::min(buf.len(), remaining.len());
+
+            if to_copy > 0 {
+                buf[..to_copy].copy_from_slice(&remaining[..to_copy]);
+                self.current_pos += to_copy;
+
+                // If we've consumed the entire buffer, clear it
+                if self.current_pos >= buffer.len() {
+                    self.current_buffer = None;
+                    self.current_pos = 0;
+                }
+
+                Ok(to_copy)
+            } else {
+                Ok(0)
+            }
+        } else {
+            Ok(0) // EOF
+        }
+    }
+}
+
+impl io::BufRead for BinaryChannelStdinReader {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        self.ensure_current_buffer()?;
+
+        if let Some(ref buffer) = self.current_buffer {
+            Ok(&buffer[self.current_pos..])
+        } else {
+            Ok(&[])
+        }
+    }
+
+    fn consume(&mut self, amt: usize) {
+        if let Some(ref buffer) = self.current_buffer {
+            self.current_pos = std::cmp::min(self.current_pos + amt, buffer.len());
+
+            // If we've consumed the entire buffer, clear it
+            if self.current_pos >= buffer.len() {
+                self.current_buffer = None;
+                self.current_pos = 0;
+            }
+        }
+    }
+}
+
 /// A multi-file reader that streams through files sequentially
 pub struct MultiFileReader {
     files: Vec<String>,
@@ -266,17 +373,36 @@ impl MultiFileReader {
             let file_path = &self.files[self.current_file_idx];
 
             if file_path == "-" {
-                // Handle stdin with streaming support
-                match ChannelStdinReader::new() {
-                    Ok(stdin_reader) => {
-                        self.current_reader = Some(Box::new(stdin_reader));
-                        return Ok(true);
+                // Handle stdin with binary reader for gzip detection
+                match BinaryChannelStdinReader::new() {
+                    Ok(binary_stdin_reader) => {
+                        // Apply magic bytes detection to binary stdin reader
+                        match crate::decompression::maybe_gzip(binary_stdin_reader) {
+                            Ok(processed_reader) => {
+                                self.current_reader = Some(Box::new(BufReader::with_capacity(
+                                    self.buffer_size,
+                                    processed_reader,
+                                )));
+                                return Ok(true);
+                            }
+                            Err(e) => {
+                                eprintln!(
+                                    "{}",
+                                    crate::config::format_error_message_auto(&format!(
+                                        "Warning: Failed to setup stdin decompression: {}",
+                                        e
+                                    ))
+                                );
+                                self.current_file_idx += 1;
+                                continue;
+                            }
+                        }
                     }
                     Err(e) => {
                         eprintln!(
                             "{}",
                             crate::config::format_error_message_auto(&format!(
-                                "Warning: Failed to setup stdin reader: {}",
+                                "Warning: Failed to setup binary stdin reader: {}",
                                 e
                             ))
                         );

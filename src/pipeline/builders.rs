@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::collections::HashMap;
 use std::fs;
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, BufReader};
 
 /// Wrapper parser that applies timestamp configuration after parsing
 struct TimestampConfiguredParser {
@@ -45,7 +45,7 @@ use super::{
 };
 use crate::decompression::DecompressionReader;
 use crate::engine::{DebugConfig, RhaiEngine};
-use crate::readers::{ChannelStdinReader, MultiFileReader};
+use crate::readers::MultiFileReader;
 
 /// Pipeline builder for easy construction from CLI arguments
 #[derive(Clone)]
@@ -746,8 +746,10 @@ pub fn create_input_reader(
     config: &crate::config::KeloraConfig,
 ) -> Result<Box<dyn BufRead + Send>> {
     if config.input.files.is_empty() {
-        // Use channel-based stdin reader for Send compatibility
-        Ok(Box::new(ChannelStdinReader::new()?))
+        // Use binary stdin reader with gzip detection for Send compatibility
+        let binary_stdin = crate::readers::BinaryChannelStdinReader::new()?;
+        let processed_stdin = crate::decompression::maybe_gzip(binary_stdin)?;
+        Ok(Box::new(BufReader::new(processed_stdin)))
     } else {
         let sorted_files = sort_files(&config.input.files, &config.input.file_order)?;
         Ok(Box::new(MultiFileReader::new(sorted_files)?))
