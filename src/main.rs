@@ -58,10 +58,9 @@ fn detect_format_for_parallel_mode(files: &[String]) -> Result<config::InputForm
     use std::io;
 
     if files.is_empty() {
-        // For stdin with potential gzip, we need to handle decompression first
-        // Create a binary stdin reader and apply magic bytes detection
-        let binary_stdin = readers::BinaryChannelStdinReader::new()?;
-        let processed_stdin = decompression::maybe_gzip(binary_stdin)?;
+        // For stdin with potential gzip, handle decompression first
+        let stdin_reader = readers::ChannelStdinReader::new()?;
+        let processed_stdin = decompression::maybe_gzip(stdin_reader)?;
         let mut peekable_reader = readers::PeekableLineReader::new(
             io::BufReader::new(processed_stdin)
         );
@@ -260,8 +259,8 @@ fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) -> R
     // Handle filename tracking by creating the appropriate reader
     if config.input.files.is_empty() {
         // Stdin processing with gzip support - no filename tracking
-        let binary_stdin = readers::BinaryChannelStdinReader::new()?;
-        let processed_stdin = decompression::maybe_gzip(binary_stdin)?;
+        let stdin_reader = readers::ChannelStdinReader::new()?;
+        let processed_stdin = decompression::maybe_gzip(stdin_reader)?;
         let reader = io::BufReader::new(processed_stdin);
 
         for line_result in reader.lines() {
@@ -391,8 +390,8 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
     // Handle auto-detection based on input source
     if config.input.files.is_empty() {
         // Stdin processing with auto-detection and gzip support
-        let binary_stdin = readers::BinaryChannelStdinReader::new()?;
-        let processed_stdin = decompression::maybe_gzip(binary_stdin)?;
+        let stdin_reader = readers::ChannelStdinReader::new()?;
+        let processed_stdin = decompression::maybe_gzip(stdin_reader)?;
         let mut peekable_reader = readers::PeekableLineReader::new(
             io::BufReader::new(processed_stdin)
         );

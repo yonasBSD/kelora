@@ -74,14 +74,6 @@ impl<R: BufRead> std::io::Read for PeekableLineReader<R> {
 
 /// A channel-based stdin reader that is Send-compatible
 pub struct ChannelStdinReader {
-    receiver: Receiver<String>,
-    current_line: Option<String>,
-    current_pos: usize,
-    eof: bool,
-}
-
-/// A channel-based binary stdin reader that handles raw bytes
-pub struct BinaryChannelStdinReader {
     receiver: Receiver<Vec<u8>>,
     current_buffer: Option<Vec<u8>>,
     current_pos: usize,
@@ -90,118 +82,6 @@ pub struct BinaryChannelStdinReader {
 
 impl ChannelStdinReader {
     #[allow(dead_code)] // Used by create_input_reader in builders.rs for stdin handling
-    pub fn new() -> Result<Self> {
-        let (sender, receiver) = crossbeam_channel::unbounded();
-
-        // Spawn a thread to read from stdin
-        thread::spawn(move || {
-            let stdin = io::stdin();
-            let mut lock = stdin.lock();
-            let mut line = String::new();
-
-            while let Ok(bytes_read) = lock.read_line(&mut line) {
-                if bytes_read == 0 {
-                    break; // EOF
-                }
-
-                if sender.send(line.clone()).is_err() {
-                    break; // Receiver dropped
-                }
-
-                line.clear();
-            }
-        });
-
-        Ok(Self {
-            receiver,
-            current_line: None,
-            current_pos: 0,
-            eof: false,
-        })
-    }
-
-    fn ensure_current_line(&mut self) -> io::Result<()> {
-        if self.current_line.is_none() && !self.eof {
-            match self.receiver.recv() {
-                Ok(line) => {
-                    self.current_line = Some(line);
-                    self.current_pos = 0;
-                }
-                Err(_) => {
-                    self.eof = true;
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-impl io::Read for ChannelStdinReader {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        self.ensure_current_line()?;
-
-        if let Some(ref line) = self.current_line {
-            let remaining = &line.as_bytes()[self.current_pos..];
-            let to_copy = std::cmp::min(buf.len(), remaining.len());
-
-            if to_copy > 0 {
-                buf[..to_copy].copy_from_slice(&remaining[..to_copy]);
-                self.current_pos += to_copy;
-
-                // If we've consumed the entire line, clear it
-                if self.current_pos >= line.len() {
-                    self.current_line = None;
-                    self.current_pos = 0;
-                }
-
-                Ok(to_copy)
-            } else {
-                Ok(0)
-            }
-        } else {
-            Ok(0) // EOF
-        }
-    }
-}
-
-impl io::BufRead for ChannelStdinReader {
-    fn fill_buf(&mut self) -> io::Result<&[u8]> {
-        self.ensure_current_line()?;
-
-        if let Some(ref line) = self.current_line {
-            Ok(&line.as_bytes()[self.current_pos..])
-        } else {
-            Ok(&[])
-        }
-    }
-
-    fn consume(&mut self, amt: usize) {
-        if let Some(ref line) = self.current_line {
-            self.current_pos = std::cmp::min(self.current_pos + amt, line.len());
-
-            // If we've consumed the entire line, clear it
-            if self.current_pos >= line.len() {
-                self.current_line = None;
-                self.current_pos = 0;
-            }
-        }
-    }
-
-    fn read_line(&mut self, buf: &mut String) -> io::Result<usize> {
-        self.ensure_current_line()?;
-
-        if let Some(line) = self.current_line.take() {
-            let len = line.len();
-            buf.push_str(&line);
-            self.current_pos = 0;
-            Ok(len)
-        } else {
-            Ok(0) // EOF
-        }
-    }
-}
-
-impl BinaryChannelStdinReader {
     pub fn new() -> Result<Self> {
         let (sender, receiver) = crossbeam_channel::unbounded();
 
@@ -215,7 +95,6 @@ impl BinaryChannelStdinReader {
                 match lock.read(&mut buffer) {
                     Ok(0) => break, // EOF
                     Ok(n) => {
-                        // Send the actual bytes read
                         if sender.send(buffer[..n].to_vec()).is_err() {
                             break; // Receiver dropped
                         }
@@ -224,6 +103,7 @@ impl BinaryChannelStdinReader {
                 }
             }
         });
+
         Ok(Self {
             receiver,
             current_buffer: None,
@@ -248,7 +128,7 @@ impl BinaryChannelStdinReader {
     }
 }
 
-impl io::Read for BinaryChannelStdinReader {
+impl io::Read for ChannelStdinReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.ensure_current_buffer()?;
 
@@ -276,7 +156,7 @@ impl io::Read for BinaryChannelStdinReader {
     }
 }
 
-impl io::BufRead for BinaryChannelStdinReader {
+impl io::BufRead for ChannelStdinReader {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         self.ensure_current_buffer()?;
 
@@ -373,11 +253,11 @@ impl MultiFileReader {
             let file_path = &self.files[self.current_file_idx];
 
             if file_path == "-" {
-                // Handle stdin with binary reader for gzip detection
-                match BinaryChannelStdinReader::new() {
-                    Ok(binary_stdin_reader) => {
-                        // Apply magic bytes detection to binary stdin reader
-                        match crate::decompression::maybe_gzip(binary_stdin_reader) {
+                // Handle stdin with gzip detection
+                match ChannelStdinReader::new() {
+                    Ok(stdin_reader) => {
+                        // Apply magic bytes detection to stdin reader
+                        match crate::decompression::maybe_gzip(stdin_reader) {
                             Ok(processed_reader) => {
                                 self.current_reader = Some(Box::new(BufReader::with_capacity(
                                     self.buffer_size,
@@ -402,7 +282,7 @@ impl MultiFileReader {
                         eprintln!(
                             "{}",
                             crate::config::format_error_message_auto(&format!(
-                                "Warning: Failed to setup binary stdin reader: {}",
+                                "Warning: Failed to setup stdin reader: {}",
                                 e
                             ))
                         );
