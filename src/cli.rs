@@ -240,40 +240,49 @@ pub struct Cli {
     #[arg(short = 'c', long = "core", help_heading = "Output Options")]
     pub core: bool,
 
-    /// Output only field values
-    #[arg(short = 'b', long = "brief", help_heading = "Output Options")]
-    pub brief: bool,
-
-    /// Enable word-wrapping for default output format (default: enabled)
-    #[arg(long = "wrap", help_heading = "Output Options")]
-    pub wrap: bool,
-
-    /// Disable word-wrapping for default output format
-    #[arg(
-        long = "no-wrap",
-        help_heading = "Output Options",
-        overrides_with = "wrap"
-    )]
-    pub no_wrap: bool,
-
     /// Output file for formatted events
     #[arg(short = 'o', long = "output-file", help_heading = "Output Options")]
     pub output_file: Option<String>,
 
-    /// Comma-separated list of fields to format as RFC3339 timestamps.
-    /// Only affects default output; does not modify event data.
-    #[arg(long = "pretty-ts", help_heading = "Output Options")]
+    /// Output only field values
+    #[arg(short = 'b', long = "brief", help_heading = "Default Format Options")]
+    pub brief: bool,
+
+    /// Enable word-wrapping (default: enabled)
+    #[arg(long = "wrap", help_heading = "Default Format Options")]
+    pub wrap: bool,
+
+    /// Disable word-wrapping
+    #[arg(
+        long = "no-wrap",
+        help_heading = "Default Format Options",
+        overrides_with = "wrap"
+    )]
+    pub no_wrap: bool,
+
+    /// Comma-separated list of fields to format as RFC3339 timestamps
+    #[arg(long = "pretty-ts", help_heading = "Default Format Options")]
     pub pretty_ts: Option<String>,
 
-    /// Auto-format all known timestamp fields as local RFC3339.
-    /// Only affects default output; does not modify event data.
-    #[arg(short = 'z', help_heading = "Output Options")]
+    /// Auto-format all known timestamp fields as local RFC3339
+    #[arg(short = 'z', help_heading = "Default Format Options")]
     pub format_timestamps_local: bool,
 
-    /// Auto-format all known timestamp fields as UTC RFC3339.
-    /// Only affects default output; does not modify event data.
-    #[arg(short = 'Z', help_heading = "Output Options")]
+    /// Auto-format all known timestamp fields as UTC RFC3339
+    #[arg(short = 'Z', help_heading = "Default Format Options")]
     pub format_timestamps_utc: bool,
+
+    /// Force colored output
+    #[arg(long = "force-color", help_heading = "Display Options")]
+    pub force_color: bool,
+
+    /// Disable colored output
+    #[arg(long = "no-color", help_heading = "Display Options")]
+    pub no_color: bool,
+
+    /// Disable emoji prefixes
+    #[arg(long = "no-emoji", help_heading = "Display Options")]
+    pub no_emoji: bool,
 
     /// Enable parallel processing
     #[arg(long = "parallel", help_heading = "Performance Options")]
@@ -310,18 +319,6 @@ pub struct Cli {
     /// Disable ordered output
     #[arg(long = "unordered", help_heading = "Performance Options")]
     pub no_preserve_order: bool,
-
-    /// Force colored output
-    #[arg(long = "force-color", help_heading = "Display Options")]
-    pub force_color: bool,
-
-    /// Disable colored output
-    #[arg(long = "no-color", help_heading = "Display Options")]
-    pub no_color: bool,
-
-    /// Disable emoji prefixes
-    #[arg(long = "no-emoji", help_heading = "Display Options")]
-    pub no_emoji: bool,
 
     /// Show processing statistics
     #[arg(short = 's', long = "stats", help_heading = "Metrics and Stats")]
