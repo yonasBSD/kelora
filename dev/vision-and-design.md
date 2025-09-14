@@ -12,7 +12,7 @@ This document defines what Kelora is, what it is not, its design principles, set
 * Designed to filter, mutate, and format logs using [Rhai](https://rhai.rs/)
 * Supports line-oriented input formats (JSON, logfmt, syslog, raw lines, etc.)
 * Works as part of UNIX pipelines — stdin in, stdout out
-* Supports **stateful processing** with built-in tracking capabilities
+* Supports **tracking functions** with built-in counting, averaging, and windowing capabilities
 * Enables **real-time or batch streaming** with selectable execution modes
 * **Scriptable, composable, predictable** — always
 
@@ -105,7 +105,7 @@ This document defines what Kelora is, what it is not, its design principles, set
 
 Each event consists of:
 
-* **`fields`**: `IndexMap<String, FieldValue>` — preserves log field order
+* **`fields`**: Structured field storage — preserves log field order
 * **`ts`, `level`, `msg`**: Special fields used internally
 * **`meta`**: Internal tracking or derived values (not exposed unless needed)
 
@@ -164,10 +164,10 @@ Each event consists of:
 
 | Tool | Kelora Is… |
 |------|------------|
-| **jq** | More structured, stateful, supports multiline, real scripting |
+| **jq** | More structured, supports tracking functions, multiline, real scripting |
 | **awk** | Safer, saner, and field-aware — built for logs, not CSVs |
 | **lnav** | Not interactive — scriptable, batch-oriented, composable in pipelines |
-| **angle-grinder** | More flexible due to Rhai, chunking, and tracked state |
+| **angle-grinder** | More flexible due to Rhai, multi-line support, and tracking functions |
 | **Loki / Vector** | Not a log shipper — Kelora is a processing tool, not a system |
 
 ---

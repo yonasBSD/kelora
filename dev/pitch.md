@@ -1,25 +1,24 @@
-# Pitch 
-Kelora is a fast, scriptable, stream-oriented log processor for the command line.
+# Pitch
+Kelora is a programmable, scriptable log processor built for real-world logs, fast pipelines, and complete control.
 
-It treats logs as structured events — not just lines of text — and gives you full control over filtering, transforming, and analyzing them using the Rhai scripting language. Designed for composability and clarity, Kelora works with common formats like JSON and logfmt, supports powerful batch and parallel processing, and features a robust resiliency model that gracefully handles malformed data. It excels in environments where traditional tools fall short: CI pipelines, messy logs, and ad hoc forensic work. It's not a log viewer or a log shipper — it's a log shaper.
+It treats logs as structured data — not just text — and gives you full control over filtering, transforming, and analyzing them using the Rhai scripting language. Designed for CLI-first workflows and composability, Kelora works with JSON, logfmt, syslog, and other formats with powerful parallel processing and a robust resiliency model that gracefully handles malformed data. It excels where traditional tools fall short: CI pipelines, messy real-world logs, and ad hoc forensic work. It's not a log viewer or shipper — it's a processing tool for turning diverse logs into structured, analyzable data.
 
 Use it when you want to:
-	•	Normalize inconsistent logs
-	•	Enrich events with derived fields
-	•	Extract insights from raw streams
-	•	Do real processing — not just grepping
+	•	Transform messy, inconsistent logs into structured events
+	•	Enrich events with tracking functions and derived fields
+	•	Extract insights from raw streams with business logic
+	•	Do real log processing — not just pattern matching
 
 # README Header
 
-Kelora is a fast, scriptable log processor for the command line.
+Kelora is a programmable, scriptable log processor built for real-world logs, fast pipelines, and complete control.
 
-It turns raw logs into structured events and lets you filter, transform, and analyze them using simple, powerful Rhai scripts.
-Designed for composability and clarity, Kelora works with JSON, logfmt, and other formats with a robust resiliency model that gracefully handles malformed data — making it a perfect tool for pipelines, automation, and log forensics.
+It turns messy, diverse logs into structured events and lets you filter, transform, and analyze them using powerful Rhai scripts. Designed for CLI-first workflows and composability, Kelora works with JSON, logfmt, syslog, and other formats with a robust resiliency model that gracefully handles malformed data — making it perfect for pipelines, automation, and forensic work.
 
 # Man page
 
 Kelora is a stream-oriented log processor that reads structured or semi-structured logs from stdin or files, transforms them using Rhai scripts, and writes filtered or enriched output.
-It is designed to be composable with other CLI tools, offering high-performance filtering, aggregation, and formatting for JSON, logfmt, and custom formats.
+It is designed to be composable with other CLI tools, offering high-performance filtering, tracking functions, and formatting for JSON, logfmt, syslog, and custom formats with robust error handling for real-world data.
 
 # Taglines
 
@@ -31,12 +30,12 @@ Kelora filters, transforms, and analyzes logs using clean CLI pipelines and embe
 
 # Elevator Pitch / Why?
 
-Most tools treat logs as text. Kelora treats them as data.
-With support for structured formats, custom field logic, batch processing, built-in scripting, and a resilient error handling model, Kelora bridges the gap between grep and full-blown observability stacks — without the bloat.
-It's perfect for local debugging, CI pipelines, forensic audits, and anything in between.
+Most tools treat logs as text. Kelora treats them as structured data.
+With support for multiple formats, tracking functions, parallel execution, embedded scripting, and a resilient error handling model that gracefully handles real-world messiness, Kelora bridges the gap between simple pattern matching tools and complex observability stacks — without the bloat.
+It's perfect for local debugging, CI pipelines, forensic analysis, and anywhere you need complete control over log processing.
 
 # Tweet
-Logs are data.
-Kelora is a scriptable log processor for your terminal.
-Filter, transform, and analyze JSON/logfmt logs using clean CLI pipelines, embedded scripts, and resilient error handling.
+Logs are data, not text.
+Kelora is a programmable log processor for your terminal.
+Transform messy, real-world logs into structured events using CLI pipelines, embedded Rhai scripts, and resilient error handling.
 🛠️ https://github.com/dloss/kelora #logs #cli #observability
