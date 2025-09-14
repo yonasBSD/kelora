@@ -1,358 +1,136 @@
-#[allow(dead_code)] // Variants used by generate_help_text function called from main.rs
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Category {
-    StringProcessing,
-    DataParsing,
-    SafetyFunctions,
-    ArrayFunctions,
-    Utility,
-}
+/// Generate help text with comprehensive hand-written function documentation
+pub fn generate_help_text() -> &'static str {
+    r#"
+Available Rhai Functions for Kelora:
 
-impl Category {
-    #[allow(dead_code)] // Used by generate_help_text function called from main.rs
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Category::StringProcessing => "STRING PROCESSING",
-            Category::DataParsing => "DATA PARSING",
-            Category::SafetyFunctions => "SAFETY FUNCTIONS",
-            Category::ArrayFunctions => "ARRAY FUNCTIONS",
-            Category::Utility => "UTILITY",
-        }
-    }
+STRING/TEXT FUNCTIONS:
+  text.after(delimiter)                 Text after first occurrence of delimiter
+  text.before(delimiter)                Text before first occurrence of delimiter
+  text.between(start, end)              Text between start and end delimiters
+  text.contains(pattern)                Check if text contains pattern
+  text.count(pattern)                   Count occurrences of pattern in text
+  text.ending_with(suffix)              Return text if it ends with suffix, else empty
+  text.extract_domain()                 Extract domain from URL or email address
+  text.extract_ip()                     Extract first IP address from text
+  text.extract_ips()                    Extract all IP addresses as array
+  text.extract_re(pattern [, group])    Extract regex match or capture group
+  text.extract_all_re(pattern [, group]) Extract all regex matches as array
+  text.extract_url()                    Extract first URL from text
+  text.is_digit()                       Check if text contains only digits
+  text.is_private_ip()                  Check if IP is in private ranges
+  text.lower()                          Convert text to lowercase
+  text.upper()                          Convert text to uppercase
+  text.mask_ip([octets])                Mask IP address (default: last octet)
+  text.matches(pattern)                 Check if text matches regex pattern
+  text.slice(spec)                      Slice text using Python notation (e.g., "1:5", ":3", "-2:")
+  text.split_re(pattern)                Split text by regex pattern
+  text.starting_with(prefix)            Return text if it starts with prefix, else empty
+  text.strip([chars])                   Remove whitespace or specified characters
 
-    #[allow(dead_code)] // Used by generate_help_text function called from main.rs
-    pub fn sort_order(&self) -> u8 {
-        match self {
-            Category::StringProcessing => 1,
-            Category::DataParsing => 2,
-            Category::SafetyFunctions => 3,
-            Category::ArrayFunctions => 4,
-            Category::Utility => 5,
-        }
-    }
-}
+  # Encoding/Decoding
+  text.encode_b64()                     Encode text to base64 string
+  text.decode_b64()                     Decode base64 string to text
+  text.encode_hex()                     Encode text to hexadecimal string
+  text.decode_hex()                     Decode hexadecimal string to text
+  text.encode_url()                     URL-encode text (percent encoding)
+  text.decode_url()                     Decode URL-encoded string
+  text.escape_html()                    Escape HTML special characters (&, <, >, ", ')
+  text.unescape_html()                  Unescape HTML entities to text
+  text.escape_json()                    Escape JSON special characters
+  text.unescape_json()                  Unescape JSON escape sequences
 
-#[allow(dead_code)] // Used by generate_help_text function called from main.rs
-#[derive(Debug, Clone)]
-pub struct FunctionDoc {
-    pub signature: &'static str,
-    pub doc: &'static str,
-    pub category: Category,
-}
+ARRAY FUNCTIONS:
+  array.join(separator)                 Join array elements with separator
+  array.flatten([style [, max_depth]])  Flatten nested arrays/objects
+  reversed(array)                       Return new array in reverse order
+  sorted(array)                         Return new sorted array (numeric/lexicographic)
+  sorted_by(array, field)               Sort array of objects by field name
+  contains_any(array, search_array)     Check if array contains any search values
+  starts_with_any(array, search_array)  Check if array starts with any search values
 
-/// Get all function documentation
-#[allow(dead_code)] // Used by generate_help_text function called from main.rs
-pub fn get_all_function_docs() -> Vec<FunctionDoc> {
-    let mut docs = Vec::new();
+MAP/OBJECT FUNCTIONS:
+  map.flatten([separator [, style]])    Flatten nested object to dot notation
+  map.unflatten([separator])            Reconstruct nested object from flat keys
+  map.merge(other_map)                  Merge another map into this one
+  obj.get_path("field.path" [, default]) Safe nested field access with fallback
+  obj.has_path("field.path")            Check if nested field path exists
 
-    // STRING PROCESSING
-    docs.extend(vec![
-        FunctionDoc {
-            signature: "text.after(delimiter)",
-            doc: "Text after first delimiter",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.before(delimiter)",
-            doc: "Text before first delimiter",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.between(start, end)",
-            doc: "Text between start and end delimiters",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.contains(pattern)",
-            doc: "Check if text contains pattern",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.count(pattern)",
-            doc: "Count occurrences of pattern in text",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.ending_with(suffix)",
-            doc: "Return text if it ends with suffix",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.extract_domain()",
-            doc: "Extract domain from URL or email",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.extract_ip()",
-            doc: "Extract first IP address from text",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.extract_ips()",
-            doc: "Extract all IP addresses from text",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.extract_re(pattern [, group])",
-            doc: "Extract regex match/group from text",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.extract_all_re(pattern [, group])",
-            doc: "Extract all regex matches from text",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.extract_url()",
-            doc: "Extract first URL from text",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.is_digit()",
-            doc: "Check if text contains only digits",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.is_private_ip()",
-            doc: "Check if IP address is in private range",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.lower()",
-            doc: "Convert text to lowercase",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.mask_ip([octets])",
-            doc: "Mask IP address (default: last octet)",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.matches(pattern)",
-            doc: "Check if text matches regex pattern",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.replace_re(pattern, replacement)",
-            doc: "Replace regex matches with replacement",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.slice(spec)",
-            doc: "Slice text using Python-style notation",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.split_re(pattern)",
-            doc: "Split text by regex pattern",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.starting_with(prefix)",
-            doc: "Return text if it starts with prefix",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.strip([chars])",
-            doc: "Remove whitespace or specified chars",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.upper()",
-            doc: "Convert text to uppercase",
-            category: Category::StringProcessing,
-        },
-        // Encoding/Decoding functions
-        FunctionDoc {
-            signature: "text.decode_b64()",
-            doc: "Decode base64 string to text",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.decode_hex()",
-            doc: "Decode hexadecimal string to text",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.decode_url()",
-            doc: "Decode URL-encoded string",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.encode_b64()",
-            doc: "Encode text to base64 string",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.encode_hex()",
-            doc: "Encode text to hexadecimal string",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.encode_url()",
-            doc: "URL-encode text (percent encoding)",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.escape_html()",
-            doc: "Escape HTML special characters",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.escape_json()",
-            doc: "Escape JSON special characters",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.unescape_html()",
-            doc: "Unescape HTML entities",
-            category: Category::StringProcessing,
-        },
-        FunctionDoc {
-            signature: "text.unescape_json()",
-            doc: "Unescape JSON escape sequences",
-            category: Category::StringProcessing,
-        },
-    ]);
+EVENT MANIPULATION:
+  emit_each(array [, base_map])         Fan out array elements as separate events
+  text.col(index [, separator])         Extract column by index from whitespace/delimited text
+  text.col("1,3,5" [, separator])       Extract multiple columns as concatenated string
+  text.col("1:5" [, separator])         Extract column range as concatenated string
+  e = ()                                Clear entire event (remove all fields)
+  e.field = ()                          Remove individual field from event
 
-    // DATA PARSING
-    docs.extend(vec![
-        FunctionDoc {
-            signature: "parse_kv(text [, sep [, kv_sep]])",
-            doc: "Parse key-value pairs from text",
-            category: Category::DataParsing,
-        },
-        FunctionDoc {
-            signature: "to_float(text)",
-            doc: "Convert text to float (0 on error)",
-            category: Category::DataParsing,
-        },
-        FunctionDoc {
-            signature: "to_int(text)",
-            doc: "Convert text to integer (0 on error)",
-            category: Category::DataParsing,
-        },
-        FunctionDoc {
-            signature: "map.unflatten([separator])",
-            doc: "Reconstruct nested structures from flat keys",
-            category: Category::DataParsing,
-        },
-    ]);
+DATETIME FUNCTIONS:
+  now_utc()                             Current UTC timestamp (DateTimeWrapper)
+  now_local()                           Current local timestamp (DateTimeWrapper)
+  parse_dur("1h30m")                    Parse duration string into DurationWrapper
+  dt.format("format_string")            Format datetime using custom format string
+  dt.year(), dt.month(), dt.day()       Extract date components
+  dt.hour(), dt.minute(), dt.second()   Extract time components
+  dt.to_utc(), dt.to_local()            Convert timezone
+  dt + dur, dt - dur                    Add/subtract duration from datetime
+  dt1 - dt2                             Get duration between datetimes
+  dur.as_seconds(), dur.as_minutes()    Convert duration to numeric values
 
-    // ARRAY FUNCTIONS
-    docs.extend(vec![
-        FunctionDoc {
-            signature: "contains_any(array, search_array)",
-            doc: "Check if array contains any search values",
-            category: Category::ArrayFunctions,
-        },
-        FunctionDoc {
-            signature: "array.flatten([style [, max_depth]])",
-            doc: "Flatten nested arrays/objects",
-            category: Category::ArrayFunctions,
-        },
-        FunctionDoc {
-            signature: "array.join(separator)",
-            doc: "Join array elements with separator",
-            category: Category::ArrayFunctions,
-        },
-        FunctionDoc {
-            signature: "reversed(array)",
-            doc: "Return new array in reverse order",
-            category: Category::ArrayFunctions,
-        },
-        FunctionDoc {
-            signature: "sorted(array)",
-            doc: "Return new sorted array",
-            category: Category::ArrayFunctions,
-        },
-        FunctionDoc {
-            signature: "sorted_by(array, field)",
-            doc: "Sort array of objects by field",
-            category: Category::ArrayFunctions,
-        },
-        FunctionDoc {
-            signature: "starts_with_any(array, search_array)",
-            doc: "Check if array starts with any search values",
-            category: Category::ArrayFunctions,
-        },
-    ]);
+TRACKING/METRICS FUNCTIONS:
+  track_count(key [, increment])        Increment counter for key (default: 1)
+  track_min(key, value)                 Track minimum value for key
+  track_max(key, value)                 Track maximum value for key
+  track_unique(key, value)              Track unique values for key
+  track_bucket(key, bucket)             Track values in buckets for histograms
 
-    // SAFETY FUNCTIONS
-    docs.extend(vec![
-        FunctionDoc {
-            signature: "path_equals(obj, \"field.path\", value)",
-            doc: "Safe nested field comparison",
-            category: Category::SafetyFunctions,
-        },
-        FunctionDoc {
-            signature: "to_bool(value, default)",
-            doc: "Safe boolean conversion with fallback",
-            category: Category::SafetyFunctions,
-        },
-        FunctionDoc {
-            signature: "to_number(value, default)",
-            doc: "Safe number conversion with fallback",
-            category: Category::SafetyFunctions,
-        },
-    ]);
+MATH/UTILITY FUNCTIONS:
+  mod(a, b) / a % b                     Modulo operation with division-by-zero protection
+  rand()                                Random float between 0 and 1
+  rand_int(min, max)                    Random integer between min and max (inclusive)
 
-    // UTILITY
-    docs.extend(vec![
-        FunctionDoc {
-            signature: "eprint(message)",
-            doc: "Print to stderr",
-            category: Category::Utility,
-        },
-        FunctionDoc {
-            signature: "print(message)",
-            doc: "Print to stdout",
-            category: Category::Utility,
-        },
-    ]);
+SAFETY FUNCTIONS:
+  to_number(value [, default])          Safe number conversion with fallback (default: 0)
+  to_int(text)                          Convert text to integer (0 on error)
+  to_float(text)                        Convert text to float (0 on error)
+  to_bool(value [, default])            Safe boolean conversion with fallback
+  path_equals(obj, "path", value)       Safe nested field comparison
 
-    docs
-}
+UTILITY FUNCTIONS:
+  print(message)                        Print to stdout (suppressed with -qqq)
+  eprint(message)                       Print to stderr (suppressed with -qqq)
+  get_env(var [, default])              Get environment variable with optional default
+  parse_kv(text [, sep [, kv_sep]])     Parse key-value pairs from text
+  read_file(path)                       Read file contents as string
+  read_lines(path)                      Read file as array of lines
+  exit(code)                            Exit kelora with given exit code
+  percentile(array, pct)                Calculate percentile of numeric array
+  window_values(field)                  Get field values from current window
+  window_numbers(field)                 Get numeric field values from current window
 
-/// Generate help text from function documentation
-#[allow(dead_code)] // Used by main.rs for --help-functions flag
-pub fn generate_help_text() -> String {
-    let docs = get_all_function_docs();
-    let mut output = String::from("\nAvailable Rhai Functions for Kelora:\n\n");
+Examples:
+  # String processing with method syntax
+  e.clean_url = e.url.extract_domain().lower()
 
-    // Group by category and sort
-    let mut categories: std::collections::BTreeMap<u8, Vec<&FunctionDoc>> =
-        std::collections::BTreeMap::new();
+  # Array processing and fan-out
+  e.tag_count = e.tags.len()
+  emit_each(e.items)  # Creates separate event for each item
 
-    for doc in &docs {
-        categories
-            .entry(doc.category.sort_order())
-            .or_default()
-            .push(doc);
-    }
+  # Safe nested field access
+  e.user_role = e.get_path("user.profile.role", "guest")
 
-    for (_, category_docs) in categories {
-        if category_docs.is_empty() {
-            continue;
-        }
+  # Datetime manipulation
+  let now = now_utc()
+  e.hour = now.hour()
+  e.formatted = now.format("%Y-%m-%d %H:%M")
 
-        let category_name = category_docs[0].category.as_str();
-        output.push_str(&format!("{}:\n", category_name));
+  # Tracking metrics
+  track_count("http_requests")
+  track_bucket("response_time", "slow")
 
-        // Sort functions within category by signature
-        let mut sorted_docs = category_docs;
-        sorted_docs.sort_by(|a, b| a.signature.cmp(b.signature));
+  # Random values
+  e.sample_rate = rand()
+  e.random_id = rand_int(1000, 9999)
 
-        for doc in sorted_docs {
-            // Format: "  signature                             doc string"
-            output.push_str(&format!("  {:<35} {}\n", doc.signature, doc.doc));
-        }
-        output.push('\n');
-    }
-
-    output.push_str("Note: These functions are available in --filter and --exec expressions.\n");
-    output.push_str("Use 'e' to access the current event (e.g., e.message.lower()).\n");
-    output.push_str("For more examples, see the documentation or use --help for general usage.\n");
-
-    output
+Note: Use 'e' to access the current event. Most functions use method syntax.
+For more examples, see the documentation or use --help for general usage.
+"#
 }
