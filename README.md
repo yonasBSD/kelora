@@ -24,6 +24,10 @@ kelora -f combined --exec 'track_count("status_" + e.status)' --metrics access.l
 # Real-time monitoring with pattern detection
 kubectl logs -f app | kelora -j --parallel --levels warn,error
 
+# Process gzipped logs (auto-detects compression for files and pipes)
+kelora -f json --filter 'e.level == "error"' app.log.gz
+cat app.log.gz | kelora -f json --filter 'e.level == "error"'
+
 # Monitor for brute force attacks using sliding windows
 kelora -j auth.log --window 3 --filter 'e.event == "login_failed"' \
   --exec 'if window_values(window, "user").len() >= 2 { eprint("🚨 Brute force detected from " + e.ip) }'
@@ -81,7 +85,7 @@ Each parser creates events with different fields:
 |`csv/tsv`     |Column headers as fields            |Structured data files               |
 |`combined`    |`ip`, `status`, `request`, `method`, `path`, `request_time`|Apache/NGINX web server logs|
 
-All formats support gzip compression. Use `-f format` to specify (`-j` is a shortcut for `-f json`).
+All formats support gzip compression automatically (detects magic bytes `1F 8B 08`) for both files and stdin. No additional flags needed - works with pipes, `.gz` files, and files without extensions. Use `-f format` to specify (`-j` is a shortcut for `-f json`).
 
 ### Prefix Extraction
 
