@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 use anyhow::Result;
-use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
+use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
 use rhai::Dynamic;
 use std::collections::HashMap;
-use std::io::Read;
+use std::io::{self, Read};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 
 use crate::event::Event;
 use crate::pipeline::PipelineBuilder;
-use crate::platform::SHOULD_TERMINATE;
+use crate::platform::{Ctrl, SHOULD_TERMINATE};
 use crate::stats::{get_thread_stats, stats_finish_processing, stats_start_timer, ProcessingStats};
 
 /// Configuration for parallel processing
@@ -44,6 +44,19 @@ pub struct Batch {
     pub start_line_num: usize,
     pub filenames: Vec<Option<String>>,   // Filename for each line
     pub csv_headers: Option<Vec<String>>, // CSV headers for this batch (if applicable)
+}
+
+#[derive(Debug)]
+enum LineMessage {
+    Line {
+        line: String,
+        filename: Option<String>,
+    },
+    Error {
+        error: io::Error,
+        filename: Option<String>,
+    },
+    Eof,
 }
 
 /// Result of processing a batch
@@ -323,14 +336,28 @@ impl ParallelProcessor {
         stages: Vec<crate::config::ScriptStageType>,
         config: &crate::config::KeloraConfig,
         output: W,
+        ctrl_rx: crossbeam_channel::Receiver<Ctrl>,
     ) -> Result<()> {
         // For file processing, try to use file-aware reader if available
         if !config.input.files.is_empty() {
-            return self.process_with_file_aware_pipeline(pipeline_builder, stages, config, output);
+            return self.process_with_file_aware_pipeline(
+                pipeline_builder,
+                stages,
+                config,
+                output,
+                ctrl_rx,
+            );
         }
 
         // Fallback to original implementation for stdin
-        self.process_with_generic_pipeline(reader, pipeline_builder, stages, config, output)
+        self.process_with_generic_pipeline(
+            reader,
+            pipeline_builder,
+            stages,
+            config,
+            output,
+            ctrl_rx,
+        )
     }
 
     fn process_with_generic_pipeline<
@@ -343,6 +370,7 @@ impl ParallelProcessor {
         stages: Vec<crate::config::ScriptStageType>,
         config: &crate::config::KeloraConfig,
         output: W,
+        ctrl_rx: crossbeam_channel::Receiver<Ctrl>,
     ) -> Result<()> {
         // Create channels
         let (batch_sender, batch_receiver) = if let Some(size) = self.config.buffer_size {
@@ -375,19 +403,27 @@ impl ParallelProcessor {
             )
         };
 
-        // Start reader thread
-        let reader_handle = {
+        let batch_timeout = Duration::from_millis(self.config.batch_timeout_ms);
+        let line_buffer_bound = self.config.buffer_size.unwrap_or(10000);
+        let (line_sender, line_receiver) = bounded(line_buffer_bound);
+
+        let io_handle = {
+            let ctrl_for_io = ctrl_rx.clone();
+            thread::spawn(move || Self::plain_io_reader_thread(reader, line_sender, ctrl_for_io))
+        };
+
+        let batch_handle = {
             let batch_sender = batch_sender.clone();
             let batch_size = self.config.batch_size;
-            let batch_timeout = Duration::from_millis(self.config.batch_timeout_ms);
             let ignore_lines = config.input.ignore_lines.clone();
             let skip_lines = config.input.skip_lines;
-
             let global_tracker_clone = self.global_tracker.clone();
             let input_format = config.input.format.clone();
+            let ctrl_for_batcher = ctrl_rx.clone();
+
             thread::spawn(move || {
-                Self::reader_thread(
-                    reader,
+                Self::batcher_thread(
+                    line_receiver,
                     batch_sender,
                     batch_size,
                     batch_timeout,
@@ -396,6 +432,7 @@ impl ParallelProcessor {
                     skip_lines,
                     input_format,
                     preprocessing_line_count,
+                    ctrl_for_batcher,
                 )
             })
         };
@@ -447,7 +484,8 @@ impl ParallelProcessor {
         };
 
         // Wait for all threads to complete
-        reader_handle.join().unwrap()?;
+        io_handle.join().unwrap()?;
+        batch_handle.join().unwrap()?;
 
         for handle in worker_handles {
             handle.join().unwrap()?;
@@ -464,6 +502,7 @@ impl ParallelProcessor {
         stages: Vec<crate::config::ScriptStageType>,
         config: &crate::config::KeloraConfig,
         output: W,
+        ctrl_rx: crossbeam_channel::Receiver<Ctrl>,
     ) -> Result<()> {
         // Create file-aware reader
         let file_aware_reader = crate::pipeline::builders::create_file_aware_input_reader(config)?;
@@ -496,19 +535,29 @@ impl ParallelProcessor {
             pipeline_builder
         };
 
-        // Start file-aware reader thread
-        let reader_handle = {
+        let batch_timeout = Duration::from_millis(self.config.batch_timeout_ms);
+        let line_buffer_bound = self.config.buffer_size.unwrap_or(10000);
+        let (line_sender, line_receiver) = bounded(line_buffer_bound);
+
+        let io_handle = {
+            let ctrl_for_io = ctrl_rx.clone();
+            thread::spawn(move || {
+                Self::file_aware_io_reader_thread(file_aware_reader, line_sender, ctrl_for_io)
+            })
+        };
+
+        let batch_handle = {
             let batch_sender = batch_sender.clone();
             let batch_size = self.config.batch_size;
-            let batch_timeout = Duration::from_millis(self.config.batch_timeout_ms);
             let ignore_lines = config.input.ignore_lines.clone();
             let skip_lines = config.input.skip_lines;
             let global_tracker_clone = self.global_tracker.clone();
             let input_format = config.input.format.clone();
+            let ctrl_for_batcher = ctrl_rx.clone();
 
             thread::spawn(move || {
-                Self::file_aware_reader_thread(
-                    file_aware_reader,
+                Self::file_aware_batcher_thread(
+                    line_receiver,
                     batch_sender,
                     batch_size,
                     batch_timeout,
@@ -516,6 +565,7 @@ impl ParallelProcessor {
                     ignore_lines,
                     skip_lines,
                     input_format,
+                    ctrl_for_batcher,
                 )
             })
         };
@@ -567,7 +617,8 @@ impl ParallelProcessor {
         };
 
         // Wait for all threads to complete
-        reader_handle.join().unwrap()?;
+        io_handle.join().unwrap()?;
+        batch_handle.join().unwrap()?;
 
         for handle in worker_handles {
             handle.join().unwrap()?;
@@ -598,10 +649,95 @@ impl ParallelProcessor {
             .extract_final_stats_from_tracking(final_tracked)
     }
 
-    /// File-aware reader thread: batches input lines with filename tracking
-    #[allow(clippy::too_many_arguments)]
-    fn file_aware_reader_thread(
+    fn plain_io_reader_thread<R: std::io::BufRead>(
+        mut reader: R,
+        line_sender: Sender<LineMessage>,
+        ctrl_rx: Receiver<Ctrl>,
+    ) -> Result<()> {
+        let mut buffer = String::new();
+        loop {
+            if let Ok(Ctrl::Shutdown { immediate }) = ctrl_rx.try_recv() {
+                let _ = line_sender.send(LineMessage::Eof);
+                if immediate {
+                    return Ok(());
+                }
+                break;
+            }
+
+            buffer.clear();
+            match reader.read_line(&mut buffer) {
+                Ok(0) => {
+                    let _ = line_sender.send(LineMessage::Eof);
+                    break;
+                }
+                Ok(_) => {
+                    let line = buffer.trim_end().to_string();
+                    if line_sender
+                        .send(LineMessage::Line {
+                            line,
+                            filename: None,
+                        })
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    let _ = line_sender.send(LineMessage::Error {
+                        error: e,
+                        filename: None,
+                    });
+                    break;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn file_aware_io_reader_thread(
         mut reader: Box<dyn crate::readers::FileAwareRead>,
+        line_sender: Sender<LineMessage>,
+        ctrl_rx: Receiver<Ctrl>,
+    ) -> Result<()> {
+        let mut buffer = String::new();
+        loop {
+            if let Ok(Ctrl::Shutdown { immediate }) = ctrl_rx.try_recv() {
+                let _ = line_sender.send(LineMessage::Eof);
+                if immediate {
+                    return Ok(());
+                }
+                break;
+            }
+
+            buffer.clear();
+            match reader.read_line(&mut buffer) {
+                Ok(0) => {
+                    let _ = line_sender.send(LineMessage::Eof);
+                    break;
+                }
+                Ok(_) => {
+                    let line = buffer.trim_end().to_string();
+                    let filename = reader.current_filename().map(|s| s.to_string());
+                    if line_sender
+                        .send(LineMessage::Line { line, filename })
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    let filename = reader.current_filename().map(|s| s.to_string());
+                    let _ = line_sender.send(LineMessage::Error { error: e, filename });
+                    break;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn batcher_thread(
+        line_receiver: Receiver<LineMessage>,
         batch_sender: Sender<Batch>,
         batch_size: usize,
         batch_timeout: Duration,
@@ -609,46 +745,237 @@ impl ParallelProcessor {
         ignore_lines: Option<regex::Regex>,
         skip_lines: usize,
         input_format: crate::config::InputFormat,
+        preprocessing_line_count: usize,
+        ctrl_rx: Receiver<Ctrl>,
+    ) -> Result<()> {
+        let mut batch_id = 0u64;
+        let mut current_batch = Vec::with_capacity(batch_size);
+        let mut line_num = preprocessing_line_count;
+        let mut batch_start_line = 1usize;
+        let mut pending_deadline: Option<Instant> = None;
+        let mut skipped_lines_count = 0usize;
+        let mut filtered_lines = 0usize;
+
+        let ctrl_rx = ctrl_rx;
+
+        'outer: loop {
+            if let Some(deadline) = pending_deadline {
+                let now = Instant::now();
+                if deadline <= now {
+                    if !current_batch.is_empty() {
+                        Self::send_batch(
+                            &batch_sender,
+                            &mut current_batch,
+                            batch_id,
+                            batch_start_line,
+                        )?;
+                        batch_id += 1;
+                        batch_start_line = line_num + 1;
+                    }
+                    pending_deadline = None;
+                    continue;
+                }
+
+                let wait = deadline - now;
+                let timeout = crossbeam_channel::after(wait);
+                select! {
+                    recv(ctrl_rx) -> msg => {
+                        match msg {
+                            Ok(Ctrl::Shutdown { immediate }) => {
+                                if !current_batch.is_empty() && !immediate {
+                                    Self::send_batch(
+                                        &batch_sender,
+                                        &mut current_batch,
+                                        batch_id,
+                                        batch_start_line,
+                                    )?;
+                                }
+                                break 'outer;
+                            }
+                            Err(_) => {
+                                if !current_batch.is_empty() {
+                                    Self::send_batch(
+                                        &batch_sender,
+                                        &mut current_batch,
+                                        batch_id,
+                                        batch_start_line,
+                                    )?;
+                                }
+                                break 'outer;
+                            }
+                        }
+                    }
+                    recv(line_receiver) -> msg => {
+                        match msg {
+                            Ok(LineMessage::Line { line, .. }) => {
+                                Self::handle_plain_line(
+                                    line,
+                                    &batch_sender,
+                                    &mut current_batch,
+                                    batch_size,
+                                    batch_timeout,
+                                    &mut batch_id,
+                                    &mut batch_start_line,
+                                    &mut line_num,
+                                    &mut skipped_lines_count,
+                                    &mut filtered_lines,
+                                    skip_lines,
+                                    &input_format,
+                                    &ignore_lines,
+                                    &mut pending_deadline,
+                                )?;
+                            }
+                            Ok(LineMessage::Error { error, .. }) => return Err(error.into()),
+                            Ok(LineMessage::Eof) => {
+                                if !current_batch.is_empty() {
+                                    Self::send_batch(
+                                        &batch_sender,
+                                        &mut current_batch,
+                                        batch_id,
+                                        batch_start_line,
+                                    )?;
+                                }
+                                break 'outer;
+                            }
+                            Err(_) => {
+                                if !current_batch.is_empty() {
+                                    Self::send_batch(
+                                        &batch_sender,
+                                        &mut current_batch,
+                                        batch_id,
+                                        batch_start_line,
+                                    )?;
+                                }
+                                break 'outer;
+                            }
+                        }
+                    }
+                    recv(timeout) -> _ => {
+                        if !current_batch.is_empty() {
+                            Self::send_batch(
+                                &batch_sender,
+                                &mut current_batch,
+                                batch_id,
+                                batch_start_line,
+                            )?;
+                            batch_id += 1;
+                            batch_start_line = line_num + 1;
+                        }
+                        pending_deadline = None;
+                    }
+                }
+            } else {
+                select! {
+                    recv(ctrl_rx) -> msg => {
+                        match msg {
+                            Ok(Ctrl::Shutdown { immediate }) => {
+                                if !current_batch.is_empty() && !immediate {
+                                    Self::send_batch(
+                                        &batch_sender,
+                                        &mut current_batch,
+                                        batch_id,
+                                        batch_start_line,
+                                    )?;
+                                }
+                                break 'outer;
+                            }
+                            Err(_) => {
+                                if !current_batch.is_empty() {
+                                    Self::send_batch(
+                                        &batch_sender,
+                                        &mut current_batch,
+                                        batch_id,
+                                        batch_start_line,
+                                    )?;
+                                }
+                                break 'outer;
+                            }
+                        }
+                    }
+                    recv(line_receiver) -> msg => {
+                        match msg {
+                            Ok(LineMessage::Line { line, .. }) => {
+                                Self::handle_plain_line(
+                                    line,
+                                    &batch_sender,
+                                    &mut current_batch,
+                                    batch_size,
+                                    batch_timeout,
+                                    &mut batch_id,
+                                    &mut batch_start_line,
+                                    &mut line_num,
+                                    &mut skipped_lines_count,
+                                    &mut filtered_lines,
+                                    skip_lines,
+                                    &input_format,
+                                    &ignore_lines,
+                                    &mut pending_deadline,
+                                )?;
+                            }
+                            Ok(LineMessage::Error { error, .. }) => return Err(error.into()),
+                            Ok(LineMessage::Eof) => {
+                                if !current_batch.is_empty() {
+                                    Self::send_batch(
+                                        &batch_sender,
+                                        &mut current_batch,
+                                        batch_id,
+                                        batch_start_line,
+                                    )?;
+                                }
+                                break 'outer;
+                            }
+                            Err(_) => {
+                                if !current_batch.is_empty() {
+                                    Self::send_batch(
+                                        &batch_sender,
+                                        &mut current_batch,
+                                        batch_id,
+                                        batch_start_line,
+                                    )?;
+                                }
+                                break 'outer;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        global_tracker.set_total_lines_read(line_num)?;
+        global_tracker.add_lines_filtered(filtered_lines)?;
+
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn file_aware_batcher_thread(
+        line_receiver: Receiver<LineMessage>,
+        batch_sender: Sender<Batch>,
+        batch_size: usize,
+        batch_timeout: Duration,
+        global_tracker: GlobalTracker,
+        ignore_lines: Option<regex::Regex>,
+        skip_lines: usize,
+        input_format: crate::config::InputFormat,
+        ctrl_rx: Receiver<Ctrl>,
     ) -> Result<()> {
         let mut batch_id = 0u64;
         let mut current_batch = Vec::with_capacity(batch_size);
         let mut current_filenames = Vec::with_capacity(batch_size);
         let mut line_num = 0usize;
         let mut batch_start_line = 1usize;
-        let mut last_batch_time = Instant::now();
-        let mut line_buffer = String::new();
-        let mut skipped_lines = 0;
-        let mut filtered_lines = 0;
-        #[allow(unused_assignments)]
-        let mut current_csv_parser: Option<crate::parsers::CsvParser> = None;
+        let mut pending_deadline: Option<Instant> = None;
+        let mut skipped_lines_count = 0usize;
+        let mut filtered_lines = 0usize;
         let mut last_filename: Option<String> = None;
         let mut current_headers: Option<Vec<String>> = None;
 
-        loop {
-            // Check for termination signal
-            if SHOULD_TERMINATE.load(Ordering::Relaxed) {
-                break;
-            }
+        let ctrl_rx = ctrl_rx;
 
-            // Check if we should send current batch due to timeout
-            if !current_batch.is_empty() && last_batch_time.elapsed() >= batch_timeout {
-                Self::send_batch_with_filenames_and_headers(
-                    &batch_sender,
-                    &mut current_batch,
-                    &mut current_filenames,
-                    batch_id,
-                    batch_start_line,
-                    current_headers.clone(),
-                )?;
-                batch_id += 1;
-                batch_start_line = line_num + 1;
-                last_batch_time = Instant::now();
-            }
-
-            line_buffer.clear();
-            match reader.read_line(&mut line_buffer) {
-                Ok(0) => {
-                    // EOF reached
+        'outer: loop {
+            if let Some(deadline) = pending_deadline {
+                let now = Instant::now();
+                if deadline <= now {
                     if !current_batch.is_empty() {
                         Self::send_batch_with_filenames_and_headers(
                             &batch_sender,
@@ -658,45 +985,100 @@ impl ParallelProcessor {
                             batch_start_line,
                             current_headers.clone(),
                         )?;
+                        batch_id += 1;
+                        batch_start_line = line_num + 1;
                     }
-                    break;
+                    pending_deadline = None;
+                    continue;
                 }
-                Ok(_) => {
-                    line_num += 1;
-                    let line = line_buffer.trim_end().to_string();
-                    let current_filename = reader.current_filename().map(|s| s.to_string());
 
-                    // Skip the first N lines if configured
-                    if skipped_lines < skip_lines {
-                        skipped_lines += 1;
-                        filtered_lines += 1;
-                        continue;
-                    }
-
-                    // Skip empty lines for structured formats only, not for line format
-                    if line.is_empty() && !matches!(input_format, crate::config::InputFormat::Line)
-                    {
-                        continue;
-                    }
-
-                    // Apply ignore-lines filter if configured
-                    if let Some(ref ignore_regex) = ignore_lines {
-                        if ignore_regex.is_match(&line) {
-                            filtered_lines += 1;
-                            continue;
+                let wait = deadline - now;
+                let timeout = crossbeam_channel::after(wait);
+                select! {
+                    recv(ctrl_rx) -> msg => {
+                        match msg {
+                            Ok(Ctrl::Shutdown { immediate }) => {
+                                if !current_batch.is_empty() && !immediate {
+                                    Self::send_batch_with_filenames_and_headers(
+                                        &batch_sender,
+                                        &mut current_batch,
+                                        &mut current_filenames,
+                                        batch_id,
+                                        batch_start_line,
+                                        current_headers.clone(),
+                                    )?;
+                                }
+                                break 'outer;
+                            }
+                            Err(_) => {
+                                if !current_batch.is_empty() {
+                                    Self::send_batch_with_filenames_and_headers(
+                                        &batch_sender,
+                                        &mut current_batch,
+                                        &mut current_filenames,
+                                        batch_id,
+                                        batch_start_line,
+                                        current_headers.clone(),
+                                    )?;
+                                }
+                                break 'outer;
+                            }
                         }
                     }
-
-                    // For CSV formats, detect file changes and reinitialize parser
-                    if matches!(
-                        input_format,
-                        crate::config::InputFormat::Csv
-                            | crate::config::InputFormat::Tsv
-                            | crate::config::InputFormat::Csvnh
-                            | crate::config::InputFormat::Tsvnh
-                    ) && current_filename != last_filename
-                    {
-                        // File changed - send current batch before processing new file
+                    recv(line_receiver) -> msg => {
+                        match msg {
+                            Ok(LineMessage::Line { line, filename }) => {
+                                Self::handle_file_aware_line(
+                                    line,
+                                    filename,
+                                    &batch_sender,
+                                    &mut current_batch,
+                                    &mut current_filenames,
+                                    batch_size,
+                                    batch_timeout,
+                                    &mut batch_id,
+                                    &mut batch_start_line,
+                                    &mut line_num,
+                                    &mut skipped_lines_count,
+                                    &mut filtered_lines,
+                                    skip_lines,
+                                    &input_format,
+                                    &ignore_lines,
+                                    &mut pending_deadline,
+                                    &mut current_headers,
+                                    &mut last_filename,
+                                )?;
+                            }
+                            Ok(LineMessage::Error { error, .. }) => return Err(error.into()),
+                            Ok(LineMessage::Eof) => {
+                                if !current_batch.is_empty() {
+                                    Self::send_batch_with_filenames_and_headers(
+                                        &batch_sender,
+                                        &mut current_batch,
+                                        &mut current_filenames,
+                                        batch_id,
+                                        batch_start_line,
+                                        current_headers.clone(),
+                                    )?;
+                                }
+                                break 'outer;
+                            }
+                            Err(_) => {
+                                if !current_batch.is_empty() {
+                                    Self::send_batch_with_filenames_and_headers(
+                                        &batch_sender,
+                                        &mut current_batch,
+                                        &mut current_filenames,
+                                        batch_id,
+                                        batch_start_line,
+                                        current_headers.clone(),
+                                    )?;
+                                }
+                                break 'outer;
+                            }
+                        }
+                    }
+                    recv(timeout) -> _ => {
                         if !current_batch.is_empty() {
                             Self::send_batch_with_filenames_and_headers(
                                 &batch_sender,
@@ -708,56 +1090,258 @@ impl ParallelProcessor {
                             )?;
                             batch_id += 1;
                             batch_start_line = line_num + 1;
-                            last_batch_time = Instant::now();
                         }
-
-                        // File changed, reinitialize CSV parser for this file
-                        current_csv_parser = Self::create_csv_parser_for_file(&input_format, &line);
-                        current_headers = current_csv_parser
-                            .as_ref()
-                            .map(|parser| parser.get_headers());
-                        last_filename = current_filename.clone();
-
-                        // Skip header lines for CSV/TSV (not for CSVNH/TSVNH)
-                        if matches!(
-                            input_format,
-                            crate::config::InputFormat::Csv | crate::config::InputFormat::Tsv
-                        ) {
-                            // This line was consumed as a header, skip it
-                            continue;
-                        }
-                    }
-
-                    current_batch.push(line);
-                    current_filenames.push(current_filename);
-
-                    // Send batch when full
-                    if current_batch.len() >= batch_size {
-                        Self::send_batch_with_filenames_and_headers(
-                            &batch_sender,
-                            &mut current_batch,
-                            &mut current_filenames,
-                            batch_id,
-                            batch_start_line,
-                            current_headers.clone(),
-                        )?;
-                        batch_id += 1;
-                        batch_start_line = line_num + 1;
-                        last_batch_time = Instant::now();
+                        pending_deadline = None;
                     }
                 }
-                Err(e) => return Err(e.into()),
+            } else {
+                select! {
+                    recv(ctrl_rx) -> msg => {
+                        match msg {
+                            Ok(Ctrl::Shutdown { immediate }) => {
+                                if !current_batch.is_empty() && !immediate {
+                                    Self::send_batch_with_filenames_and_headers(
+                                        &batch_sender,
+                                        &mut current_batch,
+                                        &mut current_filenames,
+                                        batch_id,
+                                        batch_start_line,
+                                        current_headers.clone(),
+                                    )?;
+                                }
+                                break 'outer;
+                            }
+                            Err(_) => {
+                                if !current_batch.is_empty() {
+                                    Self::send_batch_with_filenames_and_headers(
+                                        &batch_sender,
+                                        &mut current_batch,
+                                        &mut current_filenames,
+                                        batch_id,
+                                        batch_start_line,
+                                        current_headers.clone(),
+                                    )?;
+                                }
+                                break 'outer;
+                            }
+                        }
+                    }
+                    recv(line_receiver) -> msg => {
+                        match msg {
+                            Ok(LineMessage::Line { line, filename }) => {
+                                Self::handle_file_aware_line(
+                                    line,
+                                    filename,
+                                    &batch_sender,
+                                    &mut current_batch,
+                                    &mut current_filenames,
+                                    batch_size,
+                                    batch_timeout,
+                                    &mut batch_id,
+                                    &mut batch_start_line,
+                                    &mut line_num,
+                                    &mut skipped_lines_count,
+                                    &mut filtered_lines,
+                                    skip_lines,
+                                    &input_format,
+                                    &ignore_lines,
+                                    &mut pending_deadline,
+                                    &mut current_headers,
+                                    &mut last_filename,
+                                )?;
+                            }
+                            Ok(LineMessage::Error { error, .. }) => return Err(error.into()),
+                            Ok(LineMessage::Eof) => {
+                                if !current_batch.is_empty() {
+                                    Self::send_batch_with_filenames_and_headers(
+                                        &batch_sender,
+                                        &mut current_batch,
+                                        &mut current_filenames,
+                                        batch_id,
+                                        batch_start_line,
+                                        current_headers.clone(),
+                                    )?;
+                                }
+                                break 'outer;
+                            }
+                            Err(_) => {
+                                if !current_batch.is_empty() {
+                                    Self::send_batch_with_filenames_and_headers(
+                                        &batch_sender,
+                                        &mut current_batch,
+                                        &mut current_filenames,
+                                        batch_id,
+                                        batch_start_line,
+                                        current_headers.clone(),
+                                    )?;
+                                }
+                                break 'outer;
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        // Report final line count and filtered lines to global tracker
         global_tracker.set_total_lines_read(line_num)?;
         global_tracker.add_lines_filtered(filtered_lines)?;
 
         Ok(())
     }
 
-    /// Create a CSV parser for a new file
+    fn handle_plain_line(
+        line: String,
+        batch_sender: &Sender<Batch>,
+        current_batch: &mut Vec<String>,
+        batch_size: usize,
+        batch_timeout: Duration,
+        batch_id: &mut u64,
+        batch_start_line: &mut usize,
+        line_num: &mut usize,
+        skipped_lines_count: &mut usize,
+        filtered_lines: &mut usize,
+        skip_lines: usize,
+        input_format: &crate::config::InputFormat,
+        ignore_lines: &Option<regex::Regex>,
+        pending_deadline: &mut Option<Instant>,
+    ) -> Result<()> {
+        *line_num += 1;
+
+        if *skipped_lines_count < skip_lines {
+            *skipped_lines_count += 1;
+            *filtered_lines += 1;
+            return Ok(());
+        }
+
+        if line.is_empty() && !matches!(input_format, crate::config::InputFormat::Line) {
+            return Ok(());
+        }
+
+        if let Some(ref ignore_regex) = ignore_lines {
+            if ignore_regex.is_match(&line) {
+                *filtered_lines += 1;
+                return Ok(());
+            }
+        }
+
+        current_batch.push(line);
+
+        if current_batch.len() >= batch_size || batch_timeout.is_zero() {
+            Self::send_batch(batch_sender, current_batch, *batch_id, *batch_start_line)?;
+            *batch_id += 1;
+            *batch_start_line = *line_num + 1;
+            *pending_deadline = None;
+        } else {
+            *pending_deadline = Some(Instant::now() + batch_timeout);
+        }
+
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn handle_file_aware_line(
+        line: String,
+        filename: Option<String>,
+        batch_sender: &Sender<Batch>,
+        current_batch: &mut Vec<String>,
+        current_filenames: &mut Vec<Option<String>>,
+        batch_size: usize,
+        batch_timeout: Duration,
+        batch_id: &mut u64,
+        batch_start_line: &mut usize,
+        line_num: &mut usize,
+        skipped_lines_count: &mut usize,
+        filtered_lines: &mut usize,
+        skip_lines: usize,
+        input_format: &crate::config::InputFormat,
+        ignore_lines: &Option<regex::Regex>,
+        pending_deadline: &mut Option<Instant>,
+        current_headers: &mut Option<Vec<String>>,
+        last_filename: &mut Option<String>,
+    ) -> Result<()> {
+        *line_num += 1;
+
+        if *skipped_lines_count < skip_lines {
+            *skipped_lines_count += 1;
+            *filtered_lines += 1;
+            return Ok(());
+        }
+
+        if line.is_empty() && !matches!(input_format, crate::config::InputFormat::Line) {
+            return Ok(());
+        }
+
+        if let Some(ref ignore_regex) = ignore_lines {
+            if ignore_regex.is_match(&line) {
+                *filtered_lines += 1;
+                return Ok(());
+            }
+        }
+
+        let filename_changed = match (&filename, &*last_filename) {
+            (Some(new), Some(prev)) => new != prev,
+            (None, None) => false,
+            _ => true,
+        };
+
+        if matches!(
+            input_format,
+            crate::config::InputFormat::Csv
+                | crate::config::InputFormat::Tsv
+                | crate::config::InputFormat::Csvnh
+                | crate::config::InputFormat::Tsvnh
+        ) && filename_changed
+        {
+            if !current_batch.is_empty() {
+                Self::send_batch_with_filenames_and_headers(
+                    batch_sender,
+                    current_batch,
+                    current_filenames,
+                    *batch_id,
+                    *batch_start_line,
+                    current_headers.clone(),
+                )?;
+                *batch_id += 1;
+                *batch_start_line = *line_num + 1;
+                *pending_deadline = None;
+            }
+
+            *current_headers = Self::create_csv_parser_for_file(input_format, &line)
+                .map(|parser| parser.get_headers());
+            *last_filename = filename.clone();
+
+            if matches!(
+                input_format,
+                crate::config::InputFormat::Csv | crate::config::InputFormat::Tsv
+            ) {
+                return Ok(());
+            }
+        } else if filename_changed {
+            *last_filename = filename.clone();
+        }
+
+        current_batch.push(line);
+        current_filenames.push(filename);
+
+        if current_batch.len() >= batch_size || batch_timeout.is_zero() {
+            Self::send_batch_with_filenames_and_headers(
+                batch_sender,
+                current_batch,
+                current_filenames,
+                *batch_id,
+                *batch_start_line,
+                current_headers.clone(),
+            )?;
+            *batch_id += 1;
+            *batch_start_line = *line_num + 1;
+            *pending_deadline = None;
+        } else {
+            *pending_deadline = Some(Instant::now() + batch_timeout);
+        }
+
+        Ok(())
+    }
+
     fn create_csv_parser_for_file(
         input_format: &crate::config::InputFormat,
         first_line: &str,
@@ -770,123 +1354,11 @@ impl ParallelProcessor {
             _ => return None,
         };
 
-        // Initialize headers from the first line
         if parser.initialize_headers_from_line(first_line).is_ok() {
             Some(parser)
         } else {
             None
         }
-    }
-
-    /// Reader thread: batches input lines with timeout - simpler approach
-    #[allow(clippy::too_many_arguments)]
-    fn reader_thread<R: std::io::BufRead>(
-        mut reader: R,
-        batch_sender: Sender<Batch>,
-        batch_size: usize,
-        batch_timeout: Duration,
-        global_tracker: GlobalTracker,
-        ignore_lines: Option<regex::Regex>,
-        skip_lines: usize,
-        input_format: crate::config::InputFormat,
-        preprocessing_line_count: usize,
-    ) -> Result<()> {
-        let mut batch_id = 0u64;
-        let mut current_batch = Vec::with_capacity(batch_size);
-        let mut line_num = preprocessing_line_count;
-        let mut batch_start_line = 1usize;
-        let mut last_batch_time = Instant::now();
-        let mut line_buffer = String::new();
-        let mut skipped_lines = 0;
-        let mut filtered_lines = 0;
-
-        // For truly streaming behavior, we need to:
-        // 1. Process lines immediately as they arrive
-        // 2. Send single-line batches if timeout occurs
-        // 3. Avoid blocking indefinitely on read_line
-
-        loop {
-            // Check for termination signal
-            if SHOULD_TERMINATE.load(Ordering::Relaxed) {
-                break;
-            }
-
-            // Check if we should send current batch due to timeout
-            if !current_batch.is_empty() && last_batch_time.elapsed() >= batch_timeout {
-                Self::send_batch(
-                    &batch_sender,
-                    &mut current_batch,
-                    batch_id,
-                    batch_start_line,
-                )?;
-                batch_id += 1;
-                batch_start_line = line_num + 1;
-                last_batch_time = Instant::now();
-            }
-
-            line_buffer.clear();
-            match reader.read_line(&mut line_buffer) {
-                Ok(0) => {
-                    // EOF reached
-                    if !current_batch.is_empty() {
-                        Self::send_batch(
-                            &batch_sender,
-                            &mut current_batch,
-                            batch_id,
-                            batch_start_line,
-                        )?;
-                    }
-                    break;
-                }
-                Ok(_) => {
-                    line_num += 1;
-                    let line = line_buffer.trim_end().to_string();
-
-                    // Skip the first N lines if configured (applied before ignore-lines and parsing)
-                    if skipped_lines < skip_lines {
-                        skipped_lines += 1;
-                        filtered_lines += 1;
-                        continue;
-                    }
-
-                    // Skip empty lines for structured formats only, not for line format
-                    if line.is_empty() && !matches!(input_format, crate::config::InputFormat::Line)
-                    {
-                        continue;
-                    }
-
-                    // Apply ignore-lines filter if configured (early filtering before parsing)
-                    if let Some(ref ignore_regex) = ignore_lines {
-                        if ignore_regex.is_match(&line) {
-                            filtered_lines += 1;
-                            continue;
-                        }
-                    }
-
-                    current_batch.push(line);
-
-                    // For true streaming: send immediately for batch_size=1 or when batch is full
-                    if current_batch.len() >= batch_size {
-                        Self::send_batch(
-                            &batch_sender,
-                            &mut current_batch,
-                            batch_id,
-                            batch_start_line,
-                        )?;
-                        batch_id += 1;
-                        batch_start_line = line_num + 1;
-                        last_batch_time = Instant::now();
-                    }
-                }
-                Err(e) => return Err(e.into()),
-            }
-        }
-
-        // Report final line count and filtered lines to global tracker
-        global_tracker.set_total_lines_read(line_num)?;
-        global_tracker.add_lines_filtered(filtered_lines)?;
-
-        Ok(())
     }
 
     fn send_batch(

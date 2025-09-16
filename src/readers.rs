@@ -13,6 +13,9 @@ pub struct PeekableLineReader<R: BufRead> {
     first_line_consumed: bool,
 }
 
+// Safe because PeekableLineReader only shares the underlying reader, which must be Send.
+unsafe impl<R: BufRead + Send> Send for PeekableLineReader<R> {}
+
 impl<R: BufRead> PeekableLineReader<R> {
     #[allow(dead_code)] // Used by lib.rs for format auto-detection
     pub fn new(reader: R) -> Self {

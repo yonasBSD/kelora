@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use anyhow::Result;
+use crossbeam_channel::Sender;
 use std::fs::File;
 use std::io::{self, Write};
 use std::path::Path;
@@ -35,6 +36,12 @@ impl ExitCode {
 pub static SHOULD_TERMINATE: AtomicBool = AtomicBool::new(false);
 pub static TERMINATED_BY_SIGNAL: AtomicBool = AtomicBool::new(false);
 
+/// Control messages broadcast by the signal handler to processing components
+#[derive(Debug, Clone)]
+pub enum Ctrl {
+    Shutdown { immediate: bool },
+}
+
 /// Signal handler for graceful shutdown
 pub struct SignalHandler {
     _handle: thread::JoinHandle<()>,
@@ -42,22 +49,26 @@ pub struct SignalHandler {
 
 impl SignalHandler {
     /// Initialize signal handling - cross-platform
-    pub fn new() -> Result<Self> {
+    pub fn new(ctrl_sender: Sender<Ctrl>) -> Result<Self> {
         #[cfg(unix)]
         {
             let signals_to_handle = vec![SIGINT, SIGPIPE, SIGTERM];
             let mut signals = Signals::new(&signals_to_handle)?;
 
+            let sender = ctrl_sender.clone();
             let handle = thread::spawn(move || {
+                let mut shutdown_count = 0;
                 for sig in signals.forever() {
                     match sig {
                         SIGINT => {
                             SHOULD_TERMINATE.store(true, Ordering::Relaxed);
                             TERMINATED_BY_SIGNAL.store(true, Ordering::Relaxed);
-                            // Give main thread a moment to handle graceful shutdown
-                            thread::sleep(std::time::Duration::from_millis(200));
-                            // If still running after grace period, exit immediately
-                            ExitCode::SignalInt.exit();
+                            shutdown_count += 1;
+                            let immediate = shutdown_count > 1;
+                            let _ = sender.send(Ctrl::Shutdown { immediate });
+                            if immediate {
+                                ExitCode::SignalInt.exit();
+                            }
                         }
                         SIGPIPE => {
                             // Broken pipe - exit quietly (normal for Unix pipes)
@@ -74,7 +85,14 @@ impl SignalHandler {
                             );
                             SHOULD_TERMINATE.store(true, Ordering::Relaxed);
                             TERMINATED_BY_SIGNAL.store(true, Ordering::Relaxed);
-                            ExitCode::SignalTerm.exit();
+                            shutdown_count += 1;
+                            let immediate = shutdown_count > 1;
+                            let _ = sender.send(Ctrl::Shutdown { immediate });
+                            if immediate {
+                                ExitCode::SignalTerm.exit();
+                            }
+                            // Allow graceful shutdown to proceed. If still running, a
+                            // subsequent SIGTERM/SIGINT will trigger immediate exit.
                         }
                         _ => {
                             // Unknown signal - should not happen with our registration
@@ -99,16 +117,20 @@ impl SignalHandler {
             let term_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             flag::register(SIGINT, std::sync::Arc::clone(&term_flag))?;
 
+            let mut sender = ctrl_sender.clone();
             let handle = thread::spawn(move || {
+                let mut shutdown_count = 0;
                 loop {
                     thread::sleep(std::time::Duration::from_millis(100));
                     if term_flag.load(Ordering::Relaxed) {
                         SHOULD_TERMINATE.store(true, Ordering::Relaxed);
                         TERMINATED_BY_SIGNAL.store(true, Ordering::Relaxed);
-                        // Give main thread a moment to handle graceful shutdown
-                        thread::sleep(std::time::Duration::from_millis(200));
-                        // If still running after grace period, exit immediately
-                        ExitCode::SignalInt.exit();
+                        shutdown_count += 1;
+                        let immediate = shutdown_count > 1;
+                        let _ = sender.send(Ctrl::Shutdown { immediate });
+                        if immediate {
+                            ExitCode::SignalInt.exit();
+                        }
                     }
                 }
             });

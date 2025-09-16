@@ -194,6 +194,7 @@ pub trait LineFilter: Send {
 pub trait Chunker: Send {
     fn feed_line(&mut self, line: String) -> Option<String>;
     fn flush(&mut self) -> Option<String>;
+    fn has_pending(&self) -> bool;
 }
 
 /// Manage sliding window of events (future feature)
@@ -763,5 +764,10 @@ impl Pipeline {
     #[allow(dead_code)] // Used by parallel processing logic
     pub fn is_take_limit_exhausted(&self) -> bool {
         self.limiter.as_ref().is_some_and(|l| l.is_exhausted())
+    }
+
+    /// Check if the chunker currently holds a partial chunk that hasn't been emitted yet
+    pub fn has_pending_chunk(&self) -> bool {
+        self.chunker.has_pending()
     }
 }

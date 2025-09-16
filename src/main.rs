@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::{ArgMatches, CommandFactory, FromArgMatches};
+use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
 use rhai::Dynamic;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
@@ -25,8 +26,8 @@ mod tty;
 use config::KeloraConfig;
 use config_file::ConfigFile;
 use platform::{
-    ExitCode, ProcessCleanup, SafeFileOut, SafeStderr, SafeStdout, SignalHandler, SHOULD_TERMINATE,
-    TERMINATED_BY_SIGNAL,
+    Ctrl, ExitCode, ProcessCleanup, SafeFileOut, SafeStderr, SafeStdout, SignalHandler,
+    SHOULD_TERMINATE, TERMINATED_BY_SIGNAL,
 };
 
 // Internal CLI imports
@@ -61,9 +62,8 @@ fn detect_format_for_parallel_mode(files: &[String]) -> Result<config::InputForm
         // For stdin with potential gzip, handle decompression first
         let stdin_reader = readers::ChannelStdinReader::new()?;
         let processed_stdin = decompression::maybe_gzip(stdin_reader)?;
-        let mut peekable_reader = readers::PeekableLineReader::new(
-            io::BufReader::new(processed_stdin)
-        );
+        let mut peekable_reader =
+            readers::PeekableLineReader::new(io::BufReader::new(processed_stdin));
 
         match detect_format_from_peekable_reader(&mut peekable_reader)? {
             config::InputFormat::Auto => Ok(config::InputFormat::Line), // Fallback
@@ -92,12 +92,13 @@ use parallel::{ParallelConfig, ParallelProcessor};
 use pipeline::{
     create_input_reader, create_pipeline_builder_from_config, create_pipeline_from_config,
 };
-use platform::check_termination;
 use stats::{
     get_thread_stats, stats_add_error, stats_add_line_filtered, stats_add_line_output,
     stats_add_line_read, stats_finish_processing, stats_start_timer, ProcessingStats,
 };
 use std::io::{self, BufRead, Write};
+use std::thread;
+use std::time::{Duration, Instant};
 
 /// Result of pipeline processing
 #[derive(Debug)]
@@ -110,6 +111,7 @@ struct PipelineResult {
 fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
     config: &KeloraConfig,
     output: W,
+    ctrl_rx: &Receiver<Ctrl>,
 ) -> Result<PipelineResult> {
     // Start statistics collection if enabled
     if config.output.stats {
@@ -119,10 +121,10 @@ fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
     let use_parallel = config.should_use_parallel();
 
     if use_parallel {
-        run_pipeline_parallel(config, output)
+        run_pipeline_parallel(config, output, ctrl_rx)
     } else {
         let mut output = output;
-        run_pipeline_sequential(config, &mut output)?;
+        run_pipeline_sequential(config, &mut output, ctrl_rx.clone())?;
         let tracking_data = rhai_functions::tracking::get_thread_tracking_state();
         // Always collect stats for error reporting, even if --stats not used
         stats_finish_processing();
@@ -141,6 +143,7 @@ fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
 fn run_pipeline_parallel<W: Write + Send + 'static>(
     config: &KeloraConfig,
     output: W,
+    ctrl_rx: &Receiver<Ctrl>,
 ) -> Result<PipelineResult> {
     // Handle auto-detection for parallel mode
     let final_config = if matches!(config.input.format, config::InputFormat::Auto) {
@@ -198,6 +201,7 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
         config.processing.stages.clone(),
         config,
         output,
+        ctrl_rx.clone(),
     )?;
 
     // Merge the parallel metrics state with our pipeline context
@@ -235,171 +239,42 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
 }
 
 /// Run pipeline in sequential mode using KeloraConfig
-fn run_pipeline_sequential<W: Write>(config: &KeloraConfig, output: &mut W) -> Result<()> {
-    // For auto-detection, we need special handling of input sources
+fn run_pipeline_sequential<W: Write>(
+    config: &KeloraConfig,
+    output: &mut W,
+    ctrl_rx: Receiver<Ctrl>,
+) -> Result<()> {
     if matches!(config.input.format, config::InputFormat::Auto) {
-        return run_pipeline_sequential_with_auto_detection(config, output);
+        return run_pipeline_sequential_with_auto_detection(config, output, ctrl_rx);
     }
 
-    let (mut pipeline, begin_stage, end_stage, mut ctx) = create_pipeline_from_config(config)?;
-
-    // Execute begin stage
-    if let Err(e) = begin_stage.execute(&mut ctx) {
-        return Err(anyhow::anyhow!("Begin stage error: {}", e));
-    }
-
-    // For CSV formats, we need to track per-file schema
-    let mut current_csv_headers: Option<Vec<String>> = None;
-    let mut last_filename: Option<String> = None;
-
-    // Process lines using pipeline
-    let mut line_num = 0;
-    let mut skipped_lines = 0;
-
-    // Handle filename tracking by creating the appropriate reader
-    if config.input.files.is_empty() {
-        // Stdin processing with gzip support - no filename tracking
+    let input = if config.input.files.is_empty() {
         let stdin_reader = readers::ChannelStdinReader::new()?;
         let processed_stdin = decompression::maybe_gzip(stdin_reader)?;
-        let reader = io::BufReader::new(processed_stdin);
-
-        for line_result in reader.lines() {
-            // Check for termination signal between lines
-            if check_termination().is_err() {
-                return Ok(());
-            }
-
-            match process_line_sequential(
-                line_result,
-                &mut line_num,
-                &mut skipped_lines,
-                &mut pipeline,
-                &mut ctx,
-                config,
-                output,
-                None,
-                &mut current_csv_headers,
-                &mut last_filename,
-            )? {
-                ProcessingResult::Continue => {}
-                ProcessingResult::TakeLimitExhausted => break,
-            }
-
-            // Check for exit requested from Rhai scripts
-            if rhai_functions::process::is_exit_requested() {
-                let exit_code = rhai_functions::process::get_exit_code();
-                std::process::exit(exit_code);
-            }
-        }
+        SequentialInput::Stdin(Box::new(io::BufReader::new(processed_stdin)))
     } else {
-        // File processing - with filename tracking
         let sorted_files =
             pipeline::builders::sort_files(&config.input.files, &config.input.file_order)?;
-        let mut multi_reader = readers::MultiFileReader::new(sorted_files)?;
+        SequentialInput::Files(readers::MultiFileReader::new(sorted_files)?)
+    };
 
-        let mut line_buf = String::new();
-        loop {
-            // Check for termination signal between lines
-            if check_termination().is_err() {
-                return Ok(());
-            }
-
-            line_buf.clear();
-            let bytes_read = match multi_reader.read_line(&mut line_buf) {
-                Ok(0) => break, // EOF
-                Ok(n) => n,
-                Err(e) => {
-                    let line_result = Err(e);
-                    let current_filename = multi_reader.current_filename().map(|s| s.to_string());
-                    match process_line_sequential(
-                        line_result,
-                        &mut line_num,
-                        &mut skipped_lines,
-                        &mut pipeline,
-                        &mut ctx,
-                        config,
-                        output,
-                        current_filename,
-                        &mut current_csv_headers,
-                        &mut last_filename,
-                    )? {
-                        ProcessingResult::Continue => {}
-                        ProcessingResult::TakeLimitExhausted => break,
-                    }
-
-                    // Check for exit requested from Rhai scripts
-                    if rhai_functions::process::is_exit_requested() {
-                        let exit_code = rhai_functions::process::get_exit_code();
-                        std::process::exit(exit_code);
-                    }
-                    continue;
-                }
-            };
-
-            if bytes_read > 0 {
-                let current_filename = multi_reader.current_filename().map(|s| s.to_string());
-                match process_line_sequential(
-                    Ok(line_buf.clone()),
-                    &mut line_num,
-                    &mut skipped_lines,
-                    &mut pipeline,
-                    &mut ctx,
-                    config,
-                    output,
-                    current_filename,
-                    &mut current_csv_headers,
-                    &mut last_filename,
-                )? {
-                    ProcessingResult::Continue => {}
-                    ProcessingResult::TakeLimitExhausted => break,
-                }
-
-                // Check for exit requested from Rhai scripts
-                if rhai_functions::process::is_exit_requested() {
-                    let exit_code = rhai_functions::process::get_exit_code();
-                    std::process::exit(exit_code);
-                }
-            }
-        }
-    }
-
-    // Flush any remaining chunks
-    let results = pipeline.flush(&mut ctx)?;
-    for result in results {
-        if !result.is_empty() {
-            writeln!(output, "{}", result)?;
-        }
-    }
-
-    // Execute end stage
-    if let Err(e) = end_stage.execute(&ctx) {
-        return Err(anyhow::anyhow!("End stage error: {}", e));
-    }
-
-    // Merge thread-local tracking state (including errors) into context for sequential mode
-    rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
-
-    Ok(())
+    run_pipeline_sequential_internal(config, output, ctrl_rx, input)
 }
 
 /// Run pipeline in sequential mode with auto-detection support
 fn run_pipeline_sequential_with_auto_detection<W: Write>(
     config: &KeloraConfig,
     output: &mut W,
+    ctrl_rx: Receiver<Ctrl>,
 ) -> Result<()> {
-    // Handle auto-detection based on input source
     if config.input.files.is_empty() {
-        // Stdin processing with auto-detection and gzip support
         let stdin_reader = readers::ChannelStdinReader::new()?;
         let processed_stdin = decompression::maybe_gzip(stdin_reader)?;
-        let mut peekable_reader = readers::PeekableLineReader::new(
-            io::BufReader::new(processed_stdin)
-        );
+        let mut peekable_reader =
+            readers::PeekableLineReader::new(io::BufReader::new(processed_stdin));
 
-        // Detect format from first line (now decompressed if needed)
         let detected_format = detect_format_from_peekable_reader(&mut peekable_reader)?;
 
-        // Report detected format
         if config.processing.quiet_level == 0 {
             let format_name = format!("{:?}", detected_format).to_lowercase();
             let message =
@@ -407,39 +282,12 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
             eprintln!("{}", message);
         }
 
-        // Create config with detected format
         let mut final_config = config.clone();
         final_config.input.format = detected_format;
 
-        // Build pipeline with detected format
-        let (mut pipeline, begin_stage, end_stage, mut ctx) =
-            create_pipeline_from_config(&final_config)?;
-
-        // Execute begin stage
-        if let Err(e) = begin_stage.execute(&mut ctx) {
-            return Err(anyhow::anyhow!("Begin stage error: {}", e));
-        }
-
-        // Process stdin using peekable reader (which will return the first line correctly)
-        run_sequential_with_reader(
-            &mut peekable_reader,
-            &mut pipeline,
-            &mut ctx,
-            &final_config,
-            output,
-            None, // No filename for stdin
-        )?;
-
-        // Execute end stage
-        if let Err(e) = end_stage.execute(&ctx) {
-            return Err(anyhow::anyhow!("End stage error: {}", e));
-        }
-
-        // Merge thread-local tracking state
-        rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
+        let input = SequentialInput::Stdin(Box::new(peekable_reader));
+        run_pipeline_sequential_internal(&final_config, output, ctrl_rx, input)
     } else {
-        // File processing with auto-detection
-        // For files, we can just read the first line and then re-open
         let sorted_files =
             pipeline::builders::sort_files(&config.input.files, &config.input.file_order)?;
 
@@ -447,7 +295,6 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
             return Ok(());
         }
 
-        // Read first line from first file for detection
         let first_file = &sorted_files[0];
         let detected_format = {
             let decompressed = decompression::DecompressionReader::new(first_file)?;
@@ -455,7 +302,6 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
             detect_format_from_peekable_reader(&mut peekable_reader)?
         };
 
-        // Report detected format
         if config.processing.quiet_level == 0 {
             let format_name = format!("{:?}", detected_format).to_lowercase();
             let message =
@@ -463,228 +309,368 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
             eprintln!("{}", message);
         }
 
-        // Create config with detected format
         let mut final_config = config.clone();
         final_config.input.format = detected_format;
-
-        // Build pipeline with detected format
-        let (mut pipeline, begin_stage, end_stage, mut ctx) =
-            create_pipeline_from_config(&final_config)?;
-
-        // Execute begin stage
-        if let Err(e) = begin_stage.execute(&mut ctx) {
-            return Err(anyhow::anyhow!("Begin stage error: {}", e));
-        }
-
-        // Process all files normally (re-opening them)
-        let mut multi_reader = readers::MultiFileReader::new(sorted_files)?;
-        run_sequential_with_multi_reader(
-            &mut multi_reader,
-            &mut pipeline,
-            &mut ctx,
-            &final_config,
-            output,
-        )?;
-
-        // Execute end stage
-        if let Err(e) = end_stage.execute(&ctx) {
-            return Err(anyhow::anyhow!("End stage error: {}", e));
-        }
-
-        // Merge thread-local tracking state
-        rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
+        let input = SequentialInput::Files(readers::MultiFileReader::new(sorted_files)?);
+        run_pipeline_sequential_internal(&final_config, output, ctrl_rx, input)
     }
-
-    Ok(())
 }
 
-/// Generic sequential processing function that works with any BufRead reader
-fn run_sequential_with_reader<W: Write, R: BufRead>(
-    reader: &mut R,
-    pipeline: &mut pipeline::Pipeline,
-    ctx: &mut pipeline::PipelineContext,
+const DEFAULT_MULTILINE_FLUSH_TIMEOUT_MS: u64 = 400;
+const LINE_CHANNEL_BOUND: usize = 1024;
+
+enum SequentialInput {
+    Stdin(Box<dyn BufRead + Send>),
+    Files(readers::MultiFileReader),
+}
+
+enum ReaderMessage {
+    Line {
+        line: String,
+        filename: Option<String>,
+    },
+    Error {
+        error: io::Error,
+        filename: Option<String>,
+    },
+    Eof,
+}
+
+fn spawn_stdin_reader(
+    mut reader: Box<dyn BufRead + Send>,
+    sender: Sender<ReaderMessage>,
+    ctrl_rx: Receiver<Ctrl>,
+) -> thread::JoinHandle<Result<()>> {
+    thread::spawn(move || {
+        let mut buffer = String::new();
+        loop {
+            if let Ok(Ctrl::Shutdown { immediate }) = ctrl_rx.try_recv() {
+                let _ = sender.send(ReaderMessage::Eof);
+                if immediate {
+                    return Ok(());
+                }
+                break;
+            }
+
+            buffer.clear();
+            match reader.read_line(&mut buffer) {
+                Ok(0) => {
+                    let _ = sender.send(ReaderMessage::Eof);
+                    break;
+                }
+                Ok(_) => {
+                    let line = buffer.clone();
+                    if sender
+                        .send(ReaderMessage::Line {
+                            line,
+                            filename: None,
+                        })
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    if sender
+                        .send(ReaderMessage::Error {
+                            error: e,
+                            filename: None,
+                        })
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+        Ok(())
+    })
+}
+
+fn spawn_file_reader(
+    mut reader: readers::MultiFileReader,
+    sender: Sender<ReaderMessage>,
+    ctrl_rx: Receiver<Ctrl>,
+) -> thread::JoinHandle<Result<()>> {
+    thread::spawn(move || {
+        let mut buffer = String::new();
+        loop {
+            if let Ok(Ctrl::Shutdown { immediate }) = ctrl_rx.try_recv() {
+                let _ = sender.send(ReaderMessage::Eof);
+                if immediate {
+                    return Ok(());
+                }
+                break;
+            }
+
+            buffer.clear();
+            match reader.read_line(&mut buffer) {
+                Ok(0) => {
+                    let _ = sender.send(ReaderMessage::Eof);
+                    break;
+                }
+                Ok(_) => {
+                    let filename = reader.current_filename().map(|s| s.to_string());
+                    let line = buffer.clone();
+                    if sender.send(ReaderMessage::Line { line, filename }).is_err() {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    let filename = reader.current_filename().map(|s| s.to_string());
+                    if sender
+                        .send(ReaderMessage::Error { error: e, filename })
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+        Ok(())
+    })
+}
+
+fn run_pipeline_sequential_internal<W: Write>(
     config: &KeloraConfig,
     output: &mut W,
-    multi_reader: Option<&mut readers::MultiFileReader>, // For filename tracking
+    ctrl_rx: Receiver<Ctrl>,
+    input: SequentialInput,
 ) -> Result<()> {
-    // For CSV formats, we need to track per-file schema
+    let (mut pipeline, begin_stage, end_stage, mut ctx) = create_pipeline_from_config(config)?;
+
+    if let Err(e) = begin_stage.execute(&mut ctx) {
+        return Err(anyhow::anyhow!("Begin stage error: {}", e));
+    }
+
+    let (line_tx, line_rx) = bounded::<ReaderMessage>(LINE_CHANNEL_BOUND);
+    let reader_ctrl = ctrl_rx.clone();
+    let reader_handle = match input {
+        SequentialInput::Stdin(reader) => spawn_stdin_reader(reader, line_tx, reader_ctrl),
+        SequentialInput::Files(reader) => spawn_file_reader(reader, line_tx, reader_ctrl),
+    };
+
+    let multiline_timeout = config
+        .input
+        .multiline
+        .as_ref()
+        .map(|_| Duration::from_millis(DEFAULT_MULTILINE_FLUSH_TIMEOUT_MS));
+
     let mut current_csv_headers: Option<Vec<String>> = None;
     let mut last_filename: Option<String> = None;
+    let mut line_num = 0usize;
+    let mut skipped_lines = 0usize;
+    let mut pending_deadline: Option<Instant> = None;
+    let mut shutdown_requested = false;
+    let mut immediate_shutdown = false;
 
-    // Process lines using pipeline
-    let mut line_num = 0;
-    let mut skipped_lines = 0;
+    let ctrl_rx = ctrl_rx;
+    let line_rx = line_rx;
 
-    let mut line_buf = String::new();
     loop {
-        // Check for termination signal between lines
-        if check_termination().is_err() {
-            return Ok(());
+        if immediate_shutdown || shutdown_requested {
+            break;
         }
 
-        line_buf.clear();
-        let bytes_read = match reader.read_line(&mut line_buf) {
-            Ok(0) => break, // EOF
-            Ok(n) => n,
-            Err(e) => {
-                let line_result = Err(e);
-                let current_filename = multi_reader
-                    .as_ref()
-                    .and_then(|mr| mr.current_filename().map(|s| s.to_string()));
-                match process_line_sequential(
-                    line_result,
-                    &mut line_num,
-                    &mut skipped_lines,
-                    pipeline,
-                    ctx,
-                    config,
-                    output,
-                    current_filename,
-                    &mut current_csv_headers,
-                    &mut last_filename,
-                )? {
-                    ProcessingResult::Continue => {}
-                    ProcessingResult::TakeLimitExhausted => break,
-                }
+        let deadline_duration = pending_deadline.map(|deadline| {
+            let now = Instant::now();
+            if deadline <= now {
+                Duration::from_millis(0)
+            } else {
+                deadline.saturating_duration_since(now)
+            }
+        });
 
-                // Check for exit requested from Rhai scripts
-                if rhai_functions::process::is_exit_requested() {
-                    let exit_code = rhai_functions::process::get_exit_code();
-                    std::process::exit(exit_code);
+        if let Some(duration) = deadline_duration {
+            if duration.is_zero() {
+                let results = pipeline.flush(&mut ctx)?;
+                for result in results {
+                    if !result.is_empty() {
+                        writeln!(output, "{}", result)?;
+                    }
                 }
+                pending_deadline = None;
                 continue;
             }
-        };
 
-        if bytes_read > 0 {
-            let current_filename = multi_reader
-                .as_ref()
-                .and_then(|mr| mr.current_filename().map(|s| s.to_string()));
-            match process_line_sequential(
-                Ok(line_buf.clone()),
-                &mut line_num,
-                &mut skipped_lines,
-                pipeline,
-                ctx,
-                config,
-                output,
-                current_filename,
-                &mut current_csv_headers,
-                &mut last_filename,
-            )? {
-                ProcessingResult::Continue => {}
-                ProcessingResult::TakeLimitExhausted => break,
+            let timeout = crossbeam_channel::after(duration);
+            select! {
+                recv(ctrl_rx) -> msg => {
+                    match msg {
+                        Ok(Ctrl::Shutdown { immediate }) => {
+                            if immediate {
+                                immediate_shutdown = true;
+                            } else {
+                                shutdown_requested = true;
+                            }
+                        }
+                        Err(_) => {
+                            shutdown_requested = true;
+                        }
+                    }
+                }
+                recv(line_rx) -> msg => {
+                    match msg {
+                        Ok(message) => {
+                            if handle_reader_message(
+                                message,
+                                &mut pipeline,
+                                &mut ctx,
+                                config,
+                                output,
+                                &mut line_num,
+                                &mut skipped_lines,
+                                &mut current_csv_headers,
+                                &mut last_filename,
+                            )? {
+                                shutdown_requested = true;
+                            }
+                            pending_deadline = multiline_timeout
+                                .and_then(|timeout| pipeline
+                                    .has_pending_chunk()
+                                    .then(|| Instant::now() + timeout));
+                        }
+                        Err(_) => {
+                            shutdown_requested = true;
+                        }
+                    }
+                }
+                recv(timeout) -> _ => {
+                    let results = pipeline.flush(&mut ctx)?;
+                    for result in results {
+                        if !result.is_empty() {
+                            writeln!(output, "{}", result)?;
+                        }
+                    }
+                    pending_deadline = None;
+                }
             }
+        } else {
+            select! {
+                recv(ctrl_rx) -> msg => {
+                    match msg {
+                        Ok(Ctrl::Shutdown { immediate }) => {
+                            if immediate {
+                                immediate_shutdown = true;
+                            } else {
+                                shutdown_requested = true;
+                            }
+                        }
+                        Err(_) => {
+                            shutdown_requested = true;
+                        }
+                    }
+                }
+                recv(line_rx) -> msg => {
+                    match msg {
+                        Ok(message) => {
+                            if handle_reader_message(
+                                message,
+                                &mut pipeline,
+                                &mut ctx,
+                                config,
+                                output,
+                                &mut line_num,
+                                &mut skipped_lines,
+                                &mut current_csv_headers,
+                                &mut last_filename,
+                            )? {
+                                shutdown_requested = true;
+                            }
+                            pending_deadline = multiline_timeout
+                                .and_then(|timeout| pipeline
+                                    .has_pending_chunk()
+                                    .then(|| Instant::now() + timeout));
+                        }
+                        Err(_) => {
+                            shutdown_requested = true;
+                        }
+                    }
+                }
+            }
+        }
 
-            // Check for exit requested from Rhai scripts
-            if rhai_functions::process::is_exit_requested() {
-                let exit_code = rhai_functions::process::get_exit_code();
-                std::process::exit(exit_code);
-            }
+        if rhai_functions::process::is_exit_requested() {
+            let exit_code = rhai_functions::process::get_exit_code();
+            std::process::exit(exit_code);
         }
     }
 
-    // Flush any remaining chunks
-    let results = pipeline.flush(ctx)?;
+    drop(line_rx);
+
+    match reader_handle.join() {
+        Ok(result) => result?,
+        Err(_) => return Err(anyhow::anyhow!("Reader thread panicked")),
+    }
+
+    if immediate_shutdown {
+        return Ok(());
+    }
+
+    let results = pipeline.flush(&mut ctx)?;
     for result in results {
         if !result.is_empty() {
             writeln!(output, "{}", result)?;
         }
     }
 
+    if let Err(e) = end_stage.execute(&ctx) {
+        return Err(anyhow::anyhow!("End stage error: {}", e));
+    }
+
+    rhai_functions::tracking::merge_thread_tracking_to_context(&mut ctx);
+
     Ok(())
 }
 
-/// Sequential processing function that works with MultiFileReader for filename tracking
-fn run_sequential_with_multi_reader<W: Write>(
-    multi_reader: &mut readers::MultiFileReader,
+fn handle_reader_message<W: Write>(
+    message: ReaderMessage,
     pipeline: &mut pipeline::Pipeline,
     ctx: &mut pipeline::PipelineContext,
     config: &KeloraConfig,
     output: &mut W,
-) -> Result<()> {
-    // For CSV formats, we need to track per-file schema
-    let mut current_csv_headers: Option<Vec<String>> = None;
-    let mut last_filename: Option<String> = None;
-
-    // Process lines using pipeline
-    let mut line_num = 0;
-    let mut skipped_lines = 0;
-
-    let mut line_buf = String::new();
-    loop {
-        // Check for termination signal between lines
-        if check_termination().is_err() {
-            return Ok(());
-        }
-
-        line_buf.clear();
-        let bytes_read = match multi_reader.read_line(&mut line_buf) {
-            Ok(0) => break, // EOF
-            Ok(n) => n,
-            Err(e) => {
-                let line_result = Err(e);
-                let current_filename = multi_reader.current_filename().map(|s| s.to_string());
-                match process_line_sequential(
-                    line_result,
-                    &mut line_num,
-                    &mut skipped_lines,
-                    pipeline,
-                    ctx,
-                    config,
-                    output,
-                    current_filename,
-                    &mut current_csv_headers,
-                    &mut last_filename,
-                )? {
-                    ProcessingResult::Continue => {}
-                    ProcessingResult::TakeLimitExhausted => break,
-                }
-
-                // Check for exit requested from Rhai scripts
-                if rhai_functions::process::is_exit_requested() {
-                    let exit_code = rhai_functions::process::get_exit_code();
-                    std::process::exit(exit_code);
-                }
-                continue;
-            }
-        };
-
-        if bytes_read > 0 {
-            let current_filename = multi_reader.current_filename().map(|s| s.to_string());
+    line_num: &mut usize,
+    skipped_lines: &mut usize,
+    current_csv_headers: &mut Option<Vec<String>>,
+    last_filename: &mut Option<String>,
+) -> Result<bool> {
+    match message {
+        ReaderMessage::Line { line, filename } => {
             match process_line_sequential(
-                Ok(line_buf.clone()),
-                &mut line_num,
-                &mut skipped_lines,
+                Ok(line),
+                line_num,
+                skipped_lines,
                 pipeline,
                 ctx,
                 config,
                 output,
-                current_filename,
-                &mut current_csv_headers,
-                &mut last_filename,
+                filename,
+                current_csv_headers,
+                last_filename,
             )? {
-                ProcessingResult::Continue => {}
-                ProcessingResult::TakeLimitExhausted => break,
-            }
-
-            // Check for exit requested from Rhai scripts
-            if rhai_functions::process::is_exit_requested() {
-                let exit_code = rhai_functions::process::get_exit_code();
-                std::process::exit(exit_code);
+                ProcessingResult::Continue => Ok(false),
+                ProcessingResult::TakeLimitExhausted => Ok(true),
             }
         }
-    }
-
-    // Flush any remaining chunks
-    let results = pipeline.flush(ctx)?;
-    for result in results {
-        if !result.is_empty() {
-            writeln!(output, "{}", result)?;
+        ReaderMessage::Error { error, filename } => {
+            match process_line_sequential(
+                Err(error),
+                line_num,
+                skipped_lines,
+                pipeline,
+                ctx,
+                config,
+                output,
+                filename,
+                current_csv_headers,
+                last_filename,
+            )? {
+                ProcessingResult::Continue => Ok(false),
+                ProcessingResult::TakeLimitExhausted => Ok(true),
+            }
         }
+        ReaderMessage::Eof => Ok(true),
     }
-
-    Ok(())
 }
 
 /// Processing result for sequential pipeline
@@ -837,8 +823,11 @@ fn process_line_sequential<W: Write>(
 }
 
 fn main() -> Result<()> {
+    // Broadcast channel for shutdown requests from signal handler or other sources
+    let (ctrl_tx, ctrl_rx) = unbounded::<Ctrl>();
+
     // Initialize signal handling early
-    let _signal_handler = match SignalHandler::new() {
+    let _signal_handler = match SignalHandler::new(ctrl_tx.clone()) {
         Ok(handler) => handler,
         Err(e) => {
             eprintln!("Failed to initialize signal handling: {}", e);
@@ -980,11 +969,11 @@ fn main() -> Result<()> {
                 ExitCode::GeneralError.exit();
             }
         };
-        run_pipeline_with_kelora_config(&config, file_output)
+        run_pipeline_with_kelora_config(&config, file_output, &ctrl_rx)
     } else {
         // Use stdout output
         let stdout_output = SafeStdout::new();
-        run_pipeline_with_kelora_config(&config, stdout_output)
+        run_pipeline_with_kelora_config(&config, stdout_output, &ctrl_rx)
     };
 
     let (final_stats, tracking_data) = match result {

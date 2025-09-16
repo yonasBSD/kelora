@@ -214,6 +214,10 @@ impl Chunker for MultilineChunker {
     fn flush(&mut self) -> Option<String> {
         self.flush_buffer()
     }
+
+    fn has_pending(&self) -> bool {
+        !self.buffer.is_empty()
+    }
 }
 
 /// Create a chunker based on multiline configuration

@@ -65,7 +65,9 @@ fn maybe_gzip_file(mut file: File) -> std::io::Result<DecompressionReader> {
 
 /// Generic magic bytes detection for any Read type
 /// Returns Box<dyn Read + Send> that's either MultiGzDecoder or passthrough
-pub fn maybe_gzip<R: Read + Send + 'static>(mut reader: R) -> std::io::Result<Box<dyn Read + Send>> {
+pub fn maybe_gzip<R: Read + Send + 'static>(
+    mut reader: R,
+) -> std::io::Result<Box<dyn Read + Send>> {
     let mut head = [0u8; 3];
     let n = reader.read(&mut head)?;
 

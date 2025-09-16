@@ -15,6 +15,10 @@ impl Chunker for SimpleChunker {
     fn flush(&mut self) -> Option<String> {
         None
     }
+
+    fn has_pending(&self) -> bool {
+        false
+    }
 }
 
 /// Simple window manager (no windowing support)
