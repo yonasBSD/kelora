@@ -359,7 +359,7 @@ fn spawn_stdin_reader(
                     break;
                 }
                 Ok(_) => {
-                    let line = buffer.clone();
+                    let line = buffer.trim_end_matches(&['\n', '\r'][..]).to_string();
                     if sender
                         .send(ReaderMessage::Line {
                             line,
