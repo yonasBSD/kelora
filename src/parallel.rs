@@ -10,7 +10,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::event::Event;
-use crate::pipeline::PipelineBuilder;
+use crate::pipeline::{self, PipelineBuilder, DEFAULT_MULTILINE_FLUSH_TIMEOUT_MS};
 use crate::platform::{Ctrl, SHOULD_TERMINATE};
 use crate::stats::{get_thread_stats, stats_finish_processing, stats_start_timer, ProcessingStats};
 
@@ -439,12 +439,19 @@ impl ParallelProcessor {
 
         // Start worker threads
         let mut worker_handles = Vec::with_capacity(self.config.num_workers);
+        let worker_multiline_timeout = if config.input.multiline.is_some() {
+            Some(Duration::from_millis(DEFAULT_MULTILINE_FLUSH_TIMEOUT_MS))
+        } else {
+            None
+        };
 
         for worker_id in 0..self.config.num_workers {
             let batch_receiver = batch_receiver.clone();
             let result_sender = result_sender.clone();
             let worker_pipeline_builder = pipeline_builder.clone();
             let worker_stages = stages.clone();
+            let worker_ctrl = ctrl_rx.clone();
+            let worker_timeout = worker_multiline_timeout;
 
             let handle = thread::spawn(move || {
                 Self::worker_thread(
@@ -453,6 +460,8 @@ impl ParallelProcessor {
                     result_sender,
                     worker_pipeline_builder,
                     worker_stages,
+                    worker_timeout,
+                    worker_ctrl,
                 )
             });
             worker_handles.push(handle);
@@ -572,12 +581,19 @@ impl ParallelProcessor {
 
         // Start worker threads
         let mut worker_handles = Vec::with_capacity(self.config.num_workers);
+        let worker_multiline_timeout = if config.input.multiline.is_some() {
+            Some(Duration::from_millis(DEFAULT_MULTILINE_FLUSH_TIMEOUT_MS))
+        } else {
+            None
+        };
 
         for worker_id in 0..self.config.num_workers {
             let batch_receiver = batch_receiver.clone();
             let result_sender = result_sender.clone();
             let worker_pipeline_builder = file_aware_pipeline_builder.clone();
             let worker_stages = stages.clone();
+            let worker_ctrl = ctrl_rx.clone();
+            let worker_timeout = worker_multiline_timeout;
 
             let handle = thread::spawn(move || {
                 Self::worker_thread(
@@ -586,6 +602,8 @@ impl ParallelProcessor {
                     result_sender,
                     worker_pipeline_builder,
                     worker_stages,
+                    worker_timeout,
+                    worker_ctrl,
                 )
             });
             worker_handles.push(handle);
@@ -1421,359 +1439,431 @@ impl ParallelProcessor {
         result_sender: Sender<BatchResult>,
         pipeline_builder: PipelineBuilder,
         stages: Vec<crate::config::ScriptStageType>,
+        multiline_timeout: Option<Duration>,
+        ctrl_rx: Receiver<Ctrl>,
     ) -> Result<()> {
-        // Set parallel mode for print capturing
         crate::rhai_functions::strings::set_parallel_mode(true);
 
         stats_start_timer();
 
-        // Create worker pipeline and context
         let (mut pipeline, mut ctx) = pipeline_builder.clone().build_worker(stages.clone())?;
 
-        // Keep track of current CSV headers to avoid recreating parsers unnecessarily
         let mut current_csv_headers: Option<Vec<String>> = None;
+        let mut immediate_shutdown = false;
 
-        while let Ok(batch) = batch_receiver.recv() {
-            // Check for termination signal
-            if SHOULD_TERMINATE.load(Ordering::Relaxed) {
+        let ctrl_rx = ctrl_rx;
+        let batch_receiver = batch_receiver;
+
+        'worker_loop: loop {
+            if immediate_shutdown {
                 break;
             }
 
-            // If this batch has CSV headers and they're different from our current ones,
-            // we need to rebuild the pipeline with the new headers
-            if batch.csv_headers.is_some() && batch.csv_headers != current_csv_headers {
-                current_csv_headers = batch.csv_headers.clone();
+            let flush_deadline = multiline_timeout
+                .filter(|_| pipeline.has_pending_chunk())
+                .map(|timeout| Instant::now() + timeout);
 
-                // Rebuild the pipeline with the new headers
-                let new_pipeline_builder = pipeline_builder
-                    .clone()
-                    .with_csv_headers(current_csv_headers.clone().unwrap());
-                let (new_pipeline, new_ctx) = new_pipeline_builder.build_worker(stages.clone())?;
-                pipeline = new_pipeline;
-                // Note: We keep the existing ctx to preserve tracking state
-                ctx.rhai = new_ctx.rhai; // Update the Rhai engine to match new parser
-            }
-
-            // Track stats before batch to calculate deltas
-            let before = (
-                ctx.tracker
-                    .get("__kelora_stats_output")
-                    .and_then(|v| v.as_int().ok())
-                    .unwrap_or(0),
-                ctx.tracker
-                    .get("__kelora_stats_lines_errors")
-                    .and_then(|v| v.as_int().ok())
-                    .unwrap_or(0),
-                ctx.tracker
-                    .get("__kelora_stats_events_created")
-                    .and_then(|v| v.as_int().ok())
-                    .unwrap_or(0),
-                ctx.tracker
-                    .get("__kelora_stats_events_output")
-                    .and_then(|v| v.as_int().ok())
-                    .unwrap_or(0),
-                ctx.tracker
-                    .get("__kelora_stats_events_filtered")
-                    .and_then(|v| v.as_int().ok())
-                    .unwrap_or(0),
-            );
-
-            let mut batch_results = Vec::with_capacity(batch.lines.len());
-
-            for (line_idx, line) in batch.lines.iter().enumerate() {
-                let current_line_num = batch.start_line_num + line_idx;
-
-                // Update metadata
-                ctx.meta.line_num = Some(current_line_num);
-                ctx.meta.filename = batch.filenames.get(line_idx).cloned().flatten();
-
-                // Clear any previous captured prints/eprints before processing this event
-                crate::rhai_functions::strings::clear_captured_prints();
-                crate::rhai_functions::strings::clear_captured_eprints();
-
-                // Process line through pipeline
-                match pipeline.process_line(line.clone(), &mut ctx) {
-                    Ok(formatted_results) => {
-                        // Count output lines
-                        if !formatted_results.is_empty() {
-                            ctx.tracker
-                                .entry("__kelora_stats_output".to_string())
-                                .and_modify(|v| *v = Dynamic::from(v.as_int().unwrap_or(0) + 1))
-                                .or_insert(Dynamic::from(1i64));
-                            ctx.tracker.insert(
-                                "__op___kelora_stats_output".to_string(),
-                                Dynamic::from("count"),
-                            );
+            if let Some(deadline) = flush_deadline {
+                let wait = deadline.saturating_duration_since(Instant::now());
+                let timeout = crossbeam_channel::after(wait);
+                select! {
+                    recv(ctrl_rx) -> msg => {
+                        if Self::handle_worker_ctrl(
+                            msg,
+                            &mut immediate_shutdown,
+                            &mut pipeline,
+                            &mut ctx,
+                            &result_sender,
+                        )? {
+                            break 'worker_loop;
                         }
-                        // Note: Empty results are now counted as either:
-                        // 1. Parsing errors (counted by stats_add_line_error() in pipeline)
-                        // 2. Filter rejections (counted by stats_add_event_filtered() in pipeline)
-                        // So we don't need to count empty results as filtered here anymore
-
-                        // Always collect any prints/eprints that were captured during processing this specific event
-                        // This includes verbose error messages from filter/exec errors that result in skipped events
-                        let captured_prints =
-                            crate::rhai_functions::strings::take_captured_prints();
-                        let captured_eprints =
-                            crate::rhai_functions::strings::take_captured_eprints();
-                        let captured_messages =
-                            crate::rhai_functions::strings::take_captured_messages();
-
-                        // If there are captured messages but no formatted results (e.g., filter errors that skip events),
-                        // create a dummy event to carry the error messages
-                        if formatted_results.is_empty()
-                            && (!captured_prints.is_empty()
-                                || !captured_eprints.is_empty()
-                                || !captured_messages.is_empty())
-                        {
-                            let dummy_event = Event::default_with_line(String::new());
-                            batch_results.push(ProcessedEvent {
-                                event: dummy_event,
-                                captured_prints,
-                                captured_eprints,
-                                captured_messages,
-                            });
-                        } else {
-                            // Convert formatted strings back to events for the result sink
-                            // Note: This is a temporary approach during the transition
-                            for formatted_result in formatted_results {
-                                // For now, we'll need to create a dummy event since the result sink expects events
-                                // In a full refactor, we'd change the result sink to handle formatted strings
-                                let mut dummy_event =
-                                    Event::default_with_line(formatted_result.clone());
-                                dummy_event.set_metadata(current_line_num, None);
-
-                                // Each formatted result gets its own copy of the captured prints/eprints/messages
-                                // since they all came from processing the same input line
-                                batch_results.push(ProcessedEvent {
-                                    event: dummy_event,
-                                    captured_prints: captured_prints.clone(),
-                                    captured_eprints: captured_eprints.clone(),
-                                    captured_messages: captured_messages.clone(),
-                                });
+                    }
+                    recv(batch_receiver) -> msg => {
+                        match msg {
+                            Ok(batch) => {
+                                if !Self::worker_process_batch(
+                                    batch,
+                                    &mut pipeline,
+                                    &mut ctx,
+                                    &pipeline_builder,
+                                    &stages,
+                                    &result_sender,
+                                    &mut current_csv_headers,
+                                )? {
+                                    break 'worker_loop;
+                                }
                             }
+                            Err(_) => break 'worker_loop,
                         }
                     }
-                    Err(e) => {
-                        // Error handling and stats tracking is already done in pipeline.process_line()
-                        // But we still need to collect any captured eprints/messages for verbose error output
-                        let captured_eprints =
-                            crate::rhai_functions::strings::take_captured_eprints();
-                        let captured_messages =
-                            crate::rhai_functions::strings::take_captured_messages();
-
-                        // In verbose mode, we want to output these error messages even if the event is skipped
-                        if !captured_eprints.is_empty() || !captured_messages.is_empty() {
-                            // Create a dummy processed event just to carry the error messages
-                            // This ensures verbose error output is preserved even when events are skipped
-                            let dummy_event = Event::default_with_line(String::new());
-                            batch_results.push(ProcessedEvent {
-                                event: dummy_event,
-                                captured_prints: Vec::new(),
-                                captured_eprints,
-                                captured_messages,
-                            });
+                    recv(timeout) -> _ => {
+                        Self::worker_flush_pipeline(&mut pipeline, &mut ctx, &result_sender)?;
+                    }
+                }
+            } else {
+                select! {
+                    recv(ctrl_rx) -> msg => {
+                        if Self::handle_worker_ctrl(
+                            msg,
+                            &mut immediate_shutdown,
+                            &mut pipeline,
+                            &mut ctx,
+                            &result_sender,
+                        )? {
+                            break 'worker_loop;
                         }
-
-                        // New resiliency model: check strict flag
-                        if ctx.config.strict {
-                            return Err(e);
-                        } else {
-                            continue; // Skip in default resilient mode
+                    }
+                    recv(batch_receiver) -> msg => {
+                        match msg {
+                            Ok(batch) => {
+                                if !Self::worker_process_batch(
+                                    batch,
+                                    &mut pipeline,
+                                    &mut ctx,
+                                    &pipeline_builder,
+                                    &stages,
+                                    &result_sender,
+                                    &mut current_csv_headers,
+                                )? {
+                                    break 'worker_loop;
+                                }
+                            }
+                            Err(_) => break 'worker_loop,
                         }
                     }
                 }
-
-                // Check for exit requested from Rhai scripts
-                if crate::rhai_functions::process::is_exit_requested() {
-                    let exit_code = crate::rhai_functions::process::get_exit_code();
-                    std::process::exit(exit_code);
-                }
             }
-
-            // Calculate deltas for this batch
-            let after = (
-                ctx.tracker
-                    .get("__kelora_stats_output")
-                    .and_then(|v| v.as_int().ok())
-                    .unwrap_or(0),
-                ctx.tracker
-                    .get("__kelora_stats_lines_errors")
-                    .and_then(|v| v.as_int().ok())
-                    .unwrap_or(0),
-                ctx.tracker
-                    .get("__kelora_stats_events_created")
-                    .and_then(|v| v.as_int().ok())
-                    .unwrap_or(0),
-                ctx.tracker
-                    .get("__kelora_stats_events_output")
-                    .and_then(|v| v.as_int().ok())
-                    .unwrap_or(0),
-                ctx.tracker
-                    .get("__kelora_stats_events_filtered")
-                    .and_then(|v| v.as_int().ok())
-                    .unwrap_or(0),
-            );
-
-            let mut deltas = std::collections::HashMap::new();
-            if after.0 > before.0 {
-                deltas.insert(
-                    "__kelora_stats_output".to_string(),
-                    Dynamic::from(after.0 - before.0),
-                );
-                deltas.insert(
-                    "__op___kelora_stats_output".to_string(),
-                    Dynamic::from("count"),
-                );
-            }
-            if after.1 > before.1 {
-                deltas.insert(
-                    "__kelora_stats_lines_errors".to_string(),
-                    Dynamic::from(after.1 - before.1),
-                );
-                deltas.insert(
-                    "__op___kelora_stats_lines_errors".to_string(),
-                    Dynamic::from("count"),
-                );
-            }
-            if after.2 > before.2 {
-                deltas.insert(
-                    "__kelora_stats_events_created".to_string(),
-                    Dynamic::from(after.2 - before.2),
-                );
-                deltas.insert(
-                    "__op___kelora_stats_events_created".to_string(),
-                    Dynamic::from("count"),
-                );
-            }
-            if after.3 > before.3 {
-                deltas.insert(
-                    "__kelora_stats_events_output".to_string(),
-                    Dynamic::from(after.3 - before.3),
-                );
-                deltas.insert(
-                    "__op___kelora_stats_events_output".to_string(),
-                    Dynamic::from("count"),
-                );
-            }
-            if after.4 > before.4 {
-                deltas.insert(
-                    "__kelora_stats_events_filtered".to_string(),
-                    Dynamic::from(after.4 - before.4),
-                );
-                deltas.insert(
-                    "__op___kelora_stats_events_filtered".to_string(),
-                    Dynamic::from("count"),
-                );
-            }
-
-            // Include user tracking (non-stats)
-            for (key, value) in &ctx.tracker {
-                if !key.starts_with("__kelora_stats_") && !key.starts_with("__op___kelora_stats_") {
-                    deltas.insert(key.clone(), value.clone());
-                }
-            }
-
-            // Include thread-local tracking state (includes error tracking)
-            let thread_tracking = crate::rhai_functions::tracking::get_thread_tracking_state();
-            for (key, value) in thread_tracking {
-                // Include error tracking, discovered levels/keys with their operations, and user tracking, but not other internal stats
-                if (!key.starts_with("__op___kelora_stats_")
-                    || key == "__op___kelora_stats_discovered_levels"
-                    || key == "__op___kelora_stats_discovered_keys")
-                    && (!key.starts_with("__kelora_stats_")
-                        || key == "__kelora_stats_discovered_levels"
-                        || key == "__kelora_stats_discovered_keys")
-                {
-                    deltas.insert(key, value);
-                }
-            }
-
-            // Send deltas only
-            let batch_result = BatchResult {
-                batch_id: batch.id,
-                results: batch_results,
-                internal_tracked_updates: deltas,
-                worker_stats: get_thread_stats(),
-            };
-
-            if result_sender.send(batch_result).is_err() {
-                // Channel closed, worker should exit
-                break;
-            }
-
-            // Keep stats, clear user tracking for next batch
-            ctx.tracker.retain(|k, _| {
-                k.starts_with("__kelora_stats_") || k.starts_with("__op___kelora_stats_")
-            });
         }
 
-        // Flush any remaining chunks in the worker's pipeline
-        match pipeline.flush(&mut ctx) {
-            Ok(flush_results) => {
-                if !flush_results.is_empty() {
-                    // Convert flush results to ProcessedEvent format
-                    let mut flush_batch_results = Vec::with_capacity(flush_results.len());
-
-                    for formatted_result in flush_results {
-                        // Create a dummy event for the flush result
-                        let mut dummy_event = Event::default_with_line(formatted_result.clone());
-                        dummy_event.set_metadata(0, None); // No specific line number for flushed events
-
-                        flush_batch_results.push(ProcessedEvent {
-                            event: dummy_event,
-                            captured_prints: Vec::new(),
-                            captured_eprints: Vec::new(),
-                            captured_messages: Vec::new(),
-                        });
-                    }
-
-                    // Capture tracking updates from the flush operation
-                    let mut flush_tracking_updates = HashMap::new();
-
-                    // Include stats tracking updates for the flushed events
-                    for (key, value) in &ctx.tracker {
-                        if key.starts_with("__kelora_stats_")
-                            || key.starts_with("__op___kelora_stats_")
-                        {
-                            flush_tracking_updates.insert(key.clone(), value.clone());
-                        }
-                    }
-
-                    // Include thread-local tracking state for flush
-                    let thread_tracking =
-                        crate::rhai_functions::tracking::get_thread_tracking_state();
-                    for (key, value) in thread_tracking {
-                        flush_tracking_updates.insert(key, value);
-                    }
-
-                    // Send flush results as a special batch
-                    let flush_batch_result = BatchResult {
-                        batch_id: u64::MAX - 1, // Special ID for flush batches
-                        results: flush_batch_results,
-                        internal_tracked_updates: flush_tracking_updates,
-                        worker_stats: ProcessingStats::new(),
-                    };
-
-                    // Try to send flush results, but don't fail if channel is closed
-                    let _ = result_sender.send(flush_batch_result);
-                }
-            }
-            Err(e) => {
-                // If flush fails and we're in strict mode, we should report the error
-                // In resilient mode, we'll log it but continue
-                if ctx.config.strict {
-                    stats_finish_processing();
-                    return Err(e);
-                } else {
-                    eprintln!("Warning: Failed to flush worker pipeline: {}", e);
-                }
-            }
+        if !immediate_shutdown {
+            Self::worker_flush_pipeline(&mut pipeline, &mut ctx, &result_sender)?;
         }
 
         stats_finish_processing();
 
         Ok(())
+    }
+
+    fn handle_worker_ctrl(
+        msg: Result<Ctrl, crossbeam_channel::RecvError>,
+        immediate_shutdown: &mut bool,
+        pipeline: &mut pipeline::Pipeline,
+        ctx: &mut pipeline::PipelineContext,
+        result_sender: &Sender<BatchResult>,
+    ) -> Result<bool> {
+        match msg {
+            Ok(Ctrl::Shutdown { immediate }) => {
+                if immediate {
+                    *immediate_shutdown = true;
+                    return Ok(true);
+                }
+
+                Self::worker_flush_pipeline(pipeline, ctx, result_sender)?;
+                Ok(false)
+            }
+            Err(_) => {
+                // Treat channel closure as graceful shutdown request
+                Self::worker_flush_pipeline(pipeline, ctx, result_sender)?;
+                Ok(true)
+            }
+        }
+    }
+
+    fn worker_flush_pipeline(
+        pipeline: &mut pipeline::Pipeline,
+        ctx: &mut pipeline::PipelineContext,
+        result_sender: &Sender<BatchResult>,
+    ) -> Result<()> {
+        match pipeline.flush(ctx) {
+            Ok(flush_results) => {
+                if flush_results.is_empty() {
+                    return Ok(());
+                }
+
+                let mut flush_batch_results = Vec::with_capacity(flush_results.len());
+                for formatted_result in flush_results {
+                    let mut dummy_event = Event::default_with_line(formatted_result.clone());
+                    dummy_event.set_metadata(0, None);
+
+                    flush_batch_results.push(ProcessedEvent {
+                        event: dummy_event,
+                        captured_prints: Vec::new(),
+                        captured_eprints: Vec::new(),
+                        captured_messages: Vec::new(),
+                    });
+                }
+
+                let mut flush_tracking_updates = HashMap::new();
+                for (key, value) in &ctx.tracker {
+                    if key.starts_with("__kelora_stats_") || key.starts_with("__op___kelora_stats_")
+                    {
+                        flush_tracking_updates.insert(key.clone(), value.clone());
+                    }
+                }
+
+                let thread_tracking = crate::rhai_functions::tracking::get_thread_tracking_state();
+                for (key, value) in thread_tracking {
+                    flush_tracking_updates.insert(key, value);
+                }
+
+                let flush_batch_result = BatchResult {
+                    batch_id: u64::MAX - 1,
+                    results: flush_batch_results,
+                    internal_tracked_updates: flush_tracking_updates,
+                    worker_stats: ProcessingStats::new(),
+                };
+
+                let _ = result_sender.send(flush_batch_result);
+                Ok(())
+            }
+            Err(e) => {
+                if ctx.config.strict {
+                    return Err(e);
+                }
+                eprintln!("Warning: Failed to flush worker pipeline: {}", e);
+                Ok(())
+            }
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn worker_process_batch(
+        batch: Batch,
+        pipeline: &mut pipeline::Pipeline,
+        ctx: &mut pipeline::PipelineContext,
+        pipeline_builder: &PipelineBuilder,
+        stages: &[crate::config::ScriptStageType],
+        result_sender: &Sender<BatchResult>,
+        current_csv_headers: &mut Option<Vec<String>>,
+    ) -> Result<bool> {
+        if batch.csv_headers.is_some() && batch.csv_headers != *current_csv_headers {
+            *current_csv_headers = batch.csv_headers.clone();
+
+            let new_pipeline_builder = pipeline_builder
+                .clone()
+                .with_csv_headers(current_csv_headers.clone().unwrap());
+            let (new_pipeline, new_ctx) = new_pipeline_builder.build_worker(stages.to_vec())?;
+            *pipeline = new_pipeline;
+            ctx.rhai = new_ctx.rhai;
+        }
+
+        let before = (
+            ctx.tracker
+                .get("__kelora_stats_output")
+                .and_then(|v| v.as_int().ok())
+                .unwrap_or(0),
+            ctx.tracker
+                .get("__kelora_stats_lines_errors")
+                .and_then(|v| v.as_int().ok())
+                .unwrap_or(0),
+            ctx.tracker
+                .get("__kelora_stats_events_created")
+                .and_then(|v| v.as_int().ok())
+                .unwrap_or(0),
+            ctx.tracker
+                .get("__kelora_stats_events_output")
+                .and_then(|v| v.as_int().ok())
+                .unwrap_or(0),
+            ctx.tracker
+                .get("__kelora_stats_events_filtered")
+                .and_then(|v| v.as_int().ok())
+                .unwrap_or(0),
+        );
+
+        let mut batch_results = Vec::with_capacity(batch.lines.len());
+
+        for (line_idx, line) in batch.lines.iter().enumerate() {
+            let current_line_num = batch.start_line_num + line_idx;
+            ctx.meta.line_num = Some(current_line_num);
+            ctx.meta.filename = batch.filenames.get(line_idx).cloned().flatten();
+
+            crate::rhai_functions::strings::clear_captured_prints();
+            crate::rhai_functions::strings::clear_captured_eprints();
+
+            match pipeline.process_line(line.clone(), ctx) {
+                Ok(formatted_results) => {
+                    if !formatted_results.is_empty() {
+                        ctx.tracker
+                            .entry("__kelora_stats_output".to_string())
+                            .and_modify(|v| *v = Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                            .or_insert(Dynamic::from(1i64));
+                        ctx.tracker.insert(
+                            "__op___kelora_stats_output".to_string(),
+                            Dynamic::from("count"),
+                        );
+                    }
+
+                    let captured_prints = crate::rhai_functions::strings::take_captured_prints();
+                    let captured_eprints = crate::rhai_functions::strings::take_captured_eprints();
+                    let captured_messages =
+                        crate::rhai_functions::strings::take_captured_messages();
+
+                    if formatted_results.is_empty()
+                        && (!captured_prints.is_empty()
+                            || !captured_eprints.is_empty()
+                            || !captured_messages.is_empty())
+                    {
+                        let dummy_event = Event::default_with_line(String::new());
+                        batch_results.push(ProcessedEvent {
+                            event: dummy_event,
+                            captured_prints,
+                            captured_eprints,
+                            captured_messages,
+                        });
+                    } else {
+                        for formatted_result in formatted_results {
+                            let mut dummy_event =
+                                Event::default_with_line(formatted_result.clone());
+                            dummy_event.set_metadata(current_line_num, None);
+
+                            batch_results.push(ProcessedEvent {
+                                event: dummy_event,
+                                captured_prints: captured_prints.clone(),
+                                captured_eprints: captured_eprints.clone(),
+                                captured_messages: captured_messages.clone(),
+                            });
+                        }
+                    }
+                }
+                Err(e) => {
+                    let captured_eprints = crate::rhai_functions::strings::take_captured_eprints();
+                    let captured_messages =
+                        crate::rhai_functions::strings::take_captured_messages();
+
+                    if !captured_eprints.is_empty() || !captured_messages.is_empty() {
+                        let dummy_event = Event::default_with_line(String::new());
+                        batch_results.push(ProcessedEvent {
+                            event: dummy_event,
+                            captured_prints: Vec::new(),
+                            captured_eprints,
+                            captured_messages,
+                        });
+                    }
+
+                    if ctx.config.strict {
+                        return Err(e);
+                    } else {
+                        continue;
+                    }
+                }
+            }
+
+            if crate::rhai_functions::process::is_exit_requested() {
+                let exit_code = crate::rhai_functions::process::get_exit_code();
+                std::process::exit(exit_code);
+            }
+        }
+
+        let after = (
+            ctx.tracker
+                .get("__kelora_stats_output")
+                .and_then(|v| v.as_int().ok())
+                .unwrap_or(0),
+            ctx.tracker
+                .get("__kelora_stats_lines_errors")
+                .and_then(|v| v.as_int().ok())
+                .unwrap_or(0),
+            ctx.tracker
+                .get("__kelora_stats_events_created")
+                .and_then(|v| v.as_int().ok())
+                .unwrap_or(0),
+            ctx.tracker
+                .get("__kelora_stats_events_output")
+                .and_then(|v| v.as_int().ok())
+                .unwrap_or(0),
+            ctx.tracker
+                .get("__kelora_stats_events_filtered")
+                .and_then(|v| v.as_int().ok())
+                .unwrap_or(0),
+        );
+
+        let mut deltas = std::collections::HashMap::new();
+        if after.0 > before.0 {
+            deltas.insert(
+                "__kelora_stats_output".to_string(),
+                Dynamic::from(after.0 - before.0),
+            );
+            deltas.insert(
+                "__op___kelora_stats_output".to_string(),
+                Dynamic::from("count"),
+            );
+        }
+        if after.1 > before.1 {
+            deltas.insert(
+                "__kelora_stats_lines_errors".to_string(),
+                Dynamic::from(after.1 - before.1),
+            );
+            deltas.insert(
+                "__op___kelora_stats_lines_errors".to_string(),
+                Dynamic::from("count"),
+            );
+        }
+        if after.2 > before.2 {
+            deltas.insert(
+                "__kelora_stats_events_created".to_string(),
+                Dynamic::from(after.2 - before.2),
+            );
+            deltas.insert(
+                "__op___kelora_stats_events_created".to_string(),
+                Dynamic::from("count"),
+            );
+        }
+        if after.3 > before.3 {
+            deltas.insert(
+                "__kelora_stats_events_output".to_string(),
+                Dynamic::from(after.3 - before.3),
+            );
+            deltas.insert(
+                "__op___kelora_stats_events_output".to_string(),
+                Dynamic::from("count"),
+            );
+        }
+        if after.4 > before.4 {
+            deltas.insert(
+                "__kelora_stats_events_filtered".to_string(),
+                Dynamic::from(after.4 - before.4),
+            );
+            deltas.insert(
+                "__op___kelora_stats_events_filtered".to_string(),
+                Dynamic::from("count"),
+            );
+        }
+
+        for (key, value) in &ctx.tracker {
+            if !key.starts_with("__kelora_stats_") && !key.starts_with("__op___kelora_stats_") {
+                deltas.insert(key.clone(), value.clone());
+            }
+        }
+
+        let thread_tracking = crate::rhai_functions::tracking::get_thread_tracking_state();
+        for (key, value) in thread_tracking {
+            if (!key.starts_with("__op___kelora_stats_")
+                || key == "__op___kelora_stats_discovered_levels"
+                || key == "__op___kelora_stats_discovered_keys")
+                && (!key.starts_with("__kelora_stats_")
+                    || key == "__kelora_stats_discovered_levels"
+                    || key == "__kelora_stats_discovered_keys")
+            {
+                deltas.insert(key, value);
+            }
+        }
+
+        let batch_result = BatchResult {
+            batch_id: batch.id,
+            results: batch_results,
+            internal_tracked_updates: deltas,
+            worker_stats: get_thread_stats(),
+        };
+
+        if result_sender.send(batch_result).is_err() {
+            return Ok(false);
+        }
+
+        ctx.tracker.retain(|k, _| {
+            k.starts_with("__kelora_stats_") || k.starts_with("__op___kelora_stats_")
+        });
+
+        Ok(true)
     }
 
     /// Write CSV header if the output format requires it

@@ -2,6 +2,9 @@ use super::{Chunker, EventLimiter, OutputWriter, WindowManager};
 use crate::event::Event;
 use std::collections::VecDeque;
 
+/// Default flush timeout for multiline chunkers when input is idle (milliseconds)
+pub const DEFAULT_MULTILINE_FLUSH_TIMEOUT_MS: u64 = 400;
+
 /// Default implementations for pipeline stages
 ///
 /// Simple pass-through chunker (no multi-line support)

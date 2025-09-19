@@ -89,6 +89,7 @@ fn detect_format_for_parallel_mode(files: &[String]) -> Result<config::InputForm
 }
 
 use parallel::{ParallelConfig, ParallelProcessor};
+use pipeline::DEFAULT_MULTILINE_FLUSH_TIMEOUT_MS;
 use pipeline::{
     create_input_reader, create_pipeline_builder_from_config, create_pipeline_from_config,
 };
@@ -316,7 +317,6 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
     }
 }
 
-const DEFAULT_MULTILINE_FLUSH_TIMEOUT_MS: u64 = 400;
 const LINE_CHANNEL_BOUND: usize = 1024;
 
 enum SequentialInput {
