@@ -50,9 +50,12 @@ kelora -f json app.log -l warn,error
 
 # Extract a subset of fields as CSV
 kelora -f json app.log --keys ts,method,path -F csv
+
+# Spot bursts of warnings or errors with the level map formatter
+kelora -f logfmt app.log -F levelmap
 ```
 
-These use simple conditions (`--filter`, `--levels`/`-l`) and the `--keys`/`-k` flag to narrow down both the *events* and the *fields* in your output.
+These use simple conditions (`--filter`, `--levels`/`-l`) and the `--keys`/`-k` flag to narrow down both the *events* and the *fields* in your output. The `levelmap` formatter fills the available terminal width, prefixing each block with the first event's timestamp so you can spot bursts of specific levels at a glance.
 
 ℹ️ You can chain multiple `--filter` and `--exec` flags — each one runs in order, forming a processing pipeline.
 

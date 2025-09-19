@@ -121,6 +121,12 @@ fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
 
     let use_parallel = config.should_use_parallel();
 
+    if use_parallel && matches!(config.output.format, config::OutputFormat::Levelmap) {
+        return Err(anyhow::anyhow!(
+            "levelmap output format is not supported with --parallel or thread overrides"
+        ));
+    }
+
     if use_parallel {
         run_pipeline_parallel(config, output, ctrl_rx)
     } else {
@@ -609,6 +615,12 @@ fn run_pipeline_sequential_internal<W: Write>(
 
     let results = pipeline.flush(&mut ctx)?;
     for result in results {
+        if !result.is_empty() {
+            writeln!(output, "{}", result)?;
+        }
+    }
+
+    if let Some(result) = pipeline.finish_formatter() {
         if !result.is_empty() {
             writeln!(output, "{}", result)?;
         }

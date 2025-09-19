@@ -1497,7 +1497,12 @@ impl ParallelProcessor {
                         }
                     }
                     recv(timeout) -> _ => {
-                        Self::worker_flush_pipeline(&mut pipeline, &mut ctx, &result_sender)?;
+                        Self::worker_flush_pipeline(
+                            &mut pipeline,
+                            &mut ctx,
+                            &result_sender,
+                            false,
+                        )?;
                     }
                 }
             } else {
@@ -1536,7 +1541,7 @@ impl ParallelProcessor {
         }
 
         if !immediate_shutdown {
-            Self::worker_flush_pipeline(&mut pipeline, &mut ctx, &result_sender)?;
+            Self::worker_flush_pipeline(&mut pipeline, &mut ctx, &result_sender, true)?;
         }
 
         stats_finish_processing();
@@ -1558,12 +1563,12 @@ impl ParallelProcessor {
                     return Ok(true);
                 }
 
-                Self::worker_flush_pipeline(pipeline, ctx, result_sender)?;
+                Self::worker_flush_pipeline(pipeline, ctx, result_sender, false)?;
                 Ok(false)
             }
             Err(_) => {
                 // Treat channel closure as graceful shutdown request
-                Self::worker_flush_pipeline(pipeline, ctx, result_sender)?;
+                Self::worker_flush_pipeline(pipeline, ctx, result_sender, false)?;
                 Ok(true)
             }
         }
@@ -1573,9 +1578,18 @@ impl ParallelProcessor {
         pipeline: &mut pipeline::Pipeline,
         ctx: &mut pipeline::PipelineContext,
         result_sender: &Sender<BatchResult>,
+        final_flush: bool,
     ) -> Result<()> {
         match pipeline.flush(ctx) {
-            Ok(flush_results) => {
+            Ok(mut flush_results) => {
+                if final_flush {
+                    if let Some(trailing) = pipeline.finish_formatter() {
+                        if !trailing.is_empty() {
+                            flush_results.push(trailing);
+                        }
+                    }
+                }
+
                 if flush_results.is_empty() {
                     return Ok(());
                 }

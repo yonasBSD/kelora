@@ -126,6 +126,7 @@ pub enum OutputFormat {
     #[default]
     Default,
     Logfmt,
+    Levelmap,
     Csv,
     Tsv,
     Csvnh,
@@ -803,6 +804,7 @@ impl From<crate::OutputFormat> for OutputFormat {
             crate::OutputFormat::Json => OutputFormat::Json,
             crate::OutputFormat::Default => OutputFormat::Default,
             crate::OutputFormat::Logfmt => OutputFormat::Logfmt,
+            crate::OutputFormat::Levelmap => OutputFormat::Levelmap,
             crate::OutputFormat::Csv => OutputFormat::Csv,
             crate::OutputFormat::Tsv => OutputFormat::Tsv,
             crate::OutputFormat::Csvnh => OutputFormat::Csvnh,
@@ -818,6 +820,7 @@ impl From<OutputFormat> for crate::OutputFormat {
             OutputFormat::Json => crate::OutputFormat::Json,
             OutputFormat::Default => crate::OutputFormat::Default,
             OutputFormat::Logfmt => crate::OutputFormat::Logfmt,
+            OutputFormat::Levelmap => crate::OutputFormat::Levelmap,
             OutputFormat::Csv => crate::OutputFormat::Csv,
             OutputFormat::Tsv => crate::OutputFormat::Tsv,
             OutputFormat::Csvnh => crate::OutputFormat::Csvnh,

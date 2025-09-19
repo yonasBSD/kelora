@@ -218,6 +218,11 @@ pub trait EventLimiter: Send {
 /// Format events for output
 pub trait Formatter: Send + Sync {
     fn format(&self, event: &Event) -> String;
+
+    /// Flush any pending formatter state at the end of processing
+    fn finish(&self) -> Option<String> {
+        None
+    }
 }
 
 /// Write formatted output
@@ -510,6 +515,11 @@ impl Pipeline {
         } else {
             Ok(Vec::new())
         }
+    }
+
+    /// Flush formatter state to emit any remaining buffered output
+    pub fn finish_formatter(&self) -> Option<String> {
+        self.formatter.finish()
     }
 
     /// Process a chunk directly without going through the chunker

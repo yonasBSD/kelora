@@ -122,7 +122,7 @@ Output Options:
           Output format
           
           [default: default]
-          [possible values: json, default, logfmt, csv, tsv, csvnh, tsvnh, none]
+          [possible values: json, default, logfmt, levelmap, csv, tsv, csvnh, tsvnh, none]
 
   -J
           Shortcut for -F json
@@ -130,26 +130,37 @@ Output Options:
   -c, --core
           Output only core fields
 
+  -o, --output-file <OUTPUT_FILE>
+          Output file for formatted events
+
+Default Format Options:
   -b, --brief
           Output only field values
 
       --wrap
-          Enable word-wrapping for default output format (default: enabled)
+          Enable word-wrapping (default: enabled)
 
       --no-wrap
-          Disable word-wrapping for default output format
-
-  -o, --output-file <OUTPUT_FILE>
-          Output file for formatted events
+          Disable word-wrapping
 
       --pretty-ts <PRETTY_TS>
-          Comma-separated list of fields to format as RFC3339 timestamps. Only affects default output; does not modify event data
+          Comma-separated list of fields to format as RFC3339 timestamps
 
   -z
-          Auto-format all known timestamp fields as local RFC3339. Only affects default output; does not modify event data
+          Auto-format all known timestamp fields as local RFC3339
 
   -Z
-          Auto-format all known timestamp fields as UTC RFC3339. Only affects default output; does not modify event data
+          Auto-format all known timestamp fields as UTC RFC3339
+
+Display Options:
+      --force-color
+          Force colored output
+
+      --no-color
+          Disable colored output
+
+      --no-emoji
+          Disable emoji prefixes
 
 Performance Options:
       --parallel
@@ -173,16 +184,6 @@ Performance Options:
 
       --unordered
           Disable ordered output
-
-Display Options:
-      --force-color
-          Force colored output
-
-      --no-color
-          Disable colored output
-
-      --no-emoji
-          Disable emoji prefixes
 
 Metrics and Stats:
   -s, --stats
@@ -225,3 +226,6 @@ Help Options:
 
       --help-time
           Show time format help and exit
+
+      --help-multiline
+          Show multiline strategy help and exit
