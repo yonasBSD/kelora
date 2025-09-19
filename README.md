@@ -16,7 +16,7 @@ Kelora parses log lines into structured events (`e.level`, `e.timestamp`, `e.mes
 kelora --since 1h -l error app.log
 
 # Filter and enrich JSON logs  
-kelora -f json app.log --filter 'e.status >= 500' --exec 'e.severity = "critical"'
+kelora -f json app.log --filter 'e.status.to_int() >= 500' --exec 'e.severity = if e.status.to_int() >= 500 { "critical" } else { "normal" }'
 
 # Count HTTP status codes with metrics
 kelora -f combined --exec 'track_count("status_" + e.status)' --metrics access.log
@@ -57,19 +57,19 @@ Pre-built binaries are available in the [releases section](https://github.com/dl
 **Pipeline** processes data through independent stages: `Input → Parse → Filter → Transform → Format → Output`. Mix any parser with any script with any formatter.
 
 **Scripts** provide programmable logic:
-- **Filters**: Boolean expressions (`e.status >= 500`) that decide which events to keep
+- **Filters**: Boolean expressions (`e.status.to_int() >= 500`) that decide which events to keep
 - **Execs**: Transform statements (`e.category = "error"`) that modify events  
 - **Windows**: Access recent events (`window[1].user`) for pattern detection
 
 ## Common Tasks
 
-**Finding Problems**: Filter by criteria with `-l error`, `--filter 'e.status >= 500'`, or time ranges like `--since 1h --levels error,fatal`.
+**Finding Problems**: Filter by criteria with `-l error`, `--filter 'e.status.to_int() >= 500'`, or time ranges like `--since 1h --levels error,fatal`.
 
 **Understanding Patterns**: Count and measure with `--exec 'track_count("by_status_" + e.status)'`, track averages with `track_avg("response_time", e.duration)`. View results with `--metrics` or `--stats`.
 
 **Detecting Sequences**: Use `--window N` to access recent events. Detect changes with `window[0].status != window[1].status` or patterns like `window_values(window, "user").len() >= 2` for repeated users.
 
-**Transforming Data**: Add/modify fields with `--exec 'e.severity = if e.status >= 500 { "critical" } else { "normal" }'`. Chain transformations with multiple `--exec` statements.
+**Transforming Data**: Add/modify fields with `--exec 'e.severity = if e.status.to_int() >= 500 { "critical" } else { "normal" }'`. Chain transformations with multiple `--exec` statements.
 
 ## Input Formats
 
@@ -169,10 +169,10 @@ kelora -l error \
 # Real-time nginx monitoring: stdin → filter → transform → metrics → alert
 tail -f /var/log/nginx/access.log | \
   kelora -f combined \
-    --exec 'e.status_class = if e.status >= 500 { "error" } else if e.status >= 400 { "client_error" } else { "ok" }' \
-    --filter 'e.status >= 400' \
+    --exec 'let status = e.status.to_int(); e.status_class = if status >= 500 { "error" } else if status >= 400 { "client_error" } else { "ok" }' \
+    --filter 'e.status.to_int() >= 400' \
     --exec 'track_count("errors"); track_unique("error_ips", e.ip); track_avg("error_response_time", e.request_time)' \
-    --exec 'if e.status >= 500 { eprint("🚨 SERVER ERROR: " + e.status + " from " + e.ip + " - " + e.request) }' \
+    --exec 'if e.status.to_int() >= 500 { eprint("🚨 SERVER ERROR: " + e.status + " from " + e.ip + " - " + e.request) }' \
     --metrics
 ```
 
@@ -198,7 +198,7 @@ kelora -j auth.json \
 kelora -f syslog -J /var/log/messages \
   --exec 'e.severity_level = if e.severity <= 3 { "critical" } else if e.severity <= 4 { "error" } else { "info" }' \
   --exec 'e.masked_host = e.host.mask_ip(1)' \
-  --exec 'e.processed_at = now_utc()' \
+  --exec 'e.processed_at = now_utc().format("%+")' \
   > structured-logs.json
 ```
 
@@ -216,7 +216,7 @@ echo '{"batches": [{"id": "b1", "requests": [{"url": "/api", "status": 500, "err
   kelora -f json \
     --exec 'emit_each(e.batches)' \
     --exec 'emit_each(e.requests)' \
-    --filter 'e.status >= 400' \
+    --filter 'e.status.to_int() >= 400' \
     --exec 'let ctx = #{url: e.url, status: e.status}; emit_each(e.errors, ctx)'
 # Result: type='timeout' url='/api' status=500
 #         type='db_error' url='/api' status=500
