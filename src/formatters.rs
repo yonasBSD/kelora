@@ -606,13 +606,15 @@ impl pipeline::Formatter for DefaultFormatter {
 pub struct GapTracker {
     threshold: chrono::Duration,
     last_timestamp: Option<DateTime<Utc>>,
+    use_colors: bool,
 }
 
 impl GapTracker {
-    pub fn new(threshold: chrono::Duration) -> Self {
+    pub fn new(threshold: chrono::Duration, use_colors: bool) -> Self {
         Self {
             threshold,
             last_timestamp: None,
+            use_colors,
         }
     }
 
@@ -622,7 +624,7 @@ impl GapTracker {
         let marker = self.last_timestamp.and_then(|previous_ts| {
             let diff = current_ts.signed_duration_since(previous_ts);
             if diff >= self.threshold || diff <= -self.threshold {
-                Some(Self::render_marker(diff))
+                Some(self.render_marker(diff))
             } else {
                 None
             }
@@ -632,7 +634,7 @@ impl GapTracker {
         marker
     }
 
-    fn render_marker(diff: chrono::Duration) -> String {
+    fn render_marker(&self, diff: chrono::Duration) -> String {
         let diff = if diff >= chrono::Duration::zero() {
             diff
         } else {
@@ -650,13 +652,20 @@ impl GapTracker {
         let time_label = format!("{}:{:02}:{:02}.{:06}", hours, minutes, seconds, micros);
         let label = format!(" time gap: {} ", time_label);
 
+        let blue = "\x1b[34m";
+        let reset = "\x1b[0m";
+
         let mut width = crate::tty::get_terminal_width();
         if width == 0 {
             width = 80;
         }
 
         if width <= label.len() {
-            return label.trim().to_string();
+            let marker = label.trim().to_string();
+            if self.use_colors {
+                return format!("{}{}{}", blue, marker, reset);
+            }
+            return marker;
         }
 
         let remaining = width - label.len();
@@ -667,6 +676,9 @@ impl GapTracker {
         marker.push_str(&"_".repeat(left));
         marker.push_str(&label);
         marker.push_str(&"_".repeat(right));
+        if self.use_colors {
+            return format!("{}{}{}", blue, marker, reset);
+        }
         marker
     }
 }
@@ -2391,7 +2403,7 @@ mod tests {
 
     #[test]
     fn test_gap_tracker_inserts_marker_for_large_delta() {
-        let mut tracker = GapTracker::new(ChronoDuration::minutes(30));
+        let mut tracker = GapTracker::new(ChronoDuration::minutes(30), false);
 
         let first = Some(Utc.with_ymd_and_hms(2024, 2, 5, 11, 0, 0).unwrap());
         let second = Some(Utc.with_ymd_and_hms(2024, 2, 5, 13, 0, 0).unwrap());
@@ -2405,7 +2417,7 @@ mod tests {
 
     #[test]
     fn test_gap_tracker_skips_small_delta() {
-        let mut tracker = GapTracker::new(ChronoDuration::hours(2));
+        let mut tracker = GapTracker::new(ChronoDuration::hours(2), false);
 
         let first = Some(Utc.with_ymd_and_hms(2024, 2, 5, 11, 0, 0).unwrap());
         let second = Some(Utc.with_ymd_and_hms(2024, 2, 5, 12, 0, 0).unwrap());
@@ -2416,7 +2428,7 @@ mod tests {
 
     #[test]
     fn test_gap_tracker_handles_missing_timestamp() {
-        let mut tracker = GapTracker::new(ChronoDuration::minutes(45));
+        let mut tracker = GapTracker::new(ChronoDuration::minutes(45), false);
 
         assert!(tracker.check(None).is_none());
 
@@ -2431,7 +2443,7 @@ mod tests {
 
     #[test]
     fn test_gap_tracker_handles_reverse_order() {
-        let mut tracker = GapTracker::new(ChronoDuration::milliseconds(1));
+        let mut tracker = GapTracker::new(ChronoDuration::milliseconds(1), false);
 
         let first = Some(Utc.with_ymd_and_hms(2024, 2, 5, 11, 0, 0).unwrap());
         let earlier = Some(Utc.with_ymd_and_hms(2024, 2, 5, 10, 59, 59).unwrap());
@@ -2439,5 +2451,22 @@ mod tests {
         assert!(tracker.check(first).is_none());
         let marker = tracker.check(earlier).expect("marker for backwards jump");
         assert!(marker.contains("time gap"));
+    }
+
+    #[test]
+    fn test_gap_tracker_colors_marker_when_enabled() {
+        let mut tracker = GapTracker::new(ChronoDuration::minutes(30), true);
+
+        let first = Some(Utc.with_ymd_and_hms(2024, 2, 5, 11, 0, 0).unwrap());
+        let second = Some(Utc.with_ymd_and_hms(2024, 2, 5, 13, 0, 0).unwrap());
+
+        assert!(tracker.check(first).is_none());
+        let marker = tracker.check(second).expect("colored marker");
+        assert!(marker.contains("\x1b[34m"));
+        assert!(marker.contains("\x1b[0m"));
+        assert!(marker.starts_with("\x1b[34m_"));
+        let reset_index = marker.rfind("\x1b[0m").expect("reset sequence");
+        assert!(marker[..reset_index].ends_with('_'));
+        assert!(marker.contains("time gap: 2:00:00.000000"));
     }
 }
