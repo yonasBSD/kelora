@@ -6,6 +6,7 @@ use chrono::{DateTime, FixedOffset, SecondsFormat, Utc};
 use rhai::Dynamic;
 use std::collections::HashMap;
 use std::sync::Mutex;
+use std::time::Duration as StdDuration;
 
 use once_cell::sync::Lazy;
 
@@ -597,6 +598,76 @@ impl pipeline::Formatter for DefaultFormatter {
         }
 
         output
+    }
+}
+
+/// Helper that tracks time gaps between events and renders markers when needed
+#[derive(Debug, Clone)]
+pub struct GapTracker {
+    threshold: chrono::Duration,
+    last_timestamp: Option<DateTime<Utc>>,
+}
+
+impl GapTracker {
+    pub fn new(threshold: chrono::Duration) -> Self {
+        Self {
+            threshold,
+            last_timestamp: None,
+        }
+    }
+
+    /// Returns a marker string if the supplied timestamp is sufficiently far from the last one
+    pub fn check(&mut self, timestamp: Option<DateTime<Utc>>) -> Option<String> {
+        let current_ts = timestamp?;
+        let marker = self.last_timestamp.and_then(|previous_ts| {
+            let diff = current_ts.signed_duration_since(previous_ts);
+            if diff >= self.threshold || diff <= -self.threshold {
+                Some(Self::render_marker(diff))
+            } else {
+                None
+            }
+        });
+
+        self.last_timestamp = Some(current_ts);
+        marker
+    }
+
+    fn render_marker(diff: chrono::Duration) -> String {
+        let diff = if diff >= chrono::Duration::zero() {
+            diff
+        } else {
+            -diff
+        };
+
+        let std_duration = diff.to_std().unwrap_or_else(|_| StdDuration::from_secs(0));
+
+        let total_seconds = std_duration.as_secs();
+        let hours = total_seconds / 3600;
+        let minutes = (total_seconds % 3600) / 60;
+        let seconds = total_seconds % 60;
+        let micros = std_duration.subsec_micros();
+
+        let time_label = format!("{}:{:02}:{:02}.{:06}", hours, minutes, seconds, micros);
+        let label = format!(" time gap: {} ", time_label);
+
+        let mut width = crate::tty::get_terminal_width();
+        if width == 0 {
+            width = 80;
+        }
+
+        if width <= label.len() {
+            return label.trim().to_string();
+        }
+
+        let remaining = width - label.len();
+        let left = remaining / 2;
+        let right = remaining - left;
+
+        let mut marker = String::with_capacity(width);
+        marker.push_str(&"_".repeat(left));
+        marker.push_str(&label);
+        marker.push_str(&"_".repeat(right));
+        marker
     }
 }
 
@@ -1532,7 +1603,7 @@ impl pipeline::Formatter for CsvFormatter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{TimeZone, Utc};
+    use chrono::{Duration as ChronoDuration, TimeZone, Utc};
     use rhai::Map;
 
     fn parts(line: &str) -> Vec<String> {
@@ -2316,5 +2387,57 @@ mod tests {
         assert!(result.contains("field1='value1'"));
         assert!(result.contains("very_long_field_name_that_exceeds_width="));
         assert!(result.contains("field3='value3'"));
+    }
+
+    #[test]
+    fn test_gap_tracker_inserts_marker_for_large_delta() {
+        let mut tracker = GapTracker::new(ChronoDuration::minutes(30));
+
+        let first = Some(Utc.with_ymd_and_hms(2024, 2, 5, 11, 0, 0).unwrap());
+        let second = Some(Utc.with_ymd_and_hms(2024, 2, 5, 13, 0, 0).unwrap());
+
+        assert!(tracker.check(first).is_none());
+        let marker = tracker.check(second).expect("marker line");
+        assert!(marker.starts_with('_'));
+        assert!(marker.ends_with('_'));
+        assert!(marker.contains("time gap: 2:00:00.000000"));
+    }
+
+    #[test]
+    fn test_gap_tracker_skips_small_delta() {
+        let mut tracker = GapTracker::new(ChronoDuration::hours(2));
+
+        let first = Some(Utc.with_ymd_and_hms(2024, 2, 5, 11, 0, 0).unwrap());
+        let second = Some(Utc.with_ymd_and_hms(2024, 2, 5, 12, 0, 0).unwrap());
+
+        assert!(tracker.check(first).is_none());
+        assert!(tracker.check(second).is_none());
+    }
+
+    #[test]
+    fn test_gap_tracker_handles_missing_timestamp() {
+        let mut tracker = GapTracker::new(ChronoDuration::minutes(45));
+
+        assert!(tracker.check(None).is_none());
+
+        let second = Some(Utc.with_ymd_and_hms(2024, 2, 5, 12, 0, 0).unwrap());
+        assert!(tracker.check(second).is_none());
+
+        let third = Some(Utc.with_ymd_and_hms(2024, 2, 5, 13, 0, 0).unwrap());
+        let marker = tracker.check(third).expect("marker line");
+        assert!(marker.contains("time gap: 1:00:00.000000"));
+        assert!(marker.starts_with('_'));
+    }
+
+    #[test]
+    fn test_gap_tracker_handles_reverse_order() {
+        let mut tracker = GapTracker::new(ChronoDuration::milliseconds(1));
+
+        let first = Some(Utc.with_ymd_and_hms(2024, 2, 5, 11, 0, 0).unwrap());
+        let earlier = Some(Utc.with_ymd_and_hms(2024, 2, 5, 10, 59, 59).unwrap());
+
+        assert!(tracker.check(first).is_none());
+        let marker = tracker.check(earlier).expect("marker for backwards jump");
+        assert!(marker.contains("time gap"));
     }
 }

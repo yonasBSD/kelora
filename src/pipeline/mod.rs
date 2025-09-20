@@ -1,4 +1,5 @@
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use rhai::Dynamic;
 use std::collections::HashMap;
 
@@ -20,6 +21,19 @@ pub use multiline::*;
 pub use prefix_extractor::*;
 pub use prefix_parser::*;
 pub use stages::*;
+
+/// Formatted output from the pipeline with optional timestamp metadata
+#[derive(Debug, Clone)]
+pub struct FormattedOutput {
+    pub line: String,
+    pub timestamp: Option<DateTime<Utc>>,
+}
+
+impl FormattedOutput {
+    pub fn new(line: String, timestamp: Option<DateTime<Utc>>) -> Self {
+        Self { line, timestamp }
+    }
+}
 
 /// Helper function to collect discovered levels and keys from an event for stats
 fn collect_discovered_levels_and_keys(event: &Event, ctx: &mut PipelineContext) {
@@ -248,7 +262,11 @@ pub struct Pipeline {
 impl Pipeline {
     /// Process a single line through the entire pipeline
     /// This is the core method used by both sequential and parallel processing
-    pub fn process_line(&mut self, line: String, ctx: &mut PipelineContext) -> Result<Vec<String>> {
+    pub fn process_line(
+        &mut self,
+        line: String,
+        ctx: &mut PipelineContext,
+    ) -> Result<Vec<FormattedOutput>> {
         let mut results = Vec::new();
 
         // Line filter stage
@@ -398,7 +416,9 @@ impl Pipeline {
                                 rhai::Dynamic::from("count"),
                             );
 
-                            results.push(self.formatter.format(&event));
+                            let formatted = self.formatter.format(&event);
+                            let timestamp = event.parsed_ts;
+                            results.push(FormattedOutput::new(formatted, timestamp));
                         }
                     } else {
                         crate::stats::stats_add_event_filtered();
@@ -448,7 +468,9 @@ impl Pipeline {
                                     rhai::Dynamic::from("count"),
                                 );
 
-                                results.push(self.formatter.format(&event));
+                                let formatted = self.formatter.format(&event);
+                                let timestamp = event.parsed_ts;
+                                results.push(FormattedOutput::new(formatted, timestamp));
                             }
                         } else {
                             crate::stats::stats_add_event_filtered();
@@ -508,7 +530,7 @@ impl Pipeline {
     }
 
     /// Flush any remaining chunks from the chunker
-    pub fn flush(&mut self, ctx: &mut PipelineContext) -> Result<Vec<String>> {
+    pub fn flush(&mut self, ctx: &mut PipelineContext) -> Result<Vec<FormattedOutput>> {
         if let Some(chunk) = self.chunker.flush() {
             // Process chunk directly, not through feed_line
             self.process_chunk_directly(chunk, ctx)
@@ -518,8 +540,10 @@ impl Pipeline {
     }
 
     /// Flush formatter state to emit any remaining buffered output
-    pub fn finish_formatter(&self) -> Option<String> {
-        self.formatter.finish()
+    pub fn finish_formatter(&self) -> Option<FormattedOutput> {
+        self.formatter
+            .finish()
+            .map(|line| FormattedOutput::new(line, None))
     }
 
     /// Process a chunk directly without going through the chunker
@@ -527,7 +551,7 @@ impl Pipeline {
         &mut self,
         chunk: String,
         ctx: &mut PipelineContext,
-    ) -> Result<Vec<String>> {
+    ) -> Result<Vec<FormattedOutput>> {
         let mut results = Vec::new();
 
         // This is the same logic as in process_line starting from the "Parse stage" comment
@@ -664,7 +688,9 @@ impl Pipeline {
                             rhai::Dynamic::from("count"),
                         );
 
-                        results.push(self.formatter.format(&event));
+                        let formatted = self.formatter.format(&event);
+                        let timestamp = event.parsed_ts;
+                        results.push(FormattedOutput::new(formatted, timestamp));
                     }
                 } else {
                     crate::stats::stats_add_event_filtered();
@@ -714,7 +740,9 @@ impl Pipeline {
                                 rhai::Dynamic::from("count"),
                             );
 
-                            results.push(self.formatter.format(&event));
+                            let formatted = self.formatter.format(&event);
+                            let timestamp = event.parsed_ts;
+                            results.push(FormattedOutput::new(formatted, timestamp));
                         }
                     } else {
                         crate::stats::stats_add_event_filtered();

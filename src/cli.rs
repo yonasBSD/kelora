@@ -282,6 +282,14 @@ pub struct Cli {
     #[arg(long = "no-color", help_heading = "Display Options")]
     pub no_color: bool,
 
+    /// Insert a centered marker when the time delta between events exceeds the given duration
+    #[arg(
+        long = "mark-gaps",
+        value_name = "DURATION",
+        help_heading = "Display Options"
+    )]
+    pub mark_gaps: Option<String>,
+
     /// Disable emoji prefixes
     #[arg(long = "no-emoji", help_heading = "Display Options")]
     pub no_emoji: bool,

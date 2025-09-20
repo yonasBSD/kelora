@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
 use rhai::Dynamic;
 use std::collections::HashMap;
@@ -10,6 +11,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::event::Event;
+use crate::formatters::GapTracker;
 use crate::pipeline::{self, PipelineBuilder, DEFAULT_MULTILINE_FLUSH_TIMEOUT_MS};
 use crate::platform::{Ctrl, SHOULD_TERMINATE};
 use crate::stats::{get_thread_stats, stats_finish_processing, stats_start_timer, ProcessingStats};
@@ -75,6 +77,7 @@ pub struct ProcessedEvent {
     pub captured_prints: Vec<String>,
     pub captured_eprints: Vec<String>,
     pub captured_messages: Vec<crate::rhai_functions::strings::CapturedMessage>,
+    pub timestamp: Option<DateTime<Utc>>,
 }
 
 /// Thread-safe statistics tracker for merging worker states
@@ -1584,7 +1587,7 @@ impl ParallelProcessor {
             Ok(mut flush_results) => {
                 if final_flush {
                     if let Some(trailing) = pipeline.finish_formatter() {
-                        if !trailing.is_empty() {
+                        if !trailing.line.is_empty() {
                             flush_results.push(trailing);
                         }
                     }
@@ -1596,7 +1599,7 @@ impl ParallelProcessor {
 
                 let mut flush_batch_results = Vec::with_capacity(flush_results.len());
                 for formatted_result in flush_results {
-                    let mut dummy_event = Event::default_with_line(formatted_result.clone());
+                    let mut dummy_event = Event::default_with_line(formatted_result.line);
                     dummy_event.set_metadata(0, None);
 
                     flush_batch_results.push(ProcessedEvent {
@@ -1604,6 +1607,7 @@ impl ParallelProcessor {
                         captured_prints: Vec::new(),
                         captured_eprints: Vec::new(),
                         captured_messages: Vec::new(),
+                        timestamp: formatted_result.timestamp,
                     });
                 }
 
@@ -1723,11 +1727,11 @@ impl ParallelProcessor {
                             captured_prints,
                             captured_eprints,
                             captured_messages,
+                            timestamp: None,
                         });
                     } else {
                         for formatted_result in formatted_results {
-                            let mut dummy_event =
-                                Event::default_with_line(formatted_result.clone());
+                            let mut dummy_event = Event::default_with_line(formatted_result.line);
                             dummy_event.set_metadata(current_line_num, None);
 
                             batch_results.push(ProcessedEvent {
@@ -1735,6 +1739,7 @@ impl ParallelProcessor {
                                 captured_prints: captured_prints.clone(),
                                 captured_eprints: captured_eprints.clone(),
                                 captured_messages: captured_messages.clone(),
+                                timestamp: formatted_result.timestamp,
                             });
                         }
                     }
@@ -1751,6 +1756,7 @@ impl ParallelProcessor {
                             captured_prints: Vec::new(),
                             captured_eprints,
                             captured_messages,
+                            timestamp: None,
                         });
                     }
 
@@ -1928,14 +1934,23 @@ impl ParallelProcessor {
         // Write CSV header if needed (before any worker results)
         Self::write_csv_header_if_needed(output, config)?;
 
+        let mut gap_tracker = config.output.mark_gaps.map(GapTracker::new);
+
         if preserve_order {
-            Self::pipeline_ordered_result_sink(result_receiver, global_tracker, output, take_limit)
+            Self::pipeline_ordered_result_sink(
+                result_receiver,
+                global_tracker,
+                output,
+                take_limit,
+                &mut gap_tracker,
+            )
         } else {
             Self::pipeline_unordered_result_sink(
                 result_receiver,
                 global_tracker,
                 output,
                 take_limit,
+                &mut gap_tracker,
             )
         }
     }
@@ -1945,6 +1960,7 @@ impl ParallelProcessor {
         global_tracker: GlobalTracker,
         output: &mut W,
         take_limit: Option<usize>,
+        gap_tracker: &mut Option<GapTracker>,
     ) -> Result<()> {
         let mut pending_batches: HashMap<u64, BatchResult> = HashMap::new();
         let mut next_expected_id = 0u64;
@@ -1984,6 +2000,7 @@ impl ParallelProcessor {
                         output,
                         &batch_result.results,
                         remaining_limit,
+                        gap_tracker,
                     )?;
                     events_output += events_this_batch;
 
@@ -2010,8 +2027,12 @@ impl ParallelProcessor {
             // Output all consecutive batches starting from next_expected_id
             while let Some(batch) = pending_batches.remove(&next_expected_id) {
                 let remaining_limit = take_limit.map(|limit| limit.saturating_sub(events_output));
-                let events_this_batch =
-                    Self::pipeline_output_batch_results(output, &batch.results, remaining_limit)?;
+                let events_this_batch = Self::pipeline_output_batch_results(
+                    output,
+                    &batch.results,
+                    remaining_limit,
+                    gap_tracker,
+                )?;
                 events_output += events_this_batch;
                 next_expected_id += 1;
 
@@ -2029,8 +2050,12 @@ impl ParallelProcessor {
         // Output any remaining batches (shouldn't happen with proper shutdown)
         for (_, batch) in pending_batches {
             let remaining_limit = take_limit.map(|limit| limit.saturating_sub(events_output));
-            events_output +=
-                Self::pipeline_output_batch_results(output, &batch.results, remaining_limit)?;
+            events_output += Self::pipeline_output_batch_results(
+                output,
+                &batch.results,
+                remaining_limit,
+                gap_tracker,
+            )?;
 
             // Check if we've reached the take limit even in cleanup
             if let Some(limit) = take_limit {
@@ -2048,6 +2073,7 @@ impl ParallelProcessor {
         global_tracker: GlobalTracker,
         output: &mut W,
         take_limit: Option<usize>,
+        gap_tracker: &mut Option<GapTracker>,
     ) -> Result<()> {
         let mut termination_detected = false;
         let mut events_output = 0usize;
@@ -2079,6 +2105,7 @@ impl ParallelProcessor {
                         output,
                         &batch_result.results,
                         remaining_limit,
+                        gap_tracker,
                     )?;
                     events_output += events_this_batch;
 
@@ -2105,6 +2132,7 @@ impl ParallelProcessor {
                 output,
                 &batch_result.results,
                 remaining_limit,
+                gap_tracker,
             )?;
             events_output += events_this_batch;
 
@@ -2125,6 +2153,7 @@ impl ParallelProcessor {
         output: &mut W,
         results: &[ProcessedEvent],
         remaining_limit: Option<usize>,
+        gap_tracker: &mut Option<GapTracker>,
     ) -> Result<usize> {
         let mut events_output = 0usize;
 
@@ -2164,6 +2193,15 @@ impl ParallelProcessor {
 
             // Then output the event itself to the designated output, skip empty strings
             if !processed.event.original_line.is_empty() {
+                let marker = match gap_tracker.as_mut() {
+                    Some(tracker) => tracker.check(processed.timestamp),
+                    None => None,
+                };
+
+                if let Some(marker_line) = marker {
+                    writeln!(output, "{}", marker_line).unwrap_or(());
+                }
+
                 writeln!(output, "{}", &processed.event.original_line).unwrap_or(());
                 events_output += 1;
             }

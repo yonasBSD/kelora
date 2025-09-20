@@ -469,6 +469,10 @@ fn run_pipeline_sequential_internal<W: Write>(
     let mut pending_deadline: Option<Instant> = None;
     let mut shutdown_requested = false;
     let mut immediate_shutdown = false;
+    let mut gap_tracker = config
+        .output
+        .mark_gaps
+        .map(crate::formatters::GapTracker::new);
 
     let ctrl_rx = ctrl_rx;
     let line_rx = line_rx;
@@ -490,10 +494,8 @@ fn run_pipeline_sequential_internal<W: Write>(
         if let Some(duration) = deadline_duration {
             if duration.is_zero() {
                 let results = pipeline.flush(&mut ctx)?;
-                for result in results {
-                    if !result.is_empty() {
-                        writeln!(output, "{}", result)?;
-                    }
+                for formatted in results {
+                    write_formatted_output(formatted, output, &mut gap_tracker)?;
                 }
                 pending_deadline = None;
                 continue;
@@ -528,6 +530,7 @@ fn run_pipeline_sequential_internal<W: Write>(
                                 &mut skipped_lines,
                                 &mut current_csv_headers,
                                 &mut last_filename,
+                                &mut gap_tracker,
                             )? {
                                 shutdown_requested = true;
                             }
@@ -543,10 +546,8 @@ fn run_pipeline_sequential_internal<W: Write>(
                 }
                 recv(timeout) -> _ => {
                     let results = pipeline.flush(&mut ctx)?;
-                    for result in results {
-                        if !result.is_empty() {
-                            writeln!(output, "{}", result)?;
-                        }
+                    for formatted in results {
+                        write_formatted_output(formatted, output, &mut gap_tracker)?;
                     }
                     pending_deadline = None;
                 }
@@ -580,6 +581,7 @@ fn run_pipeline_sequential_internal<W: Write>(
                                 &mut skipped_lines,
                                 &mut current_csv_headers,
                                 &mut last_filename,
+                                &mut gap_tracker,
                             )? {
                                 shutdown_requested = true;
                             }
@@ -614,16 +616,12 @@ fn run_pipeline_sequential_internal<W: Write>(
     }
 
     let results = pipeline.flush(&mut ctx)?;
-    for result in results {
-        if !result.is_empty() {
-            writeln!(output, "{}", result)?;
-        }
+    for formatted in results {
+        write_formatted_output(formatted, output, &mut gap_tracker)?;
     }
 
     if let Some(result) = pipeline.finish_formatter() {
-        if !result.is_empty() {
-            writeln!(output, "{}", result)?;
-        }
+        write_formatted_output(result, output, &mut gap_tracker)?;
     }
 
     if let Err(e) = end_stage.execute(&ctx) {
@@ -645,6 +643,7 @@ fn handle_reader_message<W: Write>(
     skipped_lines: &mut usize,
     current_csv_headers: &mut Option<Vec<String>>,
     last_filename: &mut Option<String>,
+    gap_tracker: &mut Option<crate::formatters::GapTracker>,
 ) -> Result<bool> {
     match message {
         ReaderMessage::Line { line, filename } => {
@@ -659,6 +658,7 @@ fn handle_reader_message<W: Write>(
                 filename,
                 current_csv_headers,
                 last_filename,
+                gap_tracker,
             )? {
                 ProcessingResult::Continue => Ok(false),
                 ProcessingResult::TakeLimitExhausted => Ok(true),
@@ -676,6 +676,7 @@ fn handle_reader_message<W: Write>(
                 filename,
                 current_csv_headers,
                 last_filename,
+                gap_tracker,
             )? {
                 ProcessingResult::Continue => Ok(false),
                 ProcessingResult::TakeLimitExhausted => Ok(true),
@@ -704,6 +705,7 @@ fn process_line_sequential<W: Write>(
     current_filename: Option<String>,
     current_csv_headers: &mut Option<Vec<String>>,
     last_filename: &mut Option<String>,
+    gap_tracker: &mut Option<crate::formatters::GapTracker>,
 ) -> Result<ProcessingResult> {
     let line = line_result?;
     *line_num += 1;
@@ -806,10 +808,8 @@ fn process_line_sequential<W: Write>(
             // So we don't need to count empty results as filtered here anymore
 
             // Output all results (usually just one), skip empty strings
-            for result in results {
-                if !result.is_empty() {
-                    writeln!(output, "{}", result)?;
-                }
+            for formatted in results {
+                write_formatted_output(formatted, output, gap_tracker)?;
             }
 
             // Check if take limit is exhausted after processing
@@ -832,6 +832,27 @@ fn process_line_sequential<W: Write>(
     }
 
     Ok(ProcessingResult::Continue)
+}
+
+fn write_formatted_output<W: Write>(
+    formatted: pipeline::FormattedOutput,
+    output: &mut W,
+    gap_tracker: &mut Option<crate::formatters::GapTracker>,
+) -> io::Result<()> {
+    let marker = match gap_tracker.as_mut() {
+        Some(tracker) => tracker.check(formatted.timestamp),
+        None => None,
+    };
+
+    if let Some(marker_line) = marker {
+        writeln!(output, "{}", marker_line)?;
+    }
+
+    if !formatted.line.is_empty() {
+        writeln!(output, "{}", formatted.line)?;
+    }
+
+    Ok(())
 }
 
 fn main() -> Result<()> {
@@ -967,6 +988,31 @@ fn main() -> Result<()> {
             .writeln(&config.format_error_message(&format!("Error: {}", e)))
             .unwrap_or(());
         ExitCode::InvalidUsage.exit();
+    }
+
+    if let Some(ref gap_str) = cli.mark_gaps {
+        match crate::rhai_functions::datetime::parse_dur(gap_str) {
+            Ok(duration) => {
+                if duration.inner.is_zero() {
+                    stderr
+                        .writeln(&config.format_error_message(
+                            "--mark-gaps requires a duration greater than zero",
+                        ))
+                        .unwrap_or(());
+                    ExitCode::InvalidUsage.exit();
+                }
+                config.output.mark_gaps = Some(duration.inner);
+            }
+            Err(e) => {
+                stderr
+                    .writeln(&config.format_error_message(&format!(
+                        "Invalid --mark-gaps duration '{}': {}",
+                        gap_str, e
+                    )))
+                    .unwrap_or(());
+                ExitCode::InvalidUsage.exit();
+            }
+        }
     }
 
     // Handle output destination and run pipeline

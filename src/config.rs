@@ -46,6 +46,7 @@ pub struct OutputConfig {
     pub stats: bool,
     pub metrics: bool,
     pub metrics_file: Option<String>,
+    pub mark_gaps: Option<chrono::Duration>,
     /// Timestamp formatting configuration (display-only)
     pub timestamp_formatting: TimestampFormatConfig,
 }
@@ -604,6 +605,7 @@ impl KeloraConfig {
                 stats: cli.stats || cli.stats_only,
                 metrics: cli.metrics,
                 metrics_file: cli.metrics_file.clone(),
+                mark_gaps: None,
                 timestamp_formatting: create_timestamp_format_config(cli),
             },
             processing: ProcessingConfig {
@@ -680,6 +682,7 @@ impl Default for KeloraConfig {
                 stats: false,
                 metrics: false,
                 metrics_file: None,
+                mark_gaps: None,
                 timestamp_formatting: TimestampFormatConfig::default(),
             },
             processing: ProcessingConfig {

@@ -179,42 +179,133 @@ pub fn parse_ts(
 pub fn parse_dur(s: &str) -> Result<DurationWrapper, Box<EvalAltResult>> {
     let mut total_duration = Duration::zero();
     let mut current_number = String::new();
+    let mut current_unit = String::new();
     let mut found_unit = false;
-    let chars = s.chars();
 
-    for ch in chars {
-        if ch.is_numeric() {
-            current_number.push(ch);
-        } else if ch.is_alphabetic() || ch == ' ' {
-            if !current_number.is_empty() {
-                let number: i64 = current_number.parse().map_err(|_| {
-                    Box::new(EvalAltResult::ErrorRuntime(
-                        format!("Invalid number in duration: '{}'", current_number).into(),
-                        Position::NONE,
-                    ))
-                })?;
+    fn push_duration(
+        total: &mut Duration,
+        number: &str,
+        unit: &str,
+    ) -> Result<(), Box<EvalAltResult>> {
+        if number.is_empty() || unit.is_empty() {
+            return Err(Box::new(EvalAltResult::ErrorRuntime(
+                "Incomplete duration segment".into(),
+                Position::NONE,
+            )));
+        }
 
-                let unit = ch.to_lowercase().next().unwrap();
-                let duration_part = match unit {
-                    's' => Duration::seconds(number),
-                    'm' => Duration::minutes(number),
-                    'h' => Duration::hours(number),
-                    'd' => Duration::days(number),
-                    _ => {
-                        return Err(Box::new(EvalAltResult::ErrorRuntime(
-                            format!("Unknown duration unit: '{}'", unit).into(),
-                            Position::NONE,
-                        )))
-                    }
-                };
+        let value: f64 = number.parse().map_err(|_| {
+            Box::new(EvalAltResult::ErrorRuntime(
+                format!("Invalid number in duration: '{}'", number).into(),
+                Position::NONE,
+            ))
+        })?;
 
-                total_duration += duration_part;
+        let unit_norm = unit.to_lowercase();
+        let nanos_per_unit: f64 = match unit_norm.as_str() {
+            "ns" | "nsec" | "nsecs" | "nanosecond" | "nanoseconds" => 1.0,
+            "us" | "µs" | "usec" | "usecs" | "microsecond" | "microseconds" => 1_000.0,
+            "ms" | "msec" | "msecs" | "millisecond" | "milliseconds" => 1_000_000.0,
+            "s" | "sec" | "secs" | "second" | "seconds" => 1_000_000_000.0,
+            "m" | "min" | "mins" | "minute" | "minutes" => 60.0 * 1_000_000_000.0,
+            "h" | "hr" | "hrs" | "hour" | "hours" => 3_600.0 * 1_000_000_000.0,
+            "d" | "day" | "days" => 86_400.0 * 1_000_000_000.0,
+            "w" | "week" | "weeks" => 604_800.0 * 1_000_000_000.0,
+            _ => {
+                return Err(Box::new(EvalAltResult::ErrorRuntime(
+                    format!("Unknown duration unit: '{}'", unit).into(),
+                    Position::NONE,
+                )))
+            }
+        };
+
+        let nanos = (value * nanos_per_unit).round();
+        if !nanos.is_finite() {
+            return Err(Box::new(EvalAltResult::ErrorRuntime(
+                "Duration value out of range".into(),
+                Position::NONE,
+            )));
+        }
+
+        let nanos_i128 = nanos as i128;
+        if nanos_i128 > i64::MAX as i128 || nanos_i128 < i64::MIN as i128 {
+            return Err(Box::new(EvalAltResult::ErrorRuntime(
+                "Duration value out of range".into(),
+                Position::NONE,
+            )));
+        }
+
+        *total += Duration::nanoseconds(nanos_i128 as i64);
+        Ok(())
+    }
+
+    let mut chars = s.chars().peekable();
+    let mut number_has_decimal = false;
+    while let Some(ch) = chars.next() {
+        if ch.is_ascii_whitespace() {
+            if !current_unit.is_empty() {
+                push_duration(&mut total_duration, &current_number, &current_unit)?;
                 current_number.clear();
+                current_unit.clear();
+                number_has_decimal = false;
                 found_unit = true;
             }
-        } else if ch == ' ' {
-            // Skip spaces
             continue;
+        }
+
+        if ch.is_ascii_digit() || ch == '.' {
+            if ch == '.' {
+                if number_has_decimal {
+                    return Err(Box::new(EvalAltResult::ErrorRuntime(
+                        "Multiple decimal points in duration number".into(),
+                        Position::NONE,
+                    )));
+                }
+                if current_number.is_empty() {
+                    return Err(Box::new(EvalAltResult::ErrorRuntime(
+                        "Duration numbers cannot start with a decimal point".into(),
+                        Position::NONE,
+                    )));
+                }
+                number_has_decimal = true;
+            }
+
+            if !current_unit.is_empty() {
+                push_duration(&mut total_duration, &current_number, &current_unit)?;
+                current_number.clear();
+                current_unit.clear();
+                number_has_decimal = ch == '.';
+                found_unit = true;
+                if ch == '.' {
+                    return Err(Box::new(EvalAltResult::ErrorRuntime(
+                        "Duration numbers cannot start with a decimal point".into(),
+                        Position::NONE,
+                    )));
+                }
+            }
+
+            current_number.push(ch);
+        } else if ch.is_ascii_alphabetic() || ch == 'µ' {
+            if current_number.is_empty() {
+                return Err(Box::new(EvalAltResult::ErrorRuntime(
+                    "Duration unit must follow a number".into(),
+                    Position::NONE,
+                )));
+            }
+            current_unit.push(ch);
+
+            if let Some(next) = chars.peek() {
+                if next.is_ascii_whitespace() {
+                    continue;
+                }
+                if next.is_ascii_digit() || *next == '.' {
+                    push_duration(&mut total_duration, &current_number, &current_unit)?;
+                    current_number.clear();
+                    current_unit.clear();
+                    number_has_decimal = false;
+                    found_unit = true;
+                }
+            }
         } else {
             return Err(Box::new(EvalAltResult::ErrorRuntime(
                 format!("Invalid character in duration: '{}'", ch).into(),
@@ -223,7 +314,11 @@ pub fn parse_dur(s: &str) -> Result<DurationWrapper, Box<EvalAltResult>> {
         }
     }
 
-    // Return error if we found no valid units
+    if !current_unit.is_empty() {
+        push_duration(&mut total_duration, &current_number, &current_unit)?;
+        found_unit = true;
+    }
+
     if !found_unit {
         return Err(Box::new(EvalAltResult::ErrorRuntime(
             format!("Unable to parse duration: '{}'", s).into(),
@@ -515,6 +610,15 @@ mod tests {
         let dur_d = parse_dur("3d").unwrap();
         assert_eq!(dur_d.inner.num_days(), 3);
 
+        let dur_ms = parse_dur("250ms").unwrap();
+        assert_eq!(dur_ms.inner.num_milliseconds(), 250);
+
+        let dur_us = parse_dur("500us").unwrap();
+        assert_eq!(dur_us.inner.num_microseconds().unwrap(), 500);
+
+        let dur_ns = parse_dur("750ns").unwrap();
+        assert_eq!(dur_ns.inner.num_nanoseconds().unwrap(), 750);
+
         // Test mixed units
         let dur_mixed = parse_dur("1h 30m").unwrap();
         assert_eq!(dur_mixed.inner.num_minutes(), 90);
@@ -522,6 +626,24 @@ mod tests {
         // Test with extra spaces
         let dur_spaced = parse_dur("  1h   30m  ").unwrap();
         assert_eq!(dur_spaced.inner.num_minutes(), 90);
+
+        // Test compact format without spaces
+        let dur_compact = parse_dur("1m30s").unwrap();
+        assert_eq!(dur_compact.inner.num_seconds(), 90);
+
+        // Test millisecond subsequence with additional unit
+        let dur_combo = parse_dur("2s500ms").unwrap();
+        assert_eq!(dur_combo.inner.num_milliseconds(), 2500);
+
+        // Test fractional values
+        let dur_fractional = parse_dur("1.5s").unwrap();
+        assert_eq!(dur_fractional.inner.num_milliseconds(), 1500);
+
+        let dur_fractional_ms = parse_dur("0.25ms").unwrap();
+        assert_eq!(dur_fractional_ms.inner.num_nanoseconds().unwrap(), 250_000);
+
+        let dur_fractional_minutes = parse_dur("1.25m").unwrap();
+        assert_eq!(dur_fractional_minutes.inner.num_seconds(), 75);
     }
 
     #[test]

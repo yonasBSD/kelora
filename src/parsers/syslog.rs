@@ -2,6 +2,7 @@
 use crate::event::Event;
 use crate::pipeline::EventParser;
 use anyhow::{Context, Result};
+use chrono::{DateTime, Datelike, Local, NaiveDateTime, TimeZone, Utc};
 use regex::Regex;
 use rhai::Dynamic;
 
@@ -120,6 +121,7 @@ impl SyslogParser {
             }
 
             event.extract_timestamp();
+            Self::ensure_timestamp(&mut event);
             Some(event)
         } else {
             None
@@ -181,10 +183,44 @@ impl SyslogParser {
             }
 
             event.extract_timestamp();
+            Self::ensure_timestamp(&mut event);
             Some(event)
         } else {
             None
         }
+    }
+
+    fn ensure_timestamp(event: &mut Event) {
+        if event.parsed_ts.is_some() {
+            return;
+        }
+
+        if let Some(ts_value) = event.fields.get("timestamp") {
+            if let Ok(ts_str) = ts_value.clone().into_string() {
+                if let Some(parsed) = Self::parse_syslog_timestamp(&ts_str) {
+                    event.parsed_ts = Some(parsed);
+                }
+            }
+        }
+    }
+
+    fn parse_syslog_timestamp(ts: &str) -> Option<DateTime<Utc>> {
+        let current_year = Utc::now().year();
+        Self::parse_syslog_timestamp_with_year(ts, current_year)
+            .or_else(|| Self::parse_syslog_timestamp_with_year(ts, current_year - 1))
+    }
+
+    fn parse_syslog_timestamp_with_year(ts: &str, year: i32) -> Option<DateTime<Utc>> {
+        let ts_with_year = format!("{} {}", year, ts);
+        // Use %e for space-padded days
+        let naive = NaiveDateTime::parse_from_str(&ts_with_year, "%Y %b %e %H:%M:%S").ok()?;
+
+        if let Some(local_dt) = Local.from_local_datetime(&naive).single() {
+            let utc_dt = local_dt.with_timezone(&Utc);
+            return Some(utc_dt);
+        }
+
+        None
     }
 }
 
@@ -326,6 +362,8 @@ mod tests {
                 .unwrap(),
             "Failed password for user from 192.168.1.100"
         );
+
+        assert!(result.parsed_ts.is_some());
     }
 
     #[test]
