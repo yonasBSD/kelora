@@ -2,6 +2,7 @@
 use crate::colors::ColorScheme;
 use crate::event::{flatten_dynamic, Event, FlattenStyle};
 use crate::pipeline;
+
 use chrono::{DateTime, FixedOffset, SecondsFormat, Utc};
 use rhai::Dynamic;
 use std::collections::HashMap;
@@ -774,6 +775,15 @@ pub struct InspectFormatter {
     max_inline_chars: usize,
 }
 
+struct LineSpec<'a> {
+    indent: usize,
+    name: &'a str,
+    name_width: usize,
+    type_width: usize,
+    type_label: &'a str,
+    value_repr: &'a str,
+}
+
 impl InspectFormatter {
     const KEY_WIDTH_CAP: usize = 40;
 
@@ -821,12 +831,14 @@ impl InspectFormatter {
             let type_label = format!("map({})", entries.len());
             self.push_line(
                 lines,
-                indent,
-                name,
-                name_width,
-                type_width,
-                &type_label,
-                "{",
+                LineSpec {
+                    indent,
+                    name,
+                    name_width,
+                    type_width,
+                    type_label: &type_label,
+                    value_repr: "{",
+                },
             );
 
             if !entries.is_empty() {
@@ -850,12 +862,14 @@ impl InspectFormatter {
             let type_label = format!("array({})", elements.len());
             self.push_line(
                 lines,
-                indent,
-                name,
-                name_width,
-                type_width,
-                &type_label,
-                "[",
+                LineSpec {
+                    indent,
+                    name,
+                    name_width,
+                    type_width,
+                    type_label: &type_label,
+                    value_repr: "[",
+                },
             );
 
             if !elements.is_empty() {
@@ -882,40 +896,37 @@ impl InspectFormatter {
             let (type_label, value_repr) = self.describe_scalar(value);
             self.push_line(
                 lines,
-                indent,
-                name,
-                name_width,
-                type_width,
-                &type_label,
-                &value_repr,
+                LineSpec {
+                    indent,
+                    name,
+                    name_width,
+                    type_width,
+                    type_label: &type_label,
+                    value_repr: &value_repr,
+                },
             );
         }
     }
 
-    fn push_line(
-        &self,
-        lines: &mut Vec<String>,
-        indent: usize,
-        name: &str,
-        name_width: usize,
-        type_width: usize,
-        type_label: &str,
-        value_repr: &str,
-    ) {
-        let indent_str = "  ".repeat(indent);
-        let name_cell = if name_width > 0 {
-            format!("{name:<width$}", name = name, width = name_width)
+    fn push_line(&self, lines: &mut Vec<String>, spec: LineSpec<'_>) {
+        let indent_str = "  ".repeat(spec.indent);
+        let name_cell = if spec.name_width > 0 {
+            format!("{name:<width$}", name = spec.name, width = spec.name_width)
         } else {
-            name.to_string()
+            spec.name.to_string()
         };
-        let effective_type_width = type_width.max(type_label.len());
-        let type_cell = format!("{type_label:<width$}", width = effective_type_width);
+        let effective_type_width = spec.type_width.max(spec.type_label.len());
+        let type_cell = format!(
+            "{type_label:<width$}",
+            type_label = spec.type_label,
+            width = effective_type_width
+        );
         lines.push(format!(
             "{indent}{name_cell} | {type_cell} | {value}",
             indent = indent_str,
             name_cell = name_cell,
             type_cell = type_cell,
-            value = value_repr
+            value = spec.value_repr
         ));
     }
 
@@ -1044,15 +1055,7 @@ impl InspectFormatter {
             return (value.to_string(), false);
         }
 
-        let mut truncated = String::new();
-        let mut count = 0;
-        for ch in value.chars() {
-            if count >= self.max_inline_chars {
-                break;
-            }
-            truncated.push(ch);
-            count += 1;
-        }
+        let truncated: String = value.chars().take(self.max_inline_chars).collect();
 
         (truncated, true)
     }
@@ -1997,18 +2000,24 @@ mod tests {
         let formatter = LevelmapFormatter::with_width(3);
         let ts = Utc.timestamp_millis_opt(0).unwrap();
 
-        let mut event1 = Event::default();
-        event1.parsed_ts = Some(ts);
+        let mut event1 = Event {
+            parsed_ts: Some(ts),
+            ..Event::default()
+        };
         event1.set_field("level".to_string(), Dynamic::from("info"));
         assert!(formatter.format(&event1).is_empty());
 
-        let mut event2 = Event::default();
-        event2.parsed_ts = Some(ts);
+        let mut event2 = Event {
+            parsed_ts: Some(ts),
+            ..Event::default()
+        };
         event2.set_field("level".to_string(), Dynamic::from("debug"));
         assert!(formatter.format(&event2).is_empty());
 
-        let mut event3 = Event::default();
-        event3.parsed_ts = Some(ts);
+        let mut event3 = Event {
+            parsed_ts: Some(ts),
+            ..Event::default()
+        };
         event3.set_field("level".to_string(), Dynamic::from("trace"));
         let line = formatter.format(&event3);
         assert_eq!(line, "1970-01-01T00:00:00.000Z idt");
@@ -2016,8 +2025,10 @@ mod tests {
         assert!(formatter.finish().is_none());
 
         let ts2 = Utc.timestamp_millis_opt(1_000).unwrap();
-        let mut event4 = Event::default();
-        event4.parsed_ts = Some(ts2);
+        let mut event4 = Event {
+            parsed_ts: Some(ts2),
+            ..Event::default()
+        };
         event4.set_field("level".to_string(), Dynamic::from("warn"));
         assert!(formatter.format(&event4).is_empty());
 
@@ -2032,8 +2043,10 @@ mod tests {
         let formatter = LevelmapFormatter::with_width(1);
         let ts = Utc.timestamp_millis_opt(0).unwrap();
 
-        let mut event = Event::default();
-        event.parsed_ts = Some(ts);
+        let event = Event {
+            parsed_ts: Some(ts),
+            ..Event::default()
+        };
 
         let line = formatter.format(&event);
         assert_eq!(line, "1970-01-01T00:00:00.000Z ?");

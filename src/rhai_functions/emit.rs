@@ -341,7 +341,7 @@ mod tests {
 
         let emissions = get_and_clear_pending_emissions();
         assert_eq!(emissions.len(), 1);
-        assert_eq!(emissions[0].get("valid").unwrap().as_bool().unwrap(), true);
+        assert!(emissions[0].get("valid").unwrap().as_bool().unwrap());
     }
 
     #[test]

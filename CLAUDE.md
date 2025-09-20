@@ -19,16 +19,17 @@ time ./target/release/kelora -f json <logfile> --filter "expression" > /dev/null
 # Run benchmark suite to detect performance regressions
 make bench-quick              # Quick benchmarks (10k dataset)
 make bench                    # Full benchmark suite (10k + 50k datasets)
-make bench-baseline           # Update performance baseline
+make bench-update             # Refresh the stored baseline intentionally
 
-# Run lint and type checking
-cargo clippy
-cargo fmt --check
+# Run lint and formatting
+make fmt
+make lint
+make check
 
 # Run tests
-cargo test               # Unit and integration tests
-cargo test --test integration_tests  # Integration tests only
-make test-full          # Comprehensive test suite
+make test               # Unit and integration tests
+make test-unit          # Binary/unit tests only
+make test-integration   # Integration tests only
 ```
 
 ### Error Handling and Automation Examples

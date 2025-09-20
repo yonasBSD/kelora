@@ -458,8 +458,10 @@ mod tests {
 
     #[test]
     fn test_process_args_with_defaults() {
-        let mut config = ConfigFile::default();
-        config.defaults = Some("--stats --parallel".to_string());
+        let config = ConfigFile {
+            defaults: Some("--stats --parallel".to_string()),
+            ..ConfigFile::default()
+        };
 
         let args = vec![
             "kelora".to_string(),
@@ -485,8 +487,10 @@ mod tests {
 
     #[test]
     fn test_process_args_with_defaults_and_aliases() {
-        let mut config = ConfigFile::default();
-        config.defaults = Some("--stats".to_string());
+        let mut config = ConfigFile {
+            defaults: Some("--stats".to_string()),
+            ..ConfigFile::default()
+        };
         config
             .aliases
             .insert("errors".to_string(), "-l error".to_string());

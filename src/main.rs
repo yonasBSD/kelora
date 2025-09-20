@@ -523,15 +523,17 @@ fn run_pipeline_sequential_internal<W: Write>(
                         Ok(message) => {
                             if handle_reader_message(
                                 message,
-                                &mut pipeline,
-                                &mut ctx,
-                                config,
-                                output,
-                                &mut line_num,
-                                &mut skipped_lines,
-                                &mut current_csv_headers,
-                                &mut last_filename,
-                                &mut gap_tracker,
+                                ReaderContext {
+                                    pipeline: &mut pipeline,
+                                    ctx: &mut ctx,
+                                    config,
+                                    output,
+                                    line_num: &mut line_num,
+                                    skipped_lines: &mut skipped_lines,
+                                    current_csv_headers: &mut current_csv_headers,
+                                    last_filename: &mut last_filename,
+                                    gap_tracker: &mut gap_tracker,
+                                },
                             )? {
                                 shutdown_requested = true;
                             }
@@ -574,15 +576,17 @@ fn run_pipeline_sequential_internal<W: Write>(
                         Ok(message) => {
                             if handle_reader_message(
                                 message,
-                                &mut pipeline,
-                                &mut ctx,
-                                config,
-                                output,
-                                &mut line_num,
-                                &mut skipped_lines,
-                                &mut current_csv_headers,
-                                &mut last_filename,
-                                &mut gap_tracker,
+                                ReaderContext {
+                                    pipeline: &mut pipeline,
+                                    ctx: &mut ctx,
+                                    config,
+                                    output,
+                                    line_num: &mut line_num,
+                                    skipped_lines: &mut skipped_lines,
+                                    current_csv_headers: &mut current_csv_headers,
+                                    last_filename: &mut last_filename,
+                                    gap_tracker: &mut gap_tracker,
+                                },
                             )? {
                                 shutdown_requested = true;
                             }
@@ -634,18 +638,33 @@ fn run_pipeline_sequential_internal<W: Write>(
     Ok(())
 }
 
+struct ReaderContext<'a, W: Write> {
+    pipeline: &'a mut pipeline::Pipeline,
+    ctx: &'a mut pipeline::PipelineContext,
+    config: &'a KeloraConfig,
+    output: &'a mut W,
+    line_num: &'a mut usize,
+    skipped_lines: &'a mut usize,
+    current_csv_headers: &'a mut Option<Vec<String>>,
+    last_filename: &'a mut Option<String>,
+    gap_tracker: &'a mut Option<crate::formatters::GapTracker>,
+}
+
 fn handle_reader_message<W: Write>(
     message: ReaderMessage,
-    pipeline: &mut pipeline::Pipeline,
-    ctx: &mut pipeline::PipelineContext,
-    config: &KeloraConfig,
-    output: &mut W,
-    line_num: &mut usize,
-    skipped_lines: &mut usize,
-    current_csv_headers: &mut Option<Vec<String>>,
-    last_filename: &mut Option<String>,
-    gap_tracker: &mut Option<crate::formatters::GapTracker>,
+    ctx: ReaderContext<'_, W>,
 ) -> Result<bool> {
+    let ReaderContext {
+        pipeline,
+        ctx: pipeline_ctx,
+        config,
+        output,
+        line_num,
+        skipped_lines,
+        current_csv_headers,
+        last_filename,
+        gap_tracker,
+    } = ctx;
     match message {
         ReaderMessage::Line { line, filename } => {
             match process_line_sequential(
@@ -653,7 +672,7 @@ fn handle_reader_message<W: Write>(
                 line_num,
                 skipped_lines,
                 pipeline,
-                ctx,
+                pipeline_ctx,
                 config,
                 output,
                 filename,
@@ -671,7 +690,7 @@ fn handle_reader_message<W: Write>(
                 line_num,
                 skipped_lines,
                 pipeline,
-                ctx,
+                pipeline_ctx,
                 config,
                 output,
                 filename,

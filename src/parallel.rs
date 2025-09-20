@@ -16,6 +16,22 @@ use crate::pipeline::{self, PipelineBuilder, DEFAULT_MULTILINE_FLUSH_TIMEOUT_MS}
 use crate::platform::{Ctrl, SHOULD_TERMINATE};
 use crate::stats::{get_thread_stats, stats_finish_processing, stats_start_timer, ProcessingStats};
 
+struct PlainLineContext<'a> {
+    batch_sender: &'a Sender<Batch>,
+    current_batch: &'a mut Vec<String>,
+    batch_size: usize,
+    batch_timeout: Duration,
+    batch_id: &'a mut u64,
+    batch_start_line: &'a mut usize,
+    line_num: &'a mut usize,
+    skipped_lines_count: &'a mut usize,
+    filtered_lines: &'a mut usize,
+    skip_lines: usize,
+    input_format: &'a crate::config::InputFormat,
+    ignore_lines: &'a Option<regex::Regex>,
+    pending_deadline: &'a mut Option<Instant>,
+}
+
 /// Configuration for parallel processing
 #[derive(Debug, Clone)]
 pub struct ParallelConfig {
@@ -869,19 +885,21 @@ impl ParallelProcessor {
                             Ok(LineMessage::Line { line, .. }) => {
                                 Self::handle_plain_line(
                                     line,
-                                    &batch_sender,
-                                    &mut current_batch,
-                                    batch_size,
-                                    batch_timeout,
-                                    &mut batch_id,
-                                    &mut batch_start_line,
-                                    &mut line_num,
-                                    &mut skipped_lines_count,
-                                    &mut filtered_lines,
-                                    skip_lines,
-                                    &input_format,
-                                    &ignore_lines,
-                                    &mut pending_deadline,
+                                    PlainLineContext {
+                                        batch_sender: &batch_sender,
+                                        current_batch: &mut current_batch,
+                                        batch_size,
+                                        batch_timeout,
+                                        batch_id: &mut batch_id,
+                                        batch_start_line: &mut batch_start_line,
+                                        line_num: &mut line_num,
+                                        skipped_lines_count: &mut skipped_lines_count,
+                                        filtered_lines: &mut filtered_lines,
+                                        skip_lines,
+                                        input_format: &input_format,
+                                        ignore_lines: &ignore_lines,
+                                        pending_deadline: &mut pending_deadline,
+                                    },
                                 )?;
                             }
                             Ok(LineMessage::Error { error, .. }) => return Err(error.into()),
@@ -956,19 +974,21 @@ impl ParallelProcessor {
                             Ok(LineMessage::Line { line, .. }) => {
                                 Self::handle_plain_line(
                                     line,
-                                    &batch_sender,
-                                    &mut current_batch,
-                                    batch_size,
-                                    batch_timeout,
-                                    &mut batch_id,
-                                    &mut batch_start_line,
-                                    &mut line_num,
-                                    &mut skipped_lines_count,
-                                    &mut filtered_lines,
-                                    skip_lines,
-                                    &input_format,
-                                    &ignore_lines,
-                                    &mut pending_deadline,
+                                    PlainLineContext {
+                                        batch_sender: &batch_sender,
+                                        current_batch: &mut current_batch,
+                                        batch_size,
+                                        batch_timeout,
+                                        batch_id: &mut batch_id,
+                                        batch_start_line: &mut batch_start_line,
+                                        line_num: &mut line_num,
+                                        skipped_lines_count: &mut skipped_lines_count,
+                                        filtered_lines: &mut filtered_lines,
+                                        skip_lines,
+                                        input_format: &input_format,
+                                        ignore_lines: &ignore_lines,
+                                        pending_deadline: &mut pending_deadline,
+                                    },
                                 )?;
                             }
                             Ok(LineMessage::Error { error, .. }) => return Err(error.into()),
@@ -1248,50 +1268,40 @@ impl ParallelProcessor {
         Ok(())
     }
 
-    fn handle_plain_line(
-        line: String,
-        batch_sender: &Sender<Batch>,
-        current_batch: &mut Vec<String>,
-        batch_size: usize,
-        batch_timeout: Duration,
-        batch_id: &mut u64,
-        batch_start_line: &mut usize,
-        line_num: &mut usize,
-        skipped_lines_count: &mut usize,
-        filtered_lines: &mut usize,
-        skip_lines: usize,
-        input_format: &crate::config::InputFormat,
-        ignore_lines: &Option<regex::Regex>,
-        pending_deadline: &mut Option<Instant>,
-    ) -> Result<()> {
-        *line_num += 1;
+    fn handle_plain_line(line: String, ctx: PlainLineContext<'_>) -> Result<()> {
+        *ctx.line_num += 1;
 
-        if *skipped_lines_count < skip_lines {
-            *skipped_lines_count += 1;
-            *filtered_lines += 1;
+        if *ctx.skipped_lines_count < ctx.skip_lines {
+            *ctx.skipped_lines_count += 1;
+            *ctx.filtered_lines += 1;
             return Ok(());
         }
 
-        if line.is_empty() && !matches!(input_format, crate::config::InputFormat::Line) {
+        if line.is_empty() && !matches!(ctx.input_format, crate::config::InputFormat::Line) {
             return Ok(());
         }
 
-        if let Some(ref ignore_regex) = ignore_lines {
+        if let Some(ignore_regex) = ctx.ignore_lines.as_ref() {
             if ignore_regex.is_match(&line) {
-                *filtered_lines += 1;
+                *ctx.filtered_lines += 1;
                 return Ok(());
             }
         }
 
-        current_batch.push(line);
+        ctx.current_batch.push(line);
 
-        if current_batch.len() >= batch_size || batch_timeout.is_zero() {
-            Self::send_batch(batch_sender, current_batch, *batch_id, *batch_start_line)?;
-            *batch_id += 1;
-            *batch_start_line = *line_num + 1;
-            *pending_deadline = None;
+        if ctx.current_batch.len() >= ctx.batch_size || ctx.batch_timeout.is_zero() {
+            Self::send_batch(
+                ctx.batch_sender,
+                ctx.current_batch,
+                *ctx.batch_id,
+                *ctx.batch_start_line,
+            )?;
+            *ctx.batch_id += 1;
+            *ctx.batch_start_line = *ctx.line_num + 1;
+            *ctx.pending_deadline = None;
         } else {
-            *pending_deadline = Some(Instant::now() + batch_timeout);
+            *ctx.pending_deadline = Some(Instant::now() + ctx.batch_timeout);
         }
 
         Ok(())

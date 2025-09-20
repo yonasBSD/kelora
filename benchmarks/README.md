@@ -12,7 +12,7 @@ make bench-quick
 make bench
 
 # Update performance baseline
-make bench-baseline
+make bench-update
 ```
 
 ## Benchmark Tests
@@ -51,7 +51,7 @@ make bench-quick
 ### Setting Baselines
 ```bash
 # After implementing optimizations
-make bench-baseline
+make bench-update
 ```
 
 ### CI Integration
@@ -99,7 +99,7 @@ The benchmark system automatically compares results against a baseline stored in
 2. **Make changes**: Implement optimizations or features
 3. **Test**: `make bench-quick` (verify no major regressions)
 4. **Full validation**: `make bench` (comprehensive test)
-5. **Update baseline**: `make bench-baseline` (if improvements are intentional)
+5. **Update baseline**: `make bench-update` (if improvements are intentional)
 
 ## File Structure
 
