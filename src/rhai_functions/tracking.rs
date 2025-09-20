@@ -7,6 +7,36 @@ thread_local! {
     pub static THREAD_TRACKING_STATE: RefCell<HashMap<String, Dynamic>> = RefCell::new(HashMap::new());
 }
 
+fn merge_numeric(existing: Option<Dynamic>, new_value: Dynamic) -> Dynamic {
+    let new_is_float = new_value.is_float();
+
+    if let Some(current) = existing {
+        let current_is_float = current.is_float();
+
+        if current_is_float || new_is_float {
+            let current_total = if current_is_float {
+                current.as_float().unwrap_or(0.0)
+            } else {
+                current.as_int().unwrap_or(0) as f64
+            };
+
+            let incoming = if new_is_float {
+                new_value.as_float().unwrap_or(0.0)
+            } else {
+                new_value.as_int().unwrap_or(0) as f64
+            };
+
+            Dynamic::from(current_total + incoming)
+        } else {
+            let current_total = current.as_int().unwrap_or(0);
+            let incoming = new_value.as_int().unwrap_or(0);
+            Dynamic::from(current_total + incoming)
+        }
+    } else {
+        new_value
+    }
+}
+
 /// Unified error tracking function that handles counts, samples, and verbose output
 /// This replaces both stats-based and tracking-based error mechanisms
 /// Note: This function has 8 parameters because it needs to handle diverse error contexts:
@@ -262,55 +292,46 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("track_count", |key: &str| {
         THREAD_TRACKING_STATE.with(|state| {
             let mut state = state.borrow_mut();
-            let count = state.get(key).cloned().unwrap_or(Dynamic::from(0i64));
-            let new_count = count.as_int().unwrap_or(0) + 1;
-            state.insert(key.to_string(), Dynamic::from(new_count));
+            let updated = merge_numeric(state.get(key).cloned(), Dynamic::from(1_i64));
+            state.insert(key.to_string(), updated);
             // Store operation type metadata for parallel merging
             state.insert(format!("__op_{}", key), Dynamic::from("count"));
         });
     });
 
-    engine.register_fn("track_count", |key: &str, delta: i64| {
+    engine.register_fn("track_sum", |key: &str, value: i64| {
         THREAD_TRACKING_STATE.with(|state| {
             let mut state = state.borrow_mut();
-            let count = state.get(key).cloned().unwrap_or(Dynamic::from(0i64));
-            let new_count = count.as_int().unwrap_or(0) + delta;
-            state.insert(key.to_string(), Dynamic::from(new_count));
-            // Store operation type metadata for parallel merging
-            state.insert(format!("__op_{}", key), Dynamic::from("count"));
+            let updated = merge_numeric(state.get(key).cloned(), Dynamic::from(value));
+            state.insert(key.to_string(), updated);
+            state.insert(format!("__op_{}", key), Dynamic::from("sum"));
         });
     });
 
-    engine.register_fn("track_count", |key: &str, delta: i32| {
+    engine.register_fn("track_sum", |key: &str, value: i32| {
         THREAD_TRACKING_STATE.with(|state| {
             let mut state = state.borrow_mut();
-            let count = state.get(key).cloned().unwrap_or(Dynamic::from(0i64));
-            let new_count = count.as_int().unwrap_or(0) + (delta as i64);
-            state.insert(key.to_string(), Dynamic::from(new_count));
-            // Store operation type metadata for parallel merging
-            state.insert(format!("__op_{}", key), Dynamic::from("count"));
+            let updated = merge_numeric(state.get(key).cloned(), Dynamic::from(value));
+            state.insert(key.to_string(), updated);
+            state.insert(format!("__op_{}", key), Dynamic::from("sum"));
         });
     });
 
-    engine.register_fn("track_count", |key: &str, delta: f64| {
+    engine.register_fn("track_sum", |key: &str, value: f64| {
         THREAD_TRACKING_STATE.with(|state| {
             let mut state = state.borrow_mut();
-            let count = state.get(key).cloned().unwrap_or(Dynamic::from(0i64));
-            let new_count = count.as_int().unwrap_or(0) + (delta as i64);
-            state.insert(key.to_string(), Dynamic::from(new_count));
-            // Store operation type metadata for parallel merging
-            state.insert(format!("__op_{}", key), Dynamic::from("count"));
+            let updated = merge_numeric(state.get(key).cloned(), Dynamic::from(value));
+            state.insert(key.to_string(), updated);
+            state.insert(format!("__op_{}", key), Dynamic::from("sum"));
         });
     });
 
-    engine.register_fn("track_count", |key: &str, delta: f32| {
+    engine.register_fn("track_sum", |key: &str, value: f32| {
         THREAD_TRACKING_STATE.with(|state| {
             let mut state = state.borrow_mut();
-            let count = state.get(key).cloned().unwrap_or(Dynamic::from(0i64));
-            let new_count = count.as_int().unwrap_or(0) + (delta as i64);
-            state.insert(key.to_string(), Dynamic::from(new_count));
-            // Store operation type metadata for parallel merging
-            state.insert(format!("__op_{}", key), Dynamic::from("count"));
+            let updated = merge_numeric(state.get(key).cloned(), Dynamic::from(value));
+            state.insert(key.to_string(), updated);
+            state.insert(format!("__op_{}", key), Dynamic::from("sum"));
         });
     });
 

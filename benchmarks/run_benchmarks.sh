@@ -25,7 +25,7 @@ get_test_cmd() {
             echo "benchmarks/bench_100k.jsonl --filter \"level == 'ERROR'\""
             ;;
         "medium_processing") 
-            echo "benchmarks/bench_500k.jsonl --filter \"component == 'api'\" --exec \"track_count('status_codes', status)\""
+            echo "benchmarks/bench_500k.jsonl --filter \"component == 'api'\" --exec \"track_sum('status_codes', status)\""
             ;;
         "large_parallel")
             echo "benchmarks/bench_500k.jsonl --filter \"response_time.sub_string(0,2).to_int() > 100\" --parallel --threads 4"

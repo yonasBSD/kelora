@@ -21,7 +21,7 @@ Kelora is a Rust log processor; this guide keeps contributions aligned with curr
 
 ## Testing Guidelines
 - Place focused unit tests in-module behind `#[cfg(test)]`; add scenario coverage in `tests/` named `<feature>_integration_test.rs`.
-- Run `cargo test --lib` for a quick pass, then `cargo test --test integration_tests` or `make test` before submitting changes.
+- Run `cargo test -q` or `make test` before submitting changes.
 - When output shifts, regenerate `help-screen.txt` via `cargo run -- --help > help-screen.txt` and refresh sample fixtures in `example_logs/` as needed.
 - Keep tests deterministic by leaning on `tempfile` or bundled fixtures instead of randomness.
 

@@ -904,9 +904,8 @@ impl RhaiEngine {
             "col" => "string, column_selector".to_string(),
             "cols" => "string, column_selectors...".to_string(),
             "status_class" => "status_code_number".to_string(),
-            "track_count" | "track_sum" | "track_min" | "track_max" | "track_avg" => {
-                "key, optional_value".to_string()
-            }
+            "track_count" => "key".to_string(),
+            "track_sum" | "track_min" | "track_max" | "track_avg" => "key, value".to_string(),
             "track_unique" => "key, value".to_string(),
             "track_bucket" => "key, value, bucket_size".to_string(),
             "count" => "string, substring".to_string(),

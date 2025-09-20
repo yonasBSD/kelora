@@ -76,7 +76,8 @@ DATETIME FUNCTIONS:
   dur.as_seconds(), dur.as_minutes()    Convert duration to numeric values
 
 TRACKING/METRICS FUNCTIONS:
-  track_count(key [, increment])        Increment counter for key (default: 1)
+  track_count(key)                      Increment counter for key by 1
+  track_sum(key, value)                 Accumulate numeric values for key
   track_min(key, value)                 Track minimum value for key
   track_max(key, value)                 Track maximum value for key
   track_unique(key, value)              Track unique values for key

@@ -469,8 +469,7 @@ fn run_pipeline_sequential_internal<W: Write>(
     let mut pending_deadline: Option<Instant> = None;
     let mut shutdown_requested = false;
     let mut immediate_shutdown = false;
-    let gap_marker_use_colors =
-        crate::tty::should_use_colors_with_mode(&config.output.color);
+    let gap_marker_use_colors = crate::tty::should_use_colors_with_mode(&config.output.color);
     let mut gap_tracker = config
         .output
         .mark_gaps

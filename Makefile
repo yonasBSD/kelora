@@ -13,11 +13,6 @@ build:
 # Run all tests
 test: test-unit test-integration
 
-# Run only unit tests
-test-unit:
-	@echo "🧪 Running unit tests..."
-	cargo test --lib
-
 # Run only integration tests
 test-integration:
 	@echo "🔄 Running integration tests..."

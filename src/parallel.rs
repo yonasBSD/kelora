@@ -216,6 +216,44 @@ impl GlobalTracker {
                             global.insert(key.clone(), Dynamic::from(a + b));
                             continue;
                         }
+                        let merged = if existing.is_float() || value.is_float() {
+                            let a = if existing.is_float() {
+                                existing.as_float().unwrap_or(0.0)
+                            } else {
+                                existing.as_int().unwrap_or(0) as f64
+                            };
+                            let b = if value.is_float() {
+                                value.as_float().unwrap_or(0.0)
+                            } else {
+                                value.as_int().unwrap_or(0) as f64
+                            };
+                            Dynamic::from(a + b)
+                        } else {
+                            value.clone()
+                        };
+                        global.insert(key.clone(), merged);
+                        continue;
+                    }
+                    "sum" => {
+                        let merged = if existing.is_float() || value.is_float() {
+                            let a = if existing.is_float() {
+                                existing.as_float().unwrap_or(0.0)
+                            } else {
+                                existing.as_int().unwrap_or(0) as f64
+                            };
+                            let b = if value.is_float() {
+                                value.as_float().unwrap_or(0.0)
+                            } else {
+                                value.as_int().unwrap_or(0) as f64
+                            };
+                            Dynamic::from(a + b)
+                        } else {
+                            let a = existing.as_int().unwrap_or(0);
+                            let b = value.as_int().unwrap_or(0);
+                            Dynamic::from(a + b)
+                        };
+                        global.insert(key.clone(), merged);
+                        continue;
                     }
                     "min" => {
                         // Take minimum
@@ -1934,11 +1972,11 @@ impl ParallelProcessor {
         // Write CSV header if needed (before any worker results)
         Self::write_csv_header_if_needed(output, config)?;
 
-        let gap_marker_use_colors =
-            crate::tty::should_use_colors_with_mode(&config.output.color);
-        let mut gap_tracker = config.output.mark_gaps.map(|threshold| {
-            GapTracker::new(threshold, gap_marker_use_colors)
-        });
+        let gap_marker_use_colors = crate::tty::should_use_colors_with_mode(&config.output.color);
+        let mut gap_tracker = config
+            .output
+            .mark_gaps
+            .map(|threshold| GapTracker::new(threshold, gap_marker_use_colors));
 
         if preserve_order {
             Self::pipeline_ordered_result_sink(

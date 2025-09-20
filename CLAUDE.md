@@ -27,7 +27,6 @@ cargo fmt --check
 
 # Run tests
 cargo test               # Unit and integration tests
-cargo test --lib         # Unit tests only
 cargo test --test integration_tests  # Integration tests only
 make test-full          # Comprehensive test suite
 ```
@@ -57,7 +56,7 @@ else
 fi
 
 # Clean automation with complete output suppression
-./target/release/kelora -qqq --exec 'track_count("errors", 1)' logs/*.json; echo "Exit code: $?"
+./target/release/kelora -qqq --exec 'track_count("errors")' logs/*.json; echo "Exit code: $?"
 ```
 
 ## Configuration System
@@ -493,7 +492,7 @@ kelora -qq suspicious.log || mail -s "Log errors detected" admin@company.com
     # Result: id=1 status='active' batch_name='batch1'
 
     # Count and track emitted events
-    kelora -f json --exec "e.item_count = emit_each(e.items); track_count('total_items', e.item_count)"
+    kelora -f json --exec "e.item_count = emit_each(e.items); track_sum('total_items', e.item_count)"
     ```
 - **Field and Event Removal**: Use unit `()` assignments for easy field and event removal:
   - `e.field = ()` - Remove individual fields from events

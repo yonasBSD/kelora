@@ -3696,7 +3696,7 @@ fn test_metrics_sequential_mode_basic() {
             "-f",
             "json",
             "--exec",
-            "track_count(\"total\"); track_count(\"level_\" + e.level)",
+            "track_count(\"total\"); track_count(\"level_\" + e.level); track_sum(\"message_length\", e.message.len())",
             "--metrics",
         ],
         input,
@@ -3720,6 +3720,10 @@ fn test_metrics_sequential_mode_basic() {
     assert!(
         stderr.contains("level_error  = 1"),
         "Should count error events"
+    );
+    assert!(
+        stderr.contains("message_length = 15"),
+        "Should sum message lengths"
     );
 
     // Check that main output still appears in stdout
@@ -3745,7 +3749,7 @@ fn test_metrics_parallel_mode_basic() {
             "-f",
             "json",
             "--exec",
-            "track_count(\"total\"); track_count(\"level_\" + e.level)",
+            "track_count(\"total\"); track_count(\"level_\" + e.level); track_sum(\"message_length\", e.message.len())",
             "--metrics",
             "--parallel",
             "--batch-size",
@@ -3776,6 +3780,10 @@ fn test_metrics_parallel_mode_basic() {
     assert!(
         stderr.contains("level_warn   = 1"),
         "Should count warn events across workers"
+    );
+    assert!(
+        stderr.contains("message_length = 20"),
+        "Should sum message lengths in parallel"
     );
 
     // Check that main output still appears in stdout
@@ -3833,6 +3841,43 @@ fn test_metrics_file_output() {
     assert!(
         !stderr.contains("Tracked metrics"),
         "Should not display metrics to stderr"
+    );
+}
+
+#[test]
+fn test_track_sum_handles_float_values() {
+    let input = r#"{"value":1.5}
+{"value":2}
+{"value":2.5}"#;
+
+    let temp_file = NamedTempFile::new().expect("Failed to create temp file");
+    let metrics_file_path = temp_file.path().to_str().unwrap();
+
+    let (_stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "track_sum(\"total_value\", e.value)",
+            "--metrics-file",
+            metrics_file_path,
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let metrics_content =
+        std::fs::read_to_string(metrics_file_path).expect("Failed to read metrics file");
+    let metrics_json: serde_json::Value =
+        serde_json::from_str(&metrics_content).expect("Metrics file should contain valid JSON");
+
+    let total_value = metrics_json["total_value"]
+        .as_f64()
+        .expect("Should have float sum");
+    assert!(
+        (total_value - 6.0).abs() < f64::EPSILON,
+        "Sum should match input values"
     );
 }
 
