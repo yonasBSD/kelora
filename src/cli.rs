@@ -466,3 +466,99 @@ impl Cli {
             .collect())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    fn parse_cli(args: &[String]) -> (Cli, ArgMatches) {
+        let matches = Cli::command()
+            .try_get_matches_from(args.iter().map(|s| s.as_str()))
+            .expect("failed to build matches");
+        let cli = Cli::parse_from(args.to_vec());
+        (cli, matches)
+    }
+
+    #[test]
+    fn ordered_script_stages_preserve_cli_sequence() {
+        let mut exec_file = NamedTempFile::new().expect("temp file");
+        writeln!(exec_file, "meta.count = meta.count + 1;").expect("write script");
+        let exec_path = exec_file.path().to_str().unwrap().to_string();
+
+        let args = vec![
+            "kelora".to_string(),
+            "--filter".to_string(),
+            "e.status >= 400".to_string(),
+            "-e".to_string(),
+            "e.alert = true;".to_string(),
+            "--filter".to_string(),
+            "e.status < 500".to_string(),
+            "-E".to_string(),
+            exec_path,
+        ];
+
+        let (cli, matches) = parse_cli(&args);
+        let stages = cli
+            .get_ordered_script_stages(&matches)
+            .expect("stages should be parsed");
+
+        assert_eq!(stages.len(), 4);
+        assert!(matches!(
+            &stages[0],
+            ScriptStageType::Filter(script) if script == "e.status >= 400"
+        ));
+        assert!(matches!(
+            &stages[1],
+            ScriptStageType::Exec(script) if script == "e.alert = true;"
+        ));
+        assert!(matches!(
+            &stages[2],
+            ScriptStageType::Filter(script) if script == "e.status < 500"
+        ));
+        assert!(matches!(&stages[3], ScriptStageType::Exec(script) if script.contains("meta.count")));
+    }
+
+    #[test]
+    fn ordered_script_stages_error_when_exec_file_missing() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let missing_path = std::env::temp_dir().join(format!(
+            "kelora-missing-{}-{}.rhai",
+            std::process::id(),
+            timestamp
+        ));
+        let _ = std::fs::remove_file(&missing_path);
+        let missing = missing_path.to_string_lossy().to_string();
+
+        let args = vec![
+            "kelora".to_string(),
+            "-E".to_string(),
+            missing.clone(),
+        ];
+
+        let (cli, matches) = parse_cli(&args);
+        let err = cli
+            .get_ordered_script_stages(&matches)
+            .expect_err("should report missing file");
+        assert!(err
+            .to_string()
+            .contains(&format!("Failed to read exec file '{}':", missing)));
+    }
+
+    #[test]
+    fn ordered_script_stages_empty_when_no_scripts_specified() {
+        let args = vec!["kelora".to_string()];
+        let (cli, matches) = parse_cli(&args);
+        let stages = cli
+            .get_ordered_script_stages(&matches)
+            .expect("empty stages should succeed");
+        assert!(stages.is_empty());
+    }
+}

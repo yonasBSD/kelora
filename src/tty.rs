@@ -53,3 +53,57 @@ pub fn get_terminal_width() -> usize {
         100 // Default fallback width as requested
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use once_cell::sync::Lazy;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+
+    struct EnvGuard {
+        vars: Vec<(&'static str, Option<String>)>,
+    }
+
+    impl EnvGuard {
+        fn new(keys: &[&'static str]) -> Self {
+            let vars = keys
+                .iter()
+                .map(|key| (*key, std::env::var(key).ok()))
+                .collect();
+            Self { vars }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            for (key, value) in &self.vars {
+                if let Some(v) = value {
+                    std::env::set_var(key, v);
+                } else {
+                    std::env::remove_var(key);
+                }
+            }
+        }
+    }
+
+    fn with_env_lock<F: FnOnce()>(keys: &[&'static str], f: F) {
+        let _lock = ENV_LOCK.lock().unwrap();
+        let _guard = EnvGuard::new(keys);
+        f();
+    }
+
+    #[test]
+    fn color_mode_never_disables_colors() {
+        assert!(!should_use_colors_with_mode(&ColorMode::Never));
+    }
+
+    #[test]
+    fn color_mode_always_overrides_no_color_environment() {
+        with_env_lock(&["NO_COLOR"], || {
+            std::env::set_var("NO_COLOR", "1");
+            assert!(should_use_colors_with_mode(&ColorMode::Always));
+        });
+    }
+}

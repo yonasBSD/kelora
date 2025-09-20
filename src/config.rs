@@ -855,3 +855,143 @@ impl From<FileOrder> for crate::FileOrder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cli::Cli;
+    use clap::Parser;
+    use once_cell::sync::Lazy;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+
+    struct EnvGuard {
+        vars: Vec<(&'static str, Option<String>)>,
+    }
+
+    impl EnvGuard {
+        fn new(keys: &[&'static str]) -> Self {
+            let vars = keys
+                .iter()
+                .map(|key| (*key, std::env::var(key).ok()))
+                .collect();
+            Self { vars }
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            for (key, value) in &self.vars {
+                if let Some(v) = value {
+                    std::env::set_var(key, v);
+                } else {
+                    std::env::remove_var(key);
+                }
+            }
+        }
+    }
+
+    fn with_env_lock<F: FnOnce()>(keys: &[&'static str], f: F) {
+        let _lock = ENV_LOCK.lock().unwrap();
+        let _guard = EnvGuard::new(keys);
+        f();
+    }
+
+    #[test]
+    fn determine_default_timezone_defaults_to_utc() {
+        with_env_lock(&["TZ"], || {
+            std::env::remove_var("TZ");
+            let cli = Cli::parse_from(["kelora"]);
+            let tz = super::determine_default_timezone(&cli);
+            assert_eq!(tz.as_deref(), Some("UTC"));
+        });
+    }
+
+    #[test]
+    fn determine_default_timezone_respects_cli_local() {
+        with_env_lock(&["TZ"], || {
+            std::env::remove_var("TZ");
+            let cli = Cli::parse_from(["kelora", "--input-tz", "local"]);
+            let tz = super::determine_default_timezone(&cli);
+            assert_eq!(tz, None);
+        });
+    }
+
+    #[test]
+    fn determine_default_timezone_prefers_cli_over_env() {
+        with_env_lock(&["TZ"], || {
+            std::env::set_var("TZ", "America/New_York");
+            let cli = Cli::parse_from(["kelora", "--input-tz", "Europe/Berlin"]);
+            let tz = super::determine_default_timezone(&cli);
+            assert_eq!(tz.as_deref(), Some("Europe/Berlin"));
+        });
+    }
+
+    #[test]
+    fn determine_default_timezone_uses_environment_when_present() {
+        with_env_lock(&["TZ"], || {
+            std::env::set_var("TZ", "Asia/Tokyo");
+            let cli = Cli::parse_from(["kelora"]);
+            let tz = super::determine_default_timezone(&cli);
+            assert_eq!(tz.as_deref(), Some("Asia/Tokyo"));
+        });
+    }
+
+    #[test]
+    fn format_error_message_respects_color_settings() {
+        with_env_lock(&["NO_COLOR", "NO_EMOJI", "FORCE_COLOR"], || {
+            std::env::remove_var("NO_COLOR");
+            std::env::remove_var("NO_EMOJI");
+            std::env::remove_var("FORCE_COLOR");
+
+            let mut config = KeloraConfig::default();
+            config.output.color = ColorMode::Always;
+            config.output.no_emoji = false;
+
+            let message = config.format_error_message("problem");
+            assert!(message.starts_with("🔸"));
+            assert!(message.ends_with("problem"));
+        });
+    }
+
+    #[test]
+    fn format_error_message_without_colors_falls_back_to_plain_prefix() {
+        let mut config = KeloraConfig::default();
+        config.output.color = ColorMode::Never;
+        config.output.no_emoji = true;
+
+        let message = config.format_error_message("issue");
+        assert_eq!(message, "kelora: issue");
+    }
+
+    #[test]
+    fn output_config_get_effective_keys_includes_core_fields() {
+        let mut config = KeloraConfig::default();
+        config.output.core = true;
+        config.output.keys = vec!["custom".to_string(), "ts".to_string()];
+
+        let keys = config.output.get_effective_keys();
+        let core = KeloraConfig::get_core_field_names();
+
+        for required in &core {
+            assert!(keys.contains(required), "missing core key {required}");
+        }
+        assert!(keys.contains(&"custom".to_string()));
+
+        let mut unique = keys.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(unique.len(), keys.len(), "keys should not contain duplicates");
+    }
+
+    #[test]
+    fn output_config_get_effective_keys_respects_non_core_mode() {
+        let mut config = KeloraConfig::default();
+        config.output.core = false;
+        config.output.keys = vec!["alpha".to_string(), "beta".to_string()];
+
+        let keys = config.output.get_effective_keys();
+        assert_eq!(keys, vec!["alpha".to_string(), "beta".to_string()]);
+    }
+}

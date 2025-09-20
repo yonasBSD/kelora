@@ -220,3 +220,63 @@ impl ProcessingStats {
         format!("Processing completed with {}", parts.join(", "))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn reset_thread_stats() {
+        THREAD_STATS.with(|stats| {
+            *stats.borrow_mut() = ProcessingStats::new();
+        });
+    }
+
+    #[test]
+    fn stats_counters_accumulate_expected_values() {
+        reset_thread_stats();
+
+        stats_add_line_read();
+        stats_add_line_filtered();
+        stats_add_line_output();
+        stats_add_event_created();
+        stats_add_event_output();
+        stats_add_event_filtered();
+        stats_add_error();
+
+        let stats = get_thread_stats();
+
+        assert_eq!(stats.lines_read, 1);
+        assert_eq!(stats.lines_filtered, 1);
+        assert_eq!(stats.lines_output, 1);
+        assert_eq!(stats.events_created, 1);
+        assert_eq!(stats.events_output, 1);
+        assert_eq!(stats.events_filtered, 1);
+        assert_eq!(stats.errors, 1);
+    }
+
+    #[test]
+    fn extract_discovered_from_tracking_loads_sets() {
+        let mut stats = ProcessingStats::new();
+        let mut tracking: HashMap<String, rhai::Dynamic> = HashMap::new();
+
+        let mut levels = rhai::Array::new();
+        levels.push(rhai::Dynamic::from("INFO"));
+        tracking.insert(
+            "__kelora_stats_discovered_levels".to_string(),
+            rhai::Dynamic::from(levels),
+        );
+
+        let mut keys = rhai::Array::new();
+        keys.push(rhai::Dynamic::from("request_id"));
+        tracking.insert(
+            "__kelora_stats_discovered_keys".to_string(),
+            rhai::Dynamic::from(keys),
+        );
+
+        stats.extract_discovered_from_tracking(&tracking);
+
+        assert!(stats.discovered_levels.contains("INFO"));
+        assert!(stats.discovered_keys.contains("request_id"));
+    }
+}
