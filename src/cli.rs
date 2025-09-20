@@ -27,6 +27,7 @@ pub enum OutputFormat {
     #[default]
     Default,
     Logfmt,
+    Inspect,
     Levelmap,
     Csv,
     Tsv,

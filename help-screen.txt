@@ -122,7 +122,7 @@ Output Options:
           Output format
           
           [default: default]
-          [possible values: json, default, logfmt, levelmap, csv, tsv, csvnh, tsvnh, none]
+          [possible values: json, default, logfmt, inspect, levelmap, csv, tsv, csvnh, tsvnh, none]
 
   -J
           Shortcut for -F json

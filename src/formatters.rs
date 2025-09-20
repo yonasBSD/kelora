@@ -678,6 +678,312 @@ impl pipeline::Formatter for HideFormatter {
     }
 }
 
+// Inspect formatter - detailed, type-aware introspection output
+pub struct InspectFormatter {
+    max_inline_chars: usize,
+}
+
+impl InspectFormatter {
+    const KEY_WIDTH_CAP: usize = 40;
+
+    pub fn new(verbosity: u8) -> Self {
+        // Gradually relax truncation with higher verbosity levels
+        let max_inline_chars = match verbosity {
+            0 => 80,
+            1 => 160,
+            _ => usize::MAX,
+        };
+
+        Self { max_inline_chars }
+    }
+
+    fn format_entries<'a, I>(&self, lines: &mut Vec<String>, entries: I, indent: usize)
+    where
+        I: IntoIterator<Item = (&'a str, &'a Dynamic)>,
+    {
+        // Collect to compute alignment without re-iterating source data
+        let collected: Vec<(&str, &Dynamic)> = entries.into_iter().collect();
+        if collected.is_empty() {
+            return;
+        }
+
+        let name_width = self.compute_key_width(collected.iter().map(|(k, _)| *k));
+        let type_width = self.compute_type_width(collected.iter().map(|(_, v)| *v));
+
+        for (key, value) in collected {
+            self.format_entry_with_width(lines, key, value, indent, name_width, type_width);
+        }
+    }
+
+    fn format_entry_with_width(
+        &self,
+        lines: &mut Vec<String>,
+        name: &str,
+        value: &Dynamic,
+        indent: usize,
+        name_width: usize,
+        type_width: usize,
+    ) {
+        if let Some(map) = value.clone().try_cast::<rhai::Map>() {
+            let entries: Vec<(String, Dynamic)> =
+                map.into_iter().map(|(k, v)| (k.into(), v)).collect();
+            let type_label = format!("map({})", entries.len());
+            self.push_line(
+                lines,
+                indent,
+                name,
+                name_width,
+                type_width,
+                &type_label,
+                "{",
+            );
+
+            if !entries.is_empty() {
+                let child_width = self.compute_key_width(entries.iter().map(|(k, _)| k.as_str()));
+                let child_type_width = self.compute_type_width(entries.iter().map(|(_, v)| v));
+                for (child_key, child_value) in &entries {
+                    self.format_entry_with_width(
+                        lines,
+                        child_key,
+                        child_value,
+                        indent + 1,
+                        child_width,
+                        child_type_width,
+                    );
+                }
+            }
+
+            lines.push(format!("{}{}", "  ".repeat(indent), "}"));
+        } else if let Some(array) = value.clone().try_cast::<rhai::Array>() {
+            let elements: Vec<Dynamic> = array.into_iter().collect();
+            let type_label = format!("array({})", elements.len());
+            self.push_line(
+                lines,
+                indent,
+                name,
+                name_width,
+                type_width,
+                &type_label,
+                "[",
+            );
+
+            if !elements.is_empty() {
+                let index_labels: Vec<String> =
+                    (0..elements.len()).map(|i| format!("[{}]", i)).collect();
+                let child_width = self.compute_key_width(index_labels.iter().map(|s| s.as_str()));
+                let child_type_width = self.compute_type_width(elements.iter());
+
+                for (idx, element) in elements.iter().enumerate() {
+                    let child_name = &index_labels[idx];
+                    self.format_entry_with_width(
+                        lines,
+                        child_name,
+                        element,
+                        indent + 1,
+                        child_width,
+                        child_type_width,
+                    );
+                }
+            }
+
+            lines.push(format!("{}{}", "  ".repeat(indent), "]"));
+        } else {
+            let (type_label, value_repr) = self.describe_scalar(value);
+            self.push_line(
+                lines,
+                indent,
+                name,
+                name_width,
+                type_width,
+                &type_label,
+                &value_repr,
+            );
+        }
+    }
+
+    fn push_line(
+        &self,
+        lines: &mut Vec<String>,
+        indent: usize,
+        name: &str,
+        name_width: usize,
+        type_width: usize,
+        type_label: &str,
+        value_repr: &str,
+    ) {
+        let indent_str = "  ".repeat(indent);
+        let name_cell = if name_width > 0 {
+            format!("{name:<width$}", name = name, width = name_width)
+        } else {
+            name.to_string()
+        };
+        let effective_type_width = type_width.max(type_label.len());
+        let type_cell = format!("{type_label:<width$}", width = effective_type_width);
+        lines.push(format!(
+            "{indent}{name_cell} | {type_cell} | {value}",
+            indent = indent_str,
+            name_cell = name_cell,
+            type_cell = type_cell,
+            value = value_repr
+        ));
+    }
+
+    fn compute_key_width<'a, I>(&self, keys: I) -> usize
+    where
+        I: Iterator<Item = &'a str>,
+    {
+        keys.map(|k| k.len())
+            .max()
+            .unwrap_or(0)
+            .min(Self::KEY_WIDTH_CAP)
+    }
+
+    fn compute_type_width<'a, I>(&self, values: I) -> usize
+    where
+        I: Iterator<Item = &'a Dynamic>,
+    {
+        values
+            .map(|value| self.type_label_for(value).len())
+            .max()
+            .unwrap_or(0)
+    }
+
+    fn type_label_for(&self, value: &Dynamic) -> String {
+        if let Some(map) = value.clone().try_cast::<rhai::Map>() {
+            return format!("map({})", map.len());
+        }
+        if let Some(array) = value.clone().try_cast::<rhai::Array>() {
+            return format!("array({})", array.len());
+        }
+        if value.is_string() {
+            return "string".to_string();
+        }
+        if value.is_bool() {
+            return "bool".to_string();
+        }
+        if value.is_int() {
+            return "int".to_string();
+        }
+        if value.is_float() {
+            return "float".to_string();
+        }
+        if value.is_char() {
+            return "char".to_string();
+        }
+        if value.is_unit() {
+            return "null".to_string();
+        }
+        value.type_name().to_string()
+    }
+
+    fn describe_scalar(&self, value: &Dynamic) -> (String, String) {
+        if value.is_string() {
+            if let Ok(inner) = value.clone().into_string() {
+                let escaped = self.escape_for_display(&inner);
+                let (truncated, was_truncated) = self.truncate_value(&escaped);
+                let mut rendered = format!("\"{}\"", truncated);
+                if was_truncated {
+                    rendered.push_str("...");
+                }
+                return ("string".to_string(), rendered);
+            }
+        }
+
+        if value.is_bool() {
+            if let Ok(b) = value.as_bool() {
+                return ("bool".to_string(), b.to_string());
+            }
+        }
+
+        if value.is_int() {
+            if let Ok(i) = value.as_int() {
+                return ("int".to_string(), i.to_string());
+            }
+        }
+
+        if value.is_float() {
+            if let Ok(f) = value.as_float() {
+                return ("float".to_string(), format!("{f}"));
+            }
+        }
+
+        if value.is_char() {
+            if let Ok(c) = value.as_char() {
+                return (
+                    "char".to_string(),
+                    format!("'{}'", self.escape_for_display(&c.to_string())),
+                );
+            }
+        }
+
+        if value.is_unit() {
+            return ("null".to_string(), "null".to_string());
+        }
+
+        // Fallback for other scalar types
+        let type_label = value.type_name().to_string();
+        let rendered = self.escape_for_display(&value.to_string());
+        let (truncated, was_truncated) = self.truncate_value(&rendered);
+        let mut repr = truncated;
+        if was_truncated {
+            repr.push_str("...");
+        }
+        (type_label, repr)
+    }
+
+    fn escape_for_display(&self, input: &str) -> String {
+        let mut escaped = String::with_capacity(input.len());
+        for ch in input.chars() {
+            match ch {
+                '\\' => escaped.push_str("\\\\"),
+                '\n' => escaped.push_str("\\n"),
+                '\r' => escaped.push_str("\\r"),
+                '\t' => escaped.push_str("\\t"),
+                c if c.is_control() => {
+                    escaped.push_str(&format!("\\x{:02X}", c as u32));
+                }
+                c => escaped.push(c),
+            }
+        }
+        escaped
+    }
+
+    fn truncate_value(&self, value: &str) -> (String, bool) {
+        if self.max_inline_chars == usize::MAX || value.chars().count() <= self.max_inline_chars {
+            return (value.to_string(), false);
+        }
+
+        let mut truncated = String::new();
+        let mut count = 0;
+        for ch in value.chars() {
+            if count >= self.max_inline_chars {
+                break;
+            }
+            truncated.push(ch);
+            count += 1;
+        }
+
+        (truncated, true)
+    }
+}
+
+impl pipeline::Formatter for InspectFormatter {
+    fn format(&self, event: &Event) -> String {
+        if event.fields.is_empty() {
+            return "---".to_string();
+        }
+
+        let mut lines = Vec::new();
+        self.format_entries(
+            &mut lines,
+            event.fields.iter().map(|(k, v)| (k.as_str(), v)),
+            0,
+        );
+        lines.insert(0, "---".to_string());
+        lines.join("\n")
+    }
+}
+
 /// Sanitize a field key to ensure logfmt compliance
 ///
 /// The logfmt specification requires keys to:
@@ -1227,6 +1533,13 @@ impl pipeline::Formatter for CsvFormatter {
 mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
+    use rhai::Map;
+
+    fn parts(line: &str) -> Vec<String> {
+        line.split('|')
+            .map(|segment| segment.trim().to_string())
+            .collect()
+    }
 
     #[test]
     fn test_json_formatter_empty_event() {
@@ -1251,6 +1564,103 @@ mod tests {
         assert!(result.contains("\"msg\":\"Test message\""));
         assert!(result.contains("\"user\":\"alice\""));
         assert!(result.contains("\"status\":200"));
+    }
+
+    #[test]
+    fn test_inspect_formatter_basic() {
+        let mut event = Event::default();
+        event.set_field("message".to_string(), Dynamic::from("hello"));
+        event.set_field("code".to_string(), Dynamic::from(42_i64));
+        event.set_field("active".to_string(), Dynamic::from(true));
+
+        let formatter = InspectFormatter::new(0);
+        let output = formatter.format(&event);
+        let lines: Vec<&str> = output.lines().collect();
+        assert_eq!(lines[0], "---");
+        assert_eq!(lines.len(), 4);
+        assert_eq!(
+            parts(lines[1]),
+            vec![
+                "message".to_string(),
+                "string".to_string(),
+                "\"hello\"".to_string()
+            ]
+        );
+        assert_eq!(
+            parts(lines[2]),
+            vec!["code".to_string(), "int".to_string(), "42".to_string()]
+        );
+        assert_eq!(
+            parts(lines[3]),
+            vec!["active".to_string(), "bool".to_string(), "true".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_inspect_formatter_nested_structure() {
+        let mut inner = Map::new();
+        inner.insert("id".into(), Dynamic::from(7_i64));
+        inner.insert("name".into(), Dynamic::from("alpha"));
+
+        let mut event = Event::default();
+        event.set_field("meta".to_string(), Dynamic::from(inner));
+
+        let formatter = InspectFormatter::new(0);
+        let output = formatter.format(&event);
+        let lines: Vec<&str> = output.lines().collect();
+        assert_eq!(lines[0], "---");
+        assert_eq!(lines.len(), 5);
+        assert_eq!(
+            parts(lines[1]),
+            vec!["meta".to_string(), "map(2)".to_string(), "{".to_string()]
+        );
+        assert_eq!(
+            parts(lines[2]),
+            vec!["id".to_string(), "int".to_string(), "7".to_string()]
+        );
+        assert_eq!(
+            parts(lines[3]),
+            vec![
+                "name".to_string(),
+                "string".to_string(),
+                "\"alpha\"".to_string()
+            ]
+        );
+        assert_eq!(lines[4], "}");
+    }
+
+    #[test]
+    fn test_inspect_formatter_truncates_long_values() {
+        let long_value = "a".repeat(120);
+        let mut event = Event::default();
+        event.set_field("payload".to_string(), Dynamic::from(long_value.clone()));
+
+        let formatter = InspectFormatter::new(0);
+        let output = formatter.format(&event);
+        let lines: Vec<&str> = output.lines().collect();
+        assert_eq!(lines[0], "---");
+        assert_eq!(lines.len(), 2);
+        let expected_truncated = format!("\"{}\"...", "a".repeat(80));
+        assert_eq!(
+            parts(lines[1]),
+            vec![
+                "payload".to_string(),
+                "string".to_string(),
+                expected_truncated.clone()
+            ]
+        );
+
+        let verbose_formatter = InspectFormatter::new(2);
+        let verbose_output = verbose_formatter.format(&event);
+        let verbose_lines: Vec<&str> = verbose_output.lines().collect();
+        assert_eq!(verbose_lines[0], "---");
+        assert_eq!(verbose_lines.len(), 2);
+        let expected_full = format!("\"{}\"", long_value);
+        assert_eq!(
+            parts(verbose_lines[1]),
+            vec!["payload".to_string(), "string".to_string(), expected_full]
+        );
+        assert!(verbose_output.len() > output.len());
     }
 
     #[test]

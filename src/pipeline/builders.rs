@@ -225,6 +225,9 @@ impl PipelineBuilder {
                     self.config.wrap,
                 ))
             }
+            crate::OutputFormat::Inspect => Box::new(crate::formatters::InspectFormatter::new(
+                self.config.verbose,
+            )),
             crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
             crate::OutputFormat::Levelmap => {
                 Box::new(crate::formatters::LevelmapFormatter::new(use_colors))
@@ -496,6 +499,9 @@ impl PipelineBuilder {
                     self.config.wrap,
                 ))
             }
+            crate::OutputFormat::Inspect => Box::new(crate::formatters::InspectFormatter::new(
+                self.config.verbose,
+            )),
             crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
             crate::OutputFormat::Levelmap => {
                 Box::new(crate::formatters::LevelmapFormatter::new(use_colors))
