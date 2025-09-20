@@ -649,7 +649,15 @@ impl GapTracker {
         let seconds = total_seconds % 60;
         let micros = std_duration.subsec_micros();
 
-        let time_label = format!("{}:{:02}:{:02}.{:06}", hours, minutes, seconds, micros);
+        let time_label = if micros == 0 {
+            format!("{}:{:02}:{:02}", hours, minutes, seconds)
+        } else {
+            let mut fractional = format!("{:06}", micros);
+            while fractional.ends_with('0') {
+                fractional.pop();
+            }
+            format!("{}:{:02}:{:02}.{}", hours, minutes, seconds, fractional)
+        };
         let label = format!(" time gap: {} ", time_label);
 
         let blue = "\x1b[34m";
@@ -2412,7 +2420,7 @@ mod tests {
         let marker = tracker.check(second).expect("marker line");
         assert!(marker.starts_with('_'));
         assert!(marker.ends_with('_'));
-        assert!(marker.contains("time gap: 2:00:00.000000"));
+        assert!(marker.contains("time gap: 2:00:00"));
     }
 
     #[test]
@@ -2437,7 +2445,7 @@ mod tests {
 
         let third = Some(Utc.with_ymd_and_hms(2024, 2, 5, 13, 0, 0).unwrap());
         let marker = tracker.check(third).expect("marker line");
-        assert!(marker.contains("time gap: 1:00:00.000000"));
+        assert!(marker.contains("time gap: 1:00:00"));
         assert!(marker.starts_with('_'));
     }
 
@@ -2467,6 +2475,18 @@ mod tests {
         assert!(marker.starts_with("\x1b[34m_"));
         let reset_index = marker.rfind("\x1b[0m").expect("reset sequence");
         assert!(marker[..reset_index].ends_with('_'));
-        assert!(marker.contains("time gap: 2:00:00.000000"));
+        assert!(marker.contains("time gap: 2:00:00"));
+    }
+
+    #[test]
+    fn test_gap_tracker_formats_fractional_microseconds_compactly() {
+        let mut tracker = GapTracker::new(ChronoDuration::milliseconds(1), false);
+
+        let first = Some(Utc.with_ymd_and_hms(2024, 2, 5, 11, 0, 0).unwrap());
+        let second = first.map(|ts| ts + ChronoDuration::microseconds(1_230_000));
+
+        assert!(tracker.check(first).is_none());
+        let marker = tracker.check(second).expect("fractional marker");
+        assert!(marker.contains("time gap: 0:00:01.23"));
     }
 }
