@@ -563,3 +563,7 @@ kelora -qq suspicious.log || mail -s "Log errors detected" admin@company.com
   - 🔸 (small orange diamond) for errors: error messages, warnings, failures
   - Avoid doubled emoji by ensuring only the final formatting function adds the prefix
   - Use `--no-emoji` flag to disable emoji output when needed
+
+  ## No Backwards Compatiblity
+
+Do not care for backwards compatiblity.

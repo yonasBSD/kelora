@@ -30,3 +30,7 @@ Kelora is a Rust log processor; this guide keeps contributions aligned with curr
 - PRs need a summary of behavior changes, testing evidence, and notes about new flags, Rhai APIs, or performance considerations.
 - Attach before/after CLI snippets when formatting shifts and mention any updated docs or benchmarking results.
 - Coordinate major parser or engine adjustments with maintainers early, especially if they affect `benchmarks/` expectations or default outputs.
+
+## No Backwards Compatiblity
+
+Do not care for backwards compatiblity.
