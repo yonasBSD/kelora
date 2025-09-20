@@ -21,9 +21,11 @@ make bench-quick              # Quick benchmarks (10k dataset)
 make bench                    # Full benchmark suite (10k + 50k datasets)
 make bench-update             # Refresh the stored baseline intentionally
 
-# Run lint and formatting
+# Run formatting, lint, and dependency policy checks
 make fmt
 make lint
+make audit
+make deny
 make check
 
 # Run tests

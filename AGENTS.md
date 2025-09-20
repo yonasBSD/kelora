@@ -11,7 +11,7 @@ Kelora is a Rust log processor; this guide keeps contributions aligned with curr
 ## Build, Test, and Development Commands
 - `cargo build --release` or `cargo run -- <flags>` produce local binaries for smoke testing.
 - `make test`, `make test-unit`, and `make test-integration` wrap targeted `cargo test` runs for faster iteration.
-- `make fmt`, `make lint`, and `make check` enforce formatting plus `cargo clippy -- -D warnings`.
+- `make fmt`, `make lint`, `make audit`, and `make deny` keep formatting, linting, and supply-chain policy clean; `make check` runs the whole bundle.
 - `make bench-quick` samples hot paths; use `make bench` for the full suite and `make bench-update` when you intentionally refresh the stored baseline.
 
 ## Coding Style & Naming Conventions

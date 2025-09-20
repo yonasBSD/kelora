@@ -1,4 +1,4 @@
-.PHONY: fmt lint check test test-unit test-integration bench bench-quick bench-update
+.PHONY: fmt lint audit deny check test test-unit test-integration bench bench-quick bench-update
 
 fmt:
 	cargo fmt --all
@@ -16,12 +16,22 @@ test-integration:
 	cargo test -q --tests
 
 audit:
-	cargo audit
+	cargo audit --no-fetch
 
-deny-check:
-	cargo deny check
+deny:
+	mkdir -p .cargo-deny
+	mkdir -p target
+	@if [ -d "$$HOME/.cargo/advisory-dbs" ]; then \
+		rm -rf .cargo-deny/advisory-dbs; \
+		cp -R "$$HOME/.cargo/advisory-dbs" .cargo-deny/; \
+	fi
+	cargo metadata --offline --format-version 1 > target/cargo-deny-metadata.json
+	CARGO_HOME=$(PWD)/.cargo-deny \
+	CARGO_DENY_HOME=$(PWD)/.cargo-deny \
+	CARGO_NET_OFFLINE=true \
+	cargo deny check --disable-fetch --metadata-path target/cargo-deny-metadata.json
 
-check: fmt lint audit deny-check test
+check: fmt lint audit deny test
 
 bench:
 	./benchmarks/run_benchmarks.sh

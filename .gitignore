@@ -1,4 +1,6 @@
 .vscode
 target/
+.cargo/
+.cargo-deny/
 .DS_Store
 myexamples
