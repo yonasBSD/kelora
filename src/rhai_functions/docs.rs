@@ -100,6 +100,13 @@ UTILITY FUNCTIONS:
   eprint(message)                       Print to stderr (suppressed with -qqq)
   get_env(var [, default])              Get environment variable with optional default
   parse_kv(text [, sep [, kv_sep]])     Parse key-value pairs from text
+  parse_url(text)                       Parse URL into structured components
+  parse_path(text)                      Parse filesystem path into components
+  parse_email(text)                     Parse email address into parts
+  parse_syslog(text)                    Parse syslog line into structured fields
+  parse_cef(text)                       Parse Common Event Format line into fields
+  parse_logfmt(text)                    Parse logfmt line into structured fields
+  parse_combined(text)                  Parse Apache/Nginx combined log line
   read_file(path)                       Read file contents as string
   read_lines(path)                      Read file as array of lines
   exit(code)                            Exit kelora with given exit code

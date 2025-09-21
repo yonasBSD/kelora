@@ -1,5 +1,11 @@
+use crate::event::Event;
+use crate::parsers::{CefParser, CombinedParser, LogfmtParser, SyslogParser};
+use crate::pipeline::EventParser;
+use once_cell::sync::Lazy;
 use rhai::{Array, Dynamic, Engine, Map};
 use std::cell::RefCell;
+use std::path::Path;
+use url::{Host, Url};
 
 /// Represents a captured message with its target stream
 #[derive(Debug, Clone)]
@@ -14,6 +20,277 @@ thread_local! {
     static CAPTURED_MESSAGES: RefCell<Vec<CapturedMessage>> = const { RefCell::new(Vec::new()) };
     static PARALLEL_MODE: RefCell<bool> = const { RefCell::new(false) };
     static SUPPRESS_SIDE_EFFECTS: RefCell<bool> = const { RefCell::new(false) };
+}
+
+static LOGFMT_PARSER: Lazy<LogfmtParser> = Lazy::new(LogfmtParser::new);
+static SYSLOG_PARSER: Lazy<SyslogParser> =
+    Lazy::new(|| SyslogParser::new().expect("failed to initialize syslog parser"));
+static CEF_PARSER: Lazy<CefParser> = Lazy::new(CefParser::new);
+static COMBINED_PARSER: Lazy<CombinedParser> =
+    Lazy::new(|| CombinedParser::new().expect("failed to initialize combined parser"));
+
+fn event_to_map(event: Event) -> Map {
+    let mut map = Map::new();
+    for (key, value) in event.fields {
+        map.insert(key.into(), value);
+    }
+    map
+}
+
+fn parse_event_with<P>(parser: &P, line: &str) -> Map
+where
+    P: EventParser,
+{
+    parser
+        .parse(line)
+        .map(event_to_map)
+        .unwrap_or_else(|_| Map::new())
+}
+
+fn parse_url_impl(input: &str) -> Map {
+    let mut map = Map::new();
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return map;
+    }
+
+    if let Ok(parsed) = Url::parse(trimmed) {
+        map.insert("scheme".into(), Dynamic::from(parsed.scheme().to_string()));
+
+        if !parsed.username().is_empty() {
+            map.insert(
+                "username".into(),
+                Dynamic::from(parsed.username().to_string()),
+            );
+        }
+
+        if let Some(password) = parsed.password() {
+            map.insert("password".into(), Dynamic::from(password.to_string()));
+        }
+
+        match parsed.host() {
+            Some(Host::Domain(domain)) => {
+                let domain_str = domain.to_string();
+                map.insert("host".into(), Dynamic::from(domain_str.clone()));
+                map.insert("domain".into(), Dynamic::from(domain_str));
+                map.insert("host_type".into(), Dynamic::from("domain".to_string()));
+            }
+            Some(Host::Ipv4(addr)) => {
+                map.insert("host".into(), Dynamic::from(addr.to_string()));
+                map.insert("host_type".into(), Dynamic::from("ipv4".to_string()));
+            }
+            Some(Host::Ipv6(addr)) => {
+                map.insert("host".into(), Dynamic::from(addr.to_string()));
+                map.insert("host_type".into(), Dynamic::from("ipv6".to_string()));
+            }
+            None => {}
+        }
+
+        if let Some(port) = parsed.port() {
+            map.insert("port".into(), Dynamic::from(port as i64));
+        }
+
+        map.insert("path".into(), Dynamic::from(parsed.path().to_string()));
+
+        if let Some(query) = parsed.query() {
+            map.insert("query".into(), Dynamic::from(query.to_string()));
+
+            let mut pairs = Array::new();
+            for (key, value) in parsed.query_pairs() {
+                let mut entry = Map::new();
+                entry.insert("key".into(), Dynamic::from(key.into_owned()));
+                entry.insert("value".into(), Dynamic::from(value.into_owned()));
+                pairs.push(Dynamic::from(entry));
+            }
+            if !pairs.is_empty() {
+                map.insert("query_pairs".into(), Dynamic::from(pairs));
+            }
+        }
+
+        if let Some(fragment) = parsed.fragment() {
+            map.insert("fragment".into(), Dynamic::from(fragment.to_string()));
+        }
+
+        if let Some(segments) = parsed.path_segments() {
+            let mut segment_array = Array::new();
+            for segment in segments {
+                if !segment.is_empty() {
+                    segment_array.push(Dynamic::from(segment.to_string()));
+                }
+            }
+            if !segment_array.is_empty() {
+                map.insert("segments".into(), Dynamic::from(segment_array));
+            }
+        }
+
+        if let Some(host) = parsed.host_str() {
+            if let Some(pos) = host.rfind('.') {
+                let tld = &host[pos + 1..];
+                if !tld.is_empty() {
+                    map.insert("tld".into(), Dynamic::from(tld.to_string()));
+                }
+            }
+        }
+    }
+
+    map
+}
+
+fn parse_path_impl(input: &str) -> Map {
+    let mut map = Map::new();
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return map;
+    }
+
+    let path = Path::new(trimmed);
+
+    map.insert("input".into(), Dynamic::from(trimmed.to_string()));
+    map.insert("is_absolute".into(), Dynamic::from(path.is_absolute()));
+    map.insert("is_relative".into(), Dynamic::from(path.is_relative()));
+    map.insert("has_root".into(), Dynamic::from(path.has_root()));
+
+    if let Some(parent) = path.parent() {
+        let parent_str = parent.to_string_lossy().to_string();
+        if !parent_str.is_empty() {
+            map.insert("parent".into(), Dynamic::from(parent_str));
+        }
+    }
+
+    if let Some(file_name) = path.file_name() {
+        map.insert(
+            "file_name".into(),
+            Dynamic::from(file_name.to_string_lossy().to_string()),
+        );
+    }
+
+    if let Some(stem) = path.file_stem() {
+        map.insert(
+            "stem".into(),
+            Dynamic::from(stem.to_string_lossy().to_string()),
+        );
+    }
+
+    if let Some(ext) = path.extension() {
+        map.insert(
+            "extension".into(),
+            Dynamic::from(ext.to_string_lossy().to_string()),
+        );
+    }
+
+    let mut components_array = Array::new();
+    let mut prefix_value: Option<String> = None;
+    let mut root_value: Option<String> = None;
+
+    for component in path.components() {
+        use std::path::Component;
+
+        let display = component.as_os_str().to_string_lossy().to_string();
+        match component {
+            Component::Prefix(prefix) => {
+                let value = prefix.as_os_str().to_string_lossy().to_string();
+                if prefix_value.is_none() {
+                    prefix_value = Some(value.clone());
+                }
+                components_array.push(Dynamic::from(value));
+            }
+            Component::RootDir => {
+                if root_value.is_none() {
+                    root_value = Some(display.clone());
+                }
+                components_array.push(Dynamic::from(display));
+            }
+            Component::CurDir | Component::ParentDir | Component::Normal(_) => {
+                components_array.push(Dynamic::from(display));
+            }
+        }
+    }
+
+    if !components_array.is_empty() {
+        map.insert("components".into(), Dynamic::from(components_array));
+    }
+
+    if let Some(prefix) = prefix_value {
+        map.insert("prefix".into(), Dynamic::from(prefix));
+    }
+
+    if let Some(root) = root_value {
+        map.insert("root".into(), Dynamic::from(root));
+    }
+
+    map
+}
+
+fn parse_email_impl(input: &str) -> Map {
+    let mut map = Map::new();
+    let trimmed = input.trim();
+    if trimmed.is_empty() || trimmed.contains(' ') {
+        return map;
+    }
+
+    let mut parts = trimmed.split('@');
+    let local = parts.next().unwrap_or_default();
+    let domain = parts.next().unwrap_or_default();
+
+    // Ensure exactly one '@' and both sides populated
+    if local.is_empty() || domain.is_empty() || parts.next().is_some() {
+        return map;
+    }
+
+    if domain.starts_with('.')
+        || domain.ends_with('.')
+        || !domain.contains('.')
+        || domain.split('.').any(|label| label.is_empty())
+    {
+        return map;
+    }
+
+    map.insert("address".into(), Dynamic::from(trimmed.to_string()));
+    map.insert("local".into(), Dynamic::from(local.to_string()));
+    map.insert("domain".into(), Dynamic::from(domain.to_string()));
+
+    let labels: Vec<&str> = domain.split('.').collect();
+    if let Some(tld) = labels.last() {
+        map.insert("tld".into(), Dynamic::from((*tld).to_string()));
+    }
+
+    if labels.len() >= 2 {
+        let root = labels[labels.len() - 2..].join(".");
+        map.insert("root".into(), Dynamic::from(root));
+    }
+
+    if labels.len() > 2 {
+        let subdomain = labels[..labels.len() - 2].join(".");
+        if !subdomain.is_empty() {
+            map.insert("subdomain".into(), Dynamic::from(subdomain));
+        }
+    }
+
+    let mut labels_array = Array::new();
+    for label in labels {
+        labels_array.push(Dynamic::from(label.to_string()));
+    }
+    if !labels_array.is_empty() {
+        map.insert("domain_parts".into(), Dynamic::from(labels_array));
+    }
+
+    map
+}
+
+fn parse_syslog_impl(line: &str) -> Map {
+    parse_event_with(&*SYSLOG_PARSER, line)
+}
+
+fn parse_cef_impl(line: &str) -> Map {
+    parse_event_with(&*CEF_PARSER, line)
+}
+
+fn parse_logfmt_impl(line: &str) -> Map {
+    parse_event_with(&*LOGFMT_PARSER, line)
+}
+
+fn parse_combined_impl(line: &str) -> Map {
+    parse_event_with(&*COMBINED_PARSER, line)
 }
 
 /// Capture a print statement in thread-local storage for parallel processing
@@ -366,6 +643,15 @@ pub fn register_functions(engine: &mut Engine) {
             String::new()
         }
     });
+
+    // Structured parsing helpers
+    engine.register_fn("parse_url", parse_url_impl);
+    engine.register_fn("parse_path", parse_path_impl);
+    engine.register_fn("parse_email", parse_email_impl);
+    engine.register_fn("parse_syslog", parse_syslog_impl);
+    engine.register_fn("parse_cef", parse_cef_impl);
+    engine.register_fn("parse_logfmt", parse_logfmt_impl);
+    engine.register_fn("parse_combined", parse_combined_impl);
 
     // Parse key-value pairs from a string (like logfmt)
     engine.register_fn("parse_kv", |text: &str| -> rhai::Map {
@@ -1011,6 +1297,371 @@ mod tests {
             .eval_with_scope(&mut scope, r#"text.ending_with("hello")"#)
             .unwrap();
         assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_parse_url_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push(
+            "url",
+            "https://user:pass@example.com:8443/path/to/page?foo=bar&baz=qux#frag",
+        );
+
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_url(url)"#)
+            .unwrap();
+
+        assert_eq!(
+            result.get("scheme").unwrap().clone().into_string().unwrap(),
+            "https"
+        );
+        assert_eq!(
+            result
+                .get("username")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "user"
+        );
+        assert_eq!(
+            result
+                .get("password")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "pass"
+        );
+        assert_eq!(
+            result.get("host").unwrap().clone().into_string().unwrap(),
+            "example.com"
+        );
+        assert_eq!(
+            result
+                .get("host_type")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "domain"
+        );
+        assert_eq!(result.get("port").unwrap().as_int().unwrap(), 8443);
+        assert_eq!(
+            result.get("path").unwrap().clone().into_string().unwrap(),
+            "/path/to/page"
+        );
+        assert_eq!(
+            result
+                .get("fragment")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "frag"
+        );
+        assert_eq!(
+            result.get("tld").unwrap().clone().into_string().unwrap(),
+            "com"
+        );
+
+        let segments = result
+            .get("segments")
+            .unwrap()
+            .clone()
+            .into_array()
+            .unwrap();
+        let segment_strings: Vec<String> = segments
+            .into_iter()
+            .map(|item| item.into_string().unwrap())
+            .collect();
+        assert_eq!(segment_strings, vec!["path", "to", "page"]);
+
+        let query_pairs = result
+            .get("query_pairs")
+            .unwrap()
+            .clone()
+            .into_array()
+            .unwrap();
+        assert_eq!(query_pairs.len(), 2);
+
+        let first_pair = query_pairs[0].clone().try_cast::<rhai::Map>().unwrap();
+        assert_eq!(
+            first_pair
+                .get("key")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "foo"
+        );
+        assert_eq!(
+            first_pair
+                .get("value")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "bar"
+        );
+
+        let second_pair = query_pairs[1].clone().try_cast::<rhai::Map>().unwrap();
+        assert_eq!(
+            second_pair
+                .get("key")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "baz"
+        );
+        assert_eq!(
+            second_pair
+                .get("value")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "qux"
+        );
+    }
+
+    #[test]
+    fn test_parse_path_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push("path", "logs/app.log");
+
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_path(path)"#)
+            .unwrap();
+
+        assert_eq!(
+            result.get("input").unwrap().clone().into_string().unwrap(),
+            "logs/app.log"
+        );
+        assert_eq!(result.get("is_absolute").unwrap().as_bool().unwrap(), false);
+        assert_eq!(result.get("is_relative").unwrap().as_bool().unwrap(), true);
+        assert_eq!(result.get("has_root").unwrap().as_bool().unwrap(), false);
+        assert_eq!(
+            result.get("parent").unwrap().clone().into_string().unwrap(),
+            "logs"
+        );
+        assert_eq!(
+            result
+                .get("file_name")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "app.log"
+        );
+        assert_eq!(
+            result.get("stem").unwrap().clone().into_string().unwrap(),
+            "app"
+        );
+        assert_eq!(
+            result
+                .get("extension")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "log"
+        );
+
+        let components = result
+            .get("components")
+            .unwrap()
+            .clone()
+            .into_array()
+            .unwrap();
+        let component_strings: Vec<String> = components
+            .into_iter()
+            .map(|item| item.into_string().unwrap())
+            .collect();
+        assert_eq!(component_strings, vec!["logs", "app.log"]);
+    }
+
+    #[test]
+    fn test_parse_email_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push("email", "user.name+tag@example.co.uk");
+
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_email(email)"#)
+            .unwrap();
+
+        assert_eq!(
+            result
+                .get("address")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "user.name+tag@example.co.uk"
+        );
+        assert_eq!(
+            result.get("local").unwrap().clone().into_string().unwrap(),
+            "user.name+tag"
+        );
+        assert_eq!(
+            result.get("domain").unwrap().clone().into_string().unwrap(),
+            "example.co.uk"
+        );
+        assert_eq!(
+            result.get("tld").unwrap().clone().into_string().unwrap(),
+            "uk"
+        );
+        assert_eq!(
+            result.get("root").unwrap().clone().into_string().unwrap(),
+            "co.uk"
+        );
+        assert_eq!(
+            result
+                .get("subdomain")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "example"
+        );
+
+        let domain_parts = result
+            .get("domain_parts")
+            .unwrap()
+            .clone()
+            .into_array()
+            .unwrap();
+        let parts: Vec<String> = domain_parts
+            .into_iter()
+            .map(|item| item.into_string().unwrap())
+            .collect();
+        assert_eq!(parts, vec!["example", "co", "uk"]);
+    }
+
+    #[test]
+    fn test_parse_syslog_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push(
+            "line",
+            "<34>1 2023-10-11T22:14:15.003Z server01 app - - - Test message",
+        );
+
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_syslog(line)"#)
+            .unwrap();
+
+        assert_eq!(result.get("pri").unwrap().as_int().unwrap(), 34);
+        assert_eq!(result.get("facility").unwrap().as_int().unwrap(), 4);
+        assert_eq!(result.get("severity").unwrap().as_int().unwrap(), 2);
+        assert_eq!(
+            result.get("host").unwrap().clone().into_string().unwrap(),
+            "server01"
+        );
+        assert_eq!(
+            result.get("prog").unwrap().clone().into_string().unwrap(),
+            "app"
+        );
+        assert_eq!(
+            result.get("msg").unwrap().clone().into_string().unwrap(),
+            "Test message"
+        );
+    }
+
+    #[test]
+    fn test_parse_cef_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push(
+            "line",
+            "CEF:0|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232",
+        );
+
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_cef(line)"#)
+            .unwrap();
+
+        assert_eq!(
+            result.get("vendor").unwrap().clone().into_string().unwrap(),
+            "Security"
+        );
+        assert_eq!(
+            result
+                .get("product")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "threatmanager"
+        );
+        assert_eq!(
+            result.get("src").unwrap().clone().into_string().unwrap(),
+            "10.0.0.1"
+        );
+        assert_eq!(result.get("spt").unwrap().as_int().unwrap(), 1232);
+    }
+
+    #[test]
+    fn test_parse_logfmt_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push("line", "level=info message=hello count=5");
+
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_logfmt(line)"#)
+            .unwrap();
+
+        assert_eq!(
+            result.get("level").unwrap().clone().into_string().unwrap(),
+            "info"
+        );
+        assert_eq!(result.get("count").unwrap().as_int().unwrap(), 5);
+    }
+
+    #[test]
+    fn test_parse_combined_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push(
+            "line",
+            "192.168.1.1 - user [25/Dec/1995:10:00:00 +0000] \"GET /index.html HTTP/1.0\" 200 1234 \"http://example.com\" \"Mozilla\"",
+        );
+
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_combined(line)"#)
+            .unwrap();
+
+        assert_eq!(
+            result.get("ip").unwrap().clone().into_string().unwrap(),
+            "192.168.1.1"
+        );
+        assert_eq!(result.get("status").unwrap().as_int().unwrap(), 200);
+        assert_eq!(
+            result.get("method").unwrap().clone().into_string().unwrap(),
+            "GET"
+        );
+        assert_eq!(
+            result.get("path").unwrap().clone().into_string().unwrap(),
+            "/index.html"
+        );
     }
 
     #[test]
