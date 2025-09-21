@@ -110,7 +110,7 @@ Prefix extraction runs before parsing, so the extracted prefix becomes a field i
 
 **Safe Conversion**: `to_number()`, `to_bool()` safely convert types, `mask_ip(octets)` anonymizes IPs, `upper()`, `lower()`, `trim()` normalize text.
 
-**Time Operations**: `parse_timestamp(string, format, timezone)` handles custom timestamps, `parse_duration("5m")` converts to seconds, `now_utc()` gets current time.
+**Time Operations**: `to_datetime(string, format, timezone)` converts text into a timestamp, `to_duration("5m")` converts strings into durations, `now_utc()` gets current time.
 
 **Array Processing**: `emit_each(array)` fans out arrays into individual events, `emit_each(array, base)` adds common fields to each. Transforms nested data like `{"users": [{"name": "alice"}, {"name": "bob"}]}` into separate events for each user. Original event is suppressed.
 

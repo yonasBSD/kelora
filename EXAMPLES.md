@@ -93,10 +93,10 @@ kelora -f json auth.log --filter 'e.ip.is_private_ip() == false'
 ```bash
 # Compute and print session durations
 kelora -f json sessions.log \
-  --exec 'let dur = parse_timestamp(end) - parse_timestamp(start); print("Duration: " + dur.as_seconds() + "s")'
+  --exec 'let dur = to_datetime(end) - to_datetime(start); print("Duration: " + dur.as_seconds() + "s")'
 ```
 
-Built-in helpers like `is_private_ip()` and `parse_timestamp()` make it easy to detect irregularities and compute derived values.
+Built-in helpers like `is_private_ip()` and `to_datetime()` make it easy to detect irregularities and compute derived values.
 
 ---
 
@@ -107,13 +107,13 @@ Work with times and durations using built-in parsing and arithmetic.
 ```bash
 # Filter events during business hours
 kelora -f json app.log \
-  --exec 'let dt = parse_timestamp(e.ts); if dt.hour() >= 9 && dt.hour() < 17 { print("Work hour") }'
+  --exec 'let dt = to_datetime(e.ts); if dt.hour() >= 9 && dt.hour() < 17 { print("Work hour") }'
 ```
 
 ```bash
 # Flag requests taking longer than 1 second
 kelora -f json access.log \
-  --exec 'let dur = parse_duration(e.latency); if dur > duration_from_seconds(1) { print("Slow: " + dur.as_milliseconds() + "ms") }'
+  --exec 'let dur = to_duration(e.latency); if dur > dur_from_seconds(1) { print("Slow: " + dur.as_milliseconds() + "ms") }'
 ```
 
 You can parse ISO timestamps or human-friendly durations and apply full arithmetic or formatting.

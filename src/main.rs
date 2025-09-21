@@ -1011,7 +1011,7 @@ fn main() -> Result<()> {
     }
 
     if let Some(ref gap_str) = cli.mark_gaps {
-        match crate::rhai_functions::datetime::parse_duration(gap_str) {
+        match crate::rhai_functions::datetime::to_duration(gap_str) {
             Ok(duration) => {
                 if duration.inner.is_zero() {
                     stderr
@@ -1452,7 +1452,7 @@ METHOD CHAINING EXAMPLES:
   e.message.extract_re("user=(\\w+)").upper()
   e.client_ip.mask_ip(2)
   e.url.extract_domain().lower()
-  e.timestamp.parse_ts().format("%H:%M")
+  e.timestamp.to_datetime().format("%H:%M")
 
 FUNCTION VS METHOD SYNTAX:
   extract_re(e.line, "\\d+")           Function style (avoids conflicts)

@@ -76,7 +76,8 @@ EVENT MANIPULATION:
 DATETIME FUNCTIONS:
   now_utc()                             Current UTC timestamp (DateTimeWrapper)
   now_local()                           Current local timestamp (DateTimeWrapper)
-  parse_duration("1h30m")               Parse duration string into DurationWrapper
+  to_datetime(text [, fmt [, tz]])      Convert string into DateTimeWrapper with optional hints
+  to_duration("1h30m")                  Convert duration string into DurationWrapper
   dt.format("format_string")            Format datetime using custom format string
   dt.year(), dt.month(), dt.day()       Extract date components
   dt.hour(), dt.minute(), dt.second()   Extract time components

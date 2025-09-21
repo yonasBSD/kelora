@@ -21,7 +21,7 @@ fn test_datetime_parsing_integration() {
         .arg("json")
         .arg(temp_file.path())
         .arg("--exec")
-        .arg("let dt = parse_ts(e.timestamp); let year = dt.year(); if year == 2023 { print(\"YEAR_MATCH\") }")
+        .arg("let dt = to_datetime(e.timestamp); let year = dt.year(); if year == 2023 { print(\"YEAR_MATCH\") }")
         .output()
         .expect("Failed to run kelora");
 
@@ -54,7 +54,7 @@ fn test_duration_parsing_integration() {
         .arg("json")
         .arg(temp_file.path())
         .arg("--exec")
-        .arg("let dur = parse_duration(e.duration); let minutes = dur.as_minutes(); if minutes == 90 { print(\"DURATION_MATCH\") }")
+        .arg("let dur = to_duration(e.duration); let minutes = dur.as_minutes(); if minutes == 90 { print(\"DURATION_MATCH\") }")
         .output()
         .expect("Failed to run kelora");
 
@@ -85,7 +85,7 @@ fn test_datetime_arithmetic_integration() {
         .arg("json")
         .arg(temp_file.path())
         .arg("--exec")
-        .arg("let start_dt = parse_ts(e.start); let end_dt = parse_ts(e.end); let diff = end_dt - start_dt; let minutes = diff.as_minutes(); if minutes == 90 { print(\"ARITHMETIC_MATCH\") }")
+        .arg("let start_dt = to_datetime(e.start); let end_dt = to_datetime(e.end); let diff = end_dt - start_dt; let minutes = diff.as_minutes(); if minutes == 90 { print(\"ARITHMETIC_MATCH\") }")
         .output()
         .expect("Failed to run kelora");
 
@@ -145,7 +145,7 @@ fn test_datetime_formatting_integration() {
         .arg("json")
         .arg(temp_file.path())
         .arg("--exec")
-        .arg("let dt = parse_ts(e.timestamp); let formatted = dt.format(\"%Y-%m-%d\"); if formatted == \"2023-07-04\" { print(\"FORMAT_MATCH\") }")
+        .arg("let dt = to_datetime(e.timestamp); let formatted = dt.format(\"%Y-%m-%d\"); if formatted == \"2023-07-04\" { print(\"FORMAT_MATCH\") }")
         .output()
         .expect("Failed to run kelora");
 
