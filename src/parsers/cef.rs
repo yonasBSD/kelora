@@ -10,6 +10,7 @@ use nom::{
     sequence::preceded,
     IResult,
 };
+use nom::Parser;
 use rhai::Dynamic;
 use std::collections::HashMap;
 
@@ -46,18 +47,18 @@ impl CefParser {
 
     /// Parse escaped character in CEF header (handles \| \\ etc.)
     fn parse_escaped_char(input: &str) -> IResult<&str, char> {
-        preceded(char('\\'), nom::character::complete::anychar)(input)
+        preceded(char('\\'), nom::character::complete::anychar).parse(input)
     }
 
     /// Parse unescaped character (not a pipe or backslash)
     fn parse_unescaped_char(input: &str) -> IResult<&str, char> {
-        nom::character::complete::none_of("\\|")(input)
+        nom::character::complete::none_of("\\|").parse(input)
     }
 
     /// Parse a CEF header field (handles escaping)
     fn parse_cef_header_field(input: &str) -> IResult<&str, String> {
         let (input, chars) =
-            many0(alt((Self::parse_escaped_char, Self::parse_unescaped_char)))(input)?;
+            many0(alt((Self::parse_escaped_char, Self::parse_unescaped_char))).parse(input)?;
         Ok((input, chars.into_iter().collect()))
     }
 
