@@ -1,11 +1,13 @@
 use crate::event::Event;
 use crate::parsers::{CefParser, CombinedParser, LogfmtParser, SyslogParser};
 use crate::pipeline::EventParser;
+use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
+use base64::Engine as _;
 use once_cell::sync::Lazy;
 use rhai::{Array, Dynamic, Engine, Map};
 use std::cell::RefCell;
 use std::path::Path;
-use url::{Host, Url};
+use url::Url;
 
 /// Represents a captured message with its target stream
 #[derive(Debug, Clone)]
@@ -21,6 +23,8 @@ thread_local! {
     static PARALLEL_MODE: RefCell<bool> = const { RefCell::new(false) };
     static SUPPRESS_SIDE_EFFECTS: RefCell<bool> = const { RefCell::new(false) };
 }
+
+const MAX_PARSE_LEN: usize = 1_048_576;
 
 static LOGFMT_PARSER: Lazy<LogfmtParser> = Lazy::new(LogfmtParser::new);
 static SYSLOG_PARSER: Lazy<SyslogParser> =
@@ -47,99 +51,184 @@ where
         .unwrap_or_else(|_| Map::new())
 }
 
+fn split_semicolon_params(section: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    let mut chars = section.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        match ch {
+            '"' => {
+                in_quotes = !in_quotes;
+                current.push(ch);
+            }
+            '\\' if in_quotes => {
+                current.push(ch);
+                if let Some(next) = chars.next() {
+                    current.push(next);
+                }
+            }
+            ';' if !in_quotes => {
+                if !current.trim().is_empty() {
+                    parts.push(current.trim().to_string());
+                }
+                current.clear();
+            }
+            _ => current.push(ch),
+        }
+    }
+
+    if !current.trim().is_empty() {
+        parts.push(current.trim().to_string());
+    }
+
+    parts
+}
+
+fn unescape_quoted_value(value: &str) -> String {
+    let mut result = String::with_capacity(value.len());
+    let mut chars = value.chars();
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            if let Some(next) = chars.next() {
+                result.push(next);
+            }
+        } else {
+            result.push(ch);
+        }
+    }
+    result
+}
+
+fn is_valid_http_token(token: &str) -> bool {
+    !token.is_empty()
+        && token.chars().all(|ch| {
+            matches!(
+                ch,
+                'A'..='Z'
+                    | 'a'..='z'
+                    | '0'..='9'
+                    | '!' | '#' | '$' | '%' | '&' | '\'' | '*'
+                    | '+' | '-' | '.' | '^' | '_' | '`' | '|' | '~'
+            )
+        })
+}
+
+fn percent_decode_to_vec(input: &str) -> Option<Vec<u8>> {
+    let bytes = input.as_bytes();
+    let mut result = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'%' => {
+                if i + 2 >= bytes.len() {
+                    return None;
+                }
+                let hi = bytes[i + 1];
+                let lo = bytes[i + 2];
+                let value = (hex_value(hi)? << 4) | hex_value(lo)?;
+                result.push(value);
+                i += 3;
+            }
+            b => {
+                result.push(b);
+                i += 1;
+            }
+        }
+
+        if result.len() > MAX_PARSE_LEN {
+            return None;
+        }
+    }
+    Some(result)
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
 fn parse_url_impl(input: &str) -> Map {
-    let mut map = Map::new();
     let trimmed = input.trim();
-    if trimmed.is_empty() {
-        return map;
+    if trimmed.is_empty() || trimmed.len() > MAX_PARSE_LEN {
+        return Map::new();
     }
 
-    if let Ok(parsed) = Url::parse(trimmed) {
-        map.insert("scheme".into(), Dynamic::from(parsed.scheme().to_string()));
+    let (url_str, has_scheme) = if trimmed.contains("://") {
+        (trimmed.to_string(), true)
+    } else if trimmed.starts_with("//") {
+        (format!("http:{}", trimmed), false)
+    } else {
+        return Map::new();
+    };
 
-        if !parsed.username().is_empty() {
-            map.insert(
-                "username".into(),
-                Dynamic::from(parsed.username().to_string()),
-            );
-        }
+    let parsed = match Url::parse(&url_str) {
+        Ok(url) => url,
+        Err(_) => return Map::new(),
+    };
 
-        if let Some(password) = parsed.password() {
-            map.insert("password".into(), Dynamic::from(password.to_string()));
-        }
+    if parsed.host().is_none() {
+        return Map::new();
+    }
 
-        match parsed.host() {
-            Some(Host::Domain(domain)) => {
-                let domain_str = domain.to_string();
-                map.insert("host".into(), Dynamic::from(domain_str.clone()));
-                map.insert("domain".into(), Dynamic::from(domain_str));
-                map.insert("host_type".into(), Dynamic::from("domain".to_string()));
-            }
-            Some(Host::Ipv4(addr)) => {
-                map.insert("host".into(), Dynamic::from(addr.to_string()));
-                map.insert("host_type".into(), Dynamic::from("ipv4".to_string()));
-            }
-            Some(Host::Ipv6(addr)) => {
-                map.insert("host".into(), Dynamic::from(addr.to_string()));
-                map.insert("host_type".into(), Dynamic::from("ipv6".to_string()));
-            }
-            None => {}
-        }
+    let mut result = Map::new();
 
-        if let Some(port) = parsed.port() {
-            map.insert("port".into(), Dynamic::from(port as i64));
-        }
+    if has_scheme {
+        result.insert("scheme".into(), Dynamic::from(parsed.scheme().to_string()));
+    }
 
-        map.insert("path".into(), Dynamic::from(parsed.path().to_string()));
+    if !parsed.username().is_empty() {
+        result.insert("user".into(), Dynamic::from(parsed.username().to_string()));
+    }
 
-        if let Some(query) = parsed.query() {
-            map.insert("query".into(), Dynamic::from(query.to_string()));
+    if let Some(password) = parsed.password() {
+        result.insert("pass".into(), Dynamic::from(password.to_string()));
+    }
 
-            let mut pairs = Array::new();
-            for (key, value) in parsed.query_pairs() {
-                let mut entry = Map::new();
-                entry.insert("key".into(), Dynamic::from(key.into_owned()));
-                entry.insert("value".into(), Dynamic::from(value.into_owned()));
-                pairs.push(Dynamic::from(entry));
-            }
-            if !pairs.is_empty() {
-                map.insert("query_pairs".into(), Dynamic::from(pairs));
-            }
-        }
+    if let Some(host) = parsed.host_str() {
+        result.insert("host".into(), Dynamic::from(host.to_string()));
+    }
 
-        if let Some(fragment) = parsed.fragment() {
-            map.insert("fragment".into(), Dynamic::from(fragment.to_string()));
-        }
+    if let Some(port) = parsed.port() {
+        result.insert("port".into(), Dynamic::from(port.to_string()));
+    }
 
-        if let Some(segments) = parsed.path_segments() {
-            let mut segment_array = Array::new();
-            for segment in segments {
-                if !segment.is_empty() {
-                    segment_array.push(Dynamic::from(segment.to_string()));
-                }
-            }
-            if !segment_array.is_empty() {
-                map.insert("segments".into(), Dynamic::from(segment_array));
+    let path = parsed.path().to_string();
+    if !path.is_empty() {
+        result.insert("path".into(), Dynamic::from(path));
+    }
+
+    if let Some(query) = parsed.query() {
+        result.insert("query".into(), Dynamic::from(query.to_string()));
+
+        let mut qmap = Map::new();
+        for (key, value) in parsed.query_pairs() {
+            let key_owned = key.into_owned();
+            if !qmap.contains_key(key_owned.as_str()) {
+                qmap.insert(key_owned.into(), Dynamic::from(value.into_owned()));
             }
         }
-
-        if let Some(host) = parsed.host_str() {
-            if let Some(pos) = host.rfind('.') {
-                let tld = &host[pos + 1..];
-                if !tld.is_empty() {
-                    map.insert("tld".into(), Dynamic::from(tld.to_string()));
-                }
-            }
+        if !qmap.is_empty() {
+            result.insert("query_map".into(), Dynamic::from(qmap));
         }
     }
 
-    map
+    if let Some(fragment) = parsed.fragment() {
+        result.insert("fragment".into(), Dynamic::from(fragment.to_string()));
+    }
+
+    result
 }
 
 fn parse_path_impl(input: &str) -> Map {
     let mut map = Map::new();
     let trimmed = input.trim();
-    if trimmed.is_empty() {
+    if trimmed.is_empty() || trimmed.len() > MAX_PARSE_LEN {
         return map;
     }
 
@@ -222,59 +311,571 @@ fn parse_path_impl(input: &str) -> Map {
 }
 
 fn parse_email_impl(input: &str) -> Map {
-    let mut map = Map::new();
+    fn is_allowed_unquoted_local_char(ch: char) -> bool {
+        matches!(
+            ch,
+            'A'..='Z'
+                | 'a'..='z'
+                | '0'..='9'
+                | '!' | '#' | '$' | '%' | '&' | '\'' | '*'
+                | '+' | '-' | '/' | '=' | '?' | '^' | '_' | '`' | '{' | '|' | '}'
+                | '~'
+        )
+    }
+
+    fn parse_quoted_local(local: &str) -> Option<String> {
+        if !local.starts_with('"') || !local.ends_with('"') || local.len() < 2 {
+            return None;
+        }
+
+        let mut result = String::with_capacity(local.len() - 2);
+        let mut chars = local[1..local.len() - 1].chars();
+        while let Some(ch) = chars.next() {
+            if ch == '\\' {
+                if let Some(escaped) = chars.next() {
+                    result.push(escaped);
+                } else {
+                    return None;
+                }
+            } else if ch == '"' {
+                return None;
+            } else {
+                result.push(ch);
+            }
+        }
+        Some(result)
+    }
+
+    fn parse_unquoted_local(local: &str) -> Option<String> {
+        if local.is_empty() || local.starts_with('.') || local.ends_with('.') {
+            return None;
+        }
+
+        let mut prev_dot = false;
+        for ch in local.chars() {
+            if ch == '.' {
+                if prev_dot {
+                    return None;
+                }
+                prev_dot = true;
+                continue;
+            }
+
+            if ch.is_ascii() && is_allowed_unquoted_local_char(ch) {
+                prev_dot = false;
+                continue;
+            }
+
+            return None;
+        }
+
+        if prev_dot {
+            return None;
+        }
+
+        Some(local.to_string())
+    }
+
+    fn is_valid_domain(domain: &str) -> bool {
+        if domain.is_empty()
+            || domain.len() > MAX_PARSE_LEN
+            || domain.starts_with('.')
+            || domain.ends_with('.')
+        {
+            return false;
+        }
+
+        for label in domain.split('.') {
+            if label.is_empty()
+                || label.starts_with('-')
+                || label.ends_with('-')
+                || !label
+                    .chars()
+                    .all(|ch| ch.is_ascii_alphanumeric() || ch == '-')
+            {
+                return false;
+            }
+        }
+        true
+    }
+
     let trimmed = input.trim();
-    if trimmed.is_empty() || trimmed.contains(' ') {
-        return map;
+    if trimmed.is_empty() || trimmed.len() > MAX_PARSE_LEN {
+        return Map::new();
     }
 
-    let mut parts = trimmed.split('@');
-    let local = parts.next().unwrap_or_default();
-    let domain = parts.next().unwrap_or_default();
+    let mut splitter = trimmed.split('@');
+    let local_raw = splitter.next().unwrap_or("");
+    let domain = match splitter.next() {
+        Some(value) => value,
+        None => return Map::new(),
+    };
 
-    // Ensure exactly one '@' and both sides populated
-    if local.is_empty() || domain.is_empty() || parts.next().is_some() {
-        return map;
+    if splitter.next().is_some() {
+        return Map::new();
     }
 
-    if domain.starts_with('.')
-        || domain.ends_with('.')
-        || !domain.contains('.')
-        || domain.split('.').any(|label| label.is_empty())
-    {
-        return map;
+    if domain.is_empty() || local_raw.is_empty() {
+        return Map::new();
     }
 
-    map.insert("address".into(), Dynamic::from(trimmed.to_string()));
-    map.insert("local".into(), Dynamic::from(local.to_string()));
+    if !is_valid_domain(domain) {
+        return Map::new();
+    }
+
+    let local = if local_raw.starts_with('"') {
+        parse_quoted_local(local_raw)
+    } else {
+        if local_raw.contains(char::is_whitespace) {
+            return Map::new();
+        }
+        parse_unquoted_local(local_raw)
+    };
+
+    let local = match local {
+        Some(value) => value,
+        None => return Map::new(),
+    };
+
+    let mut map = Map::new();
+    map.insert("local".into(), Dynamic::from(local));
     map.insert("domain".into(), Dynamic::from(domain.to_string()));
+    map
+}
 
-    let labels: Vec<&str> = domain.split('.').collect();
-    if let Some(tld) = labels.last() {
-        map.insert("tld".into(), Dynamic::from((*tld).to_string()));
+fn extract_version_token(ua: &str, ua_lower: &str, token: &str) -> Option<String> {
+    let token_lower = token.to_lowercase();
+    let start = ua_lower.find(&token_lower)? + token_lower.len();
+    let mut end = ua.len();
+    for (idx, ch) in ua[start..].char_indices() {
+        if !matches!(ch, '0'..='9' | 'A'..='Z' | 'a'..='z' | '.' | '_' | '-') {
+            end = start + idx;
+            break;
+        }
+    }
+    if end == start {
+        None
+    } else {
+        Some(ua[start..end].to_string())
+    }
+}
+
+fn capture_version_after(
+    ua: &str,
+    ua_lower: &str,
+    token: &str,
+    replace_underscores: bool,
+) -> Option<String> {
+    let token_lower = token.to_lowercase();
+    let start = ua_lower.find(&token_lower)? + token_lower.len();
+    let mut end = ua.len();
+    for (idx, ch) in ua[start..].char_indices() {
+        if !matches!(ch, '0'..='9' | 'A'..='Z' | 'a'..='z' | '.' | '_' ) {
+            end = start + idx;
+            break;
+        }
+    }
+    if end == start {
+        None
+    } else {
+        let mut value = ua[start..end].to_string();
+        if replace_underscores {
+            value = value.replace('_', ".");
+        }
+        Some(value)
+    }
+}
+
+fn parse_user_agent_impl(input: &str) -> Map {
+    let trimmed = input.trim();
+    if trimmed.is_empty() || trimmed.len() > MAX_PARSE_LEN {
+        return Map::new();
     }
 
-    if labels.len() >= 2 {
-        let root = labels[labels.len() - 2..].join(".");
-        map.insert("root".into(), Dynamic::from(root));
-    }
+    let ua_lower = trimmed.to_lowercase();
+    let mut result = Map::new();
 
-    if labels.len() > 2 {
-        let subdomain = labels[..labels.len() - 2].join(".");
-        if !subdomain.is_empty() {
-            map.insert("subdomain".into(), Dynamic::from(subdomain));
+    let mut agent_family: Option<String> = None;
+    let mut agent_version: Option<String> = None;
+
+    let candidate_agents: &[(&str, &str)] = &[
+        ("curl", "curl/"),
+        ("wget", "wget/"),
+        ("okhttp", "okhttp/"),
+        ("Go-http-client", "go-http-client/"),
+        ("Edge", "edge/"),
+        ("Edge", "edg/"),
+        ("Firefox", "firefox/"),
+        ("Chrome", "chrome/"),
+        ("Safari", "version/"),
+    ];
+
+    for (family, token) in candidate_agents {
+        if let Some(version) = extract_version_token(trimmed, &ua_lower, token) {
+            if *family == "Safari" {
+                if !ua_lower.contains("safari/") || ua_lower.contains("chrome/") {
+                    continue;
+                }
+            }
+            agent_family = Some(family.to_string());
+            agent_version = if *family == "Safari" {
+                Some(version)
+            } else {
+                Some(version)
+            };
+            break;
         }
     }
 
-    let mut labels_array = Array::new();
-    for label in labels {
-        labels_array.push(Dynamic::from(label.to_string()));
-    }
-    if !labels_array.is_empty() {
-        map.insert("domain_parts".into(), Dynamic::from(labels_array));
+    if agent_family.is_none() {
+        if ua_lower.contains("mozilla/") {
+            agent_family = Some("Mozilla".to_string());
+        } else if ua_lower.contains("okhttp") {
+            agent_family = Some("okhttp".to_string());
+        }
     }
 
-    map
+    if let Some(family) = agent_family.clone() {
+        result.insert("agent_family".into(), Dynamic::from(family));
+    }
+    if let Some(version) = agent_version.clone() {
+        if !version.is_empty() {
+            result.insert("agent_version".into(), Dynamic::from(version));
+        }
+    }
+
+    let mut os_family: Option<String> = None;
+    let mut os_version: Option<String> = None;
+
+    if ua_lower.contains("windows nt ") {
+        if let Some(version) = capture_version_after(trimmed, &ua_lower, "windows nt ", false) {
+            os_family = Some("Windows".to_string());
+            os_version = Some(version);
+        }
+    } else if ua_lower.contains("android ") {
+        if let Some(version) = capture_version_after(trimmed, &ua_lower, "android ", false) {
+            os_family = Some("Android".to_string());
+            os_version = Some(version);
+        } else {
+            os_family = Some("Android".to_string());
+        }
+    } else if ua_lower.contains("cpu iphone os ") {
+        if let Some(version) = capture_version_after(trimmed, &ua_lower, "cpu iphone os ", true) {
+            os_family = Some("iOS".to_string());
+            os_version = Some(version);
+        }
+    } else if ua_lower.contains("iphone os ") {
+        if let Some(version) = capture_version_after(trimmed, &ua_lower, "iphone os ", true) {
+            os_family = Some("iOS".to_string());
+            os_version = Some(version);
+        }
+    } else if ua_lower.contains("cpu os ") && ua_lower.contains("ipad") {
+        if let Some(version) = capture_version_after(trimmed, &ua_lower, "cpu os ", true) {
+            os_family = Some("iOS".to_string());
+            os_version = Some(version);
+        }
+    } else if ua_lower.contains("mac os x ") {
+        if let Some(version) = capture_version_after(trimmed, &ua_lower, "mac os x ", true) {
+            os_family = Some("macOS".to_string());
+            os_version = Some(version);
+        } else {
+            os_family = Some("macOS".to_string());
+        }
+    } else if ua_lower.contains("linux") {
+        os_family = Some("Linux".to_string());
+    }
+
+    if let Some(family) = os_family.clone() {
+        result.insert("os_family".into(), Dynamic::from(family));
+    }
+    if let Some(version) = os_version.clone() {
+        if !version.is_empty() {
+            result.insert("os_version".into(), Dynamic::from(version));
+        }
+    }
+
+    let mut device: Option<String> = None;
+    let lower = ua_lower.as_str();
+    if lower.contains("bot")
+        || lower.contains("spider")
+        || lower.contains("crawler")
+        || lower.contains("googlebot")
+        || lower.contains("bingbot")
+        || matches!(
+            agent_family.as_deref(),
+            Some("curl" | "wget" | "okhttp" | "Go-http-client")
+        )
+    {
+        device = Some("Bot".to_string());
+    } else if lower.contains("ipad") || lower.contains("tablet") {
+        device = Some("Tablet".to_string());
+    } else if lower.contains("mobile") || lower.contains("iphone") {
+        device = Some("Mobile".to_string());
+    } else if matches!(os_family.as_deref(), Some("Windows" | "macOS" | "Linux")) {
+        device = Some("Desktop".to_string());
+    }
+
+    if let Some(device_value) = device {
+        result.insert("device".into(), Dynamic::from(device_value));
+    }
+
+    if result.is_empty() {
+        Map::new()
+    } else {
+        result
+    }
+}
+
+fn parse_media_type_impl(input: &str) -> Map {
+    let trimmed = input.trim();
+    if trimmed.is_empty() || trimmed.len() > MAX_PARSE_LEN || trimmed.contains(',') {
+        return Map::new();
+    }
+
+    let mut iter = trimmed.splitn(2, ';');
+    let type_subtype = iter.next().unwrap_or("").trim();
+    if type_subtype.is_empty() {
+        return Map::new();
+    }
+
+    let mut type_parts = type_subtype.splitn(2, '/');
+    let r#type = type_parts.next().unwrap_or("").trim();
+    let subtype = type_parts.next().unwrap_or("").trim();
+
+    if !is_valid_http_token(r#type) || !is_valid_http_token(subtype) {
+        return Map::new();
+    }
+
+    let type_lower = r#type.to_lowercase();
+    let subtype_lower = subtype.to_lowercase();
+
+    let mut result = Map::new();
+    result.insert("type".into(), Dynamic::from(type_lower.clone()));
+    result.insert("subtype".into(), Dynamic::from(subtype_lower.clone()));
+
+    if let Some(dot_pos) = subtype_lower.find('.') {
+        if dot_pos > 0 {
+            let tree = &subtype_lower[..dot_pos];
+            if !tree.is_empty() {
+                result.insert("tree".into(), Dynamic::from(tree.to_string()));
+            }
+        }
+    }
+
+    if let Some(plus_pos) = subtype_lower.rfind('+') {
+        if plus_pos + 1 < subtype_lower.len() {
+            let suffix = &subtype_lower[plus_pos + 1..];
+            if !suffix.is_empty() && is_valid_http_token(suffix) {
+                result.insert("suffix".into(), Dynamic::from(suffix.to_string()));
+            }
+        }
+    }
+
+    let mut params = Map::new();
+    if let Some(rest) = iter.next() {
+        for param in split_semicolon_params(rest) {
+            let mut kv = param.splitn(2, '=');
+            let key = kv.next().unwrap_or("").trim();
+            let value_raw = kv.next().unwrap_or("").trim();
+            if key.is_empty() || !is_valid_http_token(key) {
+                continue;
+            }
+            let key_lower = key.to_lowercase();
+            if params.contains_key(key_lower.as_str()) {
+                continue;
+            }
+
+            let value =
+                if value_raw.starts_with('"') && value_raw.ends_with('"') && value_raw.len() >= 2 {
+                    unescape_quoted_value(&value_raw[1..value_raw.len() - 1])
+                } else {
+                    value_raw.to_string()
+                };
+
+            params.insert(key_lower.into(), Dynamic::from(value));
+        }
+    }
+
+    result.insert("params".into(), Dynamic::from(params));
+    result
+}
+
+fn parse_content_disposition_impl(input: &str) -> Map {
+    let trimmed = input.trim();
+    if trimmed.is_empty() || trimmed.len() > MAX_PARSE_LEN {
+        return Map::new();
+    }
+
+    let mut iter = trimmed.splitn(2, ';');
+    let disposition = iter.next().unwrap_or("").trim();
+    if disposition.is_empty() || !is_valid_http_token(disposition) {
+        return Map::new();
+    }
+
+    let mut params = Map::new();
+    let mut filename_regular: Option<String> = None;
+    let mut filename_star: Option<String> = None;
+
+    if let Some(rest) = iter.next() {
+        for param in split_semicolon_params(rest) {
+            let mut kv = param.splitn(2, '=');
+            let key = kv.next().unwrap_or("").trim();
+            if key.is_empty() {
+                continue;
+            }
+            let key_lower = key.to_lowercase();
+            let raw_value = kv.next().unwrap_or("").trim();
+
+            if !params.contains_key(key_lower.as_str()) {
+                let value = if raw_value.starts_with('"')
+                    && raw_value.ends_with('"')
+                    && raw_value.len() >= 2
+                {
+                    unescape_quoted_value(&raw_value[1..raw_value.len() - 1])
+                } else {
+                    raw_value.to_string()
+                };
+                params.insert(key_lower.clone().into(), Dynamic::from(value.clone()));
+
+                if key_lower == "filename" && filename_regular.is_none() {
+                    filename_regular = Some(value);
+                }
+            }
+
+            if key_lower == "filename*" && filename_star.is_none() {
+                let value = if raw_value.starts_with('"')
+                    && raw_value.ends_with('"')
+                    && raw_value.len() >= 2
+                {
+                    &raw_value[1..raw_value.len() - 1]
+                } else {
+                    raw_value
+                };
+
+                let apostrophe = '\'';
+                let parts: Vec<&str> = value.splitn(3, apostrophe).collect();
+                if parts.len() == 3 {
+                    if let Some(decoded) = percent_decode_to_vec(parts[2]) {
+                        let text = if parts[0].eq_ignore_ascii_case("utf-8") {
+                            match String::from_utf8(decoded) {
+                                Ok(value) => value,
+                                Err(err) => String::from_utf8_lossy(err.as_bytes()).into_owned(),
+                            }
+                        } else {
+                            String::from_utf8_lossy(&decoded).into_owned()
+                        };
+                        filename_star = Some(text);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut result = Map::new();
+    result.insert(
+        "disposition".into(),
+        Dynamic::from(disposition.to_lowercase()),
+    );
+    result.insert("params".into(), Dynamic::from(params));
+
+    if let Some(name) = filename_star.or(filename_regular) {
+        if !name.is_empty() {
+            result.insert("filename".into(), Dynamic::from(name));
+        }
+    }
+
+    result
+}
+
+fn is_base64url_char(ch: char) -> bool {
+    matches!(ch, 'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '=')
+}
+
+fn decode_jwt_segment(segment: &str) -> Option<Vec<u8>> {
+    if segment.len() > MAX_PARSE_LEN {
+        return None;
+    }
+    match URL_SAFE_NO_PAD.decode(segment.as_bytes()) {
+        Ok(bytes) => Some(bytes),
+        Err(_) => {
+            let mut padded = segment.to_string();
+            while padded.len() % 4 != 0 {
+                padded.push('=');
+                if padded.len() > MAX_PARSE_LEN {
+                    return None;
+                }
+            }
+            URL_SAFE.decode(padded.as_bytes()).ok()
+        }
+    }
+}
+
+fn jwt_segment_to_map(segment: &str) -> Map {
+    if let Some(bytes) = decode_jwt_segment(segment) {
+        if bytes.len() <= MAX_PARSE_LEN {
+            if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+                let dynamic = crate::event::json_to_dynamic(&json);
+                if let Some(map) = dynamic.try_cast::<Map>() {
+                    return map;
+                }
+            }
+        }
+    }
+    Map::new()
+}
+
+fn parse_jwt_impl(input: &str) -> Map {
+    let trimmed = input.trim();
+    if trimmed.is_empty() || trimmed.len() > MAX_PARSE_LEN {
+        return Map::new();
+    }
+
+    let parts: Vec<&str> = trimmed.split('.').collect();
+    if parts.len() < 2 || parts.len() > 3 {
+        return Map::new();
+    }
+
+    if parts[0].is_empty() || parts[1].is_empty() {
+        return Map::new();
+    }
+
+    if !parts[0].chars().all(is_base64url_char) || !parts[1].chars().all(is_base64url_char) {
+        return Map::new();
+    }
+
+    let header_map = jwt_segment_to_map(parts[0]);
+    let claims_map = jwt_segment_to_map(parts[1]);
+
+    let signature_segment = if parts.len() == 3 { parts[2] } else { "" };
+
+    let mut result = Map::new();
+    result.insert("header".into(), Dynamic::from(header_map.clone()));
+    result.insert("claims".into(), Dynamic::from(claims_map.clone()));
+    result.insert(
+        "signature_b64u".into(),
+        Dynamic::from(signature_segment.to_string()),
+    );
+
+    if let Some(alg) = header_map
+        .get("alg")
+        .and_then(|v| v.clone().into_string().ok())
+    {
+        result.insert("alg".into(), Dynamic::from(alg));
+    }
+    if let Some(kid) = header_map
+        .get("kid")
+        .and_then(|v| v.clone().into_string().ok())
+    {
+        result.insert("kid".into(), Dynamic::from(kid));
+    }
+    if let Some(typ) = header_map
+        .get("typ")
+        .and_then(|v| v.clone().into_string().ok())
+    {
+        result.insert("typ".into(), Dynamic::from(typ));
+    }
+
+    result
 }
 
 fn parse_syslog_impl(line: &str) -> Map {
@@ -648,6 +1249,10 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("parse_url", parse_url_impl);
     engine.register_fn("parse_path", parse_path_impl);
     engine.register_fn("parse_email", parse_email_impl);
+    engine.register_fn("parse_user_agent", parse_user_agent_impl);
+    engine.register_fn("parse_media_type", parse_media_type_impl);
+    engine.register_fn("parse_content_disposition", parse_content_disposition_impl);
+    engine.register_fn("parse_jwt", parse_jwt_impl);
     engine.register_fn("parse_syslog", parse_syslog_impl);
     engine.register_fn("parse_cef", parse_cef_impl);
     engine.register_fn("parse_logfmt", parse_logfmt_impl);
@@ -1319,21 +1924,11 @@ mod tests {
             "https"
         );
         assert_eq!(
-            result
-                .get("username")
-                .unwrap()
-                .clone()
-                .into_string()
-                .unwrap(),
+            result.get("user").unwrap().clone().into_string().unwrap(),
             "user"
         );
         assert_eq!(
-            result
-                .get("password")
-                .unwrap()
-                .clone()
-                .into_string()
-                .unwrap(),
+            result.get("pass").unwrap().clone().into_string().unwrap(),
             "pass"
         );
         assert_eq!(
@@ -1341,18 +1936,16 @@ mod tests {
             "example.com"
         );
         assert_eq!(
-            result
-                .get("host_type")
-                .unwrap()
-                .clone()
-                .into_string()
-                .unwrap(),
-            "domain"
+            result.get("port").unwrap().clone().into_string().unwrap(),
+            "8443"
         );
-        assert_eq!(result.get("port").unwrap().as_int().unwrap(), 8443);
         assert_eq!(
             result.get("path").unwrap().clone().into_string().unwrap(),
             "/path/to/page"
+        );
+        assert_eq!(
+            result.get("query").unwrap().clone().into_string().unwrap(),
+            "foo=bar&baz=qux"
         );
         assert_eq!(
             result
@@ -1363,70 +1956,56 @@ mod tests {
                 .unwrap(),
             "frag"
         );
-        assert_eq!(
-            result.get("tld").unwrap().clone().into_string().unwrap(),
-            "com"
-        );
-
-        let segments = result
-            .get("segments")
+        let query_map = result
+            .get("query_map")
             .unwrap()
             .clone()
-            .into_array()
+            .try_cast::<rhai::Map>()
             .unwrap();
-        let segment_strings: Vec<String> = segments
-            .into_iter()
-            .map(|item| item.into_string().unwrap())
-            .collect();
-        assert_eq!(segment_strings, vec!["path", "to", "page"]);
-
-        let query_pairs = result
-            .get("query_pairs")
-            .unwrap()
-            .clone()
-            .into_array()
-            .unwrap();
-        assert_eq!(query_pairs.len(), 2);
-
-        let first_pair = query_pairs[0].clone().try_cast::<rhai::Map>().unwrap();
         assert_eq!(
-            first_pair
-                .get("key")
-                .unwrap()
-                .clone()
-                .into_string()
-                .unwrap(),
-            "foo"
-        );
-        assert_eq!(
-            first_pair
-                .get("value")
-                .unwrap()
-                .clone()
-                .into_string()
-                .unwrap(),
+            query_map.get("foo").unwrap().clone().into_string().unwrap(),
             "bar"
         );
-
-        let second_pair = query_pairs[1].clone().try_cast::<rhai::Map>().unwrap();
         assert_eq!(
-            second_pair
-                .get("key")
-                .unwrap()
-                .clone()
-                .into_string()
-                .unwrap(),
-            "baz"
-        );
-        assert_eq!(
-            second_pair
-                .get("value")
-                .unwrap()
-                .clone()
-                .into_string()
-                .unwrap(),
+            query_map.get("baz").unwrap().clone().into_string().unwrap(),
             "qux"
         );
+
+        scope.push("schemeless", "//example.com/path");
+        let schemeless: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_url(schemeless)"#)
+            .unwrap();
+        assert!(!schemeless.contains_key("scheme"));
+        assert_eq!(
+            schemeless
+                .get("host")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "example.com"
+        );
+
+        scope.push("dup", "https://example.com/?id=1&id=2");
+        let dup_map: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_url(dup)"#)
+            .unwrap();
+        let dup_query = dup_map
+            .get("query_map")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Map>()
+            .unwrap();
+        assert_eq!(
+            dup_query.get("id").unwrap().clone().into_string().unwrap(),
+            "1"
+        );
+
+        scope.push("invalid", "/just/a/path");
+        let invalid: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_url(invalid)"#)
+            .unwrap();
+        assert!(invalid.is_empty());
     }
 
     #[test]
@@ -1501,15 +2080,6 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            result
-                .get("address")
-                .unwrap()
-                .clone()
-                .into_string()
-                .unwrap(),
-            "user.name+tag@example.co.uk"
-        );
-        assert_eq!(
             result.get("local").unwrap().clone().into_string().unwrap(),
             "user.name+tag"
         );
@@ -1517,35 +2087,278 @@ mod tests {
             result.get("domain").unwrap().clone().into_string().unwrap(),
             "example.co.uk"
         );
+        assert_eq!(result.len(), 2);
+
+        scope.push("quoted", "\"a b\"@xn--exmpl-hra.com");
+        let quoted: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_email(quoted)"#)
+            .unwrap();
         assert_eq!(
-            result.get("tld").unwrap().clone().into_string().unwrap(),
-            "uk"
+            quoted.get("local").unwrap().clone().into_string().unwrap(),
+            "a b"
         );
         assert_eq!(
-            result.get("root").unwrap().clone().into_string().unwrap(),
-            "co.uk"
+            quoted.get("domain").unwrap().clone().into_string().unwrap(),
+            "xn--exmpl-hra.com"
         );
+
+        scope.push("invalid", "missing-at.example.com");
+        let invalid: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_email(invalid)"#)
+            .unwrap();
+        assert!(invalid.is_empty());
+    }
+
+    #[test]
+    fn test_parse_user_agent_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push(
+            "ua",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+        );
+
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_user_agent(ua)"#)
+            .unwrap();
+
         assert_eq!(
             result
-                .get("subdomain")
+                .get("agent_family")
                 .unwrap()
                 .clone()
                 .into_string()
                 .unwrap(),
-            "example"
+            "Chrome"
+        );
+        assert_eq!(
+            result
+                .get("agent_version")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "114.0.0.0"
+        );
+        assert_eq!(
+            result
+                .get("os_family")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "macOS"
+        );
+        assert_eq!(
+            result
+                .get("os_version")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "10.15.7"
+        );
+        assert_eq!(
+            result.get("device").unwrap().clone().into_string().unwrap(),
+            "Desktop"
         );
 
-        let domain_parts = result
-            .get("domain_parts")
+        scope.push("bot", "curl/8.1.0");
+        let bot: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_user_agent(bot)"#)
+            .unwrap();
+        assert_eq!(
+            bot.get("agent_family")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "curl"
+        );
+        assert_eq!(
+            bot.get("device").unwrap().clone().into_string().unwrap(),
+            "Bot"
+        );
+    }
+
+    #[test]
+    fn test_parse_media_type_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push(
+            "mt",
+            "Application/vnd.api+JSON; charset=\"utf-8\"; version=1",
+        );
+
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_media_type(mt)"#)
+            .unwrap();
+
+        assert_eq!(
+            result.get("type").unwrap().clone().into_string().unwrap(),
+            "application"
+        );
+        assert_eq!(
+            result
+                .get("subtype")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "vnd.api+json"
+        );
+        assert_eq!(
+            result.get("tree").unwrap().clone().into_string().unwrap(),
+            "vnd"
+        );
+        assert_eq!(
+            result.get("suffix").unwrap().clone().into_string().unwrap(),
+            "json"
+        );
+        let params = result
+            .get("params")
             .unwrap()
             .clone()
-            .into_array()
+            .try_cast::<rhai::Map>()
             .unwrap();
-        let parts: Vec<String> = domain_parts
-            .into_iter()
-            .map(|item| item.into_string().unwrap())
-            .collect();
-        assert_eq!(parts, vec!["example", "co", "uk"]);
+        assert_eq!(
+            params
+                .get("charset")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "utf-8"
+        );
+        assert_eq!(
+            params
+                .get("version")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "1"
+        );
+
+        scope.push("invalid_mt", "textplain");
+        let invalid: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_media_type(invalid_mt)"#)
+            .unwrap();
+        assert!(invalid.is_empty());
+    }
+
+    #[test]
+    fn test_parse_content_disposition_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push(
+            "cd",
+            "attachment; filename=\"resume.pdf\"; filename*=utf-8''r%C3%A9sum%C3%A9.pdf",
+        );
+
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_content_disposition(cd)"#)
+            .unwrap();
+
+        assert_eq!(
+            result
+                .get("disposition")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "attachment"
+        );
+        assert_eq!(
+            result
+                .get("filename")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "résumé.pdf"
+        );
+
+        let params = result
+            .get("params")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Map>()
+            .unwrap();
+        assert!(params.contains_key("filename"));
+        assert!(params.contains_key("filename*"));
+
+        scope.push("bad_cd", "attachment");
+        let bad: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_content_disposition(bad_cd)"#)
+            .unwrap();
+        assert!(!bad.is_empty());
+
+        scope.push("empty_cd", "");
+        let empty: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_content_disposition(empty_cd)"#)
+            .unwrap();
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn test_parse_jwt_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push(
+            "jwt",
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.\
+             eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.\
+             SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+        );
+
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_jwt(jwt)"#)
+            .unwrap();
+
+        assert_eq!(
+            result.get("alg").unwrap().clone().into_string().unwrap(),
+            "HS256"
+        );
+        assert_eq!(
+            result.get("typ").unwrap().clone().into_string().unwrap(),
+            "JWT"
+        );
+        assert_eq!(
+            result
+                .get("signature_b64u")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+        );
+
+        let claims = result
+            .get("claims")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Map>()
+            .unwrap();
+        assert_eq!(
+            claims.get("sub").unwrap().clone().into_string().unwrap(),
+            "1234567890"
+        );
+        assert!(claims.get("admin").unwrap().clone().as_bool().unwrap());
+
+        scope.push("invalid_jwt", "ab$cd.efg");
+        let invalid: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_jwt(invalid_jwt)"#)
+            .unwrap();
+        assert!(invalid.is_empty());
     }
 
     #[test]

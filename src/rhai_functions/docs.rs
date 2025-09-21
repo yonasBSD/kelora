@@ -103,6 +103,10 @@ UTILITY FUNCTIONS:
   parse_url(text)                       Parse URL into structured components
   parse_path(text)                      Parse filesystem path into components
   parse_email(text)                     Parse email address into parts
+  parse_user_agent(text)                Parse common user-agent strings into components
+  parse_media_type(text)                Parse media type tokens and parameters
+  parse_content_disposition(text)       Parse Content-Disposition header parameters
+  parse_jwt(text)                       Parse JWT header/payload without verification
   parse_syslog(text)                    Parse syslog line into structured fields
   parse_cef(text)                       Parse Common Event Format line into fields
   parse_logfmt(text)                    Parse logfmt line into structured fields
