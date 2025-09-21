@@ -141,7 +141,9 @@ Examples:
   e.sample_rate = rand()
   e.random_id = rand_int(1000, 9999)
 
-Note: Use 'e' to access the current event. Most functions use method syntax.
+Rhai lets you call functions as either `value.method(args)` or
+`function(value, args)`. Examples prefer method calls, though some
+function-style listings remain for clarity. Use 'e' to access the current event.
 For more examples, see the documentation or use --help for general usage.
 "#
 }
