@@ -26,6 +26,7 @@ Kelora is a Rust log processor; this guide keeps contributions aligned with curr
 - Keep tests deterministic by leaning on `tempfile` or bundled fixtures instead of randomness.
 
 ## Commit & Pull Request Guidelines
+- Add `Co-authored-by: GPT-5 <noreply@openai.com>` as a trailer in every commit message.
 - Follow existing history: imperative commit subjects under ~72 characters, optional bodies explaining rationale, and `Fixes #123` lines for linked issues.
 - PRs need a summary of behavior changes, testing evidence, and notes about new flags, Rhai APIs, or performance considerations.
 - Attach before/after CLI snippets when formatting shifts and mention any updated docs or benchmarking results.
