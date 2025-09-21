@@ -982,7 +982,11 @@ mod tests {
         let mut unique = keys.clone();
         unique.sort();
         unique.dedup();
-        assert_eq!(unique.len(), keys.len(), "keys should not contain duplicates");
+        assert_eq!(
+            unique.len(),
+            keys.len(),
+            "keys should not contain duplicates"
+        );
     }
 
     #[test]

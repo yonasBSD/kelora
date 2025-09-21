@@ -7,37 +7,50 @@ STRING/TEXT FUNCTIONS:
   text.after(delimiter)                 Text after first occurrence of delimiter
   text.before(delimiter)                Text before first occurrence of delimiter
   text.between(start, end)              Text between start and end delimiters
+  text.col("1,3,5" [, separator])       Extract multiple columns as concatenated string
+  text.col("1:5" [, separator])         Extract column range as concatenated string
+  text.col(index [, separator])         Extract column by index from whitespace/delimited text
   text.contains(pattern)                Check if text contains pattern
   text.count(pattern)                   Count occurrences of pattern in text
+  text.decode_b64()                     Decode base64 string to text
+  text.decode_hex()                     Decode hexadecimal string to text
+  text.decode_url()                     Decode URL-encoded string
+  text.encode_b64()                     Encode text to base64 string
+  text.encode_hex()                     Encode text to hexadecimal string
+  text.encode_url()                     URL-encode text (percent encoding)
   text.ending_with(suffix)              Return text if it ends with suffix, else empty
+  text.escape_html()                    Escape HTML special characters (&, <, >, ", ')
+  text.escape_json()                    Escape JSON special characters
+  text.extract_all_re(pattern [, group]) Extract all regex matches as array
   text.extract_domain()                 Extract domain from URL or email address
   text.extract_ip()                     Extract first IP address from text
   text.extract_ips()                    Extract all IP addresses as array
   text.extract_re(pattern [, group])    Extract regex match or capture group
-  text.extract_all_re(pattern [, group]) Extract all regex matches as array
   text.extract_url()                    Extract first URL from text
   text.is_digit()                       Check if text contains only digits
   text.is_private_ip()                  Check if IP is in private ranges
   text.lower()                          Convert text to lowercase
-  text.upper()                          Convert text to uppercase
   text.mask_ip([octets])                Mask IP address (default: last octet)
   text.matches(pattern)                 Check if text matches regex pattern
+  text.parse_cef()                      Parse Common Event Format line into fields
+  text.parse_combined()                 Parse Apache/Nginx combined log line
+  text.parse_content_disposition()      Parse Content-Disposition header parameters
+  text.parse_email()                    Parse email address into parts
+  text.parse_jwt()                      Parse JWT header/payload without verification
+  text.parse_kv([sep [, kv_sep]])       Parse key-value pairs from text
+  text.parse_logfmt()                   Parse logfmt line into structured fields
+  text.parse_media_type()               Parse media type tokens and parameters
+  text.parse_path()                     Parse filesystem path into components
+  text.parse_syslog()                   Parse syslog line into structured fields
+  text.parse_url()                      Parse URL into structured components
+  text.parse_user_agent()               Parse common user-agent strings into components
   text.slice(spec)                      Slice text using Python notation (e.g., "1:5", ":3", "-2:")
   text.split_re(pattern)                Split text by regex pattern
   text.starting_with(prefix)            Return text if it starts with prefix, else empty
   text.strip([chars])                   Remove whitespace or specified characters
-
-  # Encoding/Decoding
-  text.encode_b64()                     Encode text to base64 string
-  text.decode_b64()                     Decode base64 string to text
-  text.encode_hex()                     Encode text to hexadecimal string
-  text.decode_hex()                     Decode hexadecimal string to text
-  text.encode_url()                     URL-encode text (percent encoding)
-  text.decode_url()                     Decode URL-encoded string
-  text.escape_html()                    Escape HTML special characters (&, <, >, ", ')
   text.unescape_html()                  Unescape HTML entities to text
-  text.escape_json()                    Escape JSON special characters
   text.unescape_json()                  Unescape JSON escape sequences
+  text.upper()                          Convert text to uppercase
 
 ARRAY FUNCTIONS:
   array.join(separator)                 Join array elements with separator
@@ -57,16 +70,13 @@ MAP/OBJECT FUNCTIONS:
 
 EVENT MANIPULATION:
   emit_each(array [, base_map])         Fan out array elements as separate events
-  text.col(index [, separator])         Extract column by index from whitespace/delimited text
-  text.col("1,3,5" [, separator])       Extract multiple columns as concatenated string
-  text.col("1:5" [, separator])         Extract column range as concatenated string
   e = ()                                Clear entire event (remove all fields)
   e.field = ()                          Remove individual field from event
 
 DATETIME FUNCTIONS:
   now_utc()                             Current UTC timestamp (DateTimeWrapper)
   now_local()                           Current local timestamp (DateTimeWrapper)
-  parse_dur("1h30m")                    Parse duration string into DurationWrapper
+  parse_duration("1h30m")               Parse duration string into DurationWrapper
   dt.format("format_string")            Format datetime using custom format string
   dt.year(), dt.month(), dt.day()       Extract date components
   dt.hour(), dt.minute(), dt.second()   Extract time components
@@ -99,18 +109,6 @@ UTILITY FUNCTIONS:
   print(message)                        Print to stdout (suppressed with -qqq)
   eprint(message)                       Print to stderr (suppressed with -qqq)
   get_env(var [, default])              Get environment variable with optional default
-  parse_kv(text [, sep [, kv_sep]])     Parse key-value pairs from text
-  parse_url(text)                       Parse URL into structured components
-  parse_path(text)                      Parse filesystem path into components
-  parse_email(text)                     Parse email address into parts
-  parse_user_agent(text)                Parse common user-agent strings into components
-  parse_media_type(text)                Parse media type tokens and parameters
-  parse_content_disposition(text)       Parse Content-Disposition header parameters
-  parse_jwt(text)                       Parse JWT header/payload without verification
-  parse_syslog(text)                    Parse syslog line into structured fields
-  parse_cef(text)                       Parse Common Event Format line into fields
-  parse_logfmt(text)                    Parse logfmt line into structured fields
-  parse_combined(text)                  Parse Apache/Nginx combined log line
   read_file(path)                       Read file contents as string
   read_lines(path)                      Read file as array of lines
   exit(code)                            Exit kelora with given exit code

@@ -176,7 +176,7 @@ pub fn parse_ts(
 }
 
 /// Parse duration from string like "1h 30m", "2d", etc.
-pub fn parse_dur(s: &str) -> Result<DurationWrapper, Box<EvalAltResult>> {
+pub fn parse_duration(s: &str) -> Result<DurationWrapper, Box<EvalAltResult>> {
     let mut total_duration = Duration::zero();
     let mut current_number = String::new();
     let mut current_unit = String::new();
@@ -351,7 +351,7 @@ pub fn register_functions(engine: &mut Engine) {
         },
     );
 
-    engine.register_fn("parse_dur", parse_dur);
+    engine.register_fn("parse_duration", parse_duration);
 
     // Current time helpers
     engine.register_fn("now_utc", || DateTimeWrapper::from_utc(Utc::now()));
@@ -578,71 +578,71 @@ mod tests {
     #[test]
     fn test_parse_dur_edge_cases() {
         // Test empty string
-        assert!(parse_dur("").is_err());
+        assert!(parse_duration("").is_err());
 
         // Test invalid characters
-        assert!(parse_dur("1x").is_err());
-        assert!(parse_dur("1h@30m").is_err());
+        assert!(parse_duration("1x").is_err());
+        assert!(parse_duration("1h@30m").is_err());
 
         // Test invalid numbers
-        assert!(parse_dur("ah").is_err());
+        assert!(parse_duration("ah").is_err());
 
         // Test zero duration
-        assert!(parse_dur("0s").is_ok());
+        assert!(parse_duration("0s").is_ok());
 
         // Test complex valid durations
-        assert!(parse_dur("1d 2h 3m 4s").is_ok());
-        assert!(parse_dur("100h").is_ok());
+        assert!(parse_duration("1d 2h 3m 4s").is_ok());
+        assert!(parse_duration("100h").is_ok());
     }
 
     #[test]
     fn test_parse_dur_various_formats() {
         // Test single units
-        let dur_s = parse_dur("30s").unwrap();
+        let dur_s = parse_duration("30s").unwrap();
         assert_eq!(dur_s.inner.num_seconds(), 30);
 
-        let dur_m = parse_dur("5m").unwrap();
+        let dur_m = parse_duration("5m").unwrap();
         assert_eq!(dur_m.inner.num_minutes(), 5);
 
-        let dur_h = parse_dur("2h").unwrap();
+        let dur_h = parse_duration("2h").unwrap();
         assert_eq!(dur_h.inner.num_hours(), 2);
 
-        let dur_d = parse_dur("3d").unwrap();
+        let dur_d = parse_duration("3d").unwrap();
         assert_eq!(dur_d.inner.num_days(), 3);
 
-        let dur_ms = parse_dur("250ms").unwrap();
+        let dur_ms = parse_duration("250ms").unwrap();
         assert_eq!(dur_ms.inner.num_milliseconds(), 250);
 
-        let dur_us = parse_dur("500us").unwrap();
+        let dur_us = parse_duration("500us").unwrap();
         assert_eq!(dur_us.inner.num_microseconds().unwrap(), 500);
 
-        let dur_ns = parse_dur("750ns").unwrap();
+        let dur_ns = parse_duration("750ns").unwrap();
         assert_eq!(dur_ns.inner.num_nanoseconds().unwrap(), 750);
 
         // Test mixed units
-        let dur_mixed = parse_dur("1h 30m").unwrap();
+        let dur_mixed = parse_duration("1h 30m").unwrap();
         assert_eq!(dur_mixed.inner.num_minutes(), 90);
 
         // Test with extra spaces
-        let dur_spaced = parse_dur("  1h   30m  ").unwrap();
+        let dur_spaced = parse_duration("  1h   30m  ").unwrap();
         assert_eq!(dur_spaced.inner.num_minutes(), 90);
 
         // Test compact format without spaces
-        let dur_compact = parse_dur("1m30s").unwrap();
+        let dur_compact = parse_duration("1m30s").unwrap();
         assert_eq!(dur_compact.inner.num_seconds(), 90);
 
         // Test millisecond subsequence with additional unit
-        let dur_combo = parse_dur("2s500ms").unwrap();
+        let dur_combo = parse_duration("2s500ms").unwrap();
         assert_eq!(dur_combo.inner.num_milliseconds(), 2500);
 
         // Test fractional values
-        let dur_fractional = parse_dur("1.5s").unwrap();
+        let dur_fractional = parse_duration("1.5s").unwrap();
         assert_eq!(dur_fractional.inner.num_milliseconds(), 1500);
 
-        let dur_fractional_ms = parse_dur("0.25ms").unwrap();
+        let dur_fractional_ms = parse_duration("0.25ms").unwrap();
         assert_eq!(dur_fractional_ms.inner.num_nanoseconds().unwrap(), 250_000);
 
-        let dur_fractional_minutes = parse_dur("1.25m").unwrap();
+        let dur_fractional_minutes = parse_duration("1.25m").unwrap();
         assert_eq!(dur_fractional_minutes.inner.num_seconds(), 75);
     }
 

@@ -1011,7 +1011,7 @@ fn main() -> Result<()> {
     }
 
     if let Some(ref gap_str) = cli.mark_gaps {
-        match crate::rhai_functions::datetime::parse_dur(gap_str) {
+        match crate::rhai_functions::datetime::parse_duration(gap_str) {
             Ok(duration) => {
                 if duration.inner.is_zero() {
                     stderr

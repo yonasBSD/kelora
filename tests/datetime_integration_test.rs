@@ -54,7 +54,7 @@ fn test_duration_parsing_integration() {
         .arg("json")
         .arg(temp_file.path())
         .arg("--exec")
-        .arg("let dur = parse_dur(e.duration); let minutes = dur.as_minutes(); if minutes == 90 { print(\"DURATION_MATCH\") }")
+        .arg("let dur = parse_duration(e.duration); let minutes = dur.as_minutes(); if minutes == 90 { print(\"DURATION_MATCH\") }")
         .output()
         .expect("Failed to run kelora");
 

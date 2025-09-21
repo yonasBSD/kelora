@@ -518,7 +518,9 @@ mod tests {
             &stages[2],
             ScriptStageType::Filter(script) if script == "e.status < 500"
         ));
-        assert!(matches!(&stages[3], ScriptStageType::Exec(script) if script.contains("meta.count")));
+        assert!(
+            matches!(&stages[3], ScriptStageType::Exec(script) if script.contains("meta.count"))
+        );
     }
 
     #[test]
@@ -537,11 +539,7 @@ mod tests {
         let _ = std::fs::remove_file(&missing_path);
         let missing = missing_path.to_string_lossy().to_string();
 
-        let args = vec![
-            "kelora".to_string(),
-            "-E".to_string(),
-            missing.clone(),
-        ];
+        let args = vec!["kelora".to_string(), "-E".to_string(), missing.clone()];
 
         let (cli, matches) = parse_cli(&args);
         let err = cli
