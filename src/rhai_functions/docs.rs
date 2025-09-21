@@ -65,8 +65,8 @@ MAP/OBJECT FUNCTIONS:
   map.flatten([separator [, style]])    Flatten nested object to dot notation
   map.unflatten([separator])            Reconstruct nested object from flat keys
   map.merge(other_map)                  Merge another map into this one
-  obj.get_path("field.path" [, default]) Safe nested field access with fallback
-  obj.has_path("field.path")            Check if nested field path exists
+  map.get_path("field.path" [, default]) Safe nested field access with fallback
+  map.has_path("field.path")            Check if nested field path exists
 
 EVENT MANIPULATION:
   emit_each(array [, base_map])         Fan out array elements as separate events
@@ -104,7 +104,7 @@ SAFETY FUNCTIONS:
   to_int(text)                          Convert text to integer (0 on error)
   to_float(text)                        Convert text to float (0 on error)
   to_bool(value [, default])            Safe boolean conversion with fallback
-  path_equals(obj, "path", value)       Safe nested field comparison
+  path_equals(map, "path", value)       Safe nested field comparison
 
 UTILITY FUNCTIONS:
   print(message)                        Print to stdout (suppressed with -qqq)
