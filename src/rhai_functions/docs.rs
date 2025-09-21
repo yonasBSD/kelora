@@ -51,6 +51,8 @@ STRING/TEXT FUNCTIONS:
   text.unescape_html()                  Unescape HTML entities to text
   text.unescape_json()                  Unescape JSON escape sequences
   text.upper()                          Convert text to uppercase
+  to_int(text)                          Convert text to integer (0 on error)
+  to_float(text)                        Convert text to float (0 on error)
 
 ARRAY FUNCTIONS:
   array.join(separator)                 Join array elements with separator
@@ -67,6 +69,11 @@ MAP/OBJECT FUNCTIONS:
   map.merge(other_map)                  Merge another map into this one
   map.get_path("field.path" [, default]) Safe nested field access with fallback
   map.has_path("field.path")            Check if nested field path exists
+  map.path_equals("path", value)        Safe nested field comparison
+
+VALUE SAFETY FUNCTIONS:
+  to_number(value [, default])          Safe number conversion with fallback (default: 0)
+  to_bool(value [, default])            Safe boolean conversion with fallback
 
 EVENT MANIPULATION:
   emit_each(array [, base_map])         Fan out array elements as separate events
@@ -98,13 +105,6 @@ MATH/UTILITY FUNCTIONS:
   mod(a, b) / a % b                     Modulo operation with division-by-zero protection
   rand()                                Random float between 0 and 1
   rand_int(min, max)                    Random integer between min and max (inclusive)
-
-SAFETY FUNCTIONS:
-  to_number(value [, default])          Safe number conversion with fallback (default: 0)
-  to_int(text)                          Convert text to integer (0 on error)
-  to_float(text)                        Convert text to float (0 on error)
-  to_bool(value [, default])            Safe boolean conversion with fallback
-  path_equals(map, "path", value)       Safe nested field comparison
 
 UTILITY FUNCTIONS:
   print(message)                        Print to stdout (suppressed with -qqq)
