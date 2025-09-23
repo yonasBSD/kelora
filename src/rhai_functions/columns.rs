@@ -530,12 +530,6 @@ fn apply_spec<'a>(
         if strict {
             return Err(message.into());
         }
-        warnings.push(message);
-    }
-
-    if !warnings.is_empty() {
-        let warn_array: Array = warnings.into_iter().map(Dynamic::from).collect();
-        result.insert("_warn".into(), Dynamic::from(warn_array));
     }
 
     Ok(result)
@@ -841,7 +835,6 @@ mod parse_cols_tests {
         );
         assert_eq!(dynamic_to_string(map.get("level").unwrap()), "INFO");
         assert_eq!(dynamic_to_string(map.get("msg").unwrap()), "hello   world");
-        assert!(!map.contains_key("_warn"));
     }
 
     #[test]
@@ -857,7 +850,6 @@ mod parse_cols_tests {
         );
         assert_eq!(dynamic_to_string(map.get("level").unwrap()), "INFO");
         assert_eq!(dynamic_to_string(map.get("msg").unwrap()), "|done");
-        assert!(!map.contains_key("_warn"));
     }
 
     #[test]
@@ -874,10 +866,6 @@ mod parse_cols_tests {
 
         assert_eq!(dynamic_to_string(map.get("ts").unwrap()), "2025-09-22");
         assert!(map.get("action").unwrap().is_unit());
-
-        let warn = map.get("_warn").unwrap().clone().into_array().unwrap();
-        assert_eq!(warn.len(), 1);
-        assert!(warn[0].to_string().contains("expected >="));
     }
 
     #[test]
@@ -900,7 +888,6 @@ mod parse_cols_tests {
             dynamic_to_string(map.get("rest").unwrap()),
             "delta::epsilon"
         );
-        assert!(!map.contains_key("_warn"));
     }
 
     #[test]
