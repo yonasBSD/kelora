@@ -395,6 +395,11 @@ impl ScriptStage for KeyFilterStage {
         // Apply the filtering
         event.filter_keys(&effective_keys);
 
+        // Mark that key filtering has been applied to this event
+        if self.is_active() {
+            event.key_filtered = true;
+        }
+
         // If any key filtering was applied and no fields remain, skip this event
         if self.is_active() && event.fields.is_empty() {
             ScriptResult::Skip

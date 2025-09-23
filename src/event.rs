@@ -292,9 +292,62 @@ pub const MESSAGE_FIELD_NAMES: &[&str] = &[
     "@m",
 ];
 
+/// Create an ordered iterator over event fields, prioritizing timestamps, log levels, and messages
+///
+/// If the event has been processed by key filtering (--keys/--exclude-keys),
+/// the existing order is preserved. Otherwise, returns field pairs in this order:
+/// 1. Timestamp fields (in order of TIMESTAMP_FIELD_NAMES)
+/// 2. Log level fields (in order of LEVEL_FIELD_NAMES)
+/// 3. Message fields (in order of MESSAGE_FIELD_NAMES)
+/// 4. All other fields (sorted alphabetically)
+pub fn ordered_fields<'a>(event: &'a Event) -> Vec<(&'a String, &'a rhai::Dynamic)> {
+    // If the event has been processed by key filtering, preserve the existing order
+    if event.key_filtered {
+        return event.fields.iter().collect();
+    }
+
+    let mut ordered = Vec::with_capacity(event.fields.len());
+
+    // 1. Add timestamp fields in priority order
+    for &ts_name in TIMESTAMP_FIELD_NAMES {
+        if let Some((key, value)) = event.fields.get_key_value(ts_name) {
+            ordered.push((key, value));
+        }
+    }
+
+    // 2. Add log level fields in priority order
+    for &level_name in LEVEL_FIELD_NAMES {
+        if let Some((key, value)) = event.fields.get_key_value(level_name) {
+            ordered.push((key, value));
+        }
+    }
+
+    // 3. Add message fields in priority order
+    for &msg_name in MESSAGE_FIELD_NAMES {
+        if let Some((key, value)) = event.fields.get_key_value(msg_name) {
+            ordered.push((key, value));
+        }
+    }
+
+    // 4. Add all remaining fields in IndexMap order (no additional sorting)
+    let remaining: Vec<_> = event.fields.iter()
+        .filter(|(key, _)| {
+            !TIMESTAMP_FIELD_NAMES.contains(&key.as_str()) &&
+            !LEVEL_FIELD_NAMES.contains(&key.as_str()) &&
+            !MESSAGE_FIELD_NAMES.contains(&key.as_str())
+        })
+        .collect();
+
+    ordered.extend(remaining);
+
+    ordered
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Event {
     pub fields: IndexMap<String, Dynamic>,
+    /// Flag indicating whether this event has been processed by key filtering (--keys/--exclude-keys)
+    pub key_filtered: bool,
     pub original_line: String,
     pub line_num: Option<usize>,
     pub filename: Option<String>,
@@ -316,6 +369,7 @@ impl Event {
     pub fn with_capacity(original_line: String, capacity: usize) -> Self {
         Self {
             fields: IndexMap::with_capacity(capacity),
+            key_filtered: false,
             original_line,
             line_num: None,
             filename: None,

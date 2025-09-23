@@ -189,7 +189,7 @@ impl pipeline::Formatter for JsonFormatter {
         // Convert Dynamic values to JSON manually
         let mut json_obj = serde_json::Map::new();
 
-        for (key, value) in &event.fields {
+        for (key, value) in crate::event::ordered_fields(event) {
             let json_value = dynamic_to_json(value);
             json_obj.insert(key.clone(), json_value);
         }
@@ -538,7 +538,7 @@ impl pipeline::Formatter for DefaultFormatter {
         let mut first_on_line = true;
         let mut first_overall = true;
 
-        for (key, value) in &event.fields {
+        for (key, value) in crate::event::ordered_fields(event) {
             // Build the field string first to measure its length
             let mut field_output = String::new();
 
@@ -699,7 +699,7 @@ impl DefaultFormatter {
         let mut output = String::with_capacity(estimated_capacity);
         let mut first = true;
 
-        for (key, value) in &event.fields {
+        for (key, value) in crate::event::ordered_fields(event) {
             if !first {
                 output.push(' ');
             }
@@ -1070,7 +1070,7 @@ impl pipeline::Formatter for InspectFormatter {
         let mut lines = Vec::new();
         self.format_entries(
             &mut lines,
-            event.fields.iter().map(|(k, v)| (k.as_str(), v)),
+            crate::event::ordered_fields(event).into_iter().map(|(k, v)| (k.as_str(), v)),
             0,
         );
         lines.insert(0, "---".to_string());
@@ -1174,7 +1174,7 @@ impl pipeline::Formatter for LogfmtFormatter {
         let mut output = String::with_capacity(estimated_capacity);
         let mut first = true;
 
-        for (key, value) in &event.fields {
+        for (key, value) in crate::event::ordered_fields(event) {
             if !first {
                 output.push(' ');
             }
