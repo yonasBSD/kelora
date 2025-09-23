@@ -144,6 +144,14 @@ fn try_parse_with_format(
 ) -> Option<DateTime<Utc>> {
     use chrono_tz::Tz;
 
+    // Strip brackets if present (common in Apache/Nginx logs)
+    let ts_str = ts_str.trim();
+    let ts_str = if ts_str.starts_with('[') && ts_str.ends_with(']') {
+        &ts_str[1..ts_str.len()-1]
+    } else {
+        ts_str
+    };
+
     // Handle comma-separated fractional seconds (Python logging format)
     let (processed_ts_str, processed_format) = if format.contains(",%f") {
         // Convert comma to dot for chrono compatibility and handle milliseconds properly
@@ -661,6 +669,14 @@ mod tests {
 
         let result = parse_timestamp_arg_with_timezone("invalid-timestamp", None);
         assert!(result.is_err());
+
+        // Test bracketed timestamps (common in Apache/Nginx logs)
+        let result = parse_timestamp_arg_with_timezone("[9/Feb/2017:10:34:12 -0700]", None);
+        assert!(result.is_ok());
+        let dt = result.unwrap();
+        assert_eq!(dt.year(), 2017);
+        assert_eq!(dt.month(), 2);
+        assert_eq!(dt.day(), 9);
     }
 
     #[test]
@@ -782,5 +798,42 @@ mod tests {
 
         let result = parser.parse_ts("12345678901234567890123"); // too long
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_bracketed_timestamp_parsing() {
+        let mut parser = AdaptiveTsParser::new();
+
+        // Test Apache/Nginx log format with brackets
+        let result = parser.parse_ts("[9/Feb/2017:10:34:12 -0700]");
+        assert!(result.is_some());
+        let dt = result.unwrap();
+        assert_eq!(dt.year(), 2017);
+        assert_eq!(dt.month(), 2);
+        assert_eq!(dt.day(), 9);
+        assert_eq!(dt.hour(), 17); // 10:34 -0700 = 17:34 UTC
+        assert_eq!(dt.minute(), 34);
+        assert_eq!(dt.second(), 12);
+
+        // Test without brackets (should still work)
+        let result = parser.parse_ts("9/Feb/2017:10:34:12 -0700");
+        assert!(result.is_some());
+        let dt = result.unwrap();
+        assert_eq!(dt.year(), 2017);
+        assert_eq!(dt.month(), 2);
+
+        // Test other bracketed formats
+        let result = parser.parse_ts("[2023-07-04T12:34:56Z]");
+        assert!(result.is_some());
+        let dt = result.unwrap();
+        assert_eq!(dt.year(), 2023);
+
+        let result = parser.parse_ts("[2023-07-04 12:34:56]");
+        assert!(result.is_some());
+        let dt = result.unwrap();
+        assert_eq!(dt.year(), 2023);
+
+        // Edge case: malformed brackets are outside our scope -
+        // our improvement handles the common case of properly bracketed timestamps
     }
 }
