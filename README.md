@@ -114,6 +114,33 @@ Prefix extraction runs before parsing, so the extracted prefix becomes a field i
 
 **Array Processing**: `emit_each(array)` fans out arrays into individual events, `emit_each(array, base)` adds common fields to each. Transforms nested data like `{"users": [{"name": "alice"}, {"name": "bob"}]}` into separate events for each user. Original event is suppressed.
 
+**Column Mapping**: `line.parse_cols("ts(2) level *msg")` declaratively assigns whitespace-delimited columns, `line.parse_cols("ts level *msg", "|")` honors literal separators, and `["field","values"].parse_cols("name value")` works with pre-split arrays.
+
+Specs use short tokens:
+
+- `name` assigns a single column to the field (e.g. `level`).
+- `name(n)` consumes `n ≥ 2` columns, joining them with the current separator (`ts(2)` grabs the date and time).
+- `-` skips one column, `-(n)` skips many.
+- `*name` captures the remainder verbatim (strings) or joined with spaces/separator (arrays); it must be last and unique.
+
+Most scripts simply replace the event with the parsed map: `e = e.line.parse_cols("ts level *msg")`.
+
+```rhai
+// Whitespace-delimited: collapse extra spaces, preserve rest verbatim
+// Example line: "2025-09-22 12:33:44 -- INFO hello   world"
+e = e.line.parse_cols("ts(2) level *msg");
+
+// Custom separator: keep empty columns and join multi-column fields with the same separator
+// Example line: "alice|LOGIN||success"
+e = e.line.parse_cols("user action *rest", "|");
+
+// Array overload: when split() already gave you columns
+let cols = e.line.split("|");
+let parsed = cols.parse_cols("service status *rest", "|");
+e.service = parsed["service"];
+e.status = parsed["status"];
+```
+
 **Metrics**: `track_count(key)` increments counters, `track_sum/avg/min/max(key, value)` accumulate statistics, `track_unique(key, value)` counts distinct values. Access via `metrics` map in `--end` scripts or display with `--metrics`.
 
 **Output**: Use `eprint()` for alerts and diagnostics (writes to stderr), `print()` for data output (writes to stdout). Since kelora's processed events go to stdout, `eprint()` prevents interference with the data pipeline.

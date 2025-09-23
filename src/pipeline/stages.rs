@@ -2,6 +2,7 @@ use super::{PipelineContext, ScriptResult, ScriptStage};
 use crate::config::TimestampFilterConfig;
 use crate::engine::RhaiEngine;
 use crate::event::Event;
+use crate::rhai_functions::columns;
 use anyhow::Result;
 
 /// Filter stage implementation
@@ -31,6 +32,8 @@ impl ScriptStage for FilterStage {
         if let Some(ref tracer) = ctx.rhai.get_execution_tracer() {
             tracer.trace_stage_execution(self.stage_number, "filter");
         }
+
+        columns::set_parse_cols_strict(ctx.config.strict);
 
         let result = if ctx.window.is_empty() {
             // No window context - use standard method
@@ -112,6 +115,8 @@ impl ScriptStage for ExecStage {
 
         // Atomic execution: work on a copy of the event for rollback behavior
         let mut event_copy = event.clone();
+
+        columns::set_parse_cols_strict(ctx.config.strict);
 
         let result = if ctx.window.is_empty() {
             // No window context - use standard method
@@ -221,6 +226,7 @@ impl BeginStage {
     #[allow(dead_code)] // Used by sequential processing pipeline
     pub fn execute(&self, ctx: &mut PipelineContext) -> Result<()> {
         if let Some(ref compiled) = self.compiled_begin {
+            columns::set_parse_cols_strict(ctx.config.strict);
             let _init_map = ctx
                 .rhai
                 .execute_compiled_begin(compiled, &mut ctx.tracker)?;
@@ -251,6 +257,7 @@ impl EndStage {
     #[allow(dead_code)] // Used by sequential processing pipeline
     pub fn execute(&self, ctx: &PipelineContext) -> Result<()> {
         if let Some(ref compiled) = self.compiled_end {
+            columns::set_parse_cols_strict(ctx.config.strict);
             ctx.rhai.execute_compiled_end(compiled, &ctx.tracker)
         } else {
             Ok(())

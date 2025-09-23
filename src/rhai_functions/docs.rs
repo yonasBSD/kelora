@@ -36,6 +36,7 @@ STRING/TEXT FUNCTIONS:
   text.parse_combined()                 Parse Apache/Nginx combined log line
   text.parse_content_disposition()      Parse Content-Disposition header parameters
   text.parse_email()                    Parse email address into parts
+  text.parse_cols(spec [, sep])         Parse columns according to spec (typical: e = text.parse_cols(...))
   text.parse_jwt()                      Parse JWT header/payload without verification
   text.parse_kv([sep [, kv_sep]])       Parse key-value pairs from text
   text.parse_logfmt()                   Parse logfmt line into structured fields
@@ -57,6 +58,7 @@ STRING/TEXT FUNCTIONS:
 ARRAY FUNCTIONS:
   array.join(separator)                 Join array elements with separator
   array.flatten([style [, max_depth]])  Flatten nested arrays/objects
+  array.parse_cols(spec [, sep])        Apply column spec to pre-split values
   reversed(array)                       Return new array in reverse order
   sorted(array)                         Return new sorted array (numeric/lexicographic)
   sorted_by(array, field)               Sort array of objects by field name

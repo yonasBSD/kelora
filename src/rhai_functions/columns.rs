@@ -1,6 +1,25 @@
-use rhai::{Dynamic, Engine};
+use rhai::{Array, Dynamic, Engine, Map};
+use std::cell::Cell;
+
+thread_local! {
+    static PARSE_COLS_STRICT: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Set strict parsing mode for parse_cols (controlled by pipeline config)
+pub fn set_parse_cols_strict(strict: bool) {
+    PARSE_COLS_STRICT.with(|flag| flag.set(strict));
+}
+
+fn is_parse_cols_strict() -> bool {
+    PARSE_COLS_STRICT.with(|flag| flag.get())
+}
 
 pub fn register_functions(engine: &mut Engine) {
+    engine.register_fn("parse_cols", parse_cols_whitespace);
+    engine.register_fn("parse_cols", parse_cols_with_sep);
+    engine.register_fn("parse_cols", parse_cols_array);
+    engine.register_fn("parse_cols", parse_cols_array_with_sep);
+
     // Column extraction functions
     engine.register_fn("col", |text: &str, selector: &str| -> String {
         extract_columns(text, selector, " ", " ")
@@ -309,6 +328,403 @@ pub fn register_functions(engine: &mut Engine) {
     });
 }
 
+fn parse_cols_whitespace(line: &str, spec: &str) -> Result<Map, Box<rhai::EvalAltResult>> {
+    let plan = parse_spec(spec)?;
+    let (columns, byte_starts) = split_whitespace_columns(line);
+    apply_spec(
+        &plan,
+        &columns,
+        Some(&byte_starts),
+        Some(line),
+        JoinPolicy::Space,
+        is_parse_cols_strict(),
+    )
+}
+
+fn parse_cols_with_sep(line: &str, spec: &str, sep: &str) -> Result<Map, Box<rhai::EvalAltResult>> {
+    if sep.is_empty() {
+        return Err("parse_cols: separator must not be empty".into());
+    }
+
+    let plan = parse_spec(spec)?;
+    let (columns, byte_starts) = split_with_separator(line, sep);
+    apply_spec(
+        &plan,
+        &columns,
+        Some(&byte_starts),
+        Some(line),
+        JoinPolicy::Literal(sep),
+        is_parse_cols_strict(),
+    )
+}
+
+fn parse_cols_array(values: Array, spec: &str) -> Result<Map, Box<rhai::EvalAltResult>> {
+    let plan = parse_spec(spec)?;
+
+    let mut owned: Vec<String> = Vec::with_capacity(values.len());
+    for value in values.into_iter() {
+        let type_name = value.type_name().to_string();
+        let string = value
+            .into_string()
+            .map_err(|_| -> Box<rhai::EvalAltResult> {
+                format!(
+                    "parse_cols: array elements must be strings (got {})",
+                    type_name
+                )
+                .into()
+            })?;
+        owned.push(string);
+    }
+
+    let refs: Vec<&str> = owned.iter().map(|s| s.as_str()).collect();
+
+    apply_spec(
+        &plan,
+        &refs,
+        None,
+        None,
+        JoinPolicy::ArraySpace,
+        is_parse_cols_strict(),
+    )
+}
+
+fn parse_cols_array_with_sep(
+    values: Array,
+    spec: &str,
+    sep: &str,
+) -> Result<Map, Box<rhai::EvalAltResult>> {
+    let plan = parse_spec(spec)?;
+
+    let mut owned: Vec<String> = Vec::with_capacity(values.len());
+    for value in values.into_iter() {
+        let type_name = value.type_name().to_string();
+        let string = value
+            .into_string()
+            .map_err(|_| -> Box<rhai::EvalAltResult> {
+                format!(
+                    "parse_cols: array elements must be strings (got {})",
+                    type_name
+                )
+                .into()
+            })?;
+        owned.push(string);
+    }
+
+    let refs: Vec<&str> = owned.iter().map(|s| s.as_str()).collect();
+
+    apply_spec(
+        &plan,
+        &refs,
+        None,
+        None,
+        JoinPolicy::Literal(sep),
+        is_parse_cols_strict(),
+    )
+}
+
+fn apply_spec<'a>(
+    plan: &SpecPlan,
+    columns: &[&'a str],
+    byte_starts: Option<&[usize]>,
+    original_line: Option<&'a str>,
+    join_policy: JoinPolicy<'a>,
+    strict: bool,
+) -> Result<Map, Box<rhai::EvalAltResult>> {
+    let mut result = Map::new();
+    let mut warnings: Vec<String> = Vec::new();
+    let mut shortage_detected = false;
+    let mut index = 0usize;
+    let total_columns = columns.len();
+
+    for token in &plan.tokens {
+        match token {
+            SpecToken::Field { name, count } => {
+                let available = total_columns.saturating_sub(index);
+                let take = available.min(*count);
+
+                if take > 0 {
+                    let value = if *count == 1 && take == 1 {
+                        Dynamic::from(columns[index].to_string())
+                    } else {
+                        Dynamic::from(join_values(&columns[index..index + take], &join_policy))
+                    };
+                    result.insert(name.clone().into(), value);
+                } else {
+                    result.insert(name.clone().into(), Dynamic::UNIT);
+                }
+
+                if take < *count {
+                    shortage_detected = true;
+                }
+
+                index += take;
+            }
+            SpecToken::Skip { count } => {
+                let available = total_columns.saturating_sub(index);
+                if available < *count {
+                    shortage_detected = true;
+                    index = total_columns;
+                } else {
+                    index += *count;
+                }
+            }
+            SpecToken::Rest { name } => {
+                let value = if index < total_columns {
+                    if let (Some(starts), Some(line)) = (byte_starts, original_line) {
+                        if let Some(start_idx) = starts.get(index) {
+                            if *start_idx < line.len() {
+                                Dynamic::from(line[*start_idx..].to_string())
+                            } else {
+                                Dynamic::UNIT
+                            }
+                        } else {
+                            Dynamic::UNIT
+                        }
+                    } else {
+                        let remainder = &columns[index..];
+                        if remainder.is_empty() {
+                            Dynamic::UNIT
+                        } else {
+                            Dynamic::from(join_values(remainder, &join_policy))
+                        }
+                    }
+                } else {
+                    Dynamic::UNIT
+                };
+
+                result.insert(name.clone().into(), value);
+                index = total_columns;
+                break;
+            }
+        }
+    }
+
+    let need_min = plan.min_required;
+    if total_columns < need_min {
+        shortage_detected = true;
+    }
+
+    let consumed = index.min(total_columns);
+    let extra = if plan.has_rest {
+        0
+    } else {
+        total_columns.saturating_sub(consumed)
+    };
+
+    if shortage_detected {
+        let message = format!(
+            "parse_cols: expected >= {} columns (got {})",
+            need_min, total_columns
+        );
+        if strict {
+            return Err(message.into());
+        }
+        warnings.push(message);
+    }
+
+    if extra > 0 {
+        let message = format!(
+            "parse_cols: {} unconsumed columns; add *field or skip with -",
+            extra
+        );
+        if strict {
+            return Err(message.into());
+        }
+        warnings.push(message);
+    }
+
+    if !warnings.is_empty() {
+        let warn_array: Array = warnings.into_iter().map(Dynamic::from).collect();
+        result.insert("_warn".into(), Dynamic::from(warn_array));
+    }
+
+    Ok(result)
+}
+
+fn split_whitespace_columns(line: &str) -> (Vec<&str>, Vec<usize>) {
+    let bytes = line.as_bytes();
+    let mut columns = Vec::new();
+    let mut starts = Vec::new();
+    let mut i = 0usize;
+
+    while i < bytes.len() {
+        while i < bytes.len() && (bytes[i] == b' ' || bytes[i] == b'\t') {
+            i += 1;
+        }
+
+        if i >= bytes.len() {
+            break;
+        }
+
+        let start = i;
+        while i < bytes.len() && bytes[i] != b' ' && bytes[i] != b'\t' {
+            i += 1;
+        }
+        let end = i;
+
+        columns.push(&line[start..end]);
+        starts.push(start);
+    }
+
+    (columns, starts)
+}
+
+fn split_with_separator<'a>(line: &'a str, sep: &str) -> (Vec<&'a str>, Vec<usize>) {
+    let mut columns = Vec::new();
+    let mut starts = Vec::new();
+    let mut last = 0usize;
+
+    for (idx, _) in line.match_indices(sep) {
+        columns.push(&line[last..idx]);
+        starts.push(last);
+        last = idx + sep.len();
+    }
+
+    columns.push(&line[last..]);
+    starts.push(last);
+
+    (columns, starts)
+}
+
+fn parse_spec(spec: &str) -> Result<SpecPlan, Box<rhai::EvalAltResult>> {
+    let mut tokens = Vec::new();
+    let mut seen_rest = false;
+    let mut min_required = 0usize;
+
+    for raw_token in spec.split_whitespace() {
+        if raw_token.is_empty() {
+            continue;
+        }
+
+        if raw_token.starts_with('*') {
+            if seen_rest {
+                return Err("parse_cols: *field may appear only once and must be last".into());
+            }
+            let name = &raw_token[1..];
+            if name.is_empty() {
+                return Err("parse_cols: *field requires a name".into());
+            }
+            if !is_valid_field_name(name) {
+                return Err(format!("parse_cols: invalid field name '{}'", name).into());
+            }
+
+            tokens.push(SpecToken::Rest {
+                name: name.to_string(),
+            });
+            seen_rest = true;
+            continue;
+        }
+
+        if seen_rest {
+            return Err("parse_cols: *field must be the final token".into());
+        }
+
+        if raw_token == "-" {
+            tokens.push(SpecToken::Skip { count: 1 });
+            min_required += 1;
+            continue;
+        }
+
+        if raw_token.starts_with("-(") && raw_token.ends_with(')') {
+            let count = parse_count(&raw_token[2..raw_token.len() - 1], "skip")?;
+            tokens.push(SpecToken::Skip { count });
+            min_required += count;
+            continue;
+        }
+
+        let (name, count) = parse_field_token(raw_token)?;
+        min_required += count;
+        tokens.push(SpecToken::Field { name, count });
+    }
+
+    if tokens.is_empty() {
+        return Err("parse_cols: spec must contain at least one token".into());
+    }
+
+    let has_rest = matches!(tokens.last(), Some(SpecToken::Rest { .. }));
+    if seen_rest && !has_rest {
+        return Err("parse_cols: *field must be the final token".into());
+    }
+
+    Ok(SpecPlan {
+        tokens,
+        min_required,
+        has_rest,
+    })
+}
+
+fn parse_field_token(token: &str) -> Result<(String, usize), Box<rhai::EvalAltResult>> {
+    if let Some(open) = token.find('(') {
+        if !token.ends_with(')') {
+            return Err(format!("parse_cols: invalid field token '{}'", token).into());
+        }
+
+        let name = &token[..open];
+        let count_str = &token[open + 1..token.len() - 1];
+
+        if name.is_empty() || !is_valid_field_name(name) {
+            return Err(format!("parse_cols: invalid field name '{}'", name).into());
+        }
+
+        let count = parse_count(count_str, "field")?;
+        Ok((name.to_string(), count))
+    } else {
+        if !is_valid_field_name(token) {
+            return Err(format!("parse_cols: invalid field name '{}'", token).into());
+        }
+        Ok((token.to_string(), 1))
+    }
+}
+
+fn parse_count(value: &str, kind: &str) -> Result<usize, Box<rhai::EvalAltResult>> {
+    if value.is_empty() || !value.chars().all(|c| c.is_ascii_digit()) {
+        return Err(format!("parse_cols: invalid {} count '{}'", kind, value).into());
+    }
+
+    let count = value.parse::<usize>().unwrap_or(0);
+    if count < 2 {
+        return Err(format!("parse_cols: {} count must be >= 2 (got {})", kind, count).into());
+    }
+    Ok(count)
+}
+
+fn is_valid_field_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(ch) if ch == '_' || ch.is_ascii_alphabetic() => {}
+        _ => return false,
+    }
+
+    chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+}
+
+fn join_values(slice: &[&str], policy: &JoinPolicy<'_>) -> String {
+    match policy {
+        JoinPolicy::Space | JoinPolicy::ArraySpace => slice.join(" "),
+        JoinPolicy::Literal(sep) => slice.join(sep),
+    }
+}
+
+#[derive(Debug)]
+struct SpecPlan {
+    tokens: Vec<SpecToken>,
+    min_required: usize,
+    has_rest: bool,
+}
+
+#[derive(Debug)]
+enum SpecToken {
+    Field { name: String, count: usize },
+    Skip { count: usize },
+    Rest { name: String },
+}
+
+enum JoinPolicy<'a> {
+    Space,
+    Literal(&'a str),
+    ArraySpace,
+}
+
 /// Extract columns from text using selector syntax
 fn extract_columns(text: &str, selector: &str, sep: &str, outsep: &str) -> String {
     let columns = split_text(text, sep);
@@ -398,6 +814,109 @@ fn parse_range_selector(range: &str, total_cols: usize) -> Vec<usize> {
     }
 
     (start..end.min(total_cols)).collect()
+}
+
+#[cfg(test)]
+mod parse_cols_tests {
+    use super::*;
+    use rhai::{Array, Dynamic};
+
+    fn dynamic_to_string(value: &Dynamic) -> String {
+        value.clone().into_string().unwrap()
+    }
+
+    #[test]
+    fn parse_cols_whitespace_keeps_verbatim_tail() {
+        set_parse_cols_strict(false);
+
+        let map = parse_cols_whitespace(
+            "2025-09-22 12:33:44 -- INFO hello   world",
+            "ts(2) - level *msg",
+        )
+        .unwrap();
+
+        assert_eq!(
+            dynamic_to_string(map.get("ts").unwrap()),
+            "2025-09-22 12:33:44"
+        );
+        assert_eq!(dynamic_to_string(map.get("level").unwrap()), "INFO");
+        assert_eq!(dynamic_to_string(map.get("msg").unwrap()), "hello   world");
+        assert!(!map.contains_key("_warn"));
+    }
+
+    #[test]
+    fn parse_cols_custom_separator_preserves_empty_columns() {
+        set_parse_cols_strict(false);
+
+        let map =
+            parse_cols_with_sep("2025-09-22|12:34:56|INFO||done", "ts(2) level *msg", "|").unwrap();
+
+        assert_eq!(
+            dynamic_to_string(map.get("ts").unwrap()),
+            "2025-09-22|12:34:56"
+        );
+        assert_eq!(dynamic_to_string(map.get("level").unwrap()), "INFO");
+        assert_eq!(dynamic_to_string(map.get("msg").unwrap()), "|done");
+        assert!(!map.contains_key("_warn"));
+    }
+
+    #[test]
+    fn parse_cols_array_resilient_shortage_sets_unit() {
+        set_parse_cols_strict(false);
+
+        let columns: Array = vec![
+            Dynamic::from("2025-09-22"),
+            Dynamic::from("INFO"),
+            Dynamic::from("alice"),
+        ];
+
+        let map = parse_cols_array(columns, "ts level user action").unwrap();
+
+        assert_eq!(dynamic_to_string(map.get("ts").unwrap()), "2025-09-22");
+        assert!(map.get("action").unwrap().is_unit());
+
+        let warn = map.get("_warn").unwrap().clone().into_array().unwrap();
+        assert_eq!(warn.len(), 1);
+        assert!(warn[0].to_string().contains("expected >="));
+    }
+
+    #[test]
+    fn parse_cols_array_with_custom_separator() {
+        set_parse_cols_strict(false);
+
+        let columns: Array = vec![
+            Dynamic::from("alpha"),
+            Dynamic::from("beta"),
+            Dynamic::from("gamma"),
+            Dynamic::from("delta"),
+            Dynamic::from("epsilon"),
+        ];
+
+        let map = parse_cols_array_with_sep(columns, "first second(2) *rest", "::").unwrap();
+
+        assert_eq!(dynamic_to_string(map.get("first").unwrap()), "alpha");
+        assert_eq!(dynamic_to_string(map.get("second").unwrap()), "beta::gamma");
+        assert_eq!(
+            dynamic_to_string(map.get("rest").unwrap()),
+            "delta::epsilon"
+        );
+        assert!(!map.contains_key("_warn"));
+    }
+
+    #[test]
+    fn parse_cols_strict_shortage_errors() {
+        set_parse_cols_strict(true);
+        let result = parse_cols_whitespace("a b", "first second third");
+        assert!(result.is_err());
+        set_parse_cols_strict(false);
+    }
+
+    #[test]
+    fn parse_cols_rejects_invalid_counts() {
+        set_parse_cols_strict(false);
+        let err = parse_cols_whitespace("hello", "field(1)").unwrap_err();
+        assert!(err.to_string().contains("count"));
+    }
 }
 
 /// Convert potentially negative index to positive index
