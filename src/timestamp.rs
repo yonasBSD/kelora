@@ -179,7 +179,9 @@ fn try_parse_with_format(
     }
 
     // Try naive parsing
-    if let Ok(naive_dt) = chrono::NaiveDateTime::parse_from_str(&processed_ts_str, &processed_format) {
+    if let Ok(naive_dt) =
+        chrono::NaiveDateTime::parse_from_str(&processed_ts_str, &processed_format)
+    {
         // Apply timezone configuration
         match default_timezone {
             Some("UTC") => {
@@ -731,21 +733,30 @@ mod tests {
         assert_eq!(dt.minute(), 52);
         assert_eq!(dt.second(), 9);
         // 487 milliseconds should equal 487,000,000 nanoseconds
-        assert_eq!(dt.timestamp_nanos_opt().unwrap() % 1_000_000_000, 487_000_000);
+        assert_eq!(
+            dt.timestamp_nanos_opt().unwrap() % 1_000_000_000,
+            487_000_000
+        );
 
         // Test 2-digit centiseconds
         let result = parser.parse_ts_with_config("2010-04-24 07:52:09,12", None, Some("UTC"));
         assert!(result.is_some());
         let dt = result.unwrap();
         // 12 centiseconds = 120 milliseconds = 120,000,000 nanoseconds
-        assert_eq!(dt.timestamp_nanos_opt().unwrap() % 1_000_000_000, 120_000_000);
+        assert_eq!(
+            dt.timestamp_nanos_opt().unwrap() % 1_000_000_000,
+            120_000_000
+        );
 
         // Test 1-digit deciseconds
         let result = parser.parse_ts_with_config("2010-04-24 07:52:09,5", None, Some("UTC"));
         assert!(result.is_some());
         let dt = result.unwrap();
         // 5 deciseconds = 500 milliseconds = 500,000,000 nanoseconds
-        assert_eq!(dt.timestamp_nanos_opt().unwrap() % 1_000_000_000, 500_000_000);
+        assert_eq!(
+            dt.timestamp_nanos_opt().unwrap() % 1_000_000_000,
+            500_000_000
+        );
     }
 
     #[test]

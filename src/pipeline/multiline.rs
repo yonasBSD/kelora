@@ -270,7 +270,10 @@ impl Chunker for MultilineChunker {
 }
 
 /// Create a chunker based on multiline configuration
-pub fn create_multiline_chunker(config: &MultilineConfig, input_format: InputFormat) -> Result<Box<dyn Chunker>, String> {
+pub fn create_multiline_chunker(
+    config: &MultilineConfig,
+    input_format: InputFormat,
+) -> Result<Box<dyn Chunker>, String> {
     let chunker = MultilineChunker::new(config.clone(), input_format)?;
     Ok(Box::new(chunker))
 }
