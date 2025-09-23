@@ -29,6 +29,7 @@ struct PlainLineContext<'a> {
     skip_lines: usize,
     input_format: &'a crate::config::InputFormat,
     ignore_lines: &'a Option<regex::Regex>,
+    keep_lines: &'a Option<regex::Regex>,
     pending_deadline: &'a mut Option<Instant>,
 }
 
@@ -473,6 +474,7 @@ impl ParallelProcessor {
             let batch_sender = batch_sender.clone();
             let batch_size = self.config.batch_size;
             let ignore_lines = config.input.ignore_lines.clone();
+            let keep_lines = config.input.keep_lines.clone();
             let skip_lines = config.input.skip_lines;
             let global_tracker_clone = self.global_tracker.clone();
             let input_format = config.input.format.clone();
@@ -486,6 +488,7 @@ impl ParallelProcessor {
                     batch_timeout,
                     global_tracker_clone,
                     ignore_lines,
+                    keep_lines,
                     skip_lines,
                     input_format,
                     preprocessing_line_count,
@@ -616,6 +619,7 @@ impl ParallelProcessor {
             let batch_sender = batch_sender.clone();
             let batch_size = self.config.batch_size;
             let ignore_lines = config.input.ignore_lines.clone();
+            let keep_lines = config.input.keep_lines.clone();
             let skip_lines = config.input.skip_lines;
             let global_tracker_clone = self.global_tracker.clone();
             let input_format = config.input.format.clone();
@@ -629,6 +633,7 @@ impl ParallelProcessor {
                     batch_timeout,
                     global_tracker_clone,
                     ignore_lines,
+                    keep_lines,
                     skip_lines,
                     input_format,
                     ctrl_for_batcher,
@@ -818,6 +823,7 @@ impl ParallelProcessor {
         batch_timeout: Duration,
         global_tracker: GlobalTracker,
         ignore_lines: Option<regex::Regex>,
+        keep_lines: Option<regex::Regex>,
         skip_lines: usize,
         input_format: crate::config::InputFormat,
         preprocessing_line_count: usize,
@@ -898,6 +904,7 @@ impl ParallelProcessor {
                                         skip_lines,
                                         input_format: &input_format,
                                         ignore_lines: &ignore_lines,
+                                        keep_lines: &keep_lines,
                                         pending_deadline: &mut pending_deadline,
                                     },
                                 )?;
@@ -987,6 +994,7 @@ impl ParallelProcessor {
                                         skip_lines,
                                         input_format: &input_format,
                                         ignore_lines: &ignore_lines,
+                                        keep_lines: &keep_lines,
                                         pending_deadline: &mut pending_deadline,
                                     },
                                 )?;
@@ -1034,6 +1042,7 @@ impl ParallelProcessor {
         batch_timeout: Duration,
         global_tracker: GlobalTracker,
         ignore_lines: Option<regex::Regex>,
+        keep_lines: Option<regex::Regex>,
         skip_lines: usize,
         input_format: crate::config::InputFormat,
         ctrl_rx: Receiver<Ctrl>,
@@ -1123,6 +1132,7 @@ impl ParallelProcessor {
                                     skip_lines,
                                     &input_format,
                                     &ignore_lines,
+                                    &keep_lines,
                                     &mut pending_deadline,
                                     &mut current_headers,
                                     &mut last_filename,
@@ -1224,6 +1234,7 @@ impl ParallelProcessor {
                                     skip_lines,
                                     &input_format,
                                     &ignore_lines,
+                                    &keep_lines,
                                     &mut pending_deadline,
                                     &mut current_headers,
                                     &mut last_filename,
@@ -1281,6 +1292,13 @@ impl ParallelProcessor {
             return Ok(());
         }
 
+        if let Some(keep_regex) = ctx.keep_lines.as_ref() {
+            if !keep_regex.is_match(&line) {
+                *ctx.filtered_lines += 1;
+                return Ok(());
+            }
+        }
+
         if let Some(ignore_regex) = ctx.ignore_lines.as_ref() {
             if ignore_regex.is_match(&line) {
                 *ctx.filtered_lines += 1;
@@ -1324,6 +1342,7 @@ impl ParallelProcessor {
         skip_lines: usize,
         input_format: &crate::config::InputFormat,
         ignore_lines: &Option<regex::Regex>,
+        keep_lines: &Option<regex::Regex>,
         pending_deadline: &mut Option<Instant>,
         current_headers: &mut Option<Vec<String>>,
         last_filename: &mut Option<String>,
@@ -1338,6 +1357,13 @@ impl ParallelProcessor {
 
         if line.is_empty() && !matches!(input_format, crate::config::InputFormat::Line) {
             return Ok(());
+        }
+
+        if let Some(ref keep_regex) = keep_lines {
+            if !keep_regex.is_match(&line) {
+                *filtered_lines += 1;
+                return Ok(());
+            }
         }
 
         if let Some(ref ignore_regex) = ignore_lines {

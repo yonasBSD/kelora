@@ -18,6 +18,7 @@ pub struct InputConfig {
     pub file_order: FileOrder,
     pub skip_lines: usize,
     pub ignore_lines: Option<regex::Regex>,
+    pub keep_lines: Option<regex::Regex>,
     pub multiline: Option<MultilineConfig>,
     /// Custom timestamp field name (reserved for --since/--until features)
     #[allow(dead_code)]
@@ -578,6 +579,7 @@ impl KeloraConfig {
                 file_order: cli.file_order.clone().into(),
                 skip_lines: cli.skip_lines.unwrap_or(0),
                 ignore_lines: None, // Will be set after CLI parsing
+                keep_lines: None,   // Will be set after CLI parsing
                 multiline: None,    // Will be set after CLI parsing
                 ts_field: cli.ts_field.clone(),
                 ts_format: cli.ts_format.clone(),
@@ -664,6 +666,7 @@ impl Default for KeloraConfig {
                 file_order: FileOrder::Cli,
                 skip_lines: 0,
                 ignore_lines: None,
+                keep_lines: None,
                 multiline: None,
                 ts_field: None,
                 ts_format: None,

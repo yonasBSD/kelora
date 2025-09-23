@@ -2264,6 +2264,142 @@ fn test_ignore_lines_with_specific_pattern() {
     }
 }
 
+#[test]
+fn test_keep_lines_functionality() {
+    let input = r#"{"level": "INFO", "message": "This is an info message"}
+# This is a comment line
+{"level": "ERROR", "message": "This is an error message"}
+
+{"level": "DEBUG", "message": "This is a debug message"}
+# Another comment
+{"level": "WARN", "message": "This is a warning"}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "-F",
+            "json",
+            "--keep-lines",
+            r#"^\{"#, // Keep only lines starting with JSON (curly brace)
+        ],
+        input,
+    );
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully with keep-lines"
+    );
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(
+        lines.len(),
+        4,
+        "Should output 4 lines (only JSON lines kept)"
+    );
+
+    // Verify all lines are valid JSON (no comments or empty lines)
+    for line in lines {
+        let parsed: serde_json::Value =
+            serde_json::from_str(line).expect("Line should be valid JSON");
+        assert!(parsed.is_object(), "Each line should be a JSON object");
+    }
+}
+
+#[test]
+fn test_keep_lines_with_specific_pattern() {
+    let input = r#"{"level": "INFO", "message": "User login successful"}
+{"level": "DEBUG", "message": "systemd startup complete"}
+{"level": "ERROR", "message": "Failed to connect to database"}
+{"level": "DEBUG", "message": "systemd service started"}
+{"level": "WARN", "message": "High memory usage detected"}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "-F",
+            "json",
+            "--keep-lines",
+            "ERROR|WARN", // Keep only ERROR and WARN level lines
+        ],
+        input,
+    );
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully with keep-lines pattern"
+    );
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(
+        lines.len(),
+        2,
+        "Should output 2 lines (only ERROR and WARN lines kept)"
+    );
+
+    // Verify only ERROR and WARN lines are present
+    for line in lines {
+        assert!(
+            line.contains("ERROR") || line.contains("WARN"),
+            "Output should only contain ERROR or WARN lines"
+        );
+    }
+}
+
+#[test]
+fn test_combined_keep_lines_and_ignore_lines() {
+    let input = r#"{"level": "INFO", "message": "User login successful"}
+# This is a comment line
+{"level": "DEBUG", "message": "systemd startup complete"}
+{"level": "ERROR", "message": "Failed to connect to database"}
+
+{"level": "DEBUG", "message": "systemd service started"}
+{"level": "WARN", "message": "High memory usage detected"}
+# Another comment"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "-F",
+            "json",
+            "--keep-lines",
+            r#"^\{"#, // Keep only lines starting with JSON (curly brace)
+            "--ignore-lines",
+            "systemd", // Then ignore lines containing "systemd"
+        ],
+        input,
+    );
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully with both keep-lines and ignore-lines"
+    );
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(
+        lines.len(),
+        3,
+        "Should output 3 lines (JSON lines kept, then systemd lines ignored)"
+    );
+
+    // Verify lines are valid JSON and don't contain systemd
+    for line in lines {
+        let parsed: serde_json::Value =
+            serde_json::from_str(line).expect("Line should be valid JSON");
+        assert!(parsed.is_object(), "Each line should be a JSON object");
+        assert!(
+            !line.contains("systemd"),
+            "Output should not contain systemd lines"
+        );
+    }
+
+    // Verify specific levels are present
+    let content = stdout.trim();
+    assert!(content.contains("INFO"));
+    assert!(content.contains("ERROR"));
+    assert!(content.contains("WARN"));
+    assert!(!content.contains("DEBUG")); // DEBUG lines contain systemd
+}
+
 // TODO: Update test for new stats format
 // #[test]
 // fn test_ignore_lines_with_stats() {

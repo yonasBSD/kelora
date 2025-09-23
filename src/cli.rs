@@ -84,6 +84,10 @@ pub struct Cli {
     /// Skip the first N input lines
     #[arg(long = "skip-lines", help_heading = "Input Options")]
     pub skip_lines: Option<usize>,
+    
+    /// Keep only input lines matching this regex pattern (applied before ignore-lines)
+    #[arg(long = "keep-lines", help_heading = "Input Options")]
+    pub keep_lines: Option<String>,
 
     /// Ignore input lines matching this regex pattern
     #[arg(long = "ignore-lines", help_heading = "Input Options")]

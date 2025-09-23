@@ -745,6 +745,17 @@ fn process_line_sequential<W: Write>(
         return Ok(ProcessingResult::Continue);
     }
 
+    // Apply keep-lines filter if configured (early filtering before parsing)
+    if let Some(ref keep_regex) = config.input.keep_lines {
+        if !keep_regex.is_match(&line) {
+            // Count filtered line for stats
+            if config.output.stats {
+                stats_add_line_filtered();
+            }
+            return Ok(ProcessingResult::Continue);
+        }
+    }
+
     // Apply ignore-lines filter if configured (early filtering before parsing)
     if let Some(ref ignore_regex) = config.input.ignore_lines {
         if ignore_regex.is_match(&line) {
@@ -974,6 +985,24 @@ fn main() -> Result<()> {
                     .writeln(&config.format_error_message(&format!(
                         "Invalid ignore-lines regex pattern '{}': {}",
                         ignore_pattern, e
+                    )))
+                    .unwrap_or(());
+                ExitCode::InvalidUsage.exit();
+            }
+        }
+    }
+
+    // Compile keep-lines regex if provided
+    if let Some(keep_pattern) = &cli.keep_lines {
+        match regex::Regex::new(keep_pattern) {
+            Ok(regex) => {
+                config.input.keep_lines = Some(regex);
+            }
+            Err(e) => {
+                stderr
+                    .writeln(&config.format_error_message(&format!(
+                        "Invalid keep-lines regex pattern '{}': {}",
+                        keep_pattern, e
                     )))
                     .unwrap_or(());
                 ExitCode::InvalidUsage.exit();
