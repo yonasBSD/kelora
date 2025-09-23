@@ -5,6 +5,7 @@ pub mod csv;
 pub mod json;
 pub mod line;
 pub mod logfmt;
+pub mod raw;
 pub mod syslog;
 
 #[allow(unused_imports)] // Used by lib.rs for format auto-detection
@@ -15,4 +16,5 @@ pub use csv::CsvParser;
 pub use json::JsonlParser;
 pub use line::LineParser;
 pub use logfmt::LogfmtParser;
+pub use raw::RawParser;
 pub use syslog::SyslogParser;

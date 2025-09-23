@@ -11,6 +11,7 @@ pub enum InputFormat {
     Auto,
     Json,
     Line,
+    Raw,
     Logfmt,
     Syslog,
     Cef,

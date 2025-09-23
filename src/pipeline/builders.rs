@@ -142,6 +142,7 @@ impl PipelineBuilder {
             }
             crate::InputFormat::Json => Box::new(crate::parsers::JsonlParser::new()),
             crate::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
+            crate::InputFormat::Raw => Box::new(crate::parsers::RawParser::new()),
             crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
             crate::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
             crate::InputFormat::Cef => Box::new(crate::parsers::CefParser::new()),
@@ -333,7 +334,7 @@ impl PipelineBuilder {
 
         // Create chunker based on multiline configuration
         let chunker = if let Some(ref multiline_config) = self.multiline {
-            create_multiline_chunker(multiline_config)
+            create_multiline_chunker(multiline_config, self.input_format.clone().into())
                 .map_err(|e| anyhow::anyhow!("Failed to create multiline chunker: {}", e))?
         } else {
             Box::new(SimpleChunker) as Box<dyn super::Chunker>
@@ -416,6 +417,7 @@ impl PipelineBuilder {
             }
             crate::InputFormat::Json => Box::new(crate::parsers::JsonlParser::new()),
             crate::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
+            crate::InputFormat::Raw => Box::new(crate::parsers::RawParser::new()),
             crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
             crate::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
             crate::InputFormat::Cef => Box::new(crate::parsers::CefParser::new()),
@@ -603,7 +605,7 @@ impl PipelineBuilder {
 
         // Create chunker based on multiline configuration
         let chunker = if let Some(ref multiline_config) = self.multiline {
-            create_multiline_chunker(multiline_config)
+            create_multiline_chunker(multiline_config, self.input_format.clone().into())
                 .map_err(|e| anyhow::anyhow!("Failed to create multiline chunker: {}", e))?
         } else {
             Box::new(SimpleChunker) as Box<dyn super::Chunker>

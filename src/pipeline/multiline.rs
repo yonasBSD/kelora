@@ -1,5 +1,5 @@
 use super::Chunker;
-use crate::config::{MultilineConfig, MultilineStrategy};
+use crate::config::{InputFormat, MultilineConfig, MultilineStrategy};
 use regex::Regex;
 
 /// Multi-line chunker that implements various strategies for detecting event boundaries
@@ -7,10 +7,11 @@ pub struct MultilineChunker {
     config: MultilineConfig,
     buffer: Vec<String>,
     regex: Option<Regex>,
+    input_format: InputFormat,
 }
 
 impl MultilineChunker {
-    pub fn new(config: MultilineConfig) -> Result<Self, String> {
+    pub fn new(config: MultilineConfig, input_format: InputFormat) -> Result<Self, String> {
         let regex = match &config.strategy {
             MultilineStrategy::Timestamp { pattern } => {
                 Some(Regex::new(pattern).map_err(|e| format!("Invalid timestamp regex: {}", e))?)
@@ -36,6 +37,7 @@ impl MultilineChunker {
             config,
             buffer: Vec::new(),
             regex,
+            input_format,
         })
     }
 
@@ -138,25 +140,72 @@ impl MultilineChunker {
         }
     }
 
+    /// Clean backslash continuation sequences from a string
+    fn clean_backslash_continuations(&self, input: &str, continuation_char: char) -> String {
+        let mut result = String::with_capacity(input.len());
+        let lines: Vec<&str> = input.split('\n').collect();
+
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim_end_matches('\r');
+
+            if trimmed.ends_with(continuation_char) {
+                // Remove the continuation character and join directly with the next line
+                let without_continuation = &trimmed[..trimmed.len() - continuation_char.len_utf8()];
+                result.push_str(without_continuation);
+                // Don't add space - continuation means direct concatenation
+            } else {
+                result.push_str(trimmed);
+            }
+
+            // Only add space between lines if current line doesn't end with continuation
+            // and this isn't the last line
+            if !trimmed.ends_with(continuation_char) && i < lines.len() - 1 {
+                result.push(' ');
+            }
+        }
+
+        result
+    }
+
     /// Flush the current buffer and return the event
     fn flush_buffer(&mut self) -> Option<String> {
         if self.buffer.is_empty() {
             None
         } else {
-            // For "whole" strategy, preserve line structure with newlines
-            // For other strategies, lines already contain newlines, so join with empty string to avoid double newlines
-            let result = match &self.config.strategy {
+            let joined = match &self.config.strategy {
                 MultilineStrategy::Whole => {
                     // Join with newlines to preserve line structure for whole file reading
-                    Some(self.buffer.join("\n"))
+                    self.buffer.join("\n")
                 }
                 _ => {
                     // Lines already contain newlines for other strategies
-                    Some(self.buffer.join(""))
+                    self.buffer.join("")
                 }
             };
+
+            // Apply format-aware line cleaning
+            let result = match &self.config.strategy {
+                MultilineStrategy::Backslash { char } => {
+                    // Always clean backslash continuations regardless of format
+                    self.clean_backslash_continuations(&joined, *char)
+                }
+                _ => {
+                    // For other strategies, clean based on input format
+                    match self.input_format {
+                        InputFormat::Raw => {
+                            // Preserve newlines for raw format - this is the new use case
+                            joined
+                        }
+                        _ => {
+                            // Replace newlines with spaces for all other formats (including line)
+                            joined.replace('\n', " ").replace('\r', "")
+                        }
+                    }
+                }
+            };
+
             self.buffer.clear();
-            result
+            Some(result)
         }
     }
 }
@@ -221,7 +270,7 @@ impl Chunker for MultilineChunker {
 }
 
 /// Create a chunker based on multiline configuration
-pub fn create_multiline_chunker(config: &MultilineConfig) -> Result<Box<dyn Chunker>, String> {
-    let chunker = MultilineChunker::new(config.clone())?;
+pub fn create_multiline_chunker(config: &MultilineConfig, input_format: InputFormat) -> Result<Box<dyn Chunker>, String> {
+    let chunker = MultilineChunker::new(config.clone(), input_format)?;
     Ok(Box::new(chunker))
 }

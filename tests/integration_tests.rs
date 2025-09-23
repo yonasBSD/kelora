@@ -1122,9 +1122,9 @@ Line 3 with even more content
 Final line of the document"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
-        "-f", "line",
+        "-f", "raw",
         "-M", "whole",
-        "--exec", "let lines = e.line.split(\"\\n\"); e.line_count = lines.len(); e.word_count = e.line.split(\" \").len();"
+        "--exec", "let lines = e.raw.split(\"\\n\"); e.line_count = lines.len(); e.word_count = e.raw.split(\" \").len();"
     ], input);
     assert_eq!(
         exit_code, 0,

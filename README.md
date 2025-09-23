@@ -77,7 +77,8 @@ Each parser creates events with different fields:
 
 |Format        |Fields Created                      |Example                              |
 |--------------|------------------------------------|------------------------------------|
-|`line`        |`line`                              |Raw log files                       |
+|`line`        |`line`                              |Clean text processing                |
+|`raw`         |`raw`                               |Preserves text artifacts for analysis|
 |`json`        |All JSON keys                       |`{"level":"info","msg":"started"}`  |
 |`logfmt`      |Key-value pairs                     |`level=info msg="started" user=alice`|
 |`syslog`      |`timestamp`, `host`, `facility`, `message`|`Jan 15 14:30:45 host app: message`|
@@ -86,6 +87,29 @@ Each parser creates events with different fields:
 |`combined`    |`ip`, `status`, `request`, `method`, `path`, `request_time`|Apache/NGINX web server logs|
 
 All formats support gzip compression automatically (detects magic bytes `1F 8B 08`) for both files and stdin. No additional flags needed - works with pipes, `.gz` files, and files without extensions. Use `-f format` to specify (`-j` is a shortcut for `-f json`).
+
+### Raw vs Line Format
+
+Choose between text preservation and clean output:
+
+**Raw Format** (`-f raw`): Preserves ALL text artifacts including newlines, backslashes, and carriage returns. Perfect for text analysis where you need to count lines or preserve exact formatting:
+
+```bash
+# Count lines in multiline events
+kelora -f raw -M whole --exec 'e.line_count = e.raw.split("\\n").len()' file.txt
+
+# Preserve backslash continuations for analysis
+kelora -f raw --exec 'if e.raw.contains("\\\\") { e.has_continuation = true }' file.txt
+```
+
+**Line Format** (`-f line`): Provides clean, readable output by replacing newlines with spaces. Better for general processing and display:
+
+```bash
+# Clean multiline processing
+kelora -f line -M timestamp --filter 'e.line.contains("error")' file.txt
+```
+
+Use Raw when you need the full text structure, Line when you want clean output.
 
 ### Prefix Extraction
 
