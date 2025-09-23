@@ -2,6 +2,7 @@
 use crate::event::Event;
 use crate::pipeline::EventParser;
 use anyhow::Result;
+use nom::Parser;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_until},
@@ -10,7 +11,6 @@ use nom::{
     sequence::preceded,
     IResult,
 };
-use nom::Parser;
 use rhai::Dynamic;
 use std::collections::HashMap;
 

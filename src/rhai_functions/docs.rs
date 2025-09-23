@@ -33,10 +33,10 @@ STRING/TEXT FUNCTIONS:
   text.mask_ip([octets])                Mask IP address (default: last octet)
   text.matches(pattern)                 Check if text matches regex pattern
   text.parse_cef()                      Parse Common Event Format line into fields
+  text.parse_cols(spec [, sep])         Parse columns according to spec (typical: e = text.parse_cols(...))
   text.parse_combined()                 Parse Apache/Nginx combined log line
   text.parse_content_disposition()      Parse Content-Disposition header parameters
   text.parse_email()                    Parse email address into parts
-  text.parse_cols(spec [, sep])         Parse columns according to spec (typical: e = text.parse_cols(...))
   text.parse_jwt()                      Parse JWT header/payload without verification
   text.parse_kv([sep [, kv_sep]])       Parse key-value pairs from text
   text.parse_logfmt()                   Parse logfmt line into structured fields
