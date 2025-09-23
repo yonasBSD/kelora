@@ -144,13 +144,42 @@ fn try_parse_with_format(
 ) -> Option<DateTime<Utc>> {
     use chrono_tz::Tz;
 
+    // Handle comma-separated fractional seconds (Python logging format)
+    let (processed_ts_str, processed_format) = if format.contains(",%f") {
+        // Convert comma to dot for chrono compatibility and handle milliseconds properly
+        if let Some(comma_pos) = ts_str.rfind(',') {
+            let base_part = &ts_str[..comma_pos];
+            let frac_part = &ts_str[comma_pos + 1..];
+
+            // Pad or truncate fractional part to 9 digits (nanoseconds)
+            let frac_nanos = if frac_part.len() <= 3 {
+                // Treat as milliseconds, pad to nanoseconds
+                format!("{:0<9}", format!("{:0<3}", frac_part))
+            } else if frac_part.len() <= 6 {
+                // Treat as microseconds, pad to nanoseconds
+                format!("{:0<9}", format!("{:0<6}", frac_part))
+            } else {
+                // Truncate to nanoseconds
+                frac_part[..9].to_string()
+            };
+
+            let new_ts_str = format!("{}.{}", base_part, frac_nanos);
+            let new_format = format.replace(",%f", ".%f");
+            (new_ts_str, new_format)
+        } else {
+            (ts_str.to_string(), format.to_string())
+        }
+    } else {
+        (ts_str.to_string(), format.to_string())
+    };
+
     // Try timezone-aware parsing first
-    if let Ok(dt) = DateTime::parse_from_str(ts_str, format) {
+    if let Ok(dt) = DateTime::parse_from_str(&processed_ts_str, &processed_format) {
         return Some(dt.with_timezone(&Utc));
     }
 
     // Try naive parsing
-    if let Ok(naive_dt) = chrono::NaiveDateTime::parse_from_str(ts_str, format) {
+    if let Ok(naive_dt) = chrono::NaiveDateTime::parse_from_str(&processed_ts_str, &processed_format) {
         // Apply timezone configuration
         match default_timezone {
             Some("UTC") => {
@@ -446,7 +475,7 @@ fn parse_time_only(arg: &str) -> Option<DateTime<Utc>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Datelike;
+    use chrono::{Datelike, Timelike};
 
     #[test]
     fn test_adaptive_parser_basic() {
@@ -685,6 +714,38 @@ mod tests {
         // Invalid time formats
         let result = parse_timestamp_arg_with_timezone("25:70:80", None);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_comma_separated_milliseconds() {
+        let mut parser = AdaptiveTsParser::new();
+
+        // Test 3-digit milliseconds (most common) - use UTC timezone to avoid local time conversion
+        let result = parser.parse_ts_with_config("2010-04-24 07:52:09,487", None, Some("UTC"));
+        assert!(result.is_some());
+        let dt = result.unwrap();
+        assert_eq!(dt.year(), 2010);
+        assert_eq!(dt.month(), 4);
+        assert_eq!(dt.day(), 24);
+        assert_eq!(dt.hour(), 7);
+        assert_eq!(dt.minute(), 52);
+        assert_eq!(dt.second(), 9);
+        // 487 milliseconds should equal 487,000,000 nanoseconds
+        assert_eq!(dt.timestamp_nanos_opt().unwrap() % 1_000_000_000, 487_000_000);
+
+        // Test 2-digit centiseconds
+        let result = parser.parse_ts_with_config("2010-04-24 07:52:09,12", None, Some("UTC"));
+        assert!(result.is_some());
+        let dt = result.unwrap();
+        // 12 centiseconds = 120 milliseconds = 120,000,000 nanoseconds
+        assert_eq!(dt.timestamp_nanos_opt().unwrap() % 1_000_000_000, 120_000_000);
+
+        // Test 1-digit deciseconds
+        let result = parser.parse_ts_with_config("2010-04-24 07:52:09,5", None, Some("UTC"));
+        assert!(result.is_some());
+        let dt = result.unwrap();
+        // 5 deciseconds = 500 milliseconds = 500,000,000 nanoseconds
+        assert_eq!(dt.timestamp_nanos_opt().unwrap() % 1_000_000_000, 500_000_000);
     }
 
     #[test]
