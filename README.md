@@ -125,20 +125,18 @@ Specs use short tokens:
 
 Most scripts simply replace the event with the parsed map: `e = e.line.parse_cols("ts level *msg")`.
 
-```rhai
-// Whitespace-delimited: collapse extra spaces, preserve rest verbatim
-// Example line: "2025-09-22 12:33:44 -- INFO hello   world"
-e = e.line.parse_cols("ts(2) level *msg");
+```bash
+# Sample input file with mixed log levels:
+# 2025-09-22 12:33:44 INFO IgnoreMe: hello world!
+# 2025-09-23 08:15:32 ERROR SomeService: connection failed
 
-// Custom separator: keep empty columns and join multi-column fields with the same separator
-// Example line: "alice|LOGIN||success"
-e = e.line.parse_cols("user action *rest", "|");
+kelora -f line sample.log --exec 'e = e.line.parse_cols("ts(2) level - *msg")' --keys ts,level,msg
 
-// Array overload: when split() already gave you columns
-let cols = e.line.split("|");
-let parsed = cols.parse_cols("service status *rest", "|");
-e.service = parsed["service"];
-e.status = parsed["status"];
+# Output:
+# ts='2025-09-22 12:33:44' level='INFO' msg='hello world!'
+# ts='2025-09-23 08:15:32' level='ERROR' msg='connection failed'
+# ts='2025-09-23 14:22:01' level='WARN' msg='timeout occurred'
+# ts='2025-09-23 16:45:18' level='DEBUG' msg='user login successful'
 ```
 
 **Metrics**: `track_count(key)` increments counters, `track_sum/avg/min/max(key, value)` accumulate statistics, `track_unique(key, value)` counts distinct values. Access via `metrics` map in `--end` scripts or display with `--metrics`.

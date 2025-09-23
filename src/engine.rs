@@ -1778,14 +1778,109 @@ impl RhaiEngine {
 
         // Capture mutations made directly to the `e` event map
         if let Some(obj) = scope.get_value::<Map>("e") {
+            event.fields.clear();
+
             for (k, v) in obj {
                 // Remove fields that are set to unit () - allows easy field removal
                 if v.is::<()>() {
-                    event.fields.shift_remove(&k.to_string());
-                } else {
-                    event.fields.insert(k.to_string(), v.clone());
+                    continue;
                 }
+
+                event.fields.insert(k.to_string(), v.clone());
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn build_event_with_line(line: &str) -> Event {
+        let mut event = Event::with_capacity(line.to_string(), 1);
+        event.set_field("line".to_string(), Dynamic::from(line.to_string()));
+        event
+    }
+
+    #[test]
+    fn assignment_replaces_entire_event_map() {
+        let engine = RhaiEngine::new();
+        let mut event = build_event_with_line("orig line");
+        event.set_field("keep".to_string(), Dynamic::from("value"));
+
+        let mut scope = engine.create_scope_for_event(&event);
+
+        let mut new_map = rhai::Map::new();
+        new_map.insert("ts".into(), Dynamic::from("2025-09-22"));
+        scope.set_value("e", new_map);
+
+        let mut event_clone = event.clone();
+        engine.update_event_from_scope(&mut event_clone, &scope);
+
+        assert!(event_clone.fields.get("line").is_none());
+        assert!(event_clone.fields.get("keep").is_none());
+        assert_eq!(
+            event_clone
+                .fields
+                .get("ts")
+                .and_then(|v| v.clone().try_cast::<String>())
+                .as_deref(),
+            Some("2025-09-22")
+        );
+        assert_eq!(event_clone.fields.len(), 1);
+    }
+
+    #[test]
+    fn unit_values_still_remove_fields() {
+        let engine = RhaiEngine::new();
+        let mut event = build_event_with_line("orig line");
+        event.set_field("msg".to_string(), Dynamic::from("hello"));
+
+        let mut scope = engine.create_scope_for_event(&event);
+
+        let mut updated_map = rhai::Map::new();
+        updated_map.insert("msg".into(), Dynamic::from("world"));
+        updated_map.insert("line".into(), Dynamic::UNIT);
+        scope.set_value("e", updated_map);
+
+        let mut event_clone = event.clone();
+        engine.update_event_from_scope(&mut event_clone, &scope);
+
+        assert!(event_clone.fields.get("line").is_none());
+        assert_eq!(
+            event_clone
+                .fields
+                .get("msg")
+                .and_then(|v| v.clone().try_cast::<String>())
+                .as_deref(),
+            Some("world")
+        );
+    }
+
+    #[test]
+    fn in_place_mutations_preserve_unchanged_fields() {
+        let engine = RhaiEngine::new();
+        let mut event = build_event_with_line("orig line");
+        event.set_field("level".to_string(), Dynamic::from("INFO"));
+
+        let mut scope = engine.create_scope_for_event(&event);
+
+        // Simulate in-place mutation by starting from the existing map values
+        let mut mutated_map = scope.get_value::<Map>("e").unwrap();
+        mutated_map.insert("level".into(), Dynamic::from("ERROR"));
+        scope.set_value("e", mutated_map);
+
+        let mut event_clone = event.clone();
+        engine.update_event_from_scope(&mut event_clone, &scope);
+
+        assert!(event_clone.fields.get("line").is_some());
+        assert_eq!(
+            event_clone
+                .fields
+                .get("level")
+                .and_then(|v| v.clone().try_cast::<String>())
+                .as_deref(),
+            Some("ERROR")
+        );
     }
 }
