@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use anyhow::{Context, Result};
+use indexmap::IndexMap;
 use rhai::{Dynamic, Engine, EvalAltResult, Scope, AST};
 use std::collections::HashMap;
 
@@ -1778,16 +1779,30 @@ impl RhaiEngine {
 
         // Capture mutations made directly to the `e` event map
         if let Some(obj) = scope.get_value::<Map>("e") {
-            event.fields.clear();
+            let original_order: Vec<String> = event.fields.keys().cloned().collect();
+            let mut remaining_entries: Vec<(String, Dynamic)> =
+                obj.into_iter().map(|(k, v)| (k.into(), v)).collect();
 
-            for (k, v) in obj {
-                // Remove fields that are set to unit () - allows easy field removal
-                if v.is::<()>() {
+            let mut reordered_fields = IndexMap::with_capacity(remaining_entries.len());
+
+            for key in &original_order {
+                if let Some(pos) = remaining_entries.iter().position(|(k, _)| k == key) {
+                    let (_, value) = remaining_entries.remove(pos);
+                    if value.is::<()>() {
+                        continue;
+                    }
+                    reordered_fields.insert(key.clone(), value);
+                }
+            }
+
+            for (key, value) in remaining_entries {
+                if value.is::<()>() {
                     continue;
                 }
-
-                event.fields.insert(k.to_string(), v.clone());
+                reordered_fields.insert(key, value);
             }
+
+            event.fields = reordered_fields;
         }
     }
 }
@@ -1882,5 +1897,26 @@ mod tests {
                 .as_deref(),
             Some("ERROR")
         );
+    }
+
+    #[test]
+    fn update_event_preserves_field_order_and_appends_new_keys() {
+        let engine = RhaiEngine::new();
+        let mut event = build_event_with_line("orig line");
+        event.set_field("z".to_string(), Dynamic::from(1_i64));
+        event.set_field("a".to_string(), Dynamic::from(2_i64));
+        event.set_field("b".to_string(), Dynamic::from(3_i64));
+
+        let mut scope = engine.create_scope_for_event(&event);
+
+        let mut mutated_map = scope.get_value::<Map>("e").unwrap();
+        mutated_map.insert("foo".into(), Dynamic::from(42_i64));
+        scope.set_value("e", mutated_map);
+
+        let mut event_clone = event.clone();
+        engine.update_event_from_scope(&mut event_clone, &scope);
+
+        let keys: Vec<String> = event_clone.fields.keys().cloned().collect();
+        assert_eq!(keys, vec!["line", "z", "a", "b", "foo"]);
     }
 }
