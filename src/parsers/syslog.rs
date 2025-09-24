@@ -233,10 +233,7 @@ impl EventParser for SyslogParser {
         } else if let Some(event) = self.try_parse_rfc3164(line) {
             Ok(event)
         } else {
-            Err(anyhow::anyhow!(
-                "Failed to parse syslog line: {}",
-                crate::config::format_error_line(line)
-            ))
+            Err(anyhow::anyhow!("Invalid syslog format"))
         }
     }
 }

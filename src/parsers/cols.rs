@@ -37,7 +37,7 @@ impl EventParser for ColsParser {
             }
             Err(err) => {
                 // Return error for the parser to handle according to strict/resilient mode
-                Err(anyhow::anyhow!("parse_cols error: {}", err))
+                Err(anyhow::anyhow!("{}", err))
             }
         }
     }

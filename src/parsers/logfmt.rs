@@ -127,7 +127,7 @@ impl EventParser for LogfmtParser {
         let line = line.trim_end_matches('\n').trim_end_matches('\r');
         let pairs = self
             .parse_logfmt_pairs(line.trim())
-            .map_err(|e| anyhow::anyhow!("Failed to parse logfmt: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
 
         // Pre-allocate Event with capacity based on number of pairs
         let mut event = Event::with_capacity(line.to_string(), pairs.len());

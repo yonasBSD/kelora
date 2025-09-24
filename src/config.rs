@@ -1001,7 +1001,7 @@ mod tests {
             config.output.no_emoji = false;
 
             let message = config.format_error_message("problem");
-            assert!(message.starts_with("⚠️"));
+            assert!(message.starts_with("\n⚠️"));
             assert!(message.ends_with("problem"));
         });
     }
@@ -1013,7 +1013,7 @@ mod tests {
         config.output.no_emoji = true;
 
         let message = config.format_error_message("issue");
-        assert_eq!(message, "kelora: issue");
+        assert_eq!(message, "\nkelora: issue");
     }
 
     #[test]

@@ -128,15 +128,23 @@ pub fn track_error(
             let use_emoji = use_colors && !no_emoji;
             let prefix = if use_emoji { "⚠️ " } else { "kelora: " };
 
-            let input_files = config
-                .map(|c| c.input_files.as_slice())
-                .unwrap_or(&[]);
+            let input_files = config.map(|c| c.input_files.as_slice()).unwrap_or(&[]);
 
             let location = format_error_location(line_num, filename, input_files);
-            let formatted_error = if !location.is_empty() && location != "unknown" {
-                format!("{}{}: {} - {}", prefix, location, error_type, message)
+            let formatted_error = if error_type == "parse" {
+                // For parse errors, omit the redundant "parse -" prefix
+                if !location.is_empty() && location != "unknown" {
+                    format!("{}{}: {}", prefix, location, message)
+                } else {
+                    format!("{}{}", prefix, message)
+                }
             } else {
-                format!("{}{} - {}", prefix, error_type, message)
+                // For other error types, keep the existing format
+                if !location.is_empty() && location != "unknown" {
+                    format!("{}{}: {} - {}", prefix, location, error_type, message)
+                } else {
+                    format!("{}{} - {}", prefix, error_type, message)
+                }
             };
 
             if crate::rhai_functions::strings::is_parallel_mode() {
@@ -205,7 +213,7 @@ pub fn has_errors_in_tracking(metrics: &HashMap<String, Dynamic>) -> bool {
 pub fn extract_error_summary_from_tracking(
     metrics: &HashMap<String, Dynamic>,
     verbose: u8,
-    config: Option<&crate::config::KeloraConfig>,
+    _config: Option<&crate::config::KeloraConfig>,
 ) -> Option<String> {
     let mut total_errors = 0;
     let mut error_types = Vec::new();
@@ -288,15 +296,9 @@ pub fn extract_error_summary_from_tracking(
             .and_then(|v| v.clone().into_string().ok());
 
         // Format location using same smart logic as immediate errors
-        let input_files = config
-            .map(|c| c.input.files.as_slice())
-            .unwrap_or(&[]);
+        let input_files = &[];
 
-        let location = format_error_location(
-            Some(line_num as usize),
-            Some(&filename),
-            input_files
-        );
+        let location = format_error_location(Some(line_num as usize), Some(&filename), input_files);
 
         summary.push_str(&format!("\n  {}: {}", location, message));
 
@@ -319,31 +321,13 @@ pub fn extract_error_summary_from_tracking(
     // Add "more errors not shown" if total errors exceed samples shown
     if total_errors as usize > shown_samples {
         let remaining = total_errors as usize - shown_samples;
-
-        // Determine prefix for consistency with error message formatting
-        let prefix = if let Some(cfg) = config {
-            let use_colors = crate::tty::should_use_colors_with_mode(&cfg.output.color);
-            let no_emoji = cfg.output.no_emoji || std::env::var("NO_EMOJI").is_ok();
-            let use_emoji = use_colors && !no_emoji;
-            if use_emoji {
-                "⚠️ "
-            } else {
-                "kelora: "
-            }
-        } else {
-            "kelora: "
-        };
-
         let message = if verbose > 0 {
             "Each error shown above. Use -q to suppress."
         } else {
             "Use -v to see each error or -q to suppress."
         };
 
-        summary.push_str(&format!(
-            "\n{}[+{} more. {}]",
-            prefix, remaining, message
-        ));
+        summary.push_str(&format!("\n  [+{} more. {}]", remaining, message));
     }
 
     Some(summary)

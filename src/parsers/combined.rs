@@ -291,10 +291,7 @@ impl EventParser for CombinedParser {
         else if let Some(event) = self.try_parse_common(line) {
             Ok(event)
         } else {
-            Err(anyhow::anyhow!(
-                "Failed to parse combined log line: {}",
-                crate::config::format_error_line(line)
-            ))
+            Err(anyhow::anyhow!("Invalid combined log format"))
         }
     }
 }

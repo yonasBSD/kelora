@@ -154,11 +154,11 @@ impl EventParser for CefParser {
 
         // Parse syslog prefix if present
         let (remaining, (timestamp, hostname)) = Self::parse_syslog_prefix(line)
-            .map_err(|e| anyhow::anyhow!("Failed to parse syslog prefix: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Invalid syslog prefix: {}", e))?;
 
         // Parse CEF header
         let (remaining, header_fields) = Self::parse_cef_header(remaining)
-            .map_err(|e| anyhow::anyhow!("Failed to parse CEF header: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Invalid CEF header: {}", e))?;
 
         if header_fields.len() != 7 {
             return Err(anyhow::anyhow!("CEF header must have exactly 7 fields"));
@@ -174,7 +174,7 @@ impl EventParser for CefParser {
                 HashMap::new()
             } else {
                 let (_, pairs) = Self::parse_cef_extension(extension_text)
-                    .map_err(|e| anyhow::anyhow!("Failed to parse CEF extension: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Invalid CEF extension: {}", e))?;
                 pairs
             }
         };
