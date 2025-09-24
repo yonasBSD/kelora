@@ -1,6 +1,7 @@
 use rhai::{Dynamic, Engine};
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::path::Path;
 
 // Thread-local storage for tracking state
 thread_local! {
@@ -34,6 +35,49 @@ fn merge_numeric(existing: Option<Dynamic>, new_value: Dynamic) -> Dynamic {
         }
     } else {
         new_value
+    }
+}
+
+/// Format filename for error display based on input context
+/// Returns appropriate display format: line number only for single file/stdin,
+/// basename for multiple files without conflicts, full path for conflicts
+fn format_error_location(
+    line_num: Option<usize>,
+    filename: Option<&str>,
+    input_files: &[String],
+) -> String {
+    match (line_num, filename) {
+        (Some(line), Some(fname)) => {
+            // Check if we have single file or stdin
+            if input_files.is_empty() || input_files.len() == 1 {
+                format!("line {}", line)
+            } else {
+                // Multiple files - check for basename conflicts
+                let basenames: HashSet<_> = input_files
+                    .iter()
+                    .map(|f| {
+                        Path::new(f)
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("unknown")
+                    })
+                    .collect();
+
+                if basenames.len() == input_files.len() {
+                    // No conflicts - use basename
+                    let basename = Path::new(fname)
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("unknown");
+                    format!("{}:{}", basename, line)
+                } else {
+                    // Conflicts exist - use full path
+                    format!("{}:{}", fname, line)
+                }
+            }
+        }
+        (Some(line), None) => format!("line {}", line),
+        _ => "unknown".to_string(),
     }
 }
 
@@ -84,10 +128,13 @@ pub fn track_error(
             let use_emoji = use_colors && !no_emoji;
             let prefix = if use_emoji { "⚠️ " } else { "kelora: " };
 
-            let formatted_error = if let (Some(line), Some(fname)) = (line_num, filename) {
-                format!("{}{}:{}: {} - {}", prefix, fname, line, error_type, message)
-            } else if let Some(line) = line_num {
-                format!("{}line {}: {} - {}", prefix, line, error_type, message)
+            let input_files = config
+                .map(|c| c.input_files.as_slice())
+                .unwrap_or(&[]);
+
+            let location = format_error_location(line_num, filename, input_files);
+            let formatted_error = if !location.is_empty() && location != "unknown" {
+                format!("{}{}: {} - {}", prefix, location, error_type, message)
             } else {
                 format!("{}{} - {}", prefix, error_type, message)
             };
@@ -240,8 +287,18 @@ pub fn extract_error_summary_from_tracking(
             .get("original_line")
             .and_then(|v| v.clone().into_string().ok());
 
-        // Format: "  filename:line: error message"
-        summary.push_str(&format!("\n  {}:{}: {}", filename, line_num, message));
+        // Format location using same smart logic as immediate errors
+        let input_files = config
+            .map(|c| c.input.files.as_slice())
+            .unwrap_or(&[]);
+
+        let location = format_error_location(
+            Some(line_num as usize),
+            Some(&filename),
+            input_files
+        );
+
+        summary.push_str(&format!("\n  {}: {}", location, message));
 
         // In verbose mode, add indented original line
         if verbose > 0 {

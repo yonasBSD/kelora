@@ -182,6 +182,8 @@ pub struct PipelineConfig {
     pub quiet_level: u8,
     /// Disable emoji in error output
     pub no_emoji: bool,
+    /// Input files for smart error message formatting
+    pub input_files: Vec<String>,
 }
 
 /// Metadata about current processing context

@@ -90,6 +90,7 @@ impl PipelineBuilder {
                 verbose: 0,
                 quiet_level: 0,
                 no_emoji: false,
+                input_files: Vec::new(),
             },
             begin: None,
             end: None,
@@ -738,6 +739,7 @@ pub fn create_pipeline_builder_from_config(
         verbose: config.processing.verbose,
         quiet_level: config.processing.quiet_level,
         no_emoji: config.output.no_emoji,
+        input_files: config.input.files.clone(),
     };
 
     // Extract cols spec if needed before conversion
