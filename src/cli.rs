@@ -20,6 +20,7 @@ pub enum InputFormat {
     Csvnh,
     Tsvnh,
     Combined,
+    Cols,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, Default)]
@@ -58,15 +59,16 @@ pub struct Cli {
     /// Input files (stdin if not specified, or use "-" to explicitly specify stdin)
     pub files: Vec<String>,
 
-    /// Input format
+    /// Input format. Supports standard formats (json, line, csv, etc.) and cols:<spec> for column parsing.
+    /// Example: -f json, -f 'cols:ts(2) level - *msg'
     #[arg(
         short = 'f',
         long = "format",
-        value_enum,
         default_value = "line",
-        help_heading = "Input Options"
+        help_heading = "Input Options",
+        value_parser = parse_format_value
     )]
-    pub format: InputFormat,
+    pub format: String,
 
     /// Shortcut for -f json
     #[arg(short = 'j', help_heading = "Input Options", conflicts_with = "format")]
@@ -122,6 +124,10 @@ pub struct Cli {
         help_heading = "Input Options"
     )]
     pub prefix_sep: String,
+
+    /// Column separator for cols:<spec> format (default: whitespace)
+    #[arg(long = "cols-sep", help_heading = "Input Options")]
+    pub cols_sep: Option<String>,
 
     /// Pre-run a Rhai script. Use it to populate the global `conf` map
     /// with shared, read-only data.
@@ -469,6 +475,32 @@ impl Cli {
             .into_iter()
             .map(|(_, stage)| stage)
             .collect())
+    }
+}
+
+/// Parse and validate format value - supports both standard formats and cols:<spec>
+fn parse_format_value(s: &str) -> Result<String, String> {
+    // Check if it's a cols format
+    if s.starts_with("cols:") {
+        let spec = &s[5..];
+        if spec.trim().is_empty() {
+            return Err("cols format requires a specification, e.g., 'cols:ts level *msg'".to_string());
+        }
+        return Ok(s.to_string());
+    }
+
+    // Check if it's a standard format
+    match s.to_lowercase().as_str() {
+        "auto" | "json" | "line" | "raw" | "logfmt" | "syslog" | "cef"
+        | "csv" | "tsv" | "csvnh" | "tsvnh" | "combined" | "cols" => {
+            Ok(s.to_string())
+        }
+        _ => {
+            Err(format!(
+                "Unknown format '{}'. Supported formats: auto, json, line, raw, logfmt, syslog, cef, csv, tsv, csvnh, tsvnh, combined, cols, or cols:<spec>",
+                s
+            ))
+        }
     }
 }
 

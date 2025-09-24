@@ -31,6 +31,8 @@ pub struct InputConfig {
     pub extract_prefix: Option<String>,
     /// Separator string for prefix extraction (default: pipe '|')
     pub prefix_sep: String,
+    /// Column separator for cols format (None = whitespace)
+    pub cols_sep: Option<String>,
 }
 
 /// Output configuration
@@ -106,7 +108,7 @@ pub struct PerformanceConfig {
 }
 
 /// Input format enumeration
-#[derive(ValueEnum, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum InputFormat {
     Auto,
     Json,
@@ -120,6 +122,7 @@ pub enum InputFormat {
     Csvnh,
     Tsvnh,
     Combined,
+    Cols(String), // Contains the column spec
 }
 
 /// Output format enumeration
@@ -558,7 +561,7 @@ impl OutputConfig {
 
 impl KeloraConfig {
     /// Create configuration from CLI arguments
-    pub fn from_cli(cli: &crate::Cli) -> Self {
+    pub fn from_cli(cli: &crate::Cli) -> anyhow::Result<Self> {
         // Determine color mode from flags (no-color takes precedence over force-color)
         let color_mode = if cli.no_color {
             ColorMode::Never
@@ -568,13 +571,13 @@ impl KeloraConfig {
             ColorMode::Auto
         };
 
-        Self {
+        Ok(Self {
             input: InputConfig {
                 files: cli.files.clone(),
                 format: if cli.json_input {
                     InputFormat::Json
                 } else {
-                    cli.format.clone().into()
+                    parse_input_format_from_cli(cli)?
                 },
                 file_order: cli.file_order.clone().into(),
                 skip_lines: cli.skip_lines.unwrap_or(0),
@@ -586,6 +589,7 @@ impl KeloraConfig {
                 default_timezone: determine_default_timezone(cli),
                 extract_prefix: cli.extract_prefix.clone(),
                 prefix_sep: cli.prefix_sep.clone(),
+                cols_sep: cli.cols_sep.clone(),
             },
             output: OutputConfig {
                 format: if cli.stats_only {
@@ -632,7 +636,7 @@ impl KeloraConfig {
                 batch_timeout: cli.batch_timeout,
                 no_preserve_order: cli.no_preserve_order,
             },
-        }
+        })
     }
 
     /// Check if parallel processing should be used
@@ -673,6 +677,7 @@ impl Default for KeloraConfig {
                 default_timezone: None,
                 extract_prefix: None,
                 prefix_sep: "|".to_string(),
+                cols_sep: None,
             },
             output: OutputConfig {
                 format: OutputFormat::Default,
@@ -712,6 +717,38 @@ impl Default for KeloraConfig {
                 batch_timeout: 200,
                 no_preserve_order: false,
             },
+        }
+    }
+}
+
+/// Parse input format from CLI options, handling the --format option
+fn parse_input_format_from_cli(cli: &crate::Cli) -> anyhow::Result<InputFormat> {
+    parse_input_format_spec(&cli.format)
+}
+
+/// Parse input format specification string (e.g., "cols:ts(2) level - *msg")
+fn parse_input_format_spec(spec: &str) -> anyhow::Result<InputFormat> {
+    if let Some(cols_spec) = spec.strip_prefix("cols:") {
+        if cols_spec.trim().is_empty() {
+            return Err(anyhow::anyhow!("cols format requires a specification, e.g., 'cols:ts level *msg'"));
+        }
+        Ok(InputFormat::Cols(cols_spec.to_string()))
+    } else {
+        // Parse standard formats
+        match spec.to_lowercase().as_str() {
+            "auto" => Ok(InputFormat::Auto),
+            "json" => Ok(InputFormat::Json),
+            "line" => Ok(InputFormat::Line),
+            "raw" => Ok(InputFormat::Raw),
+            "logfmt" => Ok(InputFormat::Logfmt),
+            "syslog" => Ok(InputFormat::Syslog),
+            "cef" => Ok(InputFormat::Cef),
+            "csv" => Ok(InputFormat::Csv),
+            "tsv" => Ok(InputFormat::Tsv),
+            "csvnh" => Ok(InputFormat::Csvnh),
+            "tsvnh" => Ok(InputFormat::Tsvnh),
+            "combined" => Ok(InputFormat::Combined),
+            _ => Err(anyhow::anyhow!("Unknown input format: '{}'. Supported formats: json, line, csv, syslog, cef, logfmt, raw, tsv, csvnh, tsvnh, combined, auto, and cols:<spec>", spec)),
         }
     }
 }
@@ -785,6 +822,11 @@ impl From<crate::InputFormat> for InputFormat {
             crate::InputFormat::Csvnh => InputFormat::Csvnh,
             crate::InputFormat::Tsvnh => InputFormat::Tsvnh,
             crate::InputFormat::Combined => InputFormat::Combined,
+            crate::InputFormat::Cols => {
+                // This should not happen since CLI Cols enum has no parameters
+                // But if it does, create an empty spec as fallback
+                InputFormat::Cols(String::new())
+            },
         }
     }
 }
@@ -804,6 +846,7 @@ impl From<InputFormat> for crate::InputFormat {
             InputFormat::Csvnh => crate::InputFormat::Csvnh,
             InputFormat::Tsvnh => crate::InputFormat::Tsvnh,
             InputFormat::Combined => crate::InputFormat::Combined,
+            InputFormat::Cols(_) => crate::InputFormat::Cols,
         }
     }
 }

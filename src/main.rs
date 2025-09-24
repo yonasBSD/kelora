@@ -928,7 +928,7 @@ fn main() -> Result<()> {
     };
 
     // Create configuration from CLI and set stages (using lib config directly)
-    let mut config = KeloraConfig::from_cli(&cli);
+    let mut config = KeloraConfig::from_cli(&cli)?;
     // Set the ordered stages directly
     config.processing.stages = ordered_stages;
 

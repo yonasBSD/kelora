@@ -18,6 +18,9 @@ kelora --since 1h -l error app.log
 # Filter and enrich JSON logs  
 kelora -f json app.log --filter 'e.status.to_int() >= 500' --exec 'e.severity = if e.status.to_int() >= 500 { "critical" } else { "normal" }'
 
+# Parse structured log columns directly
+echo "2025-09-22 INFO alice login success" | kelora -f 'cols:date level user action *details' --keys user,action
+
 # Count HTTP status codes with metrics
 kelora -f combined --exec 'track_count("status_" + e.status)' --metrics access.log
 
@@ -85,6 +88,7 @@ Each parser creates events with different fields:
 |`cef`         |`vendor`, `product`, `severity` + extensions|ArcSight CEF logs               |
 |`csv/tsv`     |Column headers as fields            |Structured data files               |
 |`combined`    |`ip`, `status`, `request`, `method`, `path`, `request_time`|Apache/NGINX web server logs|
+|`cols:<spec>` |Fields defined by column spec       |`-f 'cols:ts(2) level *msg'`        |
 
 All formats support gzip compression automatically (detects magic bytes `1F 8B 08`) for both files and stdin. No additional flags needed - works with pipes, `.gz` files, and files without extensions. Use `-f format` to specify (`-j` is a shortcut for `-f json`).
 
@@ -128,6 +132,27 @@ kelora -f json --extract-prefix container input.log
 
 Prefix extraction runs before parsing, so the extracted prefix becomes a field in the parsed event. Default separator is `|`, configurable with `--prefix-sep`.
 
+### Column Format (`cols:<spec>`)
+
+Parse delimited text into structured fields using declarative specifications. Syntax: `name` (single), `name(n)` (multiple joined), `-` (skip), `*name` (remainder, must be last).
+
+```bash
+# Basic: whitespace-separated columns
+kelora -f 'cols:date level user action *details' app.log
+
+# Custom separator: pipe-delimited
+kelora -f 'cols:ip user timestamp *request' --cols-sep '|' app.log
+
+# Field grouping and skipping
+kelora -f 'cols:ts(2) level - *msg' app.log  # ts="date time", skip 4th column
+
+# Integration with processing pipeline
+kelora -f 'cols:date level user action' --filter 'e.level == "ERROR"' \
+       --exec 'track_count("user_" + e.user)' --metrics app.log
+```
+
+Default: whitespace splitting. Use `--cols-sep 'delim'` for custom separators (supports multi-character). Missing columns become empty/null (resilient mode) or fail with `--strict`.
+
 ## Built-in Functions
 
 **Text Extraction**: `extract_re(pattern)` finds regex matches, `extract_ip()` pulls IP addresses, `parse_kv("=", ";")` converts key-value pairs to fields.
@@ -138,30 +163,7 @@ Prefix extraction runs before parsing, so the extracted prefix becomes a field i
 
 **Array Processing**: `emit_each(array)` fans out arrays into individual events, `emit_each(array, base)` adds common fields to each. Transforms nested data like `{"users": [{"name": "alice"}, {"name": "bob"}]}` into separate events for each user. Original event is suppressed.
 
-**Column Mapping**: `line.parse_cols("ts(2) level *msg")` declaratively assigns whitespace-delimited columns, `line.parse_cols("ts level *msg", "|")` honors literal separators, and `["field","values"].parse_cols("name value")` works with pre-split arrays.
-
-Specs use short tokens:
-
-- `name` assigns a single column to the field (e.g. `level`).
-- `name(n)` consumes `n ≥ 2` columns, joining them with the current separator (`ts(2)` grabs the date and time).
-- `-` skips one column, `-(n)` skips many.
-- `*name` captures the remainder verbatim (strings) or joined with spaces/separator (arrays); it must be last and unique.
-
-Most scripts simply replace the event with the parsed map: `e = e.line.parse_cols("ts level *msg")`.
-
-```bash
-# Sample input file with mixed log levels:
-# 2025-09-22 12:33:44 INFO IgnoreMe: hello world!
-# 2025-09-23 08:15:32 ERROR SomeService: connection failed
-
-kelora -f line sample.log --exec 'e = e.line.parse_cols("ts(2) level - *msg")' --keys ts,level,msg
-
-# Output:
-# ts='2025-09-22 12:33:44' level='INFO' msg='hello world!'
-# ts='2025-09-23 08:15:32' level='ERROR' msg='connection failed'
-# ts='2025-09-23 14:22:01' level='WARN' msg='timeout occurred'
-# ts='2025-09-23 16:45:18' level='DEBUG' msg='user login successful'
-```
+**Column Mapping**: For programmatic use, `parse_cols()` is available in Rhai scripts: `e = e.line.parse_cols("ts(2) level *msg")` or with custom separators `e.line.parse_cols("spec", "|")`. For most use cases, the direct `-f cols:<spec>` format is recommended (see Column Format section above).
 
 **Metrics**: `track_count(key)` increments counters, `track_sum/avg/min/max(key, value)` accumulate statistics, `track_unique(key, value)` counts distinct values. Access via `metrics` map in `--end` scripts or display with `--metrics`.
 

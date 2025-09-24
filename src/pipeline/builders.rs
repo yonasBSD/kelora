@@ -71,6 +71,8 @@ pub struct PipelineBuilder {
     default_timezone: Option<String>,
     extract_prefix: Option<String>,
     prefix_sep: String,
+    cols_spec: Option<String>,
+    cols_sep: Option<String>,
 }
 
 impl PipelineBuilder {
@@ -107,6 +109,8 @@ impl PipelineBuilder {
             default_timezone: None,
             extract_prefix: None,
             prefix_sep: "|".to_string(),
+            cols_spec: None,
+            cols_sep: None,
         }
     }
 
@@ -183,6 +187,13 @@ impl PipelineBuilder {
                 }
             }
             crate::InputFormat::Combined => Box::new(crate::parsers::CombinedParser::new()?),
+            crate::InputFormat::Cols => {
+                if let Some(ref spec) = self.cols_spec {
+                    Box::new(crate::parsers::ColsParser::new(spec.clone(), self.cols_sep.clone()))
+                } else {
+                    return Err(anyhow::anyhow!("Cols format requires a specification"));
+                }
+            },
         };
 
         // Wrap parser with prefix extraction if needed
@@ -458,6 +469,13 @@ impl PipelineBuilder {
                 }
             }
             crate::InputFormat::Combined => Box::new(crate::parsers::CombinedParser::new()?),
+            crate::InputFormat::Cols => {
+                if let Some(ref spec) = self.cols_spec {
+                    Box::new(crate::parsers::ColsParser::new(spec.clone(), self.cols_sep.clone()))
+                } else {
+                    return Err(anyhow::anyhow!("Cols format requires a specification"));
+                }
+            },
         };
 
         // Wrap parser with prefix extraction if needed
@@ -676,6 +694,18 @@ impl PipelineBuilder {
         self.prefix_sep = prefix_sep;
         self
     }
+
+    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
+    pub fn with_cols_spec(mut self, cols_spec: Option<String>) -> Self {
+        self.cols_spec = cols_spec;
+        self
+    }
+
+    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
+    pub fn with_cols_sep(mut self, cols_sep: Option<String>) -> Self {
+        self.cols_sep = cols_sep;
+        self
+    }
 }
 
 impl Default for PipelineBuilder {
@@ -710,12 +740,20 @@ pub fn create_pipeline_builder_from_config(
         no_emoji: config.output.no_emoji,
     };
 
+    // Extract cols spec if needed before conversion
+    let (input_format, cols_spec) = match &config.input.format {
+        crate::config::InputFormat::Cols(spec) => (crate::InputFormat::Cols, Some(spec.clone())),
+        other => (other.clone().into(), None),
+    };
+
     let mut builder = PipelineBuilder::new()
         .with_config(pipeline_config)
         .with_begin(config.processing.begin.clone())
         .with_end(config.processing.end.clone())
-        .with_input_format(config.input.format.clone().into())
-        .with_output_format(config.output.format.clone().into());
+        .with_input_format(input_format)
+        .with_output_format(config.output.format.clone().into())
+        .with_cols_spec(cols_spec)
+        .with_cols_sep(config.input.cols_sep.clone());
     builder.keys = config.output.get_effective_keys();
     builder.exclude_keys = config.output.exclude_keys.clone();
     builder.levels = config.processing.levels.clone();
