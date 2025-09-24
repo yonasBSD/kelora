@@ -388,9 +388,9 @@ impl KeloraConfig {
         let use_emoji = use_colors && !self.output.no_emoji;
 
         if use_emoji {
-            format!("🔸{}", message)
+            format!("\n⚠️ {}", message)
         } else {
-            format!("kelora: {}", message)
+            format!("\nkelora: {}", message)
         }
     }
 
@@ -400,9 +400,9 @@ impl KeloraConfig {
         let use_emoji = use_colors && !self.output.no_emoji;
 
         if use_emoji {
-            format!("🔹Kelora Stats\n{}", message)
+            format!("\n📈 Stats:\n{}", message)
         } else {
-            format!("kelora: Stats\n{}", message)
+            format!("\nkelora: Stats:\n{}", message)
         }
     }
 
@@ -412,9 +412,9 @@ impl KeloraConfig {
         let use_emoji = use_colors && !self.output.no_emoji;
 
         if use_emoji {
-            format!("🔹Tracked metrics\n{}", message)
+            format!("\n📊 Tracked metrics:\n{}", message)
         } else {
-            format!("kelora: Tracked metrics\n{}", message)
+            format!("\nkelora: Tracked metrics:\n{}", message)
         }
     }
 }
@@ -427,9 +427,9 @@ pub fn format_error_message_auto(message: &str) -> String {
     let use_emoji = use_colors && !no_emoji;
 
     if use_emoji {
-        format!("🔸{}", message)
+        format!("\n⚠️ {}", message)
     } else {
-        format!("kelora: {}", message)
+        format!("\nkelora: {}", message)
     }
 }
 
@@ -455,7 +455,7 @@ pub fn format_verbose_error_with_config(
     };
 
     let use_emoji = use_colors && !no_emoji;
-    let prefix = if use_emoji { "🔸" } else { "kelora: " };
+    let prefix = if use_emoji { "⚠️ " } else { "kelora: " };
 
     if let Some(line) = line_num {
         format!("{}line {}: {} - {}", prefix, line, error_type, message)
@@ -521,7 +521,7 @@ pub fn format_verbose_error_with_pipeline_config(
     };
 
     let use_emoji = use_colors && !no_emoji;
-    let prefix = if use_emoji { "🔸" } else { "kelora: " };
+    let prefix = if use_emoji { "⚠️ " } else { "kelora: " };
 
     if let Some(line) = line_num {
         format!("{}line {}: {} - {}", prefix, line, error_type, message)
@@ -730,7 +730,9 @@ fn parse_input_format_from_cli(cli: &crate::Cli) -> anyhow::Result<InputFormat> 
 fn parse_input_format_spec(spec: &str) -> anyhow::Result<InputFormat> {
     if let Some(cols_spec) = spec.strip_prefix("cols:") {
         if cols_spec.trim().is_empty() {
-            return Err(anyhow::anyhow!("cols format requires a specification, e.g., 'cols:ts level *msg'"));
+            return Err(anyhow::anyhow!(
+                "cols format requires a specification, e.g., 'cols:ts level *msg'"
+            ));
         }
         Ok(InputFormat::Cols(cols_spec.to_string()))
     } else {
@@ -826,7 +828,7 @@ impl From<crate::InputFormat> for InputFormat {
                 // This should not happen since CLI Cols enum has no parameters
                 // But if it does, create an empty spec as fallback
                 InputFormat::Cols(String::new())
-            },
+            }
         }
     }
 }
@@ -999,7 +1001,7 @@ mod tests {
             config.output.no_emoji = false;
 
             let message = config.format_error_message("problem");
-            assert!(message.starts_with("🔸"));
+            assert!(message.starts_with("⚠️"));
             assert!(message.ends_with("problem"));
         });
     }

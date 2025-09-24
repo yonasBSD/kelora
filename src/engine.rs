@@ -177,7 +177,7 @@ impl ErrorEnhancer {
         let mut output = String::new();
 
         // Basic error info
-        output.push_str(&format!("🔸Stage {} failed\n", stage));
+        output.push_str(&format!("⚠️ Stage {} failed\n", stage));
         output.push_str(&format!("  Code: {}\n", script.trim()));
         output.push_str(&format!("  Error: {}\n", error));
 

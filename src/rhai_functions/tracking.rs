@@ -82,7 +82,7 @@ pub fn track_error(
                 std::env::var("NO_EMOJI").is_ok()
             };
             let use_emoji = use_colors && !no_emoji;
-            let prefix = if use_emoji { "🔸" } else { "kelora: " };
+            let prefix = if use_emoji { "⚠️ " } else { "kelora: " };
 
             let formatted_error = if let (Some(line), Some(fname)) = (line_num, filename) {
                 format!("{}{}:{}: {} - {}", prefix, fname, line, error_type, message)
@@ -269,7 +269,7 @@ pub fn extract_error_summary_from_tracking(
             let no_emoji = cfg.output.no_emoji || std::env::var("NO_EMOJI").is_ok();
             let use_emoji = use_colors && !no_emoji;
             if use_emoji {
-                "🔸"
+                "⚠️ "
             } else {
                 "kelora: "
             }
@@ -277,9 +277,15 @@ pub fn extract_error_summary_from_tracking(
             "kelora: "
         };
 
+        let message = if verbose > 0 {
+            "Each error shown above. Use -q to suppress."
+        } else {
+            "Use -v to see each error or -q to suppress."
+        };
+
         summary.push_str(&format!(
-            "\n{}[+{} more errors. Use -v to view all of them.]",
-            prefix, remaining
+            "\n{}[+{} more. {}]",
+            prefix, remaining, message
         ));
     }
 

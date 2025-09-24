@@ -64,7 +64,7 @@ fn emit_each_impl(
             } else {
                 // Log warning in resilient mode
                 eprintln!(
-                    "🔸 emit_each(): items must be array<map>; got {}; returning 0",
+                    "⚠️ emit_each(): items must be array<map>; got {}; returning 0",
                     items_val.type_name()
                 );
                 return Ok(Dynamic::from(0i64));
@@ -87,7 +87,7 @@ fn emit_each_impl(
                     .into());
                 } else {
                     eprintln!(
-                        "🔸 emit_each(): base must be map; got {}; treating as empty",
+                        "⚠️ emit_each(): base must be map; got {}; treating as empty",
                         base_val.type_name()
                     );
                     None
@@ -115,7 +115,7 @@ fn emit_each_impl(
                     .into());
                 } else {
                     eprintln!(
-                        "🔸 emit_each(): skipping items[{}], expected map (got {})",
+                        "⚠️ emit_each(): skipping items[{}], expected map (got {})",
                         i,
                         item.type_name()
                     );

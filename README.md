@@ -209,7 +209,7 @@ kelora -l error \
 - **Multiline**: `-M timestamp` (Java stacks), `-M indent` (continuation lines), `-M backslash` (line continuation), `-M whole` (entire input as single event)
 - **Scripts**: `-E script.rhai` (from file), `--begin 'conf.config = ...'` (initialization), `--end 'print(metrics.total)'` (final reporting)
 - **Error Handling**: Default is resilient (skip errors), `--strict` for fail-fast, `--verbose` for details, `--no-emoji` to disable emoji prefixes
-- **Verbose Output**: Uses standardized emoji prefixes - 🔹 (blue diamond) for general output like stats and processing messages, 🔸 (orange diamond) for errors and warnings
+- **Verbose Output**: Uses standardized emoji prefixes - 🔹 (blue diamond) for general output like stats and processing messages, ⚠️  (warning) for errors and warnings
 - **Config**: `~/.config/kelora/config.ini` for defaults and aliases, `--config-file path/to/config.ini` for custom config, `--show-config` to view
 
 ## Complete Examples
