@@ -147,7 +147,7 @@ fn try_parse_with_format(
     // Strip brackets if present (common in Apache/Nginx logs)
     let ts_str = ts_str.trim();
     let ts_str = if ts_str.starts_with('[') && ts_str.ends_with(']') {
-        &ts_str[1..ts_str.len()-1]
+        &ts_str[1..ts_str.len() - 1]
     } else {
         ts_str
     };

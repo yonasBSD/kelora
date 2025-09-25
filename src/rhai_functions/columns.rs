@@ -341,7 +341,11 @@ pub fn parse_cols_whitespace(line: &str, spec: &str) -> Result<Map, Box<rhai::Ev
     )
 }
 
-pub fn parse_cols_with_sep(line: &str, spec: &str, sep: &str) -> Result<Map, Box<rhai::EvalAltResult>> {
+pub fn parse_cols_with_sep(
+    line: &str,
+    spec: &str,
+    sep: &str,
+) -> Result<Map, Box<rhai::EvalAltResult>> {
     if sep.is_empty() {
         return Err("parse_cols: separator must not be empty".into());
     }

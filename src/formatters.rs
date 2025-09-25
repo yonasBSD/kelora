@@ -1070,7 +1070,9 @@ impl pipeline::Formatter for InspectFormatter {
         let mut lines = Vec::new();
         self.format_entries(
             &mut lines,
-            crate::event::ordered_fields(event).into_iter().map(|(k, v)| (k.as_str(), v)),
+            crate::event::ordered_fields(event)
+                .into_iter()
+                .map(|(k, v)| (k.as_str(), v)),
             0,
         );
         lines.insert(0, "---".to_string());

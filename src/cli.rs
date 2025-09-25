@@ -86,7 +86,7 @@ pub struct Cli {
     /// Skip the first N input lines
     #[arg(long = "skip-lines", help_heading = "Input Options")]
     pub skip_lines: Option<usize>,
-    
+
     /// Keep only input lines matching this regex pattern (applied before ignore-lines)
     #[arg(long = "keep-lines", help_heading = "Input Options")]
     pub keep_lines: Option<String>,
@@ -484,7 +484,9 @@ fn parse_format_value(s: &str) -> Result<String, String> {
     if s.starts_with("cols:") {
         let spec = &s[5..];
         if spec.trim().is_empty() {
-            return Err("cols format requires a specification, e.g., 'cols:ts level *msg'".to_string());
+            return Err(
+                "cols format requires a specification, e.g., 'cols:ts level *msg'".to_string(),
+            );
         }
         return Ok(s.to_string());
     }

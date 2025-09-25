@@ -330,11 +330,13 @@ pub fn ordered_fields<'a>(event: &'a Event) -> Vec<(&'a String, &'a rhai::Dynami
     }
 
     // 4. Add all remaining fields in IndexMap order (no additional sorting)
-    let remaining: Vec<_> = event.fields.iter()
+    let remaining: Vec<_> = event
+        .fields
+        .iter()
         .filter(|(key, _)| {
-            !TIMESTAMP_FIELD_NAMES.contains(&key.as_str()) &&
-            !LEVEL_FIELD_NAMES.contains(&key.as_str()) &&
-            !MESSAGE_FIELD_NAMES.contains(&key.as_str())
+            !TIMESTAMP_FIELD_NAMES.contains(&key.as_str())
+                && !LEVEL_FIELD_NAMES.contains(&key.as_str())
+                && !MESSAGE_FIELD_NAMES.contains(&key.as_str())
         })
         .collect();
 
