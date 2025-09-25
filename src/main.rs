@@ -1546,96 +1546,64 @@ fn print_multiline_help() {
     let help_text = r#"
 Multiline Strategy Reference for --multiline:
 
-Kelora supports various strategies for detecting multi-line event boundaries.
-By default, multiline processing is disabled for all formats to avoid unexpected
-buffering behavior in streaming scenarios.
+Kelora supports several multiline strategies. Multiline remains off unless you
+request it. Some formats (for example, --format syslog) enable a safe preset
+automatically; override with --no-multiline if you prefer single-line events.
 
-AVAILABLE STRATEGIES:
+QUICK PRESETS (recommended):
+
+stacktrace
+  Timestamp anchored framing for typical application logs and stack traces
+  Equivalent to: -M timestamp
+
+docker
+  RFC3339 timestamp framing used by Docker JSON logs
+  Equivalent to: -M timestamp:pattern=^\d{4}-\d{2}-\d{2}T
+
+syslog
+  RFC3164/5424 style headers ("Jan  2", "2024-01-02T...")
+  Equivalent to: -M timestamp:pattern=^(<\d+>\d\s+\d{4}-\d{2}-\d{2}T|\w{3}\s+\d{1,2})
+
+nginx
+  Bracketed date headers like "[10/Oct/2000:13:55:36 +0000]"
+  Equivalent to: -M timestamp:pattern=^\[[0-9]{2}/[A-Za-z]{3}/[0-9]{4}:
+
+continuation
+  Join lines ending with the continuation marker (default: \)
+  Equivalent to: -M backslash
+
+block
+  Treat BEGIN...END style sections as one event
+  Equivalent to: -M boundary:start=^BEGIN:end=^END
+
+ADVANCED RECIPES (build your own):
 
 timestamp[:pattern=REGEX]
-  Events start with timestamp pattern (anchored to line beginning)
-  Default pattern matches ISO dates and syslog timestamps
-  Examples:
-    -M timestamp                    # Use default timestamp patterns
-    -M timestamp:pattern=^\d{4}     # Lines starting with 4 digits
-    -M timestamp:pattern=^\[.*\]    # Lines starting with bracketed content
+  Events start with timestamp pattern (anchored to the beginning of the line)
 
 indent[:spaces=N|tabs|mixed]
   Continuation lines are indented, new events start at column 1
-  Options:
-    spaces=N  - Require exactly N spaces minimum
-    tabs      - Only tabs count as indentation
-    mixed     - Any whitespace counts (default)
-  Examples:
-    -M indent                       # Any whitespace indentation
-    -M indent:spaces=4              # Minimum 4 spaces
-    -M indent:tabs                  # Only tab indentation
 
 start:REGEX
-  Events start when line matches pattern
-  Pattern is a regular expression
-  Examples:
-    -M start:^ERROR                 # Events start with "ERROR"
-    -M start:^\d{4}-\d{2}-\d{2}     # Events start with date format
-    -M start:^[A-Z]+:               # Events start with UPPERCASE:
+  Events start when the line matches the regular expression
 
 end:REGEX
-  Events end when line matches pattern
-  Current event completes when pattern is found
-  Examples:
-    -M end:^$                       # Events end at blank lines
-    -M end:END_OF_EVENT             # Events end with specific marker
-    -M end:^---+$                   # Events end with dashed separator
+  Events end when the line matches the regular expression
 
 boundary:start=START_REGEX:end=END_REGEX
-  Events have both start and end boundaries
-  New events start at start pattern, current events end at end pattern
-  Note: End markers become part of the next event's start
-  Examples:
-    -M boundary:start=^BEGIN:end=^END        # BEGIN...END blocks
-    -M boundary:start=^START:end=^STOP       # START...STOP blocks
-    -M boundary:start=^<log:end=^</log>      # XML-like boundaries
+  Events start at START_REGEX and close at END_REGEX
 
 backslash[:char=C]
-  Lines ending with continuation character continue the event
-  Default continuation character is backslash (\)
-  Examples:
-    -M backslash                    # Lines ending with \ continue
-    -M backslash:char=,             # Lines ending with comma continue
-    -M backslash:char=^             # Lines ending with caret continue
+  Lines ending with the continuation character continue the event
 
 whole
-  Read entire input as a single event
-  Useful for processing complete files as single records
-  Examples:
-    -M whole                        # Entire input becomes one event
-
-COMMON USE CASES:
-
-Stack Traces (Java/Python):
-  -M timestamp                      # New events start with timestamps
-  -M indent                         # Continuation lines are indented
-
-JSON Objects:
-  -M whole                          # Single large JSON file
-  -M timestamp                      # JSON logs with timestamps per entry
-
-Log Entries with Continuation:
-  -M backslash                      # Lines ending with \ continue
-  -M indent                         # Indented lines continue previous
-
-Docker/Container Logs:
-  -M timestamp --extract-prefix container  # Container-prefixed with timestamps
-
-SQL Statements:
-  -M end:;$                         # Statements end with semicolon
-  -M backslash                      # Line continuation with backslash
+  Read the entire input as a single event (loads everything into memory)
 
 PERFORMANCE NOTES:
-- Multiline mode buffers events in memory until boundaries are detected
-- Use --batch-size to control memory usage in parallel mode  
-- --take N applies after multiline reconstruction, not to input lines
-- Whole strategy loads entire input into memory
+- Multiline buffers events until a boundary arrives; watch memory usage
+- --batch-size helps control memory in parallel mode  
+- --take N applies after multiline reconstruction, not to raw lines
+- The whole strategy buffers the entire input
 
 For complete CLI reference: kelora --help
 For Rhai scripting help: kelora --help-rhai

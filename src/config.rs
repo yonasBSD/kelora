@@ -204,9 +204,20 @@ pub enum MultilineStrategy {
     Whole,
 }
 
+const DEFAULT_TIMESTAMP_PATTERN: &str = r"^(\d{4}-\d{2}-\d{2}|\w{3}\s+\d{1,2})";
+const DOCKER_TIMESTAMP_PATTERN: &str = r"^\d{4}-\d{2}-\d{2}T";
+const SYSLOG_TIMESTAMP_PATTERN: &str = r"^(<\d+>\d\s+\d{4}-\d{2}-\d{2}T|\w{3}\s+\d{1,2})";
+const NGINX_TIMESTAMP_PATTERN: &str = r"^\[[0-9]{2}/[A-Za-z]{3}/[0-9]{4}:";
+const DEFAULT_BLOCK_START: &str = r"^BEGIN";
+const DEFAULT_BLOCK_END: &str = r"^END";
+
 impl MultilineConfig {
     /// Parse multiline configuration from CLI string
     pub fn parse(value: &str) -> Result<Self, String> {
+        if let Some(strategy) = Self::parse_preset(value) {
+            return Ok(MultilineConfig { strategy });
+        }
+
         let parts: Vec<&str> = value.split(':').collect();
 
         if parts.is_empty() {
@@ -220,7 +231,7 @@ impl MultilineConfig {
                     Self::parse_pattern_option(parts[1])?
                 } else {
                     // Default timestamp patterns (ISO and syslog) - both anchored to start
-                    r"^(\d{4}-\d{2}-\d{2}|\w{3}\s+\d{1,2})".to_string()
+                    DEFAULT_TIMESTAMP_PATTERN.to_string()
                 };
                 MultilineStrategy::Timestamp { pattern }
             }
@@ -273,6 +284,33 @@ impl MultilineConfig {
         };
 
         Ok(MultilineConfig { strategy })
+    }
+
+    pub fn preset(name: &str) -> Option<Self> {
+        Self::parse_preset(name).map(|strategy| MultilineConfig { strategy })
+    }
+
+    fn parse_preset(name: &str) -> Option<MultilineStrategy> {
+        match name {
+            "stacktrace" => Some(MultilineStrategy::Timestamp {
+                pattern: DEFAULT_TIMESTAMP_PATTERN.to_string(),
+            }),
+            "docker" => Some(MultilineStrategy::Timestamp {
+                pattern: DOCKER_TIMESTAMP_PATTERN.to_string(),
+            }),
+            "syslog" => Some(MultilineStrategy::Timestamp {
+                pattern: SYSLOG_TIMESTAMP_PATTERN.to_string(),
+            }),
+            "nginx" => Some(MultilineStrategy::Timestamp {
+                pattern: NGINX_TIMESTAMP_PATTERN.to_string(),
+            }),
+            "continuation" => Some(MultilineStrategy::Backslash { char: '\\' }),
+            "block" => Some(MultilineStrategy::Boundary {
+                start: DEFAULT_BLOCK_START.to_string(),
+                end: DEFAULT_BLOCK_END.to_string(),
+            }),
+            _ => None,
+        }
     }
 
     fn parse_pattern_option(option: &str) -> Result<String, String> {
@@ -338,7 +376,7 @@ impl Default for MultilineConfig {
     fn default() -> Self {
         Self {
             strategy: MultilineStrategy::Timestamp {
-                pattern: r"^(\d{4}-\d{2}-\d{2}|\w{3}\s+\d{1,2})".to_string(),
+                pattern: DEFAULT_TIMESTAMP_PATTERN.to_string(),
             },
         }
     }
@@ -351,9 +389,10 @@ impl InputFormat {
     /// to avoid unexpected buffering behavior in streaming scenarios.
     /// Users must explicitly enable multiline with --multiline option.
     pub fn default_multiline(&self) -> Option<MultilineConfig> {
-        // Multiline is now strictly opt-in for all formats to avoid
-        // unexpected "last event buffering" behavior in streaming scenarios
-        None
+        match self {
+            InputFormat::Syslog => MultilineConfig::preset("syslog"),
+            _ => None,
+        }
     }
 }
 

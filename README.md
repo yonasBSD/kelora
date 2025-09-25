@@ -206,7 +206,7 @@ kelora -l error \
 ### Performance & Configuration
 - **Processing**: `--parallel` for batch files (2-10x faster), `--threads N`, `--batch-size N`
 - **Timezones**: `--input-tz Europe/Berlin` (parse), `-z` (display local), `-Z` (display UTC)  
-- **Multiline**: `-M timestamp` (Java stacks), `-M indent` (continuation lines), `-M backslash` (line continuation), `-M whole` (entire input as single event)
+- **Multiline**: Start with presets like `-M stacktrace`, `-M docker`, `-M syslog`, `-M nginx`, or `-M continuation`; run `kelora --help-multiline` for advanced recipes and custom patterns
 - **Scripts**: `-E script.rhai` (from file), `--begin 'conf.config = ...'` (initialization), `--end 'print(metrics.total)'` (final reporting)
 - **Error Handling**: Default is resilient (skip errors), `--strict` for fail-fast, `--verbose` for details, `--no-emoji` to disable emoji prefixes
 - **Verbose Output**: Uses standardized emoji prefixes - 🔹 (blue diamond) for general output like stats and processing messages, ⚠️  (warning) for errors and warnings
@@ -301,6 +301,19 @@ kelora --help-functions    # Built-in function reference
 kelora --help-multiline    # Multiline strategy guide
 kelora --show-config       # Current configuration
 ```
+
+### Multiline Presets
+
+| Preset | When to use it | Equivalent explicit form |
+| --- | --- | --- |
+| `stacktrace` | App logs or stack traces that start with ISO or syslog timestamps | `-M timestamp` |
+| `docker` | Docker JSON logs with RFC3339 timestamps | `-M timestamp:pattern=^\d{4}-\d{2}-\d{2}T` |
+| `syslog` | RFC3164/5424 headers such as `Jan  2` or `<165>1 2024-01-02T...` | `-M timestamp:pattern=^(<\d+>\d\s+\d{4}-\d{2}-\d{2}T|\w{3}\s+\d{1,2})` |
+| `nginx` | Access/error logs with bracketed datetimes | `-M timestamp:pattern=^\[[0-9]{2}/[A-Za-z]{3}/[0-9]{4}:` |
+| `continuation` | Entries that end with a continuation marker (`\` by default) | `-M backslash` |
+| `block` | Sections delimited by `BEGIN`/`END` markers | `-M boundary:start=^BEGIN:end=^END` |
+
+Use `--no-multiline` to disable format defaults. Switch to the advanced recipes in `kelora --help-multiline` when you need custom boundaries.
 
 ### Configuration File Example
 
