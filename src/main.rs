@@ -1547,8 +1547,9 @@ fn print_multiline_help() {
 Multiline Strategy Reference for --multiline:
 
 Kelora supports several multiline strategies. Multiline remains off unless you
-request it. Some formats (for example, --format syslog) enable a safe preset
-automatically; override with --no-multiline if you prefer single-line events.
+request it. Some formats (for example, --format syslog or --format combined)
+enable a safe preset automatically; override with --no-multiline if you prefer
+single-line events.
 
 QUICK PRESETS (recommended):
 
@@ -1563,6 +1564,10 @@ docker
 syslog
   RFC3164/5424 style headers ("Jan  2", "2024-01-02T...")
   Equivalent to: -M timestamp:pattern=^(<\d+>\d\s+\d{4}-\d{2}-\d{2}T|\w{3}\s+\d{1,2})
+
+accesslog
+  Common/combined web access logs with remote host prefix
+  Equivalent to: -M start:^\S+\s+\S+\s+\S+\s+\[
 
 nginx
   Bracketed date headers like "[10/Oct/2000:13:55:36 +0000]"

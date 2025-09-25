@@ -208,6 +208,7 @@ const DEFAULT_TIMESTAMP_PATTERN: &str = r"^(\d{4}-\d{2}-\d{2}|\w{3}\s+\d{1,2})";
 const DOCKER_TIMESTAMP_PATTERN: &str = r"^\d{4}-\d{2}-\d{2}T";
 const SYSLOG_TIMESTAMP_PATTERN: &str = r"^(<\d+>\d\s+\d{4}-\d{2}-\d{2}T|\w{3}\s+\d{1,2})";
 const NGINX_TIMESTAMP_PATTERN: &str = r"^\[[0-9]{2}/[A-Za-z]{3}/[0-9]{4}:";
+const ACCESSLOG_START_PATTERN: &str = r"^\S+\s+\S+\s+\S+\s+\[";
 const DEFAULT_BLOCK_START: &str = r"^BEGIN";
 const DEFAULT_BLOCK_END: &str = r"^END";
 
@@ -304,6 +305,9 @@ impl MultilineConfig {
             "nginx" => Some(MultilineStrategy::Timestamp {
                 pattern: NGINX_TIMESTAMP_PATTERN.to_string(),
             }),
+            "accesslog" => Some(MultilineStrategy::Start {
+                pattern: ACCESSLOG_START_PATTERN.to_string(),
+            }),
             "continuation" => Some(MultilineStrategy::Backslash { char: '\\' }),
             "block" => Some(MultilineStrategy::Boundary {
                 start: DEFAULT_BLOCK_START.to_string(),
@@ -391,6 +395,7 @@ impl InputFormat {
     pub fn default_multiline(&self) -> Option<MultilineConfig> {
         match self {
             InputFormat::Syslog => MultilineConfig::preset("syslog"),
+            InputFormat::Combined => MultilineConfig::preset("accesslog"),
             _ => None,
         }
     }
