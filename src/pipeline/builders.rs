@@ -190,11 +190,14 @@ impl PipelineBuilder {
             crate::InputFormat::Combined => Box::new(crate::parsers::CombinedParser::new()?),
             crate::InputFormat::Cols => {
                 if let Some(ref spec) = self.cols_spec {
-                    Box::new(crate::parsers::ColsParser::new(spec.clone(), self.cols_sep.clone()))
+                    Box::new(crate::parsers::ColsParser::new(
+                        spec.clone(),
+                        self.cols_sep.clone(),
+                    ))
                 } else {
                     return Err(anyhow::anyhow!("Cols format requires a specification"));
                 }
-            },
+            }
         };
 
         // Wrap parser with prefix extraction if needed
@@ -339,6 +342,7 @@ impl PipelineBuilder {
         let ctx = PipelineContext {
             config: self.config,
             tracker: HashMap::new(),
+            internal_tracker: HashMap::new(),
             window: Vec::new(),
             rhai: rhai_engine.clone(),
             meta: MetaData::default(),
@@ -472,11 +476,14 @@ impl PipelineBuilder {
             crate::InputFormat::Combined => Box::new(crate::parsers::CombinedParser::new()?),
             crate::InputFormat::Cols => {
                 if let Some(ref spec) = self.cols_spec {
-                    Box::new(crate::parsers::ColsParser::new(spec.clone(), self.cols_sep.clone()))
+                    Box::new(crate::parsers::ColsParser::new(
+                        spec.clone(),
+                        self.cols_sep.clone(),
+                    ))
                 } else {
                     return Err(anyhow::anyhow!("Cols format requires a specification"));
                 }
-            },
+            }
         };
 
         // Wrap parser with prefix extraction if needed
@@ -617,6 +624,7 @@ impl PipelineBuilder {
         let ctx = PipelineContext {
             config: self.config,
             tracker: HashMap::new(),
+            internal_tracker: HashMap::new(),
             window: Vec::new(),
             rhai: rhai_engine.clone(),
             meta: MetaData::default(),

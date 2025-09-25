@@ -130,6 +130,76 @@ fn test_filter_expression() {
 }
 
 #[test]
+fn test_metrics_output_exposes_only_user_keys() {
+    let input = r#"{"msg": "first"}
+{"msg": "second"}"#;
+
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "track_count(\"events_total\");",
+            "--metrics",
+        ],
+        input,
+    );
+
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully with --metrics"
+    );
+    assert!(
+        stderr.contains("Tracked metrics") || stderr.contains("Tracked metrics:\""),
+        "Metrics banner should be present in stderr"
+    );
+    assert!(
+        stderr.contains("events_total"),
+        "User metric key should appear in metrics output"
+    );
+    assert!(
+        !stderr.contains("__kelora_stats"),
+        "Internal stats keys must not leak into metrics output"
+    );
+}
+
+#[test]
+fn test_parallel_stats_output_counts_lines_and_events() {
+    let input = r#"{"status": 200}
+{"status": 404}
+{"status": 500}"#;
+
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--parallel",
+            "--stats",
+            "--exec",
+            "if status >= 400 { track_count(\"errors\"); }",
+        ],
+        input,
+    );
+
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully with --stats in parallel"
+    );
+    assert!(
+        stderr.contains("Lines processed: 3 total"),
+        "Stats output should report total lines processed"
+    );
+    assert!(
+        stderr.contains("Events created: 3 total"),
+        "Stats output should report events created"
+    );
+    assert!(
+        !stderr.contains("__kelora_stats"),
+        "Stats output must not leak internal tracker keys"
+    );
+}
+
+#[test]
 fn test_exec_script() {
     let input = r#"{"level": "INFO", "status": 200}
 {"level": "ERROR", "status": 500}"#;

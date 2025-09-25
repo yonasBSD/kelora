@@ -3,9 +3,68 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
+/// Snapshot of tracking state separated into user-visible metrics and internal-only data.
+#[derive(Debug, Clone, Default)]
+pub struct TrackingSnapshot {
+    pub user: HashMap<String, Dynamic>,
+    pub internal: HashMap<String, Dynamic>,
+}
+
+impl TrackingSnapshot {
+    pub fn from_parts(user: HashMap<String, Dynamic>, internal: HashMap<String, Dynamic>) -> Self {
+        Self { user, internal }
+    }
+}
+
 // Thread-local storage for tracking state
 thread_local! {
-    pub static THREAD_TRACKING_STATE: RefCell<HashMap<String, Dynamic>> = RefCell::new(HashMap::new());
+    pub static THREAD_TRACKING_STATE: RefCell<TrackingSnapshot> = RefCell::new(TrackingSnapshot::default());
+}
+
+pub fn get_thread_snapshot() -> TrackingSnapshot {
+    THREAD_TRACKING_STATE.with(|state| state.borrow().clone())
+}
+
+pub fn with_user_tracking<F, R>(f: F) -> R
+where
+    F: FnOnce(&mut HashMap<String, Dynamic>) -> R,
+{
+    THREAD_TRACKING_STATE.with(|state| {
+        let mut snapshot = state.borrow_mut();
+        f(&mut snapshot.user)
+    })
+}
+
+pub fn with_internal_tracking<F, R>(f: F) -> R
+where
+    F: FnOnce(&mut HashMap<String, Dynamic>) -> R,
+{
+    THREAD_TRACKING_STATE.with(|state| {
+        let mut snapshot = state.borrow_mut();
+        f(&mut snapshot.internal)
+    })
+}
+
+pub fn set_thread_tracking_state(metrics: &HashMap<String, Dynamic>) {
+    THREAD_TRACKING_STATE.with(|state| {
+        let mut snapshot = state.borrow_mut();
+        snapshot.user = metrics.clone();
+    });
+}
+
+pub fn get_thread_tracking_state() -> HashMap<String, Dynamic> {
+    THREAD_TRACKING_STATE.with(|state| state.borrow().user.clone())
+}
+
+pub fn set_thread_internal_state(metrics: &HashMap<String, Dynamic>) {
+    THREAD_TRACKING_STATE.with(|state| {
+        let mut snapshot = state.borrow_mut();
+        snapshot.internal = metrics.clone();
+    });
+}
+
+pub fn get_thread_internal_state() -> HashMap<String, Dynamic> {
+    THREAD_TRACKING_STATE.with(|state| state.borrow().internal.clone())
 }
 
 fn merge_numeric(existing: Option<Dynamic>, new_value: Dynamic) -> Dynamic {
@@ -100,9 +159,7 @@ pub fn track_error(
     // Use tracking infrastructure for error counting in all modes
     // This ensures consistent mapreduce behavior and avoids double counting
 
-    THREAD_TRACKING_STATE.with(|state| {
-        let mut state = state.borrow_mut();
-
+    with_internal_tracking(|state| {
         // Track error count by type - uses "count" operation for summing across workers
         let count_key = format!("__kelora_error_count_{}", error_type);
         let current_count = state
@@ -195,8 +252,8 @@ pub fn track_error(
 
 /// Check if any errors occurred based on tracking data
 #[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
-pub fn has_errors_in_tracking(metrics: &HashMap<String, Dynamic>) -> bool {
-    for (key, value) in metrics {
+pub fn has_errors_in_tracking(snapshot: &TrackingSnapshot) -> bool {
+    for (key, value) in &snapshot.internal {
         if let Some(_error_type) = key.strip_prefix("__kelora_error_count_") {
             if let Ok(count) = value.as_int() {
                 if count > 0 {
@@ -211,7 +268,7 @@ pub fn has_errors_in_tracking(metrics: &HashMap<String, Dynamic>) -> bool {
 /// Extract error summary from tracking state with different verbosity levels
 #[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
 pub fn extract_error_summary_from_tracking(
-    metrics: &HashMap<String, Dynamic>,
+    snapshot: &TrackingSnapshot,
     verbose: u8,
     _config: Option<&crate::config::KeloraConfig>,
 ) -> Option<String> {
@@ -220,7 +277,7 @@ pub fn extract_error_summary_from_tracking(
     let mut sample_objects: Vec<rhai::Map> = Vec::new();
 
     // Collect error counts by type
-    for (key, value) in metrics {
+    for (key, value) in &snapshot.internal {
         if let Some(error_type) = key.strip_prefix("__kelora_error_count_") {
             if let Ok(count) = value.as_int() {
                 if count > 0 {
@@ -236,7 +293,7 @@ pub fn extract_error_summary_from_tracking(
     }
 
     // Collect sample objects with structured data
-    for (key, value) in metrics {
+    for (key, value) in &snapshot.internal {
         if let Some(_error_type) = key.strip_prefix("__kelora_error_samples_") {
             if let Ok(sample_array) = value.clone().into_array() {
                 for sample in sample_array {
@@ -337,8 +394,7 @@ pub fn register_functions(engine: &mut Engine) {
     // Track functions using thread-local storage - clean user API
     // Store operation metadata for proper parallel merging
     engine.register_fn("track_count", |key: &str| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             let updated = merge_numeric(state.get(key).cloned(), Dynamic::from(1_i64));
             state.insert(key.to_string(), updated);
             // Store operation type metadata for parallel merging
@@ -347,8 +403,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_sum", |key: &str, value: i64| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             let updated = merge_numeric(state.get(key).cloned(), Dynamic::from(value));
             state.insert(key.to_string(), updated);
             state.insert(format!("__op_{}", key), Dynamic::from("sum"));
@@ -356,8 +411,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_sum", |key: &str, value: i32| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             let updated = merge_numeric(state.get(key).cloned(), Dynamic::from(value));
             state.insert(key.to_string(), updated);
             state.insert(format!("__op_{}", key), Dynamic::from("sum"));
@@ -365,8 +419,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_sum", |key: &str, value: f64| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             let updated = merge_numeric(state.get(key).cloned(), Dynamic::from(value));
             state.insert(key.to_string(), updated);
             state.insert(format!("__op_{}", key), Dynamic::from("sum"));
@@ -374,8 +427,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_sum", |key: &str, value: f32| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             let updated = merge_numeric(state.get(key).cloned(), Dynamic::from(value));
             state.insert(key.to_string(), updated);
             state.insert(format!("__op_{}", key), Dynamic::from("sum"));
@@ -384,8 +436,7 @@ pub fn register_functions(engine: &mut Engine) {
 
     // track_min overloads for different number types
     engine.register_fn("track_min", |key: &str, value: i64| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             let current = state
                 .get(key)
                 .cloned()
@@ -405,8 +456,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_min", |key: &str, value: i32| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             let current = state
                 .get(key)
                 .cloned()
@@ -426,8 +476,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_min", |key: &str, value: f64| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             let current = state
                 .get(key)
                 .cloned()
@@ -446,8 +495,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_min", |key: &str, value: f32| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             let current = state
                 .get(key)
                 .cloned()
@@ -468,8 +516,7 @@ pub fn register_functions(engine: &mut Engine) {
 
     // track_max overloads for different number types
     engine.register_fn("track_max", |key: &str, value: i64| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             let current = state
                 .get(key)
                 .cloned()
@@ -489,8 +536,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_max", |key: &str, value: i32| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             let current = state
                 .get(key)
                 .cloned()
@@ -510,8 +556,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_max", |key: &str, value: f64| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             let current = state
                 .get(key)
                 .cloned()
@@ -530,8 +575,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_max", |key: &str, value: f32| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             let current = state
                 .get(key)
                 .cloned()
@@ -551,8 +595,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_unique", |key: &str, value: &str| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             // Get existing set or create new one
             let current = state.get(key).cloned().unwrap_or_else(|| {
                 // Create a new array to store unique values
@@ -576,8 +619,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_unique", |key: &str, value: i64| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             // Get existing set or create new one
             let current = state.get(key).cloned().unwrap_or_else(|| {
                 // Create a new array to store unique values
@@ -598,8 +640,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_unique", |key: &str, value: i32| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             // Get existing set or create new one
             let current = state.get(key).cloned().unwrap_or_else(|| {
                 // Create a new array to store unique values
@@ -623,8 +664,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_unique", |key: &str, value: f64| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             // Get existing set or create new one
             let current = state.get(key).cloned().unwrap_or_else(|| {
                 // Create a new array to store unique values
@@ -648,8 +688,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_unique", |key: &str, value: f32| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             // Get existing set or create new one
             let current = state.get(key).cloned().unwrap_or_else(|| {
                 // Create a new array to store unique values
@@ -673,8 +712,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_bucket", |key: &str, bucket: &str| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             // Get existing map or create new one
             let current = state
                 .get(key)
@@ -693,8 +731,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_bucket", |key: &str, bucket: i64| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             // Get existing map or create new one
             let current = state
                 .get(key)
@@ -717,8 +754,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_bucket", |key: &str, bucket: i32| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             // Get existing map or create new one
             let current = state
                 .get(key)
@@ -741,8 +777,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_bucket", |key: &str, bucket: f64| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             // Get existing map or create new one
             let current = state
                 .get(key)
@@ -765,8 +800,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("track_bucket", |key: &str, bucket: f32| {
-        THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        with_user_tracking(|state| {
             // Get existing map or create new one
             let current = state
                 .get(key)
@@ -789,27 +823,15 @@ pub fn register_functions(engine: &mut Engine) {
     });
 }
 
-// Expose the thread-local state management functions for engine.rs
-pub fn set_thread_tracking_state(metrics: &HashMap<String, Dynamic>) {
-    THREAD_TRACKING_STATE.with(|state| {
-        let mut state = state.borrow_mut();
-        state.clear();
-        for (k, v) in metrics {
-            state.insert(k.clone(), v.clone());
-        }
-    });
-}
-
-pub fn get_thread_tracking_state() -> HashMap<String, Dynamic> {
-    THREAD_TRACKING_STATE.with(|state| state.borrow().clone())
-}
-
 /// Merge thread-local tracking state into context tracker for sequential mode
 #[allow(dead_code)] // Planned feature for parallel mode metrics merging
 pub fn merge_thread_tracking_to_context(ctx: &mut crate::pipeline::PipelineContext) {
-    let thread_state = get_thread_tracking_state();
-    for (key, value) in thread_state {
+    let snapshot = get_thread_snapshot();
+    for (key, value) in snapshot.user {
         ctx.tracker.insert(key, value);
+    }
+    for (key, value) in snapshot.internal {
+        ctx.internal_tracker.insert(key, value);
     }
 }
 

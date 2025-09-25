@@ -37,8 +37,12 @@ impl ScriptStage for FilterStage {
 
         let result = if ctx.window.is_empty() {
             // No window context - use standard method
-            ctx.rhai
-                .execute_compiled_filter(&self.compiled_filter, &event, &mut ctx.tracker)
+            ctx.rhai.execute_compiled_filter(
+                &self.compiled_filter,
+                &event,
+                &mut ctx.tracker,
+                &mut ctx.internal_tracker,
+            )
         } else {
             // Window context available - use window-aware method
             ctx.rhai.execute_compiled_filter_with_window(
@@ -46,6 +50,7 @@ impl ScriptStage for FilterStage {
                 &event,
                 &ctx.window,
                 &mut ctx.tracker,
+                &mut ctx.internal_tracker,
             )
         };
 
@@ -120,8 +125,12 @@ impl ScriptStage for ExecStage {
 
         let result = if ctx.window.is_empty() {
             // No window context - use standard method
-            ctx.rhai
-                .execute_compiled_exec(&self.compiled_exec, &mut event_copy, &mut ctx.tracker)
+            ctx.rhai.execute_compiled_exec(
+                &self.compiled_exec,
+                &mut event_copy,
+                &mut ctx.tracker,
+                &mut ctx.internal_tracker,
+            )
         } else {
             // Window context available - use window-aware method
             ctx.rhai.execute_compiled_exec_with_window(
@@ -129,6 +138,7 @@ impl ScriptStage for ExecStage {
                 &mut event_copy,
                 &ctx.window,
                 &mut ctx.tracker,
+                &mut ctx.internal_tracker,
             )
         };
 
@@ -227,9 +237,11 @@ impl BeginStage {
     pub fn execute(&self, ctx: &mut PipelineContext) -> Result<()> {
         if let Some(ref compiled) = self.compiled_begin {
             columns::set_parse_cols_strict(ctx.config.strict);
-            let _init_map = ctx
-                .rhai
-                .execute_compiled_begin(compiled, &mut ctx.tracker)?;
+            let _init_map = ctx.rhai.execute_compiled_begin(
+                compiled,
+                &mut ctx.tracker,
+                &mut ctx.internal_tracker,
+            )?;
             Ok(())
         } else {
             Ok(())
@@ -491,6 +503,7 @@ mod tests {
                 input_files: vec![],
             },
             tracker: std::collections::HashMap::new(),
+            internal_tracker: std::collections::HashMap::new(),
             window: Vec::new(),
             rhai: crate::engine::RhaiEngine::new(),
             meta: MetaData::default(),
@@ -541,6 +554,7 @@ mod tests {
                 input_files: vec![],
             },
             tracker: std::collections::HashMap::new(),
+            internal_tracker: std::collections::HashMap::new(),
             window: Vec::new(),
             rhai: crate::engine::RhaiEngine::new(),
             meta: MetaData::default(),
@@ -590,6 +604,7 @@ mod tests {
                 input_files: vec![],
             },
             tracker: std::collections::HashMap::new(),
+            internal_tracker: std::collections::HashMap::new(),
             window: Vec::new(),
             rhai: crate::engine::RhaiEngine::new(),
             meta: MetaData::default(),

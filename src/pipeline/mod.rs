@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 use crate::engine::RhaiEngine;
 use crate::event::Event;
+use crate::rhai_functions::tracking;
 
 // Re-export submodules
 pub mod builders;
@@ -42,11 +43,11 @@ fn collect_discovered_levels_and_keys(event: &Event, ctx: &mut PipelineContext) 
         if let Some(value) = event.fields.get(*level_field_name) {
             if let Ok(level_str) = value.clone().into_string() {
                 if !level_str.is_empty() {
-                    // Add to both ctx.tracker (for parallel) and thread-local tracking (for sequential)
-                    // 1. Add to ctx.tracker
+                    // Add to both ctx.internal_tracker (for parallel) and thread-local tracking (for sequential)
+                    // 1. Add to ctx.internal_tracker
                     let key = "__kelora_stats_discovered_levels".to_string();
                     let current = ctx
-                        .tracker
+                        .internal_tracker
                         .get(&key)
                         .cloned()
                         .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
@@ -60,14 +61,13 @@ fn collect_discovered_levels_and_keys(event: &Event, ctx: &mut PipelineContext) 
                         }) {
                             arr.push(level_dynamic);
                         }
-                        ctx.tracker.insert(key.clone(), Dynamic::from(arr));
-                        ctx.tracker
+                        ctx.internal_tracker.insert(key.clone(), Dynamic::from(arr));
+                        ctx.internal_tracker
                             .insert(format!("__op_{}", key), Dynamic::from("unique"));
                     }
 
                     // 2. Add to thread-local tracking state (reuse existing track_unique pattern)
-                    crate::rhai_functions::tracking::THREAD_TRACKING_STATE.with(|state| {
-                        let mut state = state.borrow_mut();
+                    tracking::with_internal_tracking(|state| {
                         let key = "__kelora_stats_discovered_levels";
 
                         let current = state
@@ -76,7 +76,7 @@ fn collect_discovered_levels_and_keys(event: &Event, ctx: &mut PipelineContext) 
                             .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
 
                         if let Ok(mut arr) = current.into_array() {
-                            let level_dynamic = Dynamic::from(level_str);
+                            let level_dynamic = Dynamic::from(level_str.clone());
                             if !arr.iter().any(|v| {
                                 v.clone().into_string().unwrap_or_default()
                                     == level_dynamic.clone().into_string().unwrap_or_default()
@@ -96,7 +96,7 @@ fn collect_discovered_levels_and_keys(event: &Event, ctx: &mut PipelineContext) 
     // Collect discovered keys
     let key = "__kelora_stats_discovered_keys".to_string();
     let current = ctx
-        .tracker
+        .internal_tracker
         .get(&key)
         .cloned()
         .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
@@ -112,15 +112,15 @@ fn collect_discovered_levels_and_keys(event: &Event, ctx: &mut PipelineContext) 
                 arr.push(key_dynamic.clone());
             }
         }
-        ctx.tracker.insert(key.clone(), Dynamic::from(arr.clone()));
-        ctx.tracker
+        ctx.internal_tracker
+            .insert(key.clone(), Dynamic::from(arr.clone()));
+        ctx.internal_tracker
             .insert(format!("__op_{}", key), Dynamic::from("unique"));
 
         // Also add to thread-local tracking state
-        crate::rhai_functions::tracking::THREAD_TRACKING_STATE.with(|state| {
-            let mut state = state.borrow_mut();
+        tracking::with_internal_tracking(|state| {
             let key = "__kelora_stats_discovered_keys";
-            state.insert(key.to_string(), Dynamic::from(arr));
+            state.insert(key.to_string(), Dynamic::from(arr.clone()));
             state.insert(format!("__op_{}", key), Dynamic::from("unique"));
         });
     }
@@ -158,6 +158,7 @@ impl ScriptResult {
 pub struct PipelineContext {
     pub config: PipelineConfig,
     pub tracker: HashMap<String, Dynamic>,
+    pub internal_tracker: HashMap<String, Dynamic>,
     pub window: Vec<Event>, // window[0] = current event, rest are previous
     pub rhai: RhaiEngine,
     pub meta: MetaData,
@@ -290,11 +291,11 @@ impl Pipeline {
                     collect_discovered_levels_and_keys(&e, ctx);
 
                     // Also track in Rhai context for parallel processing
-                    ctx.tracker
+                    ctx.internal_tracker
                         .entry("__kelora_stats_events_created".to_string())
                         .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
                         .or_insert(rhai::Dynamic::from(1i64));
-                    ctx.tracker.insert(
+                    ctx.internal_tracker.insert(
                         "__op___kelora_stats_events_created".to_string(),
                         rhai::Dynamic::from("count"),
                     );
@@ -393,13 +394,13 @@ impl Pipeline {
                             crate::stats::stats_add_event_filtered();
 
                             // Also track in Rhai context for parallel processing
-                            ctx.tracker
+                            ctx.internal_tracker
                                 .entry("__kelora_stats_events_filtered".to_string())
                                 .and_modify(|v| {
                                     *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
                                 })
                                 .or_insert(rhai::Dynamic::from(1i64));
-                            ctx.tracker.insert(
+                            ctx.internal_tracker.insert(
                                 "__op___kelora_stats_events_filtered".to_string(),
                                 rhai::Dynamic::from("count"),
                             );
@@ -407,13 +408,13 @@ impl Pipeline {
                             crate::stats::stats_add_event_output();
 
                             // Also track in Rhai context for parallel processing
-                            ctx.tracker
+                            ctx.internal_tracker
                                 .entry("__kelora_stats_events_output".to_string())
                                 .and_modify(|v| {
                                     *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
                                 })
                                 .or_insert(rhai::Dynamic::from(1i64));
-                            ctx.tracker.insert(
+                            ctx.internal_tracker.insert(
                                 "__op___kelora_stats_events_output".to_string(),
                                 rhai::Dynamic::from("count"),
                             );
@@ -426,11 +427,11 @@ impl Pipeline {
                         crate::stats::stats_add_event_filtered();
 
                         // Also track in Rhai context for parallel processing
-                        ctx.tracker
+                        ctx.internal_tracker
                             .entry("__kelora_stats_events_filtered".to_string())
                             .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
                             .or_insert(rhai::Dynamic::from(1i64));
-                        ctx.tracker.insert(
+                        ctx.internal_tracker.insert(
                             "__op___kelora_stats_events_filtered".to_string(),
                             rhai::Dynamic::from("count"),
                         );
@@ -445,13 +446,13 @@ impl Pipeline {
                                 crate::stats::stats_add_event_filtered();
 
                                 // Also track in Rhai context for parallel processing
-                                ctx.tracker
+                                ctx.internal_tracker
                                     .entry("__kelora_stats_events_filtered".to_string())
                                     .and_modify(|v| {
                                         *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
                                     })
                                     .or_insert(rhai::Dynamic::from(1i64));
-                                ctx.tracker.insert(
+                                ctx.internal_tracker.insert(
                                     "__op___kelora_stats_events_filtered".to_string(),
                                     rhai::Dynamic::from("count"),
                                 );
@@ -459,13 +460,13 @@ impl Pipeline {
                                 crate::stats::stats_add_event_output();
 
                                 // Also track in Rhai context for parallel processing
-                                ctx.tracker
+                                ctx.internal_tracker
                                     .entry("__kelora_stats_events_output".to_string())
                                     .and_modify(|v| {
                                         *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
                                     })
                                     .or_insert(rhai::Dynamic::from(1i64));
-                                ctx.tracker.insert(
+                                ctx.internal_tracker.insert(
                                     "__op___kelora_stats_events_output".to_string(),
                                     rhai::Dynamic::from("count"),
                                 );
@@ -478,13 +479,13 @@ impl Pipeline {
                             crate::stats::stats_add_event_filtered();
 
                             // Also track in Rhai context for parallel processing
-                            ctx.tracker
+                            ctx.internal_tracker
                                 .entry("__kelora_stats_events_filtered".to_string())
                                 .and_modify(|v| {
                                     *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
                                 })
                                 .or_insert(rhai::Dynamic::from(1i64));
-                            ctx.tracker.insert(
+                            ctx.internal_tracker.insert(
                                 "__op___kelora_stats_events_filtered".to_string(),
                                 rhai::Dynamic::from("count"),
                             );
@@ -495,11 +496,11 @@ impl Pipeline {
                     crate::stats::stats_add_event_filtered();
 
                     // Also track in Rhai context for parallel processing
-                    ctx.tracker
+                    ctx.internal_tracker
                         .entry("__kelora_stats_events_filtered".to_string())
                         .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
                         .or_insert(rhai::Dynamic::from(1i64));
-                    ctx.tracker.insert(
+                    ctx.internal_tracker.insert(
                         "__op___kelora_stats_events_filtered".to_string(),
                         rhai::Dynamic::from("count"),
                     );
@@ -566,11 +567,11 @@ impl Pipeline {
                 collect_discovered_levels_and_keys(&e, ctx);
 
                 // Also track in Rhai context for parallel processing
-                ctx.tracker
+                ctx.internal_tracker
                     .entry("__kelora_stats_events_created".to_string())
                     .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
                     .or_insert(rhai::Dynamic::from(1i64));
-                ctx.tracker.insert(
+                ctx.internal_tracker.insert(
                     "__op___kelora_stats_events_created".to_string(),
                     rhai::Dynamic::from("count"),
                 );
@@ -669,11 +670,11 @@ impl Pipeline {
                         crate::stats::stats_add_event_filtered();
 
                         // Also track in Rhai context for parallel processing
-                        ctx.tracker
+                        ctx.internal_tracker
                             .entry("__kelora_stats_events_filtered".to_string())
                             .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
                             .or_insert(rhai::Dynamic::from(1i64));
-                        ctx.tracker.insert(
+                        ctx.internal_tracker.insert(
                             "__op___kelora_stats_events_filtered".to_string(),
                             rhai::Dynamic::from("count"),
                         );
@@ -681,11 +682,11 @@ impl Pipeline {
                         crate::stats::stats_add_event_output();
 
                         // Also track in Rhai context for parallel processing
-                        ctx.tracker
+                        ctx.internal_tracker
                             .entry("__kelora_stats_events_output".to_string())
                             .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
                             .or_insert(rhai::Dynamic::from(1i64));
-                        ctx.tracker.insert(
+                        ctx.internal_tracker.insert(
                             "__op___kelora_stats_events_output".to_string(),
                             rhai::Dynamic::from("count"),
                         );
@@ -698,11 +699,11 @@ impl Pipeline {
                     crate::stats::stats_add_event_filtered();
 
                     // Also track in Rhai context for parallel processing
-                    ctx.tracker
+                    ctx.internal_tracker
                         .entry("__kelora_stats_events_filtered".to_string())
                         .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
                         .or_insert(rhai::Dynamic::from(1i64));
-                    ctx.tracker.insert(
+                    ctx.internal_tracker.insert(
                         "__op___kelora_stats_events_filtered".to_string(),
                         rhai::Dynamic::from("count"),
                     );
@@ -717,13 +718,13 @@ impl Pipeline {
                             crate::stats::stats_add_event_filtered();
 
                             // Also track in Rhai context for parallel processing
-                            ctx.tracker
+                            ctx.internal_tracker
                                 .entry("__kelora_stats_events_filtered".to_string())
                                 .and_modify(|v| {
                                     *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
                                 })
                                 .or_insert(rhai::Dynamic::from(1i64));
-                            ctx.tracker.insert(
+                            ctx.internal_tracker.insert(
                                 "__op___kelora_stats_events_filtered".to_string(),
                                 rhai::Dynamic::from("count"),
                             );
@@ -731,13 +732,13 @@ impl Pipeline {
                             crate::stats::stats_add_event_output();
 
                             // Also track in Rhai context for parallel processing
-                            ctx.tracker
+                            ctx.internal_tracker
                                 .entry("__kelora_stats_events_output".to_string())
                                 .and_modify(|v| {
                                     *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
                                 })
                                 .or_insert(rhai::Dynamic::from(1i64));
-                            ctx.tracker.insert(
+                            ctx.internal_tracker.insert(
                                 "__op___kelora_stats_events_output".to_string(),
                                 rhai::Dynamic::from("count"),
                             );
@@ -750,11 +751,11 @@ impl Pipeline {
                         crate::stats::stats_add_event_filtered();
 
                         // Also track in Rhai context for parallel processing
-                        ctx.tracker
+                        ctx.internal_tracker
                             .entry("__kelora_stats_events_filtered".to_string())
                             .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
                             .or_insert(rhai::Dynamic::from(1i64));
-                        ctx.tracker.insert(
+                        ctx.internal_tracker.insert(
                             "__op___kelora_stats_events_filtered".to_string(),
                             rhai::Dynamic::from("count"),
                         );
@@ -765,11 +766,11 @@ impl Pipeline {
                 crate::stats::stats_add_event_filtered();
 
                 // Also track in Rhai context for parallel processing
-                ctx.tracker
+                ctx.internal_tracker
                     .entry("__kelora_stats_events_filtered".to_string())
                     .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
                     .or_insert(rhai::Dynamic::from(1i64));
-                ctx.tracker.insert(
+                ctx.internal_tracker.insert(
                     "__op___kelora_stats_events_filtered".to_string(),
                     rhai::Dynamic::from("count"),
                 );

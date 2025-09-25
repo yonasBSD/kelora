@@ -1,9 +1,9 @@
 use anyhow::Result;
 use clap::{ArgMatches, CommandFactory, FromArgMatches};
 use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
-use rhai::Dynamic;
-use std::collections::HashMap;
 use std::sync::atomic::Ordering;
+
+use crate::rhai_functions::tracking::{self, TrackingSnapshot};
 
 mod cli;
 mod colors;
@@ -105,7 +105,7 @@ use std::time::{Duration, Instant};
 #[derive(Debug)]
 struct PipelineResult {
     pub stats: Option<ProcessingStats>,
-    pub tracking_data: HashMap<String, Dynamic>,
+    pub tracking_data: TrackingSnapshot,
 }
 
 /// Core pipeline processing function using KeloraConfig  
@@ -132,11 +132,13 @@ fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
     } else {
         let mut output = output;
         run_pipeline_sequential(config, &mut output, ctrl_rx.clone())?;
-        let tracking_data = rhai_functions::tracking::get_thread_tracking_state();
+        let tracking_user = tracking::get_thread_tracking_state();
+        let tracking_internal = tracking::get_thread_internal_state();
+        let tracking_data = TrackingSnapshot::from_parts(tracking_user, tracking_internal);
         // Always collect stats for error reporting, even if --stats not used
         stats_finish_processing();
         let mut stats = get_thread_stats();
-        stats.extract_discovered_from_tracking(&tracking_data);
+        stats.extract_discovered_from_tracking(&tracking_data.internal);
         let final_stats = Some(stats);
 
         Ok(PipelineResult {
@@ -212,16 +214,16 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     )?;
 
     // Merge the parallel metrics state with our pipeline context
-    let parallel_tracked = processor.get_final_tracked_state();
+    let parallel_snapshot = processor.get_final_tracked_state();
 
     // Extract internal stats from tracking system before merging
     // This is needed for error reporting, not just when --stats is enabled
     processor
-        .extract_final_stats_from_tracking(&parallel_tracked)
+        .extract_final_stats_from_tracking(&parallel_snapshot)
         .unwrap_or(());
 
     // Filter out stats and errors from user-visible context and merge the rest
-    for (key, dynamic_value) in &parallel_tracked {
+    for (key, dynamic_value) in &parallel_snapshot.user {
         if !key.starts_with("__internal_")
             && !key.starts_with("__kelora_stats_")
             && !key.starts_with("__op___kelora_stats_")
@@ -241,7 +243,7 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     // Always collect stats for error reporting, even if --stats not used
     Ok(PipelineResult {
         stats: Some(processor.get_final_stats()),
-        tracking_data: parallel_tracked,
+        tracking_data: parallel_snapshot,
     })
 }
 
@@ -1088,7 +1090,7 @@ fn main() -> Result<()> {
             // Print metrics if enabled (only if not terminated)
             if config.output.metrics && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
                 let metrics_output = crate::rhai_functions::tracking::format_metrics_output(
-                    &pipeline_result.tracking_data,
+                    &pipeline_result.tracking_data.user,
                 );
                 if !metrics_output.is_empty() && metrics_output != "No metrics tracked" {
                     stderr
@@ -1100,7 +1102,7 @@ fn main() -> Result<()> {
             // Write metrics to file if configured
             if let Some(ref metrics_file) = config.output.metrics_file {
                 if let Ok(json_output) = crate::rhai_functions::tracking::format_metrics_json(
-                    &pipeline_result.tracking_data,
+                    &pipeline_result.tracking_data.user,
                 ) {
                     if let Err(e) = std::fs::write(metrics_file, json_output) {
                         stderr

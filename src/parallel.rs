@@ -14,6 +14,7 @@ use crate::event::Event;
 use crate::formatters::GapTracker;
 use crate::pipeline::{self, PipelineBuilder, DEFAULT_MULTILINE_FLUSH_TIMEOUT_MS};
 use crate::platform::{Ctrl, SHOULD_TERMINATE};
+use crate::rhai_functions::tracking::{self, TrackingSnapshot};
 use crate::stats::{get_thread_stats, stats_finish_processing, stats_start_timer, ProcessingStats};
 
 struct PlainLineContext<'a> {
@@ -83,6 +84,7 @@ enum LineMessage {
 pub struct BatchResult {
     pub batch_id: u64,
     pub results: Vec<ProcessedEvent>,
+    pub user_tracked_updates: HashMap<String, Dynamic>,
     pub internal_tracked_updates: HashMap<String, Dynamic>,
     pub worker_stats: ProcessingStats,
 }
@@ -100,6 +102,7 @@ pub struct ProcessedEvent {
 /// Thread-safe statistics tracker for merging worker states
 #[derive(Debug, Default, Clone)]
 pub struct GlobalTracker {
+    user_tracked: Arc<Mutex<HashMap<String, Dynamic>>>,
     internal_tracked: Arc<Mutex<HashMap<String, Dynamic>>>,
     processing_stats: Arc<Mutex<ProcessingStats>>,
     start_time: Option<Instant>,
@@ -108,6 +111,7 @@ pub struct GlobalTracker {
 impl GlobalTracker {
     pub fn new() -> Self {
         Self {
+            user_tracked: Arc::new(Mutex::new(HashMap::new())),
             internal_tracked: Arc::new(Mutex::new(HashMap::new())),
             processing_stats: Arc::new(Mutex::new(ProcessingStats::new())),
             start_time: Some(Instant::now()),
@@ -211,16 +215,35 @@ impl GlobalTracker {
         Ok(())
     }
 
-    pub fn merge_worker_state(&self, worker_state: HashMap<String, Dynamic>) -> Result<()> {
-        let mut global = self.internal_tracked.lock().unwrap();
+    pub fn merge_worker_state(
+        &self,
+        user_state: HashMap<String, Dynamic>,
+        internal_state: HashMap<String, Dynamic>,
+    ) -> Result<()> {
+        {
+            let mut global_user = self.user_tracked.lock().unwrap();
+            Self::merge_state_into(&mut global_user, user_state);
+        }
 
+        {
+            let mut global_internal = self.internal_tracked.lock().unwrap();
+            Self::merge_state_into(&mut global_internal, internal_state);
+        }
+
+        Ok(())
+    }
+
+    fn merge_state_into(
+        target: &mut HashMap<String, Dynamic>,
+        worker_state: HashMap<String, Dynamic>,
+    ) {
         for (key, value) in &worker_state {
             if key.starts_with("__op_") {
-                global.insert(key.clone(), value.clone());
+                target.insert(key.clone(), value.clone());
                 continue;
             }
 
-            if let Some(existing) = global.get(key) {
+            if let Some(existing) = target.get(key) {
                 let op_key = format!("__op_{}", key);
                 let operation = worker_state
                     .get(&op_key)
@@ -230,7 +253,7 @@ impl GlobalTracker {
                 match operation.as_str() {
                     "count" => {
                         if let (Ok(a), Ok(b)) = (existing.as_int(), value.as_int()) {
-                            global.insert(key.clone(), Dynamic::from(a + b));
+                            target.insert(key.clone(), Dynamic::from(a + b));
                             continue;
                         }
                         let merged = if existing.is_float() || value.is_float() {
@@ -248,7 +271,7 @@ impl GlobalTracker {
                         } else {
                             value.clone()
                         };
-                        global.insert(key.clone(), merged);
+                        target.insert(key.clone(), merged);
                         continue;
                     }
                     "sum" => {
@@ -269,43 +292,36 @@ impl GlobalTracker {
                             let b = value.as_int().unwrap_or(0);
                             Dynamic::from(a + b)
                         };
-                        global.insert(key.clone(), merged);
+                        target.insert(key.clone(), merged);
                         continue;
                     }
                     "min" => {
-                        // Take minimum
                         if let (Ok(a), Ok(b)) = (existing.as_int(), value.as_int()) {
-                            global.insert(key.clone(), Dynamic::from(a.min(b)));
+                            target.insert(key.clone(), Dynamic::from(a.min(b)));
                             continue;
                         }
                     }
                     "max" => {
-                        // Take maximum
                         if let (Ok(a), Ok(b)) = (existing.as_int(), value.as_int()) {
-                            global.insert(key.clone(), Dynamic::from(a.max(b)));
+                            target.insert(key.clone(), Dynamic::from(a.max(b)));
                             continue;
                         }
                     }
                     "unique" => {
-                        // Merge unique arrays
                         if let (Ok(existing_arr), Ok(new_arr)) =
                             (existing.clone().into_array(), value.clone().into_array())
                         {
                             let mut merged = existing_arr;
                             for item in new_arr {
-                                if !merged.iter().any(|v| {
-                                    // Compare string representations for simplicity
-                                    v.to_string() == item.to_string()
-                                }) {
+                                if !merged.iter().any(|v| v.to_string() == item.to_string()) {
                                     merged.push(item);
                                 }
                             }
-                            global.insert(key.clone(), Dynamic::from(merged));
+                            target.insert(key.clone(), Dynamic::from(merged));
                             continue;
                         }
                     }
                     "bucket" => {
-                        // Merge bucket maps by summing counts
                         if let (Some(existing_map), Some(new_map)) = (
                             existing.clone().try_cast::<rhai::Map>(),
                             value.clone().try_cast::<rhai::Map>(),
@@ -323,12 +339,11 @@ impl GlobalTracker {
                                     );
                                 }
                             }
-                            global.insert(key.clone(), Dynamic::from(merged));
+                            target.insert(key.clone(), Dynamic::from(merged));
                             continue;
                         }
                     }
                     "error_examples" => {
-                        // Merge error examples arrays (max 3 per type)
                         if let (Ok(existing_arr), Ok(new_arr)) =
                             (existing.clone().into_array(), value.clone().into_array())
                         {
@@ -340,25 +355,23 @@ impl GlobalTracker {
                                     merged.push(item);
                                 }
                             }
-                            global.insert(key.clone(), Dynamic::from(merged));
+                            target.insert(key.clone(), Dynamic::from(merged));
                             continue;
                         }
                     }
-                    _ => {
-                        // Default: replace with newer value
-                    }
+                    _ => {}
                 }
-                global.insert(key.clone(), value.clone());
+                target.insert(key.clone(), value.clone());
             } else {
-                global.insert(key.clone(), value.clone());
+                target.insert(key.clone(), value.clone());
             }
         }
-
-        Ok(())
     }
 
-    pub fn get_final_state(&self) -> HashMap<String, Dynamic> {
-        self.internal_tracked.lock().unwrap().clone()
+    pub fn get_final_snapshot(&self) -> TrackingSnapshot {
+        let user = self.user_tracked.lock().unwrap().clone();
+        let internal = self.internal_tracked.lock().unwrap().clone();
+        TrackingSnapshot::from_parts(user, internal)
     }
 }
 
@@ -710,9 +723,9 @@ impl ParallelProcessor {
     }
 
     /// Get the final merged global state for use in --end stage
-    /// This converts __internal_tracked to the user-visible 'tracked' variable
-    pub fn get_final_tracked_state(&self) -> HashMap<String, Dynamic> {
-        self.global_tracker.get_final_state()
+    /// Returns both user-visible metrics and internal stats snapshot
+    pub fn get_final_tracked_state(&self) -> TrackingSnapshot {
+        self.global_tracker.get_final_snapshot()
     }
 
     /// Get the final merged statistics from all workers
@@ -723,10 +736,10 @@ impl ParallelProcessor {
     /// Extract stats from tracking system into global stats
     pub fn extract_final_stats_from_tracking(
         &self,
-        final_tracked: &HashMap<String, Dynamic>,
+        final_tracked: &TrackingSnapshot,
     ) -> Result<()> {
         self.global_tracker
-            .extract_final_stats_from_tracking(final_tracked)
+            .extract_final_stats_from_tracking(&final_tracked.internal)
     }
 
     fn plain_io_reader_thread<R: std::io::BufRead>(
@@ -1685,23 +1698,32 @@ impl ParallelProcessor {
                     });
                 }
 
-                let mut flush_tracking_updates = HashMap::new();
-                for (key, value) in &ctx.tracker {
-                    if key.starts_with("__kelora_stats_") || key.starts_with("__op___kelora_stats_")
-                    {
-                        flush_tracking_updates.insert(key.clone(), value.clone());
-                    }
+                let mut flush_user_updates = HashMap::new();
+                let mut flush_internal_updates = HashMap::new();
+
+                for (key, value) in &ctx.internal_tracker {
+                    flush_internal_updates.insert(key.clone(), value.clone());
                 }
 
-                let thread_tracking = crate::rhai_functions::tracking::get_thread_tracking_state();
-                for (key, value) in thread_tracking {
-                    flush_tracking_updates.insert(key, value);
+                for (key, value) in &ctx.tracker {
+                    flush_user_updates.insert(key.clone(), value.clone());
+                }
+
+                let thread_user = tracking::get_thread_tracking_state();
+                for (key, value) in thread_user {
+                    flush_user_updates.insert(key, value);
+                }
+
+                let thread_internal = tracking::get_thread_internal_state();
+                for (key, value) in thread_internal {
+                    flush_internal_updates.insert(key, value);
                 }
 
                 let flush_batch_result = BatchResult {
                     batch_id: u64::MAX - 1,
                     results: flush_batch_results,
-                    internal_tracked_updates: flush_tracking_updates,
+                    user_tracked_updates: flush_user_updates,
+                    internal_tracked_updates: flush_internal_updates,
                     worker_stats: ProcessingStats::new(),
                 };
 
@@ -1739,28 +1761,7 @@ impl ParallelProcessor {
             ctx.rhai = new_ctx.rhai;
         }
 
-        let before = (
-            ctx.tracker
-                .get("__kelora_stats_output")
-                .and_then(|v| v.as_int().ok())
-                .unwrap_or(0),
-            ctx.tracker
-                .get("__kelora_stats_lines_errors")
-                .and_then(|v| v.as_int().ok())
-                .unwrap_or(0),
-            ctx.tracker
-                .get("__kelora_stats_events_created")
-                .and_then(|v| v.as_int().ok())
-                .unwrap_or(0),
-            ctx.tracker
-                .get("__kelora_stats_events_output")
-                .and_then(|v| v.as_int().ok())
-                .unwrap_or(0),
-            ctx.tracker
-                .get("__kelora_stats_events_filtered")
-                .and_then(|v| v.as_int().ok())
-                .unwrap_or(0),
-        );
+        let before_internal = ctx.internal_tracker.clone();
 
         let mut batch_results = Vec::with_capacity(batch.lines.len());
 
@@ -1775,11 +1776,11 @@ impl ParallelProcessor {
             match pipeline.process_line(line.clone(), ctx) {
                 Ok(formatted_results) => {
                     if !formatted_results.is_empty() {
-                        ctx.tracker
+                        ctx.internal_tracker
                             .entry("__kelora_stats_output".to_string())
                             .and_modify(|v| *v = Dynamic::from(v.as_int().unwrap_or(0) + 1))
                             .or_insert(Dynamic::from(1i64));
-                        ctx.tracker.insert(
+                        ctx.internal_tracker.insert(
                             "__op___kelora_stats_output".to_string(),
                             Dynamic::from("count"),
                         );
@@ -1848,104 +1849,78 @@ impl ParallelProcessor {
             }
         }
 
-        let after = (
-            ctx.tracker
-                .get("__kelora_stats_output")
-                .and_then(|v| v.as_int().ok())
-                .unwrap_or(0),
-            ctx.tracker
-                .get("__kelora_stats_lines_errors")
-                .and_then(|v| v.as_int().ok())
-                .unwrap_or(0),
-            ctx.tracker
-                .get("__kelora_stats_events_created")
-                .and_then(|v| v.as_int().ok())
-                .unwrap_or(0),
-            ctx.tracker
-                .get("__kelora_stats_events_output")
-                .and_then(|v| v.as_int().ok())
-                .unwrap_or(0),
-            ctx.tracker
-                .get("__kelora_stats_events_filtered")
-                .and_then(|v| v.as_int().ok())
-                .unwrap_or(0),
-        );
+        let mut internal_deltas = std::collections::HashMap::new();
+        for (key, value) in &ctx.internal_tracker {
+            if key.starts_with("__op_") {
+                // Operation metadata is added alongside the associated value when needed
+                continue;
+            }
 
-        let mut deltas = std::collections::HashMap::new();
-        if after.0 > before.0 {
-            deltas.insert(
-                "__kelora_stats_output".to_string(),
-                Dynamic::from(after.0 - before.0),
-            );
-            deltas.insert(
-                "__op___kelora_stats_output".to_string(),
-                Dynamic::from("count"),
-            );
-        }
-        if after.1 > before.1 {
-            deltas.insert(
-                "__kelora_stats_lines_errors".to_string(),
-                Dynamic::from(after.1 - before.1),
-            );
-            deltas.insert(
-                "__op___kelora_stats_lines_errors".to_string(),
-                Dynamic::from("count"),
-            );
-        }
-        if after.2 > before.2 {
-            deltas.insert(
-                "__kelora_stats_events_created".to_string(),
-                Dynamic::from(after.2 - before.2),
-            );
-            deltas.insert(
-                "__op___kelora_stats_events_created".to_string(),
-                Dynamic::from("count"),
-            );
-        }
-        if after.3 > before.3 {
-            deltas.insert(
-                "__kelora_stats_events_output".to_string(),
-                Dynamic::from(after.3 - before.3),
-            );
-            deltas.insert(
-                "__op___kelora_stats_events_output".to_string(),
-                Dynamic::from("count"),
-            );
-        }
-        if after.4 > before.4 {
-            deltas.insert(
-                "__kelora_stats_events_filtered".to_string(),
-                Dynamic::from(after.4 - before.4),
-            );
-            deltas.insert(
-                "__op___kelora_stats_events_filtered".to_string(),
-                Dynamic::from("count"),
-            );
-        }
+            let op_key = format!("__op_{}", key);
+            let operation = ctx
+                .internal_tracker
+                .get(&op_key)
+                .and_then(|v| v.clone().into_string().ok())
+                .unwrap_or_else(|| "replace".to_string());
 
-        for (key, value) in &ctx.tracker {
-            if !key.starts_with("__kelora_stats_") && !key.starts_with("__op___kelora_stats_") {
-                deltas.insert(key.clone(), value.clone());
+            match operation.as_str() {
+                "count" | "sum" => {
+                    let before_value = before_internal.get(key);
+                    let diff_dynamic = if value.is_float()
+                        || before_value.map(|v| v.is_float()).unwrap_or(false)
+                    {
+                        let current = if value.is_float() {
+                            value.as_float().unwrap_or(0.0)
+                        } else {
+                            value.as_int().unwrap_or(0) as f64
+                        };
+                        let previous = before_value
+                            .and_then(|v| {
+                                if v.is_float() {
+                                    v.as_float().ok()
+                                } else {
+                                    v.as_int().ok().map(|i| i as f64)
+                                }
+                            })
+                            .unwrap_or(0.0);
+                        Dynamic::from(current - previous)
+                    } else {
+                        let current = value.as_int().unwrap_or(0);
+                        let previous = before_value.and_then(|v| v.as_int().ok()).unwrap_or(0);
+                        Dynamic::from(current - previous)
+                    };
+
+                    let is_zero = if diff_dynamic.is_float() {
+                        diff_dynamic.as_float().unwrap_or(0.0).abs() < f64::EPSILON
+                    } else {
+                        diff_dynamic.as_int().unwrap_or(0) == 0
+                    };
+
+                    if !is_zero {
+                        internal_deltas.insert(key.clone(), diff_dynamic);
+                        internal_deltas.insert(op_key.clone(), Dynamic::from(operation));
+                    }
+                }
+                _ => {
+                    internal_deltas.insert(key.clone(), value.clone());
+                    if let Some(op_value) = ctx.internal_tracker.get(&op_key) {
+                        internal_deltas.insert(op_key.clone(), op_value.clone());
+                    }
+                }
             }
         }
 
-        let thread_tracking = crate::rhai_functions::tracking::get_thread_tracking_state();
-        for (key, value) in thread_tracking {
-            if (!key.starts_with("__op___kelora_stats_")
-                || key == "__op___kelora_stats_discovered_levels"
-                || key == "__op___kelora_stats_discovered_keys")
-                && (!key.starts_with("__kelora_stats_")
-                    || key == "__kelora_stats_discovered_levels"
-                    || key == "__kelora_stats_discovered_keys")
-            {
-                deltas.insert(key, value);
-            }
+        let mut user_deltas = std::collections::HashMap::new();
+        let thread_user = tracking::get_thread_tracking_state();
+        for (key, value) in thread_user {
+            user_deltas.insert(key, value);
         }
 
         let batch_result = BatchResult {
             batch_id: batch.id,
             results: batch_results,
-            internal_tracked_updates: deltas,
+            user_tracked_updates: user_deltas,
+            internal_tracked_updates: internal_deltas,
             worker_stats: get_thread_stats(),
         };
 
@@ -1953,9 +1928,7 @@ impl ParallelProcessor {
             return Ok(false);
         }
 
-        ctx.tracker.retain(|k, _| {
-            k.starts_with("__kelora_stats_") || k.starts_with("__op___kelora_stats_")
-        });
+        ctx.tracker.clear();
 
         Ok(true)
     }
@@ -2053,11 +2026,12 @@ impl ParallelProcessor {
             }
 
             let batch_id = batch_result.batch_id;
+            let user_tracked_updates = std::mem::take(&mut batch_result.user_tracked_updates);
             let internal_tracked_updates =
                 std::mem::take(&mut batch_result.internal_tracked_updates);
 
             // Merge global state and stats
-            global_tracker.merge_worker_state(internal_tracked_updates)?;
+            global_tracker.merge_worker_state(user_tracked_updates, internal_tracked_updates)?;
             global_tracker.merge_worker_stats(&batch_result.worker_stats)?;
 
             // Handle special batches
@@ -2155,7 +2129,7 @@ impl ParallelProcessor {
     ) -> Result<()> {
         let mut termination_detected = false;
         let mut events_output = 0usize;
-        while let Ok(batch_result) = result_receiver.recv() {
+        while let Ok(mut batch_result) = result_receiver.recv() {
             // Check for termination signal, but don't break immediately
             // Continue processing to collect final stats from workers
             if SHOULD_TERMINATE.load(Ordering::Relaxed) {
@@ -2163,7 +2137,9 @@ impl ParallelProcessor {
             }
 
             // Merge global state and stats
-            global_tracker.merge_worker_state(batch_result.internal_tracked_updates)?;
+            let user_updates = std::mem::take(&mut batch_result.user_tracked_updates);
+            let internal_updates = std::mem::take(&mut batch_result.internal_tracked_updates);
+            global_tracker.merge_worker_state(user_updates, internal_updates)?;
             global_tracker.merge_worker_stats(&batch_result.worker_stats)?;
 
             // Handle special batches
