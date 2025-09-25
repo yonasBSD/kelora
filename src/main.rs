@@ -1565,8 +1565,8 @@ syslog
   RFC3164/5424 style headers ("Jan  2", "2024-01-02T...")
   Equivalent to: -M timestamp:pattern=^(<\d+>\d\s+\d{4}-\d{2}-\d{2}T|\w{3}\s+\d{1,2})
 
-accesslog
-  Common/combined web access logs with remote host prefix
+combined
+  Apache/Nginx access logs with remote host prefix
   Equivalent to: -M start:^\S+\s+\S+\s+\S+\s+\[
 
 nginx
