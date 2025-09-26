@@ -1012,7 +1012,7 @@ fn main() -> Result<()> {
         }
     }
 
-    // Parse multiline configuration if provided, or apply format defaults
+    // Parse multiline configuration if provided
     if let Some(multiline_str) = &cli.multiline {
         match MultilineConfig::parse(multiline_str) {
             Ok(multiline_config) => {
@@ -1028,9 +1028,6 @@ fn main() -> Result<()> {
                 ExitCode::InvalidUsage.exit();
             }
         }
-    } else {
-        // Apply format-specific default multiline configuration
-        config.input.multiline = config.input.format.default_multiline();
     }
 
     // Validate arguments early
@@ -1547,9 +1544,8 @@ fn print_multiline_help() {
 Multiline Strategy Reference for --multiline:
 
 Kelora supports several multiline strategies. Multiline remains off unless you
-request it. Some formats (for example, --format syslog or --format combined)
-enable a safe preset automatically; override with --no-multiline if you prefer
-single-line events.
+request it with -M/--multiline. Pick a preset below or supply a custom
+strategy string to control how lines are grouped.
 
 QUICK PRESETS (recommended):
 

@@ -387,21 +387,6 @@ impl Default for MultilineConfig {
     }
 }
 
-impl InputFormat {
-    /// Get default multiline configuration for this input format
-    ///
-    /// NOTE: Multiline processing is disabled by default for all formats
-    /// to avoid unexpected buffering behavior in streaming scenarios.
-    /// Users must explicitly enable multiline with --multiline option.
-    pub fn default_multiline(&self) -> Option<MultilineConfig> {
-        match self {
-            InputFormat::Syslog => MultilineConfig::preset("syslog"),
-            InputFormat::Combined => MultilineConfig::preset("combined"),
-            _ => None,
-        }
-    }
-}
-
 impl KeloraConfig {
     /// Get the list of core field names (ts, level, msg variants)
     pub fn get_core_field_names() -> Vec<String> {
