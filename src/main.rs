@@ -32,7 +32,7 @@ use platform::{
 
 // Internal CLI imports
 use cli::{Cli, FileOrder, InputFormat, OutputFormat};
-use config::{MultilineConfig, TimestampFilterConfig};
+use config::{MultilineConfig, MultilineStrategy, TimestampFilterConfig};
 
 /// Detect format from a peekable reader
 /// Returns the detected format without consuming the first line
@@ -1030,6 +1030,15 @@ fn main() -> Result<()> {
         }
     }
 
+    // Share --ts-format hint with multiline timestamp strategies so regex fallback stays optional
+    if let (Some(multiline_config), Some(ts_format)) =
+        (config.input.multiline.as_mut(), &config.input.ts_format)
+    {
+        if let MultilineStrategy::Timestamp { chrono_format, .. } = &mut multiline_config.strategy {
+            *chrono_format = Some(ts_format.clone());
+        }
+    }
+
     // Validate arguments early
     if let Err(e) = validate_cli_args(&cli) {
         stderr
@@ -1581,6 +1590,7 @@ ADVANCED RECIPES (build your own):
 
 timestamp[:pattern=REGEX]
   Events start with timestamp pattern (anchored to the beginning of the line)
+  Combine with --ts-format=<chrono fmt> to align with your exact timestamp prefix
 
 indent[:spaces=N|tabs|mixed]
   Continuation lines are indented, new events start at column 1

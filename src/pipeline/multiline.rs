@@ -1,5 +1,6 @@
 use super::Chunker;
 use crate::config::{InputFormat, MultilineConfig, MultilineStrategy};
+use chrono::format::{parse_and_remainder, Parsed, StrftimeItems};
 use regex::Regex;
 
 /// Multi-line chunker that implements various strategies for detecting event boundaries
@@ -13,7 +14,7 @@ pub struct MultilineChunker {
 impl MultilineChunker {
     pub fn new(config: MultilineConfig, input_format: InputFormat) -> Result<Self, String> {
         let regex = match &config.strategy {
-            MultilineStrategy::Timestamp { pattern } => {
+            MultilineStrategy::Timestamp { pattern, .. } => {
                 Some(Regex::new(pattern).map_err(|e| format!("Invalid timestamp regex: {}", e))?)
             }
             MultilineStrategy::Start { pattern } => {
@@ -44,7 +45,12 @@ impl MultilineChunker {
     /// Check if this line starts a new event based on the strategy
     fn starts_new_event(&self, line: &str) -> bool {
         match &self.config.strategy {
-            MultilineStrategy::Timestamp { .. } => {
+            MultilineStrategy::Timestamp { chrono_format, .. } => {
+                if let Some(format) = chrono_format {
+                    if self.matches_chrono_timestamp(line, format) {
+                        return true;
+                    }
+                }
                 if let Some(ref regex) = self.regex {
                     regex.is_match(line)
                 } else {
@@ -207,6 +213,48 @@ impl MultilineChunker {
             self.buffer.clear();
             Some(result)
         }
+    }
+}
+
+impl MultilineChunker {
+    /// Check whether the line starts with a timestamp matching the provided chrono format.
+    fn matches_chrono_timestamp(&self, line: &str, format: &str) -> bool {
+        let mut parsed = Parsed::new();
+
+        parse_and_remainder(&mut parsed, line, StrftimeItems::new(format)).is_ok()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn timestamp_strategy_prefers_ts_format_hint() {
+        let config = MultilineConfig {
+            strategy: MultilineStrategy::Timestamp {
+                pattern: r"^\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}".to_string(),
+                chrono_format: Some("%b %e %H:%M:%S".to_string()),
+            },
+        };
+
+        let mut chunker =
+            MultilineChunker::new(config, InputFormat::Syslog).expect("chunker should build");
+
+        // First event starts with the chrono format, continuation line is indented
+        assert!(chunker
+            .feed_line("Jan  2 03:04:05 host app: one\n".to_string())
+            .is_none());
+        assert!(chunker
+            .feed_line("  stack frame line\n".to_string())
+            .is_none());
+
+        // New timestamp should flush the buffered event
+        let flushed = chunker.feed_line("Jan  3 03:04:05 host app: two\n".to_string());
+        assert!(flushed.is_some());
+
+        // Flush remaining buffered lines for the second event
+        assert!(chunker.flush().is_some());
     }
 }
 

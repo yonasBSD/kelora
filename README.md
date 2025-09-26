@@ -241,6 +241,10 @@ See `kelora --help-rhai` for syntax essentials and `kelora --help-functions` for
 | `block` | `BEGIN` ... `END` sections form a single event | `-M boundary:start=^BEGIN:end=^END` |
 | `whole` | Treat the entire input as one event (fixtures, preformatted payloads) | `-M whole` |
 
+When you pick a timestamp-based strategy (the presets above or `-M timestamp`), you can also
+provide `--ts-format=<chrono fmt>` so Kelora matches your exact timestamp prefix instead of relying
+solely on the preset regex.
+
 Build custom strategies with `timestamp:pattern=...`, `indent`, `start:REGEX`, `end:REGEX`, `boundary`, `backslash[:char=...]`, or `whole` (single mega-event). Remember that buffering happens until a boundary is found; when running with `--parallel`, lower `--batch-size` or `--batch-timeout` to keep long multi-line frames flushable, and `whole` will buffer the entire stream in memory.
 
 ## Configuration & Defaults

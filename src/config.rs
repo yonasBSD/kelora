@@ -186,7 +186,10 @@ pub struct MultilineConfig {
 #[derive(Debug, Clone)]
 pub enum MultilineStrategy {
     /// Events start with timestamp pattern
-    Timestamp { pattern: String },
+    Timestamp {
+        pattern: String,
+        chrono_format: Option<String>,
+    },
     /// Continuation lines are indented
     Indent {
         spaces: Option<u32>,
@@ -235,7 +238,10 @@ impl MultilineConfig {
                     // Default timestamp patterns (ISO and syslog) - both anchored to start
                     DEFAULT_TIMESTAMP_PATTERN.to_string()
                 };
-                MultilineStrategy::Timestamp { pattern }
+                MultilineStrategy::Timestamp {
+                    pattern,
+                    chrono_format: None,
+                }
             }
             "indent" => {
                 let (spaces, tabs, mixed) = if parts.len() > 1 {
@@ -296,15 +302,19 @@ impl MultilineConfig {
         match name {
             "stacktrace" => Some(MultilineStrategy::Timestamp {
                 pattern: DEFAULT_TIMESTAMP_PATTERN.to_string(),
+                chrono_format: None,
             }),
             "docker" => Some(MultilineStrategy::Timestamp {
                 pattern: DOCKER_TIMESTAMP_PATTERN.to_string(),
+                chrono_format: None,
             }),
             "syslog" => Some(MultilineStrategy::Timestamp {
                 pattern: SYSLOG_TIMESTAMP_PATTERN.to_string(),
+                chrono_format: None,
             }),
             "nginx" => Some(MultilineStrategy::Timestamp {
                 pattern: NGINX_TIMESTAMP_PATTERN.to_string(),
+                chrono_format: None,
             }),
             "combined" => Some(MultilineStrategy::Start {
                 pattern: COMBINED_START_PATTERN.to_string(),
@@ -382,6 +392,7 @@ impl Default for MultilineConfig {
         Self {
             strategy: MultilineStrategy::Timestamp {
                 pattern: DEFAULT_TIMESTAMP_PATTERN.to_string(),
+                chrono_format: None,
             },
         }
     }
