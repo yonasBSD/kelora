@@ -136,7 +136,7 @@ Pre-built binaries live in the [GitHub releases](https://github.com/dloss/kelora
 
 ### Performance & Reliability
 
-- `--parallel`, `--threads`, `--batch-size`, and `--batch-timeout` tune throughput for large datasets.
+- `--parallel` and `--threads` control concurrency; pair with `--batch-size` (lines per worker batch, default 1000) and `--batch-timeout` (max ms to flush a partial batch, default 200) to balance parallel throughput and latency.
 - `--unordered` relaxes output ordering for faster parallel flushes.
 - Sequential mode (default) shines for streaming sources; `--parallel` excels at log archives.
 - Combine with `--config-file` or aliases for repeatable pipelines at scale.
@@ -241,7 +241,7 @@ See `kelora --help-rhai` for syntax essentials and `kelora --help-functions` for
 | `block` | `BEGIN` ... `END` sections form a single event | `-M boundary:start=^BEGIN:end=^END` |
 | `whole` | Treat the entire input as one event (fixtures, preformatted payloads) | `-M whole` |
 
-Build custom strategies with `timestamp:pattern=...`, `indent`, `start:REGEX`, `end:REGEX`, `boundary`, `backslash[:char=...]`, or `whole` (single mega-event). Remember that buffering happens until a boundary is found; large windows may need the `--batch-size` and `--batch-timeout` knobs, and `whole` will buffer the entire stream in memory.
+Build custom strategies with `timestamp:pattern=...`, `indent`, `start:REGEX`, `end:REGEX`, `boundary`, `backslash[:char=...]`, or `whole` (single mega-event). Remember that buffering happens until a boundary is found; when running with `--parallel`, lower `--batch-size` or `--batch-timeout` to keep long multi-line frames flushable, and `whole` will buffer the entire stream in memory.
 
 ## Configuration & Defaults
 
