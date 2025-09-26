@@ -143,17 +143,19 @@ Pre-built binaries live in the [GitHub releases](https://github.com/dloss/kelora
 
 ## Parsers & Formats
 
+Kelora defaults to `-f line`, which trims trailing newline/CR characters and exposes the result as `e.line`. Reach for `-f raw` when you need a byte-for-byte copy (including trailing newlines or escape markers), and reserve `-f 'cols:<spec>'` for bespoke formats that the built-in parsers do not cover. All parsers expect UTF-8 text; binary or other encodings will raise input errors.
+
 | Format | Fields Produced | Typical Source |
 | --- | --- | --- |
-| `line` | `line` | Plain text with whitespace-normalized lines |
-| `raw` | `raw` | Exact text preservation (newlines, escapes, artifacts) |
+| `line` (default) | `line` | Newline-delimited text where trimming the trailing newline is acceptable |
+| `raw` | `raw` | Exact text preservation (newline-sensitive data, continuation markers, binary artifacts) |
 | `json` | Original JSON keys | JSONL or JSON arrays |
 | `logfmt` | Key-value pairs | Logfmt structured logs |
 | `syslog` | `timestamp`, `host`, `facility`, `message`, ... | RFC3164/RFC5424 syslog |
 | `cef` | Header fields + extension map | ArcSight/Common Event Format |
 | `csv` / `tsv` | Column headers as fields | Delimited datasets |
 | `combined` | `ip`, `status`, `method`, `path`, `request`, `request_time`, ... | Apache/Nginx access logs |
-| `cols:<spec>` | Custom columns per spec | Tokenized text (see below) |
+| `cols:<spec>` | Named fields defined by your spec (`ts`, `level`, `*rest`, ...) | Custom or proprietary log formats |
 
 All parsers auto-detect gzip compression (files and stdin) by magic bytes—no extra flags required.
 
@@ -161,7 +163,7 @@ All parsers auto-detect gzip compression (files and stdin) by magic bytes—no e
 
 ### Raw vs Line
 
-Choose the right baseline for text pre-processing.
+Choose the right baseline for text pre-processing. `-f line` is the default: it trims the trailing newline/CR and gives you a tidy `e.line` field for downstream filters. `-f raw` keeps every byte (including trailing delimiters and escape markers) in `e.raw`, which is invaluable when you need to preserve continuation characters, feed the data into another parser verbatim, or re-emit the original payload.
 
 ```bash
 # Preserve every byte (newline-sensitive analyses)
@@ -184,7 +186,16 @@ docker compose logs | \
 
 ### Column Specs (`cols:<spec>`)
 
-Declarative column parsing with skips, joins, and tail captures.
+Declarative column parsing with skips, joins, and tail captures. This mode shines when your data has a repeatable column layout but no dedicated parser—think bespoke appliance logs, legacy flat files, or regex capture groups you want to map into fields.
+
+Spec tokens are space-separated:
+
+- `field` — consume one column into `field`.
+- `field(n)` — consume `n ≥ 2` columns, joined together (whitespace joins in default mode, literal separator joins when you set one).
+- `-` / `-(n)` — skip one or `n` columns with no output field.
+- `*field` — capture the remaining text verbatim; must appear once and always at the end.
+
+Whitespace is the default separator; add `--cols-sep "|"` (or another literal) when your columns are delimited. You can also feed pre-split arrays to `parse_cols` from Rhai (`let caps = e.line.extract_all_re(...); caps.parse_cols("ip user ts *msg");`). Missing data fills fields with `()` in resilient mode, while `--strict` turns shortages/extras into errors.
 
 ```bash
 echo "2025-09-22 12:33:44 INFO alice login success" | \
@@ -228,8 +239,9 @@ See `kelora --help-rhai` for syntax essentials and `kelora --help-functions` for
 | `nginx` | Nginx error logs prefixed with `[dd/Mon/yyyy:` | `-M timestamp:pattern=^\\[[0-9]{2}/[A-Za-z]{3}/[0-9]{4}:` |
 | `continuation` | Lines ending with `\\` continue the current event | `-M backslash` |
 | `block` | `BEGIN` ... `END` sections form a single event | `-M boundary:start=^BEGIN:end=^END` |
+| `whole` | Treat the entire input as one event (fixtures, preformatted payloads) | `-M whole` |
 
-Build custom strategies with `timestamp:pattern=...`, `indent`, `start:REGEX`, `end:REGEX`, `boundary`, `backslash[:char=...]`, or `whole` (single mega-event). Remember that buffering happens until a boundary is found; large windows may need the `--batch-size` and `--batch-timeout` knobs.
+Build custom strategies with `timestamp:pattern=...`, `indent`, `start:REGEX`, `end:REGEX`, `boundary`, `backslash[:char=...]`, or `whole` (single mega-event). Remember that buffering happens until a boundary is found; large windows may need the `--batch-size` and `--batch-timeout` knobs, and `whole` will buffer the entire stream in memory.
 
 ## Configuration & Defaults
 
