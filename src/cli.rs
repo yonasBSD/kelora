@@ -261,6 +261,10 @@ pub struct Cli {
     #[arg(short = 'b', long = "brief", help_heading = "Default Format Options")]
     pub brief: bool,
 
+    /// Pretty-print nested values
+    #[arg(short = 'P', long = "pretty", help_heading = "Default Format Options")]
+    pub pretty: bool,
+
     /// Enable word-wrapping (default: enabled)
     #[arg(long = "wrap", help_heading = "Default Format Options")]
     pub wrap: bool,

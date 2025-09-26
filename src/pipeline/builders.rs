@@ -84,6 +84,7 @@ impl PipelineBuilder {
                 },
                 brief: false,
                 wrap: true, // Default to enabled
+                pretty: false,
                 color_mode: crate::config::ColorMode::Auto,
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
@@ -239,6 +240,7 @@ impl PipelineBuilder {
                     self.config.brief,
                     self.config.timestamp_formatting.clone(),
                     self.config.wrap,
+                    self.config.pretty,
                 ))
             }
             crate::OutputFormat::Inspect => Box::new(crate::formatters::InspectFormatter::new(
@@ -525,6 +527,7 @@ impl PipelineBuilder {
                     self.config.brief,
                     self.config.timestamp_formatting.clone(),
                     self.config.wrap,
+                    self.config.pretty,
                 ))
             }
             crate::OutputFormat::Inspect => Box::new(crate::formatters::InspectFormatter::new(
@@ -741,6 +744,7 @@ pub fn create_pipeline_builder_from_config(
         error_report: config.processing.error_report.clone(),
         brief: config.output.brief,
         wrap: config.output.wrap,
+        pretty: config.output.pretty,
         color_mode: config.output.color.clone(),
         timestamp_formatting: config.output.timestamp_formatting.clone(),
         strict: config.processing.strict,

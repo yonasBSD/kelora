@@ -96,6 +96,23 @@ fn format_dynamic_value(value: &Dynamic) -> (String, bool) {
     }
 }
 
+/// Indent each subsequent line of a multiline string for consistent display
+fn indent_multiline_value(value: &str, indent: &str) -> String {
+    let mut lines = value.lines();
+    match lines.next() {
+        Some(first_line) => {
+            let mut output = String::from(first_line);
+            for line in lines {
+                output.push('\n');
+                output.push_str(indent);
+                output.push_str(line);
+            }
+            output
+        }
+        None => String::new(),
+    }
+}
+
 /// Utility to format a quoted logfmt value into a buffer
 fn format_quoted_logfmt_value(value: &str, output: &mut String) {
     if needs_logfmt_quoting(value) {
@@ -207,6 +224,7 @@ pub struct DefaultFormatter {
     timestamp_formatting: crate::config::TimestampFormatConfig,
     enable_wrapping: bool,
     terminal_width: usize,
+    pretty_nested: bool,
 }
 
 impl DefaultFormatter {
@@ -214,6 +232,7 @@ impl DefaultFormatter {
         use_colors: bool,
         brief: bool,
         timestamp_formatting: crate::config::TimestampFormatConfig,
+        pretty_nested: bool,
     ) -> Self {
         Self {
             colors: ColorScheme::new(use_colors),
@@ -230,6 +249,7 @@ impl DefaultFormatter {
             timestamp_formatting,
             enable_wrapping: true, // Default to enabled
             terminal_width: crate::tty::get_terminal_width(),
+            pretty_nested,
         }
     }
 
@@ -238,6 +258,7 @@ impl DefaultFormatter {
         brief: bool,
         timestamp_formatting: crate::config::TimestampFormatConfig,
         enable_wrapping: bool,
+        pretty_nested: bool,
     ) -> Self {
         let terminal_width = if enable_wrapping {
             crate::tty::get_terminal_width()
@@ -260,6 +281,7 @@ impl DefaultFormatter {
             timestamp_formatting,
             enable_wrapping,
             terminal_width,
+            pretty_nested,
         }
     }
 
@@ -487,31 +509,28 @@ impl DefaultFormatter {
         None
     }
 
-    /// Format a Dynamic value for default output, flattening nested structures with dot notation
+    /// Format a Dynamic value for default output, preserving nested structures
     fn format_default_value(&self, value: &Dynamic) -> (String, bool) {
-        // Check if this is a complex nested structure
+        // Check if this is a complex nested structure and render it as JSON so the type is explicit
         if value.clone().try_cast::<rhai::Map>().is_some()
             || value.clone().try_cast::<rhai::Array>().is_some()
         {
-            // Flatten nested structures using bracket style for consistency with get_path()
-            let flattened = flatten_dynamic(value, FlattenStyle::Bracket, 0);
-
-            if flattened.len() == 1 {
-                // Single flattened value - use it directly
-                let val = flattened.values().next().unwrap().to_string();
-                (val, false) // Treat flattened structures as non-string for formatting
-            } else if flattened.is_empty() {
-                // Empty structure
-                (String::new(), true)
+            let json_value = dynamic_to_json(value);
+            let serialized = if self.pretty_nested {
+                serde_json::to_string_pretty(&json_value)
             } else {
-                // Multiple flattened values - create a readable representation
-                // Format as "key1=val1 key2=val2" for logfmt-style readability
-                let formatted = flattened
-                    .iter()
-                    .map(|(k, v)| format!("{}={}", k, v))
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                (formatted, true) // Treat as string for proper quoting
+                serde_json::to_string(&json_value)
+            };
+
+            match serialized {
+                Ok(mut s) => {
+                    if self.pretty_nested {
+                        // Keep continuation lines aligned with formatter indentation
+                        s = indent_multiline_value(&s, "  ");
+                    }
+                    (s, false)
+                }
+                Err(_) => (value.to_string(), false),
             }
         } else {
             // Use the original format_dynamic_value for scalar values
@@ -1629,7 +1648,7 @@ impl pipeline::Formatter for CsvFormatter {
 mod tests {
     use super::*;
     use chrono::{Duration as ChronoDuration, TimeZone, Utc};
-    use rhai::Map;
+    use rhai::{Array, Map};
 
     fn parts(line: &str) -> Vec<String> {
         line.split('|')
@@ -1771,6 +1790,7 @@ mod tests {
             false,
             crate::config::TimestampFormatConfig::default(),
             false, // Disable wrapping for this test
+            false,
         ); // No colors, no brief mode, no wrapping
         let result = formatter.format(&event);
 
@@ -1784,6 +1804,56 @@ mod tests {
     }
 
     #[test]
+    fn test_default_formatter_nested_values_render_as_json() {
+        let mut meta = Map::new();
+        meta.insert("id".into(), Dynamic::from(7_i64));
+        meta.insert("name".into(), Dynamic::from("alpha"));
+
+        let tags: Array = vec![Dynamic::from("blue"), Dynamic::from("green")];
+
+        let mut event = Event::default();
+        event.set_field("meta".to_string(), Dynamic::from(meta));
+        event.set_field("tags".to_string(), Dynamic::from(tags));
+
+        let formatter = DefaultFormatter::new_with_wrapping(
+            false,
+            false,
+            crate::config::TimestampFormatConfig::default(),
+            false,
+            false,
+        );
+        let result = formatter.format(&event);
+
+        assert!(result.contains("meta={\"id\":7,\"name\":\"alpha\"}"));
+        assert!(result.contains("tags=[\"blue\",\"green\"]"));
+    }
+
+    #[test]
+    fn test_default_formatter_pretty_nested_output() {
+        let mut meta = Map::new();
+        meta.insert("id".into(), Dynamic::from(7_i64));
+        meta.insert("name".into(), Dynamic::from("alpha"));
+
+        let tags: Array = vec![Dynamic::from("blue"), Dynamic::from("green")];
+
+        let mut event = Event::default();
+        event.set_field("meta".to_string(), Dynamic::from(meta));
+        event.set_field("tags".to_string(), Dynamic::from(tags));
+
+        let formatter = DefaultFormatter::new_with_wrapping(
+            false,
+            false,
+            crate::config::TimestampFormatConfig::default(),
+            false,
+            true,
+        );
+        let result = formatter.format(&event);
+
+        assert!(result.contains("meta={\n    \"id\": 7,\n    \"name\": \"alpha\"\n  }"));
+        assert!(result.contains("tags=[\n    \"blue\",\n    \"green\"\n  ]"));
+    }
+
+    #[test]
     fn test_default_formatter_brief_mode() {
         let mut event = Event::default();
         event.set_field("level".to_string(), Dynamic::from("info".to_string()));
@@ -1794,6 +1864,7 @@ mod tests {
             true,
             crate::config::TimestampFormatConfig::default(),
             false, // Disable wrapping for this test
+            false,
         ); // No colors, brief mode, no wrapping
         let result = formatter.format(&event);
 
@@ -2242,6 +2313,7 @@ mod tests {
             false,
             crate::config::TimestampFormatConfig::default(),
             false, // wrapping disabled
+            false,
         );
         let result = formatter.format(&event);
 
@@ -2273,6 +2345,7 @@ mod tests {
             timestamp_formatting: crate::config::TimestampFormatConfig::default(),
             enable_wrapping: true,
             terminal_width: 50, // Small width to force wrapping
+            pretty_nested: false,
         };
 
         let result = formatter.format(&event);
@@ -2307,6 +2380,7 @@ mod tests {
             timestamp_formatting: crate::config::TimestampFormatConfig::default(),
             enable_wrapping: true,
             terminal_width: 30, // Very small width
+            pretty_nested: false,
         };
 
         let result = formatter.format(&event);
@@ -2331,6 +2405,7 @@ mod tests {
             false,
             crate::config::TimestampFormatConfig::default(),
             true,
+            false,
         );
 
         // Test string with ANSI color codes
@@ -2361,6 +2436,7 @@ mod tests {
             timestamp_formatting: crate::config::TimestampFormatConfig::default(),
             enable_wrapping: true,
             terminal_width: 20, // Force wrapping
+            pretty_nested: false,
         };
 
         let result = formatter.format(&event);
@@ -2400,11 +2476,18 @@ mod tests {
         event.set_field("field3".to_string(), Dynamic::from("value3".to_string()));
 
         // Use the basic constructor (should enable wrapping by default now)
-        let formatter = DefaultFormatter::new(
+        let mut formatter = DefaultFormatter::new(
             false,
             false,
             crate::config::TimestampFormatConfig::default(),
+            false,
         );
+
+        // Default constructor should have wrapping enabled
+        assert!(formatter.enable_wrapping);
+
+        // Force a small terminal width to make wrapping deterministic in tests
+        formatter.terminal_width = 80;
 
         let result = formatter.format(&event);
 

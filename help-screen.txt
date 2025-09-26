@@ -142,6 +142,9 @@ Default Format Options:
   -b, --brief
           Output only field values
 
+  -P, --pretty
+          Pretty-print nested values
+
       --wrap
           Enable word-wrapping (default: enabled)
 

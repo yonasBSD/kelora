@@ -494,6 +494,7 @@ mod tests {
                 },
                 brief: false,
                 wrap: true, // Default to enabled
+                pretty: false,
                 color_mode: crate::config::ColorMode::Auto,
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
@@ -545,6 +546,7 @@ mod tests {
                 },
                 brief: false,
                 wrap: true, // Default to enabled
+                pretty: false,
                 color_mode: crate::config::ColorMode::Auto,
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,
@@ -595,6 +597,7 @@ mod tests {
                 },
                 brief: false,
                 wrap: true, // Default to enabled
+                pretty: false,
                 color_mode: crate::config::ColorMode::Auto,
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
                 strict: false,

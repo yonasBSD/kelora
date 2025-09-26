@@ -44,6 +44,7 @@ pub struct OutputConfig {
     pub core: bool,
     pub brief: bool,
     pub wrap: bool,
+    pub pretty: bool,
     pub color: ColorMode,
     pub no_emoji: bool,
     pub stats: bool,
@@ -651,6 +652,7 @@ impl KeloraConfig {
                 core: cli.core,
                 brief: cli.brief,
                 wrap: !cli.no_wrap, // Default true, disabled by --no-wrap
+                pretty: cli.pretty,
                 color: color_mode,
                 no_emoji: cli.no_emoji,
                 stats: cli.stats || cli.stats_only,
@@ -730,6 +732,7 @@ impl Default for KeloraConfig {
                 core: false,
                 brief: false,
                 wrap: true, // Default to enabled
+                pretty: false,
                 color: ColorMode::Auto,
                 no_emoji: false,
                 stats: false,
