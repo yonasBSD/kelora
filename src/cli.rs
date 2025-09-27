@@ -231,6 +231,18 @@ pub struct Cli {
     #[arg(long = "take", help_heading = "Filtering Options")]
     pub take: Option<usize>,
 
+    /// Show N lines before each match (requires filtering)
+    #[arg(short = 'B', long = "before-context", help_heading = "Filtering Options")]
+    pub before_context: Option<usize>,
+
+    /// Show N lines after each match (requires filtering)
+    #[arg(short = 'A', long = "after-context", help_heading = "Filtering Options")]
+    pub after_context: Option<usize>,
+
+    /// Show N lines before and after each match (requires filtering)
+    #[arg(short = 'C', long = "context", help_heading = "Filtering Options")]
+    pub context: Option<usize>,
+
     /// Output format
     #[arg(
         short = 'F',
@@ -485,8 +497,7 @@ impl Cli {
 /// Parse and validate format value - supports both standard formats and cols:<spec>
 fn parse_format_value(s: &str) -> Result<String, String> {
     // Check if it's a cols format
-    if s.starts_with("cols:") {
-        let spec = &s[5..];
+    if let Some(spec) = s.strip_prefix("cols:") {
         if spec.trim().is_empty() {
             return Err(
                 "cols format requires a specification, e.g., 'cols:ts level *msg'".to_string(),

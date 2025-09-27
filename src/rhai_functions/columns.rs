@@ -594,11 +594,10 @@ fn parse_spec(spec: &str) -> Result<SpecPlan, Box<rhai::EvalAltResult>> {
             continue;
         }
 
-        if raw_token.starts_with('*') {
+        if let Some(name) = raw_token.strip_prefix('*') {
             if seen_rest {
                 return Err("parse_cols: *field may appear only once and must be last".into());
             }
-            let name = &raw_token[1..];
             if name.is_empty() {
                 return Err("parse_cols: *field requires a name".into());
             }

@@ -53,6 +53,11 @@ kelora -j example_logs/sample.jsonl \
 kelora -f combined example_logs/sample.nginx \
   --keys ip,status,request_time,request \
   --stats
+
+# Show errors with surrounding context (like grep -A/-B/-C)
+kelora -j example_logs/sample.jsonl \
+  --filter 'e.level == "ERROR"' \
+  --after-context 2 --before-context 1
 ```
 
 ### Advanced Moves
@@ -116,6 +121,7 @@ Pre-built binaries live in the [GitHub releases](https://github.com/dloss/kelora
 - `--filter 'expression'` runs boolean Rhai expressions; chain multiple occurrences.
 - `-l/--levels` and `-L/--exclude-levels` gate standard log levels.
 - `--since`, `--until`, and `--take` trim by time range or limit output volume.
+- `-A/--after-context`, `-B/--before-context`, and `-C/--context` show surrounding lines around matches (requires filtering).
 - `--keep-lines`/`--ignore-lines` pair well with `--strict` to enforce hygiene.
 
 ### Transformations & State
@@ -133,6 +139,7 @@ Pre-built binaries live in the [GitHub releases](https://github.com/dloss/kelora
 - `--pretty-ts`, `-z`, and `-Z` format timestamps (local vs UTC).
 - `--stats`, `--metrics`, and `-S/--stats-only` expose processing telemetry; `--metrics-file` writes JSON metrics to disk.
 - `--mark-gaps` inserts visual separators when time jumps exceed a duration; `--no-emoji` disables emoji prefixes.
+- Context lines are marked with visual prefixes: `*` for matches, `/` for before-context, `\` for after-context.
 
 ### Performance & Reliability
 

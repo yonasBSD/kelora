@@ -73,6 +73,7 @@ pub struct PipelineBuilder {
     prefix_sep: String,
     cols_spec: Option<String>,
     cols_sep: Option<String>,
+    context_config: crate::config::ContextConfig,
 }
 
 impl PipelineBuilder {
@@ -113,6 +114,7 @@ impl PipelineBuilder {
             prefix_sep: "|".to_string(),
             cols_spec: None,
             cols_sep: None,
+            context_config: crate::config::ContextConfig::disabled(),
         }
     }
 
@@ -293,11 +295,18 @@ impl PipelineBuilder {
         let mut script_stages: Vec<Box<dyn ScriptStage>> = Vec::new();
         let mut stage_number = 1;
 
+        // Check if any script filters exist
+        let has_script_filters = stages.iter().any(|stage| {
+            matches!(stage, crate::config::ScriptStageType::Filter(_))
+        });
+
         for stage in stages {
             match stage {
                 crate::config::ScriptStageType::Filter(filter) => {
                     let filter_stage =
-                        FilterStage::new(filter, &mut rhai_engine)?.with_stage_number(stage_number);
+                        FilterStage::new(filter, &mut rhai_engine)?
+                            .with_stage_number(stage_number)
+                            .with_context(self.context_config.clone());
                     script_stages.push(Box::new(filter_stage));
                     stage_number += 1;
                 }
@@ -317,17 +326,23 @@ impl PipelineBuilder {
         }
 
         // Add level filtering stage (runs after timestamp filtering, before key filtering)
-        let level_filter_stage =
+        let mut level_filter_stage =
             LevelFilterStage::new(self.levels.clone(), self.exclude_levels.clone());
         if level_filter_stage.is_active() {
+            // Only assign context to level filter if no script filters are active
+            if !has_script_filters {
+                level_filter_stage = level_filter_stage.with_context(self.context_config.clone());
+            }
             script_stages.push(Box::new(level_filter_stage));
         }
 
-        // Add key filtering stage (runs after level filtering, before formatting)
+        // Add key filtering stage (runs after level filtering, before context processing)
         let key_filter_stage = KeyFilterStage::new(self.keys.clone(), self.exclude_keys.clone());
         if key_filter_stage.is_active() {
             script_stages.push(Box::new(key_filter_stage));
         }
+
+        // Context processing is now handled within FilterStage
 
         // Create limiter if specified
         let limiter: Option<Box<dyn EventLimiter>> = if let Some(limit) = self.take_limit {
@@ -584,11 +599,18 @@ impl PipelineBuilder {
         let mut script_stages: Vec<Box<dyn ScriptStage>> = Vec::new();
         let mut stage_number = 1;
 
+        // Check if any script filters exist
+        let has_script_filters = stages.iter().any(|stage| {
+            matches!(stage, crate::config::ScriptStageType::Filter(_))
+        });
+
         for stage in stages {
             match stage {
                 crate::config::ScriptStageType::Filter(filter) => {
                     let filter_stage =
-                        FilterStage::new(filter, &mut rhai_engine)?.with_stage_number(stage_number);
+                        FilterStage::new(filter, &mut rhai_engine)?
+                            .with_stage_number(stage_number)
+                            .with_context(self.context_config.clone());
                     script_stages.push(Box::new(filter_stage));
                     stage_number += 1;
                 }
@@ -608,17 +630,23 @@ impl PipelineBuilder {
         }
 
         // Add level filtering stage (runs after timestamp filtering, before key filtering)
-        let level_filter_stage =
+        let mut level_filter_stage =
             LevelFilterStage::new(self.levels.clone(), self.exclude_levels.clone());
         if level_filter_stage.is_active() {
+            // Only assign context to level filter if no script filters are active
+            if !has_script_filters {
+                level_filter_stage = level_filter_stage.with_context(self.context_config.clone());
+            }
             script_stages.push(Box::new(level_filter_stage));
         }
 
-        // Add key filtering stage (runs after level filtering, before formatting)
+        // Add key filtering stage (runs after level filtering, before context processing)
         let key_filter_stage = KeyFilterStage::new(self.keys.clone(), self.exclude_keys.clone());
         if key_filter_stage.is_active() {
             script_stages.push(Box::new(key_filter_stage));
         }
+
+        // Context processing is now handled within FilterStage
 
         // No limiter for parallel workers (limiting happens at the result sink level)
         let limiter: Option<Box<dyn EventLimiter>> = None;
@@ -781,6 +809,7 @@ pub fn create_pipeline_builder_from_config(
     builder.extract_prefix = config.input.extract_prefix.clone();
     builder.prefix_sep = config.input.prefix_sep.clone();
     builder.take_limit = config.processing.take_limit;
+    builder.context_config = config.processing.context.clone();
     builder
 }
 

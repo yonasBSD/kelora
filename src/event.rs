@@ -4,6 +4,16 @@ use indexmap::IndexMap;
 use rhai::Dynamic;
 use serde::{Deserialize, Serialize};
 
+/// Context type for lines around matches
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ContextType {
+    #[default]
+    None,    // Regular event, no context
+    Match,   // Event that matched filters
+    Before,  // Before-context for a match
+    After,   // After-context for a match
+}
+
 /// Flattening style for nested data structures
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FlattenStyle {
@@ -300,7 +310,7 @@ pub const MESSAGE_FIELD_NAMES: &[&str] = &[
 /// 2. Log level fields (in order of LEVEL_FIELD_NAMES)
 /// 3. Message fields (in order of MESSAGE_FIELD_NAMES)
 /// 4. All other fields (sorted alphabetically)
-pub fn ordered_fields<'a>(event: &'a Event) -> Vec<(&'a String, &'a rhai::Dynamic)> {
+pub fn ordered_fields(event: &Event) -> Vec<(&String, &rhai::Dynamic)> {
     // If the event has been processed by key filtering, preserve the existing order
     if event.key_filtered {
         return event.fields.iter().collect();
@@ -356,6 +366,8 @@ pub struct Event {
     /// Parsed timestamp field for efficient timestamp operations
     /// This is populated automatically when timestamps are extracted from fields
     pub parsed_ts: Option<DateTime<Utc>>,
+    /// Context type for this event (match, before, after, none)
+    pub context_type: ContextType,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -376,6 +388,7 @@ impl Event {
             line_num: None,
             filename: None,
             parsed_ts: None,
+            context_type: ContextType::None,
         }
     }
 

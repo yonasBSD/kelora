@@ -512,17 +512,12 @@ fn parse_user_agent_impl(input: &str) -> Map {
 
     for (family, token) in candidate_agents {
         if let Some(version) = extract_version_token(trimmed, &ua_lower, token) {
-            if *family == "Safari" {
-                if !ua_lower.contains("safari/") || ua_lower.contains("chrome/") {
+            if *family == "Safari"
+                && (!ua_lower.contains("safari/") || ua_lower.contains("chrome/")) {
                     continue;
                 }
-            }
             agent_family = Some(family.to_string());
-            agent_version = if *family == "Safari" {
-                Some(version)
-            } else {
-                Some(version)
-            };
+            agent_version = Some(version);
             break;
         }
     }

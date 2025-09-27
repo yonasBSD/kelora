@@ -545,6 +545,51 @@ impl pipeline::Formatter for DefaultFormatter {
             return String::new();
         }
 
+        // Add context prefix based on event context type
+        let context_prefix = self.get_context_prefix(event);
+        let formatted_content = self.format_content(event);
+
+        if context_prefix.is_empty() {
+            formatted_content
+        } else {
+            format!("{} {}", context_prefix, formatted_content)
+        }
+    }
+}
+
+impl DefaultFormatter {
+    /// Get the context prefix for an event based on its context type
+    fn get_context_prefix(&self, event: &Event) -> String {
+        use crate::event::ContextType;
+
+        match event.context_type {
+            ContextType::Match => {
+                if !self.colors.key.is_empty() {
+                    format!("{}*{}", self.colors.key, self.colors.reset)
+                } else {
+                    "*".to_string()
+                }
+            }
+            ContextType::Before => {
+                if !self.colors.level_debug.is_empty() {
+                    format!("{}/{}", self.colors.level_debug, self.colors.reset)
+                } else {
+                    "/".to_string()
+                }
+            }
+            ContextType::After => {
+                if !self.colors.level_debug.is_empty() {
+                    format!("{}\\{}", self.colors.level_debug, self.colors.reset)
+                } else {
+                    "\\".to_string()
+                }
+            }
+            ContextType::None => String::new(),
+        }
+    }
+
+    /// Format the main content of an event (original format logic)
+    fn format_content(&self, event: &Event) -> String {
         if !self.enable_wrapping {
             // Use original single-line formatting when wrapping is disabled
             return self.format_single_line(event);

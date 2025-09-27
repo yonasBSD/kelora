@@ -75,6 +75,44 @@ pub enum ErrorReportStyle {
     Print,
 }
 
+/// Context options configuration
+#[derive(Debug, Clone)]
+pub struct ContextConfig {
+    pub before_context: usize,
+    pub after_context: usize,
+    pub enabled: bool,
+}
+
+impl ContextConfig {
+    pub fn new(before_context: usize, after_context: usize) -> Self {
+        Self {
+            before_context,
+            after_context,
+            enabled: before_context > 0 || after_context > 0,
+        }
+    }
+
+    pub fn disabled() -> Self {
+        Self {
+            before_context: 0,
+            after_context: 0,
+            enabled: false,
+        }
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.enabled && (self.before_context > 0 || self.after_context > 0)
+    }
+
+    pub fn required_window_size(&self) -> usize {
+        if self.is_active() {
+            self.before_context + self.after_context + 1
+        } else {
+            0
+        }
+    }
+}
+
 /// Processing configuration
 #[derive(Debug, Clone)]
 pub struct ProcessingConfig {
@@ -96,6 +134,8 @@ pub struct ProcessingConfig {
     pub verbose: u8,
     /// Quiet mode level (0=normal, 1=suppress diagnostics, 2=suppress events, 3=suppress script output)
     pub quiet_level: u8,
+    /// Context options for showing surrounding lines around matches
+    pub context: ContextConfig,
 }
 
 /// Performance configuration
@@ -670,6 +710,7 @@ impl KeloraConfig {
                 strict: cli.strict,
                 verbose: cli.verbose,
                 quiet_level: cli.quiet,
+                context: create_context_config(cli)?,
             },
             performance: PerformanceConfig {
                 parallel: cli.parallel,
@@ -752,6 +793,7 @@ impl Default for KeloraConfig {
                 strict: false,
                 verbose: 0,
                 quiet_level: 0,
+                context: ContextConfig::disabled(),
             },
             performance: PerformanceConfig {
                 parallel: false,
@@ -826,6 +868,32 @@ fn parse_error_report_config(cli: &crate::Cli) -> ErrorReportConfig {
     };
 
     ErrorReportConfig { style }
+}
+
+/// Create context configuration from CLI arguments
+fn create_context_config(cli: &crate::Cli) -> anyhow::Result<ContextConfig> {
+    let (before_context, after_context) = if let Some(context) = cli.context {
+        // -C sets both before and after context
+        (context, context)
+    } else {
+        // Use individual -A and -B settings
+        (cli.before_context.unwrap_or(0), cli.after_context.unwrap_or(0))
+    };
+
+    // Validate that context requires filtering
+    let has_filtering = !cli.filters.is_empty()
+        || !cli.levels.is_empty()
+        || !cli.exclude_levels.is_empty()
+        || cli.since.is_some()
+        || cli.until.is_some();
+
+    if (before_context > 0 || after_context > 0) && !has_filtering {
+        return Err(anyhow::anyhow!(
+            "Context options (-A, -B, -C) require active filtering (use --filter, --levels, --since, --until, etc.)"
+        ));
+    }
+
+    Ok(ContextConfig::new(before_context, after_context))
 }
 
 /// Determine the default timezone based on CLI options and environment
