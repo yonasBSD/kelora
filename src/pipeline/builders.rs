@@ -234,11 +234,13 @@ impl PipelineBuilder {
 
         // Create formatter
         let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
+        let use_emoji = use_colors && !self.config.no_emoji;
         let formatter: Box<dyn Formatter> = match self.output_format {
             crate::OutputFormat::Json => Box::new(crate::formatters::JsonFormatter::new()),
             crate::OutputFormat::Default => {
                 Box::new(crate::formatters::DefaultFormatter::new_with_wrapping(
                     use_colors,
+                    use_emoji,
                     self.config.brief,
                     self.config.timestamp_formatting.clone(),
                     self.config.wrap,
@@ -534,11 +536,13 @@ impl PipelineBuilder {
 
         // Create formatter (workers still need formatters for output)
         let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
+        let use_emoji = use_colors && !self.config.no_emoji;
         let formatter: Box<dyn Formatter> = match self.output_format {
             crate::OutputFormat::Json => Box::new(crate::formatters::JsonFormatter::new()),
             crate::OutputFormat::Default => {
                 Box::new(crate::formatters::DefaultFormatter::new_with_wrapping(
                     use_colors,
+                    use_emoji,
                     self.config.brief,
                     self.config.timestamp_formatting.clone(),
                     self.config.wrap,

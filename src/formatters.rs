@@ -225,11 +225,13 @@ pub struct DefaultFormatter {
     enable_wrapping: bool,
     terminal_width: usize,
     pretty_nested: bool,
+    use_emoji: bool,
 }
 
 impl DefaultFormatter {
     pub fn new(
         use_colors: bool,
+        use_emoji: bool,
         brief: bool,
         timestamp_formatting: crate::config::TimestampFormatConfig,
         pretty_nested: bool,
@@ -250,11 +252,13 @@ impl DefaultFormatter {
             enable_wrapping: true, // Default to enabled
             terminal_width: crate::tty::get_terminal_width(),
             pretty_nested,
+            use_emoji: use_emoji && use_colors,
         }
     }
 
     pub fn new_with_wrapping(
         use_colors: bool,
+        use_emoji: bool,
         brief: bool,
         timestamp_formatting: crate::config::TimestampFormatConfig,
         enable_wrapping: bool,
@@ -282,6 +286,7 @@ impl DefaultFormatter {
             enable_wrapping,
             terminal_width,
             pretty_nested,
+            use_emoji: use_emoji && use_colors,
         }
     }
 
@@ -559,28 +564,37 @@ impl DefaultFormatter {
         use crate::event::ContextType;
 
         match event.context_type {
-            ContextType::Match => {
-                if !self.colors.context_match.is_empty() {
-                    format!("{}*{}", self.colors.context_match, self.colors.reset)
-                } else {
-                    "*".to_string()
-                }
-            }
-            ContextType::Before => {
-                if !self.colors.context_before.is_empty() {
-                    format!("{}/{}", self.colors.context_before, self.colors.reset)
-                } else {
-                    "/".to_string()
-                }
-            }
-            ContextType::After => {
-                if !self.colors.context_after.is_empty() {
-                    format!("{}\\{}", self.colors.context_after, self.colors.reset)
-                } else {
-                    "\\".to_string()
-                }
-            }
+            ContextType::Match => self.render_context_marker(
+                self.colors.context_match,
+                "◉",
+                "*",
+            ),
+            ContextType::Before => self.render_context_marker(
+                self.colors.context_before,
+                "/",
+                "/",
+            ),
+            ContextType::After => self.render_context_marker(
+                self.colors.context_after,
+                "\\",
+                "\\",
+            ),
             ContextType::None => String::new(),
+        }
+    }
+
+    fn render_context_marker(
+        &self,
+        color: &'static str,
+        emoji_marker: &str,
+        ascii_marker: &str,
+    ) -> String {
+        let marker = if self.use_emoji { emoji_marker } else { ascii_marker };
+
+        if !color.is_empty() {
+            format!("{}{}{}", color, marker, self.colors.reset)
+        } else {
+            marker.to_string()
         }
     }
 
@@ -1710,6 +1724,7 @@ mod tests {
     use super::*;
     use chrono::{Duration as ChronoDuration, TimeZone, Utc};
     use rhai::{Array, Map};
+    use crate::event::ContextType;
 
     fn parts(line: &str) -> Vec<String> {
         line.split('|')
@@ -1849,6 +1864,7 @@ mod tests {
         let formatter = DefaultFormatter::new_with_wrapping(
             false,
             false,
+            false,
             crate::config::TimestampFormatConfig::default(),
             false, // Disable wrapping for this test
             false,
@@ -1879,6 +1895,7 @@ mod tests {
         let formatter = DefaultFormatter::new_with_wrapping(
             false,
             false,
+            false,
             crate::config::TimestampFormatConfig::default(),
             false,
             false,
@@ -1904,6 +1921,7 @@ mod tests {
         let formatter = DefaultFormatter::new_with_wrapping(
             false,
             false,
+            false,
             crate::config::TimestampFormatConfig::default(),
             false,
             true,
@@ -1922,6 +1940,7 @@ mod tests {
 
         let formatter = DefaultFormatter::new_with_wrapping(
             false,
+            false,
             true,
             crate::config::TimestampFormatConfig::default(),
             false, // Disable wrapping for this test
@@ -1931,6 +1950,36 @@ mod tests {
 
         // Brief mode should output only values, space-separated
         assert_eq!(result, "info test message");
+    }
+
+    #[test]
+    fn test_context_markers_use_emoji_when_enabled() {
+        let formatter = DefaultFormatter::new_with_wrapping(
+            true,
+            true,
+            false,
+            crate::config::TimestampFormatConfig::default(),
+            false,
+            false,
+        );
+
+        let mut before_event = Event::default();
+        before_event.context_type = ContextType::Before;
+        before_event.set_field("msg".to_string(), Dynamic::from("before".to_string()));
+        let before_line = formatter.format(&before_event);
+        assert!(before_line.starts_with("\x1b[34m/\x1b[0m "));
+
+        let mut match_event = Event::default();
+        match_event.context_type = ContextType::Match;
+        match_event.set_field("msg".to_string(), Dynamic::from("match".to_string()));
+        let match_line = formatter.format(&match_event);
+        assert!(match_line.starts_with("\x1b[95m◉\x1b[0m "));
+
+        let mut after_event = Event::default();
+        after_event.context_type = ContextType::After;
+        after_event.set_field("msg".to_string(), Dynamic::from("after".to_string()));
+        let after_line = formatter.format(&after_event);
+        assert!(after_line.starts_with("\x1b[34m\\\x1b[0m "));
     }
 
     #[test]
@@ -2372,6 +2421,7 @@ mod tests {
         let formatter = DefaultFormatter::new_with_wrapping(
             false,
             false,
+            false,
             crate::config::TimestampFormatConfig::default(),
             false, // wrapping disabled
             false,
@@ -2407,6 +2457,7 @@ mod tests {
             enable_wrapping: true,
             terminal_width: 50, // Small width to force wrapping
             pretty_nested: false,
+            use_emoji: false,
         };
 
         let result = formatter.format(&event);
@@ -2442,6 +2493,7 @@ mod tests {
             enable_wrapping: true,
             terminal_width: 30, // Very small width
             pretty_nested: false,
+            use_emoji: false,
         };
 
         let result = formatter.format(&event);
@@ -2462,6 +2514,7 @@ mod tests {
     #[test]
     fn test_display_length_ignores_ansi_codes() {
         let formatter = DefaultFormatter::new_with_wrapping(
+            false,
             false,
             false,
             crate::config::TimestampFormatConfig::default(),
@@ -2498,6 +2551,7 @@ mod tests {
             enable_wrapping: true,
             terminal_width: 20, // Force wrapping
             pretty_nested: false,
+            use_emoji: false,
         };
 
         let result = formatter.format(&event);
@@ -2538,6 +2592,7 @@ mod tests {
 
         // Use the basic constructor (should enable wrapping by default now)
         let mut formatter = DefaultFormatter::new(
+            false,
             false,
             false,
             crate::config::TimestampFormatConfig::default(),
