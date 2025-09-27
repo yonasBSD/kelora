@@ -10,6 +10,9 @@ pub struct ColorScheme {
     pub level_info: &'static str,  // Bright green for info levels
     pub level_warn: &'static str,  // Bright yellow for warn levels
     pub level_error: &'static str, // Bright red for error levels
+    pub context_before: &'static str, // Blue for context prefix before markers
+    pub context_match: &'static str,  // Bright magenta for context prefix match markers
+    pub context_after: &'static str,  // Blue for context prefix after markers
     pub reset: &'static str,       // Reset to default color
 }
 
@@ -26,6 +29,9 @@ impl ColorScheme {
                 level_info: "\x1b[92m",  // Bright green for info/informational/notice
                 level_warn: "\x1b[93m",  // Bright yellow for warn/warning
                 level_error: "\x1b[91m", // Bright red for error/fatal/panic/etc
+                context_before: "\x1b[34m", // Blue for before context markers
+                context_match: "\x1b[95m",  // Bright magenta for match context markers
+                context_after: "\x1b[34m",  // Blue for after context markers
                 reset: "\x1b[0m",        // Reset
             }
         } else {
@@ -39,6 +45,9 @@ impl ColorScheme {
                 level_info: "",
                 level_warn: "",
                 level_error: "",
+                context_before: "",
+                context_match: "",
+                context_after: "",
                 reset: "",
             }
         }

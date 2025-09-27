@@ -560,22 +560,22 @@ impl DefaultFormatter {
 
         match event.context_type {
             ContextType::Match => {
-                if !self.colors.key.is_empty() {
-                    format!("{}*{}", self.colors.key, self.colors.reset)
+                if !self.colors.context_match.is_empty() {
+                    format!("{}*{}", self.colors.context_match, self.colors.reset)
                 } else {
                     "*".to_string()
                 }
             }
             ContextType::Before => {
-                if !self.colors.level_debug.is_empty() {
-                    format!("{}/{}", self.colors.level_debug, self.colors.reset)
+                if !self.colors.context_before.is_empty() {
+                    format!("{}/{}", self.colors.context_before, self.colors.reset)
                 } else {
                     "/".to_string()
                 }
             }
             ContextType::After => {
-                if !self.colors.level_debug.is_empty() {
-                    format!("{}\\{}", self.colors.level_debug, self.colors.reset)
+                if !self.colors.context_after.is_empty() {
+                    format!("{}\\{}", self.colors.context_after, self.colors.reset)
                 } else {
                     "\\".to_string()
                 }
@@ -584,7 +584,7 @@ impl DefaultFormatter {
         }
     }
 
-    /// Format the main content of an event with context prefixes on wrapped lines
+    /// Format the main content of an event while keeping wrapped lines aligned with the context marker
     fn format_content_with_context(&self, event: &Event, context_prefix: &str) -> String {
         if !self.enable_wrapping {
             // Use original single-line formatting when wrapping is disabled
@@ -602,10 +602,11 @@ impl DefaultFormatter {
 
         // Add context prefix to the first line
         let mut current_line_length = 0;
+        let prefix_display_length = self.display_length(context_prefix);
         if !context_prefix.is_empty() {
             output.push_str(context_prefix);
             output.push(' ');
-            current_line_length = self.display_length(context_prefix) + 1;
+            current_line_length = prefix_display_length + 1;
         }
 
         let mut first_on_line = true;
@@ -653,9 +654,8 @@ impl DefaultFormatter {
                 // Wrap: add newline, context prefix, and indentation
                 output.push('\n');
                 if !context_prefix.is_empty() {
-                    output.push_str(context_prefix);
-                    output.push(' ');
-                    current_line_length = self.display_length(context_prefix) + 1;
+                    output.push_str(&" ".repeat(prefix_display_length + 1));
+                    current_line_length = prefix_display_length + 1;
                 } else {
                     current_line_length = 0;
                 }
