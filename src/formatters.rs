@@ -547,13 +547,9 @@ impl pipeline::Formatter for DefaultFormatter {
 
         // Add context prefix based on event context type
         let context_prefix = self.get_context_prefix(event);
-        let formatted_content = self.format_content(event);
+        let formatted_content = self.format_content_with_context(event, &context_prefix);
 
-        if context_prefix.is_empty() {
-            formatted_content
-        } else {
-            format!("{} {}", context_prefix, formatted_content)
-        }
+        formatted_content
     }
 }
 
@@ -588,17 +584,30 @@ impl DefaultFormatter {
         }
     }
 
-    /// Format the main content of an event (original format logic)
-    fn format_content(&self, event: &Event) -> String {
+    /// Format the main content of an event with context prefixes on wrapped lines
+    fn format_content_with_context(&self, event: &Event, context_prefix: &str) -> String {
         if !self.enable_wrapping {
             // Use original single-line formatting when wrapping is disabled
-            return self.format_single_line(event);
+            let single_line = self.format_single_line(event);
+            if context_prefix.is_empty() {
+                return single_line;
+            } else {
+                return format!("{} {}", context_prefix, single_line);
+            }
         }
 
         // Word-wrapping implementation
         let estimated_capacity = event.fields.len() * 32;
         let mut output = String::with_capacity(estimated_capacity);
+
+        // Add context prefix to the first line
         let mut current_line_length = 0;
+        if !context_prefix.is_empty() {
+            output.push_str(context_prefix);
+            output.push(' ');
+            current_line_length = self.display_length(context_prefix) + 1;
+        }
+
         let mut first_on_line = true;
         let mut first_overall = true;
 
@@ -641,10 +650,17 @@ impl DefaultFormatter {
             if !first_overall
                 && current_line_length + space_needed + field_display_length > self.terminal_width
             {
-                // Wrap: add newline and indentation
+                // Wrap: add newline, context prefix, and indentation
                 output.push('\n');
+                if !context_prefix.is_empty() {
+                    output.push_str(context_prefix);
+                    output.push(' ');
+                    current_line_length = self.display_length(context_prefix) + 1;
+                } else {
+                    current_line_length = 0;
+                }
                 output.push_str("  "); // 2-space indentation as requested
-                current_line_length = 2; // Account for indentation
+                current_line_length += 2; // Account for indentation
                 first_on_line = true;
             }
 
