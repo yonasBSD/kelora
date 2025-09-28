@@ -91,6 +91,7 @@ array.sorted()                        Return new sorted array (numeric/lexicogra
 array.starts_with_any(search_array)   Check if array starts with any search values
   
 MAP/OBJECT FUNCTIONS:
+map.contains("key")                   Check if map contains key (ignores value) (builtin)
 map.flatten([separator [, style]])    Flatten nested object to dot notation
 map.get_path("field.path" [,default]) Safe nested field access with fallback
 map.has_field("key")                  Check if map contains key with non-unit value
