@@ -68,14 +68,16 @@ text.unescape_json()                  Unescape JSON escape sequences
 text.upper()                          Convert text to uppercase
   
 ARRAY FUNCTIONS:
-array.all(|item| condition)          Check if all elements match condition (builtin)
+array.all(|item| condition)           Check if all elements match condition (builtin)
 array.contains_any(search_array)      Check if array contains any search values
 array.contains(value)                 Check if array contains value (builtin)
-array.filter(|item| condition)       Keep elements matching condition (builtin)
+array.filter(|item| condition)        Keep elements matching condition (builtin)
 array.flatten([style [, max_depth]])  Flatten nested arrays/objects
 array.join(separator)                 Join array elements with separator
 array.len                             Get array length (builtin)
 array.map(|item| expression)          Transform each element (builtin)
+array.max()                           Find maximum value in array (no auto string-to-number coercion)
+array.min()                           Find minimum value in array (no auto string-to-number coercion)
 array.parse_cols(spec [, sep])        Apply column spec to pre-split values
 array.percentile(pct)                 Calculate percentile of numeric array
 array.pop()                           Remove and return last item (builtin)
@@ -86,13 +88,11 @@ array.some(|item| condition)          Check if any element matches condition (bu
 array.sort()                          Sort array in place (builtin)
 array.sorted_by(field)                Sort array of objects by field name
 array.sorted()                        Return new sorted array (numeric/lexicographic)
-array.min()                           Find minimum value in array (no auto string-to-number coercion)
-array.max()                           Find maximum value in array (no auto string-to-number coercion)
 array.starts_with_any(search_array)   Check if array starts with any search values
   
 MAP/OBJECT FUNCTIONS:
 map.flatten([separator [, style]])    Flatten nested object to dot notation
-map.get_path("field.path" [, default]) Safe nested field access with fallback
+map.get_path("field.path" [,default]) Safe nested field access with fallback
 map.has_path("field.path")            Check if nested field path exists
 map.merge(other_map)                  Merge another map into this one
 map.path_equals("path", value)        Safe nested field comparison
@@ -126,13 +126,13 @@ rand_int(min, max)                    Random integer between min and max (inclus
 round(x)                              Round to nearest integer
 
 UTILITY FUNCTIONS:
-type_of(value)                        Get type name as string (builtin)
 eprint(message)                       Print to stderr (suppressed with -qqq)
 exit(code)                            Exit kelora with given exit code
 get_env(var [, default])              Get environment variable with optional default
 print(message)                        Print to stdout (suppressed with -qqq)
 read_file(path)                       Read file contents as string
 read_lines(path)                      Read file as array of lines
+type_of(value)                        Get type name as string (builtin)
 window_numbers(field)                 Get numeric field values from current window
 window_values(field)                  Get field values from current window
 
