@@ -10,8 +10,16 @@ STRING/TEXT FUNCTIONS:
   text.col("1,3,5" [, separator])       Extract multiple columns as concatenated string
   text.col("1:5" [, separator])         Extract column range as concatenated string
   text.col(index [, separator])         Extract column by index from whitespace/delimited text
-  text.contains(pattern)                Check if text contains pattern
+  text.contains(pattern)                Check if text contains pattern (builtin)
   text.count(pattern)                   Count occurrences of pattern in text
+  text.index_of(pattern)                Find position of substring (-1 if not found) (builtin)
+  text.len                              Get string length (builtin)
+  text.replace(pattern, replacement)    Replace all occurrences of pattern (builtin)
+  text.split(separator)                 Split string into array by delimiter (builtin)
+  text.sub_string(start [, length])     Extract substring from position (builtin)
+  text.to_lower()                       Convert to lowercase (builtin)
+  text.to_upper()                       Convert to uppercase (builtin)
+  text.trim()                           Remove whitespace from start and end (builtin)
   text.decode_b64()                     Decode base64 string to text
   text.decode_hex()                     Decode hexadecimal string to text
   text.decode_url()                     Decode URL-encoded string
@@ -62,9 +70,19 @@ STRING/TEXT FUNCTIONS:
   to_float(text)                        Convert text to float (0 on error)
 
 ARRAY FUNCTIONS:
-  array.join(separator)                 Join array elements with separator
+  array.all(|item| condition)          Check if all elements match condition (builtin)
+  array.contains(value)                 Check if array contains value (builtin)
+  array.filter(|item| condition)       Keep elements matching condition (builtin)
   array.flatten([style [, max_depth]])  Flatten nested arrays/objects
+  array.join(separator)                 Join array elements with separator
+  array.len                             Get array length (builtin)
+  array.map(|item| expression)          Transform each element (builtin)
   array.parse_cols(spec [, sep])        Apply column spec to pre-split values
+  array.pop()                           Remove and return last item (builtin)
+  array.push(item)                      Add item to end of array (builtin)
+  array.reduce(|acc, item| expr, init)  Aggregate array into single value (builtin)
+  array.some(|item| condition)         Check if any element matches condition (builtin)
+  array.sort()                          Sort array in place (builtin)
   reversed(array)                       Return new array in reverse order
   sorted(array)                         Return new sorted array (numeric/lexicographic)
   sorted_by(array, field)               Sort array of objects by field name
@@ -79,9 +97,14 @@ MAP/OBJECT FUNCTIONS:
   map.has_path("field.path")            Check if nested field path exists
   map.path_equals("path", value)        Safe nested field comparison
 
-VALUE SAFETY FUNCTIONS:
+PARSING/CONVERSION FUNCTIONS:
+  parse_int(text)                       Convert string to integer (0 on error) (builtin)
+  parse_float(text)                     Convert string to float (0.0 on error) (builtin)
   to_number(value [, default])          Safe number conversion with fallback (default: 0)
   to_bool(value [, default])            Safe boolean conversion with fallback
+
+TYPE CHECKING FUNCTIONS:
+  type_of(value)                        Get type name as string (builtin)
 
 EVENT MANIPULATION:
   emit_each(array [, base_map])         Fan out array elements as separate events
@@ -131,12 +154,19 @@ FILE OUTPUT (REQUIRES --allow-fs-writes):
   append_file(path, text_or_array)       Append line(s) to file; arrays append one line per element
 
 Examples:
-  # String processing with method syntax
-  e.clean_url = e.url.extract_domain().lower()
+  # String processing with builtin and custom functions
+  e.clean_url = e.url.extract_domain().to_lower()
+  e.parts = e.message.split("|")  # Use builtin split
+  e.word_count = e.text.trim().split(" ").len  # Chain builtin functions
 
-  # Array processing and fan-out
-  e.tag_count = e.tags.len()
+  # Array processing with builtins and fan-out
+  e.tag_count = e.tags.len  # Use builtin len
+  e.error_tags = e.tags.filter(|tag| tag.contains("error"))  # Builtin filter
   emit_each(e.items)  # Creates separate event for each item
+
+  # Type-safe parsing and validation
+  e.status_code = parse_int(e.status)  # Parse safely
+  if type_of(e.level) == "string" { e.log_level = e.level.to_upper() }
 
   # Safe nested field access
   e.user_role = e.get_path("user.profile.role", "guest")
