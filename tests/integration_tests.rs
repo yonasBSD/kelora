@@ -4688,3 +4688,363 @@ fn test_extract_re_maps_composability() {
         assert!(parsed["original_text"].is_string());
     }
 }
+
+// ==================== PARALLEL MULTILINE PROCESSING TESTS ====================
+// These tests ensure that parallel processing works correctly with multiline mode
+// and produces identical results to sequential processing.
+
+/// Helper to extract event count from stats stderr output
+fn extract_events_created_from_stats(stderr: &str) -> i32 {
+    for line in stderr.lines() {
+        if line.contains("Events created:") {
+            // Parse "Events created: X total, Y output, Z filtered"
+            if let Some(events_part) = line.split("Events created:").nth(1) {
+                if let Some(total_part) = events_part.trim().split(" total").next() {
+                    return total_part.trim().parse().unwrap_or(0);
+                }
+            }
+        }
+    }
+    0
+}
+
+/// Helper to extract filtered count from stats stderr output
+fn extract_events_filtered_from_stats(stderr: &str) -> i32 {
+    for line in stderr.lines() {
+        if line.contains("Events created:") {
+            // Parse "Events created: X total, Y output, Z filtered"
+            if let Some(filtered_part) = line.split(", ").nth(2) {
+                if let Some(num_part) = filtered_part.split(" filtered").next() {
+                    return num_part.trim().parse().unwrap_or(0);
+                }
+            }
+        }
+    }
+    0
+}
+
+#[test]
+fn test_parallel_multiline_indent_consistency() {
+    // Test that parallel and sequential processing produce identical results for indent strategy
+    let input = r#"2024-01-01 10:00:00 INFO Starting application
+    Additional info line 1
+    Additional info line 2
+2024-01-01 10:00:05 ERROR Database connection failed
+    Stack trace line 1
+    Stack trace line 2
+    Stack trace line 3
+2024-01-01 10:00:10 INFO Application started successfully
+    Single continuation line
+2024-01-01 10:00:15 DEBUG Debug message
+    Debug detail 1
+    Debug detail 2"#;
+
+    // Sequential processing
+    let (stdout_seq, stderr_seq, exit_code_seq) = run_kelora_with_input(
+        &["-f", "line", "-M", "indent", "--stats"],
+        input,
+    );
+    assert_eq!(exit_code_seq, 0, "Sequential should succeed");
+
+    // Parallel processing
+    let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(
+        &["-f", "line", "-M", "indent", "--stats", "--parallel"],
+        input,
+    );
+    assert_eq!(exit_code_par, 0, "Parallel should succeed");
+
+    // Parse event counts
+    let events_created_seq = extract_events_created_from_stats(&stderr_seq);
+    let events_created_par = extract_events_created_from_stats(&stderr_par);
+
+    // Assert identical event counts
+    assert_eq!(
+        events_created_seq, events_created_par,
+        "Sequential and parallel should create same number of events"
+    );
+    assert_eq!(
+        events_created_seq, 4,
+        "Should create exactly 4 multiline events from 12 lines"
+    );
+
+    // Count output lines (should be same)
+    let output_lines_seq = stdout_seq.lines().count();
+    let output_lines_par = stdout_par.lines().count();
+    assert_eq!(
+        output_lines_seq, output_lines_par,
+        "Sequential and parallel should produce same number of output lines"
+    );
+    assert_eq!(output_lines_seq, 4, "Should output exactly 4 events");
+}
+
+#[test]
+fn test_parallel_multiline_timestamp_consistency() {
+    // Test timestamp strategy with parallel processing
+    let input = r#"Jan  1 10:00:00 host app: Event one starts here
+and continues on this line
+and ends here
+Jan  1 10:00:05 host app: Event two is an error
+with multiple lines
+of detailed information
+Jan  1 10:00:10 host app: Event three is info
+single line continuation
+Jan  1 10:00:15 host app: Event four debug message"#;
+
+    // Sequential processing
+    let (stdout_seq, stderr_seq, exit_code_seq) = run_kelora_with_input(
+        &["-f", "syslog", "-M", "timestamp", "--stats"],
+        input,
+    );
+    assert_eq!(exit_code_seq, 0, "Sequential should succeed");
+
+    // Parallel processing
+    let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(
+        &["-f", "syslog", "-M", "timestamp", "--stats", "--parallel"],
+        input,
+    );
+    assert_eq!(exit_code_par, 0, "Parallel should succeed");
+
+    // Parse event counts
+    let events_created_seq = extract_events_created_from_stats(&stderr_seq);
+    let events_created_par = extract_events_created_from_stats(&stderr_par);
+
+    // Assert identical event counts
+    assert_eq!(
+        events_created_seq, events_created_par,
+        "Sequential and parallel should create same number of events"
+    );
+    assert_eq!(
+        events_created_seq, 4,
+        "Should create exactly 4 multiline events from 9 lines"
+    );
+
+    // Count output lines
+    let output_lines_seq = stdout_seq.lines().count();
+    let output_lines_par = stdout_par.lines().count();
+    assert_eq!(
+        output_lines_seq, output_lines_par,
+        "Sequential and parallel should produce same number of output lines"
+    );
+}
+
+#[test]
+fn test_parallel_multiline_whole_consistency() {
+    // Test whole strategy with parallel processing
+    let input = r#"{"level": "INFO", "message": "Event one"}
+{"level": "ERROR", "message": "Event two with error"}
+{"level": "INFO", "message": "Event three info"}
+{"level": "DEBUG", "message": "Event four debug"}
+{"level": "ERROR", "message": "Event five another error"}
+{"level": "INFO", "message": "Event six final info"}"#;
+
+    // Sequential processing
+    let (stdout_seq, stderr_seq, exit_code_seq) = run_kelora_with_input(
+        &["-f", "line", "-M", "whole", "--stats"],
+        input,
+    );
+    assert_eq!(exit_code_seq, 0, "Sequential should succeed");
+
+    // Parallel processing
+    let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(
+        &["-f", "line", "-M", "whole", "--stats", "--parallel"],
+        input,
+    );
+    assert_eq!(exit_code_par, 0, "Parallel should succeed");
+
+    // Parse event counts
+    let events_created_seq = extract_events_created_from_stats(&stderr_seq);
+    let events_created_par = extract_events_created_from_stats(&stderr_par);
+
+    // Assert identical event counts
+    assert_eq!(
+        events_created_seq, events_created_par,
+        "Sequential and parallel should create same number of events"
+    );
+    assert_eq!(
+        events_created_seq, 1,
+        "Whole strategy should create exactly 1 event from all lines"
+    );
+
+    // Both should produce exactly 1 output line
+    let output_lines_seq = stdout_seq.lines().count();
+    let output_lines_par = stdout_par.lines().count();
+    assert_eq!(output_lines_seq, 1, "Sequential should output 1 line");
+    assert_eq!(output_lines_par, 1, "Parallel should output 1 line");
+}
+
+#[test]
+fn test_parallel_multiline_filtering_accuracy() {
+    // Test that filtering works correctly in parallel multiline mode
+    let input = r#"2024-01-01 10:00:00 INFO Starting application
+    Additional info line 1
+    Additional info line 2
+2024-01-01 10:00:05 ERROR Database connection failed
+    Stack trace line 1
+    Stack trace line 2
+2024-01-01 10:00:10 INFO Application started successfully
+    Single continuation line
+2024-01-01 10:00:15 DEBUG Debug message
+    Debug detail 1"#;
+
+    // Test filtering for ERROR events only
+    let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(
+        &[
+            "-f", "line",
+            "-M", "indent",
+            "--stats",
+            "--parallel",
+            "--filter", "e.line.contains(\"ERROR\")"
+        ],
+        input,
+    );
+    assert_eq!(exit_code_par, 0, "Parallel filtering should succeed");
+
+    // Parse event counts
+    let events_created = extract_events_created_from_stats(&stderr_par);
+    let events_filtered = extract_events_filtered_from_stats(&stderr_par);
+
+    assert_eq!(events_created, 4, "Should create 4 events total");
+    assert_eq!(events_filtered, 3, "Should filter out 3 non-ERROR events");
+
+    // Should output exactly 1 line (the ERROR event)
+    let output_lines = stdout_par.lines().count();
+    assert_eq!(output_lines, 1, "Should output exactly 1 ERROR event");
+    assert!(stdout_par.contains("ERROR"), "Output should contain ERROR event");
+
+    // Test the reverse filter
+    let (stdout_par2, stderr_par2, exit_code_par2) = run_kelora_with_input(
+        &[
+            "-f", "line",
+            "-M", "indent",
+            "--stats",
+            "--parallel",
+            "--filter", "e.line.contains(\"INFO\") || e.line.contains(\"DEBUG\")"
+        ],
+        input,
+    );
+    assert_eq!(exit_code_par2, 0, "Parallel reverse filtering should succeed");
+
+    let events_created2 = extract_events_created_from_stats(&stderr_par2);
+    let events_filtered2 = extract_events_filtered_from_stats(&stderr_par2);
+
+    assert_eq!(events_created2, 4, "Should create 4 events total");
+    assert_eq!(events_filtered2, 1, "Should filter out 1 ERROR event");
+
+    let output_lines2 = stdout_par2.lines().count();
+    assert_eq!(output_lines2, 3, "Should output 3 non-ERROR events");
+}
+
+#[test]
+fn test_parallel_multiline_event_counting_accuracy() {
+    // Test various scenarios to ensure event counting is always accurate
+
+    // Scenario 1: Simple multiline events
+    let input1 = r#"Event 1 start
+  continuation 1
+Event 2 start
+  continuation 2"#;
+
+    let (_, stderr1, exit_code1) = run_kelora_with_input(
+        &["-f", "line", "-M", "indent", "--stats", "--parallel"],
+        input1,
+    );
+    assert_eq!(exit_code1, 0);
+    assert_eq!(extract_events_created_from_stats(&stderr1), 2, "Simple case should create 2 events");
+
+    // Scenario 2: Edge case with single line events mixed with multiline
+    let input2 = r#"Single line event
+Multiline event start
+  continuation line
+Another single line
+Final multiline start
+  final continuation"#;
+
+    let (_, stderr2, exit_code2) = run_kelora_with_input(
+        &["-f", "line", "-M", "indent", "--stats", "--parallel"],
+        input2,
+    );
+    assert_eq!(exit_code2, 0);
+    assert_eq!(extract_events_created_from_stats(&stderr2), 4, "Mixed case should create 4 events");
+
+    // Scenario 3: Many small multiline events
+    let input3 = (0..10)
+        .map(|i| format!("Event {} start\n  continuation {}", i, i))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let (_, stderr3, exit_code3) = run_kelora_with_input(
+        &["-f", "line", "-M", "indent", "--stats", "--parallel"],
+        &input3,
+    );
+    assert_eq!(exit_code3, 0);
+    assert_eq!(extract_events_created_from_stats(&stderr3), 10, "Many events case should create 10 events");
+}
+
+#[test]
+fn test_parallel_multiline_vs_sequential_comprehensive() {
+    // Comprehensive test comparing parallel vs sequential for multiple strategies and filters
+
+    let test_cases = vec![
+        (
+            "indent",
+            r#"App started
+  with details
+Error occurred
+  stack trace line 1
+  stack trace line 2
+App finished
+  cleanup done"#,
+            3 // expected events
+        ),
+        (
+            "timestamp",
+            r#"Jan 1 10:00:00 server app: Request started
+continuation line 1
+continuation line 2
+Jan 1 10:00:05 server app: Request completed
+final line"#,
+            2 // expected events
+        )
+    ];
+
+    for (strategy, input, expected_events) in test_cases {
+        // Test without filtering
+        let (stdout_seq, stderr_seq, _) = run_kelora_with_input(
+            &["-f", if strategy == "timestamp" { "syslog" } else { "line" },
+              "-M", strategy, "--stats"],
+            input,
+        );
+        let (stdout_par, stderr_par, _) = run_kelora_with_input(
+            &["-f", if strategy == "timestamp" { "syslog" } else { "line" },
+              "-M", strategy, "--stats", "--parallel"],
+            input,
+        );
+
+        let events_seq = extract_events_created_from_stats(&stderr_seq);
+        let events_par = extract_events_created_from_stats(&stderr_par);
+
+        assert_eq!(events_seq, expected_events, "Sequential {} should create {} events", strategy, expected_events);
+        assert_eq!(events_par, expected_events, "Parallel {} should create {} events", strategy, expected_events);
+        assert_eq!(events_seq, events_par, "Sequential and parallel {} should match", strategy);
+
+        let lines_seq = stdout_seq.lines().count();
+        let lines_par = stdout_par.lines().count();
+        assert_eq!(lines_seq, lines_par, "Output line count should match for {}", strategy);
+
+        // Test with filtering (where applicable)
+        if strategy == "indent" {
+            let (_, stderr_seq_f, _) = run_kelora_with_input(
+                &["-f", "line", "-M", strategy, "--stats", "--filter", "e.line.contains(\"Error\")"],
+                input,
+            );
+            let (_, stderr_par_f, _) = run_kelora_with_input(
+                &["-f", "line", "-M", strategy, "--stats", "--parallel", "--filter", "e.line.contains(\"Error\")"],
+                input,
+            );
+
+            let filtered_seq = extract_events_filtered_from_stats(&stderr_seq_f);
+            let filtered_par = extract_events_filtered_from_stats(&stderr_par_f);
+            assert_eq!(filtered_seq, filtered_par, "Filtered counts should match for {}", strategy);
+        }
+    }
+}

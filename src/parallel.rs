@@ -67,6 +67,23 @@ pub struct Batch {
     pub csv_headers: Option<Vec<String>>, // CSV headers for this batch (if applicable)
 }
 
+/// A batch of pre-chunked events (for multiline processing)
+#[derive(Debug, Clone)]
+pub struct EventBatch {
+    pub id: u64,
+    pub events: Vec<String>,          // Complete event strings from chunker
+    pub start_line_num: usize,
+    pub filenames: Vec<Option<String>>, // Filename for each event
+    pub csv_headers: Option<Vec<String>>,
+}
+
+/// Message type for distributing work to workers
+#[derive(Debug)]
+enum WorkMessage {
+    LineBatch(Batch),      // Raw lines (non-multiline mode)
+    EventBatch(EventBatch), // Pre-chunked events (multiline mode)
+}
+
 #[derive(Debug)]
 enum LineMessage {
     Line {
@@ -445,8 +462,14 @@ impl ParallelProcessor {
         output: W,
         ctrl_rx: crossbeam_channel::Receiver<Ctrl>,
     ) -> Result<()> {
-        // Create channels
+        // Create channels - conditionally use chunker thread for multiline mode
         let (batch_sender, batch_receiver) = if let Some(size) = self.config.buffer_size {
+            bounded(size)
+        } else {
+            unbounded()
+        };
+
+        let (work_sender, work_receiver) = if let Some(size) = self.config.buffer_size {
             bounded(size)
         } else {
             unbounded()
@@ -512,6 +535,40 @@ impl ParallelProcessor {
             })
         };
 
+        // Conditionally spawn chunker thread for multiline mode
+        let chunker_handle = if let Some(multiline_config) = &config.input.multiline {
+            let chunker_ctrl = ctrl_rx.clone();
+            let chunker_multiline_config = multiline_config.clone();
+            let chunker_input_format = config.input.format.clone();
+
+            let handle = thread::spawn(move || {
+                Self::chunker_thread(
+                    batch_receiver,
+                    work_sender,
+                    chunker_multiline_config,
+                    chunker_input_format,
+                    chunker_ctrl,
+                )
+            });
+            Some(handle)
+        } else {
+            // For non-multiline mode, workers receive line batches directly
+            // Convert line batches to work messages
+            let converter_ctrl = ctrl_rx.clone();
+            let handle = thread::spawn(move || -> Result<()> {
+                while let Ok(batch) = batch_receiver.recv() {
+                    if let Ok(Ctrl::Shutdown { .. }) = converter_ctrl.try_recv() {
+                        break;
+                    }
+                    if work_sender.send(WorkMessage::LineBatch(batch)).is_err() {
+                        break;
+                    }
+                }
+                Ok(())
+            });
+            Some(handle)
+        };
+
         // Start worker threads
         let mut worker_handles = Vec::with_capacity(self.config.num_workers);
         let worker_multiline_timeout = if config.input.multiline.is_some() {
@@ -521,7 +578,7 @@ impl ParallelProcessor {
         };
 
         for worker_id in 0..self.config.num_workers {
-            let batch_receiver = batch_receiver.clone();
+            let work_receiver = work_receiver.clone();
             let result_sender = result_sender.clone();
             let worker_pipeline_builder = pipeline_builder.clone();
             let worker_stages = stages.clone();
@@ -531,7 +588,7 @@ impl ParallelProcessor {
             let handle = thread::spawn(move || {
                 Self::worker_thread(
                     worker_id,
-                    batch_receiver,
+                    work_receiver,
                     result_sender,
                     worker_pipeline_builder,
                     worker_stages,
@@ -571,6 +628,11 @@ impl ParallelProcessor {
         io_handle.join().unwrap()?;
         batch_handle.join().unwrap()?;
 
+        // Join chunker thread if it was spawned
+        if let Some(handle) = chunker_handle {
+            handle.join().unwrap()?;
+        }
+
         for handle in worker_handles {
             handle.join().unwrap()?;
         }
@@ -591,8 +653,14 @@ impl ParallelProcessor {
         // Create file-aware reader
         let file_aware_reader = crate::pipeline::builders::create_file_aware_input_reader(config)?;
 
-        // Create channels
+        // Create channels - conditionally use chunker thread for multiline mode
         let (batch_sender, batch_receiver) = if let Some(size) = self.config.buffer_size {
+            bounded(size)
+        } else {
+            unbounded()
+        };
+
+        let (work_sender, work_receiver) = if let Some(size) = self.config.buffer_size {
             bounded(size)
         } else {
             unbounded()
@@ -656,6 +724,40 @@ impl ParallelProcessor {
             })
         };
 
+        // Conditionally spawn chunker thread for multiline mode
+        let chunker_handle = if let Some(multiline_config) = &config.input.multiline {
+            let chunker_ctrl = ctrl_rx.clone();
+            let chunker_multiline_config = multiline_config.clone();
+            let chunker_input_format = config.input.format.clone();
+
+            let handle = thread::spawn(move || {
+                Self::chunker_thread(
+                    batch_receiver,
+                    work_sender,
+                    chunker_multiline_config,
+                    chunker_input_format,
+                    chunker_ctrl,
+                )
+            });
+            Some(handle)
+        } else {
+            // For non-multiline mode, workers receive line batches directly
+            // Convert line batches to work messages
+            let converter_ctrl = ctrl_rx.clone();
+            let handle = thread::spawn(move || -> Result<()> {
+                while let Ok(batch) = batch_receiver.recv() {
+                    if let Ok(Ctrl::Shutdown { .. }) = converter_ctrl.try_recv() {
+                        break;
+                    }
+                    if work_sender.send(WorkMessage::LineBatch(batch)).is_err() {
+                        break;
+                    }
+                }
+                Ok(())
+            });
+            Some(handle)
+        };
+
         // Start worker threads
         let mut worker_handles = Vec::with_capacity(self.config.num_workers);
         let worker_multiline_timeout = if config.input.multiline.is_some() {
@@ -665,7 +767,7 @@ impl ParallelProcessor {
         };
 
         for worker_id in 0..self.config.num_workers {
-            let batch_receiver = batch_receiver.clone();
+            let work_receiver = work_receiver.clone();
             let result_sender = result_sender.clone();
             let worker_pipeline_builder = file_aware_pipeline_builder.clone();
             let worker_stages = stages.clone();
@@ -675,7 +777,7 @@ impl ParallelProcessor {
             let handle = thread::spawn(move || {
                 Self::worker_thread(
                     worker_id,
-                    batch_receiver,
+                    work_receiver,
                     result_sender,
                     worker_pipeline_builder,
                     worker_stages,
@@ -714,6 +816,11 @@ impl ParallelProcessor {
         // Wait for all threads to complete
         io_handle.join().unwrap()?;
         batch_handle.join().unwrap()?;
+
+        // Join chunker thread if it was spawned
+        if let Some(handle) = chunker_handle {
+            handle.join().unwrap()?;
+        }
 
         for handle in worker_handles {
             handle.join().unwrap()?;
@@ -1524,10 +1631,68 @@ impl ParallelProcessor {
         Ok(())
     }
 
+    /// Chunker thread: converts line batches to event batches for multiline processing
+    fn chunker_thread(
+        line_batch_receiver: Receiver<Batch>,
+        event_batch_sender: Sender<WorkMessage>,
+        multiline_config: crate::config::MultilineConfig,
+        input_format: crate::config::InputFormat,
+        ctrl_rx: Receiver<Ctrl>,
+    ) -> Result<()> {
+        // Create a chunker for multiline processing
+        let mut chunker = crate::pipeline::multiline::create_multiline_chunker(
+            &multiline_config,
+            input_format,
+        ).map_err(|e| anyhow::anyhow!("Failed to create chunker: {}", e))?;
+
+        while let Ok(batch) = line_batch_receiver.recv() {
+            // Check for shutdown
+            if let Ok(Ctrl::Shutdown { .. }) = ctrl_rx.try_recv() {
+                break;
+            }
+
+            let mut events = Vec::new();
+            let mut event_filenames = Vec::new();
+
+            // Process each line through chunker
+            for (line_idx, line) in batch.lines.iter().enumerate() {
+                // Feed line to chunker and collect complete events
+                if let Some(chunk) = chunker.feed_line(line.clone()) {
+                    events.push(chunk);
+                    // Use the filename from the corresponding line
+                    event_filenames.push(batch.filenames.get(line_idx).cloned().flatten());
+                }
+            }
+
+            // Flush any remaining events from the chunker
+            if let Some(chunk) = chunker.flush() {
+                events.push(chunk);
+                event_filenames.push(None); // No specific filename for flushed events
+            }
+
+            // Send event batch to workers if we have events
+            if !events.is_empty() {
+                let event_batch = EventBatch {
+                    id: batch.id,
+                    events,
+                    start_line_num: batch.start_line_num,
+                    filenames: event_filenames,
+                    csv_headers: batch.csv_headers,
+                };
+
+                if event_batch_sender.send(WorkMessage::EventBatch(event_batch)).is_err() {
+                    break;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Worker thread: processes batches in parallel
     fn worker_thread(
         _worker_id: usize,
-        batch_receiver: Receiver<Batch>,
+        work_receiver: Receiver<WorkMessage>,
         result_sender: Sender<BatchResult>,
         pipeline_builder: PipelineBuilder,
         stages: Vec<crate::config::ScriptStageType>,
@@ -1544,7 +1709,7 @@ impl ParallelProcessor {
         let mut immediate_shutdown = false;
 
         let ctrl_rx = ctrl_rx;
-        let batch_receiver = batch_receiver;
+        let work_receiver = work_receiver;
 
         'worker_loop: loop {
             if immediate_shutdown {
@@ -1570,18 +1735,34 @@ impl ParallelProcessor {
                             break 'worker_loop;
                         }
                     }
-                    recv(batch_receiver) -> msg => {
+                    recv(work_receiver) -> msg => {
                         match msg {
-                            Ok(batch) => {
-                                if !Self::worker_process_batch(
-                                    batch,
-                                    &mut pipeline,
-                                    &mut ctx,
-                                    &pipeline_builder,
-                                    &stages,
-                                    &result_sender,
-                                    &mut current_csv_headers,
-                                )? {
+                            Ok(work_msg) => {
+                                let continue_processing = match work_msg {
+                                    WorkMessage::LineBatch(batch) => {
+                                        Self::worker_process_batch(
+                                            batch,
+                                            &mut pipeline,
+                                            &mut ctx,
+                                            &pipeline_builder,
+                                            &stages,
+                                            &result_sender,
+                                            &mut current_csv_headers,
+                                        )?
+                                    }
+                                    WorkMessage::EventBatch(event_batch) => {
+                                        Self::worker_process_event_batch(
+                                            event_batch,
+                                            &mut pipeline,
+                                            &mut ctx,
+                                            &pipeline_builder,
+                                            &stages,
+                                            &result_sender,
+                                            &mut current_csv_headers,
+                                        )?
+                                    }
+                                };
+                                if !continue_processing {
                                     break 'worker_loop;
                                 }
                             }
@@ -1610,18 +1791,34 @@ impl ParallelProcessor {
                             break 'worker_loop;
                         }
                     }
-                    recv(batch_receiver) -> msg => {
+                    recv(work_receiver) -> msg => {
                         match msg {
-                            Ok(batch) => {
-                                if !Self::worker_process_batch(
-                                    batch,
-                                    &mut pipeline,
-                                    &mut ctx,
-                                    &pipeline_builder,
-                                    &stages,
-                                    &result_sender,
-                                    &mut current_csv_headers,
-                                )? {
+                            Ok(work_msg) => {
+                                let continue_processing = match work_msg {
+                                    WorkMessage::LineBatch(batch) => {
+                                        Self::worker_process_batch(
+                                            batch,
+                                            &mut pipeline,
+                                            &mut ctx,
+                                            &pipeline_builder,
+                                            &stages,
+                                            &result_sender,
+                                            &mut current_csv_headers,
+                                        )?
+                                    }
+                                    WorkMessage::EventBatch(event_batch) => {
+                                        Self::worker_process_event_batch(
+                                            event_batch,
+                                            &mut pipeline,
+                                            &mut ctx,
+                                            &pipeline_builder,
+                                            &stages,
+                                            &result_sender,
+                                            &mut current_csv_headers,
+                                        )?
+                                    }
+                                };
+                                if !continue_processing {
                                     break 'worker_loop;
                                 }
                             }
@@ -1934,6 +2131,207 @@ impl ParallelProcessor {
 
         let batch_result = BatchResult {
             batch_id: batch.id,
+            results: batch_results,
+            user_tracked_updates: user_deltas,
+            internal_tracked_updates: internal_deltas,
+            worker_stats: get_thread_stats(),
+        };
+
+        if result_sender.send(batch_result).is_err() {
+            return Ok(false);
+        }
+
+        ctx.tracker.clear();
+
+        Ok(true)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn worker_process_event_batch(
+        event_batch: EventBatch,
+        pipeline: &mut pipeline::Pipeline,
+        ctx: &mut pipeline::PipelineContext,
+        pipeline_builder: &PipelineBuilder,
+        stages: &[crate::config::ScriptStageType],
+        result_sender: &Sender<BatchResult>,
+        current_csv_headers: &mut Option<Vec<String>>,
+    ) -> Result<bool> {
+        if event_batch.csv_headers.is_some() && event_batch.csv_headers != *current_csv_headers {
+            *current_csv_headers = event_batch.csv_headers.clone();
+
+            let new_pipeline_builder = pipeline_builder
+                .clone()
+                .with_csv_headers(current_csv_headers.clone().unwrap());
+            let (new_pipeline, new_ctx) = new_pipeline_builder.build_worker(stages.to_vec())?;
+            *pipeline = new_pipeline;
+            ctx.rhai = new_ctx.rhai;
+        }
+
+        let before_internal = ctx.internal_tracker.clone();
+
+        let mut batch_results = Vec::with_capacity(event_batch.events.len());
+
+        for (event_idx, event_string) in event_batch.events.iter().enumerate() {
+            let current_line_num = event_batch.start_line_num + event_idx;
+            ctx.meta.line_num = Some(current_line_num);
+            ctx.meta.filename = event_batch.filenames.get(event_idx).cloned().flatten();
+
+            crate::rhai_functions::strings::clear_captured_prints();
+            crate::rhai_functions::strings::clear_captured_eprints();
+
+            // For event batches, skip chunking and go directly to parsing
+            match pipeline.process_event_string(event_string.clone(), ctx) {
+                Ok(formatted_results) => {
+                    if !formatted_results.is_empty() {
+                        ctx.internal_tracker
+                            .entry("__kelora_stats_output".to_string())
+                            .and_modify(|v| *v = Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                            .or_insert(Dynamic::from(1i64));
+                        ctx.internal_tracker.insert(
+                            "__op___kelora_stats_output".to_string(),
+                            Dynamic::from("count"),
+                        );
+                    }
+
+                    let captured_prints = crate::rhai_functions::strings::take_captured_prints();
+                    let captured_eprints = crate::rhai_functions::strings::take_captured_eprints();
+                    let captured_messages =
+                        crate::rhai_functions::strings::take_captured_messages();
+
+                    if formatted_results.is_empty()
+                        && (!captured_prints.is_empty()
+                            || !captured_eprints.is_empty()
+                            || !captured_messages.is_empty())
+                    {
+                        let dummy_event = Event::default_with_line(String::new());
+                        batch_results.push(ProcessedEvent {
+                            event: dummy_event,
+                            captured_prints,
+                            captured_eprints,
+                            captured_messages,
+                            timestamp: None,
+                            file_ops: Vec::new(),
+                        });
+                    } else {
+                        for formatted_result in formatted_results {
+                            let pipeline::FormattedOutput {
+                                line,
+                                timestamp,
+                                file_ops,
+                            } = formatted_result;
+                            let mut dummy_event = Event::default_with_line(line);
+                            dummy_event.set_metadata(current_line_num, None);
+
+                            batch_results.push(ProcessedEvent {
+                                event: dummy_event,
+                                captured_prints: captured_prints.clone(),
+                                captured_eprints: captured_eprints.clone(),
+                                captured_messages: captured_messages.clone(),
+                                timestamp,
+                                file_ops,
+                            });
+                        }
+                    }
+                }
+                Err(e) => {
+                    let captured_eprints = crate::rhai_functions::strings::take_captured_eprints();
+                    let captured_messages =
+                        crate::rhai_functions::strings::take_captured_messages();
+
+                    if !captured_eprints.is_empty() || !captured_messages.is_empty() {
+                        let dummy_event = Event::default_with_line(String::new());
+                        batch_results.push(ProcessedEvent {
+                            event: dummy_event,
+                            captured_prints: Vec::new(),
+                            captured_eprints,
+                            captured_messages,
+                            timestamp: None,
+                            file_ops: Vec::new(),
+                        });
+                    }
+
+                    if ctx.config.strict {
+                        return Err(e);
+                    } else {
+                        continue;
+                    }
+                }
+            }
+
+            if crate::rhai_functions::process::is_exit_requested() {
+                let exit_code = crate::rhai_functions::process::get_exit_code();
+                std::process::exit(exit_code);
+            }
+        }
+
+        let mut internal_deltas = std::collections::HashMap::new();
+        for (key, value) in &ctx.internal_tracker {
+            if key.starts_with("__op_") {
+                continue;
+            }
+
+            let op_key = format!("__op_{}", key);
+            let operation = ctx
+                .internal_tracker
+                .get(&op_key)
+                .and_then(|v| v.clone().into_string().ok())
+                .unwrap_or_else(|| "replace".to_string());
+
+            match operation.as_str() {
+                "count" | "sum" => {
+                    let before_value = before_internal.get(key);
+                    let diff_dynamic = if value.is_float()
+                        || before_value.map(|v| v.is_float()).unwrap_or(false)
+                    {
+                        let current = if value.is_float() {
+                            value.as_float().unwrap_or(0.0)
+                        } else {
+                            value.as_int().unwrap_or(0) as f64
+                        };
+                        let previous = before_value
+                            .and_then(|v| {
+                                if v.is_float() {
+                                    v.as_float().ok()
+                                } else {
+                                    v.as_int().ok().map(|i| i as f64)
+                                }
+                            })
+                            .unwrap_or(0.0);
+                        Dynamic::from(current - previous)
+                    } else {
+                        let current = value.as_int().unwrap_or(0);
+                        let previous = before_value.and_then(|v| v.as_int().ok()).unwrap_or(0);
+                        Dynamic::from(current - previous)
+                    };
+
+                    let is_zero = if diff_dynamic.is_float() {
+                        diff_dynamic.as_float().unwrap_or(0.0).abs() < f64::EPSILON
+                    } else {
+                        diff_dynamic.as_int().unwrap_or(0) == 0
+                    };
+
+                    if !is_zero {
+                        internal_deltas.insert(key.clone(), diff_dynamic);
+                        internal_deltas.insert(op_key.clone(), Dynamic::from(operation));
+                    }
+                }
+                _ => {
+                    internal_deltas.insert(key.clone(), value.clone());
+                    if let Some(op_value) = ctx.internal_tracker.get(&op_key) {
+                        internal_deltas.insert(op_key.clone(), op_value.clone());
+                    }
+                }
+            }
+        }
+
+        let mut user_deltas = std::collections::HashMap::new();
+        let thread_user = tracking::get_thread_tracking_state();
+        for (key, value) in thread_user {
+            user_deltas.insert(key, value);
+        }
+
+        let batch_result = BatchResult {
+            batch_id: event_batch.id,
             results: batch_results,
             user_tracked_updates: user_deltas,
             internal_tracked_updates: internal_deltas,

@@ -129,11 +129,6 @@ fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
         ));
     }
 
-    if use_parallel && config.input.multiline.is_some() {
-        return Err(anyhow::anyhow!(
-            "multiline mode is not supported with --parallel or thread overrides (multiline processing requires sequential line processing)"
-        ));
-    }
 
     if use_parallel {
         run_pipeline_parallel(config, output, ctrl_rx)

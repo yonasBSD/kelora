@@ -427,6 +427,16 @@ impl Pipeline {
         }
     }
 
+    /// Process a complete event string (for pre-chunked multiline events)
+    /// Skips the chunking stage and goes directly to parsing
+    pub fn process_event_string(
+        &mut self,
+        event_string: String,
+        ctx: &mut PipelineContext,
+    ) -> Result<Vec<FormattedOutput>> {
+        self.process_chunk_directly(event_string, ctx)
+    }
+
     /// Flush formatter state to emit any remaining buffered output
     pub fn finish_formatter(&self) -> Option<FormattedOutput> {
         self.formatter
