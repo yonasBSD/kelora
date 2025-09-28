@@ -32,7 +32,7 @@ STRING/TEXT FUNCTIONS:
   text.is_private_ip()                  Check if IP is in private ranges
   text.lower()                          Convert text to lowercase
   text.mask_ip([octets])                Mask IP address (default: last octet)
-  text.matches(pattern)                 Check if text matches regex pattern
+  text.has_matches(pattern)             Check if text matches regex pattern
   text.parse_cef()                      Parse Common Event Format line into fields
   text.parse_cols(spec [, sep])         Parse columns according to spec
   text.parse_combined()                 Parse Apache/Nginx combined log line
