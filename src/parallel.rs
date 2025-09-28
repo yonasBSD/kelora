@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
 use rhai::Dynamic;
@@ -14,6 +14,7 @@ use crate::event::Event;
 use crate::formatters::GapTracker;
 use crate::pipeline::{self, PipelineBuilder, DEFAULT_MULTILINE_FLUSH_TIMEOUT_MS};
 use crate::platform::{Ctrl, SHOULD_TERMINATE};
+use crate::rhai_functions::file_ops::{self, FileOp};
 use crate::rhai_functions::tracking::{self, TrackingSnapshot};
 use crate::stats::{get_thread_stats, stats_finish_processing, stats_start_timer, ProcessingStats};
 
@@ -97,6 +98,7 @@ pub struct ProcessedEvent {
     pub captured_eprints: Vec<String>,
     pub captured_messages: Vec<crate::rhai_functions::strings::CapturedMessage>,
     pub timestamp: Option<DateTime<Utc>>,
+    pub file_ops: Vec<FileOp>,
 }
 
 /// Thread-safe statistics tracker for merging worker states
@@ -1686,7 +1688,12 @@ impl ParallelProcessor {
 
                 let mut flush_batch_results = Vec::with_capacity(flush_results.len());
                 for formatted_result in flush_results {
-                    let mut dummy_event = Event::default_with_line(formatted_result.line);
+                    let pipeline::FormattedOutput {
+                        line,
+                        timestamp,
+                        file_ops,
+                    } = formatted_result;
+                    let mut dummy_event = Event::default_with_line(line);
                     dummy_event.set_metadata(0, None);
 
                     flush_batch_results.push(ProcessedEvent {
@@ -1694,7 +1701,8 @@ impl ParallelProcessor {
                         captured_prints: Vec::new(),
                         captured_eprints: Vec::new(),
                         captured_messages: Vec::new(),
-                        timestamp: formatted_result.timestamp,
+                        timestamp,
+                        file_ops,
                     });
                 }
 
@@ -1803,10 +1811,16 @@ impl ParallelProcessor {
                             captured_eprints,
                             captured_messages,
                             timestamp: None,
+                            file_ops: Vec::new(),
                         });
                     } else {
                         for formatted_result in formatted_results {
-                            let mut dummy_event = Event::default_with_line(formatted_result.line);
+                            let pipeline::FormattedOutput {
+                                line,
+                                timestamp,
+                                file_ops,
+                            } = formatted_result;
+                            let mut dummy_event = Event::default_with_line(line);
                             dummy_event.set_metadata(current_line_num, None);
 
                             batch_results.push(ProcessedEvent {
@@ -1814,7 +1828,8 @@ impl ParallelProcessor {
                                 captured_prints: captured_prints.clone(),
                                 captured_eprints: captured_eprints.clone(),
                                 captured_messages: captured_messages.clone(),
-                                timestamp: formatted_result.timestamp,
+                                timestamp,
+                                file_ops,
                             });
                         }
                     }
@@ -1832,6 +1847,7 @@ impl ParallelProcessor {
                             captured_eprints,
                             captured_messages,
                             timestamp: None,
+                            file_ops: Vec::new(),
                         });
                     }
 
@@ -2212,6 +2228,10 @@ impl ParallelProcessor {
         let mut events_output = 0usize;
 
         for processed in results {
+            if let Err(err) = file_ops::execute_ops(&processed.file_ops) {
+                return Err(anyhow!(err));
+            }
+
             // Check if we've reached the limit
             if let Some(limit) = remaining_limit {
                 if events_output >= limit {

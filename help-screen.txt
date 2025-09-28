@@ -84,6 +84,9 @@ Processing Options:
       --end <END>
           Run once after processing
 
+      --allow-fs-writes
+          Allow Rhai scripts to create directories and write files on disk (disabled by default for safety)
+
       --window <WINDOW_SIZE>
           Enable access to a sliding window of N+1 recent events
 
@@ -121,6 +124,15 @@ Filtering Options:
 
       --take <TAKE>
           Limit output to the first N events
+
+  -B, --before-context <BEFORE_CONTEXT>
+          Show N lines before each match (requires filtering)
+
+  -A, --after-context <AFTER_CONTEXT>
+          Show N lines after each match (requires filtering)
+
+  -C, --context <CONTEXT>
+          Show N lines before and after each match (requires filtering)
 
 Output Options:
   -F, --output-format <OUTPUT_FORMAT>

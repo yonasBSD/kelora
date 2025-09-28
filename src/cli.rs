@@ -156,6 +156,10 @@ pub struct Cli {
     #[arg(long = "end", help_heading = "Processing Options")]
     pub end: Option<String>,
 
+    /// Allow Rhai scripts to create directories and write files on disk (disabled by default for safety)
+    #[arg(long = "allow-fs-writes", help_heading = "Processing Options")]
+    pub allow_fs_writes: bool,
+
     /// Enable access to a sliding window of N+1 recent events
     #[arg(long = "window", help_heading = "Processing Options")]
     pub window_size: Option<usize>,
@@ -232,11 +236,19 @@ pub struct Cli {
     pub take: Option<usize>,
 
     /// Show N lines before each match (requires filtering)
-    #[arg(short = 'B', long = "before-context", help_heading = "Filtering Options")]
+    #[arg(
+        short = 'B',
+        long = "before-context",
+        help_heading = "Filtering Options"
+    )]
     pub before_context: Option<usize>,
 
     /// Show N lines after each match (requires filtering)
-    #[arg(short = 'A', long = "after-context", help_heading = "Filtering Options")]
+    #[arg(
+        short = 'A',
+        long = "after-context",
+        help_heading = "Filtering Options"
+    )]
     pub after_context: Option<usize>,
 
     /// Show N lines before and after each match (requires filtering)

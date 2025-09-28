@@ -119,6 +119,11 @@ UTILITY FUNCTIONS:
   window_values(field)                  Get field values from current window
   window_numbers(field)                 Get numeric field values from current window
 
+FILE OUTPUT (REQUIRES --allow-fs-writes):
+  mkdir(path [, recursive])              Create directory (set recursive=true to create parents)
+  truncate_file(path)                    Create or zero-length a file for fresh output
+  append_file(path, text_or_array)       Append line(s) to file; arrays append one line per element
+
 Examples:
   # String processing with method syntax
   e.clean_url = e.url.extract_domain().lower()

@@ -19,6 +19,8 @@ mod pipeline;
 mod platform;
 mod readers;
 mod rhai_functions;
+
+use crate::rhai_functions::file_ops::{self, FileOpMode};
 mod stats;
 mod timestamp;
 mod tty;
@@ -178,11 +180,12 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     let config = &final_config;
     let batch_size = config.effective_batch_size();
 
+    let preserve_order = !config.performance.no_preserve_order;
     let parallel_config = ParallelConfig {
         num_workers: config.effective_threads(),
         batch_size,
         batch_timeout_ms: config.performance.batch_timeout,
-        preserve_order: !config.performance.no_preserve_order,
+        preserve_order,
         buffer_size: Some(10000),
     };
 
@@ -195,6 +198,8 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
         .clone()
         .build(config.processing.stages.clone())?;
 
+    file_ops::set_mode(FileOpMode::Sequential);
+
     // Execute begin stage sequentially if provided
     if let Err(e) = begin_stage.execute(&mut ctx) {
         return Err(anyhow::anyhow!("Begin stage error: {}", e));
@@ -204,6 +209,12 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     let reader = create_input_reader(config)?;
 
     // Process stages in parallel
+    if preserve_order {
+        file_ops::set_mode(FileOpMode::ParallelOrdered);
+    } else {
+        file_ops::set_mode(FileOpMode::ParallelUnordered);
+    }
+
     processor.process_with_pipeline(
         reader,
         pipeline_builder,
@@ -235,6 +246,7 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     }
 
     // Execute end stage sequentially with merged state
+    file_ops::set_mode(FileOpMode::Sequential);
     if let Err(e) = end_stage.execute(&ctx) {
         return Err(anyhow::anyhow!("End stage error: {}", e));
     }
@@ -446,6 +458,8 @@ fn run_pipeline_sequential_internal<W: Write>(
     input: SequentialInput,
 ) -> Result<()> {
     let (mut pipeline, begin_stage, end_stage, mut ctx) = create_pipeline_from_config(config)?;
+
+    file_ops::set_mode(FileOpMode::Sequential);
 
     if let Err(e) = begin_stage.execute(&mut ctx) {
         return Err(anyhow::anyhow!("Begin stage error: {}", e));
@@ -872,6 +886,10 @@ fn write_formatted_output<W: Write>(
     output: &mut W,
     gap_tracker: &mut Option<crate::formatters::GapTracker>,
 ) -> io::Result<()> {
+    if let Err(err) = file_ops::execute_ops(&formatted.file_ops) {
+        return Err(io::Error::new(io::ErrorKind::Other, err));
+    }
+
     let marker = match gap_tracker.as_mut() {
         Some(tracker) => tracker.check(formatted.timestamp),
         None => None,

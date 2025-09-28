@@ -123,6 +123,7 @@ Pre-built binaries live in the [GitHub releases](https://github.com/dloss/kelora
 - `--since`, `--until`, and `--take` trim by time range or limit output volume.
 - `-A/--after-context`, `-B/--before-context`, and `-C/--context` show surrounding lines around matches (requires filtering).
 - `--keep-lines`/`--ignore-lines` pair well with `--strict` to enforce hygiene.
+- `--allow-fs-writes` enables Rhai file helpers (`mkdir`, `truncate_file`, `append_file`) so scripts can shard or persist results; without it these functions return `false` and perform no I/O.
 
 ### Transformations & State
 

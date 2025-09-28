@@ -3,12 +3,14 @@ use crate::config::TimestampFilterConfig;
 use crate::engine::RhaiEngine;
 use crate::event::Event;
 use crate::rhai_functions::columns;
+use crate::rhai_functions::file_ops;
 use anyhow::Result;
 
 /// Cached event along with whether it satisfied the stage filter.
 struct ContextBufferEntry {
     event: Event,
     is_match: bool,
+    context_type: crate::event::ContextType,
 }
 
 /// Filter stage implementation
@@ -58,7 +60,9 @@ impl FilterStage {
     fn evaluate_filter(&mut self, event: &Event, ctx: &mut PipelineContext) -> Result<bool> {
         columns::set_parse_cols_strict(ctx.config.strict);
 
-        if ctx.window.is_empty() {
+        file_ops::clear_pending_ops();
+
+        let eval_result = if ctx.window.is_empty() {
             ctx.rhai.execute_compiled_filter(
                 &self.compiled_filter,
                 event,
@@ -73,6 +77,20 @@ impl FilterStage {
                 &mut ctx.tracker,
                 &mut ctx.internal_tracker,
             )
+        };
+
+        match eval_result {
+            Ok(value) => {
+                let ops = file_ops::take_pending_ops();
+                if !ops.is_empty() {
+                    ctx.pending_file_ops.extend(ops);
+                }
+                Ok(value)
+            }
+            Err(err) => {
+                file_ops::clear_pending_ops();
+                Err(err)
+            }
         }
     }
 
@@ -92,6 +110,7 @@ impl FilterStage {
         self.buffer.push_back(ContextBufferEntry {
             event: event.clone(),
             is_match: false,
+            context_type: crate::event::ContextType::None,
         });
 
         // Check if current event matches filter
@@ -120,6 +139,9 @@ impl FilterStage {
 
         if let Some(last) = self.buffer.back_mut() {
             last.is_match = is_match;
+            if is_match {
+                last.context_type = crate::event::ContextType::Match;
+            }
         }
 
         if is_match {
@@ -135,13 +157,20 @@ impl FilterStage {
             };
 
             for i in start_idx..buffer_len - 1 {
-                if let Some(buffered) = self.buffer.get(i) {
+                if let Some(buffered) = self.buffer.get_mut(i) {
                     let mut before_event = buffered.event.clone();
-                    if buffered.is_match {
-                        before_event.context_type = crate::event::ContextType::Match;
+                    let context_type = if buffered.is_match {
+                        crate::event::ContextType::Match
                     } else {
-                        before_event.context_type = crate::event::ContextType::Before;
-                    }
+                        match buffered.context_type {
+                            crate::event::ContextType::After | crate::event::ContextType::Both => {
+                                crate::event::ContextType::Both
+                            }
+                            _ => crate::event::ContextType::Before,
+                        }
+                    };
+                    buffered.context_type = context_type;
+                    before_event.context_type = context_type;
                     output_events.push(before_event);
                 }
             }
@@ -170,7 +199,19 @@ impl FilterStage {
             if self.after_counter > 0 {
                 self.after_counter -= 1;
                 let mut after_event = event;
-                after_event.context_type = crate::event::ContextType::After;
+
+                let updated_context_type = if let Some(last) = self.buffer.back_mut() {
+                    last.context_type = match last.context_type {
+                        crate::event::ContextType::Before | crate::event::ContextType::Both => {
+                            crate::event::ContextType::Both
+                        }
+                        _ => crate::event::ContextType::After,
+                    };
+                    last.context_type
+                } else {
+                    crate::event::ContextType::After
+                };
+                after_event.context_type = updated_context_type;
 
                 let max_buffer_size = before_context + after_context + 1;
                 while self.buffer.len() > max_buffer_size {
@@ -273,6 +314,8 @@ impl ScriptStage for ExecStage {
 
         columns::set_parse_cols_strict(ctx.config.strict);
 
+        file_ops::clear_pending_ops();
+
         let result = if ctx.window.is_empty() {
             // No window context - use standard method
             ctx.rhai.execute_compiled_exec(
@@ -294,6 +337,11 @@ impl ScriptStage for ExecStage {
 
         match result {
             Ok(()) => {
+                let ops = file_ops::take_pending_ops();
+                if !ops.is_empty() {
+                    ctx.pending_file_ops.extend(ops);
+                }
+
                 // Check for deferred emissions from emit_each()
                 let pending_emissions =
                     crate::rhai_functions::emit::get_and_clear_pending_emissions();
@@ -337,6 +385,7 @@ impl ScriptStage for ExecStage {
                 }
             }
             Err(e) => {
+                file_ops::clear_pending_ops();
                 // Clear emission state on error
                 crate::rhai_functions::emit::clear_suppression_flag();
                 let _ = crate::rhai_functions::emit::get_and_clear_pending_emissions();
@@ -387,11 +436,14 @@ impl BeginStage {
     pub fn execute(&self, ctx: &mut PipelineContext) -> Result<()> {
         if let Some(ref compiled) = self.compiled_begin {
             columns::set_parse_cols_strict(ctx.config.strict);
+            file_ops::clear_pending_ops();
             let _init_map = ctx.rhai.execute_compiled_begin(
                 compiled,
                 &mut ctx.tracker,
                 &mut ctx.internal_tracker,
             )?;
+            let ops = file_ops::take_pending_ops();
+            file_ops::execute_ops(&ops)?;
             Ok(())
         } else {
             Ok(())
@@ -420,7 +472,10 @@ impl EndStage {
     pub fn execute(&self, ctx: &PipelineContext) -> Result<()> {
         if let Some(ref compiled) = self.compiled_end {
             columns::set_parse_cols_strict(ctx.config.strict);
-            ctx.rhai.execute_compiled_end(compiled, &ctx.tracker)
+            file_ops::clear_pending_ops();
+            ctx.rhai.execute_compiled_end(compiled, &ctx.tracker)?;
+            let ops = file_ops::take_pending_ops();
+            file_ops::execute_ops(&ops)
         } else {
             Ok(())
         }
@@ -544,6 +599,7 @@ impl LevelFilterStage {
         self.buffer.push_back(ContextBufferEntry {
             event: event.clone(),
             is_match: false,
+            context_type: crate::event::ContextType::None,
         });
 
         // Check if current event matches level filter
@@ -551,6 +607,9 @@ impl LevelFilterStage {
 
         if let Some(last) = self.buffer.back_mut() {
             last.is_match = is_match;
+            if is_match {
+                last.context_type = crate::event::ContextType::Match;
+            }
         }
 
         if is_match {
@@ -566,13 +625,21 @@ impl LevelFilterStage {
             };
 
             for i in start_idx..buffer_len - 1 {
-                if let Some(buffered) = self.buffer.get(i) {
+                if let Some(buffered) = self.buffer.get_mut(i) {
                     if !buffered.is_match {
                         continue;
                     }
 
                     let mut before_event = buffered.event.clone();
-                    before_event.context_type = crate::event::ContextType::Before;
+                    let context_type = match buffered.context_type {
+                        crate::event::ContextType::After | crate::event::ContextType::Both => {
+                            crate::event::ContextType::Both
+                        }
+                        crate::event::ContextType::Match => crate::event::ContextType::Match,
+                        _ => crate::event::ContextType::Before,
+                    };
+                    buffered.context_type = context_type;
+                    before_event.context_type = context_type;
                     output_events.push(before_event);
                 }
             }
@@ -784,12 +851,14 @@ mod tests {
                 quiet_level: 0,
                 no_emoji: false,
                 input_files: vec![],
+                allow_fs_writes: false,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),
             window: Vec::new(),
             rhai: engine,
             meta: MetaData::default(),
+            pending_file_ops: Vec::new(),
         };
 
         let methods = ["POST", "HEAD", "HEAD", "GET"];
@@ -863,6 +932,81 @@ mod tests {
     }
 
     #[test]
+    fn filter_stage_marks_overlapping_context_with_both_marker() {
+        let mut engine = crate::engine::RhaiEngine::new();
+        let mut stage = FilterStage::new("e.method == \"DELETE\"".to_string(), &mut engine)
+            .expect("filter compilation should succeed")
+            .with_context(crate::config::ContextConfig::new(1, 1));
+
+        let mut ctx = PipelineContext {
+            config: PipelineConfig {
+                error_report: crate::config::ErrorReportConfig {
+                    style: crate::config::ErrorReportStyle::Summary,
+                },
+                brief: false,
+                wrap: true,
+                pretty: false,
+                color_mode: crate::config::ColorMode::Auto,
+                timestamp_formatting: crate::config::TimestampFormatConfig::default(),
+                strict: false,
+                verbose: 0,
+                quiet_level: 0,
+                no_emoji: false,
+                input_files: vec![],
+                allow_fs_writes: false,
+            },
+            tracker: std::collections::HashMap::new(),
+            internal_tracker: std::collections::HashMap::new(),
+            window: Vec::new(),
+            rhai: engine,
+            meta: MetaData::default(),
+            pending_file_ops: Vec::new(),
+        };
+
+        let methods = ["GET", "DELETE", "PUT", "DELETE"];
+        let mut outputs = Vec::new();
+
+        for (idx, method) in methods.iter().enumerate() {
+            let mut event = Event::default();
+            event.set_field("method".to_string(), Dynamic::from((*method).to_string()));
+            event.set_field("ordinal".to_string(), Dynamic::from((idx + 1) as i64));
+
+            match stage.apply(event, &mut ctx) {
+                ScriptResult::Emit(emitted) => outputs.push(emitted),
+                ScriptResult::EmitMultiple(mut many) => outputs.append(&mut many),
+                ScriptResult::Skip => {}
+                ScriptResult::Error(err) => panic!("unexpected filter error: {}", err),
+            }
+        }
+
+        let put_events: Vec<_> = outputs
+            .iter()
+            .filter(|event| {
+                event
+                    .fields
+                    .get("method")
+                    .and_then(|value| value.clone().try_cast::<String>())
+                    .as_deref()
+                    == Some("PUT")
+            })
+            .collect();
+
+        assert!(
+            put_events
+                .iter()
+                .any(|event| event.context_type == crate::event::ContextType::After),
+            "Expected PUT event to first appear as after-context",
+        );
+
+        assert!(
+            put_events
+                .iter()
+                .any(|event| event.context_type == crate::event::ContextType::Both),
+            "Expected PUT event to be re-emitted with the overlapping context marker",
+        );
+    }
+
+    #[test]
     fn level_filter_context_respects_exclude_levels() {
         let mut stage =
             LevelFilterStage::new(vec![], vec!["debug".to_string(), "info".to_string()])
@@ -883,12 +1027,14 @@ mod tests {
                 quiet_level: 0,
                 no_emoji: false,
                 input_files: vec![],
+                allow_fs_writes: false,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),
             window: Vec::new(),
             rhai: crate::engine::RhaiEngine::new(),
             meta: MetaData::default(),
+            pending_file_ops: Vec::new(),
         };
 
         let make_event = |level: &str, msg: &str| {
@@ -958,12 +1104,14 @@ mod tests {
                 quiet_level: 0,
                 no_emoji: false,
                 input_files: vec![],
+                allow_fs_writes: false,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),
             window: Vec::new(),
             rhai: crate::engine::RhaiEngine::new(),
             meta: MetaData::default(),
+            pending_file_ops: Vec::new(),
         };
 
         // Test event before since time (should be skipped)
@@ -1010,12 +1158,14 @@ mod tests {
                 quiet_level: 0,
                 no_emoji: false,
                 input_files: vec![],
+                allow_fs_writes: false,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),
             window: Vec::new(),
             rhai: crate::engine::RhaiEngine::new(),
             meta: MetaData::default(),
+            pending_file_ops: Vec::new(),
         };
 
         // Test event before until time (should be emitted)
@@ -1061,12 +1211,14 @@ mod tests {
                 quiet_level: 0,
                 no_emoji: false,
                 input_files: vec![],
+                allow_fs_writes: false,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),
             window: Vec::new(),
             rhai: crate::engine::RhaiEngine::new(),
             meta: MetaData::default(),
+            pending_file_ops: Vec::new(),
         };
 
         // Test event without timestamp (should be emitted - pass through behavior)

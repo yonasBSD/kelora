@@ -136,6 +136,8 @@ pub struct ProcessingConfig {
     pub quiet_level: u8,
     /// Context options for showing surrounding lines around matches
     pub context: ContextConfig,
+    /// Allow Rhai scripts to create directories and write files on disk
+    pub allow_fs_writes: bool,
 }
 
 /// Performance configuration
@@ -711,6 +713,7 @@ impl KeloraConfig {
                 verbose: cli.verbose,
                 quiet_level: cli.quiet,
                 context: create_context_config(cli)?,
+                allow_fs_writes: cli.allow_fs_writes,
             },
             performance: PerformanceConfig {
                 parallel: cli.parallel,
@@ -794,6 +797,7 @@ impl Default for KeloraConfig {
                 verbose: 0,
                 quiet_level: 0,
                 context: ContextConfig::disabled(),
+                allow_fs_writes: false,
             },
             performance: PerformanceConfig {
                 parallel: false,
@@ -877,7 +881,10 @@ fn create_context_config(cli: &crate::Cli) -> anyhow::Result<ContextConfig> {
         (context, context)
     } else {
         // Use individual -A and -B settings
-        (cli.before_context.unwrap_or(0), cli.after_context.unwrap_or(0))
+        (
+            cli.before_context.unwrap_or(0),
+            cli.after_context.unwrap_or(0),
+        )
     };
 
     // Validate that context requires filtering

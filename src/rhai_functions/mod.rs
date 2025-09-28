@@ -8,6 +8,7 @@ pub mod docs;
 pub mod emit;
 pub mod encoding;
 pub mod environment;
+pub mod file_ops;
 pub mod maps;
 pub mod math;
 pub mod process;
@@ -33,4 +34,5 @@ pub fn register_all_functions(engine: &mut Engine) {
     encoding::register_functions(engine);
     environment::register_functions(engine);
     emit::register_functions(engine);
+    file_ops::register_functions(engine);
 }

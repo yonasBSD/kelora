@@ -46,6 +46,7 @@ use super::{
 use crate::decompression::DecompressionReader;
 use crate::engine::{DebugConfig, RhaiEngine};
 use crate::readers::MultiFileReader;
+use crate::rhai_functions::file_ops::{self, RuntimeConfig};
 
 /// Pipeline builder for easy construction from CLI arguments
 #[derive(Clone)]
@@ -93,6 +94,7 @@ impl PipelineBuilder {
                 quiet_level: 0,
                 no_emoji: false,
                 input_files: Vec::new(),
+                allow_fs_writes: false,
             },
             begin: None,
             end: None,
@@ -140,6 +142,12 @@ impl PipelineBuilder {
         if self.config.quiet_level >= 3 {
             rhai_engine.set_suppress_side_effects(true);
         }
+
+        file_ops::set_runtime_config(RuntimeConfig {
+            allow_fs_writes: self.config.allow_fs_writes,
+            strict: self.config.strict,
+            quiet_level: self.config.quiet_level,
+        });
 
         // Create parser
         let base_parser: Box<dyn EventParser> = match self.input_format {
@@ -298,17 +306,16 @@ impl PipelineBuilder {
         let mut stage_number = 1;
 
         // Check if any script filters exist
-        let has_script_filters = stages.iter().any(|stage| {
-            matches!(stage, crate::config::ScriptStageType::Filter(_))
-        });
+        let has_script_filters = stages
+            .iter()
+            .any(|stage| matches!(stage, crate::config::ScriptStageType::Filter(_)));
 
         for stage in stages {
             match stage {
                 crate::config::ScriptStageType::Filter(filter) => {
-                    let filter_stage =
-                        FilterStage::new(filter, &mut rhai_engine)?
-                            .with_stage_number(stage_number)
-                            .with_context(self.context_config.clone());
+                    let filter_stage = FilterStage::new(filter, &mut rhai_engine)?
+                        .with_stage_number(stage_number)
+                        .with_context(self.context_config.clone());
                     script_stages.push(Box::new(filter_stage));
                     stage_number += 1;
                 }
@@ -365,6 +372,7 @@ impl PipelineBuilder {
             window: Vec::new(),
             rhai: rhai_engine.clone(),
             meta: MetaData::default(),
+            pending_file_ops: Vec::new(),
         };
 
         // Create chunker based on multiline configuration
@@ -442,6 +450,12 @@ impl PipelineBuilder {
         if self.config.quiet_level >= 3 {
             rhai_engine.set_suppress_side_effects(true);
         }
+
+        file_ops::set_runtime_config(RuntimeConfig {
+            allow_fs_writes: self.config.allow_fs_writes,
+            strict: self.config.strict,
+            quiet_level: self.config.quiet_level,
+        });
 
         // Create parser (with pre-processed CSV headers if available)
         let base_parser: Box<dyn EventParser> = match self.input_format {
@@ -604,17 +618,16 @@ impl PipelineBuilder {
         let mut stage_number = 1;
 
         // Check if any script filters exist
-        let has_script_filters = stages.iter().any(|stage| {
-            matches!(stage, crate::config::ScriptStageType::Filter(_))
-        });
+        let has_script_filters = stages
+            .iter()
+            .any(|stage| matches!(stage, crate::config::ScriptStageType::Filter(_)));
 
         for stage in stages {
             match stage {
                 crate::config::ScriptStageType::Filter(filter) => {
-                    let filter_stage =
-                        FilterStage::new(filter, &mut rhai_engine)?
-                            .with_stage_number(stage_number)
-                            .with_context(self.context_config.clone());
+                    let filter_stage = FilterStage::new(filter, &mut rhai_engine)?
+                        .with_stage_number(stage_number)
+                        .with_context(self.context_config.clone());
                     script_stages.push(Box::new(filter_stage));
                     stage_number += 1;
                 }
@@ -663,6 +676,7 @@ impl PipelineBuilder {
             window: Vec::new(),
             rhai: rhai_engine.clone(),
             meta: MetaData::default(),
+            pending_file_ops: Vec::new(),
         };
 
         // Create chunker based on multiline configuration
@@ -784,6 +798,7 @@ pub fn create_pipeline_builder_from_config(
         quiet_level: config.processing.quiet_level,
         no_emoji: config.output.no_emoji,
         input_files: config.input.files.clone(),
+        allow_fs_writes: config.processing.allow_fs_writes,
     };
 
     // Extract cols spec if needed before conversion

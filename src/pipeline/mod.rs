@@ -1,10 +1,11 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use rhai::Dynamic;
 use std::collections::HashMap;
 
 use crate::engine::RhaiEngine;
 use crate::event::Event;
+use crate::rhai_functions::file_ops::{self, FileOp};
 use crate::rhai_functions::tracking;
 
 // Re-export submodules
@@ -28,11 +29,24 @@ pub use stages::*;
 pub struct FormattedOutput {
     pub line: String,
     pub timestamp: Option<DateTime<Utc>>,
+    pub file_ops: Vec<FileOp>,
 }
 
 impl FormattedOutput {
     pub fn new(line: String, timestamp: Option<DateTime<Utc>>) -> Self {
-        Self { line, timestamp }
+        Self {
+            line,
+            timestamp,
+            file_ops: Vec::new(),
+        }
+    }
+
+    pub fn with_ops(line: String, timestamp: Option<DateTime<Utc>>, file_ops: Vec<FileOp>) -> Self {
+        Self {
+            line,
+            timestamp,
+            file_ops,
+        }
     }
 }
 
@@ -162,6 +176,7 @@ pub struct PipelineContext {
     pub window: Vec<Event>, // window[0] = current event, rest are previous
     pub rhai: RhaiEngine,
     pub meta: MetaData,
+    pub pending_file_ops: Vec<FileOp>,
 }
 
 /// Pipeline configuration
@@ -186,6 +201,8 @@ pub struct PipelineConfig {
     pub no_emoji: bool,
     /// Input files for smart error message formatting
     pub input_files: Vec<String>,
+    /// Allow Rhai scripts to create directories and write files on disk
+    pub allow_fs_writes: bool,
 }
 
 /// Metadata about current processing context
@@ -336,6 +353,9 @@ impl Pipeline {
             self.window_manager.update(&event);
             ctx.window = self.window_manager.get_window();
 
+            file_ops::clear_pending_ops();
+            ctx.pending_file_ops.clear();
+
             // Apply script stages (filters, execs, etc.)
             let mut result = ScriptResult::Emit(event);
 
@@ -386,148 +406,12 @@ impl Pipeline {
             }
 
             // Handle final result
-            match result {
-                ScriptResult::Emit(event) => {
-                    if self.limiter.as_mut().is_none_or(|l| l.allow()) {
-                        // Filter out empty events before formatting
-                        if event.fields.is_empty() {
-                            // Empty events are counted as filtered
-                            crate::stats::stats_add_event_filtered();
-
-                            // Also track in Rhai context for parallel processing
-                            ctx.internal_tracker
-                                .entry("__kelora_stats_events_filtered".to_string())
-                                .and_modify(|v| {
-                                    *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
-                                })
-                                .or_insert(rhai::Dynamic::from(1i64));
-                            ctx.internal_tracker.insert(
-                                "__op___kelora_stats_events_filtered".to_string(),
-                                rhai::Dynamic::from("count"),
-                            );
-                        } else {
-                            crate::stats::stats_add_event_output();
-
-                            // Also track in Rhai context for parallel processing
-                            ctx.internal_tracker
-                                .entry("__kelora_stats_events_output".to_string())
-                                .and_modify(|v| {
-                                    *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
-                                })
-                                .or_insert(rhai::Dynamic::from(1i64));
-                            ctx.internal_tracker.insert(
-                                "__op___kelora_stats_events_output".to_string(),
-                                rhai::Dynamic::from("count"),
-                            );
-
-                            let formatted = self.formatter.format(&event);
-                            let timestamp = event.parsed_ts;
-                            results.push(FormattedOutput::new(formatted, timestamp));
-                        }
-                    } else {
-                        crate::stats::stats_add_event_filtered();
-
-                        // Also track in Rhai context for parallel processing
-                        ctx.internal_tracker
-                            .entry("__kelora_stats_events_filtered".to_string())
-                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
-                            .or_insert(rhai::Dynamic::from(1i64));
-                        ctx.internal_tracker.insert(
-                            "__op___kelora_stats_events_filtered".to_string(),
-                            rhai::Dynamic::from("count"),
-                        );
-                    }
-                }
-                ScriptResult::EmitMultiple(events) => {
-                    for event in events {
-                        if self.limiter.as_mut().is_none_or(|l| l.allow()) {
-                            // Filter out empty events before formatting
-                            if event.fields.is_empty() {
-                                // Empty events are counted as filtered
-                                crate::stats::stats_add_event_filtered();
-
-                                // Also track in Rhai context for parallel processing
-                                ctx.internal_tracker
-                                    .entry("__kelora_stats_events_filtered".to_string())
-                                    .and_modify(|v| {
-                                        *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
-                                    })
-                                    .or_insert(rhai::Dynamic::from(1i64));
-                                ctx.internal_tracker.insert(
-                                    "__op___kelora_stats_events_filtered".to_string(),
-                                    rhai::Dynamic::from("count"),
-                                );
-                            } else {
-                                crate::stats::stats_add_event_output();
-
-                                // Also track in Rhai context for parallel processing
-                                ctx.internal_tracker
-                                    .entry("__kelora_stats_events_output".to_string())
-                                    .and_modify(|v| {
-                                        *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
-                                    })
-                                    .or_insert(rhai::Dynamic::from(1i64));
-                                ctx.internal_tracker.insert(
-                                    "__op___kelora_stats_events_output".to_string(),
-                                    rhai::Dynamic::from("count"),
-                                );
-
-                                let formatted = self.formatter.format(&event);
-                                let timestamp = event.parsed_ts;
-                                results.push(FormattedOutput::new(formatted, timestamp));
-                            }
-                        } else {
-                            crate::stats::stats_add_event_filtered();
-
-                            // Also track in Rhai context for parallel processing
-                            ctx.internal_tracker
-                                .entry("__kelora_stats_events_filtered".to_string())
-                                .and_modify(|v| {
-                                    *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
-                                })
-                                .or_insert(rhai::Dynamic::from(1i64));
-                            ctx.internal_tracker.insert(
-                                "__op___kelora_stats_events_filtered".to_string(),
-                                rhai::Dynamic::from("count"),
-                            );
-                        }
-                    }
-                }
-                ScriptResult::Skip => {
-                    crate::stats::stats_add_event_filtered();
-
-                    // Also track in Rhai context for parallel processing
-                    ctx.internal_tracker
-                        .entry("__kelora_stats_events_filtered".to_string())
-                        .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
-                        .or_insert(rhai::Dynamic::from(1i64));
-                    ctx.internal_tracker.insert(
-                        "__op___kelora_stats_events_filtered".to_string(),
-                        rhai::Dynamic::from("count"),
-                    );
-                }
-                ScriptResult::Error(msg) => {
-                    // Use unified error tracking system
-                    crate::rhai_functions::tracking::track_error(
-                        "script",
-                        ctx.meta.line_num,
-                        &msg,
-                        None, // Original line not available at this stage
-                        ctx.meta.filename.as_deref(),
-                        ctx.config.verbose,
-                        ctx.config.quiet_level,
-                        Some(&ctx.config),
-                    );
-
-                    // New resiliency model: use strict flag
-                    if ctx.config.strict {
-                        return Err(anyhow::anyhow!(msg));
-                    } else {
-                        // Skip errors in resilient mode and continue processing
-                        return Ok(results);
-                    }
-                }
+            let remaining_ops = file_ops::take_pending_ops();
+            if !remaining_ops.is_empty() {
+                ctx.pending_file_ops.extend(remaining_ops);
             }
+
+            self.apply_script_result(result, ctx, &mut results)?;
         }
 
         Ok(results)
@@ -548,6 +432,184 @@ impl Pipeline {
         self.formatter
             .finish()
             .map(|line| FormattedOutput::new(line, None))
+    }
+
+    fn apply_script_result(
+        &mut self,
+        result: ScriptResult,
+        ctx: &mut PipelineContext,
+        outputs: &mut Vec<FormattedOutput>,
+    ) -> Result<()> {
+        match result {
+            ScriptResult::Emit(event) => {
+                let ops = std::mem::take(&mut ctx.pending_file_ops);
+
+                if self.limiter.as_mut().is_none_or(|l| l.allow()) {
+                    if event.fields.is_empty() {
+                        crate::stats::stats_add_event_filtered();
+
+                        ctx.internal_tracker
+                            .entry("__kelora_stats_events_filtered".to_string())
+                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                            .or_insert(rhai::Dynamic::from(1i64));
+                        ctx.internal_tracker.insert(
+                            "__op___kelora_stats_events_filtered".to_string(),
+                            rhai::Dynamic::from("count"),
+                        );
+
+                        if !ops.is_empty() {
+                            outputs.push(FormattedOutput::with_ops(String::new(), None, ops));
+                        }
+                    } else {
+                        crate::stats::stats_add_event_output();
+
+                        ctx.internal_tracker
+                            .entry("__kelora_stats_events_output".to_string())
+                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                            .or_insert(rhai::Dynamic::from(1i64));
+                        ctx.internal_tracker.insert(
+                            "__op___kelora_stats_events_output".to_string(),
+                            rhai::Dynamic::from("count"),
+                        );
+
+                        let formatted = self.formatter.format(&event);
+                        let timestamp = event.parsed_ts;
+                        outputs.push(FormattedOutput::with_ops(formatted, timestamp, ops));
+                    }
+                } else {
+                    crate::stats::stats_add_event_filtered();
+
+                    ctx.internal_tracker
+                        .entry("__kelora_stats_events_filtered".to_string())
+                        .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                        .or_insert(rhai::Dynamic::from(1i64));
+                    ctx.internal_tracker.insert(
+                        "__op___kelora_stats_events_filtered".to_string(),
+                        rhai::Dynamic::from("count"),
+                    );
+
+                    if !ops.is_empty() {
+                        outputs.push(FormattedOutput::with_ops(String::new(), None, ops));
+                    }
+                }
+            }
+            ScriptResult::EmitMultiple(events) => {
+                let mut ops = std::mem::take(&mut ctx.pending_file_ops);
+
+                for (idx, event) in events.into_iter().enumerate() {
+                    if self.limiter.as_mut().is_none_or(|l| l.allow()) {
+                        if event.fields.is_empty() {
+                            crate::stats::stats_add_event_filtered();
+
+                            ctx.internal_tracker
+                                .entry("__kelora_stats_events_filtered".to_string())
+                                .and_modify(|v| {
+                                    *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
+                                })
+                                .or_insert(rhai::Dynamic::from(1i64));
+                            ctx.internal_tracker.insert(
+                                "__op___kelora_stats_events_filtered".to_string(),
+                                rhai::Dynamic::from("count"),
+                            );
+
+                            if idx == 0 && !ops.is_empty() {
+                                outputs.push(FormattedOutput::with_ops(
+                                    String::new(),
+                                    None,
+                                    std::mem::take(&mut ops),
+                                ));
+                            }
+                        } else {
+                            crate::stats::stats_add_event_output();
+
+                            ctx.internal_tracker
+                                .entry("__kelora_stats_events_output".to_string())
+                                .and_modify(|v| {
+                                    *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
+                                })
+                                .or_insert(rhai::Dynamic::from(1i64));
+                            ctx.internal_tracker.insert(
+                                "__op___kelora_stats_events_output".to_string(),
+                                rhai::Dynamic::from("count"),
+                            );
+
+                            let formatted = self.formatter.format(&event);
+                            let timestamp = event.parsed_ts;
+                            let event_ops = if idx == 0 {
+                                std::mem::take(&mut ops)
+                            } else {
+                                Vec::new()
+                            };
+                            outputs
+                                .push(FormattedOutput::with_ops(formatted, timestamp, event_ops));
+                        }
+                    } else {
+                        crate::stats::stats_add_event_filtered();
+
+                        ctx.internal_tracker
+                            .entry("__kelora_stats_events_filtered".to_string())
+                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                            .or_insert(rhai::Dynamic::from(1i64));
+                        ctx.internal_tracker.insert(
+                            "__op___kelora_stats_events_filtered".to_string(),
+                            rhai::Dynamic::from("count"),
+                        );
+
+                        if idx == 0 && !ops.is_empty() {
+                            outputs.push(FormattedOutput::with_ops(
+                                String::new(),
+                                None,
+                                std::mem::take(&mut ops),
+                            ));
+                        }
+                    }
+                }
+
+                if !ops.is_empty() {
+                    outputs.push(FormattedOutput::with_ops(String::new(), None, ops));
+                }
+            }
+            ScriptResult::Skip => {
+                crate::stats::stats_add_event_filtered();
+
+                ctx.internal_tracker
+                    .entry("__kelora_stats_events_filtered".to_string())
+                    .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                    .or_insert(rhai::Dynamic::from(1i64));
+                ctx.internal_tracker.insert(
+                    "__op___kelora_stats_events_filtered".to_string(),
+                    rhai::Dynamic::from("count"),
+                );
+
+                let ops = std::mem::take(&mut ctx.pending_file_ops);
+                if !ops.is_empty() {
+                    outputs.push(FormattedOutput::with_ops(String::new(), None, ops));
+                }
+            }
+            ScriptResult::Error(msg) => {
+                ctx.pending_file_ops.clear();
+                file_ops::clear_pending_ops();
+
+                crate::rhai_functions::tracking::track_error(
+                    "script",
+                    ctx.meta.line_num,
+                    &msg,
+                    None,
+                    ctx.meta.filename.as_deref(),
+                    ctx.config.verbose,
+                    ctx.config.quiet_level,
+                    Some(&ctx.config),
+                );
+
+                if ctx.config.strict {
+                    return Err(anyhow!(msg));
+                } else {
+                    return Ok(());
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Process a chunk directly without going through the chunker
@@ -612,6 +674,9 @@ impl Pipeline {
         self.window_manager.update(&event);
         ctx.window = self.window_manager.get_window();
 
+        file_ops::clear_pending_ops();
+        ctx.pending_file_ops.clear();
+
         // Apply script stages (filters, execs, etc.)
         let mut result = ScriptResult::Emit(event);
 
@@ -662,142 +727,12 @@ impl Pipeline {
         }
 
         // Handle final result
-        match result {
-            ScriptResult::Emit(event) => {
-                if self.limiter.as_mut().is_none_or(|l| l.allow()) {
-                    // Filter out empty events before formatting
-                    if event.fields.is_empty() {
-                        // Empty events are counted as filtered
-                        crate::stats::stats_add_event_filtered();
-
-                        // Also track in Rhai context for parallel processing
-                        ctx.internal_tracker
-                            .entry("__kelora_stats_events_filtered".to_string())
-                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
-                            .or_insert(rhai::Dynamic::from(1i64));
-                        ctx.internal_tracker.insert(
-                            "__op___kelora_stats_events_filtered".to_string(),
-                            rhai::Dynamic::from("count"),
-                        );
-                    } else {
-                        crate::stats::stats_add_event_output();
-
-                        // Also track in Rhai context for parallel processing
-                        ctx.internal_tracker
-                            .entry("__kelora_stats_events_output".to_string())
-                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
-                            .or_insert(rhai::Dynamic::from(1i64));
-                        ctx.internal_tracker.insert(
-                            "__op___kelora_stats_events_output".to_string(),
-                            rhai::Dynamic::from("count"),
-                        );
-
-                        let formatted = self.formatter.format(&event);
-                        let timestamp = event.parsed_ts;
-                        results.push(FormattedOutput::new(formatted, timestamp));
-                    }
-                } else {
-                    crate::stats::stats_add_event_filtered();
-
-                    // Also track in Rhai context for parallel processing
-                    ctx.internal_tracker
-                        .entry("__kelora_stats_events_filtered".to_string())
-                        .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
-                        .or_insert(rhai::Dynamic::from(1i64));
-                    ctx.internal_tracker.insert(
-                        "__op___kelora_stats_events_filtered".to_string(),
-                        rhai::Dynamic::from("count"),
-                    );
-                }
-            }
-            ScriptResult::EmitMultiple(events) => {
-                for event in events {
-                    if self.limiter.as_mut().is_none_or(|l| l.allow()) {
-                        // Filter out empty events before formatting
-                        if event.fields.is_empty() {
-                            // Empty events are counted as filtered
-                            crate::stats::stats_add_event_filtered();
-
-                            // Also track in Rhai context for parallel processing
-                            ctx.internal_tracker
-                                .entry("__kelora_stats_events_filtered".to_string())
-                                .and_modify(|v| {
-                                    *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
-                                })
-                                .or_insert(rhai::Dynamic::from(1i64));
-                            ctx.internal_tracker.insert(
-                                "__op___kelora_stats_events_filtered".to_string(),
-                                rhai::Dynamic::from("count"),
-                            );
-                        } else {
-                            crate::stats::stats_add_event_output();
-
-                            // Also track in Rhai context for parallel processing
-                            ctx.internal_tracker
-                                .entry("__kelora_stats_events_output".to_string())
-                                .and_modify(|v| {
-                                    *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1)
-                                })
-                                .or_insert(rhai::Dynamic::from(1i64));
-                            ctx.internal_tracker.insert(
-                                "__op___kelora_stats_events_output".to_string(),
-                                rhai::Dynamic::from("count"),
-                            );
-
-                            let formatted = self.formatter.format(&event);
-                            let timestamp = event.parsed_ts;
-                            results.push(FormattedOutput::new(formatted, timestamp));
-                        }
-                    } else {
-                        crate::stats::stats_add_event_filtered();
-
-                        // Also track in Rhai context for parallel processing
-                        ctx.internal_tracker
-                            .entry("__kelora_stats_events_filtered".to_string())
-                            .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
-                            .or_insert(rhai::Dynamic::from(1i64));
-                        ctx.internal_tracker.insert(
-                            "__op___kelora_stats_events_filtered".to_string(),
-                            rhai::Dynamic::from("count"),
-                        );
-                    }
-                }
-            }
-            ScriptResult::Skip => {
-                crate::stats::stats_add_event_filtered();
-
-                // Also track in Rhai context for parallel processing
-                ctx.internal_tracker
-                    .entry("__kelora_stats_events_filtered".to_string())
-                    .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
-                    .or_insert(rhai::Dynamic::from(1i64));
-                ctx.internal_tracker.insert(
-                    "__op___kelora_stats_events_filtered".to_string(),
-                    rhai::Dynamic::from("count"),
-                );
-            }
-            ScriptResult::Error(msg) => {
-                // Use unified error tracking system
-                crate::rhai_functions::tracking::track_error(
-                    "script",
-                    ctx.meta.line_num,
-                    &msg,
-                    None, // Original line not available at this stage
-                    ctx.meta.filename.as_deref(),
-                    ctx.config.verbose,
-                    ctx.config.quiet_level,
-                    Some(&ctx.config),
-                );
-
-                // New resiliency model: use strict flag
-                if ctx.config.strict {
-                    return Err(anyhow::anyhow!(msg));
-                } else {
-                    // Skip errors in resilient mode and continue processing
-                    return Ok(results);
-                }
-            }
+        let remaining_ops = file_ops::take_pending_ops();
+        if !remaining_ops.is_empty() {
+            ctx.pending_file_ops.extend(remaining_ops);
         }
+
+        self.apply_script_result(result, ctx, &mut results)?;
 
         Ok(results)
     }
