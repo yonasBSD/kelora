@@ -2,18 +2,19 @@
 /// ANSI color codes for logfmt output formatting
 #[derive(Debug, Clone)]
 pub struct ColorScheme {
-    pub key: &'static str,         // Green for field names
-    pub equals: &'static str,      // No color for = separator
-    pub string: &'static str,      // No color for quoted strings
-    pub level_trace: &'static str, // Cyan for trace levels
-    pub level_debug: &'static str, // Bright cyan for debug levels
-    pub level_info: &'static str,  // Bright green for info levels
-    pub level_warn: &'static str,  // Bright yellow for warn levels
-    pub level_error: &'static str, // Bright red for error levels
-    pub context_before: &'static str, // Blue for context prefix before markers
-    pub context_match: &'static str,  // Bright magenta for context prefix match markers
-    pub context_after: &'static str,  // Blue for context prefix after markers
-    pub reset: &'static str,       // Reset to default color
+    pub key: &'static str,             // Green for field names
+    pub equals: &'static str,          // No color for = separator
+    pub string: &'static str,          // No color for quoted strings
+    pub level_trace: &'static str,     // Cyan for trace levels
+    pub level_debug: &'static str,     // Bright cyan for debug levels
+    pub level_info: &'static str,      // Bright green for info levels
+    pub level_warn: &'static str,      // Bright yellow for warn levels
+    pub level_error: &'static str,     // Bright red for error levels
+    pub context_before: &'static str,  // Blue for context prefix before markers
+    pub context_match: &'static str,   // Bright magenta for context prefix match markers
+    pub context_after: &'static str,   // Blue for context prefix after markers
+    pub context_overlap: &'static str, // Cyan for overlapping context markers
+    pub reset: &'static str,           // Reset to default color
 }
 
 impl ColorScheme {
@@ -21,18 +22,19 @@ impl ColorScheme {
     pub fn new(use_colors: bool) -> Self {
         if use_colors {
             Self {
-                key: "\x1b[32m",         // Green for field names
-                equals: "",              // No color for equals signs
-                string: "",              // No color for quoted values
-                level_trace: "\x1b[36m", // Cyan for trace/finest
-                level_debug: "\x1b[96m", // Bright cyan for debug/finer/config
-                level_info: "\x1b[92m",  // Bright green for info/informational/notice
-                level_warn: "\x1b[93m",  // Bright yellow for warn/warning
-                level_error: "\x1b[91m", // Bright red for error/fatal/panic/etc
-                context_before: "\x1b[34m", // Blue for before context markers
-                context_match: "\x1b[95m",  // Bright magenta for match context markers
-                context_after: "\x1b[34m",  // Blue for after context markers
-                reset: "\x1b[0m",        // Reset
+                key: "\x1b[32m",             // Green for field names
+                equals: "",                  // No color for equals signs
+                string: "",                  // No color for quoted values
+                level_trace: "\x1b[36m",     // Cyan for trace/finest
+                level_debug: "\x1b[96m",     // Bright cyan for debug/finer/config
+                level_info: "\x1b[92m",      // Bright green for info/informational/notice
+                level_warn: "\x1b[93m",      // Bright yellow for warn/warning
+                level_error: "\x1b[91m",     // Bright red for error/fatal/panic/etc
+                context_before: "\x1b[34m",  // Blue for before context markers
+                context_match: "\x1b[95m",   // Bright magenta for match context markers
+                context_after: "\x1b[34m",   // Blue for after context markers
+                context_overlap: "\x1b[36m", // Cyan for overlapping context markers
+                reset: "\x1b[0m",            // Reset
             }
         } else {
             // All empty strings for no-color mode
@@ -48,6 +50,7 @@ impl ColorScheme {
                 context_before: "",
                 context_match: "",
                 context_after: "",
+                context_overlap: "",
                 reset: "",
             }
         }

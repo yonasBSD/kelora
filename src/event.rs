@@ -8,10 +8,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ContextType {
     #[default]
-    None,    // Regular event, no context
-    Match,   // Event that matched filters
-    Before,  // Before-context for a match
-    After,   // After-context for a match
+    None, // Regular event, no context
+    Match,  // Event that matched filters
+    Before, // Before-context for a match
+    After,  // After-context for a match
+    Both,   // Overlapping context (before + after)
 }
 
 /// Flattening style for nested data structures

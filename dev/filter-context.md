@@ -129,6 +129,7 @@ pub enum ContextType {
     Match,   // Event that matched filters
     Before,  // Before-context for a match
     After,   // After-context for a match
+    Both,    // Overlapping before/after context
 }
 ```
 
@@ -149,6 +150,7 @@ Following klp's visual conventions:
 - `*` prefix: Actual matches (`ContextType::Match`)
 - `/` prefix: Before-context lines (`ContextType::Before`)
 - `\` prefix: After-context lines (`ContextType::After`)
+- `|` prefix: Overlapping context lines (`ContextType::Both`)
 - No prefix: Regular events (`ContextType::None`)
 
 ### Color Integration
@@ -160,6 +162,7 @@ Context markers use existing theme system:
     "before": "blue",      // / prefix
     "match": "bright_magenta", // * prefix
     "after": "blue",       // \ prefix
+    "overlap": "cyan",     // | prefix
 }
 ```
 
@@ -172,6 +175,7 @@ timestamp=2024-01-15T10:00:01Z level=info msg="normal message"
 * timestamp=2024-01-15T10:00:03Z level=error msg="ERROR OCCURRED"
 \ timestamp=2024-01-15T10:00:04Z level=info msg="after context"
 \ timestamp=2024-01-15T10:00:05Z level=debug msg="more after context"
+| timestamp=2024-01-15T10:00:06Z level=info msg="overlapping context"
 ```
 
 ## Streaming Behavior

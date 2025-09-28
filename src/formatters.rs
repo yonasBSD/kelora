@@ -564,21 +564,10 @@ impl DefaultFormatter {
         use crate::event::ContextType;
 
         match event.context_type {
-            ContextType::Match => self.render_context_marker(
-                self.colors.context_match,
-                "◉",
-                "*",
-            ),
-            ContextType::Before => self.render_context_marker(
-                self.colors.context_before,
-                "/",
-                "/",
-            ),
-            ContextType::After => self.render_context_marker(
-                self.colors.context_after,
-                "\\",
-                "\\",
-            ),
+            ContextType::Match => self.render_context_marker(self.colors.context_match, "◉", "*"),
+            ContextType::Before => self.render_context_marker(self.colors.context_before, "/", "/"),
+            ContextType::After => self.render_context_marker(self.colors.context_after, "\\", "\\"),
+            ContextType::Both => self.render_context_marker(self.colors.context_overlap, "|", "|"),
             ContextType::None => String::new(),
         }
     }
@@ -589,7 +578,11 @@ impl DefaultFormatter {
         emoji_marker: &str,
         ascii_marker: &str,
     ) -> String {
-        let marker = if self.use_emoji { emoji_marker } else { ascii_marker };
+        let marker = if self.use_emoji {
+            emoji_marker
+        } else {
+            ascii_marker
+        };
 
         if !color.is_empty() {
             format!("{}{}{}", color, marker, self.colors.reset)
@@ -1722,9 +1715,9 @@ impl pipeline::Formatter for CsvFormatter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::ContextType;
     use chrono::{Duration as ChronoDuration, TimeZone, Utc};
     use rhai::{Array, Map};
-    use crate::event::ContextType;
 
     fn parts(line: &str) -> Vec<String> {
         line.split('|')
@@ -1980,6 +1973,12 @@ mod tests {
         after_event.set_field("msg".to_string(), Dynamic::from("after".to_string()));
         let after_line = formatter.format(&after_event);
         assert!(after_line.starts_with("\x1b[34m\\\x1b[0m "));
+
+        let mut overlap_event = Event::default();
+        overlap_event.context_type = ContextType::Both;
+        overlap_event.set_field("msg".to_string(), Dynamic::from("overlap".to_string()));
+        let overlap_line = formatter.format(&overlap_event);
+        assert!(overlap_line.starts_with("\x1b[36m|\x1b[0m "));
     }
 
     #[test]
