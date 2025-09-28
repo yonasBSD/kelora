@@ -1276,6 +1276,46 @@ pub fn register_functions(engine: &mut Engine) {
         |text: &str, _sep: (), kv_sep: &str| -> rhai::Map { parse_kv_impl(text, None, kv_sep) },
     );
 
+    // Complementary to_<format>() functions for serialization
+
+    // to_logfmt() - Convert Map to logfmt format string
+    engine.register_fn("to_logfmt", |map: rhai::Map| -> String {
+        to_logfmt_impl(map)
+    });
+
+    // to_kv() - Multiple variants for flexible key-value formatting
+    engine.register_fn("to_kv", |map: rhai::Map| -> String {
+        to_kv_impl(map, None, "=")
+    });
+
+    engine.register_fn("to_kv", |map: rhai::Map, sep: &str| -> String {
+        to_kv_impl(map, Some(sep), "=")
+    });
+
+    engine.register_fn("to_kv", |map: rhai::Map, sep: &str, kv_sep: &str| -> String {
+        to_kv_impl(map, Some(sep), kv_sep)
+    });
+
+    // Allow unit type for null separator
+    engine.register_fn("to_kv", |map: rhai::Map, _sep: (), kv_sep: &str| -> String {
+        to_kv_impl(map, None, kv_sep)
+    });
+
+    // to_syslog() - Convert Map to syslog format string
+    engine.register_fn("to_syslog", |map: rhai::Map| -> String {
+        to_syslog_impl(map)
+    });
+
+    // to_cef() - Convert Map to CEF format string
+    engine.register_fn("to_cef", |map: rhai::Map| -> String {
+        to_cef_impl(map)
+    });
+
+    // to_combined() - Convert Map to combined log format string
+    engine.register_fn("to_combined", |map: rhai::Map| -> String {
+        to_combined_impl(map)
+    });
+
     // String case conversion functions
     engine.register_fn("lower", |text: &str| -> String { text.to_lowercase() });
 
@@ -1807,6 +1847,327 @@ fn set_array_value_with_path(
             }
         }
     }
+}
+
+// Implementation functions for to_<format>() functions
+
+/// Implementation for to_logfmt() function
+/// Converts a Rhai Map to logfmt format string using the same logic as LogfmtFormatter
+fn to_logfmt_impl(map: rhai::Map) -> String {
+    use crate::event::{flatten_dynamic, FlattenStyle};
+
+    let mut output = String::new();
+    let mut first = true;
+
+    for (key, value) in map {
+        if !first {
+            output.push(' ');
+        }
+        first = false;
+
+        // Sanitize key for logfmt compliance
+        let sanitized_key = sanitize_logfmt_key_local(&key);
+        output.push_str(&sanitized_key);
+        output.push('=');
+
+        // Format value based on type
+        let is_string = value.is_string();
+
+        if value.clone().try_cast::<rhai::Map>().is_some()
+            || value.clone().try_cast::<rhai::Array>().is_some()
+        {
+            // Handle nested structures by flattening
+            let flattened = flatten_dynamic(&value, FlattenStyle::Underscore, 0);
+
+            let formatted_value = if flattened.len() == 1 {
+                flattened.values().next().unwrap().to_string()
+            } else if flattened.is_empty() {
+                String::new()
+            } else {
+                // Format as "key1=val1,key2=val2" for nested structures
+                flattened
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            };
+
+            if is_string || needs_logfmt_quoting_local(&formatted_value) {
+                format_quoted_logfmt_value_local(&formatted_value, &mut output);
+            } else {
+                output.push_str(&formatted_value);
+            }
+        } else {
+            // Handle scalar values
+            let string_val = value.to_string();
+            if is_string {
+                format_quoted_logfmt_value_local(&string_val, &mut output);
+            } else {
+                output.push_str(&string_val);
+            }
+        }
+    }
+
+    output
+}
+
+/// Implementation for to_kv() function with flexible separators
+/// Mirrors the flexibility of parse_kv() function
+fn to_kv_impl(map: rhai::Map, sep: Option<&str>, kv_sep: &str) -> String {
+    let mut output = String::new();
+    let mut first = true;
+
+    // Use whitespace as default separator if none specified
+    let field_sep = sep.unwrap_or(" ");
+
+    for (key, value) in map {
+        if !first {
+            output.push_str(field_sep);
+        }
+        first = false;
+
+        // Key=value format
+        output.push_str(&key);
+        output.push_str(kv_sep);
+        output.push_str(&value.to_string());
+    }
+
+    output
+}
+
+/// Implementation for to_syslog() function
+/// Generates RFC3164/RFC5424 syslog format
+fn to_syslog_impl(map: rhai::Map) -> String {
+    use chrono::Utc;
+
+    // Standard syslog fields with defaults
+    let priority = map.get("priority")
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "13".to_string()); // user.notice
+
+    let timestamp = map.get("timestamp")
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| Utc::now().format("%b %d %H:%M:%S").to_string());
+
+    let hostname = map.get("hostname")
+        .or_else(|| map.get("host"))
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "localhost".to_string());
+
+    let tag = map.get("tag")
+        .or_else(|| map.get("program"))
+        .or_else(|| map.get("ident"))
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "kelora".to_string());
+
+    let message = map.get("message")
+        .or_else(|| map.get("msg"))
+        .or_else(|| map.get("content"))
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| String::new());
+
+    // RFC3164 format: <priority>timestamp hostname tag: message
+    format!("<{}>{} {} {}: {}", priority, timestamp, hostname, tag, message)
+}
+
+/// Implementation for to_cef() function
+/// Generates Common Event Format (CEF) output
+fn to_cef_impl(map: rhai::Map) -> String {
+    // CEF Header fields
+    let device_vendor = map.get("deviceVendor")
+        .or_else(|| map.get("device_vendor"))
+        .map(|v| escape_cef_value(&v.to_string()))
+        .unwrap_or_else(|| "Kelora".to_string());
+
+    let device_product = map.get("deviceProduct")
+        .or_else(|| map.get("device_product"))
+        .map(|v| escape_cef_value(&v.to_string()))
+        .unwrap_or_else(|| "LogAnalyzer".to_string());
+
+    let device_version = map.get("deviceVersion")
+        .or_else(|| map.get("device_version"))
+        .map(|v| escape_cef_value(&v.to_string()))
+        .unwrap_or_else(|| "1.0".to_string());
+
+    let signature_id = map.get("signatureId")
+        .or_else(|| map.get("signature_id"))
+        .or_else(|| map.get("event_id"))
+        .map(|v| escape_cef_value(&v.to_string()))
+        .unwrap_or_else(|| "1".to_string());
+
+    let name = map.get("name")
+        .or_else(|| map.get("event_name"))
+        .or_else(|| map.get("message"))
+        .map(|v| escape_cef_value(&v.to_string()))
+        .unwrap_or_else(|| "Event".to_string());
+
+    let severity = map.get("severity")
+        .or_else(|| map.get("level"))
+        .map(|v| escape_cef_value(&v.to_string()))
+        .unwrap_or_else(|| "5".to_string());
+
+    // Start with CEF header
+    let mut output = format!(
+        "CEF:0|{}|{}|{}|{}|{}|{}|",
+        device_vendor, device_product, device_version, signature_id, name, severity
+    );
+
+    // Add extension fields
+    let mut extensions = Vec::new();
+    for (key, value) in map {
+        // Skip header fields we already processed
+        if matches!(key.as_str(),
+            "deviceVendor" | "device_vendor" | "deviceProduct" | "device_product" |
+            "deviceVersion" | "device_version" | "signatureId" | "signature_id" |
+            "event_id" | "name" | "event_name" | "message" | "severity" | "level"
+        ) {
+            continue;
+        }
+
+        extensions.push(format!("{}={}", key, escape_cef_extension_value(&value.to_string())));
+    }
+
+    if !extensions.is_empty() {
+        output.push_str(&extensions.join(" "));
+    }
+
+    output
+}
+
+/// Implementation for to_combined() function
+/// Generates Apache/NGINX combined log format
+fn to_combined_impl(map: rhai::Map) -> String {
+    use chrono::Utc;
+
+    // Standard combined log format fields
+    let ip = map.get("ip")
+        .or_else(|| map.get("remote_addr"))
+        .or_else(|| map.get("client_ip"))
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "127.0.0.1".to_string());
+
+    let identity = map.get("identity")
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "-".to_string());
+
+    let user = map.get("user")
+        .or_else(|| map.get("remote_user"))
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "-".to_string());
+
+    let timestamp = map.get("timestamp")
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| format!("[{}]", Utc::now().format("%d/%b/%Y:%H:%M:%S %z")));
+
+    // Build request line from components or use provided request
+    let request = if let Some(req) = map.get("request") {
+        format!("\"{}\"", req.to_string().replace('"', "\\\""))
+    } else {
+        let method = map.get("method").map(|v| v.to_string()).unwrap_or_else(|| "GET".to_string());
+        let path = map.get("path").or_else(|| map.get("uri")).map(|v| v.to_string()).unwrap_or_else(|| "/".to_string());
+        let protocol = map.get("protocol").map(|v| v.to_string()).unwrap_or_else(|| "HTTP/1.1".to_string());
+        format!("\"{} {} {}\"", method, path, protocol)
+    };
+
+    let status = map.get("status")
+        .or_else(|| map.get("response_status"))
+        .or_else(|| map.get("status_code"))
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "200".to_string());
+
+    let bytes = map.get("bytes")
+        .or_else(|| map.get("response_size"))
+        .or_else(|| map.get("body_bytes_sent"))
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "-".to_string());
+
+    let referer = map.get("referer")
+        .or_else(|| map.get("http_referer"))
+        .map(|v| format!("\"{}\"", v.to_string().replace('"', "\\\"")))
+        .unwrap_or_else(|| "\"-\"".to_string());
+
+    let user_agent = map.get("user_agent")
+        .or_else(|| map.get("http_user_agent"))
+        .map(|v| format!("\"{}\"", v.to_string().replace('"', "\\\"")))
+        .unwrap_or_else(|| "\"-\"".to_string());
+
+    // Basic combined format
+    let mut output = format!(
+        "{} {} {} {} {} {} {} {} {}",
+        ip, identity, user, timestamp, request, status, bytes, referer, user_agent
+    );
+
+    // Add request_time if present (NGINX style)
+    if let Some(request_time) = map.get("request_time") {
+        output.push_str(&format!(" \"{}\"", request_time.to_string()));
+    }
+
+    output
+}
+
+// Helper functions for logfmt formatting
+
+/// Sanitize a field key to ensure logfmt compliance
+/// Replaces problematic characters (spaces, tabs, newlines, carriage returns, equals) with underscores
+fn sanitize_logfmt_key_local(key: &str) -> String {
+    key.chars()
+        .map(|c| match c {
+            ' ' | '\t' | '\n' | '\r' | '=' => '_',
+            c => c,
+        })
+        .collect()
+}
+
+/// Check if a string value needs to be quoted per logfmt rules
+fn needs_logfmt_quoting_local(value: &str) -> bool {
+    // Quote values that contain spaces, tabs, newlines, quotes, equals, or are empty
+    value.is_empty()
+        || value.contains(' ')
+        || value.contains('\t')
+        || value.contains('\n')
+        || value.contains('\r')
+        || value.contains('\'')
+        || value.contains('"')
+        || value.contains('=')
+}
+
+/// Escape logfmt string by escaping quotes, backslashes, newlines, tabs, and carriage returns
+fn escape_logfmt_string_local(input: &str) -> String {
+    let mut output = String::with_capacity(input.len() + 10); // Some extra space for escapes
+
+    for ch in input.chars() {
+        match ch {
+            '"' => output.push_str("\\\""),
+            '\\' => output.push_str("\\\\"),
+            '\n' => output.push_str("\\n"),
+            '\t' => output.push_str("\\t"),
+            '\r' => output.push_str("\\r"),
+            c => output.push(c),
+        }
+    }
+
+    output
+}
+
+/// Format a quoted logfmt value into a buffer
+fn format_quoted_logfmt_value_local(value: &str, output: &mut String) {
+    if needs_logfmt_quoting_local(value) {
+        output.push('"');
+        output.push_str(&escape_logfmt_string_local(value));
+        output.push('"');
+    } else {
+        output.push_str(value);
+    }
+}
+
+/// Escape CEF header field values (pipe characters)
+fn escape_cef_value(value: &str) -> String {
+    value.replace('|', "\\|").replace('\\', "\\\\")
+}
+
+/// Escape CEF extension field values (equals and backslashes)
+fn escape_cef_extension_value(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('=', "\\=").replace('\n', "\\n").replace('\r', "\\r")
 }
 
 #[cfg(test)]
@@ -3830,5 +4191,380 @@ mod tests {
                 .unwrap(),
             "true"
         );
+    }
+
+    #[test]
+    fn test_to_logfmt_basic() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let result: String = engine
+            .eval(
+                r##"
+                let map = #{
+                    level: "INFO",
+                    msg: "Test message",
+                    user: "alice",
+                    status: 200
+                };
+                map.to_logfmt()
+            "##,
+            )
+            .unwrap();
+
+        // Check that all key-value pairs are present
+        assert!(result.contains("level=INFO"));
+        assert!(result.contains("msg=\"Test message\"")); // Quoted due to space
+        assert!(result.contains("user=alice"));
+        assert!(result.contains("status=200"));
+
+        // Fields should be space-separated
+        assert!(result.contains(" "));
+    }
+
+    #[test]
+    fn test_to_logfmt_quoting() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let result: String = engine
+            .eval(
+                r##"
+                let map = #{
+                    simple: "value",
+                    spaced: "has spaces",
+                    quoted: "has\"quotes",
+                    equals: "has=sign",
+                    empty: ""
+                };
+                map.to_logfmt()
+            "##,
+            )
+            .unwrap();
+
+        assert!(result.contains("simple=value")); // No quotes for simple value
+        assert!(result.contains("spaced=\"has spaces\"")); // Quotes due to spaces
+        assert!(result.contains("quoted=\"has\\\"quotes\"")); // Escaped quotes
+        assert!(result.contains("equals=\"has=sign\"")); // Quotes due to equals sign
+        assert!(result.contains("empty=\"\"")); // Quotes for empty string
+    }
+
+    #[test]
+    fn test_to_logfmt_key_sanitization() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let result: String = engine
+            .eval(
+                r##"
+                let map = #{};
+                map["field with spaces"] = "value1";
+                map["field=with=equals"] = "value2";
+                map["field\twith\ttabs"] = "value3";
+                map["normal_field"] = "value4";
+                map.to_logfmt()
+            "##,
+            )
+            .unwrap();
+
+        // Keys should be sanitized
+        assert!(result.contains("field_with_spaces=value1"));
+        assert!(result.contains("field_with_equals=value2"));
+        assert!(result.contains("field_with_tabs=value3"));
+        assert!(result.contains("normal_field=value4"));
+    }
+
+    #[test]
+    fn test_to_kv_basic() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let result: String = engine
+            .eval(
+                r##"
+                let map = #{
+                    name: "alice",
+                    age: 25,
+                    active: true
+                };
+                map.to_kv()
+            "##,
+            )
+            .unwrap();
+
+        assert!(result.contains("name=alice"));
+        assert!(result.contains("age=25"));
+        assert!(result.contains("active=true"));
+        assert!(result.contains(" ")); // Space separator
+    }
+
+    #[test]
+    fn test_to_kv_custom_separators() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Test custom field separator
+        let result1: String = engine
+            .eval(
+                r##"
+                let map = #{
+                    a: "1",
+                    b: "2"
+                };
+                map.to_kv("|")
+            "##,
+            )
+            .unwrap();
+
+        assert!(result1.contains("a=1|b=2") || result1.contains("b=2|a=1"));
+
+        // Test custom field and kv separators
+        let result2: String = engine
+            .eval(
+                r##"
+                let map = #{
+                    a: "1",
+                    b: "2"
+                };
+                map.to_kv("|", ":")
+            "##,
+            )
+            .unwrap();
+
+        assert!(result2.contains("a:1|b:2") || result2.contains("b:2|a:1"));
+
+        // Test null separator (should use whitespace)
+        let result3: String = engine
+            .eval(
+                r##"
+                let map = #{
+                    a: "1",
+                    b: "2"
+                };
+                map.to_kv((), ":")
+            "##,
+            )
+            .unwrap();
+
+        assert!(result3.contains("a:1 b:2") || result3.contains("b:2 a:1"));
+    }
+
+    #[test]
+    fn test_to_syslog_basic() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let result: String = engine
+            .eval(
+                r##"
+                let map = #{
+                    priority: "16",
+                    timestamp: "Oct 24 12:34:56",
+                    hostname: "server1",
+                    tag: "myapp",
+                    message: "Something happened"
+                };
+                map.to_syslog()
+            "##,
+            )
+            .unwrap();
+
+        assert_eq!(result, "<16>Oct 24 12:34:56 server1 myapp: Something happened");
+    }
+
+    #[test]
+    fn test_to_syslog_defaults() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let result: String = engine
+            .eval(
+                r##"
+                let map = #{
+                    msg: "Test"
+                };
+                map.to_syslog()
+            "##,
+            )
+            .unwrap();
+
+        // Should use defaults
+        assert!(result.starts_with("<13>")); // Default priority
+        assert!(result.contains("localhost")); // Default hostname
+        assert!(result.contains("kelora:")); // Default tag
+        assert!(result.contains("Test")); // Message from msg field
+    }
+
+    #[test]
+    fn test_to_cef_basic() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let result: String = engine
+            .eval(
+                r##"
+                let map = #{
+                    deviceVendor: "Acme",
+                    deviceProduct: "SecTool",
+                    deviceVersion: "2.0",
+                    signatureId: "100",
+                    name: "Attack detected",
+                    severity: "8",
+                    src: "192.168.1.1",
+                    dst: "10.0.0.1"
+                };
+                map.to_cef()
+            "##,
+            )
+            .unwrap();
+
+        assert!(result.starts_with("CEF:0|Acme|SecTool|2.0|100|Attack detected|8|"));
+        assert!(result.contains("src=192.168.1.1"));
+        assert!(result.contains("dst=10.0.0.1"));
+    }
+
+    #[test]
+    fn test_to_cef_defaults() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let result: String = engine
+            .eval(
+                r##"
+                let map = #{
+                    extra_field: "value"
+                };
+                map.to_cef()
+            "##,
+            )
+            .unwrap();
+
+        // Should use defaults for header fields
+        assert!(result.starts_with("CEF:0|Kelora|LogAnalyzer|1.0|1|Event|5|"));
+        assert!(result.contains("extra_field=value"));
+    }
+
+    #[test]
+    fn test_to_combined_basic() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let result: String = engine
+            .eval(
+                r##"
+                let map = #{
+                    ip: "192.168.1.1",
+                    identity: "-",
+                    user: "alice",
+                    timestamp: "[25/Dec/1995:10:00:00 +0000]",
+                    request: "GET /index.html HTTP/1.0",
+                    status: "200",
+                    bytes: "1234",
+                    referer: "http://example.com/",
+                    user_agent: "Mozilla/4.08"
+                };
+                map.to_combined()
+            "##,
+            )
+            .unwrap();
+
+        assert_eq!(
+            result,
+            r#"192.168.1.1 - alice [25/Dec/1995:10:00:00 +0000] "GET /index.html HTTP/1.0" 200 1234 "http://example.com/" "Mozilla/4.08""#
+        );
+    }
+
+    #[test]
+    fn test_to_combined_from_components() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let result: String = engine
+            .eval(
+                r##"
+                let map = #{
+                    ip: "192.168.1.1",
+                    method: "POST",
+                    path: "/api/users",
+                    protocol: "HTTP/1.1",
+                    status: "201"
+                };
+                map.to_combined()
+            "##,
+            )
+            .unwrap();
+
+        // Should build request from components and use defaults
+        assert!(result.contains("192.168.1.1"));
+        assert!(result.contains(r#""POST /api/users HTTP/1.1""#));
+        assert!(result.contains("201"));
+        assert!(result.contains("- -")); // Default identity and user
+        assert!(result.contains("\"-\"")); // Default referer and user agent
+    }
+
+    #[test]
+    fn test_to_combined_with_request_time() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let result: String = engine
+            .eval(
+                r##"
+                let map = #{
+                    ip: "192.168.1.1",
+                    method: "GET",
+                    path: "/",
+                    status: "200",
+                    request_time: "0.123"
+                };
+                map.to_combined()
+            "##,
+            )
+            .unwrap();
+
+        // Should include request_time at the end (NGINX style)
+        assert!(result.ends_with(r#" "0.123""#));
+    }
+
+    #[test]
+    fn test_to_functions_roundtrip() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Test logfmt roundtrip
+        let result: rhai::Map = engine
+            .eval(
+                r##"
+                let original = #{
+                    level: "INFO",
+                    msg: "Test message",
+                    count: 42
+                };
+                let logfmt_string = original.to_logfmt();
+                logfmt_string.parse_logfmt()
+            "##,
+            )
+            .unwrap();
+
+        assert_eq!(result.get("level").unwrap().to_string(), "INFO");
+        assert_eq!(result.get("msg").unwrap().to_string(), "Test message");
+        assert_eq!(result.get("count").unwrap().to_string(), "42");
+
+        // Test kv roundtrip
+        let result2: rhai::Map = engine
+            .eval(
+                r##"
+                let original = #{
+                    name: "alice",
+                    age: "25"
+                };
+                let kv_string = original.to_kv();
+                kv_string.parse_kv()
+            "##,
+            )
+            .unwrap();
+
+        assert_eq!(result2.get("name").unwrap().to_string(), "alice");
+        assert_eq!(result2.get("age").unwrap().to_string(), "25");
     }
 }

@@ -46,6 +46,11 @@ STRING/TEXT FUNCTIONS:
   text.parse_syslog()                   Parse syslog line into structured fields
   text.parse_url()                      Parse URL into structured components
   text.parse_user_agent()               Parse common user-agent strings into components
+  map.to_cef()                          Convert map to Common Event Format (CEF) string
+  map.to_combined()                     Convert map to Apache/Nginx combined log format
+  map.to_kv([sep [, kv_sep]])           Convert map to key-value string with separators
+  map.to_logfmt()                       Convert map to logfmt format string
+  map.to_syslog()                       Convert map to syslog format string
   text.slice(spec)                      Slice text using Python notation (e.g., "1:5", ":3", "-2:")
   text.split_re(pattern)                Split text by regex pattern
   text.starting_with(prefix)            Return text if it starts with prefix, else empty
@@ -144,6 +149,17 @@ Examples:
   # Tracking metrics
   track_count("http_requests")
   track_bucket("response_time", "slow")
+
+  # Format conversion and serialization
+  e.logfmt_output = e.to_logfmt()                          # Convert to logfmt
+  e.syslog_line = e.to_syslog()                            # Convert to syslog
+  e.cef_event = e.to_cef()                                 # Convert to CEF
+  e.access_log = e.to_combined()                           # Convert to combined log
+  e.custom_kv = e.to_kv("|", ":")                          # Custom key-value format
+
+  # Bidirectional processing (roundtrip)
+  let logfmt_string = e.to_logfmt()
+  e.parsed_back = logfmt_string.parse_logfmt()
 
   # Random values
   e.sample_rate = rand()
