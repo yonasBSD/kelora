@@ -79,6 +79,11 @@ pub fn register_functions(engine: &mut Engine) {
 
         result
     });
+
+    // map.has_field(key) - check if map contains key AND value is not unit ()
+    engine.register_fn("has_field", |map: Map, key: rhai::ImmutableString| -> bool {
+        map.get(key.as_str()).map_or(false, |value| !value.is_unit())
+    });
 }
 
 /// Convert IndexMap<String, Dynamic> to rhai::Map

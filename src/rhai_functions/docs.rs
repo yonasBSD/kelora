@@ -93,6 +93,7 @@ array.starts_with_any(search_array)   Check if array starts with any search valu
 MAP/OBJECT FUNCTIONS:
 map.flatten([separator [, style]])    Flatten nested object to dot notation
 map.get_path("field.path" [,default]) Safe nested field access with fallback
+map.has_field("key")                  Check if map contains key with non-unit value
 map.has_path("field.path")            Check if nested field path exists
 map.merge(other_map)                  Merge another map into this one
 map.path_equals("path", value)        Safe nested field comparison
