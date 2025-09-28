@@ -48,6 +48,7 @@ text.parse_path()                     Parse filesystem path into components
 text.parse_syslog()                   Parse syslog line into structured fields
 text.parse_url()                      Parse URL into structured components
 text.parse_user_agent()               Parse common user-agent strings into components
+text.parse_json()                     Parse JSON string into map/array
 text.replace(pattern, replacement)    Replace all occurrences of pattern (builtin)
 text.slice(spec)                      Slice text using Python notation (e.g., "1:5", ":3", "-2:")
 text.split_re(pattern)                Split text by regex pattern
@@ -59,6 +60,8 @@ text.to_float()                       Convert text to float (0 on error)
 text.to_int()                         Convert text to integer (0 on error)
 text.to_lower()                       Convert to lowercase (builtin)
 text.to_upper()                       Convert to uppercase (builtin)
+text.to_number([default])             Safe number conversion with fallback (default: 0)
+text.to_bool([default])               Safe boolean conversion with fallback
 text.trim()                           Remove whitespace from start and end (builtin)
 text.unescape_html()                  Unescape HTML entities to text
 text.unescape_json()                  Unescape JSON escape sequences
@@ -74,6 +77,7 @@ array.join(separator)                 Join array elements with separator
 array.len                             Get array length (builtin)
 array.map(|item| expression)          Transform each element (builtin)
 array.parse_cols(spec [, sep])        Apply column spec to pre-split values
+array.percentile(pct)                 Calculate percentile of numeric array
 array.pop()                           Remove and return last item (builtin)
 array.push(item)                      Add item to end of array (builtin)
 array.reduce(|acc, item| expr, init)  Aggregate array into single value (builtin)
@@ -97,17 +101,9 @@ map.to_combined()                     Convert map to Apache/Nginx combined log f
 map.to_kv([sep [, kv_sep]])           Convert map to key-value string with separators
 map.to_logfmt()                       Convert map to logfmt format string
 map.to_syslog()                       Convert map to syslog format string
+map.to_json([pretty])                 Convert map to JSON string
 map.unflatten([separator])            Reconstruct nested object from flat keys
   
-CONVERSION FUNCTIONS:
-parse_int(text)                       Convert string to integer (0 on error) (builtin)
-parse_float(text)                     Convert string to float (0.0 on error) (builtin)
-to_number(value [, default])          Safe number conversion with fallback (default: 0)
-to_bool(value [, default])            Safe boolean conversion with fallback
-
-TYPE CHECKING FUNCTIONS:
-type_of(value)                        Get type name as string (builtin)
-
 DATETIME FUNCTIONS:
 now_utc()                             Current UTC timestamp (DateTimeWrapper)
 now_local()                           Current local timestamp (DateTimeWrapper)
@@ -120,7 +116,26 @@ dt.to_utc(), dt.to_local()            Convert timezone
 dt + dur, dt - dur                    Add/subtract duration from datetime
 dt1 - dt2                             Get duration between datetimes
 dur.as_seconds(), dur.as_minutes()    Convert duration to numeric values
-  
+
+MATH FUNCTIONS:
+abs(x)                                Absolute value of number
+floor(x)                              Round down to nearest integer
+mod(a, b) / a % b                     Modulo operation with division-by-zero protection
+rand()                                Random float between 0 and 1
+rand_int(min, max)                    Random integer between min and max (inclusive)
+round(x)                              Round to nearest integer
+
+UTILITY FUNCTIONS:
+type_of(value)                        Get type name as string (builtin)
+eprint(message)                       Print to stderr (suppressed with -qqq)
+exit(code)                            Exit kelora with given exit code
+get_env(var [, default])              Get environment variable with optional default
+print(message)                        Print to stdout (suppressed with -qqq)
+read_file(path)                       Read file contents as string
+read_lines(path)                      Read file as array of lines
+window_numbers(field)                 Get numeric field values from current window
+window_values(field)                  Get field values from current window
+
 TRACKING/METRICS FUNCTIONS:
 track_bucket(key, bucket)             Track values in buckets for histograms
 track_count(key)                      Increment counter for key by 1
@@ -128,23 +143,7 @@ track_max(key, value)                 Track maximum value for key
 track_min(key, value)                 Track minimum value for key
 track_sum(key, value)                 Accumulate numeric values for key
 track_unique(key, value)              Track unique values for key
-  
-MATH/UTILITY FUNCTIONS:
-mod(a, b) / a % b                     Modulo operation with division-by-zero protection
-rand()                                Random float between 0 and 1
-rand_int(min, max)                    Random integer between min and max (inclusive)
-  
-UTILITY FUNCTIONS:
-eprint(message)                       Print to stderr (suppressed with -qqq)
-exit(code)                            Exit kelora with given exit code
-get_env(var [, default])              Get environment variable with optional default
-percentile(array, pct)                Calculate percentile of numeric array
-print(message)                        Print to stdout (suppressed with -qqq)
-read_file(path)                       Read file contents as string
-read_lines(path)                      Read file as array of lines
-window_numbers(field)                 Get numeric field values from current window
-window_values(field)                  Get field values from current window
-  
+
 FILE OUTPUT (REQUIRES --allow-fs-writes):
 append_file(path, text_or_array)       Append line(s) to file; arrays append one line per element
 mkdir(path [, recursive])              Create directory (set recursive=true to create parents)
@@ -167,8 +166,17 @@ e.error_tags = e.tags.filter(|tag| tag.contains("error"))  # Builtin filter
 emit_each(e.items)  # Creates separate event for each item
 
 # Type-safe parsing and validation
-e.status_code = parse_int(e.status)  # Parse safely
+e.status_code = e.status.to_int()  # Parse safely
 if type_of(e.level) == "string" { e.log_level = e.level.to_upper() }
+
+# JSON parsing and serialization
+e.parsed_data = e.json_field.parse_json()
+e.json_output = e.data.to_json()
+
+# Math functions
+e.abs_value = abs(e.negative_number)
+e.rounded = round(e.decimal_value)
+e.floored = floor(e.decimal_value)
 
 # Safe nested field access
 e.user_role = e.get_path("user.profile.role", "guest")
