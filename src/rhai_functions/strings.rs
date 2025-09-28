@@ -1927,9 +1927,18 @@ fn to_kv_impl(map: rhai::Map, sep: Option<&str>, kv_sep: &str) -> String {
         first = false;
 
         // Key=value format
+        let value_str = value.to_string();
         output.push_str(&key);
         output.push_str(kv_sep);
-        output.push_str(&value.to_string());
+
+        // If using space as field separator and value contains spaces, quote it
+        if field_sep == " " && value_str.contains(' ') {
+            output.push('"');
+            output.push_str(&value_str.replace('"', "\\\""));
+            output.push('"');
+        } else {
+            output.push_str(&value_str);
+        }
     }
 
     output
@@ -4566,5 +4575,467 @@ mod tests {
 
         assert_eq!(result2.get("name").unwrap().to_string(), "alice");
         assert_eq!(result2.get("age").unwrap().to_string(), "25");
+    }
+
+    // Invariance tests: Testing the mathematical property that parse(to(x)) = x
+    // These tests ensure bidirectional compatibility between parse_* and to_* functions
+
+    #[test]
+    fn test_logfmt_parse_to_invariance() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Test basic logfmt invariance: parse(to(map)) = map
+        let result: rhai::Map = engine
+            .eval(
+                r##"
+                let original = #{
+                    level: "INFO",
+                    message: "Test with spaces",
+                    count: 42,
+                    active: true,
+                    ratio: 3.14
+                };
+                let serialized = original.to_logfmt();
+                serialized.parse_logfmt()
+            "##,
+            )
+            .unwrap();
+
+        assert_eq!(result.get("level").unwrap().to_string(), "INFO");
+        assert_eq!(result.get("message").unwrap().to_string(), "Test with spaces");
+        assert_eq!(result.get("count").unwrap().to_string(), "42");
+        assert_eq!(result.get("active").unwrap().to_string(), "true");
+        assert_eq!(result.get("ratio").unwrap().to_string(), "3.14");
+    }
+
+    #[test]
+    fn test_kv_parse_to_invariance() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Test kv invariance with default separators
+        let result: rhai::Map = engine
+            .eval(
+                r##"
+                let original = #{
+                    name: "alice",
+                    age: "25",
+                    role: "admin"
+                };
+                let serialized = original.to_kv();
+                serialized.parse_kv()
+            "##,
+            )
+            .unwrap();
+
+        assert_eq!(result.get("name").unwrap().to_string(), "alice");
+        assert_eq!(result.get("age").unwrap().to_string(), "25");
+        assert_eq!(result.get("role").unwrap().to_string(), "admin");
+
+        // Test kv invariance with custom separators
+        let result2: rhai::Map = engine
+            .eval(
+                r##"
+                let original = #{
+                    host: "server1",
+                    port: "8080"
+                };
+                let serialized = original.to_kv("|", ":");
+                serialized.parse_kv("|", ":")
+            "##,
+            )
+            .unwrap();
+
+        assert_eq!(result2.get("host").unwrap().to_string(), "server1");
+        assert_eq!(result2.get("port").unwrap().to_string(), "8080");
+    }
+
+    #[test]
+    fn test_logfmt_edge_cases_invariance() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Test with problematic characters that require escaping/quoting
+        let result: rhai::Map = engine
+            .eval(
+                r##"
+                let original = #{
+                    simple: "value",
+                    spaced: "value with spaces",
+                    quoted: "value\"with\"quotes",
+                    equals: "value=with=equals",
+                    empty: "",
+                    newlines: "line1\nline2"
+                };
+                let serialized = original.to_logfmt();
+                serialized.parse_logfmt()
+            "##,
+            )
+            .unwrap();
+
+        assert_eq!(result.get("simple").unwrap().to_string(), "value");
+        assert_eq!(result.get("spaced").unwrap().to_string(), "value with spaces");
+        assert_eq!(result.get("quoted").unwrap().to_string(), "value\"with\"quotes");
+        assert_eq!(result.get("equals").unwrap().to_string(), "value=with=equals");
+        assert_eq!(result.get("empty").unwrap().to_string(), "");
+        assert_eq!(result.get("newlines").unwrap().to_string(), "line1\nline2");
+    }
+
+    #[test]
+    fn test_key_sanitization_invariance() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Test that key sanitization works in roundtrip
+        let result: rhai::Map = engine
+            .eval(
+                r##"
+                let original = #{};
+                original["field with spaces"] = "value1";
+                original["field=with=equals"] = "value2";
+                original["field\twith\ttabs"] = "value3";
+
+                let serialized = original.to_logfmt();
+                serialized.parse_logfmt()
+            "##,
+            )
+            .unwrap();
+
+        // Keys should be sanitized consistently
+        assert_eq!(result.get("field_with_spaces").unwrap().to_string(), "value1");
+        assert_eq!(result.get("field_with_equals").unwrap().to_string(), "value2");
+        assert_eq!(result.get("field_with_tabs").unwrap().to_string(), "value3");
+    }
+
+    #[test]
+    fn test_triple_transformation_logfmt_kv_logfmt() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Test: Map -> logfmt -> parse -> kv -> parse -> logfmt -> parse
+        // Use values without spaces since parse_kv doesn't handle quoted values
+        let result: rhai::Map = engine
+            .eval(
+                r##"
+                let original = #{
+                    service: "web",
+                    level: "INFO",
+                    code: "200",
+                    user: "alice"
+                };
+
+                // Transform: Map -> logfmt -> Map -> kv -> Map -> logfmt -> Map
+                let step1 = original.to_logfmt();           // Map -> logfmt string
+                let step2 = step1.parse_logfmt();          // logfmt -> Map
+                let step3 = step2.to_kv();                 // Map -> kv string
+                let step4 = step3.parse_kv();              // kv -> Map
+                let step5 = step4.to_logfmt();             // Map -> logfmt string
+                step5.parse_logfmt()                       // logfmt -> Map
+            "##,
+            )
+            .unwrap();
+
+        // Should preserve all original data through triple transformation
+        assert_eq!(result.get("service").unwrap().to_string(), "web");
+        assert_eq!(result.get("level").unwrap().to_string(), "INFO");
+        assert_eq!(result.get("code").unwrap().to_string(), "200");
+        assert_eq!(result.get("user").unwrap().to_string(), "alice");
+    }
+
+    #[test]
+    fn test_triple_transformation_kv_logfmt_kv() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Alternative triple transformation with non-space separators
+        let result: rhai::Map = engine
+            .eval(
+                r##"
+                let original = #{
+                    host: "server1",
+                    port: "8080",
+                    status: "active"
+                };
+
+                // Transform: Map -> kv(|,:) -> Map -> logfmt -> Map -> kv(|,:) -> Map
+                let step1 = original.to_kv("|", ":");      // Map -> kv string
+                let step2 = step1.parse_kv("|", ":");      // kv -> Map
+                let step3 = step2.to_logfmt();             // Map -> logfmt string
+                let step4 = step3.parse_logfmt();          // logfmt -> Map
+                let step5 = step4.to_kv("|", ":");         // Map -> kv string
+                step5.parse_kv("|", ":")                   // kv -> Map
+            "##,
+            )
+            .unwrap();
+
+        // Should preserve all original data through triple transformation
+        assert_eq!(result.get("host").unwrap().to_string(), "server1");
+        assert_eq!(result.get("port").unwrap().to_string(), "8080");
+        assert_eq!(result.get("status").unwrap().to_string(), "active");
+    }
+
+    #[test]
+    fn test_cross_format_consistency() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Test that the same data produces consistent results across formats
+        // Use simple values (no spaces) to ensure kv format compatibility
+        let logfmt_result: rhai::Map = engine
+            .eval(
+                r##"
+                let original = #{
+                    timestamp: "2023-10-24T12:34:56Z",
+                    level: "ERROR",
+                    service: "auth-service",
+                    user_id: "12345",
+                    status_code: "401"
+                };
+                let logfmt_str = original.to_logfmt();
+                logfmt_str.parse_logfmt()
+            "##,
+            )
+            .unwrap();
+
+        // Convert through kv
+        let kv_result: rhai::Map = engine
+            .eval(
+                r##"
+                let original = #{
+                    timestamp: "2023-10-24T12:34:56Z",
+                    level: "ERROR",
+                    service: "auth-service",
+                    user_id: "12345",
+                    status_code: "401"
+                };
+                let kv_str = original.to_kv();
+                kv_str.parse_kv()
+            "##,
+            )
+            .unwrap();
+
+        // Both should preserve the same core fields
+        for key in ["level", "service", "user_id", "status_code", "timestamp"] {
+            assert_eq!(
+                logfmt_result.get(key).unwrap().to_string(),
+                kv_result.get(key).unwrap().to_string(),
+                "Field '{}' differs between logfmt and kv transformations",
+                key
+            );
+        }
+    }
+
+    #[test]
+    fn test_syslog_field_preservation() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Test that syslog format preserves specific fields when parsed back
+        let result: String = engine
+            .eval(
+                r##"
+                let original = #{
+                    priority: "16",
+                    timestamp: "Oct 24 12:34:56",
+                    hostname: "web-server",
+                    tag: "nginx",
+                    message: "GET /api/health 200"
+                };
+
+                let syslog_line = original.to_syslog();
+                // Return the generated syslog line to verify format
+                syslog_line
+            "##,
+            )
+            .unwrap();
+
+        // Verify syslog format structure
+        assert!(result.starts_with("<16>"));
+        assert!(result.contains("Oct 24 12:34:56"));
+        assert!(result.contains("web-server"));
+        assert!(result.contains("nginx:"));
+        assert!(result.contains("GET /api/health 200"));
+
+        // Test complete format: <priority>timestamp hostname tag: message
+        let expected_format = "<16>Oct 24 12:34:56 web-server nginx: GET /api/health 200";
+        assert_eq!(result, expected_format);
+    }
+
+    #[test]
+    fn test_cef_field_preservation() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Test CEF format structure preservation
+        let result: String = engine
+            .eval(
+                r##"
+                let original = #{
+                    deviceVendor: "Acme",
+                    deviceProduct: "SecurityTool",
+                    deviceVersion: "2.0",
+                    signatureId: "100",
+                    name: "Suspicious activity",
+                    severity: "7",
+                    src: "192.168.1.100",
+                    dst: "10.0.0.1",
+                    act: "blocked"
+                };
+
+                original.to_cef()
+            "##,
+            )
+            .unwrap();
+
+        // Verify CEF header format
+        assert!(result.starts_with("CEF:0|Acme|SecurityTool|2.0|100|Suspicious activity|7|"));
+
+        // Verify extension fields are present
+        assert!(result.contains("src=192.168.1.100"));
+        assert!(result.contains("dst=10.0.0.1"));
+        assert!(result.contains("act=blocked"));
+    }
+
+    #[test]
+    fn test_combined_log_format_consistency() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Test combined log format structure
+        let result: String = engine
+            .eval(
+                r##"
+                let original = #{
+                    ip: "192.168.1.1",
+                    identity: "-",
+                    user: "alice",
+                    timestamp: "[25/Dec/1995:10:00:00 +0000]",
+                    method: "GET",
+                    path: "/api/users",
+                    protocol: "HTTP/1.1",
+                    status: "200",
+                    bytes: "1234",
+                    referer: "https://example.com/",
+                    user_agent: "Mozilla/5.0",
+                    request_time: "0.045"
+                };
+
+                original.to_combined()
+            "##,
+            )
+            .unwrap();
+
+        // Verify combined log format components
+        assert!(result.contains("192.168.1.1"));
+        assert!(result.contains("- alice"));
+        assert!(result.contains("[25/Dec/1995:10:00:00 +0000]"));
+        assert!(result.contains("\"GET /api/users HTTP/1.1\""));
+        assert!(result.contains("200 1234"));
+        assert!(result.contains("\"https://example.com/\""));
+        assert!(result.contains("\"Mozilla/5.0\""));
+        assert!(result.ends_with(" \"0.045\""));
+    }
+
+    #[test]
+    fn test_empty_and_null_handling_invariance() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Test handling of empty values and null-like data
+        let result: rhai::Map = engine
+            .eval(
+                r##"
+                let original = #{
+                    empty_string: "",
+                    normal_field: "value"
+                };
+
+                let logfmt_str = original.to_logfmt();
+                logfmt_str.parse_logfmt()
+            "##,
+            )
+            .unwrap();
+
+        assert_eq!(result.get("empty_string").unwrap().to_string(), "");
+        assert_eq!(result.get("normal_field").unwrap().to_string(), "value");
+
+        // Test kv handling of empty values
+        let result2: rhai::Map = engine
+            .eval(
+                r##"
+                let original = #{
+                    empty: "",
+                    normal: "test"
+                };
+
+                let kv_str = original.to_kv();
+                kv_str.parse_kv()
+            "##,
+            )
+            .unwrap();
+
+        assert_eq!(result2.get("empty").unwrap().to_string(), "");
+        assert_eq!(result2.get("normal").unwrap().to_string(), "test");
+    }
+
+    #[test]
+    fn test_numeric_type_consistency() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Test that numeric values maintain consistency through transformations
+        let result: rhai::Map = engine
+            .eval(
+                r##"
+                let original = #{
+                    integer: 42,
+                    float: 3.14159,
+                    zero: 0,
+                    negative: -100
+                };
+
+                let logfmt_str = original.to_logfmt();
+                logfmt_str.parse_logfmt()
+            "##,
+            )
+            .unwrap();
+
+        // Note: After parse, all values become strings, but should preserve numeric representation
+        assert_eq!(result.get("integer").unwrap().to_string(), "42");
+        assert_eq!(result.get("float").unwrap().to_string(), "3.14159");
+        assert_eq!(result.get("zero").unwrap().to_string(), "0");
+        assert_eq!(result.get("negative").unwrap().to_string(), "-100");
+    }
+
+    #[test]
+    fn test_large_data_invariance() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Test with larger datasets to ensure scalability
+        let result: rhai::Map = engine
+            .eval(
+                r##"
+                let original = #{};
+
+                // Create a map with many fields
+                for i in 0..50 {
+                    let key = "field_" + i;
+                    let value = "value_" + i + "_with_some_data";
+                    original[key] = value;
+                }
+
+                let logfmt_str = original.to_logfmt();
+                logfmt_str.parse_logfmt()
+            "##,
+            )
+            .unwrap();
+
+        // Verify all fields are preserved
+        assert_eq!(result.len(), 50);
+        assert_eq!(result.get("field_0").unwrap().to_string(), "value_0_with_some_data");
+        assert_eq!(result.get("field_25").unwrap().to_string(), "value_25_with_some_data");
+        assert_eq!(result.get("field_49").unwrap().to_string(), "value_49_with_some_data");
     }
 }
