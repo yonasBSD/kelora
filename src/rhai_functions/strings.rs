@@ -1226,16 +1226,16 @@ pub fn register_functions(engine: &mut Engine) {
     );
 
     engine.register_fn("starting_with", |text: &str, prefix: &str| -> String {
-        if text.starts_with(prefix) {
-            text.to_string()
+        if let Some(pos) = text.find(prefix) {
+            text[pos..].to_string()
         } else {
             String::new()
         }
     });
 
     engine.register_fn("ending_with", |text: &str, suffix: &str| -> String {
-        if text.ends_with(suffix) {
-            text.to_string()
+        if let Some(pos) = text.rfind(suffix) {
+            text[..pos + suffix.len()].to_string()
         } else {
             String::new()
         }
@@ -2266,13 +2266,27 @@ mod tests {
         let mut scope = Scope::new();
         scope.push("text", "hello world");
 
+        // Test finding text at the beginning
         let result: String = engine
             .eval_with_scope(&mut scope, r#"text.starting_with("hello")"#)
             .unwrap();
         assert_eq!(result, "hello world");
 
+        // Test finding text in the middle
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.starting_with("llo")"#)
+            .unwrap();
+        assert_eq!(result, "llo world");
+
+        // Test finding text at the end
         let result: String = engine
             .eval_with_scope(&mut scope, r#"text.starting_with("world")"#)
+            .unwrap();
+        assert_eq!(result, "world");
+
+        // Test text not found
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.starting_with("xyz")"#)
             .unwrap();
         assert_eq!(result, "");
     }
@@ -2285,13 +2299,27 @@ mod tests {
         let mut scope = Scope::new();
         scope.push("text", "hello world");
 
+        // Test finding text at the end
         let result: String = engine
             .eval_with_scope(&mut scope, r#"text.ending_with("world")"#)
             .unwrap();
         assert_eq!(result, "hello world");
 
+        // Test finding text in the middle
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.ending_with("ell")"#)
+            .unwrap();
+        assert_eq!(result, "hell");
+
+        // Test finding text at the beginning
         let result: String = engine
             .eval_with_scope(&mut scope, r#"text.ending_with("hello")"#)
+            .unwrap();
+        assert_eq!(result, "hello");
+
+        // Test text not found
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.ending_with("xyz")"#)
             .unwrap();
         assert_eq!(result, "");
     }

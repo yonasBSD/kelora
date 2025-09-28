@@ -18,7 +18,7 @@ text.decode_url()                     Decode URL-encoded string
 text.encode_b64()                     Encode text to base64 string
 text.encode_hex()                     Encode text to hexadecimal string
 text.encode_url()                     URL-encode text (percent encoding)
-text.ending_with(suffix)              Return text if it ends with suffix, else empty
+text.ending_with(suffix)              Return substring from start to end of suffix, else empty
 text.escape_html()                    Escape HTML special characters (&, <, >, ", ')
 text.escape_json()                    Escape JSON special characters
 text.extract_all_re(pattern [, group]) Extract all regex matches as array
@@ -52,7 +52,7 @@ text.replace(pattern, replacement)    Replace all occurrences of pattern (builti
 text.slice(spec)                      Slice text using Python notation (e.g., "1:5", ":3", "-2:")
 text.split_re(pattern)                Split text by regex pattern
 text.split(separator)                 Split string into array by delimiter (builtin)
-text.starting_with(prefix)            Return text if it starts with prefix, else empty
+text.starting_with(prefix)            Return substring from prefix to end, else empty
 text.strip([chars])                   Remove whitespace or specified characters
 text.sub_string(start [, length])     Extract substring from position (builtin)
 text.to_float()                       Convert text to float (0 on error)
