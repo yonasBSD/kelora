@@ -82,6 +82,8 @@ array.some(|item| condition)          Check if any element matches condition (bu
 array.sort()                          Sort array in place (builtin)
 array.sorted_by(field)                Sort array of objects by field name
 array.sorted()                        Return new sorted array (numeric/lexicographic)
+array.min()                           Find minimum value in array (no auto string-to-number coercion)
+array.max()                           Find maximum value in array (no auto string-to-number coercion)
 array.starts_with_any(search_array)   Check if array starts with any search values
   
 MAP/OBJECT FUNCTIONS:

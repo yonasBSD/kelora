@@ -19,6 +19,10 @@ pub fn register_functions(engine: &mut Engine) {
     // Register starts_with_any function - check if array starts with any of the specified values
     engine.register_fn("starts_with_any", starts_with_any_array);
 
+    // Register min/max functions - find minimum/maximum values in arrays
+    engine.register_fn("min", min_array);
+    engine.register_fn("max", max_array);
+
     // Array flattening functions
 
     // Default flatten() for arrays - uses bracket style, unlimited depth
@@ -359,6 +363,245 @@ fn starts_with_any_array(arr: Array, search_values: Array) -> bool {
     // Check if the first element matches any search value
     let first_element_str = arr[0].to_string();
     search_strings.contains(&first_element_str)
+}
+
+/// Find the minimum value in an array
+///
+/// Returns the smallest value in the array. All elements must be of compatible types.
+/// Actual numbers (integers, floats) are compared numerically.
+/// Strings are compared lexicographically. Mixed incompatible types return an error.
+///
+/// # Arguments
+/// * `arr` - The array to find the minimum value in
+///
+/// # Returns
+/// The minimum value, or `()` if the array is empty or contains incompatible types
+///
+/// # Examples
+/// ```rhai
+/// let numbers = [3, 1, 4, 1, 5];
+/// let min_val = min(numbers);  // 1
+///
+/// let strings = ["banana", "apple", "cherry"];
+/// let min_str = min(strings);  // "apple"
+///
+/// let floats = [3.14, 2.71, 1.41];
+/// let min_float = min(floats);  // 1.41
+///
+/// let numeric_strings = ["10", "2", "100"];
+/// let min_num_str = min(numeric_strings);  // "10" (lexicographic comparison)
+///
+/// let mixed = [1, "apple"];  // Returns () - incompatible types
+/// let min_mixed = min(mixed);
+///
+/// let mixed_num_str = [1, "2"];  // Returns () - numbers and strings are incompatible
+/// let min_mixed_2 = min(mixed_num_str);
+///
+/// let empty = [];
+/// let min_empty = min(empty);  // ()
+/// ```
+///
+/// # Type Compatibility
+/// - All actual numbers (i64, f64) are compatible with each other
+/// - All strings (including numeric strings) are compatible with each other
+/// - Actual numbers and strings are incompatible (no automatic coercion)
+/// - Booleans are treated as strings ("false", "true")
+/// - Empty arrays return `()`
+/// - Arrays with incompatible types return `()`
+fn min_array(arr: Array) -> Dynamic {
+    if arr.is_empty() {
+        return Dynamic::UNIT;
+    }
+
+    // Determine the type category of the array
+    let array_type = determine_array_type(&arr);
+
+    match array_type {
+        ArrayType::Empty => Dynamic::UNIT,
+        ArrayType::Mixed => Dynamic::UNIT, // Reject mixed types
+        ArrayType::Numeric => find_numeric_min(&arr),
+        ArrayType::String => find_string_min(&arr),
+    }
+}
+
+/// Find the maximum value in an array
+///
+/// Returns the largest value in the array. All elements must be of compatible types.
+/// Actual numbers (integers, floats) are compared numerically.
+/// Strings are compared lexicographically. Mixed incompatible types return an error.
+///
+/// # Arguments
+/// * `arr` - The array to find the maximum value in
+///
+/// # Returns
+/// The maximum value, or `()` if the array is empty or contains incompatible types
+///
+/// # Examples
+/// ```rhai
+/// let numbers = [3, 1, 4, 1, 5];
+/// let max_val = max(numbers);  // 5
+///
+/// let strings = ["banana", "apple", "cherry"];
+/// let max_str = max(strings);  // "cherry"
+///
+/// let floats = [3.14, 2.71, 1.41];
+/// let max_float = max(floats);  // 3.14
+///
+/// let numeric_strings = ["10", "2", "100"];
+/// let max_num_str = max(numeric_strings);  // "2" (lexicographic comparison)
+///
+/// let mixed = [1, "apple"];  // Returns () - incompatible types
+/// let max_mixed = max(mixed);
+///
+/// let mixed_num_str = [1, "2"];  // Returns () - numbers and strings are incompatible
+/// let max_mixed_2 = max(mixed_num_str);
+///
+/// let empty = [];
+/// let max_empty = max(empty);  // ()
+/// ```
+///
+/// # Type Compatibility
+/// - All actual numbers (i64, f64) are compatible with each other
+/// - All strings (including numeric strings) are compatible with each other
+/// - Actual numbers and strings are incompatible (no automatic coercion)
+/// - Booleans are treated as strings ("false", "true")
+/// - Empty arrays return `()`
+/// - Arrays with incompatible types return `()`
+fn max_array(arr: Array) -> Dynamic {
+    if arr.is_empty() {
+        return Dynamic::UNIT;
+    }
+
+    // Determine the type category of the array
+    let array_type = determine_array_type(&arr);
+
+    match array_type {
+        ArrayType::Empty => Dynamic::UNIT,
+        ArrayType::Mixed => Dynamic::UNIT, // Reject mixed types
+        ArrayType::Numeric => find_numeric_max(&arr),
+        ArrayType::String => find_string_max(&arr),
+    }
+}
+
+/// Enum to categorize array element types
+#[derive(Debug, PartialEq)]
+enum ArrayType {
+    Empty,
+    Numeric,  // All elements are numbers or numeric strings
+    String,   // All elements are non-numeric strings or booleans
+    Mixed,    // Contains incompatible types
+}
+
+/// Determine the type category of an array
+fn determine_array_type(arr: &Array) -> ArrayType {
+    if arr.is_empty() {
+        return ArrayType::Empty;
+    }
+
+    let mut has_numeric = false;
+    let mut has_string = false;
+
+    for item in arr {
+        if is_actual_number(item) {
+            has_numeric = true;
+        } else {
+            has_string = true;
+        }
+
+        // If we have both types, it's mixed
+        if has_numeric && has_string {
+            return ArrayType::Mixed;
+        }
+    }
+
+    if has_numeric {
+        ArrayType::Numeric
+    } else {
+        ArrayType::String
+    }
+}
+
+/// Check if a value is an actual numeric type (not a string that could be parsed as a number)
+fn is_actual_number(value: &Dynamic) -> bool {
+    value.is_int() || value.is_float()
+}
+
+/// Find minimum value in a numeric array
+fn find_numeric_min(arr: &Array) -> Dynamic {
+    let mut min_val = f64::INFINITY;
+    let mut min_item = &arr[0];
+
+    for item in arr {
+        let num = if item.is_int() {
+            item.as_int().unwrap_or(0) as f64
+        } else if item.is_float() {
+            item.as_float().unwrap_or(0.0)
+        } else {
+            continue; // Skip non-numeric items (shouldn't happen in a numeric array)
+        };
+
+        if num < min_val {
+            min_val = num;
+            min_item = item;
+        }
+    }
+
+    min_item.clone()
+}
+
+/// Find maximum value in a numeric array
+fn find_numeric_max(arr: &Array) -> Dynamic {
+    let mut max_val = f64::NEG_INFINITY;
+    let mut max_item = &arr[0];
+
+    for item in arr {
+        let num = if item.is_int() {
+            item.as_int().unwrap_or(0) as f64
+        } else if item.is_float() {
+            item.as_float().unwrap_or(0.0)
+        } else {
+            continue; // Skip non-numeric items (shouldn't happen in a numeric array)
+        };
+
+        if num > max_val {
+            max_val = num;
+            max_item = item;
+        }
+    }
+
+    max_item.clone()
+}
+
+/// Find minimum value in a string array
+fn find_string_min(arr: &Array) -> Dynamic {
+    let mut min_str = arr[0].to_string();
+    let mut min_item = &arr[0];
+
+    for item in arr {
+        let item_str = item.to_string();
+        if item_str < min_str {
+            min_str = item_str;
+            min_item = item;
+        }
+    }
+
+    min_item.clone()
+}
+
+/// Find maximum value in a string array
+fn find_string_max(arr: &Array) -> Dynamic {
+    let mut max_str = arr[0].to_string();
+    let mut max_item = &arr[0];
+
+    for item in arr {
+        let item_str = item.to_string();
+        if item_str > max_str {
+            max_str = item_str;
+            max_item = item;
+        }
+    }
+
+    max_item.clone()
 }
 
 /// Convert IndexMap<String, Dynamic> to rhai::Map
@@ -873,5 +1116,236 @@ mod tests {
         let search = vec![Dynamic::from("true"), Dynamic::from("false")];
 
         assert!(starts_with_any_array(arr, search));
+    }
+
+    #[test]
+    fn test_min_array_numbers() {
+        let arr = vec![
+            Dynamic::from(3i64),
+            Dynamic::from(1i64),
+            Dynamic::from(4i64),
+            Dynamic::from(1i64),
+            Dynamic::from(5i64),
+        ];
+
+        let result = min_array(arr);
+        assert_eq!(result.as_int().unwrap(), 1i64);
+    }
+
+    #[test]
+    fn test_max_array_numbers() {
+        let arr = vec![
+            Dynamic::from(3i64),
+            Dynamic::from(1i64),
+            Dynamic::from(4i64),
+            Dynamic::from(1i64),
+            Dynamic::from(5i64),
+        ];
+
+        let result = max_array(arr);
+        assert_eq!(result.as_int().unwrap(), 5i64);
+    }
+
+    #[test]
+    fn test_min_array_floats() {
+        let arr = vec![
+            Dynamic::from(3.14),
+            Dynamic::from(2.71),
+            Dynamic::from(1.41),
+        ];
+
+        let result = min_array(arr);
+        assert_eq!(result.as_float().unwrap(), 1.41);
+    }
+
+    #[test]
+    fn test_max_array_floats() {
+        let arr = vec![
+            Dynamic::from(3.14),
+            Dynamic::from(2.71),
+            Dynamic::from(1.41),
+        ];
+
+        let result = max_array(arr);
+        assert_eq!(result.as_float().unwrap(), 3.14);
+    }
+
+    #[test]
+    fn test_min_array_strings() {
+        let arr = vec![
+            Dynamic::from("banana"),
+            Dynamic::from("apple"),
+            Dynamic::from("cherry"),
+        ];
+
+        let result = min_array(arr);
+        assert_eq!(result.to_string(), "apple");
+    }
+
+    #[test]
+    fn test_max_array_strings() {
+        let arr = vec![
+            Dynamic::from("banana"),
+            Dynamic::from("apple"),
+            Dynamic::from("cherry"),
+        ];
+
+        let result = max_array(arr);
+        assert_eq!(result.to_string(), "cherry");
+    }
+
+    #[test]
+    fn test_min_array_numeric_strings() {
+        let arr = vec![
+            Dynamic::from("10"),
+            Dynamic::from("2"),
+            Dynamic::from("100"),
+        ];
+
+        let result = min_array(arr);
+        // Should use lexicographic comparison, not numeric
+        assert_eq!(result.to_string(), "10");
+    }
+
+    #[test]
+    fn test_max_array_numeric_strings() {
+        let arr = vec![
+            Dynamic::from("10"),
+            Dynamic::from("2"),
+            Dynamic::from("100"),
+        ];
+
+        let result = max_array(arr);
+        // Should use lexicographic comparison, not numeric
+        assert_eq!(result.to_string(), "2");
+    }
+
+    #[test]
+    fn test_min_array_booleans() {
+        let arr = vec![Dynamic::from(true), Dynamic::from(false)];
+
+        let result = min_array(arr);
+        assert_eq!(result.to_string(), "false");
+    }
+
+    #[test]
+    fn test_max_array_booleans() {
+        let arr = vec![Dynamic::from(true), Dynamic::from(false)];
+
+        let result = max_array(arr);
+        assert_eq!(result.to_string(), "true");
+    }
+
+    #[test]
+    fn test_min_array_mixed_types() {
+        let arr = vec![Dynamic::from(1i64), Dynamic::from("apple")];
+
+        let result = min_array(arr);
+        assert!(result.is_unit()); // Should return () for mixed types
+    }
+
+    #[test]
+    fn test_max_array_mixed_types() {
+        let arr = vec![Dynamic::from(1i64), Dynamic::from("apple")];
+
+        let result = max_array(arr);
+        assert!(result.is_unit()); // Should return () for mixed types
+    }
+
+    #[test]
+    fn test_min_array_empty() {
+        let arr = Array::new();
+
+        let result = min_array(arr);
+        assert!(result.is_unit()); // Should return () for empty array
+    }
+
+    #[test]
+    fn test_max_array_empty() {
+        let arr = Array::new();
+
+        let result = max_array(arr);
+        assert!(result.is_unit()); // Should return () for empty array
+    }
+
+    #[test]
+    fn test_min_array_single_element() {
+        let arr = vec![Dynamic::from(42i64)];
+
+        let result = min_array(arr);
+        assert_eq!(result.as_int().unwrap(), 42i64);
+    }
+
+    #[test]
+    fn test_max_array_single_element() {
+        let arr = vec![Dynamic::from(42i64)];
+
+        let result = max_array(arr);
+        assert_eq!(result.as_int().unwrap(), 42i64);
+    }
+
+    #[test]
+    fn test_determine_array_type() {
+        // Numeric array (actual numbers only)
+        let numeric_arr = vec![Dynamic::from(1i64), Dynamic::from(2.5)];
+        assert_eq!(determine_array_type(&numeric_arr), ArrayType::Numeric);
+
+        // String array
+        let string_arr = vec![Dynamic::from("hello"), Dynamic::from("world")];
+        assert_eq!(determine_array_type(&string_arr), ArrayType::String);
+
+        // Mixed array (number + string)
+        let mixed_arr = vec![Dynamic::from(1i64), Dynamic::from("hello")];
+        assert_eq!(determine_array_type(&mixed_arr), ArrayType::Mixed);
+
+        // Empty array
+        let empty_arr = Array::new();
+        assert_eq!(determine_array_type(&empty_arr), ArrayType::Empty);
+
+        // Numeric strings (treated as strings now, not numbers)
+        let numeric_str_arr = vec![Dynamic::from("10"), Dynamic::from("20")];
+        assert_eq!(determine_array_type(&numeric_str_arr), ArrayType::String);
+
+        // Boolean array (treated as strings)
+        let bool_arr = vec![Dynamic::from(true), Dynamic::from(false)];
+        assert_eq!(determine_array_type(&bool_arr), ArrayType::String);
+
+        // Mixed number + numeric string (should be Mixed now)
+        let mixed_num_str = vec![Dynamic::from(1i64), Dynamic::from("10")];
+        assert_eq!(determine_array_type(&mixed_num_str), ArrayType::Mixed);
+    }
+
+    #[test]
+    fn test_min_max_with_mixed_numeric_types() {
+        // Mix of integers and floats only (no strings)
+        let arr = vec![
+            Dynamic::from(3i64),
+            Dynamic::from(1.5),
+            Dynamic::from(4i64),
+        ];
+
+        let min_result = min_array(arr.clone());
+        let max_result = max_array(arr);
+
+        // Min should be 1.5
+        assert_eq!(min_result.as_float().unwrap(), 1.5);
+        // Max should be 4
+        assert_eq!(max_result.as_int().unwrap(), 4i64);
+    }
+
+    #[test]
+    fn test_min_max_mixed_numbers_and_strings_rejected() {
+        // Mix of actual numbers and numeric strings should be rejected
+        let arr = vec![
+            Dynamic::from(3i64),
+            Dynamic::from("2"),
+        ];
+
+        let min_result = min_array(arr.clone());
+        let max_result = max_array(arr);
+
+        // Should return () for mixed types
+        assert!(min_result.is_unit());
+        assert!(max_result.is_unit());
     }
 }
