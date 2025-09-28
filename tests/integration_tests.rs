@@ -4541,3 +4541,150 @@ fn test_quiet_levels_with_errors() {
     // In strict mode with -qqq, even error messages should be suppressed
     // but exit code should still indicate failure
 }
+
+#[test]
+fn test_extract_re_maps_basic_functionality() {
+    let input = r#"{"log": "User alice@test.com logged in from 192.168.1.100"}
+{"log": "User bob@example.org failed login from 10.0.0.50"}
+{"log": "Error: no email addresses found in this line"}"#;
+
+    // Test basic extract_re_maps usage with emit_each
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f", "json",
+            "-F", "json",
+            "--exec", "let email_maps = extract_re_maps(e.log, \"\\\\w+@\\\\w+\\\\.\\\\w+\", \"email\"); emit_each(email_maps)",
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 2, "Should emit 2 email events");
+
+    // Check first email
+    let first: serde_json::Value = serde_json::from_str(lines[0]).expect("Should be valid JSON");
+    assert_eq!(first["email"].as_str().unwrap(), "alice@test.com");
+
+    // Check second email
+    let second: serde_json::Value = serde_json::from_str(lines[1]).expect("Should be valid JSON");
+    assert_eq!(second["email"].as_str().unwrap(), "bob@example.org");
+}
+
+#[test]
+fn test_extract_re_maps_with_capture_groups() {
+    let input = r#"{"message": "user=alice status=200 response_time=45ms"}
+{"message": "user=bob status=404 response_time=12ms"}
+{"message": "user=charlie status=500 response_time=234ms"}"#;
+
+    // Extract usernames using capture groups
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f", "json",
+            "-F", "json",
+            "--exec", "let user_maps = extract_re_maps(e.message, \"user=([\\\\w]+)\", \"username\"); emit_each(user_maps)",
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 3, "Should emit 3 username events");
+
+    let users: Vec<String> = lines
+        .iter()
+        .map(|line| {
+            let parsed: serde_json::Value = serde_json::from_str(line).unwrap();
+            parsed["username"].as_str().unwrap().to_string()
+        })
+        .collect();
+
+    assert_eq!(users, vec!["alice", "bob", "charlie"]);
+}
+
+#[test]
+fn test_extract_re_maps_with_base_context() {
+    let input = r#"{"timestamp": "2023-07-18T15:04:23Z", "source": "webapp", "message": "IPs detected: 192.168.1.1 and 10.0.0.1"}
+{"timestamp": "2023-07-18T15:05:30Z", "source": "database", "message": "Connection from 172.16.0.100"}"#;
+
+    // Extract IPs with base context preservation
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f", "json",
+            "-F", "json",
+            "--exec", r#"
+                let ip_maps = extract_re_maps(e.message, "\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b", "ip");
+                let base = #{timestamp: e.timestamp, source: e.source};
+                emit_each(ip_maps, base)
+            "#,
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 3, "Should emit 3 IP events (2 from first, 1 from second)");
+
+    // Check that all events have base context
+    for line in &lines {
+        let parsed: serde_json::Value = serde_json::from_str(line).expect("Should be valid JSON");
+        assert!(parsed["timestamp"].is_string(), "Should have timestamp from base");
+        assert!(parsed["source"].is_string(), "Should have source from base");
+        assert!(parsed["ip"].is_string(), "Should have extracted IP");
+    }
+
+    // Check specific IPs and their sources
+    let first_event: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+    assert_eq!(first_event["ip"].as_str().unwrap(), "192.168.1.1");
+    assert_eq!(first_event["source"].as_str().unwrap(), "webapp");
+
+    let third_event: serde_json::Value = serde_json::from_str(lines[2]).unwrap();
+    assert_eq!(third_event["ip"].as_str().unwrap(), "172.16.0.100");
+    assert_eq!(third_event["source"].as_str().unwrap(), "database");
+}
+
+#[test]
+fn test_extract_re_maps_composability() {
+    let input = r#"{"text": "Contact alice@test.com or call +1-555-123-4567"}
+{"text": "Email bob@example.org for support"}"#;
+
+    // Test composability: extract both emails and phone numbers, combine them
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f", "json",
+            "-F", "json",
+            "--exec", r#"
+                let email_maps = extract_re_maps(e.text, "\\w+@\\w+\\.\\w+", "contact");
+                let phone_maps = extract_re_maps(e.text, "\\+?1?-?\\d{3}-\\d{3}-\\d{4}", "contact");
+                let all_contacts = email_maps + phone_maps;
+                if all_contacts.len() > 0 {
+                    emit_each(all_contacts, #{source: "contact_extraction", original_text: e.text})
+                }
+            "#,
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 3, "Should emit 3 contact events (2 emails + 1 phone)");
+
+    let contacts: Vec<String> = lines
+        .iter()
+        .map(|line| {
+            let parsed: serde_json::Value = serde_json::from_str(line).unwrap();
+            parsed["contact"].as_str().unwrap().to_string()
+        })
+        .collect();
+
+    assert!(contacts.contains(&"alice@test.com".to_string()));
+    assert!(contacts.contains(&"bob@example.org".to_string()));
+    assert!(contacts.contains(&"+1-555-123-4567".to_string()));
+
+    // Verify all have the base context
+    for line in &lines {
+        let parsed: serde_json::Value = serde_json::from_str(line).unwrap();
+        assert_eq!(parsed["source"].as_str().unwrap(), "contact_extraction");
+        assert!(parsed["original_text"].is_string());
+    }
+}

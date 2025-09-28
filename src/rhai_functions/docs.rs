@@ -26,6 +26,7 @@ STRING/TEXT FUNCTIONS:
   text.extract_ip()                     Extract first IP address from text
   text.extract_ips()                    Extract all IP addresses as array
   text.extract_re(pattern [, group])    Extract regex match or capture group
+  text.extract_re_maps(pattern, field)  Extract regex matches as array of maps for fan-out
   text.extract_url()                    Extract first URL from text
   text.is_digit()                       Check if text contains only digits
   text.is_private_ip()                  Check if IP is in private ranges

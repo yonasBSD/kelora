@@ -513,9 +513,10 @@ fn parse_user_agent_impl(input: &str) -> Map {
     for (family, token) in candidate_agents {
         if let Some(version) = extract_version_token(trimmed, &ua_lower, token) {
             if *family == "Safari"
-                && (!ua_lower.contains("safari/") || ua_lower.contains("chrome/")) {
-                    continue;
-                }
+                && (!ua_lower.contains("safari/") || ua_lower.contains("chrome/"))
+            {
+                continue;
+            }
             agent_family = Some(family.to_string());
             agent_version = Some(version);
             break;
@@ -1418,6 +1419,32 @@ pub fn register_functions(engine: &mut Engine) {
                         if let Some(group_match) = captures.get(group_idx) {
                             results.push(Dynamic::from(group_match.as_str().to_string()));
                         }
+                    }
+                    results
+                }
+                Err(_) => rhai::Array::new(), // Invalid regex returns empty array
+            }
+        },
+    );
+
+    engine.register_fn(
+        "extract_re_maps",
+        |text: &str, pattern: &str, field_name: &str| -> rhai::Array {
+            match regex::Regex::new(pattern) {
+                Ok(re) => {
+                    let mut results = rhai::Array::new();
+                    for captures in re.captures_iter(text) {
+                        let match_value = if captures.len() > 1 {
+                            // Has capture groups - use first capture group
+                            captures.get(1).map(|m| m.as_str()).unwrap_or("")
+                        } else {
+                            // No capture groups - use full match
+                            captures.get(0).map(|m| m.as_str()).unwrap_or("")
+                        };
+
+                        let mut map = Map::new();
+                        map.insert(field_name.into(), Dynamic::from(match_value.to_string()));
+                        results.push(Dynamic::from(map));
                     }
                     results
                 }
@@ -2951,6 +2978,103 @@ mod tests {
             .eval_with_scope(&mut scope, r##"text.extract_all_re("user=(\\w+)", 5)"##)
             .unwrap();
         assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_extract_re_maps_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push("text", "alice@test.com and bob@example.org");
+
+        // Extract emails without capture groups (uses full match)
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"text.extract_re_maps("\\w+@\\w+\\.\\w+", "email")"##)
+            .unwrap();
+        assert_eq!(result.len(), 2);
+
+        // Check first email map
+        let first_map = result[0].clone().try_cast::<Map>().unwrap();
+        assert_eq!(
+            first_map.get("email").unwrap().clone().into_string().unwrap(),
+            "alice@test.com"
+        );
+
+        // Check second email map
+        let second_map = result[1].clone().try_cast::<Map>().unwrap();
+        assert_eq!(
+            second_map.get("email").unwrap().clone().into_string().unwrap(),
+            "bob@example.org"
+        );
+
+        // Extract with capture groups (uses first capture group)
+        scope.push("usertext", "user=alice status=200 user=bob status=404");
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"usertext.extract_re_maps("user=(\\w+)", "username")"##)
+            .unwrap();
+        assert_eq!(result.len(), 2);
+
+        let first_user = result[0].clone().try_cast::<Map>().unwrap();
+        assert_eq!(
+            first_user.get("username").unwrap().clone().into_string().unwrap(),
+            "alice"
+        );
+
+        let second_user = result[1].clone().try_cast::<Map>().unwrap();
+        assert_eq!(
+            second_user.get("username").unwrap().clone().into_string().unwrap(),
+            "bob"
+        );
+
+        // No matches (returns empty array)
+        scope.push("nomatch", "no emails here");
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"nomatch.extract_re_maps("\\w+@\\w+", "email")"##)
+            .unwrap();
+        assert_eq!(result.len(), 0);
+
+        // Invalid regex (returns empty array)
+        let result: rhai::Array = engine
+            .eval_with_scope(&mut scope, r##"text.extract_re_maps("[", "invalid")"##)
+            .unwrap();
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_extract_re_maps_with_emit_each() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+        crate::rhai_functions::emit::register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push("text", "Found IPs: 192.168.1.1 and 10.0.0.1");
+
+        // Test composability with emit_each
+        let result: i64 = engine
+            .eval_with_scope(&mut scope, r##"
+                let ip_maps = text.extract_re_maps("\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b", "ip");
+                emit_each(ip_maps)
+            "##)
+            .unwrap();
+
+        // Should return count of emitted events
+        assert_eq!(result, 2);
+
+        // Check that events were emitted and original suppressed
+        assert!(crate::rhai_functions::emit::should_suppress_current_event());
+
+        let emissions = crate::rhai_functions::emit::get_and_clear_pending_emissions();
+        assert_eq!(emissions.len(), 2);
+
+        assert_eq!(
+            emissions[0].get("ip").unwrap().clone().into_string().unwrap(),
+            "192.168.1.1"
+        );
+        assert_eq!(
+            emissions[1].get("ip").unwrap().clone().into_string().unwrap(),
+            "10.0.0.1"
+        );
     }
 
     #[test]
