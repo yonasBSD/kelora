@@ -9,6 +9,16 @@ use rhai::debugger::{DebuggerCommand, DebuggerEvent};
 use crate::event::Event;
 use crate::rhai_functions;
 
+/// Truncate text for display, respecting UTF-8 character boundaries
+fn truncate_for_display(text: &str, max_len: usize) -> String {
+    if text.chars().count() > max_len {
+        let truncated: String = text.chars().take(max_len.saturating_sub(3)).collect();
+        format!("{}...", truncated)
+    } else {
+        text.to_string()
+    }
+}
+
 use rhai::Map;
 
 // Temporary debug types until module structure is fixed
@@ -99,14 +109,14 @@ impl DebugTracker {
             2 => {
                 if self.config.is_enabled() {
                     eprintln!("{} execution started", stage);
-                    eprintln!("  Script: {}", self.truncate_for_display(script, 100));
+                    eprintln!("  Script: {}", truncate_for_display(script, 100));
                 }
             }
             3.. => {
                 if self.config.is_enabled() {
                     eprintln!("{} execution trace:", stage);
                     eprintln!("  Script: {}", script.trim());
-                    eprintln!("  Event: {}", self.truncate_for_display(event_data, 150));
+                    eprintln!("  Event: {}", truncate_for_display(event_data, 150));
                 }
             }
             _ => {}
@@ -120,13 +130,6 @@ impl DebugTracker {
         }
     }
 
-    fn truncate_for_display(&self, text: &str, max_len: usize) -> String {
-        if text.len() > max_len {
-            format!("{}...", &text[..max_len - 3])
-        } else {
-            text.to_string()
-        }
-    }
 
     pub fn update_context(&self, position: Option<rhai::Position>, source: Option<&str>) {
         if self.config.is_enabled() {
@@ -455,7 +458,7 @@ impl ExecutionTracer {
     pub fn trace_event_start(&self, event_num: u64, event_data: &str) {
         if self.config.verbosity >= 2 {
             eprintln!("  Filter execution trace for event {}:", event_num);
-            eprintln!("    Event: {}", self.truncate_for_display(event_data, 100));
+            eprintln!("    Event: {}", truncate_for_display(event_data, 100));
         }
     }
 
@@ -476,7 +479,7 @@ impl ExecutionTracer {
             eprintln!(
                 "    Access: {} = {}",
                 var_name,
-                self.truncate_for_display(value, 30)
+                truncate_for_display(value, 30)
             );
         }
     }
@@ -487,7 +490,7 @@ impl ExecutionTracer {
                 "    Call: {}({}) → {}",
                 func_name,
                 args,
-                self.truncate_for_display(result, 30)
+                truncate_for_display(result, 30)
             );
         }
     }
@@ -521,8 +524,8 @@ impl ExecutionTracer {
                 step_num,
                 context,
                 operation,
-                self.truncate_for_display(input, 30),
-                self.truncate_for_display(output, 30)
+                truncate_for_display(input, 30),
+                truncate_for_display(output, 30)
             );
 
             if step_type != "default" {
@@ -550,18 +553,11 @@ impl ExecutionTracer {
                 "    AST: {} at {} → \"{}\"",
                 node_type,
                 position,
-                self.truncate_for_display(source, 40)
+                truncate_for_display(source, 40)
             );
         }
     }
 
-    fn truncate_for_display(&self, text: &str, max_len: usize) -> String {
-        if text.len() > max_len {
-            format!("{}...", &text[..max_len - 3])
-        } else {
-            text.to_string()
-        }
-    }
 
     pub fn next_event(&self) -> u64 {
         if let Ok(mut counter) = self.current_event.lock() {
