@@ -212,14 +212,14 @@ impl ProcessingStats {
         // Time span: (only if we have timestamps)
         if let (Some(first), Some(last)) = (self.first_timestamp, self.last_timestamp) {
             if first == last {
-                output.push_str(&format!("Time span: {} (single timestamp)\n", first.format("%Y-%m-%d %H:%M:%S UTC")));
+                output.push_str(&format!("Time span: {} (single timestamp)\n", first.to_rfc3339()));
             } else {
                 let duration = last - first;
                 let duration_wrapper = DurationWrapper::new(duration);
                 output.push_str(&format!(
                     "Time span: {} to {} ({})\n",
-                    first.format("%Y-%m-%d %H:%M:%S UTC"),
-                    last.format("%Y-%m-%d %H:%M:%S UTC"),
+                    first.to_rfc3339(),
+                    last.to_rfc3339(),
                     duration_wrapper
                 ));
             }
