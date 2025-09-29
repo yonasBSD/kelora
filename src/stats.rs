@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 use chrono::{DateTime, Utc};
+use crate::rhai_functions::datetime::DurationWrapper;
 
 /// Statistics collected during log processing
 #[derive(Debug, Clone, Default)]
@@ -214,20 +215,12 @@ impl ProcessingStats {
                 output.push_str(&format!("Time span: {} (single timestamp)\n", first.format("%Y-%m-%d %H:%M:%S UTC")));
             } else {
                 let duration = last - first;
-                let duration_str = if duration.num_days() > 0 {
-                    format!("{}d {}h {}m", duration.num_days(), duration.num_hours() % 24, duration.num_minutes() % 60)
-                } else if duration.num_hours() > 0 {
-                    format!("{}h {}m", duration.num_hours(), duration.num_minutes() % 60)
-                } else if duration.num_minutes() > 0 {
-                    format!("{}m {}s", duration.num_minutes(), duration.num_seconds() % 60)
-                } else {
-                    format!("{:.1}s", duration.num_milliseconds() as f64 / 1000.0)
-                };
+                let duration_wrapper = DurationWrapper::new(duration);
                 output.push_str(&format!(
                     "Time span: {} to {} ({})\n",
                     first.format("%Y-%m-%d %H:%M:%S UTC"),
                     last.format("%Y-%m-%d %H:%M:%S UTC"),
-                    duration_str
+                    duration_wrapper
                 ));
             }
         }
