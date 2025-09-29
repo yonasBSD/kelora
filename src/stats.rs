@@ -135,16 +135,31 @@ impl ProcessingStats {
     pub fn format_stats(&self, _multiline_enabled: bool) -> String {
         let mut output = String::new();
 
-        // Lines processed: N total, N filtered, N errors
+        // Lines processed: N total, N filtered (X%), N errors (Y%)
+        let lines_filtered_pct = if self.lines_read > 0 {
+            format!(" ({:.1}%)", (self.lines_filtered as f64 / self.lines_read as f64) * 100.0)
+        } else {
+            String::new()
+        };
+        let lines_errors_pct = if self.lines_read > 0 {
+            format!(" ({:.1}%)", (self.lines_errors as f64 / self.lines_read as f64) * 100.0)
+        } else {
+            String::new()
+        };
         output.push_str(&format!(
-            "Lines processed: {} total, {} filtered, {} errors\n",
-            self.lines_read, self.lines_filtered, self.lines_errors
+            "Lines processed: {} total, {} filtered{}, {} errors{}\n",
+            self.lines_read, self.lines_filtered, lines_filtered_pct, self.lines_errors, lines_errors_pct
         ));
 
-        // Events created: N total, N output, N filtered
+        // Events created: N total, N output, N filtered (X%)
+        let events_filtered_pct = if self.events_created > 0 {
+            format!(" ({:.1}%)", (self.events_filtered as f64 / self.events_created as f64) * 100.0)
+        } else {
+            String::new()
+        };
         output.push_str(&format!(
-            "Events created: {} total, {} output, {} filtered\n",
-            self.events_created, self.events_output, self.events_filtered
+            "Events created: {} total, {} output, {} filtered{}\n",
+            self.events_created, self.events_output, self.events_filtered, events_filtered_pct
         ));
 
         // Throughput: N lines/s in Nms
