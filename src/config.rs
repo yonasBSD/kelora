@@ -710,7 +710,7 @@ impl KeloraConfig {
                 timestamp_filter: None, // Will be set in main() after parsing since/until
                 take_limit: cli.take,
                 strict: cli.strict,
-                verbose: cli.verbose,
+                verbose: if cli.quiet > 0 { 0 } else { cli.verbose },
                 quiet_level: cli.quiet,
                 context: create_context_config(cli)?,
                 allow_fs_writes: cli.allow_fs_writes,
