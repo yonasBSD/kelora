@@ -206,11 +206,44 @@ pub fn track_error(
 
             if crate::rhai_functions::strings::is_parallel_mode() {
                 // In parallel mode, capture stderr message for ordered output later
-                crate::rhai_functions::strings::capture_stderr(formatted_error);
+                crate::rhai_functions::strings::capture_stderr(formatted_error.clone());
+                // Show original line content for verbose >= 2 (-vv)
+                if verbose >= 2 {
+                    if let Some(line) = original_line {
+                        crate::rhai_functions::strings::capture_stderr(format!("    {}", line));
+                        // Show additional line details for verbose >= 3 (-vvv)
+                        if verbose >= 3 {
+                            let line_info = format!("    (length: {} chars, starts: {:?}, ends: {:?})",
+                                line.len(),
+                                line.chars().next().unwrap_or('\0'),
+                                line.chars().last().unwrap_or('\0')
+                            );
+                            crate::rhai_functions::strings::capture_stderr(line_info);
+                        }
+                    }
+                }
             } else {
                 // In sequential mode, output immediately but also capture for consistency
                 crate::rhai_functions::strings::capture_stderr(formatted_error.clone());
                 eprintln!("{}", formatted_error);
+                // Show original line content for verbose >= 2 (-vv)
+                if verbose >= 2 {
+                    if let Some(line) = original_line {
+                        let indented_line = format!("    {}", line);
+                        crate::rhai_functions::strings::capture_stderr(indented_line.clone());
+                        eprintln!("{}", indented_line);
+                        // Show additional line details for verbose >= 3 (-vvv)
+                        if verbose >= 3 {
+                            let line_info = format!("    (length: {} chars, starts: {:?}, ends: {:?})",
+                                line.len(),
+                                line.chars().next().unwrap_or('\0'),
+                                line.chars().last().unwrap_or('\0')
+                            );
+                            crate::rhai_functions::strings::capture_stderr(line_info.clone());
+                            eprintln!("{}", line_info);
+                        }
+                    }
+                }
             }
         }
 
