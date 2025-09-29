@@ -207,8 +207,8 @@ pub fn track_error(
             if crate::rhai_functions::strings::is_parallel_mode() {
                 // In parallel mode, capture stderr message for ordered output later
                 crate::rhai_functions::strings::capture_stderr(formatted_error.clone());
-                // Show original line content for verbose >= 2 (-vv)
-                if verbose >= 2 {
+                // Show original line content for verbose >= 2 (-vv) - only for parse errors
+                if verbose >= 2 && error_type == "parse" {
                     if let Some(line) = original_line {
                         crate::rhai_functions::strings::capture_stderr(format!("    {}", line));
                         // Show additional line details for verbose >= 3 (-vvv)
@@ -230,8 +230,8 @@ pub fn track_error(
                 // In sequential mode, output immediately but also capture for consistency
                 crate::rhai_functions::strings::capture_stderr(formatted_error.clone());
                 eprintln!("{}", formatted_error);
-                // Show original line content for verbose >= 2 (-vv)
-                if verbose >= 2 {
+                // Show original line content for verbose >= 2 (-vv) - only for parse errors
+                if verbose >= 2 && error_type == "parse" {
                     if let Some(line) = original_line {
                         let indented_line = format!("    {}", line);
                         crate::rhai_functions::strings::capture_stderr(indented_line.clone());
