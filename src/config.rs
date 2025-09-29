@@ -216,6 +216,10 @@ pub struct TimestampFormatConfig {
     pub auto_format_all: bool,
     /// Target timezone for formatting (true = UTC, false = local)
     pub format_as_utc: bool,
+    /// Explicit parsing format hint (from --ts-format) evaluated before adaptive parsing
+    pub parse_format_hint: Option<String>,
+    /// Default timezone hint reused when parsing timestamps for display
+    pub parse_timezone_hint: Option<String>,
 }
 
 /// Multi-line event detection configuration
@@ -654,6 +658,8 @@ impl KeloraConfig {
             ColorMode::Auto
         };
 
+        let default_timezone = determine_default_timezone(cli);
+
         Ok(Self {
             input: InputConfig {
                 files: cli.files.clone(),
@@ -669,7 +675,7 @@ impl KeloraConfig {
                 multiline: None,    // Will be set after CLI parsing
                 ts_field: cli.ts_field.clone(),
                 ts_format: cli.ts_format.clone(),
-                default_timezone: determine_default_timezone(cli),
+                default_timezone: default_timezone.clone(),
                 extract_prefix: cli.extract_prefix.clone(),
                 prefix_sep: cli.prefix_sep.clone(),
                 cols_sep: cli.cols_sep.clone(),
@@ -697,7 +703,7 @@ impl KeloraConfig {
                 metrics: cli.metrics,
                 metrics_file: cli.metrics_file.clone(),
                 mark_gaps: None,
-                timestamp_formatting: create_timestamp_format_config(cli),
+                timestamp_formatting: create_timestamp_format_config(cli, default_timezone.clone()),
             },
             processing: ProcessingConfig {
                 begin: cli.begin.clone(),
@@ -845,7 +851,10 @@ fn parse_input_format_spec(spec: &str) -> anyhow::Result<InputFormat> {
 }
 
 /// Create timestamp formatting configuration from CLI options
-fn create_timestamp_format_config(cli: &crate::Cli) -> TimestampFormatConfig {
+fn create_timestamp_format_config(
+    cli: &crate::Cli,
+    default_timezone: Option<String>,
+) -> TimestampFormatConfig {
     let format_fields = if let Some(ref pretty_ts) = cli.pretty_ts {
         pretty_ts.split(',').map(|s| s.trim().to_string()).collect()
     } else {
@@ -859,6 +868,8 @@ fn create_timestamp_format_config(cli: &crate::Cli) -> TimestampFormatConfig {
         format_fields,
         auto_format_all,
         format_as_utc,
+        parse_format_hint: cli.ts_format.clone(),
+        parse_timezone_hint: default_timezone,
     }
 }
 

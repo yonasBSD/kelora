@@ -439,29 +439,35 @@ impl DefaultFormatter {
         false
     }
 
+    /// Convert a parsed UTC timestamp into the configured display timezone
+    fn format_timestamp_output(&self, dt: chrono::DateTime<chrono::Utc>) -> String {
+        if self.timestamp_formatting.format_as_utc {
+            dt.to_rfc3339()
+        } else {
+            dt.with_timezone(&chrono::Local).to_rfc3339()
+        }
+    }
+
     /// Try to format a value as a timestamp, returning formatted string if successful
     fn try_format_timestamp(&self, value: &Dynamic) -> Option<String> {
-        use chrono::{DateTime, Local, Utc};
+        use chrono::{DateTime, Utc};
+
+        let format_hint = self.timestamp_formatting.parse_format_hint.as_deref();
+        let timezone_hint = self.timestamp_formatting.parse_timezone_hint.as_deref();
 
         // First, try if it's already a DateTime value
         if let Some(dt) = value.clone().try_cast::<DateTime<Utc>>() {
-            return Some(if self.timestamp_formatting.format_as_utc {
-                dt.to_rfc3339()
-            } else {
-                dt.with_timezone(&Local).to_rfc3339()
-            });
+            return Some(self.format_timestamp_output(dt));
         }
 
         // Try to parse numeric timestamps (Unix timestamps)
         if let Ok(timestamp_num) = value.as_int() {
             let timestamp_str = timestamp_num.to_string();
             let mut parser = crate::timestamp::AdaptiveTsParser::new();
-            if let Some(parsed_dt) = parser.parse_ts(&timestamp_str) {
-                return Some(if self.timestamp_formatting.format_as_utc {
-                    parsed_dt.to_rfc3339()
-                } else {
-                    parsed_dt.with_timezone(&Local).to_rfc3339()
-                });
+            if let Some(parsed_dt) =
+                parser.parse_ts_with_config(&timestamp_str, format_hint, timezone_hint)
+            {
+                return Some(self.format_timestamp_output(parsed_dt));
             }
         }
 
@@ -496,23 +502,17 @@ impl DefaultFormatter {
 
             if let Some(dt) = parsed_dt {
                 let utc_dt = dt.with_timezone(&Utc);
-                return Some(if self.timestamp_formatting.format_as_utc {
-                    utc_dt.to_rfc3339()
-                } else {
-                    utc_dt.with_timezone(&Local).to_rfc3339()
-                });
+                return Some(self.format_timestamp_output(utc_dt));
             }
         }
 
         // Otherwise, try to parse it as a string timestamp
         if let Ok(ts_str) = value.clone().into_string() {
             let mut parser = crate::timestamp::AdaptiveTsParser::new();
-            if let Some(parsed_dt) = parser.parse_ts(&ts_str) {
-                return Some(if self.timestamp_formatting.format_as_utc {
-                    parsed_dt.to_rfc3339()
-                } else {
-                    parsed_dt.with_timezone(&Local).to_rfc3339()
-                });
+            if let Some(parsed_dt) =
+                parser.parse_ts_with_config(&ts_str, format_hint, timezone_hint)
+            {
+                return Some(self.format_timestamp_output(parsed_dt));
             }
         }
 
@@ -1882,6 +1882,32 @@ mod tests {
         assert!(result.contains("count=42"));
         // Fields should be space-separated
         assert!(result.contains(" "));
+    }
+
+    #[test]
+    fn test_default_formatter_uses_ts_format_hint() {
+        let mut event = Event::default();
+        event.set_field("ts".to_string(), Dynamic::from("2000/01/01 17.59.55,210"));
+        event.set_field("msg".to_string(), Dynamic::from("hello"));
+
+        let formatter = DefaultFormatter::new_with_wrapping(
+            false,
+            false,
+            false,
+            crate::config::TimestampFormatConfig {
+                format_fields: Vec::new(),
+                auto_format_all: true,
+                format_as_utc: true,
+                parse_format_hint: Some("%Y/%m/%d %H.%M.%S,%f".to_string()),
+                parse_timezone_hint: Some("UTC".to_string()),
+            },
+            false,
+            false,
+            0,
+        );
+
+        let result = formatter.format(&event);
+        assert!(result.contains("ts='2000-01-01T17:59:55.210+00:00'"));
     }
 
     #[test]
