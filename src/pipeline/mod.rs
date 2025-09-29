@@ -478,6 +478,14 @@ impl Pipeline {
                     } else {
                         crate::stats::stats_add_event_output();
 
+                        // Track result timestamp for time span statistics
+                        let mut result_event = event.clone();
+                        result_event.parsed_ts = None; // Clear to force re-extraction
+                        result_event.extract_timestamp();
+                        if let Some(result_ts) = result_event.parsed_ts {
+                            crate::stats::stats_update_result_timestamp(result_ts);
+                        }
+
                         ctx.internal_tracker
                             .entry("__kelora_stats_events_output".to_string())
                             .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
@@ -536,6 +544,14 @@ impl Pipeline {
                             }
                         } else {
                             crate::stats::stats_add_event_output();
+
+                            // Track result timestamp for time span statistics
+                            let mut result_event = event.clone();
+                            result_event.parsed_ts = None; // Clear to force re-extraction
+                            result_event.extract_timestamp();
+                            if let Some(result_ts) = result_event.parsed_ts {
+                                crate::stats::stats_update_result_timestamp(result_ts);
+                            }
 
                             ctx.internal_tracker
                                 .entry("__kelora_stats_events_output".to_string())

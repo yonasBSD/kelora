@@ -23,6 +23,8 @@ pub struct ProcessingStats {
     pub discovered_keys: BTreeSet<String>,
     pub first_timestamp: Option<DateTime<Utc>>,
     pub last_timestamp: Option<DateTime<Utc>>,
+    pub first_result_timestamp: Option<DateTime<Utc>>,
+    pub last_result_timestamp: Option<DateTime<Utc>>,
 }
 
 // Thread-local storage for statistics (following track_count pattern)
@@ -122,6 +124,31 @@ pub fn stats_update_timestamp(timestamp: DateTime<Utc>) {
     });
 }
 
+pub fn stats_update_result_timestamp(timestamp: DateTime<Utc>) {
+    THREAD_STATS.with(|stats| {
+        let mut stats = stats.borrow_mut();
+        match stats.first_result_timestamp {
+            None => {
+                stats.first_result_timestamp = Some(timestamp);
+                stats.last_result_timestamp = Some(timestamp);
+            }
+            Some(first) => {
+                if timestamp < first {
+                    stats.first_result_timestamp = Some(timestamp);
+                }
+                match stats.last_result_timestamp {
+                    None => stats.last_result_timestamp = Some(timestamp),
+                    Some(last) => {
+                        if timestamp > last {
+                            stats.last_result_timestamp = Some(timestamp);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
 impl ProcessingStats {
     pub fn new() -> Self {
         Self {
@@ -209,19 +236,53 @@ impl ProcessingStats {
             }
         }
 
-        // Time span: (only if we have timestamps)
-        if let (Some(first), Some(last)) = (self.first_timestamp, self.last_timestamp) {
+        // Time span: show generic label when identical, specific labels when different
+        let has_original = self.first_timestamp.is_some() && self.last_timestamp.is_some();
+        let has_result = self.first_result_timestamp.is_some() && self.last_result_timestamp.is_some();
+
+        if has_original {
+            let first = self.first_timestamp.unwrap();
+            let last = self.last_timestamp.unwrap();
+
+            // Check if result timespan differs from original
+            let is_different = has_result && (
+                self.first_timestamp != self.first_result_timestamp ||
+                self.last_timestamp != self.last_result_timestamp
+            );
+
+            let label = if is_different { "Input time span" } else { "Time span" };
+
             if first == last {
-                output.push_str(&format!("Time span: {} (single timestamp)\n", first.to_rfc3339()));
+                output.push_str(&format!("{}: {} (single timestamp)\n", label, first.to_rfc3339()));
             } else {
                 let duration = last - first;
                 let duration_wrapper = DurationWrapper::new(duration);
                 output.push_str(&format!(
-                    "Time span: {} to {} ({})\n",
+                    "{}: {} to {} ({})\n",
+                    label,
                     first.to_rfc3339(),
                     last.to_rfc3339(),
                     duration_wrapper
                 ));
+            }
+
+            // Show result time span only when different
+            if is_different {
+                let result_first = self.first_result_timestamp.unwrap();
+                let result_last = self.last_result_timestamp.unwrap();
+
+                if result_first == result_last {
+                    output.push_str(&format!("Result time span: {} (single timestamp)\n", result_first.to_rfc3339()));
+                } else {
+                    let duration = result_last - result_first;
+                    let duration_wrapper = DurationWrapper::new(duration);
+                    output.push_str(&format!(
+                        "Result time span: {} to {} ({})\n",
+                        result_first.to_rfc3339(),
+                        result_last.to_rfc3339(),
+                        duration_wrapper
+                    ));
+                }
             }
         }
 
