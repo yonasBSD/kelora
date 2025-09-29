@@ -129,7 +129,6 @@ fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
         ));
     }
 
-
     if use_parallel {
         run_pipeline_parallel(config, output, ctrl_rx)
     } else {

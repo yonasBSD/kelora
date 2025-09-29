@@ -130,7 +130,6 @@ impl DebugTracker {
         }
     }
 
-
     pub fn update_context(&self, position: Option<rhai::Position>, source: Option<&str>) {
         if self.config.is_enabled() {
             if let Ok(mut ctx) = self.context.lock() {
@@ -557,7 +556,6 @@ impl ExecutionTracer {
             );
         }
     }
-
 
     pub fn next_event(&self) -> u64 {
         if let Ok(mut counter) = self.current_event.lock() {

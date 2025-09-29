@@ -214,7 +214,12 @@ pub fn track_error(
                         // Show additional line details for verbose >= 3 (-vvv)
                         if verbose >= 3 {
                             let non_ascii_count = line.chars().filter(|c| !c.is_ascii()).count();
-                            let control_char_count = line.chars().filter(|c| c.is_control() && *c != '\t' && *c != '\n' && *c != '\r').count();
+                            let control_char_count = line
+                                .chars()
+                                .filter(|c| {
+                                    c.is_control() && *c != '\t' && *c != '\n' && *c != '\r'
+                                })
+                                .count();
                             let line_info = format!("    (length: {} chars, non_ascii: {}, control_chars: {}, starts: {:?}, ends: {:?})",
                                 line.len(),
                                 non_ascii_count,
@@ -239,7 +244,12 @@ pub fn track_error(
                         // Show additional line details for verbose >= 3 (-vvv)
                         if verbose >= 3 {
                             let non_ascii_count = line.chars().filter(|c| !c.is_ascii()).count();
-                            let control_char_count = line.chars().filter(|c| c.is_control() && *c != '\t' && *c != '\n' && *c != '\r').count();
+                            let control_char_count = line
+                                .chars()
+                                .filter(|c| {
+                                    c.is_control() && *c != '\t' && *c != '\n' && *c != '\r'
+                                })
+                                .count();
                             let line_info = format!("    (length: {} chars, non_ascii: {}, control_chars: {}, starts: {:?}, ends: {:?})",
                                 line.len(),
                                 non_ascii_count,

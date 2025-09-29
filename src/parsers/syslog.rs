@@ -186,7 +186,6 @@ impl SyslogParser {
             None
         }
     }
-
 }
 
 impl EventParser for SyslogParser {

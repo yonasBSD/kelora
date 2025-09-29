@@ -1292,14 +1292,16 @@ pub fn register_functions(engine: &mut Engine) {
         to_kv_impl(map, Some(sep), "=")
     });
 
-    engine.register_fn("to_kv", |map: rhai::Map, sep: &str, kv_sep: &str| -> String {
-        to_kv_impl(map, Some(sep), kv_sep)
-    });
+    engine.register_fn(
+        "to_kv",
+        |map: rhai::Map, sep: &str, kv_sep: &str| -> String { to_kv_impl(map, Some(sep), kv_sep) },
+    );
 
     // Allow unit type for null separator
-    engine.register_fn("to_kv", |map: rhai::Map, _sep: (), kv_sep: &str| -> String {
-        to_kv_impl(map, None, kv_sep)
-    });
+    engine.register_fn(
+        "to_kv",
+        |map: rhai::Map, _sep: (), kv_sep: &str| -> String { to_kv_impl(map, None, kv_sep) },
+    );
 
     // to_syslog() - Convert Map to syslog format string
     engine.register_fn("to_syslog", |map: rhai::Map| -> String {
@@ -1307,9 +1309,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     // to_cef() - Convert Map to CEF format string
-    engine.register_fn("to_cef", |map: rhai::Map| -> String {
-        to_cef_impl(map)
-    });
+    engine.register_fn("to_cef", |map: rhai::Map| -> String { to_cef_impl(map) });
 
     // to_combined() - Convert Map to combined log format string
     engine.register_fn("to_combined", |map: rhai::Map| -> String {
@@ -1950,67 +1950,81 @@ fn to_syslog_impl(map: rhai::Map) -> String {
     use chrono::Utc;
 
     // Standard syslog fields with defaults
-    let priority = map.get("priority")
+    let priority = map
+        .get("priority")
         .map(|v| v.to_string())
         .unwrap_or_else(|| "13".to_string()); // user.notice
 
-    let timestamp = map.get("timestamp")
+    let timestamp = map
+        .get("timestamp")
         .map(|v| v.to_string())
         .unwrap_or_else(|| Utc::now().format("%b %d %H:%M:%S").to_string());
 
-    let hostname = map.get("hostname")
+    let hostname = map
+        .get("hostname")
         .or_else(|| map.get("host"))
         .map(|v| v.to_string())
         .unwrap_or_else(|| "localhost".to_string());
 
-    let tag = map.get("tag")
+    let tag = map
+        .get("tag")
         .or_else(|| map.get("program"))
         .or_else(|| map.get("ident"))
         .map(|v| v.to_string())
         .unwrap_or_else(|| "kelora".to_string());
 
-    let message = map.get("message")
+    let message = map
+        .get("message")
         .or_else(|| map.get("msg"))
         .or_else(|| map.get("content"))
         .map(|v| v.to_string())
         .unwrap_or_else(|| String::new());
 
     // RFC3164 format: <priority>timestamp hostname tag: message
-    format!("<{}>{} {} {}: {}", priority, timestamp, hostname, tag, message)
+    format!(
+        "<{}>{} {} {}: {}",
+        priority, timestamp, hostname, tag, message
+    )
 }
 
 /// Implementation for to_cef() function
 /// Generates Common Event Format (CEF) output
 fn to_cef_impl(map: rhai::Map) -> String {
     // CEF Header fields
-    let device_vendor = map.get("deviceVendor")
+    let device_vendor = map
+        .get("deviceVendor")
         .or_else(|| map.get("device_vendor"))
         .map(|v| escape_cef_value(&v.to_string()))
         .unwrap_or_else(|| "Kelora".to_string());
 
-    let device_product = map.get("deviceProduct")
+    let device_product = map
+        .get("deviceProduct")
         .or_else(|| map.get("device_product"))
         .map(|v| escape_cef_value(&v.to_string()))
         .unwrap_or_else(|| "LogAnalyzer".to_string());
 
-    let device_version = map.get("deviceVersion")
+    let device_version = map
+        .get("deviceVersion")
         .or_else(|| map.get("device_version"))
         .map(|v| escape_cef_value(&v.to_string()))
         .unwrap_or_else(|| "1.0".to_string());
 
-    let signature_id = map.get("signatureId")
+    let signature_id = map
+        .get("signatureId")
         .or_else(|| map.get("signature_id"))
         .or_else(|| map.get("event_id"))
         .map(|v| escape_cef_value(&v.to_string()))
         .unwrap_or_else(|| "1".to_string());
 
-    let name = map.get("name")
+    let name = map
+        .get("name")
         .or_else(|| map.get("event_name"))
         .or_else(|| map.get("message"))
         .map(|v| escape_cef_value(&v.to_string()))
         .unwrap_or_else(|| "Event".to_string());
 
-    let severity = map.get("severity")
+    let severity = map
+        .get("severity")
         .or_else(|| map.get("level"))
         .map(|v| escape_cef_value(&v.to_string()))
         .unwrap_or_else(|| "5".to_string());
@@ -2025,15 +2039,31 @@ fn to_cef_impl(map: rhai::Map) -> String {
     let mut extensions = Vec::new();
     for (key, value) in map {
         // Skip header fields we already processed
-        if matches!(key.as_str(),
-            "deviceVendor" | "device_vendor" | "deviceProduct" | "device_product" |
-            "deviceVersion" | "device_version" | "signatureId" | "signature_id" |
-            "event_id" | "name" | "event_name" | "message" | "severity" | "level"
+        if matches!(
+            key.as_str(),
+            "deviceVendor"
+                | "device_vendor"
+                | "deviceProduct"
+                | "device_product"
+                | "deviceVersion"
+                | "device_version"
+                | "signatureId"
+                | "signature_id"
+                | "event_id"
+                | "name"
+                | "event_name"
+                | "message"
+                | "severity"
+                | "level"
         ) {
             continue;
         }
 
-        extensions.push(format!("{}={}", key, escape_cef_extension_value(&value.to_string())));
+        extensions.push(format!(
+            "{}={}",
+            key,
+            escape_cef_extension_value(&value.to_string())
+        ));
     }
 
     if !extensions.is_empty() {
@@ -2049,22 +2079,26 @@ fn to_combined_impl(map: rhai::Map) -> String {
     use chrono::Utc;
 
     // Standard combined log format fields
-    let ip = map.get("ip")
+    let ip = map
+        .get("ip")
         .or_else(|| map.get("remote_addr"))
         .or_else(|| map.get("client_ip"))
         .map(|v| v.to_string())
         .unwrap_or_else(|| "127.0.0.1".to_string());
 
-    let identity = map.get("identity")
+    let identity = map
+        .get("identity")
         .map(|v| v.to_string())
         .unwrap_or_else(|| "-".to_string());
 
-    let user = map.get("user")
+    let user = map
+        .get("user")
         .or_else(|| map.get("remote_user"))
         .map(|v| v.to_string())
         .unwrap_or_else(|| "-".to_string());
 
-    let timestamp = map.get("timestamp")
+    let timestamp = map
+        .get("timestamp")
         .map(|v| v.to_string())
         .unwrap_or_else(|| format!("[{}]", Utc::now().format("%d/%b/%Y:%H:%M:%S %z")));
 
@@ -2072,30 +2106,44 @@ fn to_combined_impl(map: rhai::Map) -> String {
     let request = if let Some(req) = map.get("request") {
         format!("\"{}\"", req.to_string().replace('"', "\\\""))
     } else {
-        let method = map.get("method").map(|v| v.to_string()).unwrap_or_else(|| "GET".to_string());
-        let path = map.get("path").or_else(|| map.get("uri")).map(|v| v.to_string()).unwrap_or_else(|| "/".to_string());
-        let protocol = map.get("protocol").map(|v| v.to_string()).unwrap_or_else(|| "HTTP/1.1".to_string());
+        let method = map
+            .get("method")
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "GET".to_string());
+        let path = map
+            .get("path")
+            .or_else(|| map.get("uri"))
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "/".to_string());
+        let protocol = map
+            .get("protocol")
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "HTTP/1.1".to_string());
         format!("\"{} {} {}\"", method, path, protocol)
     };
 
-    let status = map.get("status")
+    let status = map
+        .get("status")
         .or_else(|| map.get("response_status"))
         .or_else(|| map.get("status_code"))
         .map(|v| v.to_string())
         .unwrap_or_else(|| "200".to_string());
 
-    let bytes = map.get("bytes")
+    let bytes = map
+        .get("bytes")
         .or_else(|| map.get("response_size"))
         .or_else(|| map.get("body_bytes_sent"))
         .map(|v| v.to_string())
         .unwrap_or_else(|| "-".to_string());
 
-    let referer = map.get("referer")
+    let referer = map
+        .get("referer")
         .or_else(|| map.get("http_referer"))
         .map(|v| format!("\"{}\"", v.to_string().replace('"', "\\\"")))
         .unwrap_or_else(|| "\"-\"".to_string());
 
-    let user_agent = map.get("user_agent")
+    let user_agent = map
+        .get("user_agent")
         .or_else(|| map.get("http_user_agent"))
         .map(|v| format!("\"{}\"", v.to_string().replace('"', "\\\"")))
         .unwrap_or_else(|| "\"-\"".to_string());
@@ -2176,7 +2224,11 @@ fn escape_cef_value(value: &str) -> String {
 
 /// Escape CEF extension field values (equals and backslashes)
 fn escape_cef_extension_value(value: &str) -> String {
-    value.replace('\\', "\\\\").replace('=', "\\=").replace('\n', "\\n").replace('\r', "\\r")
+    value
+        .replace('\\', "\\\\")
+        .replace('=', "\\=")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
 }
 
 #[cfg(test)]
@@ -3388,47 +3440,76 @@ mod tests {
 
         // Extract emails without capture groups (uses full match)
         let result: rhai::Array = engine
-            .eval_with_scope(&mut scope, r##"text.extract_re_maps("\\w+@\\w+\\.\\w+", "email")"##)
+            .eval_with_scope(
+                &mut scope,
+                r##"text.extract_re_maps("\\w+@\\w+\\.\\w+", "email")"##,
+            )
             .unwrap();
         assert_eq!(result.len(), 2);
 
         // Check first email map
         let first_map = result[0].clone().try_cast::<Map>().unwrap();
         assert_eq!(
-            first_map.get("email").unwrap().clone().into_string().unwrap(),
+            first_map
+                .get("email")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "alice@test.com"
         );
 
         // Check second email map
         let second_map = result[1].clone().try_cast::<Map>().unwrap();
         assert_eq!(
-            second_map.get("email").unwrap().clone().into_string().unwrap(),
+            second_map
+                .get("email")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "bob@example.org"
         );
 
         // Extract with capture groups (uses first capture group)
         scope.push("usertext", "user=alice status=200 user=bob status=404");
         let result: rhai::Array = engine
-            .eval_with_scope(&mut scope, r##"usertext.extract_re_maps("user=(\\w+)", "username")"##)
+            .eval_with_scope(
+                &mut scope,
+                r##"usertext.extract_re_maps("user=(\\w+)", "username")"##,
+            )
             .unwrap();
         assert_eq!(result.len(), 2);
 
         let first_user = result[0].clone().try_cast::<Map>().unwrap();
         assert_eq!(
-            first_user.get("username").unwrap().clone().into_string().unwrap(),
+            first_user
+                .get("username")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "alice"
         );
 
         let second_user = result[1].clone().try_cast::<Map>().unwrap();
         assert_eq!(
-            second_user.get("username").unwrap().clone().into_string().unwrap(),
+            second_user
+                .get("username")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "bob"
         );
 
         // No matches (returns empty array)
         scope.push("nomatch", "no emails here");
         let result: rhai::Array = engine
-            .eval_with_scope(&mut scope, r##"nomatch.extract_re_maps("\\w+@\\w+", "email")"##)
+            .eval_with_scope(
+                &mut scope,
+                r##"nomatch.extract_re_maps("\\w+@\\w+", "email")"##,
+            )
             .unwrap();
         assert_eq!(result.len(), 0);
 
@@ -3450,10 +3531,13 @@ mod tests {
 
         // Test composability with emit_each
         let result: i64 = engine
-            .eval_with_scope(&mut scope, r##"
+            .eval_with_scope(
+                &mut scope,
+                r##"
                 let ip_maps = text.extract_re_maps("\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b", "ip");
                 emit_each(ip_maps)
-            "##)
+            "##,
+            )
             .unwrap();
 
         // Should return count of emitted events
@@ -3466,11 +3550,21 @@ mod tests {
         assert_eq!(emissions.len(), 2);
 
         assert_eq!(
-            emissions[0].get("ip").unwrap().clone().into_string().unwrap(),
+            emissions[0]
+                .get("ip")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "192.168.1.1"
         );
         assert_eq!(
-            emissions[1].get("ip").unwrap().clone().into_string().unwrap(),
+            emissions[1]
+                .get("ip")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
             "10.0.0.1"
         );
     }
@@ -4406,7 +4500,10 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(result, "<16>Oct 24 12:34:56 server1 myapp: Something happened");
+        assert_eq!(
+            result,
+            "<16>Oct 24 12:34:56 server1 myapp: Something happened"
+        );
     }
 
     #[test]
@@ -4631,7 +4728,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.get("level").unwrap().to_string(), "INFO");
-        assert_eq!(result.get("message").unwrap().to_string(), "Test with spaces");
+        assert_eq!(
+            result.get("message").unwrap().to_string(),
+            "Test with spaces"
+        );
         assert_eq!(result.get("count").unwrap().to_string(), "42");
         assert_eq!(result.get("active").unwrap().to_string(), "true");
         assert_eq!(result.get("ratio").unwrap().to_string(), "3.14");
@@ -4703,9 +4803,18 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.get("simple").unwrap().to_string(), "value");
-        assert_eq!(result.get("spaced").unwrap().to_string(), "value with spaces");
-        assert_eq!(result.get("quoted").unwrap().to_string(), "value\"with\"quotes");
-        assert_eq!(result.get("equals").unwrap().to_string(), "value=with=equals");
+        assert_eq!(
+            result.get("spaced").unwrap().to_string(),
+            "value with spaces"
+        );
+        assert_eq!(
+            result.get("quoted").unwrap().to_string(),
+            "value\"with\"quotes"
+        );
+        assert_eq!(
+            result.get("equals").unwrap().to_string(),
+            "value=with=equals"
+        );
         assert_eq!(result.get("empty").unwrap().to_string(), "");
         assert_eq!(result.get("newlines").unwrap().to_string(), "line1\nline2");
     }
@@ -4731,8 +4840,14 @@ mod tests {
             .unwrap();
 
         // Keys should be sanitized consistently
-        assert_eq!(result.get("field_with_spaces").unwrap().to_string(), "value1");
-        assert_eq!(result.get("field_with_equals").unwrap().to_string(), "value2");
+        assert_eq!(
+            result.get("field_with_spaces").unwrap().to_string(),
+            "value1"
+        );
+        assert_eq!(
+            result.get("field_with_equals").unwrap().to_string(),
+            "value2"
+        );
         assert_eq!(result.get("field_with_tabs").unwrap().to_string(), "value3");
     }
 
@@ -5062,8 +5177,17 @@ mod tests {
 
         // Verify all fields are preserved
         assert_eq!(result.len(), 50);
-        assert_eq!(result.get("field_0").unwrap().to_string(), "value_0_with_some_data");
-        assert_eq!(result.get("field_25").unwrap().to_string(), "value_25_with_some_data");
-        assert_eq!(result.get("field_49").unwrap().to_string(), "value_49_with_some_data");
+        assert_eq!(
+            result.get("field_0").unwrap().to_string(),
+            "value_0_with_some_data"
+        );
+        assert_eq!(
+            result.get("field_25").unwrap().to_string(),
+            "value_25_with_some_data"
+        );
+        assert_eq!(
+            result.get("field_49").unwrap().to_string(),
+            "value_49_with_some_data"
+        );
     }
 }

@@ -359,9 +359,9 @@ fn normalise_line(mut line: String) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use once_cell::sync::Lazy;
     use std::sync::Mutex;
+    use tempfile::tempdir;
 
     static TEST_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 

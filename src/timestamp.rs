@@ -187,13 +187,18 @@ fn try_parse_with_format(
     }
 
     // Special handling for year-less syslog timestamps
-    if processed_format.contains("%b") && processed_format.contains("%d") && !processed_format.contains("%Y") {
+    if processed_format.contains("%b")
+        && processed_format.contains("%d")
+        && !processed_format.contains("%Y")
+    {
         // Try adding current year for syslog-style timestamps
         let current_year = chrono::Utc::now().year();
         let ts_with_year = format!("{} {}", current_year, processed_ts_str);
         let format_with_year = format!("%Y {}", processed_format);
 
-        if let Ok(naive_dt) = chrono::NaiveDateTime::parse_from_str(&ts_with_year, &format_with_year) {
+        if let Ok(naive_dt) =
+            chrono::NaiveDateTime::parse_from_str(&ts_with_year, &format_with_year)
+        {
             // Apply timezone configuration
             match default_timezone {
                 Some("UTC") => {
@@ -224,7 +229,9 @@ fn try_parse_with_format(
         let prev_year = current_year - 1;
         let ts_with_prev_year = format!("{} {}", prev_year, processed_ts_str);
 
-        if let Ok(naive_dt) = chrono::NaiveDateTime::parse_from_str(&ts_with_prev_year, &format_with_year) {
+        if let Ok(naive_dt) =
+            chrono::NaiveDateTime::parse_from_str(&ts_with_prev_year, &format_with_year)
+        {
             // Apply timezone configuration
             match default_timezone {
                 Some("UTC") => {

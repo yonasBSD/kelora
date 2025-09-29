@@ -4610,9 +4610,12 @@ fn test_extract_re_maps_with_base_context() {
     // Extract IPs with base context preservation
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
         &[
-            "-f", "json",
-            "-F", "json",
-            "--exec", r#"
+            "-f",
+            "json",
+            "-F",
+            "json",
+            "--exec",
+            r#"
                 let ip_maps = extract_re_maps(e.message, "\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b", "ip");
                 let base = #{timestamp: e.timestamp, source: e.source};
                 emit_each(ip_maps, base)
@@ -4623,12 +4626,19 @@ fn test_extract_re_maps_with_base_context() {
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
     let lines: Vec<&str> = stdout.trim().lines().collect();
-    assert_eq!(lines.len(), 3, "Should emit 3 IP events (2 from first, 1 from second)");
+    assert_eq!(
+        lines.len(),
+        3,
+        "Should emit 3 IP events (2 from first, 1 from second)"
+    );
 
     // Check that all events have base context
     for line in &lines {
         let parsed: serde_json::Value = serde_json::from_str(line).expect("Should be valid JSON");
-        assert!(parsed["timestamp"].is_string(), "Should have timestamp from base");
+        assert!(
+            parsed["timestamp"].is_string(),
+            "Should have timestamp from base"
+        );
         assert!(parsed["source"].is_string(), "Should have source from base");
         assert!(parsed["ip"].is_string(), "Should have extracted IP");
     }
@@ -4651,9 +4661,12 @@ fn test_extract_re_maps_composability() {
     // Test composability: extract both emails and phone numbers, combine them
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
         &[
-            "-f", "json",
-            "-F", "json",
-            "--exec", r#"
+            "-f",
+            "json",
+            "-F",
+            "json",
+            "--exec",
+            r#"
                 let email_maps = extract_re_maps(e.text, "\\w+@\\w+\\.\\w+", "contact");
                 let phone_maps = extract_re_maps(e.text, "\\+?1?-?\\d{3}-\\d{3}-\\d{4}", "contact");
                 let all_contacts = email_maps + phone_maps;
@@ -4667,7 +4680,11 @@ fn test_extract_re_maps_composability() {
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
     let lines: Vec<&str> = stdout.trim().lines().collect();
-    assert_eq!(lines.len(), 3, "Should emit 3 contact events (2 emails + 1 phone)");
+    assert_eq!(
+        lines.len(),
+        3,
+        "Should emit 3 contact events (2 emails + 1 phone)"
+    );
 
     let contacts: Vec<String> = lines
         .iter()
@@ -4740,10 +4757,8 @@ fn test_parallel_multiline_indent_consistency() {
     Debug detail 2"#;
 
     // Sequential processing
-    let (stdout_seq, stderr_seq, exit_code_seq) = run_kelora_with_input(
-        &["-f", "line", "-M", "indent", "--stats"],
-        input,
-    );
+    let (stdout_seq, stderr_seq, exit_code_seq) =
+        run_kelora_with_input(&["-f", "line", "-M", "indent", "--stats"], input);
     assert_eq!(exit_code_seq, 0, "Sequential should succeed");
 
     // Parallel processing
@@ -4791,10 +4806,8 @@ single line continuation
 Jan  1 10:00:15 host app: Event four debug message"#;
 
     // Sequential processing
-    let (stdout_seq, stderr_seq, exit_code_seq) = run_kelora_with_input(
-        &["-f", "syslog", "-M", "timestamp", "--stats"],
-        input,
-    );
+    let (stdout_seq, stderr_seq, exit_code_seq) =
+        run_kelora_with_input(&["-f", "syslog", "-M", "timestamp", "--stats"], input);
     assert_eq!(exit_code_seq, 0, "Sequential should succeed");
 
     // Parallel processing
@@ -4838,10 +4851,8 @@ fn test_parallel_multiline_whole_consistency() {
 {"level": "INFO", "message": "Event six final info"}"#;
 
     // Sequential processing
-    let (stdout_seq, stderr_seq, exit_code_seq) = run_kelora_with_input(
-        &["-f", "line", "-M", "whole", "--stats"],
-        input,
-    );
+    let (stdout_seq, stderr_seq, exit_code_seq) =
+        run_kelora_with_input(&["-f", "line", "-M", "whole", "--stats"], input);
     assert_eq!(exit_code_seq, 0, "Sequential should succeed");
 
     // Parallel processing
@@ -4889,11 +4900,14 @@ fn test_parallel_multiline_filtering_accuracy() {
     // Test filtering for ERROR events only
     let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(
         &[
-            "-f", "line",
-            "-M", "indent",
+            "-f",
+            "line",
+            "-M",
+            "indent",
             "--stats",
             "--parallel",
-            "--filter", "e.line.contains(\"ERROR\")"
+            "--filter",
+            "e.line.contains(\"ERROR\")",
         ],
         input,
     );
@@ -4909,20 +4923,29 @@ fn test_parallel_multiline_filtering_accuracy() {
     // Should output exactly 1 line (the ERROR event)
     let output_lines = stdout_par.lines().count();
     assert_eq!(output_lines, 1, "Should output exactly 1 ERROR event");
-    assert!(stdout_par.contains("ERROR"), "Output should contain ERROR event");
+    assert!(
+        stdout_par.contains("ERROR"),
+        "Output should contain ERROR event"
+    );
 
     // Test the reverse filter
     let (stdout_par2, stderr_par2, exit_code_par2) = run_kelora_with_input(
         &[
-            "-f", "line",
-            "-M", "indent",
+            "-f",
+            "line",
+            "-M",
+            "indent",
             "--stats",
             "--parallel",
-            "--filter", "e.line.contains(\"INFO\") || e.line.contains(\"DEBUG\")"
+            "--filter",
+            "e.line.contains(\"INFO\") || e.line.contains(\"DEBUG\")",
         ],
         input,
     );
-    assert_eq!(exit_code_par2, 0, "Parallel reverse filtering should succeed");
+    assert_eq!(
+        exit_code_par2, 0,
+        "Parallel reverse filtering should succeed"
+    );
 
     let events_created2 = extract_events_created_from_stats(&stderr_par2);
     let events_filtered2 = extract_events_filtered_from_stats(&stderr_par2);
@@ -4949,7 +4972,11 @@ Event 2 start
         input1,
     );
     assert_eq!(exit_code1, 0);
-    assert_eq!(extract_events_created_from_stats(&stderr1), 2, "Simple case should create 2 events");
+    assert_eq!(
+        extract_events_created_from_stats(&stderr1),
+        2,
+        "Simple case should create 2 events"
+    );
 
     // Scenario 2: Edge case with single line events mixed with multiline
     let input2 = r#"Single line event
@@ -4964,7 +4991,11 @@ Final multiline start
         input2,
     );
     assert_eq!(exit_code2, 0);
-    assert_eq!(extract_events_created_from_stats(&stderr2), 4, "Mixed case should create 4 events");
+    assert_eq!(
+        extract_events_created_from_stats(&stderr2),
+        4,
+        "Mixed case should create 4 events"
+    );
 
     // Scenario 3: Many small multiline events
     let input3 = (0..10)
@@ -4977,7 +5008,11 @@ Final multiline start
         &input3,
     );
     assert_eq!(exit_code3, 0);
-    assert_eq!(extract_events_created_from_stats(&stderr3), 10, "Many events case should create 10 events");
+    assert_eq!(
+        extract_events_created_from_stats(&stderr3),
+        10,
+        "Many events case should create 10 events"
+    );
 }
 
 #[test]
@@ -4994,7 +5029,7 @@ Error occurred
   stack trace line 2
 App finished
   cleanup done"#,
-            3 // expected events
+            3, // expected events
         ),
         (
             "timestamp",
@@ -5003,48 +5038,104 @@ continuation line 1
 continuation line 2
 Jan 1 10:00:05 server app: Request completed
 final line"#,
-            2 // expected events
-        )
+            2, // expected events
+        ),
     ];
 
     for (strategy, input, expected_events) in test_cases {
         // Test without filtering
         let (stdout_seq, stderr_seq, _) = run_kelora_with_input(
-            &["-f", if strategy == "timestamp" { "syslog" } else { "line" },
-              "-M", strategy, "--stats"],
+            &[
+                "-f",
+                if strategy == "timestamp" {
+                    "syslog"
+                } else {
+                    "line"
+                },
+                "-M",
+                strategy,
+                "--stats",
+            ],
             input,
         );
         let (stdout_par, stderr_par, _) = run_kelora_with_input(
-            &["-f", if strategy == "timestamp" { "syslog" } else { "line" },
-              "-M", strategy, "--stats", "--parallel"],
+            &[
+                "-f",
+                if strategy == "timestamp" {
+                    "syslog"
+                } else {
+                    "line"
+                },
+                "-M",
+                strategy,
+                "--stats",
+                "--parallel",
+            ],
             input,
         );
 
         let events_seq = extract_events_created_from_stats(&stderr_seq);
         let events_par = extract_events_created_from_stats(&stderr_par);
 
-        assert_eq!(events_seq, expected_events, "Sequential {} should create {} events", strategy, expected_events);
-        assert_eq!(events_par, expected_events, "Parallel {} should create {} events", strategy, expected_events);
-        assert_eq!(events_seq, events_par, "Sequential and parallel {} should match", strategy);
+        assert_eq!(
+            events_seq, expected_events,
+            "Sequential {} should create {} events",
+            strategy, expected_events
+        );
+        assert_eq!(
+            events_par, expected_events,
+            "Parallel {} should create {} events",
+            strategy, expected_events
+        );
+        assert_eq!(
+            events_seq, events_par,
+            "Sequential and parallel {} should match",
+            strategy
+        );
 
         let lines_seq = stdout_seq.lines().count();
         let lines_par = stdout_par.lines().count();
-        assert_eq!(lines_seq, lines_par, "Output line count should match for {}", strategy);
+        assert_eq!(
+            lines_seq, lines_par,
+            "Output line count should match for {}",
+            strategy
+        );
 
         // Test with filtering (where applicable)
         if strategy == "indent" {
             let (_, stderr_seq_f, _) = run_kelora_with_input(
-                &["-f", "line", "-M", strategy, "--stats", "--filter", "e.line.contains(\"Error\")"],
+                &[
+                    "-f",
+                    "line",
+                    "-M",
+                    strategy,
+                    "--stats",
+                    "--filter",
+                    "e.line.contains(\"Error\")",
+                ],
                 input,
             );
             let (_, stderr_par_f, _) = run_kelora_with_input(
-                &["-f", "line", "-M", strategy, "--stats", "--parallel", "--filter", "e.line.contains(\"Error\")"],
+                &[
+                    "-f",
+                    "line",
+                    "-M",
+                    strategy,
+                    "--stats",
+                    "--parallel",
+                    "--filter",
+                    "e.line.contains(\"Error\")",
+                ],
                 input,
             );
 
             let filtered_seq = extract_events_filtered_from_stats(&stderr_seq_f);
             let filtered_par = extract_events_filtered_from_stats(&stderr_par_f);
-            assert_eq!(filtered_seq, filtered_par, "Filtered counts should match for {}", strategy);
+            assert_eq!(
+                filtered_seq, filtered_par,
+                "Filtered counts should match for {}",
+                strategy
+            );
         }
     }
 }

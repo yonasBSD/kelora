@@ -487,9 +487,9 @@ fn max_array(arr: Array) -> Dynamic {
 #[derive(Debug, PartialEq)]
 enum ArrayType {
     Empty,
-    Numeric,  // All elements are numbers or numeric strings
-    String,   // All elements are non-numeric strings or booleans
-    Mixed,    // Contains incompatible types
+    Numeric, // All elements are numbers or numeric strings
+    String,  // All elements are non-numeric strings or booleans
+    Mixed,   // Contains incompatible types
 }
 
 /// Determine the type category of an array
@@ -1318,11 +1318,7 @@ mod tests {
     #[test]
     fn test_min_max_with_mixed_numeric_types() {
         // Mix of integers and floats only (no strings)
-        let arr = vec![
-            Dynamic::from(3i64),
-            Dynamic::from(1.5),
-            Dynamic::from(4i64),
-        ];
+        let arr = vec![Dynamic::from(3i64), Dynamic::from(1.5), Dynamic::from(4i64)];
 
         let min_result = min_array(arr.clone());
         let max_result = max_array(arr);
@@ -1336,10 +1332,7 @@ mod tests {
     #[test]
     fn test_min_max_mixed_numbers_and_strings_rejected() {
         // Mix of actual numbers and numeric strings should be rejected
-        let arr = vec![
-            Dynamic::from(3i64),
-            Dynamic::from("2"),
-        ];
+        let arr = vec![Dynamic::from(3i64), Dynamic::from("2")];
 
         let min_result = min_array(arr.clone());
         let max_result = max_array(arr);

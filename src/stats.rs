@@ -1,8 +1,8 @@
+use crate::rhai_functions::datetime::DurationWrapper;
+use chrono::{DateTime, Utc};
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
-use chrono::{DateTime, Utc};
-use crate::rhai_functions::datetime::DurationWrapper;
 
 /// Statistics collected during log processing
 #[derive(Debug, Clone, Default)]
@@ -193,23 +193,36 @@ impl ProcessingStats {
 
         // Lines processed: N total, N filtered (X%), N errors (Y%)
         let lines_filtered_pct = if self.lines_read > 0 {
-            format!(" ({:.1}%)", (self.lines_filtered as f64 / self.lines_read as f64) * 100.0)
+            format!(
+                " ({:.1}%)",
+                (self.lines_filtered as f64 / self.lines_read as f64) * 100.0
+            )
         } else {
             String::new()
         };
         let lines_errors_pct = if self.lines_read > 0 {
-            format!(" ({:.1}%)", (self.lines_errors as f64 / self.lines_read as f64) * 100.0)
+            format!(
+                " ({:.1}%)",
+                (self.lines_errors as f64 / self.lines_read as f64) * 100.0
+            )
         } else {
             String::new()
         };
         output.push_str(&format!(
             "Lines processed: {} total, {} filtered{}, {} errors{}\n",
-            self.lines_read, self.lines_filtered, lines_filtered_pct, self.lines_errors, lines_errors_pct
+            self.lines_read,
+            self.lines_filtered,
+            lines_filtered_pct,
+            self.lines_errors,
+            lines_errors_pct
         ));
 
         // Events created: N total, N output, N filtered (X%)
         let events_filtered_pct = if self.events_created > 0 {
-            format!(" ({:.1}%)", (self.events_filtered as f64 / self.events_created as f64) * 100.0)
+            format!(
+                " ({:.1}%)",
+                (self.events_filtered as f64 / self.events_created as f64) * 100.0
+            )
         } else {
             String::new()
         };
@@ -238,22 +251,30 @@ impl ProcessingStats {
 
         // Time span: show generic label when identical, specific labels when different
         let has_original = self.first_timestamp.is_some() && self.last_timestamp.is_some();
-        let has_result = self.first_result_timestamp.is_some() && self.last_result_timestamp.is_some();
+        let has_result =
+            self.first_result_timestamp.is_some() && self.last_result_timestamp.is_some();
 
         if has_original {
             let first = self.first_timestamp.unwrap();
             let last = self.last_timestamp.unwrap();
 
             // Check if result timespan differs from original
-            let is_different = has_result && (
-                self.first_timestamp != self.first_result_timestamp ||
-                self.last_timestamp != self.last_result_timestamp
-            );
+            let is_different = has_result
+                && (self.first_timestamp != self.first_result_timestamp
+                    || self.last_timestamp != self.last_result_timestamp);
 
-            let label = if is_different { "Input time span" } else { "Time span" };
+            let label = if is_different {
+                "Input time span"
+            } else {
+                "Time span"
+            };
 
             if first == last {
-                output.push_str(&format!("{}: {} (single timestamp)\n", label, first.to_rfc3339()));
+                output.push_str(&format!(
+                    "{}: {} (single timestamp)\n",
+                    label,
+                    first.to_rfc3339()
+                ));
             } else {
                 let duration = last - first;
                 let duration_wrapper = DurationWrapper::new(duration);
@@ -272,7 +293,10 @@ impl ProcessingStats {
                 let result_last = self.last_result_timestamp.unwrap();
 
                 if result_first == result_last {
-                    output.push_str(&format!("Result time span: {} (single timestamp)\n", result_first.to_rfc3339()));
+                    output.push_str(&format!(
+                        "Result time span: {} (single timestamp)\n",
+                        result_first.to_rfc3339()
+                    ));
                 } else {
                     let duration = result_last - result_first;
                     let duration_wrapper = DurationWrapper::new(duration);
