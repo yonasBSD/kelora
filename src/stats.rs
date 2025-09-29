@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
+use chrono::{DateTime, Utc};
 
 /// Statistics collected during log processing
 #[derive(Debug, Clone, Default)]
@@ -19,6 +20,8 @@ pub struct ProcessingStats {
     pub start_time: Option<Instant>,
     pub discovered_levels: BTreeSet<String>,
     pub discovered_keys: BTreeSet<String>,
+    pub first_timestamp: Option<DateTime<Utc>>,
+    pub last_timestamp: Option<DateTime<Utc>>,
 }
 
 // Thread-local storage for statistics (following track_count pattern)
@@ -91,6 +94,31 @@ pub fn stats_finish_processing() {
 
 pub fn get_thread_stats() -> ProcessingStats {
     THREAD_STATS.with(|stats| stats.borrow().clone())
+}
+
+pub fn stats_update_timestamp(timestamp: DateTime<Utc>) {
+    THREAD_STATS.with(|stats| {
+        let mut stats = stats.borrow_mut();
+        match stats.first_timestamp {
+            None => {
+                stats.first_timestamp = Some(timestamp);
+                stats.last_timestamp = Some(timestamp);
+            }
+            Some(first) => {
+                if timestamp < first {
+                    stats.first_timestamp = Some(timestamp);
+                }
+                match stats.last_timestamp {
+                    None => stats.last_timestamp = Some(timestamp),
+                    Some(last) => {
+                        if timestamp > last {
+                            stats.last_timestamp = Some(timestamp);
+                        }
+                    }
+                }
+            }
+        }
+    });
 }
 
 impl ProcessingStats {
@@ -176,6 +204,30 @@ impl ProcessingStats {
                 output.push_str(&format!(
                     "Throughput: {:.0} lines/s in {:.2}s\n",
                     throughput, duration_secs
+                ));
+            }
+        }
+
+        // Time span: (only if we have timestamps)
+        if let (Some(first), Some(last)) = (self.first_timestamp, self.last_timestamp) {
+            if first == last {
+                output.push_str(&format!("Time span: {} (single timestamp)\n", first.format("%Y-%m-%d %H:%M:%S UTC")));
+            } else {
+                let duration = last - first;
+                let duration_str = if duration.num_days() > 0 {
+                    format!("{}d {}h {}m", duration.num_days(), duration.num_hours() % 24, duration.num_minutes() % 60)
+                } else if duration.num_hours() > 0 {
+                    format!("{}h {}m", duration.num_hours(), duration.num_minutes() % 60)
+                } else if duration.num_minutes() > 0 {
+                    format!("{}m {}s", duration.num_minutes(), duration.num_seconds() % 60)
+                } else {
+                    format!("{:.1}s", duration.num_milliseconds() as f64 / 1000.0)
+                };
+                output.push_str(&format!(
+                    "Time span: {} to {} ({})\n",
+                    first.format("%Y-%m-%d %H:%M:%S UTC"),
+                    last.format("%Y-%m-%d %H:%M:%S UTC"),
+                    duration_str
                 ));
             }
         }

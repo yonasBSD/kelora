@@ -305,6 +305,11 @@ impl Pipeline {
                     // Event was successfully created from chunk
                     crate::stats::stats_add_event_created();
 
+                    // Track timestamp for time span statistics
+                    if let Some(ts) = e.parsed_ts {
+                        crate::stats::stats_update_timestamp(ts);
+                    }
+
                     // Collect discovered levels and keys for stats
                     collect_discovered_levels_and_keys(&e, ctx);
 
@@ -635,6 +640,11 @@ impl Pipeline {
             Ok(mut e) => {
                 // Event was successfully created from chunk
                 crate::stats::stats_add_event_created();
+
+                // Track timestamp for time span statistics
+                if let Some(ts) = e.parsed_ts {
+                    crate::stats::stats_update_timestamp(ts);
+                }
 
                 // Collect discovered levels and keys for stats
                 collect_discovered_levels_and_keys(&e, ctx);
