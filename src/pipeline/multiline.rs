@@ -284,28 +284,34 @@ impl Chunker for MultilineChunker {
             return None;
         }
 
-        // For all other strategies, use the original logic
-        let should_flush = match &self.config.strategy {
+        match &self.config.strategy {
             MultilineStrategy::End { .. } | MultilineStrategy::Boundary { .. } => {
-                // For end/boundary strategies, check if current line ends the event
-                self.ends_current_event(&line)
+                // For end/boundary strategies we must include the terminating line in the event
+                self.buffer.push(line);
+
+                if let Some(last_line) = self.buffer.last() {
+                    if self.ends_current_event(last_line) {
+                        return self.flush_buffer();
+                    }
+                }
+
+                None
             }
             _ => {
                 // For timestamp, indent, and start strategies, check if current line starts a new event
-                !self.buffer.is_empty() && self.starts_new_event(&line)
+                let should_flush = !self.buffer.is_empty() && self.starts_new_event(&line);
+                let result = if should_flush {
+                    self.flush_buffer()
+                } else {
+                    None
+                };
+
+                // Add the new line to buffer
+                self.buffer.push(line);
+
+                result
             }
-        };
-
-        let result = if should_flush {
-            self.flush_buffer()
-        } else {
-            None
-        };
-
-        // Add the new line to buffer
-        self.buffer.push(line);
-
-        result
+        }
     }
 
     fn flush(&mut self) -> Option<String> {
