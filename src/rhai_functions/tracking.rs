@@ -213,8 +213,12 @@ pub fn track_error(
                         crate::rhai_functions::strings::capture_stderr(format!("    {}", line));
                         // Show additional line details for verbose >= 3 (-vvv)
                         if verbose >= 3 {
-                            let line_info = format!("    (length: {} chars, starts: {:?}, ends: {:?})",
+                            let non_ascii_count = line.chars().filter(|c| !c.is_ascii()).count();
+                            let control_char_count = line.chars().filter(|c| c.is_control() && *c != '\t' && *c != '\n' && *c != '\r').count();
+                            let line_info = format!("    (length: {} chars, non_ascii: {}, control_chars: {}, starts: {:?}, ends: {:?})",
                                 line.len(),
+                                non_ascii_count,
+                                control_char_count,
                                 line.chars().next().unwrap_or('\0'),
                                 line.chars().last().unwrap_or('\0')
                             );
@@ -234,8 +238,12 @@ pub fn track_error(
                         eprintln!("{}", indented_line);
                         // Show additional line details for verbose >= 3 (-vvv)
                         if verbose >= 3 {
-                            let line_info = format!("    (length: {} chars, starts: {:?}, ends: {:?})",
+                            let non_ascii_count = line.chars().filter(|c| !c.is_ascii()).count();
+                            let control_char_count = line.chars().filter(|c| c.is_control() && *c != '\t' && *c != '\n' && *c != '\r').count();
+                            let line_info = format!("    (length: {} chars, non_ascii: {}, control_chars: {}, starts: {:?}, ends: {:?})",
                                 line.len(),
+                                non_ascii_count,
+                                control_char_count,
                                 line.chars().next().unwrap_or('\0'),
                                 line.chars().last().unwrap_or('\0')
                             );
