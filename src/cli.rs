@@ -181,8 +181,8 @@ pub struct Cli {
     pub verbose: u8,
 
     /// Quiet mode with multiple levels:
-    /// -q: suppress kelora diagnostics (errors, stats)
-    /// -qq: additionally suppress event output (-F none)  
+    /// -q: suppress kelora diagnostics (errors, stats) and context markers (-A/-B/-C)
+    /// -qq: additionally suppress event output (-F none)
     /// -qqq: additionally suppress script side effects (print/eprint)
     #[arg(short = 'q', long = "quiet", action = clap::ArgAction::Count, help_heading = "Error Handling")]
     pub quiet: u8,

@@ -688,3 +688,117 @@ fn test_context_with_window_option() {
         "Should have match prefix with window option"
     );
 }
+
+#[test]
+fn test_context_markers_suppressed_in_quiet_mode() {
+    // Test that context markers (/, *, \, |) are suppressed in quiet modes (-q/-qq/-qqq)
+    let (stdout_normal, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--filter",
+            "e.level == \"error\"",
+            "-A",
+            "1",
+            "-B",
+            "1",
+            "--no-color",
+        ],
+        SAMPLE_JSON_LOGS,
+    );
+
+    assert_eq!(exit_code, 0, "Context without quiet should succeed");
+    assert!(
+        stdout_normal.contains("/ "),
+        "Should have before context marker without quiet"
+    );
+    assert!(
+        stdout_normal.contains("* "),
+        "Should have match marker without quiet"
+    );
+    assert!(
+        stdout_normal.contains("\\ "),
+        "Should have after context marker without quiet"
+    );
+
+    // Test -q (quiet level 1) - should suppress context markers
+    let (stdout_q, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--filter",
+            "e.level == \"error\"",
+            "-A",
+            "1",
+            "-B",
+            "1",
+            "-q",
+            "--no-color",
+        ],
+        SAMPLE_JSON_LOGS,
+    );
+
+    assert_eq!(exit_code, 0, "Context with -q should succeed");
+    assert!(
+        !stdout_q.contains("/ "),
+        "Should NOT have before context marker with -q"
+    );
+    assert!(
+        !stdout_q.contains("* "),
+        "Should NOT have match marker with -q"
+    );
+    assert!(
+        !stdout_q.contains("\\ "),
+        "Should NOT have after context marker with -q"
+    );
+    assert!(
+        stdout_q.contains("level='error'"),
+        "Should still show filtered content with -q"
+    );
+
+    // Test -qq (quiet level 2) - should also suppress context markers and events
+    let (stdout_qq, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--filter",
+            "e.level == \"error\"",
+            "-A",
+            "1",
+            "-B",
+            "1",
+            "-qq",
+            "--no-color",
+        ],
+        SAMPLE_JSON_LOGS,
+    );
+
+    assert_eq!(exit_code, 0, "Context with -qq should succeed");
+    assert!(
+        stdout_qq.trim().is_empty(),
+        "Should have no output with -qq (events suppressed)"
+    );
+
+    // Test -qqq (quiet level 3) - should also suppress context markers
+    let (stdout_qqq, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--filter",
+            "e.level == \"error\"",
+            "-A",
+            "1",
+            "-B",
+            "1",
+            "-qqq",
+            "--no-color",
+        ],
+        SAMPLE_JSON_LOGS,
+    );
+
+    assert_eq!(exit_code, 0, "Context with -qqq should succeed");
+    assert!(
+        stdout_qqq.trim().is_empty(),
+        "Should have no output with -qqq (everything suppressed)"
+    );
+}

@@ -253,6 +253,7 @@ impl PipelineBuilder {
                     self.config.timestamp_formatting.clone(),
                     self.config.wrap,
                     self.config.pretty,
+                    self.config.quiet_level,
                 ))
             }
             crate::OutputFormat::Inspect => Box::new(crate::formatters::InspectFormatter::new(
@@ -561,6 +562,7 @@ impl PipelineBuilder {
                     self.config.timestamp_formatting.clone(),
                     self.config.wrap,
                     self.config.pretty,
+                    self.config.quiet_level,
                 ))
             }
             crate::OutputFormat::Inspect => Box::new(crate::formatters::InspectFormatter::new(

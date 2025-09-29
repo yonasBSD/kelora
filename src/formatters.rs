@@ -226,6 +226,7 @@ pub struct DefaultFormatter {
     terminal_width: usize,
     pretty_nested: bool,
     use_emoji: bool,
+    quiet_level: u8,
 }
 
 impl DefaultFormatter {
@@ -235,6 +236,7 @@ impl DefaultFormatter {
         brief: bool,
         timestamp_formatting: crate::config::TimestampFormatConfig,
         pretty_nested: bool,
+        quiet_level: u8,
     ) -> Self {
         Self {
             colors: ColorScheme::new(use_colors),
@@ -253,6 +255,7 @@ impl DefaultFormatter {
             terminal_width: crate::tty::get_terminal_width(),
             pretty_nested,
             use_emoji: use_emoji && use_colors,
+            quiet_level,
         }
     }
 
@@ -263,6 +266,7 @@ impl DefaultFormatter {
         timestamp_formatting: crate::config::TimestampFormatConfig,
         enable_wrapping: bool,
         pretty_nested: bool,
+        quiet_level: u8,
     ) -> Self {
         let terminal_width = if enable_wrapping {
             crate::tty::get_terminal_width()
@@ -287,6 +291,7 @@ impl DefaultFormatter {
             terminal_width,
             pretty_nested,
             use_emoji: use_emoji && use_colors,
+            quiet_level,
         }
     }
 
@@ -562,6 +567,11 @@ impl DefaultFormatter {
     /// Get the context prefix for an event based on its context type
     fn get_context_prefix(&self, event: &Event) -> String {
         use crate::event::ContextType;
+
+        // Suppress context markers in quiet modes (-q/-qq/-qqq)
+        if self.quiet_level > 0 {
+            return String::new();
+        }
 
         match event.context_type {
             ContextType::Match => self.render_context_marker(self.colors.context_match, "◉", "*"),
@@ -1861,6 +1871,7 @@ mod tests {
             crate::config::TimestampFormatConfig::default(),
             false, // Disable wrapping for this test
             false,
+            0, // No quiet mode
         ); // No colors, no brief mode, no wrapping
         let result = formatter.format(&event);
 
@@ -1892,6 +1903,7 @@ mod tests {
             crate::config::TimestampFormatConfig::default(),
             false,
             false,
+            0, // No quiet mode
         );
         let result = formatter.format(&event);
 
@@ -1918,6 +1930,7 @@ mod tests {
             crate::config::TimestampFormatConfig::default(),
             false,
             true,
+            0, // No quiet mode
         );
         let result = formatter.format(&event);
 
@@ -1938,6 +1951,7 @@ mod tests {
             crate::config::TimestampFormatConfig::default(),
             false, // Disable wrapping for this test
             false,
+            0, // No quiet mode
         ); // No colors, brief mode, no wrapping
         let result = formatter.format(&event);
 
@@ -1954,6 +1968,7 @@ mod tests {
             crate::config::TimestampFormatConfig::default(),
             false,
             false,
+            0, // No quiet mode
         );
 
         let mut before_event = Event::default();
@@ -2424,6 +2439,7 @@ mod tests {
             crate::config::TimestampFormatConfig::default(),
             false, // wrapping disabled
             false,
+            0, // No quiet mode
         );
         let result = formatter.format(&event);
 
@@ -2457,6 +2473,7 @@ mod tests {
             terminal_width: 50, // Small width to force wrapping
             pretty_nested: false,
             use_emoji: false,
+            quiet_level: 0, // No quiet mode
         };
 
         let result = formatter.format(&event);
@@ -2493,6 +2510,7 @@ mod tests {
             terminal_width: 30, // Very small width
             pretty_nested: false,
             use_emoji: false,
+            quiet_level: 0, // No quiet mode
         };
 
         let result = formatter.format(&event);
@@ -2519,6 +2537,7 @@ mod tests {
             crate::config::TimestampFormatConfig::default(),
             true,
             false,
+            0, // No quiet mode
         );
 
         // Test string with ANSI color codes
@@ -2551,6 +2570,7 @@ mod tests {
             terminal_width: 20, // Force wrapping
             pretty_nested: false,
             use_emoji: false,
+            quiet_level: 0, // No quiet mode
         };
 
         let result = formatter.format(&event);
@@ -2596,6 +2616,7 @@ mod tests {
             false,
             crate::config::TimestampFormatConfig::default(),
             false,
+            0, // No quiet mode
         );
 
         // Default constructor should have wrapping enabled
