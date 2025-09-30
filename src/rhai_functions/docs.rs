@@ -56,12 +56,10 @@ text.split(separator)                 Split string into array by delimiter (buil
 text.starting_with(prefix)            Return substring from prefix to end, else empty
 text.strip([chars])                   Remove whitespace or specified characters
 text.sub_string(start [, length])     Extract substring from position (builtin)
-text.to_float()                       Convert text to float (0 on error)
-text.to_int()                         Convert text to integer (0 on error)
+text.to_float()                       Convert text to float (returns () on error)
+text.to_int()                         Convert text to integer (returns () on error)
 text.to_lower()                       Convert to lowercase (builtin)
 text.to_upper()                       Convert to uppercase (builtin)
-text.to_number([default])             Safe number conversion with fallback (default: 0)
-text.to_bool([default])               Safe boolean conversion with fallback
 text.trim()                           Remove whitespace from start and end (builtin)
 text.unescape_html()                  Unescape HTML entities to text
 text.unescape_json()                  Unescape JSON escape sequences
@@ -127,6 +125,14 @@ rand()                                Random float between 0 and 1
 rand_int(min, max)                    Random integer between min and max (inclusive)
 round(x)                              Round to nearest integer
 
+TYPE CONVERSION FUNCTIONS:
+to_int(value)                         Convert value to integer (returns () on error)
+to_float(value)                       Convert value to float (returns () on error)
+to_bool(value)                        Convert value to boolean (returns () on error)
+to_int_or(value, default)             Convert value to integer with fallback
+to_float_or(value, default)           Convert value to float with fallback
+to_bool_or(value, default)            Convert value to boolean with fallback
+
 UTILITY FUNCTIONS:
 eprint(message)                       Print to stderr (suppressed with -qqq)
 exit(code)                            Exit kelora with given exit code
@@ -167,8 +173,17 @@ e.tag_count = e.tags.len  # Use builtin len
 e.error_tags = e.tags.filter(|tag| tag.contains("error"))  # Builtin filter
 emit_each(e.items)  # Creates separate event for each item
 
-# Type-safe parsing and validation
-e.status_code = e.status.to_int()  # Parse safely
+# Type conversion - strict (returns () on error)
+e.status_code = e.status.to_int()  # Returns () if not a valid integer
+e.price = e.price_str.to_float()   # Returns () if not a valid float
+e.active = e.enabled.to_bool()     # Returns () if not convertible
+
+# Type conversion - with defaults (safe)
+e.port = to_int_or(e.port_str, 8080)         # Use 8080 if conversion fails
+e.timeout = to_float_or(e.timeout_str, 30.0) # Use 30.0 if conversion fails
+e.debug = to_bool_or(e.debug_flag, false)    # Use false if conversion fails
+
+# Type checking and validation
 if type_of(e.level) == "string" { e.log_level = e.level.to_upper() }
 
 # JSON parsing and serialization

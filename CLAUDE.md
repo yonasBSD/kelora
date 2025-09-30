@@ -540,10 +540,12 @@ kelora -qq suspicious.log || mail -s "Log errors detected" admin@company.com
   kelora -f json --exec 'emit_each(e.requests)' --filter 'e.status >= 400' \
     --exec 'let base = #{alert_time: now_utc(), severity: "high"}; emit_each(e.errors, base)'
   ```
+- **Type Conversion Functions**: Two patterns for type conversion:
+  - **Strict conversions** (return `()` on error): `to_int(value)`, `to_float(value)`, `to_bool(value)`
+  - **Safe conversions** (with defaults): `to_int_or(value, default)`, `to_float_or(value, default)`, `to_bool_or(value, default)`
+  - Use strict variants when input should be valid; use `_or` variants for defensive parsing with fallbacks
 - **Safety Functions**: Use defensive field access functions for robust scripts:
   - `path_equals(e, "field.subfield", expected)` - Safe nested field comparison
-  - `to_number(value, default)` - Safe number conversion with fallback
-  - `to_bool(value, default)` - Safe boolean conversion with fallback
 - **Environment Variables**: Access environment variables for CI/CD and configuration:
   - `get_env(var)` - Get environment variable, returns empty string if not found
   - `get_env(var, default)` - Get environment variable with fallback default

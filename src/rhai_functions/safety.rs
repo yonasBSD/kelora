@@ -30,24 +30,83 @@ pub fn path_equals(event: Map, path: ImmutableString, expected: Dynamic) -> bool
     false
 }
 
-/// Convert value to number with default fallback
-/// Usage: to_number(e.amount, 0)
-pub fn to_number(value: Dynamic, default: Dynamic) -> Dynamic {
-    // Try to convert to i64 first
+/// Convert value to integer (strict - returns () on error)
+/// Usage: to_int(e.amount)
+pub fn to_int_strict(value: Dynamic) -> Dynamic {
+    // Already an integer
     if let Ok(num) = value.as_int() {
         return Dynamic::from(num);
     }
 
-    // Try to convert to f64
-    if let Ok(num) = value.as_float() {
-        return Dynamic::from(num);
-    }
-
-    // Try to parse string as number
+    // Try to parse string as integer
     if let Some(s) = value.read_lock::<ImmutableString>() {
         if let Ok(num) = s.parse::<i64>() {
             return Dynamic::from(num);
         }
+    }
+
+    // Return UNIT if conversion failed
+    Dynamic::UNIT
+}
+
+/// Convert value to integer with default fallback
+/// Usage: to_int_or(e.amount, 0)
+pub fn to_int_or(value: Dynamic, default: Dynamic) -> Dynamic {
+    // Already an integer
+    if let Ok(num) = value.as_int() {
+        return Dynamic::from(num);
+    }
+
+    // Try to parse string as integer
+    if let Some(s) = value.read_lock::<ImmutableString>() {
+        if let Ok(num) = s.parse::<i64>() {
+            return Dynamic::from(num);
+        }
+    }
+
+    // Return default if conversion failed
+    default
+}
+
+/// Convert value to float (strict - returns () on error)
+/// Usage: to_float(e.amount)
+pub fn to_float_strict(value: Dynamic) -> Dynamic {
+    // Already a float
+    if let Ok(num) = value.as_float() {
+        return Dynamic::from(num);
+    }
+
+    // Try to convert integer to float
+    if let Ok(num) = value.as_int() {
+        return Dynamic::from(num as f64);
+    }
+
+    // Try to parse string as float
+    if let Some(s) = value.read_lock::<ImmutableString>() {
+        if let Ok(num) = s.parse::<f64>() {
+            return Dynamic::from(num);
+        }
+    }
+
+    // Return UNIT if conversion failed
+    Dynamic::UNIT
+}
+
+/// Convert value to float with default fallback
+/// Usage: to_float_or(e.amount, 0.0)
+pub fn to_float_or(value: Dynamic, default: Dynamic) -> Dynamic {
+    // Already a float
+    if let Ok(num) = value.as_float() {
+        return Dynamic::from(num);
+    }
+
+    // Try to convert integer to float
+    if let Ok(num) = value.as_int() {
+        return Dynamic::from(num as f64);
+    }
+
+    // Try to parse string as float
+    if let Some(s) = value.read_lock::<ImmutableString>() {
         if let Ok(num) = s.parse::<f64>() {
             return Dynamic::from(num);
         }
@@ -202,9 +261,39 @@ fn parse_path_tokens(path: &str) -> Vec<PathToken> {
     tokens
 }
 
+/// Convert value to boolean (strict - returns () on error)
+/// Usage: to_bool(e.active)
+pub fn to_bool_strict(value: Dynamic) -> Dynamic {
+    // Already a boolean
+    if let Ok(b) = value.as_bool() {
+        return Dynamic::from(b);
+    }
+
+    // String conversion
+    if let Some(s) = value.read_lock::<ImmutableString>() {
+        let s_lower = s.to_lowercase();
+        match s_lower.as_str() {
+            "true" | "yes" | "1" | "on" => return Dynamic::from(true),
+            "false" | "no" | "0" | "off" => return Dynamic::from(false),
+            _ => {}
+        }
+    }
+
+    // Number conversion (0 = false, non-zero = true)
+    if let Ok(num) = value.as_int() {
+        return Dynamic::from(num != 0);
+    }
+    if let Ok(num) = value.as_float() {
+        return Dynamic::from(num != 0.0);
+    }
+
+    // Return UNIT if conversion failed
+    Dynamic::UNIT
+}
+
 /// Convert value to boolean with default fallback
-/// Usage: to_bool(e.active, false)
-pub fn to_bool(value: Dynamic, default: Dynamic) -> Dynamic {
+/// Usage: to_bool_or(e.active, false)
+pub fn to_bool_or(value: Dynamic, default: Dynamic) -> Dynamic {
     // Already a boolean
     if let Ok(b) = value.as_bool() {
         return Dynamic::from(b);
@@ -243,8 +332,16 @@ pub fn register_functions(engine: &mut Engine) {
 
     // Other safety functions
     engine.register_fn("path_equals", path_equals);
-    engine.register_fn("to_number", to_number);
-    engine.register_fn("to_bool", to_bool);
+
+    // Conversion functions - strict variants (return () on error)
+    engine.register_fn("to_int", to_int_strict);
+    engine.register_fn("to_float", to_float_strict);
+    engine.register_fn("to_bool", to_bool_strict);
+
+    // Conversion functions - with defaults
+    engine.register_fn("to_int_or", to_int_or);
+    engine.register_fn("to_float_or", to_float_or);
+    engine.register_fn("to_bool_or", to_bool_or);
 }
 
 #[cfg(test)]
@@ -312,49 +409,118 @@ mod tests {
     }
 
     #[test]
-    fn test_to_number() {
+    fn test_to_int_strict() {
         // Test integer input
-        let result = to_number(Dynamic::from(42i64), Dynamic::from(0i64));
+        let result = to_int_strict(Dynamic::from(42i64));
         assert_eq!(result.as_int().unwrap(), 42i64);
 
-        // Test float input
-        let result = to_number(Dynamic::from(std::f64::consts::PI), Dynamic::from(0.0));
-        assert_eq!(result.as_float().unwrap(), std::f64::consts::PI);
-
         // Test string integer input
-        let result = to_number(Dynamic::from("123"), Dynamic::from(0i64));
+        let result = to_int_strict(Dynamic::from("123"));
         assert_eq!(result.as_int().unwrap(), 123i64);
 
-        // Test string float input
-        let result = to_number(Dynamic::from("12.5"), Dynamic::from(0.0));
-        assert_eq!(result.as_float().unwrap(), 12.5);
+        // Test invalid input returns UNIT
+        let result = to_int_strict(Dynamic::from("invalid"));
+        assert!(result.is_unit());
+
+        // Test float input returns UNIT (strict int conversion)
+        let result = to_int_strict(Dynamic::from(12.5));
+        assert!(result.is_unit());
+    }
+
+    #[test]
+    fn test_to_int_or() {
+        // Test integer input
+        let result = to_int_or(Dynamic::from(42i64), Dynamic::from(0i64));
+        assert_eq!(result.as_int().unwrap(), 42i64);
+
+        // Test string integer input
+        let result = to_int_or(Dynamic::from("123"), Dynamic::from(0i64));
+        assert_eq!(result.as_int().unwrap(), 123i64);
 
         // Test invalid input with default
-        let result = to_number(Dynamic::from("invalid"), Dynamic::from(999i64));
+        let result = to_int_or(Dynamic::from("invalid"), Dynamic::from(999i64));
         assert_eq!(result.as_int().unwrap(), 999i64);
     }
 
     #[test]
-    fn test_to_bool() {
-        assert!(to_bool(Dynamic::from(true), Dynamic::from(false))
+    fn test_to_float_strict() {
+        // Test float input
+        let result = to_float_strict(Dynamic::from(std::f64::consts::PI));
+        assert_eq!(result.as_float().unwrap(), std::f64::consts::PI);
+
+        // Test integer input (should convert to float)
+        let result = to_float_strict(Dynamic::from(42i64));
+        assert_eq!(result.as_float().unwrap(), 42.0);
+
+        // Test string float input
+        let result = to_float_strict(Dynamic::from("12.5"));
+        assert_eq!(result.as_float().unwrap(), 12.5);
+
+        // Test invalid input returns UNIT
+        let result = to_float_strict(Dynamic::from("invalid"));
+        assert!(result.is_unit());
+    }
+
+    #[test]
+    fn test_to_float_or() {
+        // Test float input
+        let result = to_float_or(Dynamic::from(std::f64::consts::PI), Dynamic::from(0.0));
+        assert_eq!(result.as_float().unwrap(), std::f64::consts::PI);
+
+        // Test integer input (should convert to float)
+        let result = to_float_or(Dynamic::from(42i64), Dynamic::from(0.0));
+        assert_eq!(result.as_float().unwrap(), 42.0);
+
+        // Test string float input
+        let result = to_float_or(Dynamic::from("12.5"), Dynamic::from(0.0));
+        assert_eq!(result.as_float().unwrap(), 12.5);
+
+        // Test invalid input with default
+        let result = to_float_or(Dynamic::from("invalid"), Dynamic::from(999.0));
+        assert_eq!(result.as_float().unwrap(), 999.0);
+    }
+
+    #[test]
+    fn test_to_bool_strict() {
+        // Test boolean input
+        assert!(to_bool_strict(Dynamic::from(true)).as_bool().unwrap());
+        assert!(!to_bool_strict(Dynamic::from(false)).as_bool().unwrap());
+
+        // Test string conversion
+        assert!(to_bool_strict(Dynamic::from("yes")).as_bool().unwrap());
+        assert!(to_bool_strict(Dynamic::from("1")).as_bool().unwrap());
+        assert!(!to_bool_strict(Dynamic::from("false")).as_bool().unwrap());
+
+        // Test number conversion
+        assert!(to_bool_strict(Dynamic::from(1i64)).as_bool().unwrap());
+        assert!(!to_bool_strict(Dynamic::from(0i64)).as_bool().unwrap());
+
+        // Test invalid input returns UNIT
+        let result = to_bool_strict(Dynamic::from("invalid"));
+        assert!(result.is_unit());
+    }
+
+    #[test]
+    fn test_to_bool_or() {
+        assert!(to_bool_or(Dynamic::from(true), Dynamic::from(false))
             .as_bool()
             .unwrap());
-        assert!(to_bool(Dynamic::from("yes"), Dynamic::from(false))
+        assert!(to_bool_or(Dynamic::from("yes"), Dynamic::from(false))
             .as_bool()
             .unwrap());
-        assert!(to_bool(Dynamic::from("1"), Dynamic::from(false))
+        assert!(to_bool_or(Dynamic::from("1"), Dynamic::from(false))
             .as_bool()
             .unwrap());
-        assert!(!to_bool(Dynamic::from("false"), Dynamic::from(true))
+        assert!(!to_bool_or(Dynamic::from("false"), Dynamic::from(true))
             .as_bool()
             .unwrap());
-        assert!(to_bool(Dynamic::from(1i64), Dynamic::from(false))
+        assert!(to_bool_or(Dynamic::from(1i64), Dynamic::from(false))
             .as_bool()
             .unwrap());
-        assert!(!to_bool(Dynamic::from(0i64), Dynamic::from(true))
+        assert!(!to_bool_or(Dynamic::from(0i64), Dynamic::from(true))
             .as_bool()
             .unwrap());
-        assert!(to_bool(Dynamic::from("invalid"), Dynamic::from(true))
+        assert!(to_bool_or(Dynamic::from("invalid"), Dynamic::from(true))
             .as_bool()
             .unwrap());
     }
