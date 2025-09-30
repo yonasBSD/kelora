@@ -13,7 +13,16 @@ use std::thread;
 use signal_hook::{consts::SIGINT, consts::SIGPIPE, consts::SIGTERM, iterator::Signals};
 
 // Additional signals for stats printing
-#[cfg(all(unix, any(target_os = "macos", target_os = "freebsd", target_os = "openbsd", target_os = "netbsd", target_os = "dragonfly")))]
+#[cfg(all(
+    unix,
+    any(
+        target_os = "macos",
+        target_os = "freebsd",
+        target_os = "openbsd",
+        target_os = "netbsd",
+        target_os = "dragonfly"
+    )
+))]
 use signal_hook::consts::SIGINFO;
 
 #[cfg(unix)]
@@ -63,7 +72,16 @@ impl SignalHandler {
             let mut signals_to_handle = vec![SIGINT, SIGPIPE, SIGTERM, SIGUSR1];
 
             // Add SIGINFO on BSD-like systems (includes macOS)
-            #[cfg(all(unix, any(target_os = "macos", target_os = "freebsd", target_os = "openbsd", target_os = "netbsd", target_os = "dragonfly")))]
+            #[cfg(all(
+                unix,
+                any(
+                    target_os = "macos",
+                    target_os = "freebsd",
+                    target_os = "openbsd",
+                    target_os = "netbsd",
+                    target_os = "dragonfly"
+                )
+            ))]
             signals_to_handle.push(SIGINFO);
 
             let mut signals = Signals::new(&signals_to_handle)?;
@@ -111,7 +129,16 @@ impl SignalHandler {
                             // Print stats on SIGUSR1 (available on all Unix-like systems)
                             let _ = sender.send(Ctrl::PrintStats);
                         }
-                        #[cfg(all(unix, any(target_os = "macos", target_os = "freebsd", target_os = "openbsd", target_os = "netbsd", target_os = "dragonfly")))]
+                        #[cfg(all(
+                            unix,
+                            any(
+                                target_os = "macos",
+                                target_os = "freebsd",
+                                target_os = "openbsd",
+                                target_os = "netbsd",
+                                target_os = "dragonfly"
+                            )
+                        ))]
                         SIGINFO => {
                             // Print stats on SIGINFO (CTRL-T on BSD-like systems including macOS)
                             let _ = sender.send(Ctrl::PrintStats);
