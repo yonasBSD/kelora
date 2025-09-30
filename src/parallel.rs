@@ -2497,8 +2497,8 @@ impl ParallelProcessor {
         output: &mut W,
         take_limit: Option<usize>,
         gap_tracker: &mut Option<GapTracker>,
-        ctrl_rx: Receiver<Ctrl>,
-        config: &crate::config::KeloraConfig,
+        _ctrl_rx: Receiver<Ctrl>,
+        _config: &crate::config::KeloraConfig,
     ) -> Result<()> {
         let mut pending_batches: HashMap<u64, BatchResult> = HashMap::new();
         let mut next_expected_id = 0u64;
@@ -2629,7 +2629,7 @@ impl ParallelProcessor {
                     // Print current parallel stats from coordinator
                     let current_stats = global_tracker.get_final_stats();
                     let stats_message = config.format_stats_message(
-                        &current_stats.format_stats(config.input.multiline.is_some())
+                        &current_stats.format_stats(config.input.multiline.is_some()),
                     );
                     let _ = crate::platform::SafeStderr::new().writeln(&stats_message);
                 }

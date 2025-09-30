@@ -2496,9 +2496,9 @@ mod tests {
             result.get("input").unwrap().clone().into_string().unwrap(),
             "logs/app.log"
         );
-        assert_eq!(result.get("is_absolute").unwrap().as_bool().unwrap(), false);
-        assert_eq!(result.get("is_relative").unwrap().as_bool().unwrap(), true);
-        assert_eq!(result.get("has_root").unwrap().as_bool().unwrap(), false);
+        assert!(!result.get("is_absolute").unwrap().as_bool().unwrap());
+        assert!(result.get("is_relative").unwrap().as_bool().unwrap());
+        assert!(!result.get("has_root").unwrap().as_bool().unwrap());
         assert_eq!(
             result.get("parent").unwrap().clone().into_string().unwrap(),
             "logs"

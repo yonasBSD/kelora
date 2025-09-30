@@ -405,15 +405,13 @@ mod tests {
         let mut stats = ProcessingStats::new();
         let mut tracking: HashMap<String, rhai::Dynamic> = HashMap::new();
 
-        let mut levels = rhai::Array::new();
-        levels.push(rhai::Dynamic::from("INFO"));
+        let levels = vec![rhai::Dynamic::from("INFO")];
         tracking.insert(
             "__kelora_stats_discovered_levels".to_string(),
             rhai::Dynamic::from(levels),
         );
 
-        let mut keys = rhai::Array::new();
-        keys.push(rhai::Dynamic::from("request_id"));
+        let keys = vec![rhai::Dynamic::from("request_id")];
         tracking.insert(
             "__kelora_stats_discovered_keys".to_string(),
             rhai::Dynamic::from(keys),

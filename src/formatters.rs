@@ -1996,26 +1996,34 @@ mod tests {
             0, // No quiet mode
         );
 
-        let mut before_event = Event::default();
-        before_event.context_type = ContextType::Before;
+        let mut before_event = Event {
+            context_type: ContextType::Before,
+            ..Default::default()
+        };
         before_event.set_field("msg".to_string(), Dynamic::from("before".to_string()));
         let before_line = formatter.format(&before_event);
         assert!(before_line.starts_with("\x1b[34m/\x1b[0m "));
 
-        let mut match_event = Event::default();
-        match_event.context_type = ContextType::Match;
+        let mut match_event = Event {
+            context_type: ContextType::Match,
+            ..Default::default()
+        };
         match_event.set_field("msg".to_string(), Dynamic::from("match".to_string()));
         let match_line = formatter.format(&match_event);
         assert!(match_line.starts_with("\x1b[95m◉\x1b[0m "));
 
-        let mut after_event = Event::default();
-        after_event.context_type = ContextType::After;
+        let mut after_event = Event {
+            context_type: ContextType::After,
+            ..Default::default()
+        };
         after_event.set_field("msg".to_string(), Dynamic::from("after".to_string()));
         let after_line = formatter.format(&after_event);
         assert!(after_line.starts_with("\x1b[34m\\\x1b[0m "));
 
-        let mut overlap_event = Event::default();
-        overlap_event.context_type = ContextType::Both;
+        let mut overlap_event = Event {
+            context_type: ContextType::Both,
+            ..Default::default()
+        };
         overlap_event.set_field("msg".to_string(), Dynamic::from("overlap".to_string()));
         let overlap_line = formatter.format(&overlap_event);
         assert!(overlap_line.starts_with("\x1b[36m|\x1b[0m "));

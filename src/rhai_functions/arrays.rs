@@ -1149,7 +1149,7 @@ mod tests {
     #[test]
     fn test_min_array_floats() {
         let arr = vec![
-            Dynamic::from(3.14),
+            Dynamic::from(std::f64::consts::PI),
             Dynamic::from(2.71),
             Dynamic::from(1.41),
         ];
@@ -1161,13 +1161,13 @@ mod tests {
     #[test]
     fn test_max_array_floats() {
         let arr = vec![
-            Dynamic::from(3.14),
+            Dynamic::from(std::f64::consts::PI),
             Dynamic::from(2.71),
             Dynamic::from(1.41),
         ];
 
         let result = max_array(arr);
-        assert_eq!(result.as_float().unwrap(), 3.14);
+        assert!((result.as_float().unwrap() - std::f64::consts::PI).abs() < 1e-10);
     }
 
     #[test]

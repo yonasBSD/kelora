@@ -225,39 +225,6 @@ impl MultilineChunker {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn timestamp_strategy_prefers_ts_format_hint() {
-        let config = MultilineConfig {
-            strategy: MultilineStrategy::Timestamp {
-                pattern: r"^\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}".to_string(),
-                chrono_format: Some("%b %e %H:%M:%S".to_string()),
-            },
-        };
-
-        let mut chunker =
-            MultilineChunker::new(config, InputFormat::Syslog).expect("chunker should build");
-
-        // First event starts with the chrono format, continuation line is indented
-        assert!(chunker
-            .feed_line("Jan  2 03:04:05 host app: one\n".to_string())
-            .is_none());
-        assert!(chunker
-            .feed_line("  stack frame line\n".to_string())
-            .is_none());
-
-        // New timestamp should flush the buffered event
-        let flushed = chunker.feed_line("Jan  3 03:04:05 host app: two\n".to_string());
-        assert!(flushed.is_some());
-
-        // Flush remaining buffered lines for the second event
-        assert!(chunker.flush().is_some());
-    }
-}
-
 impl Chunker for MultilineChunker {
     fn feed_line(&mut self, line: String) -> Option<String> {
         // Whole strategy always buffers everything and never returns content during feed
@@ -330,4 +297,37 @@ pub fn create_multiline_chunker(
 ) -> Result<Box<dyn Chunker>, String> {
     let chunker = MultilineChunker::new(config.clone(), input_format)?;
     Ok(Box::new(chunker))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn timestamp_strategy_prefers_ts_format_hint() {
+        let config = MultilineConfig {
+            strategy: MultilineStrategy::Timestamp {
+                pattern: r"^\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}".to_string(),
+                chrono_format: Some("%b %e %H:%M:%S".to_string()),
+            },
+        };
+
+        let mut chunker =
+            MultilineChunker::new(config, InputFormat::Syslog).expect("chunker should build");
+
+        // First event starts with the chrono format, continuation line is indented
+        assert!(chunker
+            .feed_line("Jan  2 03:04:05 host app: one\n".to_string())
+            .is_none());
+        assert!(chunker
+            .feed_line("  stack frame line\n".to_string())
+            .is_none());
+
+        // New timestamp should flush the buffered event
+        let flushed = chunker.feed_line("Jan  3 03:04:05 host app: two\n".to_string());
+        assert!(flushed.is_some());
+
+        // Flush remaining buffered lines for the second event
+        assert!(chunker.flush().is_some());
+    }
 }
