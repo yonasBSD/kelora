@@ -115,6 +115,54 @@ fn detect_syslog(line: &str) -> bool {
         }
     }
 
+    // RFC3164 pattern without priority: timestamp hostname program: message
+    // Example: Jan 15 10:30:45 server1 sshd[1234]: Accepted publickey for user
+    if line.len() > 15 {
+        let month_part = &line[..3];
+        if matches!(
+            month_part,
+            "Jan"
+                | "Feb"
+                | "Mar"
+                | "Apr"
+                | "May"
+                | "Jun"
+                | "Jul"
+                | "Aug"
+                | "Sep"
+                | "Oct"
+                | "Nov"
+                | "Dec"
+        ) {
+            // Check for typical syslog timestamp pattern: "MMM dd HH:MM:SS"
+            // Look for space after month, then day (1-2 digits), then space, then time pattern
+            if let Some(space1) = line[3..].find(' ') {
+                let after_month = &line[3 + space1 + 1..];
+                if let Some(space2) = after_month.find(' ') {
+                    let day_part = &after_month[..space2];
+                    // Day should be 1-2 digits
+                    if day_part.len() <= 2 && day_part.chars().all(|c| c.is_ascii_digit()) {
+                        let after_day = &after_month[space2 + 1..];
+                        // Check for time pattern: HH:MM:SS
+                        if after_day.len() >= 8 {
+                            let time_part = &after_day[..8];
+                            if time_part.matches(':').count() == 2 {
+                                // Look for hostname and program pattern after timestamp
+                                if let Some(space3) = after_day[8..].find(' ') {
+                                    let after_time = &after_day[8 + space3 + 1..];
+                                    // Look for program: pattern (hostname program: or hostname program[pid]:)
+                                    if after_time.contains(':') {
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     false
 }
 
@@ -272,6 +320,16 @@ mod tests {
         );
         assert_eq!(
             detect_format("<13>Apr 15 10:00:00 hostname program: message").unwrap(),
+            ConfigInputFormat::Syslog
+        );
+        // Test syslog format without priority field (common in processed logs)
+        assert_eq!(
+            detect_format("Jan 15 10:30:45 server1 sshd[1234]: Accepted publickey for user")
+                .unwrap(),
+            ConfigInputFormat::Syslog
+        );
+        assert_eq!(
+            detect_format("Dec 25 23:59:59 hostname kernel: USB disconnect").unwrap(),
             ConfigInputFormat::Syslog
         );
     }
