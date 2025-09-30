@@ -468,8 +468,9 @@ fn preprocess_script_with_includes(script: &str, includes: &[String]) -> Result<
 
     // Concatenate include files first
     for include_path in includes {
-        let include_content = std::fs::read_to_string(include_path)
-            .map_err(|e| anyhow::anyhow!("Failed to read include file '{}': {}", include_path, e))?;
+        let include_content = std::fs::read_to_string(include_path).map_err(|e| {
+            anyhow::anyhow!("Failed to read include file '{}': {}", include_path, e)
+        })?;
         result.push_str(&include_content);
         result.push('\n'); // Ensure separation between files
     }
@@ -487,26 +488,31 @@ fn preprocess_filter_with_includes(filter: &str, includes: &[String]) -> Result<
 
     let mut include_content = String::new();
     for include_path in includes {
-        let content = std::fs::read_to_string(include_path)
-            .map_err(|e| anyhow::anyhow!("Failed to read include file '{}': {}", include_path, e))?;
+        let content = std::fs::read_to_string(include_path).map_err(|e| {
+            anyhow::anyhow!("Failed to read include file '{}': {}", include_path, e)
+        })?;
         include_content.push_str(&content);
         include_content.push('\n');
     }
 
     // Wrap in eval() to execute includes first, then return the filter expression
-    Ok(format!("{{ eval(`{}`); {} }}", include_content.replace('`', "\\`"), filter))
+    Ok(format!(
+        "{{ eval(`{}`); {} }}",
+        include_content.replace('`', "\\`"),
+        filter
+    ))
 }
 
 /// Get includes that apply to begin/end stages based on CLI position
 /// For begin: includes that appear before any script stage
 /// For end: includes that appear after all script stages
 fn get_begin_end_includes(matches: &ArgMatches) -> Result<(Vec<String>, Vec<String>)> {
-
     let mut begin_includes = Vec::new();
     let mut end_includes = Vec::new();
 
     if let Some(include_indices) = matches.indices_of("includes") {
-        let include_values: Vec<&String> = matches.get_many::<String>("includes").unwrap().collect();
+        let include_values: Vec<&String> =
+            matches.get_many::<String>("includes").unwrap().collect();
 
         // Collect all script stage positions
         let mut script_positions = Vec::new();
@@ -556,7 +562,8 @@ impl Cli {
 
         // First, collect all include arguments and map them to the next script stage
         if let Some(include_indices) = matches.indices_of("includes") {
-            let include_values: Vec<&String> = matches.get_many::<String>("includes").unwrap().collect();
+            let include_values: Vec<&String> =
+                matches.get_many::<String>("includes").unwrap().collect();
 
             // Collect all script stage positions
             let mut script_positions = Vec::new();
@@ -578,8 +585,14 @@ impl Cli {
                 let include_file = include_values[pos].clone();
 
                 // Find the next script stage position after this include
-                if let Some(&next_script_pos) = script_positions.iter().find(|&&script_pos| script_pos > include_index) {
-                    include_map.entry(next_script_pos).or_default().push(include_file);
+                if let Some(&next_script_pos) = script_positions
+                    .iter()
+                    .find(|&&script_pos| script_pos > include_index)
+                {
+                    include_map
+                        .entry(next_script_pos)
+                        .or_default()
+                        .push(include_file);
                 }
                 // If no script stage follows, the include will be ignored (could warn here in future)
             }
@@ -595,7 +608,9 @@ impl Cli {
                 let includes = include_map.get(&index).unwrap_or(&empty_includes);
                 // For now, filters don't support includes - skip includes for filters
                 if !includes.is_empty() {
-                    eprintln!("Warning: --include is not yet supported with --filter, ignoring includes");
+                    eprintln!(
+                        "Warning: --include is not yet supported with --filter, ignoring includes"
+                    );
                 }
                 stages_with_indices.push((index, ScriptStageType::Filter(script)));
             }
@@ -624,7 +639,8 @@ impl Cli {
                 })?;
                 let empty_includes = Vec::new();
                 let includes = include_map.get(&index).unwrap_or(&empty_includes);
-                let preprocessed_script = preprocess_script_with_includes(&script_content, includes)?;
+                let preprocessed_script =
+                    preprocess_script_with_includes(&script_content, includes)?;
                 stages_with_indices.push((index, ScriptStageType::Exec(preprocessed_script)));
             }
         }
@@ -640,11 +656,17 @@ impl Cli {
     }
 
     /// Get processed begin and end scripts with includes applied
-    pub fn get_processed_begin_end(&self, matches: &ArgMatches) -> Result<(Option<String>, Option<String>)> {
+    pub fn get_processed_begin_end(
+        &self,
+        matches: &ArgMatches,
+    ) -> Result<(Option<String>, Option<String>)> {
         let (begin_includes, end_includes) = get_begin_end_includes(matches)?;
 
         let processed_begin = if let Some(ref begin_script) = self.begin {
-            Some(preprocess_script_with_includes(begin_script, &begin_includes)?)
+            Some(preprocess_script_with_includes(
+                begin_script,
+                &begin_includes,
+            )?)
         } else if !begin_includes.is_empty() {
             // If we have includes but no begin script, create one from includes only
             Some(preprocess_script_with_includes("", &begin_includes)?)

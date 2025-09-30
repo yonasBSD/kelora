@@ -5154,10 +5154,13 @@ fn include_functionality_basic() {
 {"value": 15}"#;
 
     let args = vec![
-        "-f", "json",
-        "-I", include_path,
-        "--exec", "e.doubled = double_value(e.value);",
-        "--stats"
+        "-f",
+        "json",
+        "-I",
+        include_path,
+        "--exec",
+        "e.doubled = double_value(e.value);",
+        "--stats",
     ];
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(&args, input);
@@ -5190,22 +5193,31 @@ fn include_functionality_parallel_compatibility() {
 
     // Run sequential version
     let args_seq = vec![
-        "-f", "json",
-        "-I", include_path,
-        "--exec", "e.score = calculate_score(e.base, e.mult);",
-        "--stats"
+        "-f",
+        "json",
+        "-I",
+        include_path,
+        "--exec",
+        "e.score = calculate_score(e.base, e.mult);",
+        "--stats",
     ];
 
     let (stdout_seq, stderr_seq, exit_code_seq) = run_kelora_with_input(&args_seq, input);
-    assert_eq!(exit_code_seq, 0, "Sequential kelora should exit successfully");
+    assert_eq!(
+        exit_code_seq, 0,
+        "Sequential kelora should exit successfully"
+    );
 
     // Run parallel version
     let args_par = vec![
-        "-f", "json",
-        "-I", include_path,
-        "--exec", "e.score = calculate_score(e.base, e.mult);",
+        "-f",
+        "json",
+        "-I",
+        include_path,
+        "--exec",
+        "e.score = calculate_score(e.base, e.mult);",
         "--parallel",
-        "--stats"
+        "--stats",
     ];
 
     let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(&args_par, input);
@@ -5214,16 +5226,25 @@ fn include_functionality_parallel_compatibility() {
     // Extract and compare stats
     let processed_seq = extract_events_created_from_stats(&stderr_seq);
     let processed_par = extract_events_created_from_stats(&stderr_par);
-    assert_eq!(processed_seq, processed_par, "Processed counts should match");
+    assert_eq!(
+        processed_seq, processed_par,
+        "Processed counts should match"
+    );
     assert_eq!(processed_seq, 5, "Should process 5 events");
 
     // Verify that both outputs contain the same calculated scores
     let expected_scores = ["102", "112", "130", "156", "190"];
     for score in &expected_scores {
-        assert!(stdout_seq.contains(&format!("score={}", score)),
-               "Sequential output should contain score={}", score);
-        assert!(stdout_par.contains(&format!("score={}", score)),
-               "Parallel output should contain score={}", score);
+        assert!(
+            stdout_seq.contains(&format!("score={}", score)),
+            "Sequential output should contain score={}",
+            score
+        );
+        assert!(
+            stdout_par.contains(&format!("score={}", score)),
+            "Parallel output should contain score={}",
+            score
+        );
     }
 }
 
@@ -5250,13 +5271,18 @@ fn include_multiple_files_with_parallel() {
 
     // Test with multiple includes on different stages
     let args = vec![
-        "-f", "json",
-        "-I", include1_path,
-        "--exec", "e.sum = add(e.a, e.b);",
-        "-I", include2_path,
-        "--exec", "e.is_positive = is_positive(e.sum);",
+        "-f",
+        "json",
+        "-I",
+        include1_path,
+        "--exec",
+        "e.sum = add(e.a, e.b);",
+        "-I",
+        include2_path,
+        "--exec",
+        "e.is_positive = is_positive(e.sum);",
         "--parallel",
-        "--stats"
+        "--stats",
     ];
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(&args, input);
@@ -5273,8 +5299,14 @@ fn include_multiple_files_with_parallel() {
     assert!(stdout.contains("sum=0"), "Should contain sum=0 (0+0)");
 
     // Verify the second include function worked
-    assert!(stdout.contains("is_positive=true"), "Should contain is_positive=true for positive sums");
-    assert!(stdout.contains("is_positive=false"), "Should contain is_positive=false for zero sum");
+    assert!(
+        stdout.contains("is_positive=true"),
+        "Should contain is_positive=true for positive sums"
+    );
+    assert!(
+        stdout.contains("is_positive=false"),
+        "Should contain is_positive=false for zero sum"
+    );
 
     // Check that all 4 events were processed
     let processed = extract_events_created_from_stats(&stderr);
