@@ -4,7 +4,7 @@ use std::process::Command;
 fn test_bucket_function() {
     // Feed input via stdin
     let output = Command::new("./target/release/kelora")
-        .args(&["-f", "line", "--exec", "e.bucket = bucket(e.line)"])
+        .args(["-f", "line", "--exec", "e.bucket = bucket(e.line)"])
         .arg("-")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
@@ -25,7 +25,7 @@ fn test_bucket_function() {
 #[test]
 fn test_hash_function_default() {
     let output = Command::new("./target/release/kelora")
-        .args(&["-f", "line", "--exec", "e.hash = hash(e.line)"])
+        .args(["-f", "line", "--exec", "e.hash = hash(e.line)"])
         .arg("-")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
@@ -47,7 +47,7 @@ fn test_hash_function_default() {
 #[test]
 fn test_hash_function_with_algorithm() {
     let output = Command::new("./target/release/kelora")
-        .args(&[
+        .args([
             "-f",
             "line",
             "--exec",
@@ -74,7 +74,7 @@ fn test_hash_function_with_algorithm() {
 #[test]
 fn test_anonymize_without_salt_fails() {
     let output = Command::new("./target/release/kelora")
-        .args(&["-f", "line", "--exec", "e.anon = anonymize(e.line)"])
+        .args(["-f", "line", "--exec", "e.anon = anonymize(e.line)"])
         .arg("-")
         .stdin(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -97,7 +97,7 @@ fn test_anonymize_without_salt_fails() {
 #[test]
 fn test_anonymize_with_cli_salt() {
     let output = Command::new("./target/release/kelora")
-        .args(&[
+        .args([
             "-f",
             "line",
             "--salt",
@@ -128,7 +128,7 @@ fn test_anonymize_with_cli_salt() {
 fn test_anonymize_with_env_salt() {
     let output = Command::new("./target/release/kelora")
         .env("KELORA_SALT", "env_test_salt")
-        .args(&["-f", "line", "--exec", "e.anon = anonymize(e.line)"])
+        .args(["-f", "line", "--exec", "e.anon = anonymize(e.line)"])
         .arg("-")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
@@ -149,7 +149,7 @@ fn test_anonymize_with_env_salt() {
 #[test]
 fn test_pseudonym_with_cli_salt() {
     let output = Command::new("./target/release/kelora")
-        .args(&[
+        .args([
             "-f",
             "line",
             "--salt",
@@ -177,7 +177,7 @@ fn test_pseudonym_with_cli_salt() {
 #[test]
 fn test_pseudonym_with_custom_length() {
     let output = Command::new("./target/release/kelora")
-        .args(&[
+        .args([
             "-f",
             "line",
             "--salt",
@@ -208,7 +208,7 @@ fn test_cli_salt_overrides_env() {
     // Set env salt
     let output_env = Command::new("./target/release/kelora")
         .env("KELORA_SALT", "env_salt")
-        .args(&["-f", "line", "--exec", "e.anon = anonymize(e.line)"])
+        .args(["-f", "line", "--exec", "e.anon = anonymize(e.line)"])
         .arg("-")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
@@ -225,7 +225,7 @@ fn test_cli_salt_overrides_env() {
     // CLI salt overrides env
     let output_cli = Command::new("./target/release/kelora")
         .env("KELORA_SALT", "env_salt")
-        .args(&[
+        .args([
             "-f",
             "line",
             "--salt",
@@ -257,7 +257,7 @@ fn test_cli_salt_overrides_env() {
 fn test_deterministic_hashing() {
     // Run twice with same salt
     let output1 = Command::new("./target/release/kelora")
-        .args(&[
+        .args([
             "-f",
             "line",
             "--salt",
@@ -279,7 +279,7 @@ fn test_deterministic_hashing() {
         .expect("Failed to execute kelora");
 
     let output2 = Command::new("./target/release/kelora")
-        .args(&[
+        .args([
             "-f",
             "line",
             "--salt",
