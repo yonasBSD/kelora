@@ -113,13 +113,30 @@ now_utc()                            Current UTC timestamp (DateTimeWrapper)
 now_local()                          Current local timestamp (DateTimeWrapper)
 to_datetime(text [,fmt [,tz]])       Convert string into DateTimeWrapper with optional hints
 to_duration("1h30m")                 Convert duration string into DurationWrapper
+duration_from_seconds(n)             Create duration from seconds
+duration_from_minutes(n)             Create duration from minutes
+duration_from_hours(n)               Create duration from hours
+duration_from_days(n)                Create duration from days
+duration_from_milliseconds(n)        Create duration from milliseconds
+duration_from_nanoseconds(n)         Create duration from nanoseconds
+humanize_duration(ms)                Convert milliseconds to human-readable format (e.g., "1h 30m")
 dt.format("format_string")           Format datetime using custom format string
 dt.year(), dt.month(), dt.day()      Extract date components
 dt.hour(), dt.minute(), dt.second()  Extract time components
 dt.to_utc(), dt.to_local()           Convert timezone
-dt + dur, dt - dur                   Add/subtract duration from datetime
-dt1 - dt2                            Get duration between datetimes
-dur.as_seconds(), dur.as_minutes()   Convert duration to numeric values
+dt.to_timezone("tz_name")            Convert to named timezone
+dt.ts_nanos()                        Get timestamp as nanoseconds
+dt + duration, dt - duration         Add/subtract duration from datetime
+dt1 - dt2                            Get duration between datetimes (returns DurationWrapper)
+duration.as_seconds()                Convert duration to seconds
+duration.as_milliseconds()           Convert duration to milliseconds
+duration.as_nanoseconds()            Convert duration to nanoseconds
+duration.as_minutes()                Convert duration to minutes
+duration.as_hours()                  Convert duration to hours
+duration.as_days()                   Convert duration to days
+duration.to_string()                 Format duration as human-readable string (e.g., "1h 30m")
+duration1 + duration2                Add durations
+duration1 - duration2                Subtract durations (always returns positive result)
 
 MATH FUNCTIONS:
 abs(x)                               Absolute value of number

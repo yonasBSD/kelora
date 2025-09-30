@@ -358,12 +358,17 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("now_local", || DateTimeWrapper::from_local(Local::now()));
 
     // Duration creation functions
-    engine.register_fn("dur_from_seconds", DurationWrapper::from_seconds);
-    engine.register_fn("dur_from_minutes", DurationWrapper::from_minutes);
-    engine.register_fn("dur_from_hours", DurationWrapper::from_hours);
-    engine.register_fn("dur_from_days", DurationWrapper::from_days);
-    engine.register_fn("dur_from_milliseconds", DurationWrapper::from_milliseconds);
-    engine.register_fn("dur_from_nanoseconds", DurationWrapper::from_nanoseconds);
+    engine.register_fn("duration_from_seconds", DurationWrapper::from_seconds);
+    engine.register_fn("duration_from_minutes", DurationWrapper::from_minutes);
+    engine.register_fn("duration_from_hours", DurationWrapper::from_hours);
+    engine.register_fn("duration_from_days", DurationWrapper::from_days);
+    engine.register_fn("duration_from_milliseconds", DurationWrapper::from_milliseconds);
+    engine.register_fn("duration_from_nanoseconds", DurationWrapper::from_nanoseconds);
+
+    // Humanize milliseconds to readable duration format
+    engine.register_fn("humanize_duration", |ms: i64| -> String {
+        DurationWrapper::from_milliseconds(ms).to_string()
+    });
 
     // Register the custom types
     engine
@@ -431,6 +436,14 @@ pub fn register_functions(engine: &mut Engine) {
         dur.inner.num_hours()
     });
     engine.register_fn("as_days", |dur: &mut DurationWrapper| dur.inner.num_days());
+
+    // Duration string conversion - enables to_string() and print() formatting
+    engine.register_fn("to_string", |dur: &mut DurationWrapper| -> String {
+        dur.to_string()
+    });
+    engine.register_fn("to_debug", |dur: &mut DurationWrapper| -> String {
+        dur.to_string()
+    });
 
     // DateTime arithmetic
     engine.register_fn("+", |dt: DateTimeWrapper, dur: DurationWrapper| {
