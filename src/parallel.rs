@@ -611,6 +611,7 @@ impl ParallelProcessor {
             let mut output = output;
             let config_clone = config.clone();
             let take_limit = self.take_limit;
+            let ctrl_for_sink = ctrl_rx.clone();
 
             thread::spawn(move || {
                 Self::pipeline_result_sink_thread(
@@ -620,6 +621,7 @@ impl ParallelProcessor {
                     &mut output,
                     &config_clone,
                     take_limit,
+                    ctrl_for_sink,
                 )
             })
         };
@@ -800,6 +802,7 @@ impl ParallelProcessor {
             let mut output = output;
             let config_clone = config.clone();
             let take_limit = self.take_limit;
+            let ctrl_for_sink = ctrl_rx.clone();
 
             thread::spawn(move || {
                 Self::pipeline_result_sink_thread(
@@ -809,6 +812,7 @@ impl ParallelProcessor {
                     &mut output,
                     &config_clone,
                     take_limit,
+                    ctrl_for_sink,
                 )
             })
         };
@@ -903,12 +907,20 @@ impl ParallelProcessor {
     ) -> Result<()> {
         let mut buffer = String::new();
         loop {
-            if let Ok(Ctrl::Shutdown { immediate }) = ctrl_rx.try_recv() {
-                let _ = line_sender.send(LineMessage::Eof);
-                if immediate {
-                    return Ok(());
+            match ctrl_rx.try_recv() {
+                Ok(Ctrl::Shutdown { immediate }) => {
+                    let _ = line_sender.send(LineMessage::Eof);
+                    if immediate {
+                        return Ok(());
+                    }
+                    break;
                 }
-                break;
+                Ok(Ctrl::PrintStats) => {
+                    // File reader thread doesn't have stats to print, ignore
+                }
+                Err(_) => {
+                    // No message, continue
+                }
             }
 
             buffer.clear();
@@ -994,6 +1006,9 @@ impl ParallelProcessor {
                                     )?;
                                 }
                                 break 'outer;
+                            }
+                            Ok(Ctrl::PrintStats) => {
+                                // Batcher thread doesn't have stats to print, ignore
                             }
                             Err(_) => {
                                 if !current_batch.is_empty() {
@@ -1084,6 +1099,9 @@ impl ParallelProcessor {
                                     )?;
                                 }
                                 break 'outer;
+                            }
+                            Ok(Ctrl::PrintStats) => {
+                                // Batcher thread doesn't have stats to print, ignore
                             }
                             Err(_) => {
                                 if !current_batch.is_empty() {
@@ -1220,6 +1238,9 @@ impl ParallelProcessor {
                                 }
                                 break 'outer;
                             }
+                            Ok(Ctrl::PrintStats) => {
+                                // File-aware batcher thread doesn't have stats to print, ignore
+                            }
                             Err(_) => {
                                 if !current_batch.is_empty() {
                                     Self::send_batch_with_filenames_and_headers(
@@ -1321,6 +1342,9 @@ impl ParallelProcessor {
                                     )?;
                                 }
                                 break 'outer;
+                            }
+                            Ok(Ctrl::PrintStats) => {
+                                // File-aware batcher thread doesn't have stats to print, ignore
                             }
                             Err(_) => {
                                 if !current_batch.is_empty() {
@@ -1893,6 +1917,10 @@ impl ParallelProcessor {
                 Self::worker_flush_pipeline(pipeline, ctx, result_sender, false)?;
                 Ok(false)
             }
+            Ok(Ctrl::PrintStats) => {
+                // Worker threads don't print stats directly - ignore
+                Ok(false)
+            }
             Err(_) => {
                 // Treat channel closure as graceful shutdown request
                 Self::worker_flush_pipeline(pipeline, ctx, result_sender, false)?;
@@ -2429,6 +2457,7 @@ impl ParallelProcessor {
         output: &mut W,
         config: &crate::config::KeloraConfig,
         take_limit: Option<usize>,
+        ctrl_rx: Receiver<Ctrl>,
     ) -> Result<()> {
         // Write CSV header if needed (before any worker results)
         Self::write_csv_header_if_needed(output, config)?;
@@ -2446,6 +2475,8 @@ impl ParallelProcessor {
                 output,
                 take_limit,
                 &mut gap_tracker,
+                ctrl_rx,
+                config,
             )
         } else {
             Self::pipeline_unordered_result_sink(
@@ -2454,6 +2485,8 @@ impl ParallelProcessor {
                 output,
                 take_limit,
                 &mut gap_tracker,
+                ctrl_rx,
+                config,
             )
         }
     }
@@ -2464,6 +2497,8 @@ impl ParallelProcessor {
         output: &mut W,
         take_limit: Option<usize>,
         gap_tracker: &mut Option<GapTracker>,
+        ctrl_rx: Receiver<Ctrl>,
+        config: &crate::config::KeloraConfig,
     ) -> Result<()> {
         let mut pending_batches: HashMap<u64, BatchResult> = HashMap::new();
         let mut next_expected_id = 0u64;
@@ -2578,10 +2613,37 @@ impl ParallelProcessor {
         output: &mut W,
         take_limit: Option<usize>,
         gap_tracker: &mut Option<GapTracker>,
+        ctrl_rx: Receiver<Ctrl>,
+        config: &crate::config::KeloraConfig,
     ) -> Result<()> {
         let mut termination_detected = false;
         let mut events_output = 0usize;
-        while let Ok(mut batch_result) = result_receiver.recv() {
+
+        loop {
+            // Check for control messages first (non-blocking)
+            match ctrl_rx.try_recv() {
+                Ok(Ctrl::Shutdown { .. }) => {
+                    // Handle shutdown in termination detection below
+                }
+                Ok(Ctrl::PrintStats) => {
+                    // Print current parallel stats from coordinator
+                    let current_stats = global_tracker.get_final_stats();
+                    let stats_message = config.format_stats_message(
+                        &current_stats.format_stats(config.input.multiline.is_some())
+                    );
+                    let _ = crate::platform::SafeStderr::new().writeln(&stats_message);
+                }
+                Err(_) => {
+                    // No control message or channel closed, continue
+                }
+            }
+
+            // Now handle result messages
+            let mut batch_result = match result_receiver.recv() {
+                Ok(result) => result,
+                Err(_) => break, // Channel closed
+            };
+
             // Check for termination signal, but don't break immediately
             // Continue processing to collect final stats from workers
             if SHOULD_TERMINATE.load(Ordering::Relaxed) {

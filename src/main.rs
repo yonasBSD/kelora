@@ -364,12 +364,20 @@ fn spawn_stdin_reader(
     thread::spawn(move || {
         let mut buffer = String::new();
         loop {
-            if let Ok(Ctrl::Shutdown { immediate }) = ctrl_rx.try_recv() {
-                let _ = sender.send(ReaderMessage::Eof);
-                if immediate {
-                    return Ok(());
+            match ctrl_rx.try_recv() {
+                Ok(Ctrl::Shutdown { immediate }) => {
+                    let _ = sender.send(ReaderMessage::Eof);
+                    if immediate {
+                        return Ok(());
+                    }
+                    break;
                 }
-                break;
+                Ok(Ctrl::PrintStats) => {
+                    // Reader thread doesn't have stats to print, ignore
+                }
+                Err(_) => {
+                    // No message, continue
+                }
             }
 
             buffer.clear();
@@ -415,12 +423,20 @@ fn spawn_file_reader(
     thread::spawn(move || {
         let mut buffer = String::new();
         loop {
-            if let Ok(Ctrl::Shutdown { immediate }) = ctrl_rx.try_recv() {
-                let _ = sender.send(ReaderMessage::Eof);
-                if immediate {
-                    return Ok(());
+            match ctrl_rx.try_recv() {
+                Ok(Ctrl::Shutdown { immediate }) => {
+                    let _ = sender.send(ReaderMessage::Eof);
+                    if immediate {
+                        return Ok(());
+                    }
+                    break;
                 }
-                break;
+                Ok(Ctrl::PrintStats) => {
+                    // Reader thread doesn't have stats to print, ignore
+                }
+                Err(_) => {
+                    // No message, continue
+                }
             }
 
             buffer.clear();
@@ -529,6 +545,14 @@ fn run_pipeline_sequential_internal<W: Write>(
                                 shutdown_requested = true;
                             }
                         }
+                        Ok(Ctrl::PrintStats) => {
+                            // Print current stats to stderr (sequential mode)
+                            let current_stats = get_thread_stats();
+                            let stats_message = config.format_stats_message(
+                                &current_stats.format_stats(config.input.multiline.is_some())
+                            );
+                            let _ = SafeStderr::new().writeln(&stats_message);
+                        }
                         Err(_) => {
                             shutdown_requested = true;
                         }
@@ -581,6 +605,14 @@ fn run_pipeline_sequential_internal<W: Write>(
                             } else {
                                 shutdown_requested = true;
                             }
+                        }
+                        Ok(Ctrl::PrintStats) => {
+                            // Print current stats to stderr (sequential mode)
+                            let current_stats = get_thread_stats();
+                            let stats_message = config.format_stats_message(
+                                &current_stats.format_stats(config.input.multiline.is_some())
+                            );
+                            let _ = SafeStderr::new().writeln(&stats_message);
                         }
                         Err(_) => {
                             shutdown_requested = true;

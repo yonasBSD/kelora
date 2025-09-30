@@ -12,6 +12,13 @@ use std::thread;
 #[cfg(unix)]
 use signal_hook::{consts::SIGINT, consts::SIGPIPE, consts::SIGTERM, iterator::Signals};
 
+// Additional signals for stats printing
+#[cfg(all(unix, any(target_os = "macos", target_os = "freebsd", target_os = "openbsd", target_os = "netbsd", target_os = "dragonfly")))]
+use signal_hook::consts::SIGINFO;
+
+#[cfg(unix)]
+use signal_hook::consts::SIGUSR1;
+
 #[cfg(windows)]
 use signal_hook::{consts::SIGINT, flag};
 
@@ -40,6 +47,7 @@ pub static TERMINATED_BY_SIGNAL: AtomicBool = AtomicBool::new(false);
 #[derive(Debug, Clone)]
 pub enum Ctrl {
     Shutdown { immediate: bool },
+    PrintStats,
 }
 
 /// Signal handler for graceful shutdown
@@ -52,7 +60,12 @@ impl SignalHandler {
     pub fn new(ctrl_sender: Sender<Ctrl>) -> Result<Self> {
         #[cfg(unix)]
         {
-            let signals_to_handle = vec![SIGINT, SIGPIPE, SIGTERM];
+            let mut signals_to_handle = vec![SIGINT, SIGPIPE, SIGTERM, SIGUSR1];
+
+            // Add SIGINFO on BSD-like systems (includes macOS)
+            #[cfg(all(unix, any(target_os = "macos", target_os = "freebsd", target_os = "openbsd", target_os = "netbsd", target_os = "dragonfly")))]
+            signals_to_handle.push(SIGINFO);
+
             let mut signals = Signals::new(&signals_to_handle)?;
 
             let sender = ctrl_sender.clone();
@@ -93,6 +106,15 @@ impl SignalHandler {
                             }
                             // Allow graceful shutdown to proceed. If still running, a
                             // subsequent SIGTERM/SIGINT will trigger immediate exit.
+                        }
+                        SIGUSR1 => {
+                            // Print stats on SIGUSR1 (available on all Unix-like systems)
+                            let _ = sender.send(Ctrl::PrintStats);
+                        }
+                        #[cfg(all(unix, any(target_os = "macos", target_os = "freebsd", target_os = "openbsd", target_os = "netbsd", target_os = "dragonfly")))]
+                        SIGINFO => {
+                            // Print stats on SIGINFO (CTRL-T on BSD-like systems including macOS)
+                            let _ = sender.send(Ctrl::PrintStats);
                         }
                         _ => {
                             // Unknown signal - should not happen with our registration
