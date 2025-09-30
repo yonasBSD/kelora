@@ -1324,6 +1324,76 @@ fn extract_config_file_arg(args: &[String]) -> Option<String> {
     None
 }
 
+/// Extract --save-alias argument from raw args
+fn extract_save_alias_arg(args: &[String]) -> Option<String> {
+    for i in 0..args.len() {
+        if args[i] == "--save-alias" && i + 1 < args.len() {
+            return Some(args[i + 1].clone());
+        }
+    }
+    None
+}
+
+/// Handle --save-alias command
+fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
+    use crate::config_file::ConfigFile;
+
+    // Remove the --save-alias <name> and --no-emoji from the arguments to get the command to save
+    let mut command_args = Vec::new();
+    let mut i = 0;
+    while i < raw_args.len() {
+        if raw_args[i] == "--save-alias" {
+            // Skip --save-alias and its argument
+            i += 2;
+        } else if raw_args[i] == "--no-emoji" {
+            // Skip --no-emoji as it's only for the save operation display
+            i += 1;
+        } else {
+            command_args.push(raw_args[i].clone());
+            i += 1;
+        }
+    }
+
+    // Skip the program name (first argument)
+    if !command_args.is_empty() {
+        command_args.remove(0);
+    }
+
+    // Check if we have any command left to save
+    if command_args.is_empty() {
+        let prefix = if no_emoji { "kelora:" } else { "⚠️" };
+        eprintln!("{} No command to save as alias '{}'", prefix, alias_name);
+        std::process::exit(2);
+    }
+
+    // Join the arguments back into a single string
+    let alias_value = shell_words::join(command_args);
+
+    // Save the alias
+    match ConfigFile::save_alias(alias_name, &alias_value, None) {
+        Ok((config_path, previous_value)) => {
+            let success_prefix = if no_emoji { "kelora:" } else { "🔹" };
+            println!(
+                "{} Alias '{}' saved to {}",
+                success_prefix,
+                alias_name,
+                config_path.display()
+            );
+
+            if let Some(prev) = previous_value {
+                let info_prefix = if no_emoji { "kelora:" } else { "🔹" };
+                println!("{} Replaced previous alias:", info_prefix);
+                println!("    {} = {}", alias_name, prev);
+            }
+        }
+        Err(e) => {
+            let error_prefix = if no_emoji { "kelora:" } else { "⚠️" };
+            eprintln!("{} Failed to save alias '{}': {}", error_prefix, alias_name, e);
+            std::process::exit(1);
+        }
+    }
+}
+
 /// Process command line arguments with config file support
 fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
     // Get raw command line arguments
@@ -1356,6 +1426,14 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
     // Check for --help-multiline
     if raw_args.iter().any(|arg| arg == "--help-multiline") {
         print_multiline_help();
+        std::process::exit(0);
+    }
+
+    // Check for --save-alias before other processing
+    if let Some(alias_name) = extract_save_alias_arg(&raw_args) {
+        let no_emoji = raw_args.iter().any(|arg| arg == "--no-emoji")
+            || std::env::var("NO_EMOJI").is_ok();
+        handle_save_alias(&raw_args, &alias_name, no_emoji);
         std::process::exit(0);
     }
 

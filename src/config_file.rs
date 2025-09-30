@@ -365,6 +365,113 @@ impl ConfigFile {
 
         Ok(final_result)
     }
+
+    /// Write config file to specified path
+    pub fn write_to_path(&self, path: &std::path::Path) -> Result<()> {
+        use std::fs;
+        use std::io::Write;
+
+        // Create parent directory if it doesn't exist
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+        }
+
+        let mut content = String::new();
+
+        // Write defaults section if present
+        if let Some(defaults) = &self.defaults {
+            content.push_str(&format!("defaults = {}\n", defaults));
+        }
+
+        // Write aliases section if not empty
+        if !self.aliases.is_empty() {
+            if !content.is_empty() {
+                content.push('\n');
+            }
+            content.push_str("[aliases]\n");
+
+            // Sort aliases for consistent output
+            let mut sorted_aliases: Vec<_> = self.aliases.iter().collect();
+            sorted_aliases.sort_by_key(|(k, _)| k.as_str());
+
+            for (name, value) in sorted_aliases {
+                content.push_str(&format!("{} = {}\n", name, value));
+            }
+        }
+
+        // Write to file atomically
+        let temp_path = path.with_extension("tmp");
+        {
+            let mut file = fs::File::create(&temp_path).with_context(|| {
+                format!("Failed to create temporary file: {}", temp_path.display())
+            })?;
+            file.write_all(content.as_bytes()).with_context(|| {
+                format!("Failed to write to temporary file: {}", temp_path.display())
+            })?;
+            file.sync_all().with_context(|| {
+                format!("Failed to sync temporary file: {}", temp_path.display())
+            })?;
+        }
+
+        // Atomic rename
+        fs::rename(&temp_path, path)
+            .with_context(|| format!("Failed to rename temporary file to: {}", path.display()))?;
+
+        Ok(())
+    }
+
+    /// Save alias to config file, returns the previous value if it existed
+    pub fn save_alias(
+        alias_name: &str,
+        alias_value: &str,
+        target_path: Option<&std::path::Path>,
+    ) -> Result<(PathBuf, Option<String>)> {
+        // Validate alias name
+        let alias_regex = regex::Regex::new(r"^[a-zA-Z_][a-zA-Z0-9_-]{0,63}$").unwrap();
+        if !alias_regex.is_match(alias_name) {
+            return Err(anyhow!(
+                "Invalid alias name '{}'. Must match pattern: ^[a-zA-Z_][a-zA-Z0-9_-]{{0,63}}$",
+                alias_name
+            ));
+        }
+
+        // Determine target config file path
+        let config_path = if let Some(path) = target_path {
+            path.to_path_buf()
+        } else {
+            // Use same logic as --show-config
+            if let Some(project_path) = Self::find_project_config() {
+                project_path
+            } else if let Some(user_path) =
+                Self::get_user_config_paths().iter().find(|p| p.exists())
+            {
+                user_path.clone()
+            } else {
+                Self::get_user_config_paths()[0].clone()
+            }
+        };
+
+        // Load existing config or create new one
+        let mut config = if config_path.exists() {
+            Self::load_from_path(&config_path)?
+        } else {
+            ConfigFile::default()
+        };
+
+        // Check if alias already exists (for user feedback)
+        let previous_value = config.aliases.get(alias_name).cloned();
+
+        // Update the alias (overwrites if exists)
+        config
+            .aliases
+            .insert(alias_name.to_string(), alias_value.to_string());
+
+        // Write back to file
+        config.write_to_path(&config_path)?;
+
+        Ok((config_path, previous_value))
+    }
 }
 
 #[cfg(test)]

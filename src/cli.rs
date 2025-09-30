@@ -420,6 +420,10 @@ pub struct Cli {
     #[arg(long = "ignore-config", help_heading = "Configuration Options")]
     pub ignore_config: bool,
 
+    /// Save current command as alias to configuration file
+    #[arg(long = "save-alias", help_heading = "Configuration Options")]
+    pub save_alias: Option<String>,
+
     /// Show Rhai scripting guide and exit
     #[arg(long = "help-rhai", help_heading = "Help Options")]
     pub help_rhai: bool,

@@ -278,6 +278,7 @@ kelora --config-file custom.ini example_logs/sample.log  # Swap configuration fi
 kelora --no-stats example_logs/sample.log                # Override a default
 kelora -a errors example_logs/sample.jsonl  # Run the alias
 kelora --show-config                        # Inspect the merged configuration
+kelora -l error --stats --save-alias errors # Save current command as alias
 ```
 
 Pair configs with `--ignore-config` for hermetic runs or CI pipelines.
