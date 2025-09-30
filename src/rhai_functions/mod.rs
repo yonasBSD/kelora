@@ -9,6 +9,7 @@ pub mod emit;
 pub mod encoding;
 pub mod environment;
 pub mod file_ops;
+pub mod hashing;
 pub mod maps;
 pub mod math;
 pub mod process;
@@ -18,7 +19,7 @@ pub mod strings;
 pub mod tracking;
 pub mod window;
 
-pub fn register_all_functions(engine: &mut Engine) {
+pub fn register_all_functions(engine: &mut Engine, salt: Option<String>) {
     arrays::register_functions(engine);
     strings::register_functions(engine);
     tracking::register_functions(engine);
@@ -35,4 +36,5 @@ pub fn register_all_functions(engine: &mut Engine) {
     environment::register_functions(engine);
     emit::register_functions(engine);
     file_ops::register_functions(engine);
+    hashing::register_functions(engine, salt);
 }

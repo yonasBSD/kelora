@@ -219,6 +219,7 @@ Kelora exposes the full Rhai language plus domain-specific helpers.
 
 - **Text & parsing** - `extract_re`, `parse_logfmt`, `parse_cols`, `mask_ip`, `encode_*` / `decode_*`.
 - **Arrays & maps** - `sorted`, `sorted_by`, `array.flatten`, `map.get_path`, `map.flatten`, `emit_each`.
+- **Hashing & anonymization** - `bucket` (fast sampling), `hash` (multi-algo), `anonymize` (salted SHA-256), `pseudonym` (short IDs).
 - **Metrics** - `track_count`, `track_avg`, `track_bucket`, `track_unique` power `--metrics` and `--end` reports.
 - **Datetime** - `to_datetime`, `to_duration`, `now_utc`, formatting helpers, arithmetic.
 - **Environment & control** - `get_env`, `read_file`, `read_lines`, `exit`.
@@ -305,6 +306,12 @@ kelora -f syslog example_logs/sample.syslog \
 kelora -f syslog example_logs/sample.syslog \
   --exec 'e.severity_label = if e.severity <= 3 { "critical" } else if e.severity <= 4 { "error" } else { "info" }; e.host = e.host.mask_ip(1);' \
   -J
+
+# Anonymize PII while maintaining linkability and sampling
+kelora -j access.log --salt "$KELORA_SALT" \
+  --exec 'e.user_pseudo = pseudonym(e.user_id, 8); e.ip_anon = anonymize(e.ip)' \
+  --filter 'bucket(e.user_id) % 10 == 0' \
+  --keys user_pseudo,ip_anon,action,status
 ```
 
 ## Learning Path

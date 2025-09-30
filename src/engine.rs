@@ -666,6 +666,7 @@ pub struct RhaiEngine {
     conf_map: Option<rhai::Map>,
     debug_tracker: Option<DebugTracker>,
     execution_tracer: Option<ExecutionTracer>,
+    salt: Option<String>,
 }
 
 impl Clone for RhaiEngine {
@@ -688,7 +689,7 @@ impl Clone for RhaiEngine {
             }
         });
 
-        rhai_functions::register_all_functions(&mut engine);
+        rhai_functions::register_all_functions(&mut engine, self.salt.clone());
 
         Self {
             engine,
@@ -701,6 +702,7 @@ impl Clone for RhaiEngine {
             conf_map: self.conf_map.clone(),
             debug_tracker: self.debug_tracker.clone(),
             execution_tracer: self.execution_tracer.clone(),
+            salt: self.salt.clone(),
         }
     }
 }
@@ -1049,7 +1051,7 @@ impl RhaiEngine {
         });
 
         // Register custom functions for log analysis (includes eprint() for stderr output)
-        rhai_functions::register_all_functions(&mut engine);
+        rhai_functions::register_all_functions(&mut engine, None);
 
         // Register variable access callback for tracking functions
         Self::register_variable_resolver(&mut engine);
@@ -1071,6 +1073,7 @@ impl RhaiEngine {
             conf_map: None,
             debug_tracker: None,
             execution_tracer: None,
+            salt: None,
         }
     }
 
@@ -1192,6 +1195,13 @@ impl RhaiEngine {
                 Ok(DebuggerCommand::Continue)
             },
         );
+    }
+
+    /// Set the salt for hashing functions (anonymize, pseudonym)
+    pub fn set_salt(&mut self, salt: Option<String>) {
+        self.salt = salt.clone();
+        // Re-register functions with the new salt
+        rhai_functions::hashing::register_functions(&mut self.engine, salt);
     }
 
     /// Set whether to suppress side effects (print, eprint, etc.)

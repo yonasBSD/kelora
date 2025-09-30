@@ -95,6 +95,7 @@ impl PipelineBuilder {
                 no_emoji: false,
                 input_files: Vec::new(),
                 allow_fs_writes: false,
+                salt: None,
             },
             begin: None,
             end: None,
@@ -133,6 +134,9 @@ impl PipelineBuilder {
         stages: Vec<crate::config::ScriptStageType>,
     ) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
+
+        // Set up salt for hashing functions
+        rhai_engine.set_salt(self.config.salt.clone());
 
         // Set up debugging if enabled
         let debug_config = DebugConfig::new(self.config.verbose).with_emoji(!self.config.no_emoji);
@@ -442,6 +446,9 @@ impl PipelineBuilder {
         stages: Vec<crate::config::ScriptStageType>,
     ) -> Result<(Pipeline, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
+
+        // Set up salt for hashing functions
+        rhai_engine.set_salt(self.config.salt.clone());
 
         // Set up debugging if enabled
         let debug_config = DebugConfig::new(self.config.verbose).with_emoji(!self.config.no_emoji);
@@ -801,6 +808,7 @@ pub fn create_pipeline_builder_from_config(
         no_emoji: config.output.no_emoji,
         input_files: config.input.files.clone(),
         allow_fs_writes: config.processing.allow_fs_writes,
+        salt: config.processing.salt.clone(),
     };
 
     // Extract cols spec if needed before conversion
