@@ -952,6 +952,11 @@ fn main() -> Result<()> {
     // Set the ordered stages directly
     config.processing.stages = ordered_stages;
 
+    // Set processed begin/end scripts with includes applied
+    let (processed_begin, processed_end) = cli.get_processed_begin_end(&matches)?;
+    config.processing.begin = processed_begin;
+    config.processing.end = processed_end;
+
     // Parse timestamp filter arguments if provided
     if cli.since.is_some() || cli.until.is_some() {
         // Use the same timezone logic as the main configuration

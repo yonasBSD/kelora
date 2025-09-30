@@ -151,6 +151,9 @@ pub struct Cli {
     /// Execute script from file
     #[arg(short = 'E', long = "exec-file", help_heading = "Processing Options")]
     pub exec_files: Vec<String>,
+    /// Include Rhai files before script stages
+    #[arg(short = 'I', long = "include", help_heading = "Processing Options")]
+    pub includes: Vec<String>,
 
     /// Run once after processing
     #[arg(long = "end", help_heading = "Processing Options")]
@@ -459,30 +462,158 @@ impl Cli {
     }
 }
 
+/// Preprocess script by prepending include file contents
+fn preprocess_script_with_includes(script: &str, includes: &[String]) -> Result<String> {
+    let mut result = String::new();
+
+    // Concatenate include files first
+    for include_path in includes {
+        let include_content = std::fs::read_to_string(include_path)
+            .map_err(|e| anyhow::anyhow!("Failed to read include file '{}': {}", include_path, e))?;
+        result.push_str(&include_content);
+        result.push('\n'); // Ensure separation between files
+    }
+
+    // Append main script
+    result.push_str(script);
+    Ok(result)
+}
+
+/// Preprocess filter expression by wrapping includes in eval() for expression compatibility
+fn preprocess_filter_with_includes(filter: &str, includes: &[String]) -> Result<String> {
+    if includes.is_empty() {
+        return Ok(filter.to_string());
+    }
+
+    let mut include_content = String::new();
+    for include_path in includes {
+        let content = std::fs::read_to_string(include_path)
+            .map_err(|e| anyhow::anyhow!("Failed to read include file '{}': {}", include_path, e))?;
+        include_content.push_str(&content);
+        include_content.push('\n');
+    }
+
+    // Wrap in eval() to execute includes first, then return the filter expression
+    Ok(format!("{{ eval(`{}`); {} }}", include_content.replace('`', "\\`"), filter))
+}
+
+/// Get includes that apply to begin/end stages based on CLI position
+/// For begin: includes that appear before any script stage
+/// For end: includes that appear after all script stages
+fn get_begin_end_includes(matches: &ArgMatches) -> Result<(Vec<String>, Vec<String>)> {
+
+    let mut begin_includes = Vec::new();
+    let mut end_includes = Vec::new();
+
+    if let Some(include_indices) = matches.indices_of("includes") {
+        let include_values: Vec<&String> = matches.get_many::<String>("includes").unwrap().collect();
+
+        // Collect all script stage positions
+        let mut script_positions = Vec::new();
+        if let Some(filter_indices) = matches.indices_of("filters") {
+            script_positions.extend(filter_indices);
+        }
+        if let Some(exec_indices) = matches.indices_of("execs") {
+            script_positions.extend(exec_indices);
+        }
+        if let Some(exec_file_indices) = matches.indices_of("exec_files") {
+            script_positions.extend(exec_file_indices);
+        }
+
+        if script_positions.is_empty() {
+            // No script stages - all includes go to begin
+            for (pos, _) in include_indices.enumerate() {
+                begin_includes.push(include_values[pos].clone());
+            }
+        } else {
+            script_positions.sort();
+            let first_script_pos = script_positions[0];
+            let last_script_pos = script_positions[script_positions.len() - 1];
+
+            for (pos, include_index) in include_indices.enumerate() {
+                let include_file = include_values[pos].clone();
+
+                if include_index < first_script_pos {
+                    begin_includes.push(include_file);
+                } else if include_index > last_script_pos {
+                    end_includes.push(include_file);
+                }
+                // Includes between script stages are handled by get_ordered_script_stages
+            }
+        }
+    }
+
+    Ok((begin_includes, end_includes))
+}
+
 impl Cli {
     /// Extract filter and exec stages in the order they appeared on the command line
     pub fn get_ordered_script_stages(&self, matches: &ArgMatches) -> Result<Vec<ScriptStageType>> {
-        let mut stages_with_indices = Vec::new();
+        use std::collections::HashMap;
 
-        // Get filter stages with their indices
+        let mut stages_with_indices = Vec::new();
+        let mut include_map: HashMap<usize, Vec<String>> = HashMap::new();
+
+        // First, collect all include arguments and map them to the next script stage
+        if let Some(include_indices) = matches.indices_of("includes") {
+            let include_values: Vec<&String> = matches.get_many::<String>("includes").unwrap().collect();
+
+            // Collect all script stage positions
+            let mut script_positions = Vec::new();
+
+            if let Some(filter_indices) = matches.indices_of("filters") {
+                script_positions.extend(filter_indices);
+            }
+            if let Some(exec_indices) = matches.indices_of("execs") {
+                script_positions.extend(exec_indices);
+            }
+            if let Some(exec_file_indices) = matches.indices_of("exec_files") {
+                script_positions.extend(exec_file_indices);
+            }
+
+            script_positions.sort();
+
+            // Associate each include with the next script stage
+            for (pos, include_index) in include_indices.enumerate() {
+                let include_file = include_values[pos].clone();
+
+                // Find the next script stage position after this include
+                if let Some(&next_script_pos) = script_positions.iter().find(|&&script_pos| script_pos > include_index) {
+                    include_map.entry(next_script_pos).or_default().push(include_file);
+                }
+                // If no script stage follows, the include will be ignored (could warn here in future)
+            }
+        }
+
+        // Get filter stages with their indices and apply preprocessing
         if let Some(filter_indices) = matches.indices_of("filters") {
             let filter_values: Vec<&String> =
                 matches.get_many::<String>("filters").unwrap().collect();
             for (pos, index) in filter_indices.enumerate() {
-                stages_with_indices
-                    .push((index, ScriptStageType::Filter(filter_values[pos].clone())));
+                let script = filter_values[pos].clone();
+                let empty_includes = Vec::new();
+                let includes = include_map.get(&index).unwrap_or(&empty_includes);
+                // For now, filters don't support includes - skip includes for filters
+                if !includes.is_empty() {
+                    eprintln!("Warning: --include is not yet supported with --filter, ignoring includes");
+                }
+                stages_with_indices.push((index, ScriptStageType::Filter(script)));
             }
         }
 
-        // Get exec stages with their indices
+        // Get exec stages with their indices and apply preprocessing
         if let Some(exec_indices) = matches.indices_of("execs") {
             let exec_values: Vec<&String> = matches.get_many::<String>("execs").unwrap().collect();
             for (pos, index) in exec_indices.enumerate() {
-                stages_with_indices.push((index, ScriptStageType::Exec(exec_values[pos].clone())));
+                let script = exec_values[pos].clone();
+                let empty_includes = Vec::new();
+                let includes = include_map.get(&index).unwrap_or(&empty_includes);
+                let preprocessed_script = preprocess_script_with_includes(&script, includes)?;
+                stages_with_indices.push((index, ScriptStageType::Exec(preprocessed_script)));
             }
         }
 
-        // Get exec-file stages with their indices
+        // Get exec-file stages with their indices and apply preprocessing
         if let Some(exec_file_indices) = matches.indices_of("exec_files") {
             let exec_file_values: Vec<&String> =
                 matches.get_many::<String>("exec_files").unwrap().collect();
@@ -491,7 +622,10 @@ impl Cli {
                 let script_content = std::fs::read_to_string(file_path).map_err(|e| {
                     anyhow::anyhow!("Failed to read exec file '{}': {}", file_path, e)
                 })?;
-                stages_with_indices.push((index, ScriptStageType::Exec(script_content)));
+                let empty_includes = Vec::new();
+                let includes = include_map.get(&index).unwrap_or(&empty_includes);
+                let preprocessed_script = preprocess_script_with_includes(&script_content, includes)?;
+                stages_with_indices.push((index, ScriptStageType::Exec(preprocessed_script)));
             }
         }
 
@@ -503,6 +637,31 @@ impl Cli {
             .into_iter()
             .map(|(_, stage)| stage)
             .collect())
+    }
+
+    /// Get processed begin and end scripts with includes applied
+    pub fn get_processed_begin_end(&self, matches: &ArgMatches) -> Result<(Option<String>, Option<String>)> {
+        let (begin_includes, end_includes) = get_begin_end_includes(matches)?;
+
+        let processed_begin = if let Some(ref begin_script) = self.begin {
+            Some(preprocess_script_with_includes(begin_script, &begin_includes)?)
+        } else if !begin_includes.is_empty() {
+            // If we have includes but no begin script, create one from includes only
+            Some(preprocess_script_with_includes("", &begin_includes)?)
+        } else {
+            None
+        };
+
+        let processed_end = if let Some(ref end_script) = self.end {
+            Some(preprocess_script_with_includes(end_script, &end_includes)?)
+        } else if !end_includes.is_empty() {
+            // If we have includes but no end script, create one from includes only
+            Some(preprocess_script_with_includes("", &end_includes)?)
+        } else {
+            None
+        };
+
+        Ok((processed_begin, processed_end))
     }
 }
 
@@ -624,5 +783,236 @@ mod tests {
             .get_ordered_script_stages(&matches)
             .expect("empty stages should succeed");
         assert!(stages.is_empty());
+    }
+
+    #[test]
+    fn include_single_file_to_exec_stage() {
+        let mut include_file = NamedTempFile::new().expect("temp file");
+        writeln!(include_file, "fn helper() {{ return 42; }}").expect("write include");
+        let include_path = include_file.path().to_str().unwrap().to_string();
+
+        let args = vec![
+            "kelora".to_string(),
+            "-I".to_string(),
+            include_path,
+            "--exec".to_string(),
+            "e.result = helper();".to_string(),
+        ];
+
+        let (cli, matches) = parse_cli(&args);
+        let stages = cli
+            .get_ordered_script_stages(&matches)
+            .expect("stages should be parsed");
+
+        assert_eq!(stages.len(), 1);
+        if let ScriptStageType::Exec(script) = &stages[0] {
+            assert!(script.contains("fn helper() { return 42; }"));
+            assert!(script.contains("e.result = helper();"));
+            assert!(script.starts_with("fn helper()"));
+        } else {
+            panic!("Expected Exec stage");
+        }
+    }
+
+    #[test]
+    fn include_multiple_files_to_single_stage() {
+        let mut include1 = NamedTempFile::new().expect("temp file");
+        writeln!(include1, "fn helper1() {{ return 1; }}").expect("write include1");
+        let include1_path = include1.path().to_str().unwrap().to_string();
+
+        let mut include2 = NamedTempFile::new().expect("temp file");
+        writeln!(include2, "fn helper2() {{ return 2; }}").expect("write include2");
+        let include2_path = include2.path().to_str().unwrap().to_string();
+
+        let args = vec![
+            "kelora".to_string(),
+            "-I".to_string(),
+            include1_path,
+            "-I".to_string(),
+            include2_path,
+            "--exec".to_string(),
+            "e.result = helper1() + helper2();".to_string(),
+        ];
+
+        let (cli, matches) = parse_cli(&args);
+        let stages = cli
+            .get_ordered_script_stages(&matches)
+            .expect("stages should be parsed");
+
+        assert_eq!(stages.len(), 1);
+        if let ScriptStageType::Exec(script) = &stages[0] {
+            assert!(script.contains("fn helper1() { return 1; }"));
+            assert!(script.contains("fn helper2() { return 2; }"));
+            assert!(script.contains("e.result = helper1() + helper2();"));
+        } else {
+            panic!("Expected Exec stage");
+        }
+    }
+
+    #[test]
+    fn includes_apply_to_next_script_stage() {
+        let mut include1 = NamedTempFile::new().expect("temp file");
+        writeln!(include1, "fn util1() {{ return 1; }}").expect("write include1");
+        let include1_path = include1.path().to_str().unwrap().to_string();
+
+        let mut include2 = NamedTempFile::new().expect("temp file");
+        writeln!(include2, "fn util2() {{ return 2; }}").expect("write include2");
+        let include2_path = include2.path().to_str().unwrap().to_string();
+
+        let args = vec![
+            "kelora".to_string(),
+            "-I".to_string(),
+            include1_path,
+            "--exec".to_string(),
+            "e.val1 = util1();".to_string(),
+            "-I".to_string(),
+            include2_path,
+            "--exec".to_string(),
+            "e.val2 = util2();".to_string(),
+        ];
+
+        let (cli, matches) = parse_cli(&args);
+        let stages = cli
+            .get_ordered_script_stages(&matches)
+            .expect("stages should be parsed");
+
+        assert_eq!(stages.len(), 2);
+
+        // First stage should have include1
+        if let ScriptStageType::Exec(script) = &stages[0] {
+            assert!(script.contains("fn util1() { return 1; }"));
+            assert!(script.contains("e.val1 = util1();"));
+            assert!(!script.contains("fn util2() { return 2; }"));
+        } else {
+            panic!("Expected Exec stage");
+        }
+
+        // Second stage should have include2
+        if let ScriptStageType::Exec(script) = &stages[1] {
+            assert!(script.contains("fn util2() { return 2; }"));
+            assert!(script.contains("e.val2 = util2();"));
+            assert!(!script.contains("fn util1() { return 1; }"));
+        } else {
+            panic!("Expected Exec stage");
+        }
+    }
+
+    #[test]
+    fn include_with_exec_file() {
+        let mut include_file = NamedTempFile::new().expect("temp file");
+        writeln!(include_file, "fn shared_util() {{ return 42; }}").expect("write include");
+        let include_path = include_file.path().to_str().unwrap().to_string();
+
+        let mut exec_file = NamedTempFile::new().expect("temp file");
+        writeln!(exec_file, "e.value = shared_util();").expect("write exec");
+        let exec_path = exec_file.path().to_str().unwrap().to_string();
+
+        let args = vec![
+            "kelora".to_string(),
+            "-I".to_string(),
+            include_path,
+            "-E".to_string(),
+            exec_path,
+        ];
+
+        let (cli, matches) = parse_cli(&args);
+        let stages = cli
+            .get_ordered_script_stages(&matches)
+            .expect("stages should be parsed");
+
+        assert_eq!(stages.len(), 1);
+        if let ScriptStageType::Exec(script) = &stages[0] {
+            assert!(script.contains("fn shared_util() { return 42; }"));
+            assert!(script.contains("e.value = shared_util();"));
+        } else {
+            panic!("Expected Exec stage");
+        }
+    }
+
+    #[test]
+    fn include_error_when_file_missing() {
+        let missing_path = "/non/existent/path.rhai";
+
+        let args = vec![
+            "kelora".to_string(),
+            "-I".to_string(),
+            missing_path.to_string(),
+            "--exec".to_string(),
+            "e.test = true;".to_string(),
+        ];
+
+        let (cli, matches) = parse_cli(&args);
+        let err = cli
+            .get_ordered_script_stages(&matches)
+            .expect_err("should report missing include file");
+        assert!(err
+            .to_string()
+            .contains(&format!("Failed to read include file '{}':", missing_path)));
+    }
+
+    #[test]
+    fn get_processed_begin_end_with_includes() {
+        let mut include1 = NamedTempFile::new().expect("temp file");
+        writeln!(include1, "fn setup() {{ print('setup'); }}").expect("write include1");
+        let include1_path = include1.path().to_str().unwrap().to_string();
+
+        let mut include2 = NamedTempFile::new().expect("temp file");
+        writeln!(include2, "fn cleanup() {{ print('cleanup'); }}").expect("write include2");
+        let include2_path = include2.path().to_str().unwrap().to_string();
+
+        let args = vec![
+            "kelora".to_string(),
+            "-I".to_string(),
+            include1_path,
+            "--begin".to_string(),
+            "setup();".to_string(),
+            "--exec".to_string(),
+            "e.processed = true;".to_string(),
+            "-I".to_string(),
+            include2_path,
+            "--end".to_string(),
+            "cleanup();".to_string(),
+        ];
+
+        let (cli, matches) = parse_cli(&args);
+        let (begin, end) = cli
+            .get_processed_begin_end(&matches)
+            .expect("should process begin/end");
+
+        assert!(begin.is_some());
+        let begin_script = begin.unwrap();
+        assert!(begin_script.contains("fn setup() { print('setup'); }"));
+        assert!(begin_script.contains("setup();"));
+
+        assert!(end.is_some());
+        let end_script = end.unwrap();
+        assert!(end_script.contains("fn cleanup() { print('cleanup'); }"));
+        assert!(end_script.contains("cleanup();"));
+    }
+
+    #[test]
+    fn include_only_before_begin_creates_begin_stage() {
+        let mut include_file = NamedTempFile::new().expect("temp file");
+        writeln!(include_file, "print('auto setup');").expect("write include");
+        let include_path = include_file.path().to_str().unwrap().to_string();
+
+        let args = vec![
+            "kelora".to_string(),
+            "-I".to_string(),
+            include_path,
+            "--exec".to_string(),
+            "e.processed = true;".to_string(),
+        ];
+
+        let (cli, matches) = parse_cli(&args);
+        let (begin, end) = cli
+            .get_processed_begin_end(&matches)
+            .expect("should process begin/end");
+
+        assert!(begin.is_some());
+        let begin_script = begin.unwrap();
+        assert!(begin_script.contains("print('auto setup');"));
+
+        assert!(end.is_none());
     }
 }

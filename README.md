@@ -132,6 +132,7 @@ Pre-built binaries live in the [GitHub releases](https://github.com/dloss/kelora
 - `--window N` exposes `window` helpers for sliding analyses; combine with `window_values(...)`, `window_numbers(...)`, or custom loops.
 - Default mode is resilient—errors skip the offending event. Use `--strict` for fail-fast pipelines.
 - Dial verbosity with `-v` / `-vvv` for debugging or `-q` / `-qqq` for quiet pipelines.
+- `-I/--include` prepends Rhai files to define reusable functions for `--exec`, `--begin`, and `--end` stages.
 
 ### Output & Reporting
 
