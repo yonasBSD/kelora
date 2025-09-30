@@ -887,7 +887,7 @@ fn write_formatted_output<W: Write>(
     gap_tracker: &mut Option<crate::formatters::GapTracker>,
 ) -> io::Result<()> {
     if let Err(err) = file_ops::execute_ops(&formatted.file_ops) {
-        return Err(io::Error::new(io::ErrorKind::Other, err));
+        return Err(io::Error::other(err));
     }
 
     let marker = match gap_tracker.as_mut() {
@@ -1388,7 +1388,10 @@ fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
         }
         Err(e) => {
             let error_prefix = if no_emoji { "kelora:" } else { "⚠️" };
-            eprintln!("{} Failed to save alias '{}': {}", error_prefix, alias_name, e);
+            eprintln!(
+                "{} Failed to save alias '{}': {}",
+                error_prefix, alias_name, e
+            );
             std::process::exit(1);
         }
     }
@@ -1431,8 +1434,8 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
 
     // Check for --save-alias before other processing
     if let Some(alias_name) = extract_save_alias_arg(&raw_args) {
-        let no_emoji = raw_args.iter().any(|arg| arg == "--no-emoji")
-            || std::env::var("NO_EMOJI").is_ok();
+        let no_emoji =
+            raw_args.iter().any(|arg| arg == "--no-emoji") || std::env::var("NO_EMOJI").is_ok();
         handle_save_alias(&raw_args, &alias_name, no_emoji);
         std::process::exit(0);
     }

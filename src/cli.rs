@@ -484,29 +484,6 @@ fn preprocess_script_with_includes(script: &str, includes: &[String]) -> Result<
     Ok(result)
 }
 
-/// Preprocess filter expression by wrapping includes in eval() for expression compatibility
-fn preprocess_filter_with_includes(filter: &str, includes: &[String]) -> Result<String> {
-    if includes.is_empty() {
-        return Ok(filter.to_string());
-    }
-
-    let mut include_content = String::new();
-    for include_path in includes {
-        let content = std::fs::read_to_string(include_path).map_err(|e| {
-            anyhow::anyhow!("Failed to read include file '{}': {}", include_path, e)
-        })?;
-        include_content.push_str(&content);
-        include_content.push('\n');
-    }
-
-    // Wrap in eval() to execute includes first, then return the filter expression
-    Ok(format!(
-        "{{ eval(`{}`); {} }}",
-        include_content.replace('`', "\\`"),
-        filter
-    ))
-}
-
 /// Get includes that apply to begin/end stages based on CLI position
 /// For begin: includes that appear before any script stage
 /// For end: includes that appear after all script stages

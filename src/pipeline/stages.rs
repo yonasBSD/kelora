@@ -52,9 +52,7 @@ impl FilterStage {
     }
 
     fn has_context(&self) -> bool {
-        self.context_config
-            .as_ref()
-            .map_or(false, |c| c.is_active())
+        self.context_config.as_ref().is_some_and(|c| c.is_active())
     }
 
     fn evaluate_filter(&mut self, event: &Event, ctx: &mut PipelineContext) -> Result<bool> {
@@ -520,9 +518,7 @@ impl LevelFilterStage {
     }
 
     fn has_context(&self) -> bool {
-        self.context_config
-            .as_ref()
-            .map_or(false, |c| c.is_active())
+        self.context_config.as_ref().is_some_and(|c| c.is_active())
     }
 
     fn evaluate_level_filter(&self, event: &Event) -> bool {

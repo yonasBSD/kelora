@@ -1978,7 +1978,7 @@ fn to_syslog_impl(map: rhai::Map) -> String {
         .or_else(|| map.get("msg"))
         .or_else(|| map.get("content"))
         .map(|v| v.to_string())
-        .unwrap_or_else(|| String::new());
+        .unwrap_or_default();
 
     // RFC3164 format: <priority>timestamp hostname tag: message
     format!(
@@ -2156,7 +2156,7 @@ fn to_combined_impl(map: rhai::Map) -> String {
 
     // Add request_time if present (NGINX style)
     if let Some(request_time) = map.get("request_time") {
-        output.push_str(&format!(" \"{}\"", request_time.to_string()));
+        output.push_str(&format!(" \"{}\"", request_time));
     }
 
     output

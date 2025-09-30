@@ -10,21 +10,11 @@ use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 /// Runtime configuration controlling whether file operations are permitted and how errors behave.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct RuntimeConfig {
     pub allow_fs_writes: bool,
     pub strict: bool,
     pub quiet_level: u8,
-}
-
-impl Default for RuntimeConfig {
-    fn default() -> Self {
-        Self {
-            allow_fs_writes: false,
-            strict: false,
-            quiet_level: 0,
-        }
-    }
 }
 
 /// Execution mode for file operations.

@@ -557,9 +557,8 @@ impl pipeline::Formatter for DefaultFormatter {
 
         // Add context prefix based on event context type
         let context_prefix = self.get_context_prefix(event);
-        let formatted_content = self.format_content_with_context(event, &context_prefix);
 
-        formatted_content
+        self.format_content_with_context(event, &context_prefix)
     }
 }
 

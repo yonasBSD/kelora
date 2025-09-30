@@ -84,8 +84,7 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn(
         "has_field",
         |map: Map, key: rhai::ImmutableString| -> bool {
-            map.get(key.as_str())
-                .map_or(false, |value| !value.is_unit())
+            map.get(key.as_str()).is_some_and(|value| !value.is_unit())
         },
     );
 }
