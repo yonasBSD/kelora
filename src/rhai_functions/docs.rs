@@ -5,7 +5,6 @@ Available Rhai Functions for Kelora:
 
 STRING FUNCTIONS:
 text.after(delimiter)                Text after first occurrence of delimiter
-text.anonymize()                     Salted SHA-256 hash for PII anonymization (requires --salt or KELORA_SALT)
 text.before(delimiter)               Text before first occurrence of delimiter
 text.between(start, end)             Text between start and end delimiters
 text.bucket()                        Fast hash for sampling/grouping (returns INT for modulo operations)
@@ -52,7 +51,6 @@ text.parse_path()                    Parse filesystem path into components
 text.parse_syslog()                  Parse syslog line into structured fields
 text.parse_url()                     Parse URL into structured components
 text.parse_user_agent()              Parse common user-agent strings into components
-text.pseudonym([length])             Short pseudonym ID (base62, default length: 10, requires --salt)
 text.replace(pattern, replacement)   Replace all occurrences of pattern (builtin)
 text.slice(spec)                     Slice text using Python notation (e.g., "1:5", ":3", "-2:")
 text.split_re(pattern)               Split text by regex pattern
@@ -159,6 +157,7 @@ eprint(message)                      Print to stderr (suppressed with -qqq)
 exit(code)                           Exit kelora with given exit code
 get_env(var [,default])              Get environment variable with optional default
 print(message)                       Print to stdout (suppressed with -qqq)
+pseudonym(value, domain)             Generate domain-separated pseudonym (requires KELORA_SECRET)
 read_file(path)                      Read file contents as string
 read_lines(path)                     Read file as array of lines
 type_of(value)                       Get type name as string (builtin)

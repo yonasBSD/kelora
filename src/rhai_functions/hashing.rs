@@ -1,6 +1,183 @@
+use argon2::{Argon2, PasswordHasher};
+use argon2::password_hash::{Salt, SaltString};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use hkdf::Hkdf;
+use hmac::{Hmac, Mac};
+use once_cell::sync::Lazy;
 use rhai::Engine;
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
+use std::sync::{Mutex, RwLock};
 use xxhash_rust::xxh3::xxh3_64;
+
+type HmacSha256 = Hmac<Sha256>;
+
+/// Runtime configuration for hashing module
+#[derive(Debug, Clone, Default)]
+pub struct HashingRuntimeConfig {
+    pub verbose: u8,
+    pub no_emoji: bool,
+}
+
+static RUNTIME_CONFIG: Lazy<RwLock<HashingRuntimeConfig>> =
+    Lazy::new(|| RwLock::new(HashingRuntimeConfig::default()));
+
+/// Set runtime configuration for hashing functions
+pub fn set_runtime_config(config: HashingRuntimeConfig) {
+    let mut guard = RUNTIME_CONFIG
+        .write()
+        .expect("hashing runtime config poisoned");
+    *guard = config;
+}
+
+/// Log pseudonym initialization (only on verbose level 2+)
+fn log_pseudonym_init(message: &str) {
+    let config = RUNTIME_CONFIG.read().expect("hashing runtime config poisoned");
+    if config.verbose >= 2 {
+        let prefix = if config.no_emoji {
+            "kelora:"
+        } else {
+            "🔹"
+        };
+        eprintln!("{} {}", prefix, message);
+    }
+}
+
+/// Master key for pseudonymization (derived once at startup)
+static MASTER_KEY: Lazy<MasterKeyState> = Lazy::new(|| {
+    match std::env::var("KELORA_SECRET") {
+        Ok(secret) if !secret.is_empty() => {
+            match derive_master_key_from_secret(&secret) {
+                Ok(key) => {
+                    log_pseudonym_init("pseudonym: ON (stable; KELORA_SECRET)");
+                    MasterKeyState::Stable(key)
+                }
+                Err(e) => {
+                    // Always show fatal errors
+                    eprintln!("kelora: pseudonym init failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Ok(_) => {
+            // Always show fatal errors
+            eprintln!("kelora: KELORA_SECRET must not be empty");
+            std::process::exit(1);
+        }
+        Err(_) => {
+            // Generate ephemeral key
+            let mut key = [0u8; 32];
+            for byte in &mut key {
+                *byte = fastrand::u8(..);
+            }
+            log_pseudonym_init("pseudonym: ON (ephemeral; not stable)");
+            MasterKeyState::Ephemeral(key)
+        }
+    }
+});
+
+/// Domain-specific derived keys (cached)
+static DOMAIN_KEYS: Lazy<Mutex<HashMap<String, [u8; 32]>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+enum MasterKeyState {
+    Stable([u8; 32]),
+    Ephemeral([u8; 32]),
+}
+
+impl MasterKeyState {
+    fn as_bytes(&self) -> &[u8; 32] {
+        match self {
+            MasterKeyState::Stable(k) => k,
+            MasterKeyState::Ephemeral(k) => k,
+        }
+    }
+}
+
+/// Derive master key from secret using Argon2id
+fn derive_master_key_from_secret(secret: &str) -> Result<[u8; 32], String> {
+    let argon2 = Argon2::new(
+        argon2::Algorithm::Argon2id,
+        argon2::Version::V0x13,
+        argon2::Params::new(
+            64 * 1024, // 64 MiB
+            3,         // iterations
+            1,         // parallelism
+            Some(32),  // output length
+        )
+        .map_err(|e| format!("Argon2 params error: {}", e))?,
+    );
+
+    // Use fixed salt "kelora:v1:master"
+    let salt = SaltString::encode_b64(b"kelora:v1:master")
+        .map_err(|e| format!("Salt encoding error: {}", e))?;
+
+    let hash = argon2
+        .hash_password(secret.as_bytes(), Salt::try_from(salt.as_str()).unwrap())
+        .map_err(|e| format!("Argon2 hashing error: {}", e))?;
+
+    let hash_bytes = hash
+        .hash
+        .ok_or_else(|| "Argon2 produced no hash".to_string())?;
+
+    let mut key = [0u8; 32];
+    key.copy_from_slice(hash_bytes.as_bytes());
+    Ok(key)
+}
+
+/// Derive domain-specific key using HKDF-SHA256
+fn derive_domain_key(domain: &str) -> Result<[u8; 32], String> {
+    // Check cache first
+    {
+        let cache = DOMAIN_KEYS.lock().unwrap();
+        if let Some(key) = cache.get(domain) {
+            return Ok(*key);
+        }
+    }
+
+    let master = MASTER_KEY.as_bytes();
+    let info = format!("kelora:v1:{}", domain);
+
+    let hkdf = Hkdf::<Sha256>::new(None, master);
+    let mut okm = [0u8; 32];
+    hkdf.expand(info.as_bytes(), &mut okm)
+        .map_err(|e| format!("HKDF expansion error: {}", e))?;
+
+    // Cache the derived key
+    {
+        let mut cache = DOMAIN_KEYS.lock().unwrap();
+        cache.insert(domain.to_string(), okm);
+    }
+
+    Ok(okm)
+}
+
+/// Generate pseudonym token using HMAC-SHA256
+fn pseudonym_impl(value: &str, domain: &str) -> Result<String, Box<rhai::EvalAltResult>> {
+    if domain.is_empty() {
+        return Err("pseudonym: domain must be non-empty".into());
+    }
+
+    // Force initialization of master key (triggers logging)
+    let _ = MASTER_KEY.as_bytes();
+
+    let domain_key = derive_domain_key(domain)
+        .map_err(|e| format!("pseudonym: domain key derivation failed: {}", e))?;
+
+    // HMAC-SHA256(key=domain_key, data=domain || value)
+    let mut mac = HmacSha256::new_from_slice(&domain_key)
+        .map_err(|e| format!("HMAC init error: {}", e))?;
+
+    mac.update(domain.as_bytes());
+    mac.update(value.as_bytes());
+
+    let result = mac.finalize();
+    let tag = result.into_bytes();
+
+    // base64url encode (unpadded) and take first 24 chars
+    let encoded = URL_SAFE_NO_PAD.encode(tag);
+    Ok(encoded[..24].to_string())
+}
 
 /// Fast non-cryptographic hash for bucketing/sampling
 /// Uses xxh3_64 for performance
@@ -49,97 +226,8 @@ fn hash_default_impl(value: &str) -> Result<String, Box<rhai::EvalAltResult>> {
     hash_impl(value, "sha256")
 }
 
-/// Generate random hex salt for error messages
-fn generate_random_salt() -> String {
-    use fastrand;
-    let mut bytes = [0u8; 16];
-    for byte in &mut bytes {
-        *byte = fastrand::u8(..);
-    }
-    hex::encode(bytes)
-}
-
-/// Secure, salted anonymization using SHA-256
-/// Requires KELORA_SALT to be set
-fn anonymize_impl(value: &str, salt: &str) -> Result<String, Box<rhai::EvalAltResult>> {
-    if salt.is_empty() {
-        let suggested_salt = generate_random_salt();
-        return Err(format!(
-            "`KELORA_SALT` is not set — required for `anonymize()` and `pseudonym()`.\n\
-            \n\
-            You must set a stable, secret salt to ensure secure and consistent anonymization.\n\
-            \n\
-            Suggested (randomized) example:\n\
-                export KELORA_SALT=\"{}\"\n\
-            \n\
-            Once set, pseudonyms will remain consistent across runs.",
-            suggested_salt
-        )
-        .into());
-    }
-
-    let mut hasher = Sha256::new();
-    hasher.update(salt.as_bytes());
-    hasher.update(value.as_bytes());
-    Ok(hex::encode(hasher.finalize()))
-}
-
-/// Short, URL-safe pseudonym using Blake3 and base62
-/// Requires KELORA_SALT to be set
-fn pseudonym_impl(
-    value: &str,
-    length: i64,
-    salt: &str,
-) -> Result<String, Box<rhai::EvalAltResult>> {
-    if salt.is_empty() {
-        let suggested_salt = generate_random_salt();
-        return Err(format!(
-            "`KELORA_SALT` is not set — required for `anonymize()` and `pseudonym()`.\n\
-            \n\
-            You must set a stable, secret salt to ensure secure and consistent anonymization.\n\
-            \n\
-            Suggested (randomized) example:\n\
-                export KELORA_SALT=\"{}\"\n\
-            \n\
-            Once set, pseudonyms will remain consistent across runs.",
-            suggested_salt
-        )
-        .into());
-    }
-
-    if length <= 0 {
-        return Err("pseudonym() length must be positive".into());
-    }
-
-    // Hash with Blake3 (salted)
-    let mut hasher = blake3::Hasher::new();
-    hasher.update(salt.as_bytes());
-    hasher.update(value.as_bytes());
-    let hash = hasher.finalize();
-
-    // Encode to base62 using hex representation as input
-    let hex_str = hash.to_hex().to_string();
-    let base62_str = base62::encode(u128::from_str_radix(&hex_str[..32], 16).unwrap_or(0));
-
-    // Truncate to requested length
-    let len = length as usize;
-    if base62_str.len() >= len {
-        Ok(base62_str[..len].to_string())
-    } else {
-        Ok(base62_str)
-    }
-}
-
-/// Wrapper for pseudonym with default length
-fn pseudonym_default_impl(value: &str, salt: &str) -> Result<String, Box<rhai::EvalAltResult>> {
-    pseudonym_impl(value, 10, salt)
-}
-
 /// Register hashing functions with the Rhai engine
-/// Salt parameter comes from ProcessingConfig (CLI --salt or KELORA_SALT env var)
-pub fn register_functions(engine: &mut Engine, salt: Option<String>) {
-    let salt_str = salt.unwrap_or_default();
-
+pub fn register_functions(engine: &mut Engine) {
     // bucket() - fast non-cryptographic hash for bucketing/sampling
     engine.register_fn("bucket", bucket_impl);
 
@@ -147,22 +235,8 @@ pub fn register_functions(engine: &mut Engine, salt: Option<String>) {
     engine.register_fn("hash", hash_default_impl);
     engine.register_fn("hash", hash_impl);
 
-    // anonymize() - salted SHA-256
-    let salt_for_anonymize = salt_str.clone();
-    engine.register_fn("anonymize", move |value: &str| {
-        anonymize_impl(value, &salt_for_anonymize)
-    });
-
-    // pseudonym() - salted Blake3 + base62
-    let salt_for_pseudonym = salt_str.clone();
-    engine.register_fn("pseudonym", move |value: &str| {
-        pseudonym_default_impl(value, &salt_for_pseudonym)
-    });
-
-    let salt_for_pseudonym_len = salt_str;
-    engine.register_fn("pseudonym", move |value: &str, length: i64| {
-        pseudonym_impl(value, length, &salt_for_pseudonym_len)
-    });
+    // pseudonym() - domain-separated pseudonymization
+    engine.register_fn("pseudonym", pseudonym_impl);
 }
 
 #[cfg(test)]
@@ -236,100 +310,54 @@ mod tests {
     }
 
     #[test]
-    fn test_anonymize_with_salt() {
-        let salt = "test_salt";
-        let result1 = anonymize_impl("user123", salt).unwrap();
-        let result2 = anonymize_impl("user123", salt).unwrap();
-        let result3 = anonymize_impl("user456", salt).unwrap();
+    fn test_pseudonym_empty_domain() {
+        let result = pseudonym_impl("value", "");
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("domain must be non-empty"));
+    }
 
-        // Same input with same salt should be deterministic
+    #[test]
+    fn test_pseudonym_deterministic() {
+        // Same value and domain should produce same token
+        let result1 = pseudonym_impl("user123", "kelora:v1:email").unwrap();
+        let result2 = pseudonym_impl("user123", "kelora:v1:email").unwrap();
         assert_eq!(result1, result2);
-        // Different input should produce different hash
-        assert_ne!(result1, result3);
-        // Should be a valid SHA-256 hex string (64 chars)
-        assert_eq!(result1.len(), 64);
-        assert!(result1.chars().all(|c| c.is_ascii_hexdigit()));
+        assert_eq!(result1.len(), 24);
     }
 
     #[test]
-    fn test_anonymize_without_salt() {
-        let result = anonymize_impl("user123", "");
-        assert!(result.is_err());
-        let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("KELORA_SALT"));
-        assert!(err_msg.contains("export KELORA_SALT="));
-    }
-
-    #[test]
-    fn test_pseudonym_with_salt() {
-        let salt = "test_salt";
-        let result1 = pseudonym_impl("user123", 10, salt).unwrap();
-        let result2 = pseudonym_impl("user123", 10, salt).unwrap();
-        let result3 = pseudonym_impl("user456", 10, salt).unwrap();
-
-        // Same input with same salt should be deterministic
-        assert_eq!(result1, result2);
-        // Different input should produce different pseudonym
-        assert_ne!(result1, result3);
-        // Should be the requested length
-        assert_eq!(result1.len(), 10);
-        // Should only contain base62 characters
-        assert!(result1
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() && c != 'O' && c != 'I'));
-    }
-
-    #[test]
-    fn test_pseudonym_default_length() {
-        let salt = "test_salt";
-        let result = pseudonym_default_impl("user123", salt).unwrap();
-        assert_eq!(result.len(), 10); // Default length
-    }
-
-    #[test]
-    fn test_pseudonym_different_lengths() {
-        let salt = "test_salt";
-        let result5 = pseudonym_impl("user123", 5, salt).unwrap();
-        let result20 = pseudonym_impl("user123", 20, salt).unwrap();
-
-        assert_eq!(result5.len(), 5);
-        assert_eq!(result20.len(), 20);
-        // Shorter should be prefix of longer
-        assert!(result20.starts_with(&result5));
-    }
-
-    #[test]
-    fn test_pseudonym_without_salt() {
-        let result = pseudonym_impl("user123", 10, "");
-        assert!(result.is_err());
-        let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("KELORA_SALT"));
-    }
-
-    #[test]
-    fn test_pseudonym_invalid_length() {
-        let salt = "test_salt";
-        let result = pseudonym_impl("user123", 0, salt);
-        assert!(result.is_err());
-        let err_msg = result.unwrap_err().to_string();
-        assert!(err_msg.contains("positive"));
-    }
-
-    #[test]
-    fn test_different_salts_produce_different_results() {
-        let result1 = anonymize_impl("user123", "salt1").unwrap();
-        let result2 = anonymize_impl("user123", "salt2").unwrap();
+    fn test_pseudonym_domain_separation() {
+        // Same value, different domains should produce different tokens
+        let result1 = pseudonym_impl("user123", "kelora:v1:email").unwrap();
+        let result2 = pseudonym_impl("user123", "kelora:v1:ip").unwrap();
         assert_ne!(result1, result2);
+    }
 
-        let result3 = pseudonym_impl("user123", 10, "salt1").unwrap();
-        let result4 = pseudonym_impl("user123", 10, "salt2").unwrap();
-        assert_ne!(result3, result4);
+    #[test]
+    fn test_pseudonym_different_values() {
+        // Different values, same domain should produce different tokens
+        let result1 = pseudonym_impl("user123", "kelora:v1:email").unwrap();
+        let result2 = pseudonym_impl("user456", "kelora:v1:email").unwrap();
+        assert_ne!(result1, result2);
+    }
+
+    #[test]
+    fn test_pseudonym_output_format() {
+        let result = pseudonym_impl("test", "kelora:v1:test").unwrap();
+        // Should be exactly 24 characters
+        assert_eq!(result.len(), 24);
+        // Should only contain base64url characters (no padding)
+        assert!(result
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
+        assert!(!result.contains('='));
     }
 
     #[test]
     fn test_rhai_integration() {
         let mut engine = rhai::Engine::new();
-        register_functions(&mut engine, Some("test_salt".to_string()));
+        register_functions(&mut engine);
 
         // Test bucket
         let result: i64 = engine.eval(r#"bucket("test")"#).unwrap();
@@ -346,34 +374,14 @@ mod tests {
         let result: String = engine.eval(r#"hash("hello", "md5")"#).unwrap();
         assert_eq!(result, "5d41402abc4b2a76b9719d911017c592");
 
-        // Test anonymize
-        let result: String = engine.eval(r#"anonymize("user123")"#).unwrap();
-        assert_eq!(result.len(), 64);
+        // Test pseudonym
+        let result: String = engine
+            .eval(r#"pseudonym("user123", "kelora:v1:email")"#)
+            .unwrap();
+        assert_eq!(result.len(), 24);
 
-        // Test pseudonym with default length
-        let result: String = engine.eval(r#"pseudonym("user123")"#).unwrap();
-        assert_eq!(result.len(), 10);
-
-        // Test pseudonym with custom length
-        let result: String = engine.eval(r#"pseudonym("user123", 15)"#).unwrap();
-        assert_eq!(result.len(), 15);
-    }
-
-    #[test]
-    fn test_rhai_without_salt() {
-        let mut engine = rhai::Engine::new();
-        register_functions(&mut engine, None);
-
-        // bucket and hash should work without salt
-        let _: i64 = engine.eval(r#"bucket("test")"#).unwrap();
-        let _: String = engine.eval(r#"hash("test")"#).unwrap();
-
-        // anonymize should fail without salt
-        let result = engine.eval::<String>(r#"anonymize("user123")"#);
-        assert!(result.is_err());
-
-        // pseudonym should fail without salt
-        let result = engine.eval::<String>(r#"pseudonym("user123")"#);
+        // Test pseudonym with empty domain
+        let result = engine.eval::<String>(r#"pseudonym("user123", "")"#);
         assert!(result.is_err());
     }
 }

@@ -163,10 +163,6 @@ pub struct Cli {
     #[arg(long = "allow-fs-writes", help_heading = "Processing Options")]
     pub allow_fs_writes: bool,
 
-    /// Secret salt for anonymize() and pseudonym() functions. Can also be set via KELORA_SALT environment variable.
-    #[arg(long = "salt", help_heading = "Processing Options")]
-    pub salt: Option<String>,
-
     /// Enable access to a sliding window of N+1 recent events
     #[arg(long = "window", help_heading = "Processing Options")]
     pub window_size: Option<usize>,

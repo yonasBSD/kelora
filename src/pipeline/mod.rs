@@ -203,8 +203,6 @@ pub struct PipelineConfig {
     pub input_files: Vec<String>,
     /// Allow Rhai scripts to create directories and write files on disk
     pub allow_fs_writes: bool,
-    /// Secret salt for anonymize() and pseudonym() functions
-    pub salt: Option<String>,
 }
 
 /// Metadata about current processing context

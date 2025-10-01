@@ -47,6 +47,7 @@ use crate::decompression::DecompressionReader;
 use crate::engine::{DebugConfig, RhaiEngine};
 use crate::readers::MultiFileReader;
 use crate::rhai_functions::file_ops::{self, RuntimeConfig};
+use crate::rhai_functions::hashing;
 
 /// Pipeline builder for easy construction from CLI arguments
 #[derive(Clone)]
@@ -95,7 +96,6 @@ impl PipelineBuilder {
                 no_emoji: false,
                 input_files: Vec::new(),
                 allow_fs_writes: false,
-                salt: None,
             },
             begin: None,
             end: None,
@@ -135,9 +135,6 @@ impl PipelineBuilder {
     ) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
 
-        // Set up salt for hashing functions
-        rhai_engine.set_salt(self.config.salt.clone());
-
         // Set up debugging if enabled
         let debug_config = DebugConfig::new(self.config.verbose).with_emoji(!self.config.no_emoji);
         rhai_engine.setup_debugging(debug_config);
@@ -151,6 +148,11 @@ impl PipelineBuilder {
             allow_fs_writes: self.config.allow_fs_writes,
             strict: self.config.strict,
             quiet_level: self.config.quiet_level,
+        });
+
+        hashing::set_runtime_config(hashing::HashingRuntimeConfig {
+            verbose: self.config.verbose,
+            no_emoji: self.config.no_emoji,
         });
 
         // Create parser
@@ -447,9 +449,6 @@ impl PipelineBuilder {
     ) -> Result<(Pipeline, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
 
-        // Set up salt for hashing functions
-        rhai_engine.set_salt(self.config.salt.clone());
-
         // Set up debugging if enabled
         let debug_config = DebugConfig::new(self.config.verbose).with_emoji(!self.config.no_emoji);
         rhai_engine.setup_debugging(debug_config);
@@ -463,6 +462,11 @@ impl PipelineBuilder {
             allow_fs_writes: self.config.allow_fs_writes,
             strict: self.config.strict,
             quiet_level: self.config.quiet_level,
+        });
+
+        hashing::set_runtime_config(hashing::HashingRuntimeConfig {
+            verbose: self.config.verbose,
+            no_emoji: self.config.no_emoji,
         });
 
         // Create parser (with pre-processed CSV headers if available)
@@ -808,7 +812,6 @@ pub fn create_pipeline_builder_from_config(
         no_emoji: config.output.no_emoji,
         input_files: config.input.files.clone(),
         allow_fs_writes: config.processing.allow_fs_writes,
-        salt: config.processing.salt.clone(),
     };
 
     // Extract cols spec if needed before conversion

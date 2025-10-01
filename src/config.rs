@@ -138,8 +138,6 @@ pub struct ProcessingConfig {
     pub context: ContextConfig,
     /// Allow Rhai scripts to create directories and write files on disk
     pub allow_fs_writes: bool,
-    /// Secret salt for anonymize() and pseudonym() functions (from --salt or KELORA_SALT env var)
-    pub salt: Option<String>,
 }
 
 /// Performance configuration
@@ -722,10 +720,6 @@ impl KeloraConfig {
                 quiet_level: cli.quiet,
                 context: create_context_config(cli)?,
                 allow_fs_writes: cli.allow_fs_writes,
-                salt: cli
-                    .salt
-                    .clone()
-                    .or_else(|| std::env::var("KELORA_SALT").ok()),
             },
             performance: PerformanceConfig {
                 parallel: cli.parallel,
@@ -810,7 +804,6 @@ impl Default for KeloraConfig {
                 quiet_level: 0,
                 context: ContextConfig::disabled(),
                 allow_fs_writes: false,
-                salt: None,
             },
             performance: PerformanceConfig {
                 parallel: false,

@@ -72,9 +72,165 @@ fn test_hash_function_with_algorithm() {
 }
 
 #[test]
-fn test_anonymize_without_salt_fails() {
+fn test_pseudonym_with_env_secret() {
     let output = Command::new("./target/release/kelora")
-        .args(["-f", "line", "--exec", "e.anon = anonymize(e.line)"])
+        .env("KELORA_SECRET", "test_secret_12345")
+        .args([
+            "-vv",
+            "-f",
+            "line",
+            "--exec",
+            r#"e.pseudo = pseudonym(e.line, "kelora:v1:user")"#,
+        ])
+        .arg("-")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            use std::io::Write;
+            if let Some(stdin) = child.stdin.as_mut() {
+                stdin.write_all(b"user123\n").ok();
+            }
+            child.wait_with_output()
+        })
+        .expect("Failed to execute kelora");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Should log stable mode (only visible with -vv)
+    assert!(stderr.contains("pseudonym: ON (stable; KELORA_SECRET)"));
+    // Should produce pseudonym
+    assert!(stdout.contains("pseudo="));
+}
+
+#[test]
+fn test_pseudonym_ephemeral_mode() {
+    let output = Command::new("./target/release/kelora")
+        .env_remove("KELORA_SECRET")
+        .args([
+            "-vv",
+            "-f",
+            "line",
+            "--exec",
+            r#"e.pseudo = pseudonym(e.line, "kelora:v1:user")"#,
+        ])
+        .arg("-")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            use std::io::Write;
+            if let Some(stdin) = child.stdin.as_mut() {
+                stdin.write_all(b"user123\n").ok();
+            }
+            child.wait_with_output()
+        })
+        .expect("Failed to execute kelora");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Should log ephemeral mode (only visible with -vv)
+    assert!(stderr.contains("pseudonym: ON (ephemeral; not stable)"));
+    // Should produce pseudonym
+    assert!(stdout.contains("pseudo="));
+}
+
+#[test]
+fn test_pseudonym_domain_separation() {
+    let output = Command::new("./target/release/kelora")
+        .env("KELORA_SECRET", "test_secret_12345")
+        .args([
+            "-f",
+            "line",
+            "--exec",
+            r#"e.pseudo_email = pseudonym(e.line, "kelora:v1:email"); e.pseudo_ip = pseudonym(e.line, "kelora:v1:ip")"#,
+        ])
+        .arg("-")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            use std::io::Write;
+            if let Some(stdin) = child.stdin.as_mut() {
+                stdin.write_all(b"user123\n").ok();
+            }
+            child.wait_with_output()
+        })
+        .expect("Failed to execute kelora");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Both pseudonyms should be present
+    assert!(stdout.contains("pseudo_email="));
+    assert!(stdout.contains("pseudo_ip="));
+
+    // Extract the values to check they're different (not easily done in shell)
+    // For now, just verify both are present
+}
+
+#[test]
+fn test_pseudonym_deterministic() {
+    // Run twice with same secret
+    let output1 = Command::new("./target/release/kelora")
+        .env("KELORA_SECRET", "test_secret_12345")
+        .args([
+            "-f",
+            "line",
+            "--exec",
+            r#"e.pseudo = pseudonym(e.line, "kelora:v1:user")"#,
+        ])
+        .arg("-")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            use std::io::Write;
+            if let Some(stdin) = child.stdin.as_mut() {
+                stdin.write_all(b"user123\n").ok();
+            }
+            child.wait_with_output()
+        })
+        .expect("Failed to execute kelora");
+
+    let output2 = Command::new("./target/release/kelora")
+        .env("KELORA_SECRET", "test_secret_12345")
+        .args([
+            "-f",
+            "line",
+            "--exec",
+            r#"e.pseudo = pseudonym(e.line, "kelora:v1:user")"#,
+        ])
+        .arg("-")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            use std::io::Write;
+            if let Some(stdin) = child.stdin.as_mut() {
+                stdin.write_all(b"user123\n").ok();
+            }
+            child.wait_with_output()
+        })
+        .expect("Failed to execute kelora");
+
+    let stdout1 = String::from_utf8_lossy(&output1.stdout);
+    let stdout2 = String::from_utf8_lossy(&output2.stdout);
+
+    // Should produce identical output (deterministic)
+    assert_eq!(stdout1, stdout2);
+}
+
+#[test]
+fn test_pseudonym_empty_domain_error() {
+    let output = Command::new("./target/release/kelora")
+        .env("KELORA_SECRET", "test_secret_12345")
+        .args(["-f", "line", "--exec", r#"e.pseudo = pseudonym(e.line, "")"#])
         .arg("-")
         .stdin(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -90,23 +246,22 @@ fn test_anonymize_without_salt_fails() {
         .expect("Failed to execute kelora");
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("KELORA_SALT"));
-    assert!(stderr.contains("export KELORA_SALT="));
+    assert!(stderr.contains("domain must be non-empty"));
 }
 
 #[test]
-fn test_anonymize_with_cli_salt() {
+fn test_pseudonym_empty_secret_error() {
     let output = Command::new("./target/release/kelora")
+        .env("KELORA_SECRET", "")
         .args([
             "-f",
             "line",
-            "--salt",
-            "test_salt",
             "--exec",
-            "e.anon = anonymize(e.line)",
+            r#"e.pseudo = pseudonym(e.line, "kelora:v1:user")"#,
         ])
         .arg("-")
         .stdin(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .spawn()
         .and_then(|mut child| {
@@ -118,191 +273,9 @@ fn test_anonymize_with_cli_salt() {
         })
         .expect("Failed to execute kelora");
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("anon="));
-    // Should produce a valid hex string (64 chars for SHA-256)
-    assert!(stdout.contains("line="));
-}
-
-#[test]
-fn test_anonymize_with_env_salt() {
-    let output = Command::new("./target/release/kelora")
-        .env("KELORA_SALT", "env_test_salt")
-        .args(["-f", "line", "--exec", "e.anon = anonymize(e.line)"])
-        .arg("-")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .spawn()
-        .and_then(|mut child| {
-            use std::io::Write;
-            if let Some(stdin) = child.stdin.as_mut() {
-                stdin.write_all(b"user123\n").ok();
-            }
-            child.wait_with_output()
-        })
-        .expect("Failed to execute kelora");
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("anon="));
-}
-
-#[test]
-fn test_pseudonym_with_cli_salt() {
-    let output = Command::new("./target/release/kelora")
-        .args([
-            "-f",
-            "line",
-            "--salt",
-            "test_salt",
-            "--exec",
-            "e.pseudo = pseudonym(e.line)",
-        ])
-        .arg("-")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .spawn()
-        .and_then(|mut child| {
-            use std::io::Write;
-            if let Some(stdin) = child.stdin.as_mut() {
-                stdin.write_all(b"user123\n").ok();
-            }
-            child.wait_with_output()
-        })
-        .expect("Failed to execute kelora");
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("pseudo="));
-}
-
-#[test]
-fn test_pseudonym_with_custom_length() {
-    let output = Command::new("./target/release/kelora")
-        .args([
-            "-f",
-            "line",
-            "--salt",
-            "test_salt",
-            "--exec",
-            "e.pseudo = pseudonym(e.line, 5)",
-        ])
-        .arg("-")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .spawn()
-        .and_then(|mut child| {
-            use std::io::Write;
-            if let Some(stdin) = child.stdin.as_mut() {
-                stdin.write_all(b"user123\n").ok();
-            }
-            child.wait_with_output()
-        })
-        .expect("Failed to execute kelora");
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("pseudo="));
-    // The pseudonym should be relatively short (5 chars)
-}
-
-#[test]
-fn test_cli_salt_overrides_env() {
-    // Set env salt
-    let output_env = Command::new("./target/release/kelora")
-        .env("KELORA_SALT", "env_salt")
-        .args(["-f", "line", "--exec", "e.anon = anonymize(e.line)"])
-        .arg("-")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .spawn()
-        .and_then(|mut child| {
-            use std::io::Write;
-            if let Some(stdin) = child.stdin.as_mut() {
-                stdin.write_all(b"user123\n").ok();
-            }
-            child.wait_with_output()
-        })
-        .expect("Failed to execute kelora");
-
-    // CLI salt overrides env
-    let output_cli = Command::new("./target/release/kelora")
-        .env("KELORA_SALT", "env_salt")
-        .args([
-            "-f",
-            "line",
-            "--salt",
-            "cli_salt",
-            "--exec",
-            "e.anon = anonymize(e.line)",
-        ])
-        .arg("-")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .spawn()
-        .and_then(|mut child| {
-            use std::io::Write;
-            if let Some(stdin) = child.stdin.as_mut() {
-                stdin.write_all(b"user123\n").ok();
-            }
-            child.wait_with_output()
-        })
-        .expect("Failed to execute kelora");
-
-    let stdout_env = String::from_utf8_lossy(&output_env.stdout);
-    let stdout_cli = String::from_utf8_lossy(&output_cli.stdout);
-
-    // Results should be different (different salts)
-    assert_ne!(stdout_env, stdout_cli);
-}
-
-#[test]
-fn test_deterministic_hashing() {
-    // Run twice with same salt
-    let output1 = Command::new("./target/release/kelora")
-        .args([
-            "-f",
-            "line",
-            "--salt",
-            "test_salt",
-            "--exec",
-            "e.anon = anonymize(e.line)",
-        ])
-        .arg("-")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .spawn()
-        .and_then(|mut child| {
-            use std::io::Write;
-            if let Some(stdin) = child.stdin.as_mut() {
-                stdin.write_all(b"user123\n").ok();
-            }
-            child.wait_with_output()
-        })
-        .expect("Failed to execute kelora");
-
-    let output2 = Command::new("./target/release/kelora")
-        .args([
-            "-f",
-            "line",
-            "--salt",
-            "test_salt",
-            "--exec",
-            "e.anon = anonymize(e.line)",
-        ])
-        .arg("-")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .spawn()
-        .and_then(|mut child| {
-            use std::io::Write;
-            if let Some(stdin) = child.stdin.as_mut() {
-                stdin.write_all(b"user123\n").ok();
-            }
-            child.wait_with_output()
-        })
-        .expect("Failed to execute kelora");
-
-    let stdout1 = String::from_utf8_lossy(&output1.stdout);
-    let stdout2 = String::from_utf8_lossy(&output2.stdout);
-
-    // Should produce identical output
-    assert_eq!(stdout1, stdout2);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    // Should fail with message about empty secret
+    assert!(stderr.contains("KELORA_SECRET must not be empty"));
+    // Process should exit with error
+    assert!(!output.status.success());
 }

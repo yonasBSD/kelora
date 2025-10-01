@@ -19,7 +19,7 @@ pub mod strings;
 pub mod tracking;
 pub mod window;
 
-pub fn register_all_functions(engine: &mut Engine, salt: Option<String>) {
+pub fn register_all_functions(engine: &mut Engine) {
     arrays::register_functions(engine);
     strings::register_functions(engine);
     tracking::register_functions(engine);
@@ -36,5 +36,5 @@ pub fn register_all_functions(engine: &mut Engine, salt: Option<String>) {
     environment::register_functions(engine);
     emit::register_functions(engine);
     file_ops::register_functions(engine);
-    hashing::register_functions(engine, salt);
+    hashing::register_functions(engine);
 }
