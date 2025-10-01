@@ -185,91 +185,36 @@ impl ConfigFile {
 
     /// Show configuration information with precedence details
     pub fn show_config() {
-        println!(
-            "Configuration precedence: CLI > project .kelora.ini > user kelora.ini > defaults\n"
-        );
-
         let project_config_path = Self::find_project_config();
         let user_config_paths = Self::get_user_config_paths();
         let user_config_path = user_config_paths.iter().find(|p| p.exists());
 
-        // Load merged configuration
-        match Self::load() {
-            Ok(merged_config) => {
-                // Show which configs were loaded
-                let mut loaded_from = Vec::new();
+        // Determine which config to show
+        let config_path = project_config_path
+            .as_ref()
+            .or(user_config_path);
 
-                if let Some(project_path) = &project_config_path {
-                    loaded_from.push(format!("Project: {}", project_path.display()));
-                }
-
-                if let Some(user_path) = user_config_path {
-                    loaded_from.push(format!("User: {}", user_path.display()));
-                }
-
-                if loaded_from.is_empty() {
-                    println!("No configuration files found. Using defaults.");
-                } else {
-                    println!("Configuration loaded from:");
-                    for source in loaded_from {
-                        println!("  {}", source);
-                    }
-                }
-
-                // Show merged configuration
-                if let Some(defaults) = &merged_config.defaults {
-                    println!("\nActive defaults:");
-                    println!("  defaults = {}", defaults);
-                }
-
-                if !merged_config.aliases.is_empty() {
-                    println!("\nActive aliases:");
-                    let mut sorted_aliases: Vec<_> = merged_config.aliases.iter().collect();
-                    sorted_aliases.sort_by_key(|(k, _)| k.as_str());
-                    for (key, value) in sorted_aliases {
-                        println!("  {} = {}", key, value);
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("Error loading configuration: {}", e);
-            }
-        }
-
-        // Show search locations
-        println!("\nConfiguration search locations (in precedence order):");
-        if let Some(ref project_path) = project_config_path {
-            println!(
-                "  1. Project: {} {}",
-                project_path.display(),
-                if project_path.exists() {
-                    "(found)"
-                } else {
-                    "(not found)"
-                }
-            );
-        } else {
-            println!("  1. Project: .kelora.ini (searched up directory tree, not found)");
-        }
-
-        for (i, path) in user_config_paths.iter().enumerate() {
-            let status = if path.exists() {
-                "(found)"
-            } else {
-                "(not found)"
-            };
-            println!("  {}. User: {} {}", i + 2, path.display(), status);
-        }
-
-        // Show example configuration
-        if project_config_path.is_none() && user_config_path.is_none() {
-            println!("\nExample configuration file (.kelora.ini):");
+        if let Some(path) = config_path {
+            // Config found - show file path and full contents
+            println!("Config: {}", path.display());
             println!();
-            println!("# Set default arguments applied to every kelora command");
-            println!("defaults = --format auto --stats --input-tz UTC");
+
+            match std::fs::read_to_string(path) {
+                Ok(content) => print!("{}", content),
+                Err(e) => eprintln!("Error reading config: {}", e),
+            }
+        } else {
+            // No config found - show where we looked and example
+            println!(
+                "No config found (searched: .kelora.ini from cwd upward, {})",
+                user_config_paths[0].display()
+            );
+            println!();
+            println!("Example .kelora.ini:");
+            println!("defaults = --format auto --stats");
             println!();
             println!("[aliases]");
-            println!("errors = -l error --since 1h --stats");
+            println!("errors = -l error --stats");
             println!("json-errors = --format json -l error --output-format json");
             println!("slow-requests = --filter 'e.response_time.to_int() > 1000' --keys timestamp,method,path,response_time");
         }
