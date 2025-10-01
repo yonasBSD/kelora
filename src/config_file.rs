@@ -452,25 +452,113 @@ impl ConfigFile {
             }
         };
 
-        // Load existing config or create new one
-        let mut config = if config_path.exists() {
-            Self::load_from_path(&config_path)?
+        // Read existing content or start fresh
+        let (previous_value, new_content) = if config_path.exists() {
+            use std::fs;
+            let content = fs::read_to_string(&config_path)
+                .with_context(|| format!("Failed to read config file: {}", config_path.display()))?;
+
+            Self::update_alias_in_content(&content, alias_name, alias_value)?
         } else {
-            ConfigFile::default()
+            // New file - create minimal content with just the alias
+            let content = format!("[aliases]\n{} = {}\n", alias_name, alias_value);
+            (None, content)
         };
 
-        // Check if alias already exists (for user feedback)
-        let previous_value = config.aliases.get(alias_name).cloned();
+        // Write the updated content
+        use std::fs;
 
-        // Update the alias (overwrites if exists)
-        config
-            .aliases
-            .insert(alias_name.to_string(), alias_value.to_string());
+        // Create parent directory if it doesn't exist
+        if let Some(parent) = config_path.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+        }
 
-        // Write back to file
-        config.write_to_path(&config_path)?;
+        fs::write(&config_path, new_content.as_bytes())
+            .with_context(|| format!("Failed to write config file: {}", config_path.display()))?;
 
         Ok((config_path, previous_value))
+    }
+
+    /// Update or add an alias in existing INI content, preserving all other content
+    fn update_alias_in_content(
+        content: &str,
+        alias_name: &str,
+        alias_value: &str,
+    ) -> Result<(Option<String>, String)> {
+        let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+        let mut in_aliases_section = false;
+        let mut aliases_section_start: Option<usize> = None;
+        let mut alias_line_index: Option<usize> = None;
+        let mut previous_value: Option<String> = None;
+        let mut last_section_line: Option<usize> = None;
+
+        // Find the [aliases] section and the specific alias if it exists
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+
+            // Check for section headers
+            if trimmed.starts_with('[') && trimmed.ends_with(']') {
+                if in_aliases_section {
+                    // We've hit a new section after [aliases]
+                    last_section_line = Some(i - 1);
+                    break;
+                }
+
+                let section_name = &trimmed[1..trimmed.len() - 1];
+                if section_name == "aliases" {
+                    in_aliases_section = true;
+                    aliases_section_start = Some(i);
+                }
+                continue;
+            }
+
+            // If we're in the [aliases] section, look for our alias
+            if in_aliases_section && !trimmed.is_empty() && !trimmed.starts_with('#') && !trimmed.starts_with(';') {
+                if let Some(eq_pos) = trimmed.find('=') {
+                    let key = trimmed[..eq_pos].trim();
+                    if key == alias_name {
+                        // Found existing alias
+                        let value = trimmed[eq_pos + 1..].trim();
+                        previous_value = Some(value.to_string());
+                        alias_line_index = Some(i);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // If we didn't find the end of aliases section yet, it extends to the end
+        if in_aliases_section && last_section_line.is_none() {
+            last_section_line = Some(lines.len() - 1);
+        }
+
+        let new_alias_line = format!("{} = {}", alias_name, alias_value);
+
+        // Now update the content based on what we found
+        if let Some(idx) = alias_line_index {
+            // Replace existing alias in place
+            lines[idx] = new_alias_line;
+        } else if let Some(section_start) = aliases_section_start {
+            // [aliases] section exists but alias not found - add it at the end of the section
+            let insert_pos = last_section_line.map(|pos| pos + 1).unwrap_or(section_start + 1);
+            lines.insert(insert_pos, new_alias_line);
+        } else {
+            // No [aliases] section - add it at the end
+            if !lines.is_empty() && !lines[lines.len() - 1].is_empty() {
+                lines.push(String::new()); // Add blank line before new section
+            }
+            lines.push("[aliases]".to_string());
+            lines.push(new_alias_line);
+        }
+
+        // Ensure file ends with newline
+        let mut result = lines.join("\n");
+        if !result.ends_with('\n') {
+            result.push('\n');
+        }
+
+        Ok((previous_value, result))
     }
 }
 

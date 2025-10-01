@@ -1375,7 +1375,8 @@ fn extract_save_alias_arg(args: &[String]) -> Option<String> {
 fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
     use crate::config_file::ConfigFile;
 
-    // Remove the --save-alias <name> and --no-emoji from the arguments to get the command to save
+    // Extract --config-file if specified
+    let mut config_file_path: Option<String> = None;
     let mut command_args = Vec::new();
     let mut i = 0;
     while i < raw_args.len() {
@@ -1385,6 +1386,10 @@ fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
         } else if raw_args[i] == "--no-emoji" {
             // Skip --no-emoji as it's only for the save operation display
             i += 1;
+        } else if raw_args[i] == "--config-file" && i + 1 < raw_args.len() {
+            // Extract --config-file for saving
+            config_file_path = Some(raw_args[i + 1].clone());
+            i += 2;
         } else {
             command_args.push(raw_args[i].clone());
             i += 1;
@@ -1406,8 +1411,9 @@ fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
     // Join the arguments back into a single string
     let alias_value = shell_words::join(command_args);
 
-    // Save the alias
-    match ConfigFile::save_alias(alias_name, &alias_value, None) {
+    // Save the alias to the specified config file or auto-detect
+    let target_path = config_file_path.as_ref().map(std::path::Path::new);
+    match ConfigFile::save_alias(alias_name, &alias_value, target_path) {
         Ok((config_path, previous_value)) => {
             let success_prefix = if no_emoji { "kelora:" } else { "🔹" };
             println!(
