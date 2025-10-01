@@ -33,6 +33,9 @@ text.has_matches(pattern)            Check if text matches regex pattern
 text.hash([algo])                    Hash with algorithm (default: sha256, also: sha1, md5, xxh3, blake3)
 text.index_of(pattern)               Find position of substring (-1 if not found) (builtin)
 text.is_digit()                      Check if text contains only digits
+text.is_in_cidr(cidr)                Check if IP address is in CIDR network (e.g., "10.0.0.0/8")
+text.is_ipv4()                       Check if text is a valid IPv4 address
+text.is_ipv6()                       Check if text is a valid IPv6 address
 text.is_private_ip()                 Check if IP is in private ranges
 text.len                             Get string length (builtin)
 text.lower()                         Convert text to lowercase

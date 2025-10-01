@@ -12,6 +12,7 @@ pub mod file_ops;
 pub mod hashing;
 pub mod maps;
 pub mod math;
+pub mod network;
 pub mod process;
 pub mod random;
 pub mod safety;
@@ -26,6 +27,7 @@ pub fn register_all_functions(engine: &mut Engine) {
     columns::register_functions(engine);
     maps::register_functions(engine);
     math::register_functions(engine);
+    network::register_functions(engine);
     process::register_functions(engine);
     random::register_functions(engine);
     datetime::register_functions(engine);
