@@ -189,33 +189,46 @@ impl ProcessingStats {
     /// Format stats according to the specification
     #[allow(dead_code)] // Used in main.rs when stats are enabled
     pub fn format_stats(&self, _multiline_enabled: bool) -> String {
+        self.format_stats_internal(_multiline_enabled, false)
+    }
+
+    /// Format stats for signal handlers (skips line counts which are always 0)
+    #[allow(dead_code)]
+    pub fn format_stats_for_signal(&self, _multiline_enabled: bool) -> String {
+        self.format_stats_internal(_multiline_enabled, true)
+    }
+
+    fn format_stats_internal(&self, _multiline_enabled: bool, skip_line_counts: bool) -> String {
         let mut output = String::new();
 
         // Lines processed: N total, N filtered (X%), N errors (Y%)
-        let lines_filtered_pct = if self.lines_read > 0 {
-            format!(
-                " ({:.1}%)",
-                (self.lines_filtered as f64 / self.lines_read as f64) * 100.0
-            )
-        } else {
-            String::new()
-        };
-        let lines_errors_pct = if self.lines_read > 0 {
-            format!(
-                " ({:.1}%)",
-                (self.lines_errors as f64 / self.lines_read as f64) * 100.0
-            )
-        } else {
-            String::new()
-        };
-        output.push_str(&format!(
-            "Lines processed: {} total, {} filtered{}, {} errors{}\n",
-            self.lines_read,
-            self.lines_filtered,
-            lines_filtered_pct,
-            self.lines_errors,
-            lines_errors_pct
-        ));
+        // Skip this line when called from signal handler (line counts are always 0 there)
+        if !skip_line_counts {
+            let lines_filtered_pct = if self.lines_read > 0 {
+                format!(
+                    " ({:.1}%)",
+                    (self.lines_filtered as f64 / self.lines_read as f64) * 100.0
+                )
+            } else {
+                String::new()
+            };
+            let lines_errors_pct = if self.lines_read > 0 {
+                format!(
+                    " ({:.1}%)",
+                    (self.lines_errors as f64 / self.lines_read as f64) * 100.0
+                )
+            } else {
+                String::new()
+            };
+            output.push_str(&format!(
+                "Lines processed: {} total, {} filtered{}, {} errors{}\n",
+                self.lines_read,
+                self.lines_filtered,
+                lines_filtered_pct,
+                self.lines_errors,
+                lines_errors_pct
+            ));
+        }
 
         // Events created: N total, N output, N filtered (X%)
         let events_filtered_pct = if self.events_created > 0 {

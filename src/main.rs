@@ -549,7 +549,7 @@ fn run_pipeline_sequential_internal<W: Write>(
                             // Print current stats to stderr (sequential mode)
                             let current_stats = get_thread_stats();
                             let stats_message = config.format_stats_message(
-                                &current_stats.format_stats(config.input.multiline.is_some())
+                                &current_stats.format_stats_for_signal(config.input.multiline.is_some())
                             );
                             let _ = SafeStderr::new().writeln(&stats_message);
                         }
@@ -610,7 +610,7 @@ fn run_pipeline_sequential_internal<W: Write>(
                             // Print current stats to stderr (sequential mode)
                             let current_stats = get_thread_stats();
                             let stats_message = config.format_stats_message(
-                                &current_stats.format_stats(config.input.multiline.is_some())
+                                &current_stats.format_stats_for_signal(config.input.multiline.is_some())
                             );
                             let _ = SafeStderr::new().writeln(&stats_message);
                         }
