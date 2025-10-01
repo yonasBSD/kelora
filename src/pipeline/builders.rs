@@ -873,9 +873,9 @@ pub fn create_input_reader(
     config: &crate::config::KeloraConfig,
 ) -> Result<Box<dyn BufRead + Send>> {
     if config.input.files.is_empty() {
-        // Use stdin reader with gzip detection for Send compatibility
+        // Use stdin reader with gzip/zstd detection for Send compatibility
         let stdin_reader = crate::readers::ChannelStdinReader::new()?;
-        let processed_stdin = crate::decompression::maybe_gzip(stdin_reader)?;
+        let processed_stdin = crate::decompression::maybe_decompress(stdin_reader)?;
         Ok(Box::new(BufReader::new(processed_stdin)))
     } else {
         let sorted_files = sort_files(&config.input.files, &config.input.file_order)?;

@@ -24,6 +24,7 @@ is-terminal = "0.4"
 indexmap = "2.0"
 signal-hook = { version = "0.3", features = ["iterator"] }
 flate2 = "1.0"
+zstd = "0.13"
 nom = "8"
 shell-words = "1.1"
 csv = "1.3"

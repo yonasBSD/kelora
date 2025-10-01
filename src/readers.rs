@@ -260,7 +260,7 @@ impl MultiFileReader {
                 match ChannelStdinReader::new() {
                     Ok(stdin_reader) => {
                         // Apply magic bytes detection to stdin reader
-                        match crate::decompression::maybe_gzip(stdin_reader) {
+                        match crate::decompression::maybe_decompress(stdin_reader) {
                             Ok(processed_reader) => {
                                 self.current_reader = Some(Box::new(BufReader::with_capacity(
                                     self.buffer_size,

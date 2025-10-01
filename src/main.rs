@@ -62,9 +62,9 @@ fn detect_format_for_parallel_mode(files: &[String]) -> Result<config::InputForm
     use std::io;
 
     if files.is_empty() {
-        // For stdin with potential gzip, handle decompression first
+        // For stdin with potential gzip/zstd, handle decompression first
         let stdin_reader = readers::ChannelStdinReader::new()?;
-        let processed_stdin = decompression::maybe_gzip(stdin_reader)?;
+        let processed_stdin = decompression::maybe_decompress(stdin_reader)?;
         let mut peekable_reader =
             readers::PeekableLineReader::new(io::BufReader::new(processed_stdin));
 
@@ -272,7 +272,7 @@ fn run_pipeline_sequential<W: Write>(
 
     let input = if config.input.files.is_empty() {
         let stdin_reader = readers::ChannelStdinReader::new()?;
-        let processed_stdin = decompression::maybe_gzip(stdin_reader)?;
+        let processed_stdin = decompression::maybe_decompress(stdin_reader)?;
         SequentialInput::Stdin(Box::new(io::BufReader::new(processed_stdin)))
     } else {
         let sorted_files =
@@ -291,7 +291,7 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
 ) -> Result<()> {
     if config.input.files.is_empty() {
         let stdin_reader = readers::ChannelStdinReader::new()?;
-        let processed_stdin = decompression::maybe_gzip(stdin_reader)?;
+        let processed_stdin = decompression::maybe_decompress(stdin_reader)?;
         let mut peekable_reader =
             readers::PeekableLineReader::new(io::BufReader::new(processed_stdin));
 
