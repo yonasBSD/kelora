@@ -573,3 +573,4 @@ kelora -qq suspicious.log || mail -s "Log errors detected" admin@company.com
 
 Do not care for backwards compatiblity.
 - Always remember that Rhai allows using functions as methods on the first argument
+- When adding Rhai functions, always update the --help-functions screen in src/rhai_functions/docs.rs
