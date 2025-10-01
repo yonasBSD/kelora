@@ -190,9 +190,7 @@ impl ConfigFile {
         let user_config_path = user_config_paths.iter().find(|p| p.exists());
 
         // Determine which config to show
-        let config_path = project_config_path
-            .as_ref()
-            .or(user_config_path);
+        let config_path = project_config_path.as_ref().or(user_config_path);
 
         if let Some(path) = config_path {
             // Config found - show file path and full contents
@@ -217,6 +215,63 @@ impl ConfigFile {
             println!("errors = -l error --stats");
             println!("json-errors = --format json -l error --output-format json");
             println!("slow-requests = --filter 'e.response_time.to_int() > 1000' --keys timestamp,method,path,response_time");
+        }
+    }
+
+    /// Edit configuration file in default editor
+    pub fn edit_config(custom_path: Option<&str>) {
+        use std::fs;
+        use std::process::Command;
+
+        // Determine which config file to edit using same logic as show_config
+        let config_path = if let Some(path) = custom_path {
+            PathBuf::from(path)
+        } else {
+            let project_config_path = Self::find_project_config();
+            let user_config_paths = Self::get_user_config_paths();
+            let user_config_path = user_config_paths.iter().find(|p| p.exists());
+
+            project_config_path
+                .or_else(|| user_config_path.cloned())
+                .unwrap_or_else(|| user_config_paths[0].clone())
+        };
+
+        // Create parent directory if it doesn't exist
+        if let Some(parent) = config_path.parent() {
+            if !parent.exists() {
+                if let Err(e) = fs::create_dir_all(parent) {
+                    eprintln!(
+                        "kelora: Failed to create directory {}: {}",
+                        parent.display(),
+                        e
+                    );
+                    std::process::exit(1);
+                }
+            }
+        }
+
+        // Get editor from environment
+        let editor = if cfg!(windows) {
+            env::var("EDITOR").unwrap_or_else(|_| "notepad.exe".to_string())
+        } else {
+            env::var("EDITOR").unwrap_or_else(|_| "vi".to_string())
+        };
+
+        // Print the file being edited
+        println!("Opening {} in {}...", config_path.display(), editor);
+
+        // Spawn editor and wait for it to complete
+        match Command::new(&editor).arg(&config_path).status() {
+            Ok(status) => {
+                if !status.success() {
+                    std::process::exit(status.code().unwrap_or(1));
+                }
+            }
+            Err(e) => {
+                eprintln!("kelora: Failed to launch editor '{}': {}", editor, e);
+                eprintln!("You can set the EDITOR environment variable to your preferred editor.");
+                std::process::exit(1);
+            }
         }
     }
 
@@ -400,8 +455,9 @@ impl ConfigFile {
         // Read existing content or start fresh
         let (previous_value, new_content) = if config_path.exists() {
             use std::fs;
-            let content = fs::read_to_string(&config_path)
-                .with_context(|| format!("Failed to read config file: {}", config_path.display()))?;
+            let content = fs::read_to_string(&config_path).with_context(|| {
+                format!("Failed to read config file: {}", config_path.display())
+            })?;
 
             Self::update_alias_in_content(&content, alias_name, alias_value)?
         } else {
@@ -459,7 +515,11 @@ impl ConfigFile {
             }
 
             // If we're in the [aliases] section, look for our alias
-            if in_aliases_section && !trimmed.is_empty() && !trimmed.starts_with('#') && !trimmed.starts_with(';') {
+            if in_aliases_section
+                && !trimmed.is_empty()
+                && !trimmed.starts_with('#')
+                && !trimmed.starts_with(';')
+            {
                 if let Some(eq_pos) = trimmed.find('=') {
                     let key = trimmed[..eq_pos].trim();
                     if key == alias_name {
@@ -486,7 +546,9 @@ impl ConfigFile {
             lines[idx] = new_alias_line;
         } else if let Some(section_start) = aliases_section_start {
             // [aliases] section exists but alias not found - add it at the end of the section
-            let insert_pos = last_section_line.map(|pos| pos + 1).unwrap_or(section_start + 1);
+            let insert_pos = last_section_line
+                .map(|pos| pos + 1)
+                .unwrap_or(section_start + 1);
             lines.insert(insert_pos, new_alias_line);
         } else {
             // No [aliases] section - add it at the end
@@ -794,7 +856,8 @@ mod tests {
 
             // Grandparent should be config directory
             let grandparent_path = parent_dir.parent().unwrap().to_string_lossy();
-            let is_config_dir = grandparent_path.contains("config") || grandparent_path.contains("APPDATA");
+            let is_config_dir =
+                grandparent_path.contains("config") || grandparent_path.contains("APPDATA");
             assert!(
                 is_config_dir,
                 "Grandparent not in expected config directory: {}",

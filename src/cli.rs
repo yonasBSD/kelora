@@ -416,6 +416,10 @@ pub struct Cli {
     #[arg(long = "show-config", help_heading = "Configuration Options")]
     pub show_config: bool,
 
+    /// Edit configuration file in default editor and exit
+    #[arg(long = "edit-config", help_heading = "Configuration Options")]
+    pub edit_config: bool,
+
     /// Ignore configuration file
     #[arg(long = "ignore-config", help_heading = "Configuration Options")]
     pub ignore_config: bool,

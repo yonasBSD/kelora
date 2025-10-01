@@ -1445,9 +1445,37 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
     // Get raw command line arguments
     let raw_args: Vec<String> = std::env::args().collect();
 
+    // Extract --config-file argument early for use by config commands
+    let config_file_path = extract_config_file_arg(&raw_args);
+
+    // Check for config-related option conflicts
+    let has_show_config = raw_args.iter().any(|arg| arg == "--show-config");
+    let has_edit_config = raw_args.iter().any(|arg| arg == "--edit-config");
+    let has_ignore_config = raw_args.iter().any(|arg| arg == "--ignore-config");
+
+    if has_show_config && has_edit_config {
+        stderr
+            .writeln("kelora: Error: --show-config and --edit-config are mutually exclusive")
+            .unwrap_or(());
+        ExitCode::InvalidUsage.exit();
+    }
+
+    if has_ignore_config && has_edit_config {
+        stderr
+            .writeln("kelora: Error: --ignore-config and --edit-config are mutually exclusive")
+            .unwrap_or(());
+        ExitCode::InvalidUsage.exit();
+    }
+
     // Check for --show-config first, before any other processing
-    if raw_args.iter().any(|arg| arg == "--show-config") {
+    if has_show_config {
         ConfigFile::show_config();
+        std::process::exit(0);
+    }
+
+    // Check for --edit-config
+    if has_edit_config {
+        ConfigFile::edit_config(config_file_path.as_deref());
         std::process::exit(0);
     }
 
@@ -1484,10 +1512,7 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
     }
 
     // Check for --ignore-config
-    let ignore_config = raw_args.iter().any(|arg| arg == "--ignore-config");
-
-    // Extract --config-file argument if present
-    let config_file_path = extract_config_file_arg(&raw_args);
+    let ignore_config = has_ignore_config;
 
     let processed_args = if ignore_config {
         // Skip config file processing

@@ -362,8 +362,14 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("duration_from_minutes", DurationWrapper::from_minutes);
     engine.register_fn("duration_from_hours", DurationWrapper::from_hours);
     engine.register_fn("duration_from_days", DurationWrapper::from_days);
-    engine.register_fn("duration_from_milliseconds", DurationWrapper::from_milliseconds);
-    engine.register_fn("duration_from_nanoseconds", DurationWrapper::from_nanoseconds);
+    engine.register_fn(
+        "duration_from_milliseconds",
+        DurationWrapper::from_milliseconds,
+    );
+    engine.register_fn(
+        "duration_from_nanoseconds",
+        DurationWrapper::from_nanoseconds,
+    );
 
     // Humanize milliseconds to readable duration format
     engine.register_fn("humanize_duration", |ms: i64| -> String {

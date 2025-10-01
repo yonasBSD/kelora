@@ -230,7 +230,12 @@ fn test_pseudonym_deterministic() {
 fn test_pseudonym_empty_domain_error() {
     let output = Command::new("./target/release/kelora")
         .env("KELORA_SECRET", "test_secret_12345")
-        .args(["-f", "line", "--exec", r#"e.pseudo = pseudonym(e.line, "")"#])
+        .args([
+            "-f",
+            "line",
+            "--exec",
+            r#"e.pseudo = pseudonym(e.line, "")"#,
+        ])
         .arg("-")
         .stdin(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())

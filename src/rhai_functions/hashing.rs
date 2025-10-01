@@ -1,6 +1,6 @@
-use argon2::{Argon2, PasswordHasher};
 use argon2::password_hash::{Salt, SaltString};
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use argon2::{Argon2, PasswordHasher};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use hkdf::Hkdf;
 use hmac::{Hmac, Mac};
 use once_cell::sync::Lazy;
@@ -32,13 +32,11 @@ pub fn set_runtime_config(config: HashingRuntimeConfig) {
 
 /// Log pseudonym initialization (only on verbose level 2+)
 fn log_pseudonym_init(message: &str) {
-    let config = RUNTIME_CONFIG.read().expect("hashing runtime config poisoned");
+    let config = RUNTIME_CONFIG
+        .read()
+        .expect("hashing runtime config poisoned");
     if config.verbose >= 2 {
-        let prefix = if config.no_emoji {
-            "kelora:"
-        } else {
-            "🔹"
-        };
+        let prefix = if config.no_emoji { "kelora:" } else { "🔹" };
         eprintln!("{} {}", prefix, message);
     }
 }
@@ -165,8 +163,8 @@ fn pseudonym_impl(value: &str, domain: &str) -> Result<String, Box<rhai::EvalAlt
         .map_err(|e| format!("pseudonym: domain key derivation failed: {}", e))?;
 
     // HMAC-SHA256(key=domain_key, data=domain || value)
-    let mut mac = HmacSha256::new_from_slice(&domain_key)
-        .map_err(|e| format!("HMAC init error: {}", e))?;
+    let mut mac =
+        HmacSha256::new_from_slice(&domain_key).map_err(|e| format!("HMAC init error: {}", e))?;
 
     mac.update(domain.as_bytes());
     mac.update(value.as_bytes());
