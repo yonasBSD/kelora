@@ -51,6 +51,7 @@ text.parse_kv([sep [,kv_sep]])       Parse key-value pairs from text
 text.parse_logfmt()                  Parse logfmt line into structured fields
 text.parse_media_type()              Parse media type tokens and parameters
 text.parse_path()                    Parse filesystem path into components
+text.parse_query_params()            Parse URL query string into map
 text.parse_syslog()                  Parse syslog line into structured fields
 text.parse_url()                     Parse URL into structured components
 text.parse_user_agent()              Parse common user-agent strings into components
