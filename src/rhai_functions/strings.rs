@@ -225,6 +225,29 @@ fn parse_url_impl(input: &str) -> Map {
     result
 }
 
+fn parse_query_params_impl(input: &str) -> Map {
+    let trimmed = input.trim();
+    if trimmed.is_empty() || trimmed.len() > MAX_PARSE_LEN {
+        return Map::new();
+    }
+
+    let mut result = Map::new();
+
+    // Handle query string with or without leading '?'
+    let query_str = trimmed.strip_prefix('?').unwrap_or(trimmed);
+
+    // Parse query parameters using url::form_urlencoded
+    for (key, value) in url::form_urlencoded::parse(query_str.as_bytes()) {
+        let key_owned = key.into_owned();
+        // Only keep first occurrence of each key (matches parse_url behavior)
+        if !result.contains_key(key_owned.as_str()) {
+            result.insert(key_owned.into(), Dynamic::from(value.into_owned()));
+        }
+    }
+
+    result
+}
+
 fn parse_path_impl(input: &str) -> Map {
     let mut map = Map::new();
     let trimmed = input.trim();
@@ -1243,6 +1266,7 @@ pub fn register_functions(engine: &mut Engine) {
 
     // Structured parsing helpers
     engine.register_fn("parse_url", parse_url_impl);
+    engine.register_fn("parse_query_params", parse_query_params_impl);
     engine.register_fn("parse_path", parse_path_impl);
     engine.register_fn("parse_email", parse_email_impl);
     engine.register_fn("parse_user_agent", parse_user_agent_impl);
@@ -2478,6 +2502,98 @@ mod tests {
             .eval_with_scope(&mut scope, r#"parse_url(invalid)"#)
             .unwrap();
         assert!(invalid.is_empty());
+    }
+
+    #[test]
+    fn test_parse_query_params_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+
+        // Test basic query string with '?'
+        scope.push("query1", "?foo=bar&baz=qux&hello=world");
+        let result: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_query_params(query1)"#)
+            .unwrap();
+        assert_eq!(
+            result.get("foo").unwrap().clone().into_string().unwrap(),
+            "bar"
+        );
+        assert_eq!(
+            result.get("baz").unwrap().clone().into_string().unwrap(),
+            "qux"
+        );
+        assert_eq!(
+            result.get("hello").unwrap().clone().into_string().unwrap(),
+            "world"
+        );
+
+        // Test query string without leading '?'
+        scope.push("query2", "id=123&name=test");
+        let result2: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_query_params(query2)"#)
+            .unwrap();
+        assert_eq!(
+            result2.get("id").unwrap().clone().into_string().unwrap(),
+            "123"
+        );
+        assert_eq!(
+            result2.get("name").unwrap().clone().into_string().unwrap(),
+            "test"
+        );
+
+        // Test URL encoding
+        scope.push("query3", "name=hello%20world&email=user%40example.com");
+        let result3: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_query_params(query3)"#)
+            .unwrap();
+        assert_eq!(
+            result3.get("name").unwrap().clone().into_string().unwrap(),
+            "hello world"
+        );
+        assert_eq!(
+            result3.get("email").unwrap().clone().into_string().unwrap(),
+            "user@example.com"
+        );
+
+        // Test duplicate keys (first occurrence wins)
+        scope.push("query4", "id=1&id=2&id=3");
+        let result4: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_query_params(query4)"#)
+            .unwrap();
+        assert_eq!(
+            result4.get("id").unwrap().clone().into_string().unwrap(),
+            "1"
+        );
+
+        // Test empty value
+        scope.push("query5", "key1=&key2=value");
+        let result5: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_query_params(query5)"#)
+            .unwrap();
+        assert_eq!(
+            result5.get("key1").unwrap().clone().into_string().unwrap(),
+            ""
+        );
+        assert_eq!(
+            result5.get("key2").unwrap().clone().into_string().unwrap(),
+            "value"
+        );
+
+        // Test empty string
+        scope.push("empty", "");
+        let empty: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_query_params(empty)"#)
+            .unwrap();
+        assert!(empty.is_empty());
+
+        // Test just '?'
+        scope.push("just_q", "?");
+        let just_q: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_query_params(just_q)"#)
+            .unwrap();
+        assert!(just_q.is_empty());
     }
 
     #[test]
