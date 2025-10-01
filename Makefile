@@ -25,10 +25,9 @@ deny:
 		rm -rf .cargo-deny/advisory-dbs; \
 		cp -R "$$HOME/.cargo/advisory-dbs" .cargo-deny/; \
 	fi
-	cargo metadata --offline --format-version 1 > target/cargo-deny-metadata.json
+	cargo metadata --format-version 1 > target/cargo-deny-metadata.json
 	CARGO_HOME=$(PWD)/.cargo-deny \
 	CARGO_DENY_HOME=$(PWD)/.cargo-deny \
-	CARGO_NET_OFFLINE=true \
 	cargo deny check --disable-fetch --metadata-path target/cargo-deny-metadata.json
 
 check: fmt lint audit deny test

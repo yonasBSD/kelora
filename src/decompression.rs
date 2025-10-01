@@ -76,7 +76,8 @@ fn detect_compression_file(mut file: File) -> std::io::Result<DecompressionReade
     let is_gzip = n >= 3 && head[0] == 0x1F && head[1] == 0x8B && head[2] == 0x08;
 
     // Check for zstd magic bytes: 28 B5 2F FD
-    let is_zstd = n >= 4 && head[0] == 0x28 && head[1] == 0xB5 && head[2] == 0x2F && head[3] == 0xFD;
+    let is_zstd =
+        n >= 4 && head[0] == 0x28 && head[1] == 0xB5 && head[2] == 0x2F && head[3] == 0xFD;
 
     if is_gzip {
         let decoder = MultiGzDecoder::new(chained);
@@ -107,7 +108,8 @@ pub fn maybe_decompress<R: Read + Send + 'static>(
     let is_gzip = n >= 3 && head[0] == 0x1F && head[1] == 0x8B && head[2] == 0x08;
 
     // Check for zstd magic bytes: 28 B5 2F FD
-    let is_zstd = n >= 4 && head[0] == 0x28 && head[1] == 0xB5 && head[2] == 0x2F && head[3] == 0xFD;
+    let is_zstd =
+        n >= 4 && head[0] == 0x28 && head[1] == 0xB5 && head[2] == 0x2F && head[3] == 0xFD;
 
     if is_gzip {
         Ok(Box::new(MultiGzDecoder::new(chained)))
@@ -132,7 +134,8 @@ impl DecompressionReader {
         }
 
         // Use magic bytes detection for all files
-        detect_compression_file(file).map_err(|e| anyhow!("Failed to detect compression format: {}", e))
+        detect_compression_file(file)
+            .map_err(|e| anyhow!("Failed to detect compression format: {}", e))
     }
 }
 
