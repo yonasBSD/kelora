@@ -3,6 +3,7 @@ use clap::{ArgMatches, CommandFactory, FromArgMatches};
 use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
 use std::sync::atomic::Ordering;
 
+use crate::engine::RhaiEngine;
 use crate::rhai_functions::tracking::{self, TrackingSnapshot};
 
 mod cli;
@@ -547,7 +548,9 @@ fn run_pipeline_sequential_internal<W: Write>(
                         }
                         Ok(Ctrl::PrintStats) => {
                             // Print current stats to stderr (sequential mode)
-                            let current_stats = get_thread_stats();
+                            let mut current_stats = get_thread_stats();
+                            let internal_tracking = RhaiEngine::get_thread_internal_state();
+                            current_stats.extract_discovered_from_tracking(&internal_tracking);
                             let stats_message = config.format_stats_message(
                                 &current_stats.format_stats_for_signal(config.input.multiline.is_some())
                             );
@@ -608,7 +611,9 @@ fn run_pipeline_sequential_internal<W: Write>(
                         }
                         Ok(Ctrl::PrintStats) => {
                             // Print current stats to stderr (sequential mode)
-                            let current_stats = get_thread_stats();
+                            let mut current_stats = get_thread_stats();
+                            let internal_tracking = RhaiEngine::get_thread_internal_state();
+                            current_stats.extract_discovered_from_tracking(&internal_tracking);
                             let stats_message = config.format_stats_message(
                                 &current_stats.format_stats_for_signal(config.input.multiline.is_some())
                             );

@@ -1194,7 +1194,6 @@ impl RhaiEngine {
         );
     }
 
-
     /// Set whether to suppress side effects (print, eprint, etc.)
     pub fn set_suppress_side_effects(&mut self, suppress: bool) {
         self.suppress_side_effects = suppress;

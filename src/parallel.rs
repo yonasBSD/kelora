@@ -2627,7 +2627,10 @@ impl ParallelProcessor {
                 }
                 Ok(Ctrl::PrintStats) => {
                     // Print current parallel stats from coordinator
-                    let current_stats = global_tracker.get_final_stats();
+                    let mut current_stats = global_tracker.get_final_stats();
+                    // Extract discovered keys/levels from current internal tracking
+                    let internal_tracking = global_tracker.internal_tracked.lock().unwrap().clone();
+                    current_stats.extract_discovered_from_tracking(&internal_tracking);
                     let stats_message = config.format_stats_message(
                         &current_stats.format_stats_for_signal(config.input.multiline.is_some()),
                     );
