@@ -33,12 +33,12 @@ impl ConfigFile {
         let mut paths = Vec::new();
 
         if cfg!(windows) {
-            // Windows: %APPDATA%\kelora.ini
+            // Windows: %APPDATA%\kelora\kelora.ini
             if let Ok(appdata) = env::var("APPDATA") {
-                paths.push(PathBuf::from(appdata).join("kelora.ini"));
+                paths.push(PathBuf::from(appdata).join("kelora").join("kelora.ini"));
             }
         } else {
-            // Unix: $XDG_CONFIG_HOME/kelora.ini or ~/.config/kelora.ini
+            // Unix: $XDG_CONFIG_HOME/kelora/kelora.ini or ~/.config/kelora/kelora.ini
             let config_dir = env::var("XDG_CONFIG_HOME")
                 .map(PathBuf::from)
                 .unwrap_or_else(|_| {
@@ -47,7 +47,7 @@ impl ConfigFile {
                         .unwrap_or_else(|_| PathBuf::from(".config"))
                 });
 
-            paths.push(config_dir.join("kelora.ini"));
+            paths.push(config_dir.join("kelora").join("kelora.ini"));
         }
 
         paths
@@ -827,24 +827,33 @@ mod tests {
         // Should have at least one path
         assert!(!paths.is_empty());
 
-        // Check that user paths use the new kelora.ini naming
+        // Check that user paths use the new kelora/kelora.ini structure
         for path in &paths {
             let file_name = path.file_name().unwrap().to_string_lossy();
 
-            // Should be kelora.ini in user config directory
+            // Should be kelora.ini
             assert_eq!(
                 file_name, "kelora.ini",
                 "Unexpected user config filename: {}",
                 file_name
             );
 
-            // Path should be in user config directory
-            let parent_path = path.parent().unwrap().to_string_lossy();
-            let is_config_dir = parent_path.contains("config") || parent_path.contains("APPDATA");
+            // Parent directory should be named 'kelora'
+            let parent_dir = path.parent().unwrap();
+            let parent_name = parent_dir.file_name().unwrap().to_string_lossy();
+            assert_eq!(
+                parent_name, "kelora",
+                "Parent directory should be 'kelora', got: {}",
+                parent_name
+            );
+
+            // Grandparent should be config directory
+            let grandparent_path = parent_dir.parent().unwrap().to_string_lossy();
+            let is_config_dir = grandparent_path.contains("config") || grandparent_path.contains("APPDATA");
             assert!(
                 is_config_dir,
-                "User config not in expected config directory: {}",
-                parent_path
+                "Grandparent not in expected config directory: {}",
+                grandparent_path
             );
         }
     }

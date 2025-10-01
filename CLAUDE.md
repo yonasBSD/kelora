@@ -80,8 +80,8 @@ Kelora uses a simple, clear configuration precedence system:
 - This allows project-specific defaults that work anywhere within the project structure
 
 **User Configuration:**
-- Unix: `$XDG_CONFIG_HOME/kelora.ini` (fallback to `~/.config/kelora.ini`)
-- Windows: `%APPDATA%\kelora.ini`
+- Unix: `$XDG_CONFIG_HOME/kelora/kelora.ini` (fallback to `~/.config/kelora/kelora.ini`)
+- Windows: `%APPDATA%\kelora\kelora.ini`
 
 ### Configuration File Format
 
@@ -123,8 +123,8 @@ cd subproject/logs && kelora *.log  # Still finds and uses project defaults
 **User Setup:**
 ```bash
 # Set personal defaults for all projects
-mkdir -p ~/.config
-echo 'defaults = --input-tz America/New_York --stats' > ~/.config/kelora.ini
+mkdir -p ~/.config/kelora
+echo 'defaults = --input-tz America/New_York --stats' > ~/.config/kelora/kelora.ini
 ```
 
 ## Development Guidelines
