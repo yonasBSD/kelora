@@ -102,6 +102,7 @@ map.has_field("key")                 Check if map contains key with non-unit val
 map.has_path("field.path")           Check if nested field path exists
 map.merge(other_map)                 Merge another map into this one
 map.path_equals("path", value)       Safe nested field comparison
+map.rename_field("old", "new")       Rename a field, returns true if successful
 map.to_cef()                         Convert map to Common Event Format (CEF) string
 map.to_combined()                    Convert map to Apache/Nginx combined log format
 map.to_json([pretty])                Convert map to JSON string
@@ -185,7 +186,8 @@ EVENT MANIPULATION:
 emit_each(array [,base_map])         Fan out array elements as separate events
 e = ()                               Clear entire event (remove all fields)
 e.field = ()                         Remove individual field from event
-  
+e.rename_field("old", "new")         Rename field, returns true if successful
+
 Examples:
 # String processing with builtin and custom functions
 e.clean_url = e.url.extract_domain().to_lower()
@@ -196,6 +198,10 @@ e.word_count = e.text.trim().split(" ").len  # Chain builtin functions
 e.tag_count = e.tags.len  # Use builtin len
 e.error_tags = e.tags.filter(|tag| tag.contains("error"))  # Builtin filter
 emit_each(e.items)  # Creates separate event for each item
+
+# Field manipulation
+e.rename_field("timestamp", "ts")  # Rename field, overwrites target if exists
+e.old_field = ()  # Remove field
 
 # Type conversion - strict (returns () on error)
 e.status_code = e.status.to_int()  # Returns () if not a valid integer

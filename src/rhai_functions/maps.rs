@@ -87,6 +87,21 @@ pub fn register_functions(engine: &mut Engine) {
             map.get(key.as_str()).is_some_and(|value| !value.is_unit())
         },
     );
+
+    // map.rename_field(old_name, new_name) - rename a field, returns true if successful
+    engine.register_fn("rename_field", rename_field);
+}
+
+/// Rename a field in the map
+/// Returns true if old_name existed and was renamed, false otherwise
+/// If new_name already exists, it will be overwritten
+pub fn rename_field(map: &mut Map, old_name: &str, new_name: &str) -> bool {
+    if let Some(value) = map.remove(old_name) {
+        map.insert(new_name.into(), value);
+        true
+    } else {
+        false
+    }
 }
 
 /// Convert IndexMap<String, Dynamic> to rhai::Map
@@ -142,5 +157,140 @@ mod tests {
         } else {
             panic!("Root object is not a proper Rhai map");
         }
+    }
+
+    #[test]
+    fn test_rename_field_success() {
+        use super::*;
+        use rhai::Dynamic;
+
+        let mut map = Map::new();
+        map.insert("old_name".into(), Dynamic::from("value"));
+        map.insert("other".into(), Dynamic::from(42i64));
+
+        let result = rename_field(&mut map, "old_name", "new_name");
+
+        assert!(result);
+        assert!(!map.contains_key("old_name"));
+        assert_eq!(
+            map.get("new_name").unwrap().clone().cast::<String>(),
+            "value"
+        );
+        assert_eq!(map.get("other").unwrap().as_int().unwrap(), 42i64);
+    }
+
+    #[test]
+    fn test_rename_field_missing_source() {
+        use super::*;
+        use rhai::Dynamic;
+
+        let mut map = Map::new();
+        map.insert("existing".into(), Dynamic::from("value"));
+
+        let result = rename_field(&mut map, "nonexistent", "new_name");
+
+        assert!(!result);
+        assert!(map.contains_key("existing"));
+        assert!(!map.contains_key("new_name"));
+    }
+
+    #[test]
+    fn test_rename_field_overwrite_target() {
+        use super::*;
+        use rhai::Dynamic;
+
+        let mut map = Map::new();
+        map.insert("old_name".into(), Dynamic::from("new_value"));
+        map.insert("new_name".into(), Dynamic::from("old_value"));
+
+        let result = rename_field(&mut map, "old_name", "new_name");
+
+        assert!(result);
+        assert!(!map.contains_key("old_name"));
+        assert_eq!(
+            map.get("new_name").unwrap().clone().cast::<String>(),
+            "new_value"
+        );
+        assert_eq!(map.len(), 1);
+    }
+
+    #[test]
+    fn test_rename_field_same_name() {
+        use super::*;
+        use rhai::Dynamic;
+
+        let mut map = Map::new();
+        map.insert("field".into(), Dynamic::from("value"));
+
+        let result = rename_field(&mut map, "field", "field");
+
+        assert!(result);
+        assert_eq!(map.get("field").unwrap().clone().cast::<String>(), "value");
+        assert_eq!(map.len(), 1);
+    }
+
+    #[test]
+    fn test_rename_field_rhai_integration() {
+        use super::*;
+        use rhai::Engine;
+
+        let mut engine = Engine::new();
+        register_functions(&mut engine);
+
+        let result = engine
+            .eval::<bool>(
+                r#"
+            let e = #{timestamp: "2024-01-01", level: "info"};
+            e.rename_field("timestamp", "ts")
+        "#,
+            )
+            .unwrap();
+
+        assert!(result);
+
+        let map = engine
+            .eval::<Map>(
+                r#"
+            let e = #{timestamp: "2024-01-01", level: "info"};
+            e.rename_field("timestamp", "ts");
+            e
+        "#,
+            )
+            .unwrap();
+
+        assert!(!map.contains_key("timestamp"));
+        assert_eq!(
+            map.get("ts").unwrap().clone().cast::<String>(),
+            "2024-01-01"
+        );
+        assert_eq!(map.get("level").unwrap().clone().cast::<String>(), "info");
+    }
+
+    #[test]
+    fn test_rename_field_chained() {
+        use super::*;
+        use rhai::Engine;
+
+        let mut engine = Engine::new();
+        register_functions(&mut engine);
+
+        let map = engine
+            .eval::<Map>(
+                r#"
+            let e = #{a: 1, b: 2, c: 3};
+            e.rename_field("a", "x");
+            e.rename_field("b", "y");
+            e.rename_field("c", "z");
+            e
+        "#,
+            )
+            .unwrap();
+
+        assert_eq!(map.get("x").unwrap().clone().cast::<i64>(), 1);
+        assert_eq!(map.get("y").unwrap().clone().cast::<i64>(), 2);
+        assert_eq!(map.get("z").unwrap().clone().cast::<i64>(), 3);
+        assert!(!map.contains_key("a"));
+        assert!(!map.contains_key("b"));
+        assert!(!map.contains_key("c"));
     }
 }
