@@ -4,8 +4,8 @@ pub fn generate_help_text() -> &'static str {
 Available Rhai Functions for Kelora:
 
 STRING FUNCTIONS:
-text.after(delimiter)                Text after first occurrence of delimiter
-text.before(delimiter)               Text before first occurrence of delimiter
+text.after(delimiter [,nth])         Text after occurrence of delimiter (nth: 1=first, -1=last)
+text.before(delimiter [,nth])        Text before occurrence of delimiter (nth: 1=first, -1=last)
 text.between(start, end)             Text between start and end delimiters
 text.bucket()                        Fast hash for sampling/grouping (returns INT for modulo operations)
 text.col("1,3,5" [,separator])       Extract multiple columns as concatenated string
@@ -19,16 +19,16 @@ text.decode_url()                    Decode URL-encoded string
 text.encode_b64()                    Encode text to base64 string
 text.encode_hex()                    Encode text to hexadecimal string
 text.encode_url()                    URL-encode text (percent encoding)
-text.ending_with(suffix)             Return substring from start to end of suffix, else empty
+text.ending_with(suffix [,nth])      Return substring from start to end of suffix (nth: 1=first, -1=last)
 text.escape_html()                   Escape HTML special characters (&, <, >, ", ')
 text.escape_json()                   Escape JSON special characters
 text.extract_all_re(pattern [,group]) Extract all regex matches as array
 text.extract_domain()                Extract domain from URL or email address
-text.extract_ip()                    Extract first IP address from text
+text.extract_ip([nth])               Extract IP address from text (nth: 1=first, -1=last)
 text.extract_ips()                   Extract all IP addresses as array
 text.extract_re_maps(pattern, field) Extract regex matches as array of maps for fan-out
 text.extract_re(pattern [,group])    Extract regex match or capture group
-text.extract_url()                   Extract first URL from text
+text.extract_url([nth])              Extract URL from text (nth: 1=first, -1=last)
 text.has_matches(pattern)            Check if text matches regex pattern
 text.hash([algo])                    Hash with algorithm (default: sha256, also: sha1, md5, xxh3, blake3)
 text.index_of(pattern)               Find position of substring (-1 if not found) (builtin)
@@ -59,7 +59,7 @@ text.replace(pattern, replacement)   Replace all occurrences of pattern (builtin
 text.slice(spec)                     Slice text using Python notation (e.g., "1:5", ":3", "-2:")
 text.split_re(pattern)               Split text by regex pattern
 text.split(separator)                Split string into array by delimiter (builtin)
-text.starting_with(prefix)           Return substring from prefix to end, else empty
+text.starting_with(prefix [,nth])    Return substring from prefix to end (nth: 1=first, -1=last)
 text.strip([chars])                  Remove whitespace or specified characters
 text.sub_string(start [,length])     Extract substring from position (builtin)
 text.to_float()                      Convert text to float (returns () on error)

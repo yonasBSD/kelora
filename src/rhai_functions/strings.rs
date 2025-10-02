@@ -1219,6 +1219,42 @@ pub fn register_functions(engine: &mut Engine) {
         }
     });
 
+    engine.register_fn("after", |text: &str, substring: &str, nth: i64| -> String {
+        if nth == 0 {
+            return String::new();
+        }
+
+        // Collect all match positions
+        let mut positions = Vec::new();
+        let mut start = 0;
+        while let Some(pos) = text[start..].find(substring) {
+            positions.push(start + pos);
+            start += pos + substring.len();
+        }
+
+        if positions.is_empty() {
+            return String::new();
+        }
+
+        // Handle negative indexing (from the end)
+        let idx = if nth < 0 {
+            let abs_nth = (-nth) as usize;
+            if abs_nth > positions.len() {
+                return String::new();
+            }
+            positions.len() - abs_nth
+        } else {
+            let nth_usize = nth as usize;
+            if nth_usize < 1 || nth_usize > positions.len() {
+                return String::new();
+            }
+            nth_usize - 1 // Convert to 0-indexed
+        };
+
+        let pos = positions[idx];
+        text[pos + substring.len()..].to_string()
+    });
+
     engine.register_fn("before", |text: &str, substring: &str| -> String {
         if let Some(pos) = text.find(substring) {
             text[..pos].to_string()
@@ -1226,6 +1262,45 @@ pub fn register_functions(engine: &mut Engine) {
             String::new()
         }
     });
+
+    engine.register_fn(
+        "before",
+        |text: &str, substring: &str, nth: i64| -> String {
+            if nth == 0 {
+                return String::new();
+            }
+
+            // Collect all match positions
+            let mut positions = Vec::new();
+            let mut start = 0;
+            while let Some(pos) = text[start..].find(substring) {
+                positions.push(start + pos);
+                start += pos + substring.len();
+            }
+
+            if positions.is_empty() {
+                return String::new();
+            }
+
+            // Handle negative indexing (from the end)
+            let idx = if nth < 0 {
+                let abs_nth = (-nth) as usize;
+                if abs_nth > positions.len() {
+                    return String::new();
+                }
+                positions.len() - abs_nth
+            } else {
+                let nth_usize = nth as usize;
+                if nth_usize < 1 || nth_usize > positions.len() {
+                    return String::new();
+                }
+                nth_usize - 1 // Convert to 0-indexed
+            };
+
+            let pos = positions[idx];
+            text[..pos].to_string()
+        },
+    );
 
     engine.register_fn(
         "between",
@@ -1256,6 +1331,45 @@ pub fn register_functions(engine: &mut Engine) {
         }
     });
 
+    engine.register_fn(
+        "starting_with",
+        |text: &str, prefix: &str, nth: i64| -> String {
+            if nth == 0 {
+                return String::new();
+            }
+
+            // Collect all match positions
+            let mut positions = Vec::new();
+            let mut start = 0;
+            while let Some(pos) = text[start..].find(prefix) {
+                positions.push(start + pos);
+                start += pos + prefix.len();
+            }
+
+            if positions.is_empty() {
+                return String::new();
+            }
+
+            // Handle negative indexing (from the end)
+            let idx = if nth < 0 {
+                let abs_nth = (-nth) as usize;
+                if abs_nth > positions.len() {
+                    return String::new();
+                }
+                positions.len() - abs_nth
+            } else {
+                let nth_usize = nth as usize;
+                if nth_usize < 1 || nth_usize > positions.len() {
+                    return String::new();
+                }
+                nth_usize - 1 // Convert to 0-indexed
+            };
+
+            let pos = positions[idx];
+            text[pos..].to_string()
+        },
+    );
+
     engine.register_fn("ending_with", |text: &str, suffix: &str| -> String {
         if let Some(pos) = text.rfind(suffix) {
             text[..pos + suffix.len()].to_string()
@@ -1263,6 +1377,45 @@ pub fn register_functions(engine: &mut Engine) {
             String::new()
         }
     });
+
+    engine.register_fn(
+        "ending_with",
+        |text: &str, suffix: &str, nth: i64| -> String {
+            if nth == 0 {
+                return String::new();
+            }
+
+            // Collect all match positions
+            let mut positions = Vec::new();
+            let mut start = 0;
+            while let Some(pos) = text[start..].find(suffix) {
+                positions.push(start + pos);
+                start += pos + suffix.len();
+            }
+
+            if positions.is_empty() {
+                return String::new();
+            }
+
+            // Handle negative indexing (from the end)
+            let idx = if nth < 0 {
+                let abs_nth = (-nth) as usize;
+                if abs_nth > positions.len() {
+                    return String::new();
+                }
+                positions.len() - abs_nth
+            } else {
+                let nth_usize = nth as usize;
+                if nth_usize < 1 || nth_usize > positions.len() {
+                    return String::new();
+                }
+                nth_usize - 1 // Convert to 0-indexed
+            };
+
+            let pos = positions[idx];
+            text[..pos + suffix.len()].to_string()
+        },
+    );
 
     // Structured parsing helpers
     engine.register_fn("parse_url", parse_url_impl);
@@ -1550,6 +1703,41 @@ pub fn register_functions(engine: &mut Engine) {
         }
     });
 
+    engine.register_fn("extract_ip", |text: &str, nth: i64| -> String {
+        if nth == 0 {
+            return String::new();
+        }
+
+        let ip_pattern = r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b";
+        match regex::Regex::new(ip_pattern) {
+            Ok(re) => {
+                let matches: Vec<_> = re.find_iter(text).collect();
+
+                if matches.is_empty() {
+                    return String::new();
+                }
+
+                // Handle negative indexing (from the end)
+                let idx = if nth < 0 {
+                    let abs_nth = (-nth) as usize;
+                    if abs_nth > matches.len() {
+                        return String::new();
+                    }
+                    matches.len() - abs_nth
+                } else {
+                    let nth_usize = nth as usize;
+                    if nth_usize < 1 || nth_usize > matches.len() {
+                        return String::new();
+                    }
+                    nth_usize - 1 // Convert to 0-indexed
+                };
+
+                matches[idx].as_str().to_string()
+            }
+            Err(_) => String::new(),
+        }
+    });
+
     engine.register_fn("extract_ips", |text: &str| -> rhai::Array {
         let ip_pattern = r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b";
         match regex::Regex::new(ip_pattern) {
@@ -1580,6 +1768,41 @@ pub fn register_functions(engine: &mut Engine) {
                 .find(text)
                 .map(|m| m.as_str().to_string())
                 .unwrap_or_else(String::new),
+            Err(_) => String::new(),
+        }
+    });
+
+    engine.register_fn("extract_url", |text: &str, nth: i64| -> String {
+        if nth == 0 {
+            return String::new();
+        }
+
+        let url_pattern = r##"https?://[^\s<>"]+[^\s<>".,;!?]"##;
+        match regex::Regex::new(url_pattern) {
+            Ok(re) => {
+                let matches: Vec<_> = re.find_iter(text).collect();
+
+                if matches.is_empty() {
+                    return String::new();
+                }
+
+                // Handle negative indexing (from the end)
+                let idx = if nth < 0 {
+                    let abs_nth = (-nth) as usize;
+                    if abs_nth > matches.len() {
+                        return String::new();
+                    }
+                    matches.len() - abs_nth
+                } else {
+                    let nth_usize = nth as usize;
+                    if nth_usize < 1 || nth_usize > matches.len() {
+                        return String::new();
+                    }
+                    nth_usize - 1 // Convert to 0-indexed
+                };
+
+                matches[idx].as_str().to_string()
+            }
             Err(_) => String::new(),
         }
     });
@@ -2280,6 +2503,51 @@ mod tests {
     }
 
     #[test]
+    fn test_after_function_with_nth() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push("text", "Mississippi");
+
+        // First occurrence
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.after("ss", 1)"#)
+            .unwrap();
+        assert_eq!(result, "issippi");
+
+        // Second occurrence
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.after("ss", 2)"#)
+            .unwrap();
+        assert_eq!(result, "ippi");
+
+        // Last occurrence (negative indexing)
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.after("ss", -1)"#)
+            .unwrap();
+        assert_eq!(result, "ippi");
+
+        // Out of range
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.after("ss", 3)"#)
+            .unwrap();
+        assert_eq!(result, "");
+
+        // nth=0 edge case
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.after("ss", 0)"#)
+            .unwrap();
+        assert_eq!(result, "");
+
+        // Pattern not found
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.after("zz", 1)"#)
+            .unwrap();
+        assert_eq!(result, "");
+    }
+
+    #[test]
     fn test_before_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
@@ -2294,6 +2562,45 @@ mod tests {
 
         let result: String = engine
             .eval_with_scope(&mut scope, r#"text.before("missing")"#)
+            .unwrap();
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_before_function_with_nth() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push("text", "Mississippi");
+
+        // First occurrence
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.before("ss", 1)"#)
+            .unwrap();
+        assert_eq!(result, "Mi");
+
+        // Second occurrence
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.before("ss", 2)"#)
+            .unwrap();
+        assert_eq!(result, "Missi");
+
+        // Last occurrence (negative indexing)
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.before("ss", -1)"#)
+            .unwrap();
+        assert_eq!(result, "Missi");
+
+        // Out of range
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.before("ss", 3)"#)
+            .unwrap();
+        assert_eq!(result, "");
+
+        // nth=0 edge case
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.before("ss", 0)"#)
             .unwrap();
         assert_eq!(result, "");
     }
@@ -2368,6 +2675,51 @@ mod tests {
     }
 
     #[test]
+    fn test_starting_with_function_with_nth() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push("text", "foo-bar-foo-baz-foo-end");
+
+        // First occurrence
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.starting_with("foo", 1)"#)
+            .unwrap();
+        assert_eq!(result, "foo-bar-foo-baz-foo-end");
+
+        // Second occurrence
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.starting_with("foo", 2)"#)
+            .unwrap();
+        assert_eq!(result, "foo-baz-foo-end");
+
+        // Third occurrence
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.starting_with("foo", 3)"#)
+            .unwrap();
+        assert_eq!(result, "foo-end");
+
+        // Last occurrence (negative indexing)
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.starting_with("foo", -1)"#)
+            .unwrap();
+        assert_eq!(result, "foo-end");
+
+        // Out of range
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.starting_with("foo", 4)"#)
+            .unwrap();
+        assert_eq!(result, "");
+
+        // nth=0 edge case
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.starting_with("foo", 0)"#)
+            .unwrap();
+        assert_eq!(result, "");
+    }
+
+    #[test]
     fn test_ending_with_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
@@ -2396,6 +2748,51 @@ mod tests {
         // Test text not found
         let result: String = engine
             .eval_with_scope(&mut scope, r#"text.ending_with("xyz")"#)
+            .unwrap();
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_ending_with_function_with_nth() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push("text", "foo-bar-foo-baz-foo-end");
+
+        // First occurrence
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.ending_with("foo", 1)"#)
+            .unwrap();
+        assert_eq!(result, "foo");
+
+        // Second occurrence
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.ending_with("foo", 2)"#)
+            .unwrap();
+        assert_eq!(result, "foo-bar-foo");
+
+        // Third occurrence
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.ending_with("foo", 3)"#)
+            .unwrap();
+        assert_eq!(result, "foo-bar-foo-baz-foo");
+
+        // Last occurrence (negative indexing)
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.ending_with("foo", -1)"#)
+            .unwrap();
+        assert_eq!(result, "foo-bar-foo-baz-foo");
+
+        // Out of range
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.ending_with("foo", 4)"#)
+            .unwrap();
+        assert_eq!(result, "");
+
+        // nth=0 edge case
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.ending_with("foo", 0)"#)
             .unwrap();
         assert_eq!(result, "");
     }
@@ -3793,6 +4190,57 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_ip_function_with_nth() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push("text", "From 10.0.0.1 to 192.168.1.1 via 172.16.0.1");
+
+        // First IP
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_ip(1)"##)
+            .unwrap();
+        assert_eq!(result, "10.0.0.1");
+
+        // Second IP
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_ip(2)"##)
+            .unwrap();
+        assert_eq!(result, "192.168.1.1");
+
+        // Third IP
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_ip(3)"##)
+            .unwrap();
+        assert_eq!(result, "172.16.0.1");
+
+        // Last IP (negative indexing)
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_ip(-1)"##)
+            .unwrap();
+        assert_eq!(result, "172.16.0.1");
+
+        // Second to last IP
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_ip(-2)"##)
+            .unwrap();
+        assert_eq!(result, "192.168.1.1");
+
+        // Out of range
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_ip(4)"##)
+            .unwrap();
+        assert_eq!(result, "");
+
+        // nth=0 edge case
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_ip(0)"##)
+            .unwrap();
+        assert_eq!(result, "");
+    }
+
+    #[test]
     fn test_extract_ips_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
@@ -3986,6 +4434,60 @@ mod tests {
             .eval_with_scope(&mut scope, r##"multi.extract_url()"##)
             .unwrap();
         assert_eq!(result, "https://first.com");
+    }
+
+    #[test]
+    fn test_extract_url_function_with_nth() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push(
+            "text",
+            "Visit https://first.com or https://second.com or https://third.com",
+        );
+
+        // First URL
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_url(1)"##)
+            .unwrap();
+        assert_eq!(result, "https://first.com");
+
+        // Second URL
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_url(2)"##)
+            .unwrap();
+        assert_eq!(result, "https://second.com");
+
+        // Third URL
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_url(3)"##)
+            .unwrap();
+        assert_eq!(result, "https://third.com");
+
+        // Last URL (negative indexing)
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_url(-1)"##)
+            .unwrap();
+        assert_eq!(result, "https://third.com");
+
+        // Second to last URL
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_url(-2)"##)
+            .unwrap();
+        assert_eq!(result, "https://second.com");
+
+        // Out of range
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_url(4)"##)
+            .unwrap();
+        assert_eq!(result, "");
+
+        // nth=0 edge case
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"text.extract_url(0)"##)
+            .unwrap();
+        assert_eq!(result, "");
     }
 
     #[test]
