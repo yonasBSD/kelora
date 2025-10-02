@@ -3,14 +3,15 @@ pub fn generate_help_text() -> &'static str {
     r#"
 Available Rhai Functions for Kelora:
 
+Sections: strings | arrays | maps | datetime | math | conversion | utility | tracking | file-output | events | examples
+See the Rhai language guide at https://rhai.rs for syntax details.
+
 STRING FUNCTIONS:
 text.after(delimiter [,nth])         Text after occurrence of delimiter (nth: 1=first, -1=last)
 text.before(delimiter [,nth])        Text before occurrence of delimiter (nth: 1=first, -1=last)
 text.between(start, end)             Text between start and end delimiters
 text.bucket()                        Fast hash for sampling/grouping (returns INT for modulo operations)
-text.col("1,3,5" [,separator])       Extract multiple columns as concatenated string
-text.col("1:5" [,separator])         Extract column range as concatenated string
-text.col(index [,separator])         Extract column by index from whitespace/delimited text
+text.col(spec [,separator])         Extract columns by index/range/list (e.g., '1', '1,3,5', '1:4')
 text.contains(pattern)               Check if text contains pattern (builtin)
 text.count(pattern)                  Count occurrences of pattern in text
 text.decode_b64()                    Decode base64 string to text
@@ -116,12 +117,7 @@ now_utc()                            Current UTC timestamp (DateTimeWrapper)
 now_local()                          Current local timestamp (DateTimeWrapper)
 to_datetime(text [,fmt [,tz]])       Convert string into DateTimeWrapper with optional hints
 to_duration("1h30m")                 Convert duration string into DurationWrapper
-duration_from_seconds(n)             Create duration from seconds
-duration_from_minutes(n)             Create duration from minutes
-duration_from_hours(n)               Create duration from hours
-duration_from_days(n)                Create duration from days
-duration_from_milliseconds(n)        Create duration from milliseconds
-duration_from_nanoseconds(n)         Create duration from nanoseconds
+duration_from_<unit>(n)             Create duration from seconds/minutes/hours/days/ms/ns
 humanize_duration(ms)                Convert milliseconds to human-readable format (e.g., "1h 30m")
 dt.format("format_string")           Format datetime using custom format string
 dt.year(), dt.month(), dt.day()      Extract date components
@@ -166,10 +162,10 @@ pseudonym(value, domain)             Generate domain-separated pseudonym (requir
 read_file(path)                      Read file contents as string
 read_lines(path)                     Read file as array of lines
 type_of(value)                       Get type name as string (builtin)
-window_numbers(field)                Get numeric field values from current window
-window_values(field)                 Get field values from current window
+window_numbers(field)                Get numeric field values from current window (requires --window)
+window_values(field)                 Get field values from current window (requires --window)
 
-TRACKING/METRICS FUNCTIONS:
+TRACKING/METRICS FUNCTIONS (requires --metrics):
 track_bucket(key, bucket)            Track values in buckets for histograms
 track_count(key)                     Increment counter for key by 1
 track_max(key, value)                Track maximum value for key
@@ -183,7 +179,7 @@ mkdir(path [,recursive])             Create directory (set recursive=true to cre
 truncate_file(path)                  Create or zero-length a file for fresh output
 
 EVENT MANIPULATION:
-emit_each(array [,base_map])         Fan out array elements as separate events
+emit_each(array [,base_map])         Fan out array elements as separate events (returns emitted count)
 e = ()                               Clear entire event (remove all fields)
 e.field = ()                         Remove individual field from event
 e.rename_field("old", "new")         Rename field, returns true if successful
@@ -236,6 +232,7 @@ e.formatted = now.format("%Y-%m-%d %H:%M")
 # Tracking metrics
 track_count("http_requests")
 track_bucket("response_time", "slow")
+# Aggregated values land in the `metrics` map, best consumed from the --end stage.
 
 # Format conversion and serialization
 e.logfmt_output = e.to_logfmt()                          # Convert to logfmt

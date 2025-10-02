@@ -1569,50 +1569,62 @@ fn print_time_format_help() {
     let help_text = r#"
 Time Format Reference for --ts-format:
 
-Basic Date/Time Components:
-%Y - Year with century (e.g., 2024)
-%y - Year without century (00-99)
-%m - Month as zero-padded decimal (01-12)
-%b - Month as abbreviated name (Jan, Feb, ..., Dec)
-%B - Month as full name (January, February, ..., December)
-%d - Day of month as zero-padded decimal (01-31)
-%j - Day of year as zero-padded decimal (001-366)
-%H - Hour (24-hour) as zero-padded decimal (00-23)
-%I - Hour (12-hour) as zero-padded decimal (01-12)
-%p - AM/PM indicator
-%M - Minute as zero-padded decimal (00-59)
-%S - Second as zero-padded decimal (00-59)
+Use with:
+  --ts-format <FMT>     Describe how timestamps are parsed
+  --input-tz <TZ>       Supply a timezone for inputs without offsets (e.g., --input-tz UTC)
+  --multiline timestamp Align multiline detection with the same leading pattern
 
-Subsecond Precision:
-%f - Microseconds (000000-999999)
-%3f - Milliseconds (000-999)
-%6f - Microseconds (000000-999999)
-%9f - Nanoseconds (000000000-999999999)
-%. - Subseconds with automatic precision
+Basic date/time components:
+%Y  Year with century (e.g., 2024)
+%y  Year without century (00-99)
+%m  Month as zero-padded decimal (01-12)
+%b  Month as abbreviated name (Jan, Feb, ..., Dec)
+%B  Month as full name (January, February, ..., December)
+%d  Day of month as zero-padded decimal (01-31)
+%j  Day of year as zero-padded decimal (001-366)
+%H  Hour (24-hour) as zero-padded decimal (00-23)
+%I  Hour (12-hour) as zero-padded decimal (01-12)
+%p  AM/PM indicator
+%M  Minute as zero-padded decimal (00-59)
+%S  Second as zero-padded decimal (00-59)
 
-Time Zone:
-%z - UTC offset (+HHMM or -HHMM)
-%Z - Time zone name (if available)
-%:z - UTC offset with colon (+HH:MM or -HH:MM)
+Subsecond precision cheatsheet:
+%f   Microseconds (000000-999999)
+%3f  Milliseconds (000-999)
+%6f  Microseconds (000000-999999)
+%9f  Nanoseconds (000000000-999999999)
+%.f  Auto-match subseconds with flexible precision
 
-Weekday:
-%w - Weekday as decimal (0=Sunday, 6=Saturday)
-%a - Weekday as abbreviated name (Sun, Mon, ..., Sat)
-%A - Weekday as full name (Sunday, Monday, ..., Saturday)
+Time zone tokens:
+%z  UTC offset (+HHMM or -HHMM)
+%Z  Time zone name (if available)
+%:z UTC offset with colon (+HH:MM or -HH:MM)
 
-Week Numbers:
-%W - Week number (Monday as first day of week)
-%U - Week number (Sunday as first day of week)
+Weekday helpers:
+%w  Weekday as decimal (0=Sunday, 6=Saturday)
+%a  Weekday as abbreviated name (Sun, Mon, ..., Sat)
+%A  Weekday as full name (Sunday, Monday, ..., Saturday)
 
-Common Examples:
-%Y-%m-%d %H:%M:%S           # 2024-01-15 14:30:45
-%Y-%m-%dT%H:%M:%S%z         # 2024-01-15T14:30:45+0000
-%Y-%m-%d %H:%M:%S%.f        # 2024-01-15 14:30:45.123456
-%b %d %H:%M:%S              # Jan 15 14:30:45 (syslog format)
-%d/%b/%Y:%H:%M:%S %z        # 15/Jan/2024:14:30:45 +0000 (Apache format)
-%Y-%m-%d %H:%M:%S,%3f       # 2024-01-15 14:30:45,123 (Python logging)
+Week numbers:
+%W  Week number (Monday as first day of week)
+%U  Week number (Sunday as first day of week)
 
-For complete format reference, see:
+Common examples:
+%Y-%m-%d %H:%M:%S           2024-01-15 14:30:45
+%Y-%m-%dT%H:%M:%S%z         2024-01-15T14:30:45+0000
+%Y-%m-%d %H:%M:%S%.f        2024-01-15 14:30:45.123456
+%b %d %H:%M:%S              Jan 15 14:30:45 (syslog format)
+%d/%b/%Y:%H:%M:%S %z        15/Jan/2024:14:30:45 +0000 (Apache access log)
+%Y-%m-%d %H:%M:%S,%3f       2024-01-15 14:30:45,123 (Python logging)
+
+Naive timestamp + timezone example:
+  kelora app.log --ts-format "%Y-%m-%d %H:%M:%S" --input-tz Europe/Berlin
+  (parses local timestamps and normalises them internally)
+
+Shell tip: wrap the entire format in single quotes or escape % symbols to keep
+  your shell from expanding them.
+
+For the full chrono format reference, see:
 https://docs.rs/chrono/latest/chrono/format/strftime/index.html
 "#;
     println!("{}", help_text);
@@ -1629,7 +1641,22 @@ fn print_rhai_help() {
     let help_text = r#"
 Rhai Scripting Guide for Kelora:
 
+Quick CLI example:
+  kelora access.log --filter "e.level == 'ERROR'" --exec "e.summary = e.method + ' ' + e.status.to_string();"
+
 For complete Rhai language documentation, visit: https://rhai.rs
+
+STAGE OVERVIEW:
+  --begin         Runs once before parsing; populate `conf` (read-only later)
+  --filter        Runs per event as a boolean gate (true keeps, false drops)
+  --exec / -e     Runs per event for transformations and side effects
+  --exec-file     Same as --exec, but pull script from disk
+  --end           Runs once after processing; use it to emit reports from the metrics map and other summaries
+
+Prerequisites:
+  --allow-fs-writes   Required for Rhai file helpers such as append_file, truncate_file, mkdir
+  --window <N>        Required for window_* helpers (window_values, window_numbers)
+  --metrics           Required for track_* helpers (pair with --metrics-file to persist)
 
 BASIC CONCEPTS:
   e                                    Current event (renamed from 'event')
@@ -1646,26 +1673,21 @@ FIELD EXISTENCE AND SAFETY:
   "field" in e                         Check if field exists
   e.has_path("user.role")               Check nested field existence
   e.scores.len() > 0                   Check if array has elements
-  type_of(e.field) != "()"             Check if field has a value
+  e.field != ()                        Check if field has a value
 
 FIELD AND EVENT REMOVAL:
   e.field = ()                         Remove individual field
   e = ()                               Remove entire event (filters out)
 
-KELORA-SPECIFIC FUNCTIONS:
-  Use --help-functions to see all available functions for log processing:
-  regex operations, IP handling, text manipulation, JSON parsing, 
-  key-value extraction, array processing, safe field access, and utilities.
-
 METHOD CHAINING EXAMPLES:
-  e.message.extract_re("user=(\\w+)").upper()
+  e.message.extract_re("user=(\w+)").upper()
   e.client_ip.mask_ip(2)
   e.url.extract_domain().lower()
   e.timestamp.to_datetime().format("%H:%M")
 
 FUNCTION VS METHOD SYNTAX:
-  extract_re(e.line, "\\d+")           Function style (avoids conflicts)
-  e.line.extract_re("\\d+")            Method style (better for chaining)
+  extract_re(e.line, "\d+")           Function style (avoids conflicts)
+  e.line.extract_re("\d+")            Method style (better for chaining)
 
 Both syntaxes work identically. Use method syntax for readability and chaining,
 function syntax when method names conflict with field names.
@@ -1702,14 +1724,15 @@ JSON ARRAY HANDLING:
 SIDE EFFECTS IN QUIET MODE:
   print("debug info")                  Levels -q/-qq: visible, -qqq: suppressed
   eprint("error details")              Levels -q/-qq: visible, -qqq: suppressed
-  # File operations preserved at all quiet levels
+  File operations remain available at all quiet levels (require --allow-fs-writes).
 
 ERROR HANDLING:
-  Kelora uses resilient processing by default:
-  • Parse errors: Skip malformed lines, continue processing
-  • Filter errors: Evaluate to false, skip event
-  • Transform errors: Return original event unchanged
-  Use --strict for fail-fast behavior on any error.
+  Default (resilient) mode:
+    - Parse errors: skip malformed lines, continue processing
+    - Filter errors: evaluate to false, drop event
+    - Exec errors: keep original event unchanged
+  With --strict enabled:
+    - Any parse/filter/exec error aborts processing with a non-zero exit code
 
 For complete function reference: kelora --help-functions
 For usage examples: kelora --help (see examples section)
@@ -1724,45 +1747,56 @@ fn print_multiline_help() {
     let help_text = r#"
 Multiline Strategy Reference for --multiline:
 
-Kelora supports several multiline strategies. Multiline remains off unless you
-request it with -M/--multiline. Pick a preset below or supply a custom
-strategy string to control how lines are grouped.
+Quick usage:
+  kelora sample.log -M stacktrace
+  kelora sample.log -M "timestamp:pattern=^\d{4}-" --ts-format "%Y-%m-%d %H:%M:%S"
+
+Multiline stays off unless you enable it with -M/--multiline. Choose a preset or
+craft a custom strategy, then layer your parser (for example, --format raw) so
+multiline reconstruction happens before structured parsing.
 
 QUICK PRESETS (recommended):
 
 stacktrace
-  Timestamp anchored framing for typical application logs and stack traces
+  Timestamp anchored framing for application logs and stack traces
   Equivalent to: -M timestamp
+  Best for: services that start each event with an ISO-like timestamp
 
 docker
   RFC3339 timestamp framing used by Docker JSON logs
   Equivalent to: -M timestamp:pattern=^\d{4}-\d{2}-\d{2}T
+  Best for: container runtimes emitting JSON lines
 
 syslog
   RFC3164/5424 style headers ("Jan  2", "2024-01-02T...")
   Equivalent to: -M timestamp:pattern=^(<\d+>\d\s+\d{4}-\d{2}-\d{2}T|\w{3}\s+\d{1,2})
+  Best for: network gear and daemons with classic syslog headers
 
 combined
   Apache/Nginx access logs with remote host prefix
   Equivalent to: -M start:^\S+\s+\S+\s+\S+\s+\[
+  Best for: web access logs parsed later via --format combined/logfmt/json
 
 nginx
   Bracketed date headers like "[10/Oct/2000:13:55:36 +0000]"
   Equivalent to: -M timestamp:pattern=^\[[0-9]{2}/[A-Za-z]{3}/[0-9]{4}:
+  Best for: nginx access/error logs
 
 continuation
   Join lines ending with the continuation marker (default: \)
   Equivalent to: -M backslash
+  Best for: languages that escape newlines with a trailing backslash
 
 block
   Treat BEGIN...END style sections as one event
   Equivalent to: -M boundary:start=^BEGIN:end=^END
+  Best for: tools that delimit multi-line records explicitly
 
 ADVANCED RECIPES (build your own):
 
 timestamp[:pattern=REGEX]
-  Events start with timestamp pattern (anchored to the beginning of the line)
-  Combine with --ts-format=<chrono fmt> to align with your exact timestamp prefix
+  Events start with a timestamp pattern (anchored at line start)
+  Pair with --ts-format=<chrono fmt> to parse the captured prefix
 
 indent[:spaces=N|tabs|mixed]
   Continuation lines are indented, new events start at column 1
@@ -1782,10 +1816,19 @@ backslash[:char=C]
 whole
   Read the entire input as a single event (loads everything into memory)
 
-PERFORMANCE NOTES:
-- Multiline buffers events until a boundary arrives; watch memory usage
-- --batch-size helps control memory in parallel mode  
+INTERACTIONS:
+- Combine with --extract-prefix for prefix cleanup before parsing
 - --take N applies after multiline reconstruction, not to raw lines
+- Parallel mode buffers per worker; tune --batch-size/--batch-timeout as needed
+
+TROUBLESHOOTING:
+- Run with --stats or --metrics to monitor buffered event counts
+- Add --brief or --pretty to inspect reconstructed events quickly
+- If buffers grow unbounded, tighten the regex or temporarily disable --parallel
+
+PERFORMANCE NOTES:
+- Multiline buffers until a boundary arrives; monitor memory on long runs
+- --batch-size helps control memory in parallel mode
 - The whole strategy buffers the entire input
 
 For complete CLI reference: kelora --help

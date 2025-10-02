@@ -25,9 +25,9 @@ pub enum InputFormat {
 
 #[derive(clap::ValueEnum, Clone, Debug, Default)]
 pub enum OutputFormat {
-    Json,
     #[default]
     Default,
+    Json,
     Logfmt,
     Inspect,
     Levelmap,
@@ -50,7 +50,7 @@ pub enum FileOrder {
 #[command(name = "kelora")]
 #[command(about = "A command-line log analysis tool with embedded Rhai scripting")]
 #[command(
-    long_about = "A command-line log analysis tool with embedded Rhai scripting\n\nMODES:\n  (default)   Sequential processing - best for streaming/interactive use\n  --parallel  Parallel processing - best for high-throughput batch analysis"
+    long_about = "A command-line log analysis tool with embedded Rhai scripting\n\nMODES:\n  (default)   Sequential processing - best for streaming/interactive use\n  --parallel  Parallel processing - best for high-throughput batch analysis\n\nCOMMON EXAMPLES:\n  kelora access.log --levels error,critical         Filter streaming logs by level (case-insensitive list)\n  kelora nginx.log --format combined --keys ts,msg  Focus output on a comma-separated field list\n  kelora sample.jsonl --metrics --metrics-file stats.json  Capture tracked metrics to JSON\n\nSee also: --help-rhai for scripting stages, --help-functions for the full built-in catalogue"
 )]
 #[command(author = "Dirk Loss <mail@dirk-loss.de>")]
 #[command(version)]
@@ -129,41 +129,38 @@ pub struct Cli {
     #[arg(long = "cols-sep", help_heading = "Input Options")]
     pub cols_sep: Option<String>,
 
-    /// Pre-run a Rhai script. Use it to populate the global `conf` map
-    /// with shared, read-only data.
-    ///
-    /// Functions (usable only here):
-    ///   read_lines(path) → Array<String>  # UTF-8, one element per line
-    ///   read_file(path)  → String         # UTF-8, full file
-    ///
-    /// Data written to `conf` becomes read-only for the rest of the run.
-    #[arg(long = "begin", help_heading = "Processing Options")]
+    /// Pre-run a Rhai script before any other stage runs.
+    #[arg(
+        long = "begin",
+        help_heading = "Processing Options",
+        help = "Pre-run a Rhai script before any other stage runs.\n\nTypical use: seed the global `conf` map with lookup tables or shared context.\n\nHelpers available only here:\n  read_lines(path) -> Array<String>  # UTF-8, one entry per line\n  read_file(path)  -> String         # UTF-8, entire file contents\n\nData stored in `conf` becomes read-only afterwards. See --help-rhai for stage order."
+    )]
     pub begin: Option<String>,
 
-    /// Boolean filter expressions
+    /// Boolean filter expressions. See --help-rhai for expression examples.
     #[arg(long = "filter", help_heading = "Processing Options")]
     pub filters: Vec<String>,
 
-    /// Transform/process exec scripts
+    /// Transform/process exec scripts evaluated on each event. See --help-rhai for stage semantics.
     #[arg(short = 'e', long = "exec", help_heading = "Processing Options")]
     pub execs: Vec<String>,
 
-    /// Execute script from file
+    /// Execute script from file (contents run in the exec stage).
     #[arg(short = 'E', long = "exec-file", help_heading = "Processing Options")]
     pub exec_files: Vec<String>,
     /// Include Rhai files before script stages
     #[arg(short = 'I', long = "include", help_heading = "Processing Options")]
     pub includes: Vec<String>,
 
-    /// Run once after processing
+    /// Run once after processing completes (post-processing stage). Ideal for summarising metrics or emitting reports. The global `metrics` map from track_*() calls is accessible here.
     #[arg(long = "end", help_heading = "Processing Options")]
     pub end: Option<String>,
 
-    /// Allow Rhai scripts to create directories and write files on disk (disabled by default for safety)
+    /// Allow Rhai scripts to create directories and write files on disk (required for file helpers like append_file or mkdir).
     #[arg(long = "allow-fs-writes", help_heading = "Processing Options")]
     pub allow_fs_writes: bool,
 
-    /// Enable access to a sliding window of N+1 recent events
+    /// Enable access to a sliding window of N+1 recent events (needed for window_* functions).
     #[arg(long = "window", help_heading = "Processing Options")]
     pub window_size: Option<usize>,
 
@@ -183,11 +180,14 @@ pub struct Cli {
     #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count, help_heading = "Error Handling")]
     pub verbose: u8,
 
-    /// Quiet mode with multiple levels:
-    /// -q: suppress kelora diagnostics (errors, stats) and context markers (-A/-B/-C)
-    /// -qq: additionally suppress event output (-F none)
-    /// -qqq: additionally suppress script side effects (print/eprint)
-    #[arg(short = 'q', long = "quiet", action = clap::ArgAction::Count, help_heading = "Error Handling")]
+    /// Quiet mode with explicit levels (default: off).
+    #[arg(
+        short = 'q',
+        long = "quiet",
+        action = clap::ArgAction::Count,
+        help_heading = "Error Handling",
+        help = "Quiet mode with explicit levels (default: off).\n\n  -q   Suppress kelora diagnostics (errors, stats) and context markers (-A/-B/-C)\n  -qq  Additionally suppress event output (same as -F none)\n  -qqq Additionally suppress script side effects (print/eprint)"
+    )]
     pub quiet: u8,
 
     /// Include only events with these log levels
@@ -195,7 +195,8 @@ pub struct Cli {
         short = 'l',
         long = "levels",
         value_delimiter = ',',
-        help_heading = "Filtering Options"
+        help_heading = "Filtering Options",
+        help = "Include only events with these log levels (comma-separated, case-insensitive)."
     )]
     pub levels: Vec<String>,
 
@@ -204,7 +205,8 @@ pub struct Cli {
         short = 'L',
         long = "exclude-levels",
         value_delimiter = ',',
-        help_heading = "Filtering Options"
+        help_heading = "Filtering Options",
+        help = "Exclude events with these log levels (comma-separated, case-insensitive)."
     )]
     pub exclude_levels: Vec<String>,
 
@@ -213,7 +215,8 @@ pub struct Cli {
         short = 'k',
         long = "keys",
         value_delimiter = ',',
-        help_heading = "Filtering Options"
+        help_heading = "Filtering Options",
+        help = "Output only these fields (comma-separated list)."
     )]
     pub keys: Vec<String>,
 
@@ -222,16 +225,25 @@ pub struct Cli {
         short = 'K',
         long = "exclude-keys",
         value_delimiter = ',',
-        help_heading = "Filtering Options"
+        help_heading = "Filtering Options",
+        help = "Exclude these fields from output (comma-separated list)."
     )]
     pub exclude_keys: Vec<String>,
 
     /// Start showing entries on or newer than the specified date
-    #[arg(long = "since", help_heading = "Filtering Options")]
+    #[arg(
+        long = "since",
+        help_heading = "Filtering Options",
+        help = "Accepts journalctl-style timestamps (e.g., 2024-01-15T12:00:00Z, '2024-01-15 12:00', '1h', '-30m', 'yesterday')."
+    )]
     pub since: Option<String>,
 
     /// Stop showing entries on or older than the specified date
-    #[arg(long = "until", help_heading = "Filtering Options")]
+    #[arg(
+        long = "until",
+        help_heading = "Filtering Options",
+        help = "Accepts journalctl-style timestamps (e.g., 2024-01-15T12:00:00Z, '2024-01-15 12:00', '1h', '+30m', 'tomorrow')."
+    )]
     pub until: Option<String>,
 
     /// Limit output to the first N events
@@ -284,19 +296,19 @@ pub struct Cli {
     #[arg(short = 'o', long = "output-file", help_heading = "Output Options")]
     pub output_file: Option<String>,
 
-    /// Output only field values
+    /// Output only field values (default: false).
     #[arg(short = 'b', long = "brief", help_heading = "Default Format Options")]
     pub brief: bool,
 
-    /// Pretty-print nested values
+    /// Pretty-print nested values (default: false).
     #[arg(short = 'P', long = "pretty", help_heading = "Default Format Options")]
     pub pretty: bool,
 
-    /// Enable word-wrapping (default: enabled)
+    /// Enable word-wrapping (default: on).
     #[arg(long = "wrap", help_heading = "Default Format Options")]
     pub wrap: bool,
 
-    /// Disable word-wrapping
+    /// Disable word-wrapping (overrides --wrap).
     #[arg(
         long = "no-wrap",
         help_heading = "Default Format Options",
@@ -308,11 +320,11 @@ pub struct Cli {
     #[arg(long = "pretty-ts", help_heading = "Default Format Options")]
     pub pretty_ts: Option<String>,
 
-    /// Auto-format all known timestamp fields as local RFC3339
+    /// Auto-format all known timestamp fields as local RFC3339 (requires parsed timestamps).
     #[arg(short = 'z', help_heading = "Default Format Options")]
     pub format_timestamps_local: bool,
 
-    /// Auto-format all known timestamp fields as UTC RFC3339
+    /// Auto-format all known timestamp fields as UTC RFC3339 (requires parsed timestamps).
     #[arg(short = 'Z', help_heading = "Default Format Options")]
     pub format_timestamps_utc: bool,
 
@@ -324,11 +336,12 @@ pub struct Cli {
     #[arg(long = "no-color", help_heading = "Display Options")]
     pub no_color: bool,
 
-    /// Insert a centered marker when the time delta between events exceeds the given duration
+    /// Insert a centered marker when time gaps grow large.
     #[arg(
         long = "mark-gaps",
         value_name = "DURATION",
-        help_heading = "Display Options"
+        help_heading = "Display Options",
+        help = "Insert a centered marker when the time delta between events exceeds the given duration.\nExample: --mark-gaps 30s prints a divider when consecutive events are separated by >=30s."
     )]
     pub mark_gaps: Option<String>,
 
@@ -336,11 +349,11 @@ pub struct Cli {
     #[arg(long = "no-emoji", help_heading = "Display Options")]
     pub no_emoji: bool,
 
-    /// Enable parallel processing
+    /// Enable parallel processing (default: sequential processing).
     #[arg(long = "parallel", help_heading = "Performance Options")]
     pub parallel: bool,
 
-    /// Disable parallel processing
+    /// Disable parallel processing explicitly (default mode is sequential).
     #[arg(
         long = "no-parallel",
         help_heading = "Performance Options",
@@ -364,7 +377,8 @@ pub struct Cli {
     #[arg(
         long = "batch-timeout",
         default_value_t = 200,
-        help_heading = "Performance Options"
+        help_heading = "Performance Options",
+        help = "Flush partially full parallel batches after this idle period. Lower values reduce latency; higher values improve throughput."
     )]
     pub batch_timeout: u64,
 
@@ -372,11 +386,11 @@ pub struct Cli {
     #[arg(long = "unordered", help_heading = "Performance Options")]
     pub no_preserve_order: bool,
 
-    /// Show processing statistics
+    /// Show processing statistics (default: off).
     #[arg(short = 's', long = "stats", help_heading = "Metrics and Stats")]
     pub stats: bool,
 
-    /// Disable processing statistics
+    /// Disable processing statistics explicitly (default: off).
     #[arg(
         long = "no-stats",
         help_heading = "Metrics and Stats",
@@ -385,14 +399,24 @@ pub struct Cli {
     pub no_stats: bool,
 
     /// Show processing statistics with no output
-    #[arg(short = 'S', long = "stats-only", help_heading = "Metrics and Stats")]
+    #[arg(
+        short = 'S',
+        long = "stats-only",
+        help_heading = "Metrics and Stats",
+        help = "Print processing statistics only (implies -F none)."
+    )]
     pub stats_only: bool,
 
-    /// Show tracked metrics
-    #[arg(short = 'm', long = "metrics", help_heading = "Metrics and Stats")]
+    /// Show tracked metrics (default: off). Pair with --metrics-file for JSON output.
+    #[arg(
+        short = 'm',
+        long = "metrics",
+        help_heading = "Metrics and Stats",
+        help = "Expose metrics recorded via track_*() in Rhai (see --help-rhai)."
+    )]
     pub metrics: bool,
 
-    /// Disable tracked metrics
+    /// Disable tracked metrics explicitly (default: off).
     #[arg(
         long = "no-metrics",
         help_heading = "Metrics and Stats",
@@ -400,8 +424,12 @@ pub struct Cli {
     )]
     pub no_metrics: bool,
 
-    /// Write metrics to file (JSON format)
-    #[arg(long = "metrics-file", help_heading = "Metrics and Stats")]
+    /// Write metrics to file (JSON format). Requires --metrics.
+    #[arg(
+        long = "metrics-file",
+        help_heading = "Metrics and Stats",
+        help = "Persist the metrics map (populated by track_*()) to disk as JSON."
+    )]
     pub metrics_file: Option<String>,
 
     /// Use alias from configuration file
