@@ -1651,105 +1651,161 @@ fn print_examples_help() {
 /// Print Rhai scripting guide
 fn print_rhai_help() {
     let help_text = r#"
-Rhai Scripting Guide for Kelora:
+Rhai Language Guide for Kelora:
 
-Quick CLI example:
-  kelora access.log --filter "e.level == 'ERROR'" --exec "e.summary = e.method + ' ' + e.status.to_string();"
+This guide covers Rhai language fundamentals for programmers familiar with Python, JavaScript, or Bash.
+For practical examples: kelora --help-examples
+For complete function reference: kelora --help-functions
+For Rhai language details: https://rhai.rs
 
-For complete Rhai language documentation, visit: https://rhai.rs
+VARIABLES & TYPES:
+  let x = 42;                          Variable declaration (required for new vars)
+  let name = "alice";                  String (double quotes only)
+  let active = true;                   Boolean (true/false)
+  let tags = [1, 2, 3];                Array (dynamic, mixed types ok)
+  let user = #{name: "bob", age: 30};  Map/object literal
+  let empty = ();                      Unit type (Rhai's "nothing", not null/undefined)
 
-STAGE OVERVIEW:
-  --begin         Runs once before parsing; populate `conf` (read-only later)
-  --filter        Runs per event as a boolean gate (true keeps, false drops); repeatable, runs in given order
-  --exec / -e     Runs per event for transformations and side effects; repeatable, runs in given order
-  --exec-file     Same as --exec, but pull script from disk
-  --end           Runs once after processing; use it to emit reports from the metrics map and other summaries
+  type_of(x)                           Returns type as string: "i64", "string", "array", "map", "()"
+  x = "hello";                         Dynamic typing: variables can change type
 
-Prerequisites:
-  --allow-fs-writes   Required for Rhai file helpers such as append_file, truncate_file, mkdir
-  --window <N>        Required for window_* helpers (window_values, window_numbers)
-  --metrics           Required for track_* helpers (pair with --metrics-file to persist)
+OPERATORS:
+  Arithmetic:  +  -  *  /  %  **       (power: 2**3 == 8)
+  Comparison:  ==  !=  <  >  <=  >=
+  Logical:     &&  ||  !
+  Bitwise:     &  |  ^  <<  >>
+  Assignment:  =  +=  -=  *=  /=  %=  &=  |=  ^=  <<=  >>=
+  Range:       1..5  1..=5            (exclusive/inclusive, for loops only)
+  Membership:  "key" in map            (check map key existence)
 
-BASIC CONCEPTS:
-  e                                    Current event (renamed from 'event')
-  e.field                              Access field directly
-  e.nested.field                       Access nested fields
-  e.scores[1]                          Array access (supports negative indexing)
-  e.headers["user-agent"]              Field access with special characters
+CONTROL FLOW:
+  if x > 10 {                          If-else (braces required)
+      print("big");
+  } else if x > 5 {
+      print("medium");
+  } else {
+      print("small");
+  }
 
-VARIABLE DECLARATION:
-  let myfield = e.col("1,2")           Always use 'let' for new variables
-  let result = e.user.name.lower()     Chain operations and store result
+  switch x {                           Switch expression (returns value)
+      1 => "one",
+      2 | 3 => "two or three",
+      4..=6 => "four to six",
+      _ => "other"                     (underscore = default)
+  }
 
-FIELD EXISTENCE AND SAFETY:
-  "field" in e                         Check if field exists
-  e.has_path("user.role")               Check nested field existence
-  e.scores.len() > 0                   Check if array has elements
-  e.field != ()                        Check if field has a value
+LOOPS:
+  for i in 0..10 { print(i); }         Range loop (0..10 excludes 10, 0..=10 includes)
+  for item in array { print(item); }   Array iteration
+  for (key, value) in map { ... }      Map iteration
 
-FIELD AND EVENT REMOVAL:
-  e.field = ()                         Remove individual field
-  e = ()                               Remove entire event (filters out)
+  while condition { ... }              While loop
+  loop { if done { break; } }          Infinite loop (use break/continue)
 
-METHOD CHAINING EXAMPLES:
-  e.message.extract_re("user=(\w+)").upper()
-  e.client_ip.mask_ip(2)
-  e.url.extract_domain().lower()
-  e.timestamp.to_datetime().format("%H:%M")
+FUNCTIONS & CLOSURES:
+  fn add(a, b) { a + b }               Function definition (last expr is return value)
+  fn greet(name) {                     Explicit return
+      return "Hello, " + name;
+  }
 
-FUNCTION VS METHOD SYNTAX:
-  extract_re(e.line, "\d+")           Function style (avoids conflicts)
-  e.line.extract_re("\d+")            Method style (better for chaining)
+  let double = |x| x * 2;              Closure syntax
+  [1,2,3].map(|x| x * 2)               Common in array methods
+  [1,2,3].filter(|x| x > 1)            Predicate closures
 
-Both syntaxes work identically. Use method syntax for readability and chaining,
-function syntax when method names conflict with field names.
+FUNCTION-AS-METHOD SYNTAX (Rhai special feature):
+  extract_re(e.line, "\d+")            Function call style
+  e.line.extract_re("\d+")             Method call style (same thing!)
+
+  Rhai allows calling any function as a method on its first argument.
+  Use method style for chaining: e.url.extract_domain().lower().strip()
+
+RHAI QUIRKS & GOTCHAS:
+  • Strings use double quotes only: "hello" (not 'hello')
+  • Semicolons recommended (optional at end of blocks, required for multiple statements)
+  • No null/undefined: use unit type () to represent "nothing"
+  • No implicit type conversion: "5" + 3 is error (use "5".to_int() + 3)
+  • let required for new variables (x = 1 errors if x not declared)
+  • Arrays/maps are reference types: modifying copies affects original
+  • Last expression in block is return value (no return needed)
+  • Single-line comments: // ... (multi-line: /* ... */)
+  • Function calls without parens ok if no args: e.len (same as e.len())
+
+KELORA PIPELINE STAGES:
+  --begin         Pre-run once before parsing; populate global `conf` map (becomes read-only)
+  --filter        Boolean gate per event (true keeps, false drops); repeatable, ordered
+  --exec / -e     Transform per event; repeatable, ordered
+  --exec-file     Same as --exec, reads script from file
+  --end           Post-run once after processing; access global `metrics` map for reports
+
+Prerequisites: --allow-fs-writes (file I/O), --window N (windowing), --metrics (tracking)
+
+KELORA EVENT ACCESS:
+  e                                    Current event (global variable in --filter/--exec)
+  e.field                              Direct field access
+  e.nested.field                       Nested field traversal (maps)
+  e.scores[1]                          Array indexing (0-based, negative ok: -1 = last)
+  e.headers["user-agent"]              Bracket notation for special chars in keys
+
+  "field" in e                         Check top-level field exists
+  e.has_path("user.role")              Check nested path exists (safe)
+  e.get_path("user.role", "guest")     Get nested with default fallback
+
+  e.field = ()                         Remove field (unit assignment)
+  e = ()                               Remove entire event (becomes empty, filtered out)
+
+ARRAY & MAP OPERATIONS:
+  JSON arrays → native Rhai arrays (full functionality)
+  sorted(e.scores)                     Sort numerically/lexicographically
+  reversed(e.items)                    Reverse order
+  unique(e.tags)                       Remove duplicates
+  sorted_by(e.users, "age")            Sort objects by field
+  e.tags.join(", ")                    Join to string
+
+  emit_each(e.items)                   Fan out: each array element → separate event
+  emit_each(e.items, #{ctx: "x"})      Fan out with base fields added to each
 
 COMMON PATTERNS:
-  # Safe field access with defaults
-  let user_role = e.get_path("user.role", "guest");
-  
-  # Process arrays safely
-  if e.events.len() > 0 {
-      e.latest_event = e.events[-1];
-      e.event_types = unique(e.events.map(|event| event.type));
-  }
-  
-  # Conditional event removal
-  if e.level != "ERROR" { e = (); }
-  
-  # Field cleanup and transformation
-  e.password = (); e.ssn = ();  // Remove sensitive fields
-  e.summary = e.method + " " + e.status;
+  # Safe nested access
+  let role = e.get_path("user.role", "guest");
 
-ARRAY PROCESSING:
-  sorted(e.scores)                     Sort array numerically/lexicographically
-  reversed(e.items)                    Reverse array order
-  unique(e.tags)                       Remove duplicate elements
-  sorted_by(e.users, "age")            Sort array of objects by field
-  e.tags.join(", ")                    Join array elements
+  # Type conversion with fallback
+  let port = to_int_or(e.port, 8080);
 
-JSON ARRAY HANDLING:
-  JSON arrays are automatically converted to native Rhai arrays with full
-  functionality (sorted, reversed, unique, etc.) while maintaining proper
-  JSON types in output formats.
+  # Array safety
+  if e.items.len() > 0 { e.first = e.items[0]; }
 
-SIDE EFFECTS IN QUIET MODE:
-  print("debug info")                  Levels -q/-qq: visible, -qqq: suppressed
-  eprint("error details")              Levels -q/-qq: visible, -qqq: suppressed
-  File operations remain available at all quiet levels (require --allow-fs-writes).
+  # Conditional field removal
+  if e.level != "DEBUG" { e.stack_trace = (); }
 
-ERROR HANDLING:
-  Default (resilient) mode:
-    - Parse errors: skip malformed lines, continue processing
-    - Filter errors: evaluate to false, drop event
-    - Exec errors: keep original event unchanged
-  With --strict enabled:
-    - Any parse/filter/exec error aborts processing with a non-zero exit code
+  # Method chaining
+  e.domain = e.url.extract_domain().to_lower().strip();
 
-For complete function reference: kelora --help-functions
-For practical usage patterns: kelora --help-examples
-For time format help: kelora --help-time
-For multiline strategy help: kelora --help-multiline
+  # Map iteration
+  for (key, val) in e { print(key + " = " + val); }
+
+GLOBAL CONTEXT:
+  conf                                 Global config map (read-only after --begin)
+  metrics                              Global metrics map (from track_* calls, read in --end)
+  get_env("VAR", "default")            Environment variable access
+
+ERROR HANDLING MODES:
+  Default (resilient):
+    • Parse errors → skip line, continue
+    • Filter errors → treat as false, drop event
+    • Exec errors → rollback, keep original event
+  --strict mode:
+    • Any error → abort with exit code 1
+
+QUIET MODE SIDE EFFECTS:
+  print("msg")                         Levels -q/-qq: visible, -qqq: suppressed
+  eprint("err")                        Levels -q/-qq: visible, -qqq: suppressed
+  File ops (append_file, etc.)         Always work (needs --allow-fs-writes)
+
+See also:
+  kelora --help-examples   Practical log analysis patterns
+  kelora --help-functions  Complete function catalogue
+  kelora --help-time       Timestamp format reference
+  https://rhai.rs          Full Rhai language documentation
 "#;
     println!("{}", help_text);
 }
