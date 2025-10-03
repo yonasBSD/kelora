@@ -247,7 +247,7 @@ pub struct Cli {
     pub until: Option<String>,
 
     /// Limit output to the first N events
-    #[arg(long = "take", help_heading = "Filtering Options")]
+    #[arg(short = 'n', long = "take", help_heading = "Filtering Options")]
     pub take: Option<usize>,
 
     /// Show N lines before each match (requires filtering)
