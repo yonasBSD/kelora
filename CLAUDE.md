@@ -424,11 +424,15 @@ kelora -qq suspicious.log || mail -s "Log errors detected" admin@company.com
 - Priority: `--input-tz` > `TZ` environment variable > UTC default
 - Only affects naive timestamps (those without explicit timezone info)
 
-**Output Timestamp Formatting (Display Stage):**
-- `--pretty-ts field1,field2` - Format specific fields as RFC3339 timestamps
-- `-z` - Auto-format all known timestamp fields as local RFC3339
-- `-Z` - Auto-format all known timestamp fields as UTC RFC3339
-- Only affects default output format (human-readable display)
+**Timestamp Conversion (Processing Stage):**
+- `--convert-ts field1,field2` - Convert timestamp fields to RFC3339 format (ISO 8601 compatible)
+- Modifies event data - affects all output formats
+- Example output: `2024-01-15T10:30:00+01:00`
+
+**Timestamp Display Formatting (Display Stage):**
+- `-z, --show-ts-local` - Display timestamps as local RFC3339 (ISO 8601 compatible)
+- `-Z, --show-ts-utc` - Display timestamps as UTC RFC3339 (ISO 8601 compatible)
+- Display-only - only affects default formatter output
 - No impact on structured outputs (JSON, CSV, etc.) or event data
 
 **Adaptive Parsing:**

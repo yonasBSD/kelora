@@ -300,9 +300,9 @@ pub struct Cli {
     #[arg(short = 'b', long = "brief", help_heading = "Default Format Options")]
     pub brief: bool,
 
-    /// Pretty-print nested values (default: false).
-    #[arg(short = 'P', long = "pretty", help_heading = "Default Format Options")]
-    pub pretty: bool,
+    /// Expand nested structures (maps/arrays) with indentation.
+    #[arg(long = "expand-nested", help_heading = "Default Format Options")]
+    pub expand_nested: bool,
 
     /// Enable word-wrapping (default: on).
     #[arg(long = "wrap", help_heading = "Default Format Options")]
@@ -316,16 +316,28 @@ pub struct Cli {
     )]
     pub no_wrap: bool,
 
-    /// Comma-separated list of fields to format as RFC3339 timestamps
-    #[arg(long = "pretty-ts", help_heading = "Default Format Options")]
-    pub pretty_ts: Option<String>,
+    /// Convert timestamp fields to RFC3339 format (ISO 8601 compatible).
+    /// Example: 2024-01-15T10:30:00+01:00
+    /// Modifies event data - affects all output formats.
+    #[arg(long = "convert-ts", help_heading = "Processing Options")]
+    pub convert_ts: Option<String>,
 
-    /// Auto-format all known timestamp fields as local RFC3339 (requires parsed timestamps).
-    #[arg(short = 'z', help_heading = "Default Format Options")]
+    /// Display timestamps as local RFC3339 (ISO 8601 compatible).
+    /// Display-only - only affects default formatter output.
+    #[arg(
+        short = 'z',
+        long = "show-ts-local",
+        help_heading = "Default Format Options"
+    )]
     pub format_timestamps_local: bool,
 
-    /// Auto-format all known timestamp fields as UTC RFC3339 (requires parsed timestamps).
-    #[arg(short = 'Z', help_heading = "Default Format Options")]
+    /// Display timestamps as UTC RFC3339 (ISO 8601 compatible).
+    /// Display-only - only affects default formatter output.
+    #[arg(
+        short = 'Z',
+        long = "show-ts-utc",
+        help_heading = "Default Format Options"
+    )]
     pub format_timestamps_utc: bool,
 
     /// Force colored output

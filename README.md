@@ -138,7 +138,7 @@ Pre-built binaries live in the [GitHub releases](https://github.com/dloss/kelora
 
 - `-F/--output-format` controls formatting (`default`, `json`, `logfmt`, `inspect`, `levelmap`, CSV/TSV variants, or `none`). `-J` is shorthand for JSON.
 - `-k/--keys` and `-K/--exclude-keys` shape the output payload; `-c` keeps only core fields; `-b` switches to brief mode.
-- `--pretty-ts`, `-z`, and `-Z` format timestamps (local vs UTC).
+- `--convert-ts` converts timestamp fields to RFC3339 format (modifies event data); `-z/--show-ts-local` and `-Z/--show-ts-utc` format display timestamps (default formatter only).
 - `--stats`, `--metrics`, and `-S/--stats-only` expose processing telemetry; `--metrics-file` writes JSON metrics to disk.
 - `--mark-gaps` inserts visual separators when time jumps exceed a duration; `--no-emoji` disables emoji prefixes.
 - Context lines are marked with visual prefixes: `*` for matches, `/` for before-context, `\` for after-context.

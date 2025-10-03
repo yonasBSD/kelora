@@ -1891,7 +1891,7 @@ INTERACTIONS:
 
 TROUBLESHOOTING:
 - Run with --stats or --metrics to monitor buffered event counts
-- Add --brief or --pretty to inspect reconstructed events quickly
+- Add --brief or --expand-nested to inspect reconstructed events quickly
 - If buffers grow unbounded, tighten the regex or temporarily disable --parallel
 
 PERFORMANCE NOTES:

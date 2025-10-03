@@ -696,7 +696,7 @@ impl KeloraConfig {
                 core: cli.core,
                 brief: cli.brief,
                 wrap: !cli.no_wrap, // Default true, disabled by --no-wrap
-                pretty: cli.pretty,
+                pretty: cli.expand_nested,
                 color: color_mode,
                 no_emoji: cli.no_emoji,
                 stats: cli.stats || cli.stats_only,
@@ -855,8 +855,11 @@ fn create_timestamp_format_config(
     cli: &crate::Cli,
     default_timezone: Option<String>,
 ) -> TimestampFormatConfig {
-    let format_fields = if let Some(ref pretty_ts) = cli.pretty_ts {
-        pretty_ts.split(',').map(|s| s.trim().to_string()).collect()
+    let format_fields = if let Some(ref convert_ts) = cli.convert_ts {
+        convert_ts
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect()
     } else {
         Vec::new()
     };
