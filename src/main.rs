@@ -1491,6 +1491,12 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
         std::process::exit(0);
     }
 
+    // Check for --help-examples
+    if raw_args.iter().any(|arg| arg == "--help-examples") {
+        print_examples_help();
+        std::process::exit(0);
+    }
+
     // Check for --help-rhai
     if raw_args.iter().any(|arg| arg == "--help-rhai") {
         print_rhai_help();
@@ -1636,6 +1642,12 @@ fn print_functions_help() {
     println!("{}", help_text);
 }
 
+/// Print practical Rhai examples
+fn print_examples_help() {
+    let help_text = rhai_functions::docs::generate_examples_text();
+    println!("{}", help_text);
+}
+
 /// Print Rhai scripting guide
 fn print_rhai_help() {
     let help_text = r#"
@@ -1735,7 +1747,7 @@ ERROR HANDLING:
     - Any parse/filter/exec error aborts processing with a non-zero exit code
 
 For complete function reference: kelora --help-functions
-For usage examples: kelora --help (see examples section)
+For practical usage patterns: kelora --help-examples
 For time format help: kelora --help-time
 For multiline strategy help: kelora --help-multiline
 "#;

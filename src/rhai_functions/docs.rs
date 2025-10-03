@@ -1,4 +1,4 @@
-/// Generate help text with comprehensive hand-written function documentation
+/// Generate comprehensive function reference documentation
 pub fn generate_help_text() -> &'static str {
     r#"
 Available Rhai Functions for Kelora:
@@ -184,74 +184,164 @@ e = ()                               Clear entire event (remove all fields)
 e.field = ()                         Remove individual field from event
 e.rename_field("old", "new")         Rename field, returns true if successful
 
-Examples:
-# String processing with builtin and custom functions
-e.domain = e.url.extract_domain().to_lower()
-e.parts = e.message.split("|")  # Use builtin split
-e.word_count = e.text.trim().split(" ").len  # Chain builtin functions
+Rhai lets you call functions as either `value.method(args)` or `function(value, args)`.
+Use 'e' to access the current event. See --help-examples for common usage patterns.
+"#
+}
 
-# Array processing with builtins and fan-out
-e.tag_count = e.tags.len  # Use builtin len
-e.error_tags = e.tags.filter(|tag| tag.contains("error"))  # Builtin filter
-emit_each(e.items)                 # Creates separate event for each item
+/// Generate practical examples for common log analysis patterns
+pub fn generate_examples_text() -> &'static str {
+    r#"
+Common Log Analysis Patterns:
 
-# Field manipulation
-e.rename_field("timestamp", "ts")  # Rename field, overwrites target if exists
-e.old_field = ()                   # Remove field
+WEB LOG ANALYSIS:
+# Extract HTTP details from combined log
+kelora -f combined --exec 'e.slow = e.request_time > 1.0' --filter 'e.slow'
 
-# Type conversion - strict (returns () on error)
-e.status_code = e.status.to_int()  # Returns () if not a valid integer
-e.price = e.price_str.to_float()   # Returns () if not a valid float
-e.active = e.enabled.to_bool()     # Returns () if not convertible
+# Parse request path parameters
+kelora -f combined --exec '
+  let params = e.path.after("?").parse_query_params();
+  e.utm_source = params.get_path("utm_source", "");
+  e.user_id = params.get_path("user_id", "").to_int()
+'
 
-# Type conversion - with defaults (safe)
-e.port = to_int_or(e.port_str, 8080)         # Use 8080 if conversion fails
-e.timeout = to_float_or(e.timeout_str, 30.0) # Use 30.0 if conversion fails
-e.debug = to_bool_or(e.debug_flag, false)    # Use false if conversion fails
+# Mask IPs and extract domains from referers
+kelora -f json --exec 'e.ip = e.client_ip.mask_ip(2)' \
+  --exec 'e.referer_domain = e.get_path("referer", "").extract_domain()'
 
-# Type checking and validation
-if type_of(e.level) == "string" { e.log_level = e.level.to_upper() }
+# Detect suspicious user agents
+kelora -f combined --filter 'e.user_agent.has_matches("(?i)(bot|crawler|scanner)")'
 
-# JSON parsing and serialization
-e.parsed_data = e.json_field.parse_json()
-e.json_output = e.data.to_json()
+ERROR TRACKING:
+# Extract stack traces and error types
+kelora -f json --filter 'e.level == "ERROR"' --exec '
+  e.error_type = e.error.before(":");
+  e.line_number = e.error.extract_re(r"line (\d+)", 1).to_int()
+'
 
-# Math functions
-e.abs_value = abs(e.negative_number)
-e.rounded = round(e.decimal_value)
-e.floored = floor(e.decimal_value)
+# Group errors by hash for deduplication
+kelora -f json -l error --exec 'e.error_hash = e.message.hash("xxh3")' \
+  --metrics --exec 'track_unique("errors", e.error_hash)'
 
-# Safe nested field access
-e.user_role = e.get_path("user.profile.role", "guest")
+# Time-based error clustering (5min windows)
+kelora -f json -l error --window 100 --exec '
+  let recent = window_values("timestamp").map(|ts| to_datetime(ts));
+  let time_span = (recent[-1] - recent[0]).as_minutes();
+  e.error_burst = time_span < 5 && recent.len() > 10
+' --filter 'e.error_burst'
 
-# Datetime manipulation
-let now = now_utc()
-e.hour = now.hour()
-e.formatted = now.format("%Y-%m-%d %H:%M")
+SECURITY & AUDIT:
+# Check for private IPs in external traffic
+kelora -f json --filter 'e.source_ip.is_ipv4() && !e.source_ip.is_private_ip()'
 
-# Tracking metrics
-track_count("http_requests")
-track_bucket("response_time", "slow")
-# Aggregated values land in the `metrics` map, best consumed from the --end stage.
+# JWT token analysis without verification
+kelora -f json --exec 'let jwt = e.token.parse_jwt(); e.user_id = jwt.sub; e.role = jwt.role'
 
-# Format conversion and serialization
-e.logfmt_output = e.to_logfmt()                          # Convert to logfmt
-e.syslog_line = e.to_syslog()                            # Convert to syslog
-e.cef_event = e.to_cef()                                 # Convert to CEF
-e.access_log = e.to_combined()                           # Convert to combined log
-e.custom_kv = e.to_kv("|", ":")                          # Custom key-value format
+# Detect CIDR-based access patterns
+kelora -f json --exec 'e.internal = e.ip.is_in_cidr("10.0.0.0/8")' --filter '!e.internal'
 
-# Bidirectional processing (roundtrip)
-let logfmt_string = e.to_logfmt()
-e.parsed_back = logfmt_string.parse_logfmt()
+# Hash sensitive fields with domain separation
+export KELORA_SECRET="your-secret-key"
+kelora -f json --exec 'e.user_hash = pseudonym(e.email, "users")' --exec 'e.email = ()'
 
-# Random values
-e.sample_rate = rand()
-e.random_id = rand_int(1000, 9999)
+DATA TRANSFORMATION:
+# Parse nested JSON strings
+kelora -f json --exec 'e.metadata = e.json_payload.parse_json()' \
+  --exec 'e.user_tier = e.get_path("metadata.subscription.tier", "free")'
 
-Rhai lets you call functions as either `value.method(args)` or
-`function(value, args)`. Examples prefer method calls, though some
-function-style listings remain for clarity. Use 'e' to access the current event.
-For more examples, see the documentation or use --help for general usage.
+# Column extraction from structured text
+kelora -f line --exec 'e.cols = e.line.col("1,3,5", " ")' \
+  --exec 'e.timestamp = e.cols[0]; e.level = e.cols[1]; e.msg = e.cols[2]'
+
+# Parse key-value logs (multiple formats)
+kelora -f line --exec 'e = e.line.parse_logfmt()'  # logfmt: key=value
+kelora -f line --exec 'e = e.line.parse_kv(" ", "=")'  # custom separators
+
+# Email header parsing
+kelora -f line --exec 'let email = e.from.parse_email(); e.domain = email.domain; e.user = email.local'
+
+METRICS & AGGREGATION:
+# Response time percentiles (requires --window)
+kelora -f json --window 1000 --metrics --end '
+  let times = window_numbers("response_time");
+  print("p50: " + times.percentile(50));
+  print("p95: " + times.percentile(95));
+  print("p99: " + times.percentile(99))
+'
+
+# Status code distribution
+kelora -f combined --metrics --exec 'track_bucket("status", e.status / 100 * 100)' \
+  --end 'print(metrics.status)'
+
+# Unique users per endpoint
+kelora -f json --metrics --exec 'track_unique(e.path, e.user_id)' \
+  --end 'for (path, users) in metrics { print(path + ": " + users.len() + " users") }'
+
+ARRAY & FAN-OUT PROCESSING:
+# Process nested arrays - fan out items
+kelora -f json --exec 'emit_each(e.items)' --filter 'e.status == "active"'
+
+# Multi-level fan-out with context preservation
+kelora -f json --exec 'emit_each(e.batches)' \
+  --exec 'let ctx = #{batch: e.id}; emit_each(e.items, ctx)' \
+  --filter 'e.priority == "high"'
+
+# Array transformations and sorting
+kelora -f json --exec 'e.top_scores = sorted(e.scores)[-3:]' \
+  --exec 'e.winners = sorted_by(e.players, "score")[-5:].map(|p| p.name)'
+
+DATETIME & FILTERING:
+# Recent events (last 2 hours)
+kelora -f json --since -2h --until now
+
+# Business hours filter (9-5 local time)
+kelora -f json --exec 'let dt = to_datetime(e.timestamp).to_local(); e.hour = dt.hour()' \
+  --filter 'e.hour >= 9 && e.hour < 17'
+
+# Calculate durations and SLA violations
+kelora -f json --exec '
+  let start = to_datetime(e.start_time);
+  let end = to_datetime(e.end_time);
+  let duration = end - start;
+  e.duration_ms = duration.as_milliseconds();
+  e.sla_breach = duration.as_seconds() > 5
+' --filter 'e.sla_breach'
+
+ADVANCED PATTERNS:
+# Sampling - process 10% of events
+kelora -f json --filter 'e.request_id.bucket() % 10 == 0'
+
+# Conditional field removal based on sensitivity
+kelora -f json --exec 'if e.level != "DEBUG" { e.stack_trace = (); e.locals = () }'
+
+# Dynamic field creation from arrays
+kelora -f json --exec 'for (idx, tag) in e.tags { e["tag_" + idx] = tag }'
+
+# Format conversion pipeline
+kelora -f json --exec 'e.syslog_compat = e.to_syslog()' -F json > output.jsonl
+
+# CI/CD integration with exit codes
+kelora -f json -qq -l error logs/*.json && echo "✓ No errors" || echo "✗ Errors found"
+
+# Export results to file from script
+kelora -f json --allow-fs-writes --exec '
+  if e.severity == "critical" {
+    append_file("alerts.log", e.to_json())
+  }
+'
+
+COMMON IDIOMS:
+# Method chaining              → e.domain = e.url.extract_domain().to_lower().strip()
+# Safe nested access           → e.get_path("user.role", "guest")
+# Safe type conversion         → to_int_or(e.port, 8080)
+# Check field exists           → e.has_path("user.id")
+# Remove sensitive fields      → e.password = (); e.ssn = ()
+# Hash for grouping/sampling   → e.session_id.bucket() % 100
+# Parse then extract           → e.url.parse_url().path
+# Regex capture groups         → e.log.extract_re(r"duration: (\d+)", 1)
+# Array bounds safety          → if e.items.len() > 0 { e.first = e.items[0] }
+# Negative indexing            → e.last_score = e.scores[-1]
+
+See --help-functions for complete function reference. Visit https://rhai.rs for Rhai language details.
 "#
 }
