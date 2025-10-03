@@ -35,7 +35,7 @@ use platform::{
 
 // Internal CLI imports
 use cli::{Cli, FileOrder, InputFormat, OutputFormat};
-use config::{MultilineConfig, MultilineStrategy, TimestampFilterConfig};
+use config::{MultilineConfig, TimestampFilterConfig};
 
 /// Detect format from a peekable reader
 /// Returns the detected format without consuming the first line
@@ -1106,15 +1106,6 @@ fn main() -> Result<()> {
         }
     }
 
-    // Share --ts-format hint with multiline timestamp strategies so regex fallback stays optional
-    if let (Some(multiline_config), Some(ts_format)) =
-        (config.input.multiline.as_mut(), &config.input.ts_format)
-    {
-        if let MultilineStrategy::Timestamp { chrono_format, .. } = &mut multiline_config.strategy {
-            *chrono_format = Some(ts_format.clone());
-        }
-    }
-
     // Validate arguments early
     if let Err(e) = validate_cli_args(&cli) {
         stderr
@@ -1594,7 +1585,7 @@ Time Format Reference for --ts-format:
 Use with:
   --ts-format <FMT>     Describe how timestamps are parsed
   --input-tz <TZ>       Supply a timezone for inputs without offsets (e.g., --input-tz UTC)
-  --multiline timestamp Align multiline detection with the same leading pattern
+  --multiline timestamp:format=FMT  Use the same chrono format for header detection
 
 Basic date/time components:
 %Y  Year with century (e.g., 2024)
@@ -1832,88 +1823,37 @@ fn print_multiline_help() {
 Multiline Strategy Reference for --multiline:
 
 Quick usage:
-  kelora sample.log -M stacktrace
-  kelora sample.log -M "timestamp:pattern=^\d{4}-" --ts-format "%Y-%m-%d %H:%M:%S"
+  kelora access.log --multiline timestamp
+  kelora stack.log --multiline indent
+  kelora trace.log --multiline regex:match=^TRACE
+  kelora payload.json --multiline all
 
-Multiline stays off unless you enable it with -M/--multiline. Choose a preset or
-craft a custom strategy, then layer your parser (for example, -f raw) so
-multiline reconstruction happens before structured parsing.
+MODES:
 
-QUICK PRESETS (recommended):
+timestamp
+  Detect leading timestamps with Kelora's adaptive parser.
+  Optional hint: --multiline timestamp:format='%b %e %H:%M:%S'
 
-stacktrace
-  Timestamp anchored framing for application logs and stack traces
-  Equivalent to: -M timestamp
-  Best for: services that start each event with an ISO-like timestamp
+indent
+  Treat any line that begins with indentation as a continuation.
 
-docker
-  RFC3339 timestamp framing used by Docker JSON logs
-  Equivalent to: -M timestamp:pattern=^\d{4}-\d{2}-\d{2}T
-  Best for: container runtimes emitting JSON lines
+regex:match=REGEX[:end=REGEX]
+  Define record headers (and optional terminators) yourself.
+  Example: --multiline regex:match=^BEGIN:end=^END
 
-syslog
-  RFC3164/5424 style headers ("Jan  2", "2024-01-02T...")
-  Equivalent to: -M timestamp:pattern=^(<\d+>\d\s+\d{4}-\d{2}-\d{2}T|\w{3}\s+\d{1,2})
-  Best for: network gear and daemons with classic syslog headers
+all
+  Buffer the entire input as a single event.
 
-combined
-  Apache/Nginx access logs with remote host prefix
-  Equivalent to: -M start:^\S+\s+\S+\s+\S+\s+\[
-  Best for: web access logs parsed later via -f combined/logfmt/json
-
-nginx
-  Bracketed date headers like "[10/Oct/2000:13:55:36 +0000]"
-  Equivalent to: -M timestamp:pattern=^\[[0-9]{2}/[A-Za-z]{3}/[0-9]{4}:
-  Best for: nginx access/error logs
-
-continuation
-  Join lines ending with the continuation marker (default: \)
-  Equivalent to: -M backslash
-  Best for: languages that escape newlines with a trailing backslash
-
-block
-  Treat BEGIN...END style sections as one event
-  Equivalent to: -M boundary:start=^BEGIN:end=^END
-  Best for: tools that delimit multi-line records explicitly
-
-ADVANCED RECIPES (build your own):
-
-timestamp[:pattern=REGEX]
-  Events start with a timestamp pattern (anchored at line start)
-  Pair with --ts-format=<chrono fmt> to parse the captured prefix
-
-indent[:spaces=N|tabs|mixed]
-  Continuation lines are indented, new events start at column 1
-
-start:REGEX
-  Events start when the line matches the regular expression
-
-end:REGEX
-  Events end when the line matches the regular expression
-
-boundary:start=START_REGEX:end=END_REGEX
-  Events start at START_REGEX and close at END_REGEX
-
-backslash[:char=C]
-  Lines ending with the continuation character continue the event
-
-whole
-  Read the entire input as a single event (loads everything into memory)
-
-INTERACTIONS:
-- Combine with --extract-prefix for prefix cleanup before parsing
-- --take N applies after multiline reconstruction, not to raw lines
-- Parallel mode buffers per worker; tune --batch-size/--batch-timeout as needed
+NOTES:
+- Multiline stays off unless you set -M/--multiline.
+- Detection runs before parsing; pick -f raw/json/etc. as needed.
+- Buffering continues until the next detected start or end arrives.
+- With --parallel, tune --batch-size/--batch-timeout to keep memory bounded.
 
 TROUBLESHOOTING:
-- Run with --stats or --metrics to monitor buffered event counts
-- Add --brief or --expand-nested to inspect reconstructed events quickly
-- If buffers grow unbounded, tighten the regex or temporarily disable --parallel
-
-PERFORMANCE NOTES:
-- Multiline buffers until a boundary arrives; monitor memory on long runs
-- --batch-size helps control memory in parallel mode
-- The whole strategy buffers the entire input
+- Use --stats or --metrics to watch buffered event counts.
+- If buffers grow unbounded, tighten the regex or disable multiline temporarily.
+- Remember that `--multiline all` reads the entire stream into memory.
 
 For complete CLI reference: kelora --help
 For Rhai scripting help: kelora --help-rhai

@@ -231,205 +231,98 @@ pub struct MultilineConfig {
 /// Multi-line event detection strategies
 #[derive(Debug, Clone)]
 pub enum MultilineStrategy {
-    /// Events start with timestamp pattern
-    Timestamp {
-        pattern: String,
-        chrono_format: Option<String>,
-    },
+    /// Events start when a timestamp-like prefix is detected
+    Timestamp { chrono_format: Option<String> },
     /// Continuation lines are indented
-    Indent {
-        spaces: Option<u32>,
-        tabs: bool,
-        mixed: bool,
-    },
-    /// Lines end with continuation character
-    Backslash { char: char },
-    /// Events start with pattern
-    Start { pattern: String },
-    /// Events end with pattern
-    End { pattern: String },
-    /// Events have both start and end boundaries
-    Boundary { start: String, end: String },
+    Indent,
+    /// Events start (and optionally end) with explicit regexes
+    Regex { start: String, end: Option<String> },
     /// Read entire input as a single event
-    Whole,
+    All,
 }
-
-const DEFAULT_TIMESTAMP_PATTERN: &str = r"^(\d{4}-\d{2}-\d{2}|\w{3}\s+\d{1,2})";
-const DOCKER_TIMESTAMP_PATTERN: &str = r"^\d{4}-\d{2}-\d{2}T";
-const SYSLOG_TIMESTAMP_PATTERN: &str = r"^(<\d+>\d\s+\d{4}-\d{2}-\d{2}T|\w{3}\s+\d{1,2})";
-const NGINX_TIMESTAMP_PATTERN: &str = r"^\[[0-9]{2}/[A-Za-z]{3}/[0-9]{4}:";
-const COMBINED_START_PATTERN: &str = r"^\S+\s+\S+\s+\S+\s+\[";
-const DEFAULT_BLOCK_START: &str = r"^BEGIN";
-const DEFAULT_BLOCK_END: &str = r"^END";
 
 impl MultilineConfig {
     /// Parse multiline configuration from CLI string
     pub fn parse(value: &str) -> Result<Self, String> {
-        if let Some(strategy) = Self::parse_preset(value) {
-            return Ok(MultilineConfig { strategy });
-        }
-
-        let parts: Vec<&str> = value.split(':').collect();
-
-        if parts.is_empty() {
+        if value.trim().is_empty() {
             return Err("Empty multiline configuration".to_string());
         }
 
-        let strategy_name = parts[0];
+        let mut segments = value.split(':');
+        let strategy_name = segments
+            .next()
+            .ok_or_else(|| "Empty multiline configuration".to_string())?;
+
         let strategy = match strategy_name {
             "timestamp" => {
-                let pattern = if parts.len() > 1 {
-                    Self::parse_pattern_option(parts[1])?
-                } else {
-                    // Default timestamp patterns (ISO and syslog) - both anchored to start
-                    DEFAULT_TIMESTAMP_PATTERN.to_string()
-                };
-                MultilineStrategy::Timestamp {
-                    pattern,
-                    chrono_format: None,
+                let mut chrono_format: Option<String> = None;
+
+                for segment in segments {
+                    if let Some(format) = segment.strip_prefix("format=") {
+                        if chrono_format.replace(format.to_string()).is_some() {
+                            return Err("timestamp:format specified more than once".to_string());
+                        }
+                    } else {
+                        return Err(format!(
+                            "Unknown timestamp option: {} (supported: format=...)",
+                            segment
+                        ));
+                    }
                 }
+
+                MultilineStrategy::Timestamp { chrono_format }
             }
             "indent" => {
-                let (spaces, tabs, mixed) = if parts.len() > 1 {
-                    Self::parse_indent_options(parts[1])?
-                } else {
-                    (None, false, true) // Default: any whitespace
-                };
-                MultilineStrategy::Indent {
-                    spaces,
-                    tabs,
-                    mixed,
+                if segments.next().is_some() {
+                    return Err("indent does not accept options".to_string());
+                }
+                MultilineStrategy::Indent
+            }
+            "regex" => {
+                let mut start_pattern: Option<String> = None;
+                let mut end_pattern: Option<String> = None;
+
+                for segment in segments {
+                    if let Some(pattern) = segment.strip_prefix("match=") {
+                        if start_pattern.replace(pattern.to_string()).is_some() {
+                            return Err("regex:match specified more than once".to_string());
+                        }
+                    } else if let Some(pattern) = segment.strip_prefix("end=") {
+                        if end_pattern.replace(pattern.to_string()).is_some() {
+                            return Err("regex:end specified more than once".to_string());
+                        }
+                    } else {
+                        return Err(format!(
+                            "Unknown regex option: {} (supported: match=..., end=...)",
+                            segment
+                        ));
+                    }
+                }
+
+                let start = start_pattern.ok_or_else(|| {
+                    "regex strategy requires match=REGEX (e.g. regex:match=^PID=)".to_string()
+                })?;
+
+                MultilineStrategy::Regex {
+                    start,
+                    end: end_pattern,
                 }
             }
-            "backslash" => {
-                let char = if parts.len() > 1 {
-                    Self::parse_char_option(parts[1])?
-                } else {
-                    '\\' // Default backslash
-                };
-                MultilineStrategy::Backslash { char }
-            }
-            "start" => {
-                if parts.len() < 2 {
-                    return Err("Start strategy requires pattern: start:REGEX".to_string());
+            "all" => {
+                if segments.next().is_some() {
+                    return Err("all does not accept options".to_string());
                 }
-                let pattern = parts[1].to_string();
-                MultilineStrategy::Start { pattern }
+                MultilineStrategy::All
             }
-            "end" => {
-                if parts.len() < 2 {
-                    return Err("End strategy requires pattern: end:REGEX".to_string());
-                }
-                let pattern = parts[1].to_string();
-                MultilineStrategy::End { pattern }
+            other => {
+                return Err(format!(
+                    "Unknown multiline strategy: {} (supported: timestamp, indent, regex, all)",
+                    other
+                ));
             }
-            "boundary" => {
-                if parts.len() < 2 {
-                    return Err(
-                        "Boundary strategy requires start and end: boundary:start=REGEX:end=REGEX"
-                            .to_string(),
-                    );
-                }
-                let (start, end) = Self::parse_boundary_options(&parts[1..])?;
-                MultilineStrategy::Boundary { start, end }
-            }
-            "whole" => MultilineStrategy::Whole,
-            _ => return Err(format!("Unknown multiline strategy: {}", strategy_name)),
         };
 
         Ok(MultilineConfig { strategy })
-    }
-
-    pub fn preset(name: &str) -> Option<Self> {
-        Self::parse_preset(name).map(|strategy| MultilineConfig { strategy })
-    }
-
-    fn parse_preset(name: &str) -> Option<MultilineStrategy> {
-        match name {
-            "stacktrace" => Some(MultilineStrategy::Timestamp {
-                pattern: DEFAULT_TIMESTAMP_PATTERN.to_string(),
-                chrono_format: None,
-            }),
-            "docker" => Some(MultilineStrategy::Timestamp {
-                pattern: DOCKER_TIMESTAMP_PATTERN.to_string(),
-                chrono_format: None,
-            }),
-            "syslog" => Some(MultilineStrategy::Timestamp {
-                pattern: SYSLOG_TIMESTAMP_PATTERN.to_string(),
-                chrono_format: None,
-            }),
-            "nginx" => Some(MultilineStrategy::Timestamp {
-                pattern: NGINX_TIMESTAMP_PATTERN.to_string(),
-                chrono_format: None,
-            }),
-            "combined" => Some(MultilineStrategy::Start {
-                pattern: COMBINED_START_PATTERN.to_string(),
-            }),
-            "continuation" => Some(MultilineStrategy::Backslash { char: '\\' }),
-            "block" => Some(MultilineStrategy::Boundary {
-                start: DEFAULT_BLOCK_START.to_string(),
-                end: DEFAULT_BLOCK_END.to_string(),
-            }),
-            _ => None,
-        }
-    }
-
-    fn parse_pattern_option(option: &str) -> Result<String, String> {
-        if let Some(pattern) = option.strip_prefix("pattern=") {
-            Ok(pattern.to_string())
-        } else {
-            Err(format!("Invalid timestamp option: {}", option))
-        }
-    }
-
-    fn parse_indent_options(option: &str) -> Result<(Option<u32>, bool, bool), String> {
-        match option {
-            "tabs" => Ok((None, true, false)),
-            "mixed" => Ok((None, false, true)),
-            option if option.starts_with("spaces=") => {
-                let spaces_str = &option[7..];
-                match spaces_str.parse::<u32>() {
-                    Ok(n) => Ok((Some(n), false, false)),
-                    Err(_) => Err(format!("Invalid spaces value: {}", spaces_str)),
-                }
-            }
-            _ => Err(format!("Invalid indent option: {}", option)),
-        }
-    }
-
-    fn parse_char_option(option: &str) -> Result<char, String> {
-        if let Some(char_str) = option.strip_prefix("char=") {
-            if char_str.len() == 1 {
-                Ok(char_str.chars().next().unwrap())
-            } else {
-                Err(format!(
-                    "Continuation character must be single character: {}",
-                    char_str
-                ))
-            }
-        } else {
-            Err(format!("Invalid backslash option: {}", option))
-        }
-    }
-
-    fn parse_boundary_options(parts: &[&str]) -> Result<(String, String), String> {
-        let mut start = None;
-        let mut end = None;
-
-        for part in parts {
-            if let Some(start_pattern) = part.strip_prefix("start=") {
-                start = Some(start_pattern.to_string());
-            } else if let Some(end_pattern) = part.strip_prefix("end=") {
-                end = Some(end_pattern.to_string());
-            } else {
-                return Err(format!("Invalid boundary option: {}", part));
-            }
-        }
-
-        match (start, end) {
-            (Some(s), Some(e)) => Ok((s, e)),
-            _ => Err("Boundary strategy requires both start=REGEX and end=REGEX".to_string()),
-        }
     }
 }
 
@@ -437,7 +330,6 @@ impl Default for MultilineConfig {
     fn default() -> Self {
         Self {
             strategy: MultilineStrategy::Timestamp {
-                pattern: DEFAULT_TIMESTAMP_PATTERN.to_string(),
                 chrono_format: None,
             },
         }

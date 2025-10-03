@@ -1152,7 +1152,7 @@ fn test_multiline_real_world_scenario() {
 }
 
 #[test]
-fn test_multiline_whole_strategy_json() {
+fn test_multiline_all_strategy_json() {
     // Test reading entire JSON file as single event
     let input = r#"{"users": [
   {"name": "alice", "age": 30, "status": "active"},
@@ -1162,14 +1162,11 @@ fn test_multiline_whole_strategy_json() {
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "json",
-        "-M", "whole",
+        "-M", "all",
         "-F", "json",
         "--exec", "e.user_count = e.users.len(); e.active_users = e.users.filter(|user| user.status == \"active\").len();"
     ], input);
-    assert_eq!(
-        exit_code, 0,
-        "kelora should exit successfully with -M whole"
-    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully with -M all");
 
     let parsed: serde_json::Value =
         serde_json::from_str(stdout.trim()).expect("Output should be valid JSON");
@@ -1184,7 +1181,7 @@ fn test_multiline_whole_strategy_json() {
 }
 
 #[test]
-fn test_multiline_whole_strategy_text() {
+fn test_multiline_all_strategy_text() {
     // Test reading entire text content as single event
     let input = r#"Line 1 with some content
 Line 2 with more content
@@ -1193,12 +1190,12 @@ Final line of the document"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "raw",
-        "-M", "whole",
+        "-M", "all",
         "--exec", "let lines = e.raw.split(\"\\n\"); e.line_count = lines.len(); e.word_count = e.raw.split(\" \").len();"
     ], input);
     assert_eq!(
         exit_code, 0,
-        "kelora should exit successfully with -M whole on text"
+        "kelora should exit successfully with -M all on text"
     );
 
     // The output may be wrapped across multiple lines due to the long line content
@@ -1216,8 +1213,8 @@ Final line of the document"#;
 }
 
 #[test]
-fn test_multiline_whole_strategy_empty_input() {
-    // Test -M whole with empty input
+fn test_multiline_all_strategy_empty_input() {
+    // Test -M all with empty input
     let input = "";
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
@@ -1225,16 +1222,13 @@ fn test_multiline_whole_strategy_empty_input() {
             "-f",
             "line",
             "-M",
-            "whole",
+            "all",
             "--exec",
             "e.is_empty = e.line.len() == 0;",
         ],
         input,
     );
-    assert_eq!(
-        exit_code, 0,
-        "kelora should handle empty input with -M whole"
-    );
+    assert_eq!(exit_code, 0, "kelora should handle empty input with -M all");
 
     // With empty input, there should be no output events
     assert_eq!(
@@ -1245,8 +1239,8 @@ fn test_multiline_whole_strategy_empty_input() {
 }
 
 #[test]
-fn test_multiline_whole_strategy_with_stats() {
-    // Test -M whole with stats enabled - using line format with shorter content
+fn test_multiline_all_strategy_with_stats() {
+    // Test -M all with stats enabled - using line format with shorter content
     let input = r#"Log 1
 Log 2  
 Log 3"#;
@@ -1256,7 +1250,7 @@ Log 3"#;
             "-f",
             "line",
             "-M",
-            "whole",
+            "all",
             "--stats",
             "--exec",
             "e.line_count = e.line.split(\"\\n\").len();",
@@ -1265,7 +1259,7 @@ Log 3"#;
     );
     assert_eq!(
         exit_code, 0,
-        "kelora should exit successfully with -M whole and stats"
+        "kelora should exit successfully with -M all and stats"
     );
 
     // Should create exactly 1 event (entire input as single event)
@@ -4841,8 +4835,8 @@ Jan  1 10:00:15 host app: Event four debug message"#;
 }
 
 #[test]
-fn test_parallel_multiline_whole_consistency() {
-    // Test whole strategy with parallel processing
+fn test_parallel_multiline_all_consistency() {
+    // Test all strategy with parallel processing
     let input = r#"{"level": "INFO", "message": "Event one"}
 {"level": "ERROR", "message": "Event two with error"}
 {"level": "INFO", "message": "Event three info"}
@@ -4852,14 +4846,12 @@ fn test_parallel_multiline_whole_consistency() {
 
     // Sequential processing
     let (stdout_seq, stderr_seq, exit_code_seq) =
-        run_kelora_with_input(&["-f", "line", "-M", "whole", "--stats"], input);
+        run_kelora_with_input(&["-f", "line", "-M", "all", "--stats"], input);
     assert_eq!(exit_code_seq, 0, "Sequential should succeed");
 
     // Parallel processing
-    let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(
-        &["-f", "line", "-M", "whole", "--stats", "--parallel"],
-        input,
-    );
+    let (stdout_par, stderr_par, exit_code_par) =
+        run_kelora_with_input(&["-f", "line", "-M", "all", "--stats", "--parallel"], input);
     assert_eq!(exit_code_par, 0, "Parallel should succeed");
 
     // Parse event counts
@@ -4873,7 +4865,7 @@ fn test_parallel_multiline_whole_consistency() {
     );
     assert_eq!(
         events_created_seq, 1,
-        "Whole strategy should create exactly 1 event from all lines"
+        "All strategy should create exactly 1 event from the stream"
     );
 
     // Both should produce exactly 1 output line

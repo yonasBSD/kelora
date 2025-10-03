@@ -279,22 +279,23 @@ See `kelora --help-rhai` for syntax essentials and `kelora --help-functions` for
 
 ## Multiline Strategies
 
-| Preset | Use When | Equivalent |
-| --- | --- | --- |
-| `stacktrace` | ISO or syslog timestamps leading each entry | `-M timestamp` |
-| `docker` | Docker JSON logs (RFC3339 timestamps) | `-M timestamp:pattern=^\\d{4}-\\d{2}-\\d{2}T` |
-| `syslog` | RFC3164/5424 headers (`Jan  2`, `<34>1 2024-01-01T...`) | `-M timestamp:pattern=^(<\\d+>\\d\\s+\\d{4}-\\d{2}-\\d{2}T|\\w{3}\\s+\\d{1,2})` |
-| `combined` | Apache/Nginx access logs with remote host prefix | `-M start:^\\S+\\s+\\S+\\s+\\S+\\s+\\[` |
-| `nginx` | Nginx error logs prefixed with `[dd/Mon/yyyy:` | `-M timestamp:pattern=^\\[[0-9]{2}/[A-Za-z]{3}/[0-9]{4}:` |
-| `continuation` | Lines ending with `\\` continue the current event | `-M backslash` |
-| `block` | `BEGIN` ... `END` sections form a single event | `-M boundary:start=^BEGIN:end=^END` |
-| `whole` | Treat the entire input as one event (fixtures, preformatted payloads) | `-M whole` |
+Kelora now offers four explicit multiline modes:
 
-When you pick a timestamp-based strategy (the presets above or `-M timestamp`), you can also
-provide `--ts-format=<chrono fmt>` so Kelora matches your exact timestamp prefix instead of relying
-solely on the preset regex.
+- `timestamp` — detect leading timestamps using the adaptive parser. Add
+  `:format=<chrono>` when you need to seed a specific layout (`%b %e %H:%M:%S`, etc.).
+- `indent` — treat any line that begins with indentation as a continuation of the
+  current event.
+- `regex:match=<REGEX>[:end=<REGEX>]` — provide your own record headers (and
+  optional terminators) when you need full control.
+- `all` — buffer the entire input as a single event when you already have
+  pre-chunked payloads.
 
-Build custom strategies with `timestamp:pattern=...`, `indent`, `start:REGEX`, `end:REGEX`, `boundary`, `backslash[:char=...]`, or `whole` (single mega-event). Remember that buffering happens until a boundary is found; when running with `--parallel`, lower `--batch-size` or `--batch-timeout` to keep long multi-line frames flushable, and `whole` will buffer the entire stream in memory.
+The option stays off unless you pass `-M/--multiline`. Detection always runs before
+parsing, so pair the strategy with the input format you expect (for example, `-f raw`
+before handing events to a JSON parser). Buffering continues until the next detected
+start (or end regex) arrives; if you run with `--parallel`, tune `--batch-size` or
+`--batch-timeout` to keep memory bounded. Remember that `--multiline all` keeps the
+entire stream in memory until it flushes.
 
 ## Configuration & Defaults
 
