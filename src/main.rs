@@ -1648,8 +1648,8 @@ For complete Rhai language documentation, visit: https://rhai.rs
 
 STAGE OVERVIEW:
   --begin         Runs once before parsing; populate `conf` (read-only later)
-  --filter        Runs per event as a boolean gate (true keeps, false drops)
-  --exec / -e     Runs per event for transformations and side effects
+  --filter        Runs per event as a boolean gate (true keeps, false drops); repeatable, runs in given order
+  --exec / -e     Runs per event for transformations and side effects; repeatable, runs in given order
   --exec-file     Same as --exec, but pull script from disk
   --end           Runs once after processing; use it to emit reports from the metrics map and other summaries
 
