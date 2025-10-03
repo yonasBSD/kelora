@@ -59,8 +59,8 @@ pub struct Cli {
     /// Input files (stdin if not specified, or use "-" to explicitly specify stdin)
     pub files: Vec<String>,
 
-    /// Input format. Supports standard formats (json, line, csv, etc.) and cols:<spec> for column parsing.
-    /// Example: -f json, -f 'cols:ts(2) level - *msg'
+    /// Input format. Supports standard formats (json, line, csv, etc.), cols:<spec> for column parsing, and csv/tsv with type annotations.
+    /// Examples: -f json, -f 'cols:ts level *msg', -f 'csv status:int bytes:int'
     #[arg(
         short = 'f',
         long = "input-format",
@@ -716,7 +716,7 @@ impl Cli {
     }
 }
 
-/// Parse and validate format value - supports both standard formats and cols:<spec>
+/// Parse and validate format value - supports standard formats, cols:<spec>, and csv/tsv with type annotations
 fn parse_format_value(s: &str) -> Result<String, String> {
     // Check if it's a cols format
     if let Some(spec) = s.strip_prefix("cols:") {
@@ -728,6 +728,14 @@ fn parse_format_value(s: &str) -> Result<String, String> {
         return Ok(s.to_string());
     }
 
+    // Check if it's CSV/TSV with field specs (type annotations)
+    if s.starts_with("csv:") || s.starts_with("csv ") {
+        return Ok(s.to_string());
+    }
+    if s.starts_with("tsv:") || s.starts_with("tsv ") {
+        return Ok(s.to_string());
+    }
+
     // Check if it's a standard format
     match s.to_lowercase().as_str() {
         "auto" | "json" | "line" | "raw" | "logfmt" | "syslog" | "cef"
@@ -736,7 +744,7 @@ fn parse_format_value(s: &str) -> Result<String, String> {
         }
         _ => {
             Err(format!(
-                "Unknown format '{}'. Supported formats: auto, json, line, raw, logfmt, syslog, cef, csv, tsv, csvnh, tsvnh, combined, cols, or cols:<spec>",
+                "Unknown format '{}'. Supported formats: auto, json, line, raw, logfmt, syslog, cef, csv, tsv, csvnh, tsvnh, combined, cols, csv:<spec>, tsv:<spec>, or cols:<spec>",
                 s
             ))
         }

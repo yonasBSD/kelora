@@ -160,10 +160,10 @@ pub enum InputFormat {
     Logfmt,
     Syslog,
     Cef,
-    Csv,
-    Tsv,
-    Csvnh,
-    Tsvnh,
+    Csv(Option<String>), // Optional field spec with type annotations
+    Tsv(Option<String>), // Optional field spec with type annotations
+    Csvnh,               // No type annotations (no field names)
+    Tsvnh,               // No type annotations (no field names)
     Combined,
     Cols(String), // Contains the column spec
 }
@@ -823,30 +823,50 @@ fn parse_input_format_from_cli(cli: &crate::Cli) -> anyhow::Result<InputFormat> 
 
 /// Parse input format specification string (e.g., "cols:ts(2) level - *msg")
 fn parse_input_format_spec(spec: &str) -> anyhow::Result<InputFormat> {
+    // Helper to parse field spec after format name
+    let parse_field_spec = |_prefix: &str, name: &str| -> Option<String> {
+        // Handle both "csv:" and "csv " (optional colon)
+        if let Some(field_spec) = spec.strip_prefix(&format!("{}:", name)) {
+            Some(field_spec.trim().to_string())
+        } else {
+            spec.strip_prefix(&format!("{} ", name))
+                .map(|field_spec| field_spec.trim().to_string())
+        }
+    };
+
+    // Check for cols format with spec
     if let Some(cols_spec) = spec.strip_prefix("cols:") {
         if cols_spec.trim().is_empty() {
             return Err(anyhow::anyhow!(
                 "cols format requires a specification, e.g., 'cols:ts level *msg'"
             ));
         }
-        Ok(InputFormat::Cols(cols_spec.to_string()))
-    } else {
-        // Parse standard formats
-        match spec.to_lowercase().as_str() {
-            "auto" => Ok(InputFormat::Auto),
-            "json" => Ok(InputFormat::Json),
-            "line" => Ok(InputFormat::Line),
-            "raw" => Ok(InputFormat::Raw),
-            "logfmt" => Ok(InputFormat::Logfmt),
-            "syslog" => Ok(InputFormat::Syslog),
-            "cef" => Ok(InputFormat::Cef),
-            "csv" => Ok(InputFormat::Csv),
-            "tsv" => Ok(InputFormat::Tsv),
-            "csvnh" => Ok(InputFormat::Csvnh),
-            "tsvnh" => Ok(InputFormat::Tsvnh),
-            "combined" => Ok(InputFormat::Combined),
-            _ => Err(anyhow::anyhow!("Unknown input format: '{}'. Supported formats: json, line, csv, syslog, cef, logfmt, raw, tsv, csvnh, tsvnh, combined, auto, and cols:<spec>", spec)),
-        }
+        return Ok(InputFormat::Cols(cols_spec.to_string()));
+    }
+
+    // Check for CSV/TSV variants with optional field specs (only for formats with headers)
+    if let Some(field_spec) = parse_field_spec(spec, "csv") {
+        return Ok(InputFormat::Csv(Some(field_spec)));
+    }
+    if let Some(field_spec) = parse_field_spec(spec, "tsv") {
+        return Ok(InputFormat::Tsv(Some(field_spec)));
+    }
+
+    // Parse standard formats (no field specs)
+    match spec.to_lowercase().as_str() {
+        "auto" => Ok(InputFormat::Auto),
+        "json" => Ok(InputFormat::Json),
+        "line" => Ok(InputFormat::Line),
+        "raw" => Ok(InputFormat::Raw),
+        "logfmt" => Ok(InputFormat::Logfmt),
+        "syslog" => Ok(InputFormat::Syslog),
+        "cef" => Ok(InputFormat::Cef),
+        "csv" => Ok(InputFormat::Csv(None)),
+        "tsv" => Ok(InputFormat::Tsv(None)),
+        "csvnh" => Ok(InputFormat::Csvnh),
+        "tsvnh" => Ok(InputFormat::Tsvnh),
+        "combined" => Ok(InputFormat::Combined),
+        _ => Err(anyhow::anyhow!("Unknown input format: '{}'. Supported formats: json, line, csv, syslog, cef, logfmt, raw, tsv, csvnh, tsvnh, combined, auto, and cols:<spec>", spec)),
     }
 }
 
@@ -951,8 +971,8 @@ impl From<crate::InputFormat> for InputFormat {
             crate::InputFormat::Logfmt => InputFormat::Logfmt,
             crate::InputFormat::Syslog => InputFormat::Syslog,
             crate::InputFormat::Cef => InputFormat::Cef,
-            crate::InputFormat::Csv => InputFormat::Csv,
-            crate::InputFormat::Tsv => InputFormat::Tsv,
+            crate::InputFormat::Csv => InputFormat::Csv(None),
+            crate::InputFormat::Tsv => InputFormat::Tsv(None),
             crate::InputFormat::Csvnh => InputFormat::Csvnh,
             crate::InputFormat::Tsvnh => InputFormat::Tsvnh,
             crate::InputFormat::Combined => InputFormat::Combined,
@@ -975,8 +995,8 @@ impl From<InputFormat> for crate::InputFormat {
             InputFormat::Logfmt => crate::InputFormat::Logfmt,
             InputFormat::Syslog => crate::InputFormat::Syslog,
             InputFormat::Cef => crate::InputFormat::Cef,
-            InputFormat::Csv => crate::InputFormat::Csv,
-            InputFormat::Tsv => crate::InputFormat::Tsv,
+            InputFormat::Csv(_) => crate::InputFormat::Csv,
+            InputFormat::Tsv(_) => crate::InputFormat::Tsv,
             InputFormat::Csvnh => crate::InputFormat::Csvnh,
             InputFormat::Tsvnh => crate::InputFormat::Tsvnh,
             InputFormat::Combined => crate::InputFormat::Combined,

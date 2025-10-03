@@ -587,10 +587,7 @@ mod tests {
 
         let config = ConfigFile::load_from_path(&file.path().to_path_buf()).unwrap();
 
-        assert_eq!(
-            config.defaults,
-            Some("-f json -F csv".to_string())
-        );
+        assert_eq!(config.defaults, Some("-f json -F csv".to_string()));
         assert_eq!(config.aliases.get("errors"), Some(&"-l error".to_string()));
         assert_eq!(
             config.aliases.get("json-logs"),
@@ -604,10 +601,9 @@ mod tests {
         config
             .aliases
             .insert("errors".to_string(), "-l error".to_string());
-        config.aliases.insert(
-            "json-errors".to_string(),
-            "-f json -a errors".to_string(),
-        );
+        config
+            .aliases
+            .insert("json-errors".to_string(), "-f json -a errors".to_string());
 
         let mut seen = std::collections::HashSet::new();
         let resolved = config.resolve_alias("json-errors", &mut seen, 0).unwrap();
@@ -676,14 +672,7 @@ mod tests {
 
         assert_eq!(
             processed,
-            vec![
-                "kelora",
-                "--stats",
-                "--parallel",
-                "-f",
-                "json",
-                "input.log"
-            ]
+            vec!["kelora", "--stats", "--parallel", "-f", "json", "input.log"]
         );
     }
 

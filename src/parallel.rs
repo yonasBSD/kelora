@@ -485,8 +485,8 @@ impl ParallelProcessor {
         // We'll wrap the reader to handle this preprocessing
         let (reader, pipeline_builder, preprocessing_line_count) = if matches!(
             config.input.format,
-            crate::config::InputFormat::Csv
-                | crate::config::InputFormat::Tsv
+            crate::config::InputFormat::Csv(_)
+                | crate::config::InputFormat::Tsv(_)
                 | crate::config::InputFormat::Csvnh
                 | crate::config::InputFormat::Tsvnh
         ) {
@@ -677,8 +677,8 @@ impl ParallelProcessor {
         // For CSV formats, we need to handle per-file preprocessing
         let file_aware_pipeline_builder = if matches!(
             config.input.format,
-            crate::config::InputFormat::Csv
-                | crate::config::InputFormat::Tsv
+            crate::config::InputFormat::Csv(_)
+                | crate::config::InputFormat::Tsv(_)
                 | crate::config::InputFormat::Csvnh
                 | crate::config::InputFormat::Tsvnh
         ) {
@@ -708,6 +708,7 @@ impl ParallelProcessor {
             let skip_lines = config.input.skip_lines;
             let global_tracker_clone = self.global_tracker.clone();
             let input_format = config.input.format.clone();
+            let strict = config.processing.strict;
             let ctrl_for_batcher = ctrl_rx.clone();
 
             thread::spawn(move || {
@@ -721,6 +722,7 @@ impl ParallelProcessor {
                     keep_lines,
                     skip_lines,
                     input_format,
+                    strict,
                     ctrl_for_batcher,
                 )
             })
@@ -1185,6 +1187,7 @@ impl ParallelProcessor {
         keep_lines: Option<regex::Regex>,
         skip_lines: usize,
         input_format: crate::config::InputFormat,
+        strict: bool,
         ctrl_rx: Receiver<Ctrl>,
     ) -> Result<()> {
         let mut batch_id = 0u64;
@@ -1274,6 +1277,7 @@ impl ParallelProcessor {
                                     &mut filtered_lines,
                                     skip_lines,
                                     &input_format,
+                                    strict,
                                     &ignore_lines,
                                     &keep_lines,
                                     &mut pending_deadline,
@@ -1379,6 +1383,7 @@ impl ParallelProcessor {
                                     &mut filtered_lines,
                                     skip_lines,
                                     &input_format,
+                                    strict,
                                     &ignore_lines,
                                     &keep_lines,
                                     &mut pending_deadline,
@@ -1487,6 +1492,7 @@ impl ParallelProcessor {
         filtered_lines: &mut usize,
         skip_lines: usize,
         input_format: &crate::config::InputFormat,
+        strict: bool,
         ignore_lines: &Option<regex::Regex>,
         keep_lines: &Option<regex::Regex>,
         pending_deadline: &mut Option<Instant>,
@@ -1527,8 +1533,8 @@ impl ParallelProcessor {
 
         if matches!(
             input_format,
-            crate::config::InputFormat::Csv
-                | crate::config::InputFormat::Tsv
+            crate::config::InputFormat::Csv(_)
+                | crate::config::InputFormat::Tsv(_)
                 | crate::config::InputFormat::Csvnh
                 | crate::config::InputFormat::Tsvnh
         ) && filename_changed
@@ -1547,13 +1553,13 @@ impl ParallelProcessor {
                 *pending_deadline = None;
             }
 
-            *current_headers = Self::create_csv_parser_for_file(input_format, &line)
+            *current_headers = Self::create_csv_parser_for_file(input_format, &line, strict)
                 .map(|parser| parser.get_headers());
             *last_filename = filename.clone();
 
             if matches!(
                 input_format,
-                crate::config::InputFormat::Csv | crate::config::InputFormat::Tsv
+                crate::config::InputFormat::Csv(_) | crate::config::InputFormat::Tsv(_)
             ) {
                 return Ok(());
             }
@@ -1586,10 +1592,25 @@ impl ParallelProcessor {
     fn create_csv_parser_for_file(
         input_format: &crate::config::InputFormat,
         first_line: &str,
+        strict: bool,
     ) -> Option<crate::parsers::CsvParser> {
         let mut parser = match input_format {
-            crate::config::InputFormat::Csv => crate::parsers::CsvParser::new_csv(),
-            crate::config::InputFormat::Tsv => crate::parsers::CsvParser::new_tsv(),
+            crate::config::InputFormat::Csv(ref field_spec) => {
+                let p = crate::parsers::CsvParser::new_csv();
+                if let Some(ref spec) = field_spec {
+                    p.with_field_spec(spec).ok()?.with_strict(strict)
+                } else {
+                    p
+                }
+            }
+            crate::config::InputFormat::Tsv(ref field_spec) => {
+                let p = crate::parsers::CsvParser::new_tsv();
+                if let Some(ref spec) = field_spec {
+                    p.with_field_spec(spec).ok()?.with_strict(strict)
+                } else {
+                    p
+                }
+            }
             crate::config::InputFormat::Csvnh => crate::parsers::CsvParser::new_csv_no_headers(),
             crate::config::InputFormat::Tsvnh => crate::parsers::CsvParser::new_tsv_no_headers(),
             _ => return None,
@@ -2803,9 +2824,25 @@ impl ParallelProcessor {
         let first_line_trimmed = first_line.trim_end().to_string();
 
         // Create a temporary parser to extract headers
-        let mut temp_parser = match config.input.format {
-            crate::config::InputFormat::Csv => crate::parsers::CsvParser::new_csv(),
-            crate::config::InputFormat::Tsv => crate::parsers::CsvParser::new_tsv(),
+        let mut temp_parser = match &config.input.format {
+            crate::config::InputFormat::Csv(ref field_spec) => {
+                let p = crate::parsers::CsvParser::new_csv();
+                if let Some(ref spec) = field_spec {
+                    p.with_field_spec(spec)?
+                        .with_strict(config.processing.strict)
+                } else {
+                    p
+                }
+            }
+            crate::config::InputFormat::Tsv(ref field_spec) => {
+                let p = crate::parsers::CsvParser::new_tsv();
+                if let Some(ref spec) = field_spec {
+                    p.with_field_spec(spec)?
+                        .with_strict(config.processing.strict)
+                } else {
+                    p
+                }
+            }
             crate::config::InputFormat::Csvnh => crate::parsers::CsvParser::new_csv_no_headers(),
             crate::config::InputFormat::Tsvnh => crate::parsers::CsvParser::new_tsv_no_headers(),
             _ => return Ok((Box::new(reader), pipeline_builder, 0)), // Not a CSV format

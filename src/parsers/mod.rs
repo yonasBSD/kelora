@@ -8,6 +8,7 @@ pub mod line;
 pub mod logfmt;
 pub mod raw;
 pub mod syslog;
+pub mod type_conversion;
 
 #[allow(unused_imports)] // Used by lib.rs for format auto-detection
 pub use auto_detect::detect_format;

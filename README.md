@@ -162,7 +162,8 @@ Kelora defaults to `-f line`, which trims trailing newline/CR characters and exp
 | `logfmt` | Key-value pairs | Logfmt structured logs |
 | `syslog` | `timestamp`, `host`, `facility`, `message`, ... | RFC3164/RFC5424 syslog |
 | `cef` | Header fields + extension map | ArcSight/Common Event Format |
-| `csv` / `tsv` | Column headers as fields | Delimited datasets |
+| `csv` / `tsv` | Column headers as fields (strings by default) | Delimited datasets |
+| `csv:<spec>` / `tsv:<spec>` | Column headers with type conversions | Typed CSV/TSV data |
 | `combined` | `ip`, `status`, `method`, `path`, `request`, `request_time`, ... | Apache/Nginx access logs |
 | `cols:<spec>` | Named fields defined by your spec (`ts`, `level`, `*rest`, ...) | Custom or proprietary log formats |
 
@@ -192,6 +193,44 @@ Strip infrastructure prefixes before parsing structured payloads.
 docker compose logs | \
   kelora --extract-prefix container --prefix-sep " | " --filter 'e.container == "web_1"'
 ```
+
+### Type Annotations
+
+Type annotations allow you to convert string fields to specific types during parsing. Supported for CSV, TSV, and cols formats.
+
+```bash
+# CSV with typed columns (status and bytes as integers, active as boolean)
+kelora -f "csv status:int bytes:int active:bool" data.csv
+
+# TSV with type conversions - space-separated field specs
+kelora -f "tsv: port:int response_time:float retry:bool" metrics.tsv
+
+# Cols format with type annotations
+kelora -f "cols:status:int bytes:int active:bool *msg" access.log
+
+# Cols with count specifiers and types
+kelora -f "cols:ts(2) level:int *msg:string" --cols-sep "|" logs.txt
+
+# Strict mode: fail on conversion errors instead of falling back to strings
+kelora -f "csv status:int" --strict logs.csv
+
+# Works in pipes and with compressed data
+zcat data.csv.gz | kelora -f "csv:count:int value:float"
+```
+
+**Supported types:**
+- `int` - Convert to 64-bit integer
+- `float` - Convert to 64-bit float
+- `bool` - Convert to boolean (recognizes `true/false`, `yes/no`, `1/0`, case-insensitive)
+- (no annotation) - Keep as string (default)
+
+**Error handling:**
+- Resilient mode (default): Invalid conversions fall back to original string value
+- Strict mode (`--strict`): Invalid conversions abort processing with error
+
+**Format availability:**
+- CSV/TSV: Type annotations work with headers (`csv`, `tsv`). Headerless formats (`csvnh`, `tsvnh`) use auto-generated column names (c1, c2, ...) and don't support type annotations.
+- Cols: Type annotations can be embedded directly in the column spec (e.g., `status:int`, `ts(2):string`, `*msg:bool`)
 
 ### Column Specs (`cols:<spec>`)
 

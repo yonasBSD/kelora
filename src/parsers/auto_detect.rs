@@ -264,7 +264,7 @@ fn detect_csv_variants(line: &str) -> Option<ConfigInputFormat> {
             if first_field.chars().any(|c| c.is_ascii_alphabetic())
                 && !first_field.chars().all(|c| c.is_ascii_digit())
             {
-                return Some(ConfigInputFormat::Tsv);
+                return Some(ConfigInputFormat::Tsv(None));
             } else {
                 return Some(ConfigInputFormat::Tsvnh);
             }
@@ -278,7 +278,7 @@ fn detect_csv_variants(line: &str) -> Option<ConfigInputFormat> {
             if trimmed_field.chars().any(|c| c.is_ascii_alphabetic())
                 && !trimmed_field.chars().all(|c| c.is_ascii_digit())
             {
-                return Some(ConfigInputFormat::Csv);
+                return Some(ConfigInputFormat::Csv(None));
             } else {
                 return Some(ConfigInputFormat::Csvnh);
             }
@@ -359,20 +359,26 @@ mod tests {
 
     #[test]
     fn test_detect_csv() {
-        assert_eq!(
+        assert!(matches!(
             detect_format("name,age,city").unwrap(),
-            ConfigInputFormat::Csv
-        );
-        assert_eq!(detect_format("1,2,3").unwrap(), ConfigInputFormat::Csvnh);
-        assert_eq!(
+            ConfigInputFormat::Csv(_)
+        ));
+        assert!(matches!(
+            detect_format("1,2,3").unwrap(),
+            ConfigInputFormat::Csvnh
+        ));
+        assert!(matches!(
             detect_format("john\t25\tnyc").unwrap(),
-            ConfigInputFormat::Tsv
-        ); // "john" has letters, so it's treated as header
-        assert_eq!(
+            ConfigInputFormat::Tsv(_)
+        )); // "john" has letters, so it's treated as header
+        assert!(matches!(
             detect_format("name\tage\tcity").unwrap(),
-            ConfigInputFormat::Tsv
-        );
-        assert_eq!(detect_format("1\t2\t3").unwrap(), ConfigInputFormat::Tsvnh);
+            ConfigInputFormat::Tsv(_)
+        ));
+        assert!(matches!(
+            detect_format("1\t2\t3").unwrap(),
+            ConfigInputFormat::Tsvnh
+        ));
         // All numeric, no headers
     }
 

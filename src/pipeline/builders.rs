@@ -57,7 +57,7 @@ pub struct PipelineBuilder {
     begin: Option<String>,
     #[allow(dead_code)] // Used in builder pattern, stored for build() method
     end: Option<String>,
-    input_format: crate::InputFormat,
+    input_format: crate::config::InputFormat,
     output_format: crate::OutputFormat,
     take_limit: Option<usize>,
     keys: Vec<String>,
@@ -76,6 +76,7 @@ pub struct PipelineBuilder {
     cols_spec: Option<String>,
     cols_sep: Option<String>,
     context_config: crate::config::ContextConfig,
+    strict: bool,
 }
 
 impl PipelineBuilder {
@@ -99,7 +100,7 @@ impl PipelineBuilder {
             },
             begin: None,
             end: None,
-            input_format: crate::InputFormat::Json,
+            input_format: crate::config::InputFormat::Json,
             output_format: crate::OutputFormat::Default,
             take_limit: None,
             keys: Vec::new(),
@@ -118,6 +119,7 @@ impl PipelineBuilder {
             cols_spec: None,
             cols_sep: None,
             context_config: crate::config::ContextConfig::disabled(),
+            strict: false,
         }
     }
 
@@ -157,36 +159,50 @@ impl PipelineBuilder {
 
         // Create parser
         let base_parser: Box<dyn EventParser> = match self.input_format {
-            crate::InputFormat::Auto => {
+            crate::config::InputFormat::Auto => {
                 return Err(anyhow::anyhow!(
                     "Auto format should be resolved before pipeline creation"
                 ));
             }
-            crate::InputFormat::Json => Box::new(crate::parsers::JsonlParser::new()),
-            crate::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
-            crate::InputFormat::Raw => Box::new(crate::parsers::RawParser::new()),
-            crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
-            crate::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
-            crate::InputFormat::Cef => Box::new(crate::parsers::CefParser::new()),
-            crate::InputFormat::Csv => {
-                if let Some(ref headers) = self.csv_headers {
-                    Box::new(crate::parsers::CsvParser::new_csv_with_headers(
-                        headers.clone(),
-                    ))
+            crate::config::InputFormat::Json => Box::new(crate::parsers::JsonlParser::new()),
+            crate::config::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
+            crate::config::InputFormat::Raw => Box::new(crate::parsers::RawParser::new()),
+            crate::config::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
+            crate::config::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
+            crate::config::InputFormat::Cef => Box::new(crate::parsers::CefParser::new()),
+            crate::config::InputFormat::Csv(ref field_spec) => {
+                let parser = if let Some(ref headers) = self.csv_headers {
+                    crate::parsers::CsvParser::new_csv_with_headers(headers.clone())
                 } else {
-                    Box::new(crate::parsers::CsvParser::new_csv())
-                }
-            }
-            crate::InputFormat::Tsv => {
-                if let Some(ref headers) = self.csv_headers {
-                    Box::new(crate::parsers::CsvParser::new_tsv_with_headers(
-                        headers.clone(),
-                    ))
+                    crate::parsers::CsvParser::new_csv()
+                };
+
+                // Apply field spec if provided
+                let parser = if let Some(ref spec) = field_spec {
+                    parser.with_field_spec(spec)?.with_strict(self.strict)
                 } else {
-                    Box::new(crate::parsers::CsvParser::new_tsv())
-                }
+                    parser
+                };
+
+                Box::new(parser)
             }
-            crate::InputFormat::Csvnh => {
+            crate::config::InputFormat::Tsv(ref field_spec) => {
+                let parser = if let Some(ref headers) = self.csv_headers {
+                    crate::parsers::CsvParser::new_tsv_with_headers(headers.clone())
+                } else {
+                    crate::parsers::CsvParser::new_tsv()
+                };
+
+                // Apply field spec if provided
+                let parser = if let Some(ref spec) = field_spec {
+                    parser.with_field_spec(spec)?.with_strict(self.strict)
+                } else {
+                    parser
+                };
+
+                Box::new(parser)
+            }
+            crate::config::InputFormat::Csvnh => {
                 if let Some(ref headers) = self.csv_headers {
                     Box::new(crate::parsers::CsvParser::new_csv_no_headers_with_columns(
                         headers.clone(),
@@ -195,7 +211,7 @@ impl PipelineBuilder {
                     Box::new(crate::parsers::CsvParser::new_csv_no_headers())
                 }
             }
-            crate::InputFormat::Tsvnh => {
+            crate::config::InputFormat::Tsvnh => {
                 if let Some(ref headers) = self.csv_headers {
                     Box::new(crate::parsers::CsvParser::new_tsv_no_headers_with_columns(
                         headers.clone(),
@@ -204,13 +220,15 @@ impl PipelineBuilder {
                     Box::new(crate::parsers::CsvParser::new_tsv_no_headers())
                 }
             }
-            crate::InputFormat::Combined => Box::new(crate::parsers::CombinedParser::new()?),
-            crate::InputFormat::Cols => {
+            crate::config::InputFormat::Combined => {
+                Box::new(crate::parsers::CombinedParser::new()?)
+            }
+            crate::config::InputFormat::Cols(_) => {
                 if let Some(ref spec) = self.cols_spec {
-                    Box::new(crate::parsers::ColsParser::new(
-                        spec.clone(),
-                        self.cols_sep.clone(),
-                    ))
+                    Box::new(
+                        crate::parsers::ColsParser::new(spec.clone(), self.cols_sep.clone())
+                            .with_strict(self.strict),
+                    )
                 } else {
                     return Err(anyhow::anyhow!("Cols format requires a specification"));
                 }
@@ -384,7 +402,7 @@ impl PipelineBuilder {
 
         // Create chunker based on multiline configuration
         let chunker = if let Some(ref multiline_config) = self.multiline {
-            create_multiline_chunker(multiline_config, self.input_format.clone().into())
+            create_multiline_chunker(multiline_config, self.input_format.clone())
                 .map_err(|e| anyhow::anyhow!("Failed to create multiline chunker: {}", e))?
         } else {
             Box::new(SimpleChunker) as Box<dyn super::Chunker>
@@ -425,7 +443,7 @@ impl PipelineBuilder {
     }
 
     #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
-    pub fn with_input_format(mut self, format: crate::InputFormat) -> Self {
+    pub fn with_input_format(mut self, format: crate::config::InputFormat) -> Self {
         self.input_format = format;
         self
     }
@@ -471,36 +489,50 @@ impl PipelineBuilder {
 
         // Create parser (with pre-processed CSV headers if available)
         let base_parser: Box<dyn EventParser> = match self.input_format {
-            crate::InputFormat::Auto => {
+            crate::config::InputFormat::Auto => {
                 return Err(anyhow::anyhow!(
                     "Auto format should be resolved before pipeline creation"
                 ));
             }
-            crate::InputFormat::Json => Box::new(crate::parsers::JsonlParser::new()),
-            crate::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
-            crate::InputFormat::Raw => Box::new(crate::parsers::RawParser::new()),
-            crate::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
-            crate::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
-            crate::InputFormat::Cef => Box::new(crate::parsers::CefParser::new()),
-            crate::InputFormat::Csv => {
-                if let Some(ref headers) = self.csv_headers {
-                    Box::new(crate::parsers::CsvParser::new_csv_with_headers(
-                        headers.clone(),
-                    ))
+            crate::config::InputFormat::Json => Box::new(crate::parsers::JsonlParser::new()),
+            crate::config::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
+            crate::config::InputFormat::Raw => Box::new(crate::parsers::RawParser::new()),
+            crate::config::InputFormat::Logfmt => Box::new(crate::parsers::LogfmtParser::new()),
+            crate::config::InputFormat::Syslog => Box::new(crate::parsers::SyslogParser::new()?),
+            crate::config::InputFormat::Cef => Box::new(crate::parsers::CefParser::new()),
+            crate::config::InputFormat::Csv(ref field_spec) => {
+                let parser = if let Some(ref headers) = self.csv_headers {
+                    crate::parsers::CsvParser::new_csv_with_headers(headers.clone())
                 } else {
-                    Box::new(crate::parsers::CsvParser::new_csv())
-                }
-            }
-            crate::InputFormat::Tsv => {
-                if let Some(ref headers) = self.csv_headers {
-                    Box::new(crate::parsers::CsvParser::new_tsv_with_headers(
-                        headers.clone(),
-                    ))
+                    crate::parsers::CsvParser::new_csv()
+                };
+
+                // Apply field spec if provided
+                let parser = if let Some(ref spec) = field_spec {
+                    parser.with_field_spec(spec)?.with_strict(self.strict)
                 } else {
-                    Box::new(crate::parsers::CsvParser::new_tsv())
-                }
+                    parser
+                };
+
+                Box::new(parser)
             }
-            crate::InputFormat::Csvnh => {
+            crate::config::InputFormat::Tsv(ref field_spec) => {
+                let parser = if let Some(ref headers) = self.csv_headers {
+                    crate::parsers::CsvParser::new_tsv_with_headers(headers.clone())
+                } else {
+                    crate::parsers::CsvParser::new_tsv()
+                };
+
+                // Apply field spec if provided
+                let parser = if let Some(ref spec) = field_spec {
+                    parser.with_field_spec(spec)?.with_strict(self.strict)
+                } else {
+                    parser
+                };
+
+                Box::new(parser)
+            }
+            crate::config::InputFormat::Csvnh => {
                 if let Some(ref headers) = self.csv_headers {
                     Box::new(crate::parsers::CsvParser::new_csv_no_headers_with_columns(
                         headers.clone(),
@@ -509,7 +541,7 @@ impl PipelineBuilder {
                     Box::new(crate::parsers::CsvParser::new_csv_no_headers())
                 }
             }
-            crate::InputFormat::Tsvnh => {
+            crate::config::InputFormat::Tsvnh => {
                 if let Some(ref headers) = self.csv_headers {
                     Box::new(crate::parsers::CsvParser::new_tsv_no_headers_with_columns(
                         headers.clone(),
@@ -518,13 +550,15 @@ impl PipelineBuilder {
                     Box::new(crate::parsers::CsvParser::new_tsv_no_headers())
                 }
             }
-            crate::InputFormat::Combined => Box::new(crate::parsers::CombinedParser::new()?),
-            crate::InputFormat::Cols => {
+            crate::config::InputFormat::Combined => {
+                Box::new(crate::parsers::CombinedParser::new()?)
+            }
+            crate::config::InputFormat::Cols(_) => {
                 if let Some(ref spec) = self.cols_spec {
-                    Box::new(crate::parsers::ColsParser::new(
-                        spec.clone(),
-                        self.cols_sep.clone(),
-                    ))
+                    Box::new(
+                        crate::parsers::ColsParser::new(spec.clone(), self.cols_sep.clone())
+                            .with_strict(self.strict),
+                    )
                 } else {
                     return Err(anyhow::anyhow!("Cols format requires a specification"));
                 }
@@ -694,7 +728,7 @@ impl PipelineBuilder {
 
         // Create chunker based on multiline configuration
         let chunker = if let Some(ref multiline_config) = self.multiline {
-            create_multiline_chunker(multiline_config, self.input_format.clone().into())
+            create_multiline_chunker(multiline_config, self.input_format.clone())
                 .map_err(|e| anyhow::anyhow!("Failed to create multiline chunker: {}", e))?
         } else {
             Box::new(SimpleChunker) as Box<dyn super::Chunker>
@@ -816,8 +850,11 @@ pub fn create_pipeline_builder_from_config(
 
     // Extract cols spec if needed before conversion
     let (input_format, cols_spec) = match &config.input.format {
-        crate::config::InputFormat::Cols(spec) => (crate::InputFormat::Cols, Some(spec.clone())),
-        other => (other.clone().into(), None),
+        crate::config::InputFormat::Cols(spec) => (
+            crate::config::InputFormat::Cols(spec.clone()),
+            Some(spec.clone()),
+        ),
+        other => (other.clone(), None),
     };
 
     let mut builder = PipelineBuilder::new()
@@ -842,6 +879,7 @@ pub fn create_pipeline_builder_from_config(
     builder.prefix_sep = config.input.prefix_sep.clone();
     builder.take_limit = config.processing.take_limit;
     builder.context_config = config.processing.context.clone();
+    builder.strict = config.processing.strict;
     builder
 }
 

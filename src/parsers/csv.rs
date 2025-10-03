@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use crate::event::Event;
+use crate::parsers::type_conversion::{convert_value_to_type, parse_field_with_type, TypeMap};
 use crate::pipeline::EventParser;
 use anyhow::{Context, Result};
 use csv::ReaderBuilder;
@@ -9,13 +10,15 @@ use rhai::Dynamic;
 ///
 /// Supported formats:
 /// - CSV: Comma-separated values with headers
-/// - TSV: Tab-separated values with headers  
+/// - TSV: Tab-separated values with headers
 /// - CSVNH: Comma-separated values without headers (generates c1, c2, c3...)
 /// - TSVNH: Tab-separated values without headers (generates c1, c2, c3...)
 pub struct CsvParser {
     delimiter: u8,
     has_headers: bool,
     headers: Vec<String>,
+    type_map: TypeMap,
+    strict: bool,
 }
 
 impl CsvParser {
@@ -25,6 +28,8 @@ impl CsvParser {
             delimiter: b',',
             has_headers: true,
             headers: Vec::new(),
+            type_map: TypeMap::new(),
+            strict: false,
         }
     }
 
@@ -34,6 +39,8 @@ impl CsvParser {
             delimiter: b'\t',
             has_headers: true,
             headers: Vec::new(),
+            type_map: TypeMap::new(),
+            strict: false,
         }
     }
 
@@ -43,6 +50,8 @@ impl CsvParser {
             delimiter: b',',
             has_headers: false,
             headers: Vec::new(),
+            type_map: TypeMap::new(),
+            strict: false,
         }
     }
 
@@ -52,6 +61,8 @@ impl CsvParser {
             delimiter: b'\t',
             has_headers: false,
             headers: Vec::new(),
+            type_map: TypeMap::new(),
+            strict: false,
         }
     }
 
@@ -61,6 +72,8 @@ impl CsvParser {
             delimiter: b',',
             has_headers: true,
             headers,
+            type_map: TypeMap::new(),
+            strict: false,
         }
     }
 
@@ -70,6 +83,8 @@ impl CsvParser {
             delimiter: b'\t',
             has_headers: true,
             headers,
+            type_map: TypeMap::new(),
+            strict: false,
         }
     }
 
@@ -79,6 +94,8 @@ impl CsvParser {
             delimiter: b',',
             has_headers: false,
             headers,
+            type_map: TypeMap::new(),
+            strict: false,
         }
     }
 
@@ -88,12 +105,34 @@ impl CsvParser {
             delimiter: b'\t',
             has_headers: false,
             headers,
+            type_map: TypeMap::new(),
+            strict: false,
         }
     }
 
     /// Get the headers (for extracting initialized headers)
     pub fn get_headers(&self) -> Vec<String> {
         self.headers.clone()
+    }
+
+    /// Parse a field spec string and populate the type map
+    /// Field spec format: "field1:int field2:float field3:bool field4"
+    pub fn with_field_spec(mut self, field_spec: &str) -> Result<Self> {
+        for spec in field_spec.split_whitespace() {
+            let (field_name, field_type) = parse_field_with_type(spec)
+                .map_err(|e| anyhow::anyhow!("Invalid field spec '{}': {}", spec, e))?;
+
+            if let Some(ftype) = field_type {
+                self.type_map.insert(field_name, ftype);
+            }
+        }
+        Ok(self)
+    }
+
+    /// Set strict mode for type conversion
+    pub fn with_strict(mut self, strict: bool) -> Self {
+        self.strict = strict;
+        self
     }
 
     /// Initialize headers from the first line if needed
@@ -163,8 +202,30 @@ impl CsvParser {
             // Map CSV fields to event using local headers
             for (i, field) in record.iter().enumerate() {
                 if let Some(header) = self.headers.get(i) {
-                    // Store field values as strings (consistent with other parsers)
-                    event.set_field(header.clone(), Dynamic::from(field.to_string()));
+                    // Check if this field has a type annotation
+                    let value = if let Some(field_type) = self.type_map.get(header) {
+                        // Apply type conversion
+                        match convert_value_to_type(field, field_type, self.strict) {
+                            Ok(converted) => converted,
+                            Err(e) => {
+                                if self.strict {
+                                    return Err(anyhow::anyhow!(
+                                        "Type conversion failed for field '{}': {}",
+                                        header,
+                                        e
+                                    ));
+                                } else {
+                                    // In resilient mode, fall back to string
+                                    Dynamic::from(field.to_string())
+                                }
+                            }
+                        }
+                    } else {
+                        // No type annotation, store as string
+                        Dynamic::from(field.to_string())
+                    };
+
+                    event.set_field(header.clone(), value);
                 }
             }
 

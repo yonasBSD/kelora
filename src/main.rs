@@ -831,17 +831,33 @@ fn process_line_sequential<W: Write>(
     // For CSV formats, detect file changes and reinitialize parser, or handle first line for stdin
     if matches!(
         config.input.format,
-        config::InputFormat::Csv
-            | config::InputFormat::Tsv
+        config::InputFormat::Csv(_)
+            | config::InputFormat::Tsv(_)
             | config::InputFormat::Csvnh
             | config::InputFormat::Tsvnh
     ) && (current_filename != *last_filename
         || (current_filename.is_none() && current_csv_headers.is_none()))
     {
         // File changed, reinitialize CSV parser for this file
-        let mut temp_parser = match config.input.format {
-            config::InputFormat::Csv => parsers::CsvParser::new_csv(),
-            config::InputFormat::Tsv => parsers::CsvParser::new_tsv(),
+        let mut temp_parser = match &config.input.format {
+            config::InputFormat::Csv(ref field_spec) => {
+                let p = parsers::CsvParser::new_csv();
+                if let Some(ref spec) = field_spec {
+                    p.with_field_spec(spec)?
+                        .with_strict(config.processing.strict)
+                } else {
+                    p
+                }
+            }
+            config::InputFormat::Tsv(ref field_spec) => {
+                let p = parsers::CsvParser::new_tsv();
+                if let Some(ref spec) = field_spec {
+                    p.with_field_spec(spec)?
+                        .with_strict(config.processing.strict)
+                } else {
+                    p
+                }
+            }
             config::InputFormat::Csvnh => parsers::CsvParser::new_csv_no_headers(),
             config::InputFormat::Tsvnh => parsers::CsvParser::new_tsv_no_headers(),
             _ => unreachable!(),
