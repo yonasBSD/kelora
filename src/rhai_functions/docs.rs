@@ -11,7 +11,7 @@ text.after(delimiter [,nth])         Text after occurrence of delimiter (nth: 1=
 text.before(delimiter [,nth])        Text before occurrence of delimiter (nth: 1=first, -1=last)
 text.between(start, end)             Text between start and end delimiters
 text.bucket()                        Fast hash for sampling/grouping (returns INT for modulo operations)
-text.col(spec [,separator])         Extract columns by index/range/list (e.g., '1', '1,3,5', '1:4')
+text.col(spec [,separator])          Extract columns by index/range/list (e.g., '1', '1,3,5', '1:4')
 text.contains(pattern)               Check if text contains pattern (builtin)
 text.count(pattern)                  Count occurrences of pattern in text
 text.decode_b64()                    Decode base64 string to text
@@ -117,7 +117,7 @@ now_utc()                            Current UTC timestamp (DateTimeWrapper)
 now_local()                          Current local timestamp (DateTimeWrapper)
 to_datetime(text [,fmt [,tz]])       Convert string into DateTimeWrapper with optional hints
 to_duration("1h30m")                 Convert duration string into DurationWrapper
-duration_from_<unit>(n)             Create duration from seconds/minutes/hours/days/ms/ns
+duration_from_<unit>(n)              Create duration from seconds/minutes/hours/days/ms/ns
 humanize_duration(ms)                Convert milliseconds to human-readable format (e.g., "1h 30m")
 dt.format("format_string")           Format datetime using custom format string
 dt.year(), dt.month(), dt.day()      Extract date components
@@ -173,7 +173,7 @@ track_min(key, value)                Track minimum value for key
 track_sum(key, value)                Accumulate numeric values for key
 track_unique(key, value)             Track unique values for key
 
-FILE OUTPUT (REQUIRES --allow-fs-writes):
+FILE OUTPUT (requires --allow-fs-writes):
 append_file(path, text_or_array)     Append line(s) to file; arrays append one line per element
 mkdir(path [,recursive])             Create directory (set recursive=true to create parents)
 truncate_file(path)                  Create or zero-length a file for fresh output
@@ -186,18 +186,18 @@ e.rename_field("old", "new")         Rename field, returns true if successful
 
 Examples:
 # String processing with builtin and custom functions
-e.clean_url = e.url.extract_domain().to_lower()
+e.domain = e.url.extract_domain().to_lower()
 e.parts = e.message.split("|")  # Use builtin split
 e.word_count = e.text.trim().split(" ").len  # Chain builtin functions
 
 # Array processing with builtins and fan-out
 e.tag_count = e.tags.len  # Use builtin len
 e.error_tags = e.tags.filter(|tag| tag.contains("error"))  # Builtin filter
-emit_each(e.items)  # Creates separate event for each item
+emit_each(e.items)                 # Creates separate event for each item
 
 # Field manipulation
 e.rename_field("timestamp", "ts")  # Rename field, overwrites target if exists
-e.old_field = ()  # Remove field
+e.old_field = ()                   # Remove field
 
 # Type conversion - strict (returns () on error)
 e.status_code = e.status.to_int()  # Returns () if not a valid integer
