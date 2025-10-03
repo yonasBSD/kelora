@@ -1820,7 +1820,7 @@ Quick usage:
   kelora sample.log -M "timestamp:pattern=^\d{4}-" --ts-format "%Y-%m-%d %H:%M:%S"
 
 Multiline stays off unless you enable it with -M/--multiline. Choose a preset or
-craft a custom strategy, then layer your parser (for example, --format raw) so
+craft a custom strategy, then layer your parser (for example, -f raw) so
 multiline reconstruction happens before structured parsing.
 
 QUICK PRESETS (recommended):
@@ -1843,7 +1843,7 @@ syslog
 combined
   Apache/Nginx access logs with remote host prefix
   Equivalent to: -M start:^\S+\s+\S+\s+\S+\s+\[
-  Best for: web access logs parsed later via --format combined/logfmt/json
+  Best for: web access logs parsed later via -f combined/logfmt/json
 
 nginx
   Bracketed date headers like "[10/Oct/2000:13:55:36 +0000]"

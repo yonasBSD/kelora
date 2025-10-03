@@ -89,12 +89,12 @@ Configuration files use INI format with two main sections:
 
 ```ini
 # Global defaults applied to every kelora command
-defaults = --format auto --stats --input-tz UTC
+defaults = -f auto --stats --input-tz UTC
 
 [aliases]
 # Command aliases for common operations
 errors = -l error --stats
-json-errors = --format json -l error --output-format json
+json-errors = -f json -l error -F json
 slow-requests = --filter 'e.response_time.to_int() > 1000' --keys timestamp,method,path,response_time
 ```
 
@@ -113,7 +113,7 @@ kelora --help
 **Project Setup:**
 ```bash
 # Create project-specific defaults in your project root
-echo 'defaults = --format json --stats --parallel' > .kelora.ini
+echo 'defaults = -f json --stats --parallel' > .kelora.ini
 
 # All kelora commands in this project (and subdirectories) will use these defaults
 kelora input.log                    # Uses project defaults

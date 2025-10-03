@@ -109,7 +109,7 @@ Pre-built binaries live in the [GitHub releases](https://github.com/dloss/kelora
 
 ### Input & Parsing
 
-- `-f, --format <FORMAT>` selects a parser (`json`, `logfmt`, `syslog`, `combined`, `cols:<spec>`, ...); `-j` is shorthand for JSON.
+- `-f, --input-format <FORMAT>` selects a parser (`json`, `logfmt`, `syslog`, `combined`, `cols:<spec>`, ...); `-j` is shorthand for JSON.
 - `--file-order {cli|name|mtime}` controls multi-file processing order.
 - `--skip-lines`, `--keep-lines`, and `--ignore-lines` filter raw input before parsing.
 - `-M, --multiline <strategy>` enables multi-line reconstruction (see [Multiline Strategies](#multiline-strategies)).

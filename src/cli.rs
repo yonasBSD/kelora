@@ -50,7 +50,7 @@ pub enum FileOrder {
 #[command(name = "kelora")]
 #[command(about = "A command-line log analysis tool with embedded Rhai scripting")]
 #[command(
-    long_about = "A command-line log analysis tool with embedded Rhai scripting\n\nMODES:\n  (default)   Sequential processing - best for streaming/interactive use\n  --parallel  Parallel processing - best for high-throughput batch analysis\n\nCOMMON EXAMPLES:\n  kelora access.log --levels error,critical\n  kelora -j app.json --exec 'e.duration_ms = e.end_time - e.start_time'\n  kelora nginx.log --format combined --keys method,status,path\n\nSee also: --help-rhai for scripting stages, --help-functions for the full built-in catalogue"
+    long_about = "A command-line log analysis tool with embedded Rhai scripting\n\nMODES:\n  (default)   Sequential processing - best for streaming/interactive use\n  --parallel  Parallel processing - best for high-throughput batch analysis\n\nCOMMON EXAMPLES:\n  kelora access.log --levels error,critical\n  kelora -j app.json --exec 'e.duration_ms = e.end_time - e.start_time'\n  kelora nginx.log -f combined --keys method,status,path\n\nSee also: --help-rhai for scripting stages, --help-functions for the full built-in catalogue"
 )]
 #[command(author = "Dirk Loss <mail@dirk-loss.de>")]
 #[command(version)]
@@ -63,7 +63,7 @@ pub struct Cli {
     /// Example: -f json, -f 'cols:ts(2) level - *msg'
     #[arg(
         short = 'f',
-        long = "format",
+        long = "input-format",
         default_value = "line",
         help_heading = "Input Options",
         value_parser = parse_format_value

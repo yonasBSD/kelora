@@ -209,11 +209,11 @@ impl ConfigFile {
             );
             println!();
             println!("Example .kelora.ini:");
-            println!("defaults = --format auto --stats");
+            println!("defaults = -f auto --stats");
             println!();
             println!("[aliases]");
             println!("errors = -l error --stats");
-            println!("json-errors = --format json -l error --output-format json");
+            println!("json-errors = -f json -l error -F json");
             println!("slow-requests = --filter 'e.response_time.to_int() > 1000' --keys timestamp,method,path,response_time");
         }
     }
@@ -578,23 +578,23 @@ mod tests {
     #[test]
     fn test_load_config_file() {
         let mut file = NamedTempFile::new().unwrap();
-        writeln!(file, "defaults = --format json --output-format csv").unwrap();
+        writeln!(file, "defaults = -f json -F csv").unwrap();
         writeln!(file).unwrap();
         writeln!(file, "[aliases]").unwrap();
         writeln!(file, "errors = -l error").unwrap();
-        writeln!(file, "json-logs = --format json --output-format json").unwrap();
+        writeln!(file, "json-logs = -f json -F json").unwrap();
         file.flush().unwrap();
 
         let config = ConfigFile::load_from_path(&file.path().to_path_buf()).unwrap();
 
         assert_eq!(
             config.defaults,
-            Some("--format json --output-format csv".to_string())
+            Some("-f json -F csv".to_string())
         );
         assert_eq!(config.aliases.get("errors"), Some(&"-l error".to_string()));
         assert_eq!(
             config.aliases.get("json-logs"),
-            Some(&"--format json --output-format json".to_string())
+            Some(&"-f json -F json".to_string())
         );
     }
 
@@ -606,13 +606,13 @@ mod tests {
             .insert("errors".to_string(), "-l error".to_string());
         config.aliases.insert(
             "json-errors".to_string(),
-            "--format json -a errors".to_string(),
+            "-f json -a errors".to_string(),
         );
 
         let mut seen = std::collections::HashSet::new();
         let resolved = config.resolve_alias("json-errors", &mut seen, 0).unwrap();
 
-        assert_eq!(resolved, vec!["--format", "json", "-l", "error"]);
+        assert_eq!(resolved, vec!["-f", "json", "-l", "error"]);
     }
 
     #[test]
@@ -646,7 +646,7 @@ mod tests {
             "kelora".to_string(),
             "-a".to_string(),
             "errors".to_string(),
-            "--format".to_string(),
+            "-f".to_string(),
             "json".to_string(),
         ];
 
@@ -654,7 +654,7 @@ mod tests {
 
         assert_eq!(
             processed,
-            vec!["kelora", "-l", "error", "--stats", "--format", "json"]
+            vec!["kelora", "-l", "error", "--stats", "-f", "json"]
         );
     }
 
@@ -667,7 +667,7 @@ mod tests {
 
         let args = vec![
             "kelora".to_string(),
-            "--format".to_string(),
+            "-f".to_string(),
             "json".to_string(),
             "input.log".to_string(),
         ];
@@ -680,7 +680,7 @@ mod tests {
                 "kelora",
                 "--stats",
                 "--parallel",
-                "--format",
+                "-f",
                 "json",
                 "input.log"
             ]
@@ -701,7 +701,7 @@ mod tests {
             "kelora".to_string(),
             "-a".to_string(),
             "errors".to_string(),
-            "--format".to_string(),
+            "-f".to_string(),
             "json".to_string(),
         ];
 
@@ -709,7 +709,7 @@ mod tests {
 
         assert_eq!(
             processed,
-            vec!["kelora", "--stats", "-l", "error", "--format", "json"]
+            vec!["kelora", "--stats", "-l", "error", "-f", "json"]
         );
     }
 

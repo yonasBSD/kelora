@@ -816,7 +816,7 @@ impl Default for KeloraConfig {
     }
 }
 
-/// Parse input format from CLI options, handling the --format option
+/// Parse input format from CLI options, handling the --input-format option
 fn parse_input_format_from_cli(cli: &crate::Cli) -> anyhow::Result<InputFormat> {
     parse_input_format_spec(&cli.format)
 }
