@@ -11,8 +11,9 @@ Scriptable log processor for the command line. Treats logs as structured events 
 
 ## Table of Contents
 - [Overview](#overview)
-- [Quick Start](#quick-start)
+- [Quick Reference](#quick-reference)
 - [Installation](#installation)
+- [First Commands](#first-commands)
 - [Core Concepts](#core-concepts)
 - [CLI Feature Tour](#cli-feature-tour)
 - [Parsers & Formats](#parsers--formats)
@@ -21,6 +22,8 @@ Scriptable log processor for the command line. Treats logs as structured events 
 - [Multiline Strategies](#multiline-strategies)
 - [Configuration & Defaults](#configuration--defaults)
 - [Example Pipelines](#example-pipelines)
+- [Advanced Pipelines](#advanced-pipelines)
+- [Troubleshooting](#troubleshooting)
 - [Learning Path](#learning-path)
 - [Documentation Shortcuts](#documentation-shortcuts)
 - [When to Reach for Kelora](#when-to-reach-for-kelora)
@@ -36,22 +39,46 @@ Kelora parses log streams into structured events and runs them through a program
 - Handles streaming or batch workloads with sequential and `--parallel` execution modes.
 - Emits metrics and processing stats so you can observe pipelines while they run.
 
-## Quick Start
+## Quick Reference
+
+### Pipeline at a Glance
+
+| Stage | Trigger | Purpose |
+| --- | --- | --- |
+| Input | `kelora [FILES]` | Accept files or stdin (gzip auto-detect supported) |
+| Parse | `-f/--input-format`, `--extract-prefix`, `-M/--multiline` | Normalize raw text into structured events |
+| Filter | `--filter`, `-l/--levels`, `--since/--until` | Keep only events that matter |
+| Transform | `-e/--exec`, `--begin`, `--window` | Enrich, fan out, and compute metrics via Rhai |
+| Format | `-F/--output-format`, `-k/--keys`, `--stats` | Choose display or machine output |
+
+### High-Frequency Flags
+
+- `-f/--input-format <FORMAT>`: Swap parsers (JSON, logfmt, combined, `cols:<spec>`, etc.).
+- `--filter <expr>`: Rhai boolean expression to keep events (repeatable).
+- `-e/--exec <expr>`: Transform events in place; combine with `--metrics` or `--window`.
+- `-k/--keys <fields>`: Pick output fields or reorder columns without changing the data.
+- `-F/--output-format <FORMAT>`: Toggle renderers (`default`, `json`, `logfmt`, `levelmap`, `none`).
+- `--stats` / `--metrics`: Observe throughput and tracked counters.
+
+### Workload Recipes
+
+- Streaming tail: `tail -f examples/simple_json.jsonl | kelora -f json --filter 'e.level != "DEBUG"' --stats`
+- Archive crunching: `kelora -f combined --parallel examples/web_access_large.log.gz --stats`
+- Focused drill-down: `kelora -j examples/simple_json.jsonl --filter 'e.service == "auth"' -k timestamp,message`
 
 > [!TIP]
-> Use the fixtures in `examples/` when experimenting—no need to point at production logs.
+> The fixtures in `examples/` map to the categories in [examples/README.md](examples/README.md#file-categories). Start there before pointing Kelora at production data.
 
-### Basics
+## First Commands
 
 ```bash
 # Filter error-level events from the logfmt sample
 kelora -f logfmt -l error examples/simple_logfmt.log
 
-# Work with JSON logs and enrich the event before printing selected fields
+# Work with JSON logs and print selected fields
 kelora -j examples/simple_json.jsonl \
   --filter 'e.level == "ERROR"' \
-  --exec 'e.retry_count = e.get_path("retry", 0)' \
-  --keys timestamp,level,message,retry_count
+  --keys timestamp,level,message
 
 # Parse Apache/Nginx access logs, keep key fields, and surface stats
 kelora -f combined examples/web_access_large.log.gz \
@@ -62,28 +89,6 @@ kelora -f combined examples/web_access_large.log.gz \
 kelora -j examples/simple_json.jsonl \
   --filter 'e.level == "ERROR"' \
   --after-context 2 --before-context 1
-```
-
-### Advanced Moves
-
-```bash
-# Count slow responses and surface metrics alongside real-time output
-kelora -f logfmt examples/simple_logfmt.log \
-  --filter 'e.duration.to_int_or(0) >= 1000' \
-  --exec 'track_count("slow_requests"); e.bucket = if e.duration.to_int_or(0) >= 2000 { "very_slow" } else { "slow" }' \
-  --metrics
-
-# Sliding window alerting for login failures (stream from any source)
-kubectl logs -f deploy/auth | \
-  kelora -j --window 5 \
-    --filter 'e.event == "login_failed"' \
-    --exec 'let users = window_values("user"); if users.len() >= 3 { eprint("🚨 brute force detected for " + e.user); }'
-
-# Run a scripted pipeline from disk (save your Rhai to pipelines/critical_filter.rhai first)
-kelora -j examples/simple_json.jsonl \
-  --begin 'conf.critical_components = ["database", "auth"]' \
-  --exec-file pipelines/critical_filter.rhai \
-  --output-file filtered.json
 ```
 
 ## Installation
@@ -198,7 +203,7 @@ kelora -f line examples/simple_line.log \
 Strip infrastructure prefixes before parsing structured payloads.
 
 ```bash
-docker compose logs | \
+cat examples/prefix_docker.log | \
   kelora --extract-prefix container --prefix-sep " | " --filter 'e.container == "web_1"'
 ```
 
@@ -207,23 +212,23 @@ docker compose logs | \
 Type annotations allow you to convert string fields to specific types during parsing. Supported for CSV, TSV, and cols formats.
 
 ```bash
-# CSV with typed columns (status and bytes as integers, active as boolean)
-kelora -f "csv status:int bytes:int active:bool" data.csv
+# CSV with typed columns (status, bytes, and duration_ms as integers)
+kelora -f "csv status:int bytes:int duration_ms:int" examples/simple_csv.csv
 
 # TSV with type conversions - space-separated field specs
-kelora -f "tsv: port:int response_time:float retry:bool" metrics.tsv
+kelora -f "tsv: user_id:int success:bool" examples/simple_tsv.tsv
 
-# Cols format with type annotations
-kelora -f "cols:status:int bytes:int active:bool *msg" access.log
+# Cols format with multi-column capture
+kelora -f "cols:email ts status ip" examples/cols_mixed.log
 
-# Cols with count specifiers and types
-kelora -f "cols:ts(2) level:int *msg:string" --cols-sep "|" logs.txt
+# Cols with count specifiers and custom separator
+kelora -f "cols:date(2) level *msg:string" examples/cols_fixed.log
 
 # Strict mode: fail on conversion errors instead of falling back to strings
-kelora -f "csv status:int" --strict logs.csv
+kelora -f "csv status:int" --strict examples/errors_csv_ragged.csv
 
 # Works in pipes and with compressed data
-zcat data.csv.gz | kelora -f "csv:count:int value:float"
+gzip -dc examples/web_access_large.log.gz | kelora -f combined --stats
 ```
 
 **Supported types:**
@@ -335,13 +340,12 @@ Pair configs with `--ignore-config` for hermetic runs or CI pipelines.
 ## Example Pipelines
 
 ```bash
-# Real-time nginx monitoring with enrichment, metrics, and alerting
-tail -f /var/log/nginx/access.log | \
-  kelora -f combined \
-    --exec 'let status = e.status.to_int(); e.class = if status >= 500 { "server_error" } else if status >= 400 { "client_error" } else { "ok" };' \
-    --filter 'e.class != "ok"' \
-    --exec 'track_count("errors"); if e.class == "server_error" { eprint("🚨 " + e.status + " " + e.request); }' \
-    --metrics
+# Monitor access logs for server/client errors and count them
+kelora -f combined examples/web_access_large.log.gz \
+  --exec 'let status = e.status.to_int(); e.class = if status >= 500 { "server_error" } else if status >= 400 { "client_error" } else { "ok" };' \
+  --filter 'e.class != "ok"' \
+  --exec 'track_count("errors"); if e.class == "server_error" { eprint("🚨 " + e.status + " " + e.request); }' \
+  --metrics
 
 # Authentication watch with sliding windows and unique counters
 kelora -f syslog examples/simple_syslog.log \
@@ -355,12 +359,41 @@ kelora -f syslog examples/simple_syslog.log \
   --exec 'e.severity_label = if e.severity <= 3 { "critical" } else if e.severity <= 4 { "error" } else { "info" }; e.host = e.host.mask_ip(1);' \
   -J
 
-# Anonymize PII while maintaining linkability and sampling
-kelora -j access.log --salt "$KELORA_SALT" \
-  --exec 'e.user_pseudo = pseudonym(e.user_id, 8); e.ip_anon = anonymize(e.ip)' \
-  --filter 'bucket(e.user_id) % 10 == 0' \
-  --keys user_pseudo,ip_anon,action,status
+# Anonymize sensitive fields while keeping sessions linkable
+kelora -j examples/security_audit.jsonl \
+  --exec 'e.user_hash = e.user.hash("xxh3"); e.ip_masked = e.ip.mask_ip(1)' \
+  --filter 'e.event == "login"' \
+  --keys timestamp,user_hash,ip_masked,event
 ```
+
+## Advanced Pipelines
+
+```bash
+# Track slow requests and bucket them by severity
+kelora -f logfmt examples/simple_logfmt.log \
+  --filter '"duration" in e && e.duration.to_int_or(0) >= 100' \
+  --exec 'track_count("slow_requests"); e.slow_bucket = if e.duration.to_int_or(0) >= 2000 { "very_slow" } else { "slow" }' \
+  --metrics
+
+# Expand nested arrays into individual events
+kelora -j examples/json_arrays.jsonl \
+  --exec 'emit_each(e.get_path("users", []))' \
+  --keys id,name,score
+
+# Rolling average over windowed metrics
+kelora -j examples/window_metrics.jsonl \
+  --window 5 \
+  --metrics \
+  --exec 'let values = window_numbers("value"); if values.len() == 5 { let total = 0.0; for v in values { total += v; } e.moving_avg = total / values.len(); }'
+```
+
+## Troubleshooting
+
+- **No events printed**: run with `--verbose` to surface Rhai errors, or temporarily drop filters (`--filter`) to confirm parsing succeeds.
+- **Timestamp parsing failures**: confirm the field name via `-F json`, then add `--ts-field`/`--ts-format` from [`kelora --help-time`](#documentation-shortcuts). In resilient mode failed timestamps are dropped silently; add `--strict` to fail fast.
+- **Rhai script panics**: wrap risky lookups with helpers like `e.get_path("field", ())` or use `to_int_or` to coerce strings safely. `kelora --help-rhai` documents the available guards.
+- **Performance dips with `--parallel`**: trim `--window` sizes, avoid heavy per-event printing, and tune `--batch-size`/`--batch-timeout` as described in [Performance & Reliability](#cli-feature-tour).
+- **Unexpected empty fields**: inspect raw input using `-F inspect` or `-F logfmt` to ensure the parser chosen in `-f/--input-format` matches the data.
 
 ## Learning Path
 

@@ -11,10 +11,20 @@ kelora -f combined web_access_large.log.gz --parallel --stats
 kelora -j json_arrays.jsonl -e 'if "users" in e { emit_each(e.users) }' -k id,name,score
 ```
 
+## How to Choose an Example
+
+| File | Learn | Related Docs |
+| --- | --- | --- |
+| [simple_json.jsonl](simple_json.jsonl) | Practice filtering and key selection | [First Commands](../README.md#first-commands) |
+| [simple_logfmt.log](simple_logfmt.log) | Work with logfmt keys and metrics | [Example Pipelines](../README.md#example-pipelines) |
+| [web_access_large.log.gz](web_access_large.log.gz) | Batch processing + stats/metrics | [Quick Reference](../README.md#quick-reference) |
+| [json_arrays.jsonl](json_arrays.jsonl) | Fan out nested arrays safely | [Advanced Pipelines](../README.md#advanced-pipelines) |
+| [window_metrics.jsonl](window_metrics.jsonl) | Rolling calculations with `--window` | [Advanced Pipelines](../README.md#advanced-pipelines) |
+
 ## File Categories
 
 ### Basic Formats
-Simple examples of common formats:
+Simple examples of common formats. Pair with [Parsers & Formats](../README.md#parsers--formats).
 - [simple_json.jsonl](simple_json.jsonl) - JSON logs (20 events)
 - [simple_csv.csv](simple_csv.csv) - CSV with headers (25 rows)
 - [simple_tsv.tsv](simple_tsv.tsv) - Tab-separated (20 rows)
@@ -25,7 +35,7 @@ Simple examples of common formats:
 - [simple_line.log](simple_line.log) - Plain text (15 lines)
 
 ### Advanced Formats
-Specialized parsing features:
+Specialized parsing features for custom inputs. See [Format Recipes](../README.md#format-recipes).
 - [cols_fixed.log](cols_fixed.log) - Fixed-width columns
 - [cols_mixed.log](cols_mixed.log) - Mixed whitespace columns
 - [csv_typed.csv](csv_typed.csv) - CSV with type annotations (`status:int`)
@@ -34,7 +44,7 @@ Specialized parsing features:
 - [kv_pairs.log](kv_pairs.log) - Key-value pairs
 
 ### Multiline
-Events spanning multiple lines:
+Events spanning multiple lines. Cross-reference [Multiline Strategies](../README.md#multiline-strategies).
 - [multiline_stacktrace.log](multiline_stacktrace.log) - Java/Python stacktraces
 - [multiline_json_arrays.log](multiline_json_arrays.log) - Pretty-printed JSON
 - [multiline_continuation.log](multiline_continuation.log) - Backslash continuation
@@ -42,7 +52,7 @@ Events spanning multiple lines:
 - [multiline_indent.log](multiline_indent.log) - YAML-style indentation
 
 ### Complex Real-World
-Production-like scenarios:
+Production-like scenarios for stress testing pipelines. Useful with [Quick Reference](../README.md#quick-reference) and [Example Pipelines](../README.md#example-pipelines).
 - [web_access_large.log.gz](web_access_large.log.gz) - 1200 access logs (gzipped, 65KB)
 - [json_nested_deep.jsonl](json_nested_deep.jsonl) - Deeply nested JSON
 - [json_arrays.jsonl](json_arrays.jsonl) - Arrays for fan-out
@@ -50,7 +60,7 @@ Production-like scenarios:
 - [timezones_mixed.log](timezones_mixed.log) - Various timestamp formats
 
 ### Error Handling
-Testing resilience:
+Testing resilience and strict mode. See [Troubleshooting](../README.md#troubleshooting).
 - [errors_json_mixed.jsonl](errors_json_mixed.jsonl) - Valid + malformed JSON
 - [errors_json_types.jsonl](errors_json_types.jsonl) - Type conversion challenges
 - [errors_empty_lines.log](errors_empty_lines.log) - Empty lines, whitespace
@@ -60,18 +70,20 @@ Testing resilience:
 - [errors_exec_transform.jsonl](errors_exec_transform.jsonl) - Transform failures
 
 ### Feature-Specific
-Advanced capabilities:
+Advanced capabilities showcasing dedicated helpers. Combine with [Rhai Building Blocks](../README.md#rhai-building-blocks).
 - [window_metrics.jsonl](window_metrics.jsonl) - Time-series for window functions
 - [fan_out_batches.jsonl](fan_out_batches.jsonl) - Multi-level nested arrays
 - [custom_timestamps.log](custom_timestamps.log) - Non-standard formats
 - [sampling_hash.jsonl.gz](sampling_hash.jsonl.gz) - 600 events for sampling (gzipped, 3.6KB)
 
 ### Nightmare Mode
-Extremely challenging scenarios:
+Extremely challenging scenarios for benchmarking parser robustness.
 - [nightmare_mixed_formats.log](nightmare_mixed_formats.log) - JSON + logfmt + syslog in one file
 - [nightmare_deeply_nested_transform.jsonl](nightmare_deeply_nested_transform.jsonl) - 4-6 levels of nesting
 
 ## Common Patterns
+
+Each pattern aligns with the CLI tour in [README.md](../README.md#cli-feature-tour) so you can jump between runnable commands and flag descriptions.
 
 **Filter and select:**
 ```bash
