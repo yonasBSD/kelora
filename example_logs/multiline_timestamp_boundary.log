@@ -1,6 +1,0 @@
-Jan  1 00:00:01 host service[42]: First error line
-    stack frame line 1
-    stack frame line 2
-    stack frame line 3
-Jan  1 00:00:02 host service[42]: Second event begins here
-    stack frame continuation

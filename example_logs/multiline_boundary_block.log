@@ -1,7 +1,0 @@
-BEGIN Transaction 1
-line a
-line b
-END
-BEGIN Transaction 2
-line c
-END

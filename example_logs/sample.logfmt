@@ -1,5 +1,0 @@
-timestamp=2023-01-01T12:00:00Z level=info message="Application started" service=web
-timestamp=2023-01-01T12:00:01Z level=debug message="Processing request" method=GET path="/api/users" user_id=123
-timestamp=2023-01-01T12:00:02Z level=warn message="High response time" duration=1250 threshold=1000
-timestamp=2023-01-01T12:00:03Z level=error message="Database connection failed" error="connection timeout" retry_count=3
-timestamp=2023-01-01T12:00:04Z level=info message="Request completed" status=200 response_time=45

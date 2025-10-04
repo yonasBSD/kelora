@@ -1,5 +1,0 @@
-Dec 16 10:15:30 shade app[123]: Starting a long process \
-with multiple arguments and lots of long configuration o\
-ptions and some trailing notes\
- and an indented follow-up line that should be part of the same event
-Dec 16 10:15:31 shade app[123]: Process completed
