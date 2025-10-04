@@ -94,6 +94,10 @@ kelora -j json_nested_deep.jsonl \
 ```bash
 kelora -j json_arrays.jsonl -e 'if "users" in e { emit_each(e.users) }' -k id,name,score
 ```
+Optional shortcut when missing arrays should be ignored quietly:
+```bash
+kelora -j json_arrays.jsonl -e 'emit_each(e.get_path("users", []))' -k id,name,score
+```
 
 **Multi-level fan-out:**
 ```bash
