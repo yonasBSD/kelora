@@ -47,10 +47,11 @@ Kelora parses log streams into structured events and runs them through a program
 # Filter error-level events from the logfmt sample
 kelora -f logfmt --level error examples/simple_logfmt.log
 
-# Work with JSON logs and print selected fields
+# Focus on database events and surface slow queries
 kelora -j examples/simple_json.jsonl \
-  --filter 'e.message.contains("timeout")' \
-  --keys timestamp,service,message,duration_ms
+  --filter 'e.service == "database"' \
+  --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' \
+  --keys timestamp,message,duration_s
 
 # Parse Apache/Nginx access logs, keep key fields, and surface stats
 kelora -f combined examples/web_access_large.log.gz \
