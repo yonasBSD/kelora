@@ -80,7 +80,7 @@ kelora -j examples/simple_json.jsonl \
 
 Short one-liners for common tasks:
 
-- Streaming triage: `tail -f examples/simple_json.jsonl | kelora -j --level warn,error --exec 'track_count(e.service)' --metrics`
+- Stream-level error watch: `tail -f examples/simple_json.jsonl | kelora -j --level warn,error --exec 'track_count(e.service)' --metrics`
 - Fan out nested arrays: `kelora -j examples/json_arrays.jsonl --exec 'emit_each(e.get_path("users", []))' --keys id,name,score`
 - Mask sensitive fields: `kelora -j examples/security_audit.jsonl --exec 'e.ip_masked = e.ip.mask_ip(1); e.user_hash = e.user.hash("xxh3")' --keys timestamp,event,user_hash,ip_masked`
 
