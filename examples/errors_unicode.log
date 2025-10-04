@@ -1,0 +1,10 @@
+2024-01-15 10:00:00 INFO ASCII text is fine
+2024-01-15 10:00:05 INFO Unicode is great: ñoño 日本語 emoji 🚀
+2024-01-15 10:00:10 WARN Special chars: <>&"'
+2024-01-15 10:00:15 ERROR Control chars:
+2024-01-15 10:00:20 INFO Zero-width: a​b​c (has zero-width spaces)
+2024-01-15 10:00:25 WARN RTL text: مرحبا hello שלום
+2024-01-15 10:00:30 INFO Math symbols: ∑∫√π≠≈∞
+2024-01-15 10:00:35 DEBUG Box drawing: ┌─┐│└┘
+2024-01-15 10:00:40 INFO Combining: é (e + ́) vs é (single char)
+2024-01-15 10:00:45 WARN Surrogate pairs: 𝕳𝖊𝖑𝖑𝖔 𝔚𝔬𝔯𝔩𝔡

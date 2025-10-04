@@ -1,0 +1,10 @@
+user=alice action=login timestamp=2024-01-15T10:00:00Z success=true ip=192.168.1.10
+user=bob action=view_page timestamp=2024-01-15T10:01:00Z page=/dashboard duration=1.5
+user=charlie action=api_call timestamp=2024-01-15T10:02:00Z endpoint=/api/users method=GET status=200
+user=diana action=file_upload timestamp=2024-01-15T10:03:00Z filename=document.pdf size=1048576 success=true
+user=eve action=failed_login timestamp=2024-01-15T10:04:00Z attempts=3 locked=true ip=203.0.113.5
+user=frank action=password_reset timestamp=2024-01-15T10:05:00Z email=frank@example.com token_sent=true
+user=grace action=logout timestamp=2024-01-15T10:06:00Z session_duration=3600 reason=manual
+user=henry action=api_call timestamp=2024-01-15T10:07:00Z endpoint=/api/export method=POST bytes=5242880
+user=iris action=privilege_escalation timestamp=2024-01-15T10:08:00Z from=user to=admin success=false
+user=jack action=delete_account timestamp=2024-01-15T10:09:00Z confirmed=true data_removed=true

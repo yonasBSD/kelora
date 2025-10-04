@@ -1,0 +1,20 @@
+web_1        | 2024-01-15 10:00:00 [INFO] Starting web server on port 8080
+web_1        | 2024-01-15 10:00:05 [INFO] Listening for connections
+db_1         | 2024-01-15 10:00:10 [INFO] PostgreSQL starting up
+db_1         | 2024-01-15 10:00:15 [INFO] Database system is ready
+redis_1      | 2024-01-15 10:00:20 [INFO] Redis server starting
+redis_1      | 2024-01-15 10:00:25 [INFO] Ready to accept connections
+web_1        | 2024-01-15 10:00:30 [INFO] Connected to database
+web_1        | 2024-01-15 10:00:35 [DEBUG] Cache connection established
+nginx_1      | 2024-01-15 10:00:40 [INFO] Nginx starting
+nginx_1      | 2024-01-15 10:00:45 [INFO] Ready to serve traffic
+web_1        | 2024-01-15 10:01:00 [INFO] Received request GET /api/health
+web_1        | 2024-01-15 10:01:05 [INFO] Health check passed
+db_1         | 2024-01-15 10:01:10 [WARN] Connection pool 80% utilized
+redis_1      | 2024-01-15 10:01:15 [WARN] Memory usage at 75%
+worker_1     | 2024-01-15 10:01:20 [INFO] Background worker starting
+worker_1     | 2024-01-15 10:01:25 [INFO] Processing job queue
+web_1        | 2024-01-15 10:01:30 [ERROR] Request timeout after 5s
+nginx_1      | 2024-01-15 10:01:35 [ERROR] Upstream server timeout
+worker_1     | 2024-01-15 10:01:40 [INFO] Job completed: send_email
+db_1         | 2024-01-15 10:01:45 [INFO] Checkpoint completed

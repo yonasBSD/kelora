@@ -1,0 +1,10 @@
+{"timestamp":"2024-01-15T10:00:00Z","numerator":100,"denominator":10,"result":10}
+{"timestamp":"2024-01-15T10:00:05Z","numerator":50,"denominator":0,"result":null}
+{"timestamp":"2024-01-15T10:00:10Z","numerator":75,"denominator":5,"result":15}
+{"timestamp":"2024-01-15T10:00:15Z","value":"not-a-number","doubled":null}
+{"timestamp":"2024-01-15T10:00:20Z","value":42,"doubled":84}
+{"timestamp":"2024-01-15T10:00:25Z","user":null,"name":null}
+{"timestamp":"2024-01-15T10:00:30Z","user":{"name":"alice"},"name":"alice"}
+{"timestamp":"2024-01-15T10:00:35Z","items":[],"first":null}
+{"timestamp":"2024-01-15T10:00:40Z","items":["a","b","c"],"first":"a"}
+{"timestamp":"2024-01-15T10:00:45Z","missing_field":true}

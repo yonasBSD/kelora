@@ -1,0 +1,26 @@
+2024-01-15 10:00:00 INFO Starting application
+2024-01-15 10:00:05 DEBUG Initializing database connection
+2024-01-15 10:01:00 ERROR Failed to process request
+Traceback (most recent call last):
+  File "/app/server.py", line 42, in handle_request
+    result = process_data(request.body)
+  File "/app/processor.py", line 15, in process_data
+    return json.loads(data)
+ValueError: Invalid JSON format at line 3
+2024-01-15 10:01:30 WARN Retrying with default configuration
+2024-01-15 10:02:00 ERROR Database connection failed
+java.sql.SQLException: Connection timeout
+	at com.example.db.ConnectionPool.getConnection(ConnectionPool.java:123)
+	at com.example.api.UserController.getUser(UserController.java:45)
+	at com.example.api.RequestHandler.handle(RequestHandler.java:89)
+Caused by: java.net.SocketTimeoutException: Read timed out
+	at java.net.SocketInputStream.socketRead0(Native Method)
+	at java.net.SocketInputStream.read(SocketInputStream.java:150)
+2024-01-15 10:02:30 INFO Switching to backup database
+2024-01-15 10:03:00 ERROR Unhandled exception in worker thread
+RuntimeError: Maximum retry attempts exceeded
+  File "/app/worker.py", line 67, in run
+    self.process_job(job)
+  File "/app/worker.py", line 98, in process_job
+    raise RuntimeError("Maximum retry attempts exceeded")
+2024-01-15 10:03:30 CRITICAL System shutting down due to errors

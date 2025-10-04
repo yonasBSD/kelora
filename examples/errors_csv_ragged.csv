@@ -1,0 +1,11 @@
+timestamp,level,message,extra
+2024-01-15T10:00:00Z,INFO,Valid 4-column row,data
+2024-01-15T10:00:05Z,WARN,Missing extra column
+2024-01-15T10:00:10Z,ERROR,Extra,column,here,too,many
+2024-01-15T10:00:15Z,INFO,Valid row,more_data
+2024-01-15T10:00:20Z,DEBUG
+2024-01-15T10:00:25Z,INFO,Another valid,row
+2024-01-15T10:00:30Z,WARN,Quoted "comma, inside",value
+2024-01-15T10:00:35Z,ERROR,Missing,
+2024-01-15T10:00:40Z,INFO,Valid,data
+2024-01-15T10:00:45Z,CRITICAL,Final,row,good

@@ -1,0 +1,10 @@
+{"timestamp":"2024-01-15T10:00:00Z","batch_id":"batch_001","users":[{"id":1,"name":"alice","score":95},{"id":2,"name":"bob","score":87},{"id":3,"name":"charlie","score":92}]}
+{"timestamp":"2024-01-15T10:01:00Z","batch_id":"batch_002","users":[{"id":4,"name":"diana","score":88},{"id":5,"name":"eve","score":94}]}
+{"timestamp":"2024-01-15T10:02:00Z","event":"pageview","tags":["homepage","mobile","campaign_summer"],"scores":[85,92,78,95,88,91]}
+{"timestamp":"2024-01-15T10:03:00Z","event":"search","tags":["search","web","logged_in"],"queries":["laptop","wireless mouse","laptop","keyboard","laptop"]}
+{"timestamp":"2024-01-15T10:04:00Z","batches":[{"name":"batch_a","items":[{"id":1,"status":"active","priority":"high"},{"id":2,"status":"inactive","priority":"low"}]},{"name":"batch_b","items":[{"id":3,"status":"active","priority":"high"},{"id":4,"status":"active","priority":"medium"}]}]}
+{"timestamp":"2024-01-15T10:05:00Z","data":{"values":[100,200,150,300,250,180],"labels":["Jan","Feb","Mar","Apr","May","Jun"]}}
+{"timestamp":"2024-01-15T10:06:00Z","logs":[{"level":"info","msg":"Started"},{"level":"debug","msg":"Processing"},{"level":"warn","msg":"Slow query"},{"level":"info","msg":"Completed"}]}
+{"timestamp":"2024-01-15T10:07:00Z","emails":["alice@example.com","bob@test.org","charlie@example.com","alice@example.com","diana@example.com"],"domains":["example.com","example.com","test.org","example.com"]}
+{"timestamp":"2024-01-15T10:08:00Z","matrix":[[1,2,3],[4,5,6],[7,8,9]],"flattened":[1,2,3,4,5,6,7,8,9]}
+{"timestamp":"2024-01-15T10:09:00Z","purchases":[{"item":"laptop","price":999,"qty":1},{"item":"mouse","price":29,"qty":2},{"item":"keyboard","price":89,"qty":1}],"total":1146}

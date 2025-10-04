@@ -1,0 +1,39 @@
+{
+  "timestamp": "2024-01-15T10:00:00Z",
+  "event": "user_action",
+  "user": {
+    "id": 123,
+    "name": "alice"
+  },
+  "actions": [
+    "login",
+    "view_dashboard",
+    "edit_profile"
+  ]
+}
+{
+  "timestamp": "2024-01-15T10:01:00Z",
+  "event": "api_call",
+  "endpoint": "/api/users",
+  "response": {
+    "status": 200,
+    "data": {
+      "count": 42,
+      "users": ["alice", "bob", "charlie"]
+    }
+  }
+}
+{
+  "timestamp": "2024-01-15T10:02:00Z",
+  "event": "error",
+  "error": {
+    "type": "DatabaseError",
+    "message": "Connection failed",
+    "stack": [
+      "db.connect()",
+      "app.init()",
+      "main()"
+    ]
+  },
+  "retries": 3
+}

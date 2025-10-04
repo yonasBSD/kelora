@@ -1,0 +1,32 @@
+command: docker run -d \
+  --name myapp \
+  --memory 2g \
+  --cpus 2 \
+  -p 8080:8080 \
+  -v /data:/app/data \
+  myapp:latest
+result: Container started successfully
+command: kubectl apply -f - <<EOF \
+apiVersion: v1 \
+kind: Service \
+metadata: \
+  name: myservice \
+spec: \
+  selector: \
+    app: myapp \
+  ports: \
+  - port: 80
+result: Service created
+query: SELECT users.name, orders.total \
+FROM users \
+INNER JOIN orders ON users.id = orders.user_id \
+WHERE orders.status = 'completed' \
+  AND orders.total > 100 \
+ORDER BY orders.total DESC \
+LIMIT 10
+rows: 7
+config: export DATABASE_URL="postgresql://user:pass@localhost/db" \
+       export REDIS_URL="redis://localhost:6379" \
+       export SECRET_KEY="very-long-secret-key-that-needs-continuation" \
+       export API_ENDPOINT="https://api.example.com/v1"
+loaded: true

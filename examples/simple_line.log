@@ -1,0 +1,15 @@
+2024-01-15 10:00:00 [INFO] Server starting on port 8080
+2024-01-15 10:00:01 [DEBUG] Loading plugins from /etc/plugins
+2024-01-15 10:00:02 [INFO] Database connection established
+2024-01-15 10:00:05 [WARN] Configuration file missing, using defaults
+2024-01-15 10:01:00 [ERROR] Failed to connect to Redis: connection refused
+2024-01-15 10:01:01 [INFO] Falling back to in-memory cache
+2024-01-15 10:02:00 [INFO] HTTP server ready
+2024-01-15 10:02:30 [DEBUG] Processing GET /health
+2024-01-15 10:03:00 [WARN] Rate limit exceeded for IP 10.0.0.5
+2024-01-15 10:04:00 [ERROR] Unhandled exception in request handler
+2024-01-15 10:04:01 [DEBUG] Stack trace: at handleRequest (app.js:42)
+2024-01-15 10:05:00 [CRITICAL] Out of memory, terminating
+2024-01-15 10:05:01 [INFO] Shutdown signal received
+2024-01-15 10:05:02 [INFO] Closing database connections
+2024-01-15 10:05:03 [INFO] Server stopped gracefully

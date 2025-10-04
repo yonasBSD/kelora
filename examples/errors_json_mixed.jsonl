@@ -1,0 +1,17 @@
+{"timestamp":"2024-01-15T10:00:00Z","level":"INFO","message":"Valid event 1"}
+{"timestamp":"2024-01-15T10:00:05Z","level":"INFO","message":"Valid event 2"}
+{"timestamp":"2024-01-15T10:00:10Z","level":"ERROR","message":"Missing closing brace"
+{"timestamp":"2024-01-15T10:00:15Z","level":"INFO","message":"Valid event 3"}
+{"timestamp":"2024-01-15T10:00:20Z","level":"WARN","message":"Extra comma",}
+{"timestamp":"2024-01-15T10:00:25Z","level":"INFO","message":"Valid event 4"}
+{timestamp:"2024-01-15T10:00:30Z","level":"ERROR","message":"Unquoted key"}
+{"timestamp":"2024-01-15T10:00:35Z","level":"INFO","message":"Valid event 5"}
+{"timestamp":"2024-01-15T10:00:40Z","level":"WARN","message":"Trailing comma in array","tags":["tag1","tag2",]}
+{"timestamp":"2024-01-15T10:00:45Z","level":"INFO","message":"Valid event 6"}
+Not JSON at all - just plain text
+{"timestamp":"2024-01-15T10:00:55Z","level":"INFO","message":"Valid event 7"}
+{"timestamp":"2024-01-15T10:01:00Z","level":"ERROR","message":"Single quotes instead of double",'invalid':true}
+{"timestamp":"2024-01-15T10:01:05Z","level":"INFO","message":"Valid event 8"}
+{"timestamp":"2024-01-15T10:01:10Z"level":"WARN","message":"Missing comma between fields"}
+{"timestamp":"2024-01-15T10:01:15Z","level":"INFO","message":"Valid event 9"}
+{"timestamp":"2024-01-15T10:01:20Z","level":"INFO","message":"Valid event 10"}

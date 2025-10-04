@@ -1,0 +1,147 @@
+# Kelora Example Log Files
+
+**37 example files** demonstrating Kelora's capabilities across formats, scenarios, and complexity levels.
+
+## Quick Start
+
+```bash
+# Generate all examples
+../dev/generate_examples.sh
+
+# Try some examples
+kelora -f json simple_json.jsonl -l ERROR
+kelora -f combined web_access_large.log.gz --parallel --stats
+kelora -f json json_arrays.jsonl -e 'emit_each(e.users)' -k id,name,score
+```
+
+## File Categories
+
+### Basic Formats (8 files)
+Simple examples of common formats:
+- `simple_json.jsonl` - JSON logs (20 events)
+- `simple_csv.csv` - CSV with headers (25 rows)
+- `simple_tsv.tsv` - Tab-separated (20 rows)
+- `simple_logfmt.log` - Logfmt key=value (30 lines)
+- `simple_syslog.log` - RFC3164 syslog (25 lines)
+- `simple_combined.log` - Apache/Nginx logs (40 lines)
+- `simple_cef.log` - Security CEF format (15 events)
+- `simple_line.log` - Plain text (15 lines)
+
+### Advanced Formats (6 files)
+Specialized parsing features:
+- `cols_fixed.log` - Fixed-width columns
+- `cols_mixed.log` - Mixed whitespace columns
+- `csv_typed.csv` - CSV with type annotations (`status:int`)
+- `prefix_docker.log` - Docker container prefixes
+- `prefix_custom.log` - Custom separators (`>>>`)
+- `kv_pairs.log` - Key-value pairs
+
+### Multiline (5 files)
+Events spanning multiple lines:
+- `multiline_stacktrace.log` - Java/Python stacktraces
+- `multiline_json_arrays.log` - Pretty-printed JSON
+- `multiline_continuation.log` - Backslash continuation
+- `multiline_boundary.log` - BEGIN/END blocks
+- `multiline_indent.log` - YAML-style indentation
+
+### Complex Real-World (5 files)
+Production-like scenarios:
+- `web_access_large.log.gz` - 1200 access logs (gzipped, 65KB)
+- `json_nested_deep.jsonl` - Deeply nested JSON
+- `json_arrays.jsonl` - Arrays for fan-out
+- `security_audit.jsonl` - IPs, JWTs, hashes
+- `timezones_mixed.log` - Various timestamp formats
+
+### Error Handling (7 files)
+Testing resilience:
+- `errors_json_mixed.jsonl` - Valid + malformed JSON
+- `errors_json_types.jsonl` - Type conversion challenges
+- `errors_empty_lines.log` - Empty lines, whitespace
+- `errors_csv_ragged.csv` - Inconsistent columns
+- `errors_unicode.log` - Unicode, special chars
+- `errors_filter_runtime.jsonl` - Runtime error triggers
+- `errors_exec_transform.jsonl` - Transform failures
+
+### Feature-Specific (4 files)
+Advanced capabilities:
+- `window_metrics.jsonl` - Time-series for window functions
+- `fan_out_batches.jsonl` - Multi-level nested arrays
+- `custom_timestamps.log` - Non-standard formats
+- `sampling_hash.jsonl.gz` - 600 events for sampling (gzipped, 3.6KB)
+
+### Nightmare Mode (2 files)
+Extremely challenging scenarios:
+- `nightmare_mixed_formats.log` - JSON + logfmt + syslog in one file
+- `nightmare_deeply_nested_transform.jsonl` - 4-6 levels of nesting
+
+## Common Patterns
+
+**Filter and select:**
+```bash
+kelora -f json simple_json.jsonl -l ERROR -k timestamp,service,message
+```
+
+**Safe nested access:**
+```bash
+kelora -f json json_nested_deep.jsonl \
+  -e 'e.theme = e.get_path("request.user.profile.settings.theme", "light")'
+```
+
+**Array fan-out:**
+```bash
+kelora -f json json_arrays.jsonl -e 'emit_each(e.users)' -k id,name,score
+```
+
+**Multi-level fan-out:**
+```bash
+kelora -f json fan_out_batches.jsonl \
+  -e 'let ctx = #{batch_id: e.batch_id}; emit_each(e.orders, ctx)' \
+  -e 'let ctx2 = #{batch_id: e.batch_id, order_id: e.order_id}; emit_each(e.items, ctx2)' \
+  -k batch_id,order_id,sku,qty,price
+```
+
+**Metrics and aggregation:**
+```bash
+kelora -f json simple_json.jsonl --metrics \
+  -e 'track_count(e.service)' \
+  --end 'for (s, c) in metrics { print(s + ": " + c) }' \
+  -F none
+```
+
+**Mixed formats in one file:**
+```bash
+kelora nightmare_mixed_formats.log \
+  -e 'if e.line.starts_with("{") { e = e.line.parse_json() }
+      else if e.line.contains("timestamp=") { e = e.line.parse_logfmt() }'
+```
+
+**Gzipped files (transparent decompression):**
+```bash
+kelora -f combined web_access_large.log.gz --parallel --stats
+kelora -f json sampling_hash.jsonl.gz --filter 'e.user_id.bucket() % 10 == 0'
+```
+
+**Multiline logs:**
+```bash
+kelora multiline_stacktrace.log -M stacktrace -l ERROR
+```
+
+**Error handling modes:**
+```bash
+kelora -f json errors_json_mixed.jsonl                # Resilient (default)
+kelora -f json errors_json_mixed.jsonl --strict       # Fail-fast
+kelora -f json errors_json_mixed.jsonl --verbose      # Show each error
+```
+
+## Notes
+
+- **Gzipped files:** Large files (`.gz`) are compressed. Kelora decompresses them transparently.
+- **Total size:** ~224KB (37 files)
+- **Regeneration:** Run `../dev/generate_examples.sh` to recreate all files
+- **Help:** Use `kelora --help`, `--help-functions`, `--help-examples` for more
+
+## See Also
+
+- `../CLAUDE.md` - Complete Kelora documentation
+- `../EXAMPLES.md` - Real-world usage patterns
+- `kelora --help-functions` - All Rhai functions

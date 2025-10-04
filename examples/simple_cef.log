@@ -1,0 +1,15 @@
+CEF:0|Acme|SIEM|1.0|100|User Login|5|src=192.168.1.10 suser=alice dhost=webserver.example.com outcome=success
+CEF:0|Acme|SIEM|1.0|101|User Logout|3|src=192.168.1.10 suser=alice dhost=webserver.example.com
+CEF:0|Acme|SIEM|1.0|102|Failed Login|7|src=203.0.113.5 suser=admin dhost=webserver.example.com outcome=failure reason=invalid_password attempts=3
+CEF:0|Acme|SIEM|1.0|103|File Access|5|src=192.168.1.20 suser=bob fname=/etc/passwd outcome=success
+CEF:0|Acme|SIEM|1.0|104|Permission Denied|6|src=192.168.1.30 suser=charlie fname=/root/secrets.txt outcome=failure
+CEF:0|Acme|SIEM|1.0|105|SQL Injection Attempt|9|src=198.51.100.10 request=GET /api/users?id=1' OR '1'='1 outcome=blocked
+CEF:0|Acme|SIEM|1.0|106|Malware Detected|10|src=192.168.1.40 suser=diana fname=/tmp/malware.exe hash=d41d8cd98f00b204e9800998ecf8427e outcome=quarantined
+CEF:0|Acme|SIEM|1.0|107|Port Scan|8|src=203.0.113.42 dst=192.168.1.1 dpt=1-1024 outcome=blocked
+CEF:0|Acme|SIEM|1.0|108|Privilege Escalation|9|src=192.168.1.50 suser=eve duser=root outcome=failure
+CEF:0|Acme|SIEM|1.0|109|Data Exfiltration|10|src=192.168.1.60 suser=frank bytes=104857600 dst=198.51.100.50 outcome=blocked
+CEF:0|Acme|SIEM|1.0|110|Firewall Rule Change|6|src=192.168.1.70 suser=admin msg=Added rule: ALLOW 203.0.113.0/24
+CEF:0|Acme|SIEM|1.0|111|Account Lockout|7|suser=admin dhost=webserver.example.com reason=too_many_failed_attempts lockout_duration=1800
+CEF:0|Acme|SIEM|1.0|112|Suspicious Download|8|src=192.168.1.80 suser=grace fname=hacking_tools.zip outcome=flagged
+CEF:0|Acme|SIEM|1.0|113|VPN Connection|5|src=203.0.113.100 suser=henry dst=vpn.example.com outcome=success
+CEF:0|Acme|SIEM|1.0|114|Certificate Expiry Warning|6|dhost=api.example.com msg=Certificate expires in 7 days

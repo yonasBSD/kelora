@@ -1,0 +1,44 @@
+BEGIN
+type: database_backup
+timestamp: 2024-01-15T10:00:00Z
+status: started
+target: postgresql://production
+END
+BEGIN
+type: database_backup
+timestamp: 2024-01-15T10:05:00Z
+status: completed
+size_mb: 1024
+duration_seconds: 300
+files: backup_20240115_100000.sql.gz
+checksum: a1b2c3d4e5f6
+END
+BEGIN
+type: deployment
+timestamp: 2024-01-15T10:10:00Z
+status: started
+version: v1.2.3
+environment: production
+services:
+  - web
+  - worker
+  - scheduler
+END
+BEGIN
+type: deployment
+timestamp: 2024-01-15T10:15:00Z
+status: failed
+version: v1.2.3
+environment: production
+error: Health check timeout
+rollback: true
+END
+BEGIN
+type: alert
+timestamp: 2024-01-15T10:15:30Z
+severity: high
+message: Deployment failed, rolled back to v1.2.2
+recipients:
+  - oncall@example.com
+  - devops@example.com
+END

@@ -1,0 +1,21 @@
+2024-01-15 10:00:00 [INFO] Server starting
+{"timestamp":"2024-01-15T10:00:01Z","level":"DEBUG","format":"json","message":"Connection pool initialized","connections":50}
+timestamp=2024-01-15T10:00:02Z level=info format=logfmt msg="Cache layer ready" size=1024
+<34>Jan 15 10:00:03 appserver syslog: Authentication module loaded
+web_1    | 2024-01-15 10:00:04 [INFO] HTTP server listening on port 8080
+{"timestamp":"2024-01-15T10:00:05Z","level":"WARN","nested":{"data":{"deeply":{"buried":{"value":"hard to extract with jq"}}}}}
+2024-01-15 10:00:06 [ERROR] Database connection failed
+timestamp=2024-01-15T10:00:07Z level=error err="connection timeout" retry=3 max_retries=5
+<27>Jan 15 10:00:08 appserver nginx: GET /api/users 200 1234
+{"timestamp":"2024-01-15T10:00:09Z","users":[{"id":1,"name":"alice"},{"id":2,"name":"bob"}],"action":"batch_process"}
+db_1     | 2024-01-15 10:00:10 [WARN] Slow query detected: SELECT * FROM large_table
+2024-01-15 10:00:11 [INFO] Background worker started
+timestamp=2024-01-15T10:00:12Z level=debug component=scheduler next_run="2024-01-15T11:00:00Z"
+{"timestamp":"2024-01-15T10:00:13Z","level":"INFO","message":"Metric snapshot","metrics":{"cpu":75.5,"memory":2048,"disk":85}}
+<14>Jan 15 10:00:14 loadbalancer haproxy: Server backend1/web1 is UP
+worker_1 | 2024-01-15 10:00:15 [INFO] Job queue processed: 150 items
+2024-01-15 10:00:16 [CRITICAL] Out of memory - killing processes
+timestamp=2024-01-15T10:00:17Z level=critical action=restart reason="oom_killer"
+{"timestamp":"2024-01-15T10:00:18Z","event":"deployment","version":"v1.2.3","services":["web","worker","db"],"status":"success"}
+<19>Jan 15 10:00:19 appserver myapp[1234]: Request processing complete
+redis_1  | 2024-01-15 10:00:20 [INFO] Connected clients: 42

@@ -1,0 +1,30 @@
+timestamp=2024-01-15T10:00:00Z level=info service=web msg="Server started" port=8080
+timestamp=2024-01-15T10:00:05Z level=debug service=web msg="Loading middleware" count=5
+timestamp=2024-01-15T10:00:10Z level=info service=db msg="Connection pool ready" size=20
+timestamp=2024-01-15T10:01:00Z level=info service=web method=GET path=/api/users status=200 duration=45
+timestamp=2024-01-15T10:01:05Z level=warn service=cache msg="Cache miss" key=user:123
+timestamp=2024-01-15T10:01:10Z level=info service=web method=POST path=/api/posts status=201 duration=123
+timestamp=2024-01-15T10:02:00Z level=error service=db msg="Query timeout" query="SELECT * FROM large_table" duration=5000
+timestamp=2024-01-15T10:02:05Z level=info service=web method=GET path=/api/posts status=500 duration=5001
+timestamp=2024-01-15T10:03:00Z level=debug service=auth msg="Token validated" user_id=42
+timestamp=2024-01-15T10:03:30Z level=info service=web method=PUT path=/api/users/42 status=200 duration=67
+timestamp=2024-01-15T10:04:00Z level=warn service=rate_limiter msg="Rate limit approaching" ip=10.0.0.5 current=95 limit=100
+timestamp=2024-01-15T10:04:30Z level=error service=rate_limiter msg="Rate limit exceeded" ip=10.0.0.5 current=101 limit=100
+timestamp=2024-01-15T10:05:00Z level=info service=web method=GET path=/api/data status=429 duration=2
+timestamp=2024-01-15T10:06:00Z level=info service=scheduler msg="Job started" job_name=cleanup schedule="*/5 * * * *"
+timestamp=2024-01-15T10:06:30Z level=debug service=scheduler msg="Processing batch" records=1000
+timestamp=2024-01-15T10:07:00Z level=info service=scheduler msg="Job completed" job_name=cleanup duration=60000 records_processed=5000
+timestamp=2024-01-15T10:08:00Z level=info service=metrics msg="Metrics snapshot" requests_total=15234 errors_total=42 avg_latency=78
+timestamp=2024-01-15T10:09:00Z level=warn service=disk msg="Disk usage high" partition=/var usage_percent=87
+timestamp=2024-01-15T10:10:00Z level=info service=web method=GET path=/health status=200 duration=3
+timestamp=2024-01-15T10:11:00Z level=debug service=cache msg="Cache eviction" evicted_keys=150 reason=memory
+timestamp=2024-01-15T10:12:00Z level=info service=web method=DELETE path=/api/posts/999 status=204 duration=34
+timestamp=2024-01-15T10:13:00Z level=error service=external_api msg="API call failed" endpoint=https://api.partner.com status=503 retry=1
+timestamp=2024-01-15T10:13:30Z level=info service=external_api msg="API call succeeded" endpoint=https://api.partner.com status=200 retry=2
+timestamp=2024-01-15T10:14:00Z level=info service=web method=GET path=/api/export status=200 duration=2345 size_mb=15
+timestamp=2024-01-15T10:15:00Z level=critical service=security msg="Suspicious activity detected" ip=203.0.113.5 pattern=sql_injection
+timestamp=2024-01-15T10:15:01Z level=info service=security msg="IP blocked" ip=203.0.113.5 duration=3600
+timestamp=2024-01-15T10:16:00Z level=info service=web method=GET path=/admin status=403 duration=5
+timestamp=2024-01-15T10:17:00Z level=debug service=websocket msg="Client connected" client_id=ws_12345
+timestamp=2024-01-15T10:18:00Z level=debug service=websocket msg="Client disconnected" client_id=ws_12345 duration=60
+timestamp=2024-01-15T10:19:00Z level=info service=backup msg="Backup completed" size_gb=50 duration=3600000 destination=s3://backups/daily

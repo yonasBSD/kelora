@@ -1,0 +1,49 @@
+event: application_start
+timestamp: 2024-01-15T10:00:00Z
+config:
+  port: 8080
+  workers: 4
+  timeout: 30
+  database:
+    host: localhost
+    port: 5432
+    pool_size: 20
+status: success
+event: request_received
+timestamp: 2024-01-15T10:01:00Z
+request:
+  method: POST
+  path: /api/users
+  headers:
+    content-type: application/json
+    user-agent: curl/7.68.0
+  body:
+    name: alice
+    email: alice@example.com
+response:
+  status: 201
+  duration_ms: 45
+event: error_occurred
+timestamp: 2024-01-15T10:02:00Z
+error:
+  type: ValidationError
+  message: Invalid email format
+  field: email
+  value: not-an-email
+  context:
+    user_id: 123
+    ip: 192.168.1.10
+action: rejected
+event: scheduled_job
+timestamp: 2024-01-15T10:03:00Z
+job:
+  name: cleanup_old_logs
+  schedule: "0 2 * * *"
+  params:
+    retention_days: 30
+    directory: /var/log/app
+result:
+  deleted_files: 157
+  freed_space_mb: 2048
+  duration_seconds: 12
+status: completed

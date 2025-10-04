@@ -1,0 +1,17 @@
+2024-01-15 10:00:00 INFO First valid line
+
+2024-01-15 10:00:05 DEBUG Second valid line
+
+2024-01-15 10:00:10 WARN Third valid line with whitespace around
+
+
+2024-01-15 10:00:15 ERROR Fourth valid line after tabs
+
+
+2024-01-15 10:00:20 INFO Fifth valid line
+
+
+
+2024-01-15 10:00:25 INFO Sixth valid line after many blanks
+
+2024-01-15 10:00:30 CRITICAL Last valid line

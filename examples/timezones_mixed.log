@@ -1,0 +1,15 @@
+2024-01-15T10:00:00Z Event from UTC timezone
+2024-01-15T10:00:00+00:00 Event with explicit UTC offset
+2024-01-15T03:00:00-07:00 Event from US Mountain Time
+2024-01-15T11:00:00+01:00 Event from Central European Time
+2024-01-15T19:00:00+09:00 Event from Japan Standard Time
+2024-01-15 10:00:00 Event with naive timestamp (no timezone)
+Jan 15 10:00:00 Syslog-style timestamp without year
+15/Jan/2024:10:00:00 +0000 Apache-style timestamp
+2024-01-15 10:00:00.123 Event with milliseconds
+2024-01-15 10:00:00.123456 Event with microseconds
+2024-01-15T10:00:00.123456789Z Event with nanoseconds
+Mon Jan 15 10:00:00 2024 Ctime-style timestamp
+2024-01-15T10:00:00-08:00 Event from US Pacific Time
+2024-01-15T05:30:00+05:30 Event from India Standard Time
+2024-01-15T10:00:00.500Z Half-second precision event

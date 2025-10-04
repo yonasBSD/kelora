@@ -1,0 +1,12 @@
+{"timestamp":"2024-01-15T10:00:00Z","status":"200","bytes":"1234"}
+{"timestamp":"2024-01-15T10:00:05Z","status":"not-a-number","bytes":"invalid"}
+{"timestamp":"2024-01-15T10:00:10Z","status":"404","bytes":"567"}
+{"timestamp":"2024-01-15T10:00:15Z","tags":["a","b","c"]}
+{"timestamp":"2024-01-15T10:00:20Z","tags":"not-an-array"}
+{"timestamp":"2024-01-15T10:00:25Z","tags":["x","y","z"]}
+{"timestamp":"2024-01-15T10:00:30Z","nested":{"value":42}}
+{"timestamp":"2024-01-15T10:00:35Z","nested":"not-an-object"}
+{"timestamp":"2024-01-15T10:00:40Z","nested":{"value":99}}
+{"timestamp":"2024-01-15T10:00:45Z","url":"https://example.com/path"}
+{"timestamp":"2024-01-15T10:00:50Z","url":"not a valid url"}
+{"timestamp":"2024-01-15T10:00:55Z","url":"https://test.org/page"}

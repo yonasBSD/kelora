@@ -1,0 +1,20 @@
+{"timestamp":"2024-01-15T10:00:00Z","level":"INFO","service":"api","message":"Application started","version":"1.2.3"}
+{"timestamp":"2024-01-15T10:00:05Z","level":"DEBUG","service":"api","message":"Loading configuration","config_file":"/etc/app/config.yml"}
+{"timestamp":"2024-01-15T10:00:10Z","level":"INFO","service":"database","message":"Connection pool initialized","max_connections":50}
+{"timestamp":"2024-01-15T10:01:00Z","level":"WARN","service":"api","message":"High memory usage detected","memory_percent":85}
+{"timestamp":"2024-01-15T10:01:30Z","level":"ERROR","service":"database","message":"Query timeout","query":"SELECT * FROM users","duration_ms":5000}
+{"timestamp":"2024-01-15T10:02:00Z","level":"INFO","service":"api","message":"Request received","method":"GET","path":"/api/users","user_id":123}
+{"timestamp":"2024-01-15T10:02:15Z","level":"DEBUG","service":"cache","message":"Cache hit","key":"user:123","ttl":3600}
+{"timestamp":"2024-01-15T10:02:30Z","level":"INFO","service":"api","message":"Response sent","status":200,"duration_ms":45}
+{"timestamp":"2024-01-15T10:03:00Z","level":"WARN","service":"auth","message":"Failed login attempt","username":"admin","ip":"192.168.1.100"}
+{"timestamp":"2024-01-15T10:03:30Z","level":"ERROR","service":"auth","message":"Account locked","username":"admin","attempts":5}
+{"timestamp":"2024-01-15T10:04:00Z","level":"INFO","service":"scheduler","message":"Cron job started","job":"backup","schedule":"0 2 * * *"}
+{"timestamp":"2024-01-15T10:05:00Z","level":"DEBUG","service":"scheduler","message":"Running backup script","script":"/usr/local/bin/backup.sh"}
+{"timestamp":"2024-01-15T10:10:00Z","level":"INFO","service":"scheduler","message":"Backup completed","size_mb":1024,"duration_ms":300000}
+{"timestamp":"2024-01-15T10:15:00Z","level":"CRITICAL","service":"disk","message":"Disk space critical","partition":"/var","free_gb":0.5}
+{"timestamp":"2024-01-15T10:16:00Z","level":"ERROR","service":"api","message":"Service unavailable","reason":"disk space"}
+{"timestamp":"2024-01-15T10:17:00Z","level":"WARN","service":"monitoring","message":"Alert sent","channel":"slack","severity":"high"}
+{"timestamp":"2024-01-15T10:20:00Z","level":"INFO","service":"admin","message":"Disk cleanup initiated","target":"/var/log"}
+{"timestamp":"2024-01-15T10:25:00Z","level":"INFO","service":"admin","message":"Cleanup completed","freed_gb":10}
+{"timestamp":"2024-01-15T10:26:00Z","level":"INFO","service":"api","message":"Service resumed","downtime_seconds":600}
+{"timestamp":"2024-01-15T10:30:00Z","level":"DEBUG","service":"health","message":"Health check passed","endpoints":["api","database","cache"]}

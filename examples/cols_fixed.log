@@ -1,0 +1,10 @@
+2024-01-15 10:00:00 INFO     server  Application started successfully
+2024-01-15 10:00:05 DEBUG    config  Loading configuration from file
+2024-01-15 10:00:10 WARN     memory  Memory usage at 85% threshold
+2024-01-15 10:00:15 ERROR    network Connection timeout after 5000ms
+2024-01-15 10:00:20 INFO     api     Received GET request for /users
+2024-01-15 10:00:25 DEBUG    cache   Cache hit for key user:123
+2024-01-15 10:00:30 INFO     api     Response sent with status 200
+2024-01-15 10:00:35 CRITICAL disk    Disk space below 1GB on /var
+2024-01-15 10:00:40 ERROR    auth    Invalid credentials for admin
+2024-01-15 10:00:45 WARN     rate    Rate limit approaching for IP

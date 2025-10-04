@@ -1,0 +1,20 @@
+[node-1] >>> 2024-01-15T10:00:00Z Cluster node started
+[node-1] >>> 2024-01-15T10:00:05Z Joining cluster at 192.168.1.100
+[node-2] >>> 2024-01-15T10:00:10Z Cluster node started
+[node-2] >>> 2024-01-15T10:00:15Z Joining cluster at 192.168.1.100
+[node-1] >>> 2024-01-15T10:00:20Z Connected to 1 peer(s)
+[node-2] >>> 2024-01-15T10:00:25Z Connected to 1 peer(s)
+[node-3] >>> 2024-01-15T10:00:30Z Cluster node started
+[node-3] >>> 2024-01-15T10:00:35Z Joining cluster at 192.168.1.100
+[node-1] >>> 2024-01-15T10:00:40Z Connected to 2 peer(s)
+[node-2] >>> 2024-01-15T10:00:45Z Connected to 2 peer(s)
+[node-3] >>> 2024-01-15T10:00:50Z Connected to 2 peer(s)
+[node-1] >>> 2024-01-15T10:01:00Z Leader election starting
+[node-1] >>> 2024-01-15T10:01:05Z Elected as cluster leader
+[node-2] >>> 2024-01-15T10:01:10Z Following leader: node-1
+[node-3] >>> 2024-01-15T10:01:15Z Following leader: node-1
+[node-1] >>> 2024-01-15T10:01:20Z Cluster ready with 3 nodes
+[node-2] >>> 2024-01-15T10:01:25Z Synchronization complete
+[node-3] >>> 2024-01-15T10:01:30Z Synchronization complete
+[node-1] >>> 2024-01-15T10:01:35Z Processing distributed task #1
+[node-2] >>> 2024-01-15T10:01:40Z Processing distributed task #2

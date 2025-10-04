@@ -1,0 +1,15 @@
+01/15/2024 10:00:00.123 Event with MM/DD/YYYY format
+15-Jan-2024 10:00:05.456 Event with DD-Mon-YYYY format
+2024.01.15 10:00:10.789 Event with dots as date separators
+10:00:15 2024-01-15 Time before date
+Jan 15, 2024 at 10:00:20 Natural language style
+2024-01-15T10:00:25 No seconds, just minutes
+20240115100030 Compact format YYYYMMDDHHMMSS
+15/01/24 10:00:35 Two-digit year
+2024-015 10:00:40 Day of year format
+[2024-01-15 10:00:45,123] Bracketed with milliseconds
+2024-01-15 10:00:50 AM 12-hour format
+Mon, 15 Jan 2024 10:00:55 +0000 RFC 2822 style
+@1705315260 Unix timestamp (seconds since epoch)
+2024-W03-1 10:01:05 ISO week date
+15.01.2024 - 10:01:10 European format with separator
