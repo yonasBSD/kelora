@@ -78,9 +78,9 @@ kelora -j examples/simple_json.jsonl \
 
 #### Workload Recipes
 
-- Streaming tail: `tail -f examples/simple_json.jsonl | kelora -f json --filter 'e.level != "DEBUG"' --stats`
-- Archive crunching: `kelora -f combined --parallel examples/web_access_large.log.gz --stats`
-- Focused drill-down: `kelora -j examples/simple_json.jsonl --filter 'e.service == "auth"' -k timestamp,message`
+- Streaming triage: `tail -f examples/simple_json.jsonl | kelora -j --level warn,error --exec 'track_count(e.service)' --metrics`
+- Archive summary: `kelora -f combined --parallel examples/web_access_large.log.gz --exec 'track_bucket("status_family", e.status / 100 * 100)' --end 'print(metrics.status_family)' -F none`
+- Targeted syslog filter: `kelora -f syslog examples/simple_syslog.log --filter 'e.msg.contains("Failed login")' -F json`
 
 > [!TIP]
 > The fixtures in `examples/` map to the categories in [examples/README.md](examples/README.md#file-categories). Start there before pointing Kelora at production data. Need a fast reminder of the core flags? Run `kelora --help-quick`.
