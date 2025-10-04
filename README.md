@@ -68,23 +68,13 @@ kelora -j examples/simple_json.jsonl \
 
 #### Pipeline at a Glance
 
-| Stage | Trigger | Purpose |
+| Stage | Key switches | Purpose |
 | --- | --- | --- |
-| Input | `kelora [FILES]` | Accept files or stdin (gzip auto-detect supported) |
-| Parse | `-f/--input-format`, `--extract-prefix`, `-M/--multiline` | Normalize raw text into structured events |
-| Filter | `--filter`, `--level`, `--since/--until` | Keep only events that matter |
-| Transform | `-e/--exec`, `--begin`, `--window` | Enrich, fan out, and compute metrics via Rhai |
-| Format | `-F/--output-format`, `-k/--keys`, `--stats` | Choose display or machine output |
-
-#### High-Frequency Flags
-
-- `-f/--input-format <FORMAT>`: Swap parsers (JSON, logfmt, combined, `cols:<spec>`, etc.).
-- `--filter <expr>`: Rhai boolean expression to keep events (repeatable).
-- `--level <levels>`: Comma-separated list of standard levels to include.
-- `-e/--exec <expr>`: Transform events in place; combine with `--metrics` or `--window`.
-- `-k/--keys <fields>`: Pick output fields or reorder columns without changing the data.
-- `-F/--output-format <FORMAT>`: Toggle renderers (`default`, `json`, `logfmt`, `levelmap`, `none`).
-- `--stats` / `--metrics`: Observe throughput and tracked counters.
+| Input | `kelora [FILES]`, `--parallel`, `--file-order` | Select sources and decide sequential vs. parallel ingestion |
+| Parse | `-f/--input-format`, `--extract-prefix`, `-M/--multiline` | Turn raw text into structured events |
+| Filter | `--filter`, `--level`, `--since/--until` | Keep only the events you care about |
+| Transform | `-e/--exec`, `--begin`, `--window` | Enrich, fan out, and compute stateful metrics |
+| Format | `-F/--output-format`, `-k/--keys`, `--stats` | Control output shape and telemetry |
 
 #### Workload Recipes
 
