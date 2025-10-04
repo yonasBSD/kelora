@@ -126,7 +126,7 @@ kelora -f json sampling_hash.jsonl.gz --filter 'e.user_id.bucket() % 10 == 0'
 
 **Multiline logs:**
 ```bash
-kelora multiline_stacktrace.log -M stacktrace -l ERROR
+kelora multiline_stacktrace.log --multiline timestamp --filter 'e.line.contains("ERROR")'
 ```
 
 **Error handling modes:**
@@ -136,15 +136,7 @@ kelora -f json errors_json_mixed.jsonl --strict       # Fail-fast
 kelora -f json errors_json_mixed.jsonl --verbose      # Show each error
 ```
 
-## Notes
-
-- **Gzipped files:** Large files (`.gz`) are compressed. Kelora decompresses them transparently.
-- **Total size:** ~224KB (37 files)
-- **Regeneration:** Run `../dev/generate_examples.sh` to recreate all files
-- **Help:** Use `kelora --help`, `--help-functions`, `--help-examples` for more
-
 ## See Also
 
-- `../CLAUDE.md` - Complete Kelora documentation
-- `../EXAMPLES.md` - Real-world usage patterns
+- `kelora --help-rhai` - Rhai basics and idioms
 - `kelora --help-functions` - All Rhai functions
