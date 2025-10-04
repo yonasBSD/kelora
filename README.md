@@ -371,6 +371,9 @@ kelora -j access.log --salt "$KELORA_SALT" \
 
 Each milestone builds on the previous one; you can be productive early, then layer in advanced concepts as needed.
 
+> [!TIP]
+> See [examples/README.md](examples/README.md) for 37 working examples covering all formats and complexity levels—from basic filtering to advanced pipelines.
+
 ## Documentation Shortcuts
 
 ```bash
