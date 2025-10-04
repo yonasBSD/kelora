@@ -13,7 +13,6 @@ Scriptable log processor for the command line. Treats logs as structured events 
 - [Overview](#overview)
 - [Getting Started](#getting-started)
   - [First Commands](#first-commands)
-  - [Quick Reference](#quick-reference)
   - [Installation](#installation)
 - [Everyday Use](#everyday-use)
   - [Core Concepts](#core-concepts)
@@ -64,30 +63,14 @@ kelora -j examples/simple_json.jsonl \
   --after-context 2 --before-context 1
 ```
 
-### Quick Reference
-
-#### Pipeline at a Glance
-
-| Stage | Key switches | Purpose |
-| --- | --- | --- |
-| Input | `kelora [FILES]`, `--parallel`, `--file-order` | Select sources and decide sequential vs. parallel ingestion |
-| Parse | `-f/--input-format`, `--extract-prefix`, `-M/--multiline` | Turn raw text into structured events |
-| Filter | `--filter`, `--level`, `--since/--until` | Keep only the events you care about |
-| Transform | `-e/--exec`, `--begin`, `--window` | Enrich, fan out, and compute stateful metrics |
-| Format | `-F/--output-format`, `-k/--keys`, `--stats` | Control output shape and statistics |
-
-#### Quick Commands
-
-Short one-liners for common tasks:
+More quick commands to copy-paste:
 
 - Stream-level error watch: `tail -f examples/simple_json.jsonl | kelora -j --level warn,error --exec 'track_count(e.service)' --metrics`
-- Fan out nested arrays: `kelora -j examples/json_arrays.jsonl --exec 'emit_each(e.get_path("users", []))' --keys id,name,score`
-- Mask sensitive fields: `kelora -j examples/security_audit.jsonl --exec 'e.ip_masked = e.ip.mask_ip(1); e.user_hash = e.user.hash("xxh3")' --keys timestamp,event,user_hash,ip_masked`
+- Fan out nested arrays: `kelora -j examples/json_arrays.jsonl --exec 'emit_each(e.get_path(\"users\", []))' --keys id,name,score`
+- Mask sensitive fields: `kelora -j examples/security_audit.jsonl --exec 'e.ip_masked = e.ip.mask_ip(1); e.user_hash = e.user.hash(\"xxh3\")' --keys timestamp,event,user_hash,ip_masked`
 
 > [!TIP]
 > The sample logs in `examples/` map to the categories in [examples/README.md](examples/README.md#file-categories). Start there before pointing Kelora at production data. Need a fast reminder of the core flags? Run `kelora --help-quick`.
-
-
 
 ### Installation
 
@@ -121,6 +104,14 @@ cargo install --path .
 - **Pipeline** - Logs flow through `Input -> Parse -> Filter -> Transform -> Format -> Output`. Mix and match parsers, filters, exec scripts, and formatters freely.
 - **Scripts** - Rhai expressions drive filtering (`--filter`), transformations (`--exec`/`--exec-file`), initialization (`--begin`), and teardown (`--end`).
 - **Windows** - `--window N` exposes recent events for sequence detection via helpers like `window_values("field")`.
+
+| Stage | Key switches | Purpose |
+| --- | --- | --- |
+| Input | `kelora [FILES]`, `--parallel`, `--file-order` | Select sources and decide sequential vs. parallel ingestion |
+| Parse | `-f/--input-format`, `--extract-prefix`, `-M/--multiline` | Turn raw text into structured events |
+| Filter | `--filter`, `--level`, `--since/--until` | Keep only the events you care about |
+| Transform | `-e/--exec`, `--begin`, `--window` | Enrich, fan out, and compute stateful metrics |
+| Format | `-F/--output-format`, `-k/--keys`, `--stats` | Control output shape and statistics |
 
 ### CLI Feature Tour
 
