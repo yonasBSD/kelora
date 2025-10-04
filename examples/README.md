@@ -6,9 +6,9 @@
 
 ```bash
 # Try some examples
-kelora -f json simple_json.jsonl -l ERROR
+kelora -j simple_json.jsonl -l ERROR
 kelora -f combined web_access_large.log.gz --parallel --stats
-kelora -f json json_arrays.jsonl -e 'emit_each(e.users)' -k id,name,score
+kelora -j json_arrays.jsonl -e 'emit_each(e.users)' -k id,name,score
 ```
 
 ## File Categories
@@ -75,7 +75,7 @@ Extremely challenging scenarios:
 
 **Filter and select:**
 ```bash
-kelora -f json simple_json.jsonl -l ERROR -k timestamp,service,message
+kelora -j simple_json.jsonl -l ERROR -k timestamp,service,message
 ```
 
 **Visual level distribution:**
@@ -86,18 +86,18 @@ The `levelmap` formatter fills the available terminal width, prefixing each bloc
 
 **Safe nested access:**
 ```bash
-kelora -f json json_nested_deep.jsonl \
+kelora -j json_nested_deep.jsonl \
   -e 'e.theme = e.get_path("request.user.profile.settings.theme", "light")'
 ```
 
 **Array fan-out:**
 ```bash
-kelora -f json json_arrays.jsonl -e 'emit_each(e.users)' -k id,name,score
+kelora -j json_arrays.jsonl -e 'emit_each(e.users)' -k id,name,score
 ```
 
 **Multi-level fan-out:**
 ```bash
-kelora -f json fan_out_batches.jsonl \
+kelora -j fan_out_batches.jsonl \
   -e 'let ctx = #{batch_id: e.batch_id}; emit_each(e.orders, ctx)' \
   -e 'let ctx2 = #{batch_id: e.batch_id, order_id: e.order_id}; emit_each(e.items, ctx2)' \
   -k batch_id,order_id,sku,qty,price
@@ -105,9 +105,9 @@ kelora -f json fan_out_batches.jsonl \
 
 **Metrics and aggregation:**
 ```bash
-kelora -f json simple_json.jsonl --metrics \
+kelora -j simple_json.jsonl --metrics \
   -e 'track_count(e.service)' \
-  --end 'for (s, c) in metrics { print(s + ": " + c) }' \
+  --end 'for k in metrics.keys() { print(k + ": " + metrics[k]) }' \
   -F none
 ```
 
@@ -121,7 +121,7 @@ kelora nightmare_mixed_formats.log \
 **Gzipped files (transparent decompression):**
 ```bash
 kelora -f combined web_access_large.log.gz --parallel --stats
-kelora -f json sampling_hash.jsonl.gz --filter 'e.user_id.bucket() % 10 == 0'
+kelora -j sampling_hash.jsonl.gz --filter 'e.user_id.to_string().bucket() % 10 == 0'
 ```
 
 **Multiline logs:**
@@ -131,9 +131,9 @@ kelora multiline_stacktrace.log --multiline timestamp --filter 'e.line.contains(
 
 **Error handling modes:**
 ```bash
-kelora -f json errors_json_mixed.jsonl                # Resilient (default)
-kelora -f json errors_json_mixed.jsonl --strict       # Fail-fast
-kelora -f json errors_json_mixed.jsonl --verbose      # Show each error
+kelora -j errors_json_mixed.jsonl                # Resilient (default)
+kelora -j errors_json_mixed.jsonl --strict       # Fail-fast
+kelora -j errors_json_mixed.jsonl --verbose      # Show each error
 ```
 
 ## See Also
