@@ -5,9 +5,6 @@
 ## Quick Start
 
 ```bash
-# Generate all examples
-../dev/generate_examples.sh
-
 # Try some examples
 kelora -f json simple_json.jsonl -l ERROR
 kelora -f combined web_access_large.log.gz --parallel --stats
@@ -16,63 +13,63 @@ kelora -f json json_arrays.jsonl -e 'emit_each(e.users)' -k id,name,score
 
 ## File Categories
 
-### Basic Formats (8 files)
+### Basic Formats
 Simple examples of common formats:
-- `simple_json.jsonl` - JSON logs (20 events)
-- `simple_csv.csv` - CSV with headers (25 rows)
-- `simple_tsv.tsv` - Tab-separated (20 rows)
-- `simple_logfmt.log` - Logfmt key=value (30 lines)
-- `simple_syslog.log` - RFC3164 syslog (25 lines)
-- `simple_combined.log` - Apache/Nginx logs (40 lines)
-- `simple_cef.log` - Security CEF format (15 events)
-- `simple_line.log` - Plain text (15 lines)
+- [simple_json.jsonl](simple_json.jsonl) - JSON logs (20 events)
+- [simple_csv.csv](simple_csv.csv) - CSV with headers (25 rows)
+- [simple_tsv.tsv](simple_tsv.tsv) - Tab-separated (20 rows)
+- [simple_logfmt.log](simple_logfmt.log) - Logfmt key=value (30 lines)
+- [simple_syslog.log](simple_syslog.log) - RFC3164 syslog (25 lines)
+- [simple_combined.log](simple_combined.log) - Apache/Nginx logs (40 lines)
+- [simple_cef.log](simple_cef.log) - Security CEF format (15 events)
+- [simple_line.log](simple_line.log) - Plain text (15 lines)
 
-### Advanced Formats (6 files)
+### Advanced Formats
 Specialized parsing features:
-- `cols_fixed.log` - Fixed-width columns
-- `cols_mixed.log` - Mixed whitespace columns
-- `csv_typed.csv` - CSV with type annotations (`status:int`)
-- `prefix_docker.log` - Docker container prefixes
-- `prefix_custom.log` - Custom separators (`>>>`)
-- `kv_pairs.log` - Key-value pairs
+- [cols_fixed.log](cols_fixed.log) - Fixed-width columns
+- [cols_mixed.log](cols_mixed.log) - Mixed whitespace columns
+- [csv_typed.csv](csv_typed.csv) - CSV with type annotations (`status:int`)
+- [prefix_docker.log](prefix_docker.log) - Docker container prefixes
+- [prefix_custom.log](prefix_custom.log) - Custom separators (`>>>`)
+- [kv_pairs.log](kv_pairs.log) - Key-value pairs
 
-### Multiline (5 files)
+### Multiline
 Events spanning multiple lines:
-- `multiline_stacktrace.log` - Java/Python stacktraces
-- `multiline_json_arrays.log` - Pretty-printed JSON
-- `multiline_continuation.log` - Backslash continuation
-- `multiline_boundary.log` - BEGIN/END blocks
-- `multiline_indent.log` - YAML-style indentation
+- [multiline_stacktrace.log](multiline_stacktrace.log) - Java/Python stacktraces
+- [multiline_json_arrays.log](multiline_json_arrays.log) - Pretty-printed JSON
+- [multiline_continuation.log](multiline_continuation.log) - Backslash continuation
+- [multiline_boundary.log](multiline_boundary.log) - BEGIN/END blocks
+- [multiline_indent.log](multiline_indent.log) - YAML-style indentation
 
-### Complex Real-World (5 files)
+### Complex Real-World
 Production-like scenarios:
-- `web_access_large.log.gz` - 1200 access logs (gzipped, 65KB)
-- `json_nested_deep.jsonl` - Deeply nested JSON
-- `json_arrays.jsonl` - Arrays for fan-out
-- `security_audit.jsonl` - IPs, JWTs, hashes
-- `timezones_mixed.log` - Various timestamp formats
+- [web_access_large.log.gz](web_access_large.log.gz) - 1200 access logs (gzipped, 65KB)
+- [json_nested_deep.jsonl](json_nested_deep.jsonl) - Deeply nested JSON
+- [json_arrays.jsonl](json_arrays.jsonl) - Arrays for fan-out
+- [security_audit.jsonl](security_audit.jsonl) - IPs, JWTs, hashes
+- [timezones_mixed.log](timezones_mixed.log) - Various timestamp formats
 
-### Error Handling (7 files)
+### Error Handling
 Testing resilience:
-- `errors_json_mixed.jsonl` - Valid + malformed JSON
-- `errors_json_types.jsonl` - Type conversion challenges
-- `errors_empty_lines.log` - Empty lines, whitespace
-- `errors_csv_ragged.csv` - Inconsistent columns
-- `errors_unicode.log` - Unicode, special chars
-- `errors_filter_runtime.jsonl` - Runtime error triggers
-- `errors_exec_transform.jsonl` - Transform failures
+- [errors_json_mixed.jsonl](errors_json_mixed.jsonl) - Valid + malformed JSON
+- [errors_json_types.jsonl](errors_json_types.jsonl) - Type conversion challenges
+- [errors_empty_lines.log](errors_empty_lines.log) - Empty lines, whitespace
+- [errors_csv_ragged.csv](errors_csv_ragged.csv) - Inconsistent columns
+- [errors_unicode.log](errors_unicode.log) - Unicode, special chars
+- [errors_filter_runtime.jsonl](errors_filter_runtime.jsonl) - Runtime error triggers
+- [errors_exec_transform.jsonl](errors_exec_transform.jsonl) - Transform failures
 
-### Feature-Specific (4 files)
+### Feature-Specific
 Advanced capabilities:
-- `window_metrics.jsonl` - Time-series for window functions
-- `fan_out_batches.jsonl` - Multi-level nested arrays
-- `custom_timestamps.log` - Non-standard formats
-- `sampling_hash.jsonl.gz` - 600 events for sampling (gzipped, 3.6KB)
+- [window_metrics.jsonl](window_metrics.jsonl) - Time-series for window functions
+- [fan_out_batches.jsonl](fan_out_batches.jsonl) - Multi-level nested arrays
+- [custom_timestamps.log](custom_timestamps.log) - Non-standard formats
+- [sampling_hash.jsonl.gz](sampling_hash.jsonl.gz) - 600 events for sampling (gzipped, 3.6KB)
 
-### Nightmare Mode (2 files)
+### Nightmare Mode
 Extremely challenging scenarios:
-- `nightmare_mixed_formats.log` - JSON + logfmt + syslog in one file
-- `nightmare_deeply_nested_transform.jsonl` - 4-6 levels of nesting
+- [nightmare_mixed_formats.log](nightmare_mixed_formats.log) - JSON + logfmt + syslog in one file
+- [nightmare_deeply_nested_transform.jsonl](nightmare_deeply_nested_transform.jsonl) - 4-6 levels of nesting
 
 ## Common Patterns
 
