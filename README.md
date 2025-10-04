@@ -88,7 +88,13 @@ kelora -j examples/simple_json.jsonl \
 
 ## Installation
 
-Kelora targets stable Rust; keep your toolchain fresh (`rustup update`) for best results.
+### Binary releases (recommended)
+
+1. Download the archive for your platform from the [GitHub releases](https://github.com/dloss/kelora/releases) page (macOS, Linux, and Windows builds are provided).
+2. Unpack the archive and move `kelora` or `kelora.exe` somewhere on your `PATH`.
+3. Run `kelora --help` to ensure the binary starts up correctly.
+
+If you prefer to manage the build yourself, Kelora targets stable Rust; keep your toolchain fresh (`rustup update`) for best results.
 
 ```bash
 # Install from crates.io
@@ -99,8 +105,6 @@ git clone https://github.com/dloss/kelora
 cd kelora
 cargo install --path .
 ```
-
-Pre-built binaries live in the [GitHub releases](https://github.com/dloss/kelora/releases). They're handy for CI or containers.
 
 ## Core Concepts
 
