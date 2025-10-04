@@ -76,7 +76,9 @@ kelora -j examples/simple_json.jsonl \
 | Transform | `-e/--exec`, `--begin`, `--window` | Enrich, fan out, and compute stateful metrics |
 | Format | `-F/--output-format`, `-k/--keys`, `--stats` | Control output shape and statistics |
 
-#### Workload Recipes
+#### Quick Commands
+
+Short one-liners for common tasks:
 
 - Streaming triage: `tail -f examples/simple_json.jsonl | kelora -j --level warn,error --exec 'track_count(e.service)' --metrics`
 - Archive summary: `kelora -f combined --parallel examples/web_access_large.log.gz --exec 'track_bucket("status_family", e.status / 100 * 100)' --end 'print(metrics.status_family)' -F none`
