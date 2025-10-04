@@ -83,7 +83,7 @@ kelora -j examples/simple_json.jsonl \
 - Targeted syslog filter: `kelora -f syslog examples/simple_syslog.log --filter 'e.msg.contains("Failed login")' -F json`
 
 > [!TIP]
-> The fixtures in `examples/` map to the categories in [examples/README.md](examples/README.md#file-categories). Start there before pointing Kelora at production data. Need a fast reminder of the core flags? Run `kelora --help-quick`.
+> The sample logs in `examples/` map to the categories in [examples/README.md](examples/README.md#file-categories). Start there before pointing Kelora at production data. Need a fast reminder of the core flags? Run `kelora --help-quick`.
 
 
 

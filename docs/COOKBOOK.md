@@ -1,7 +1,7 @@
 # Kelora Cookbook
 
 Quick, runnable patterns for common log-processing workflows. Every example stays close to the
-built-in fixtures in `examples/` so you can try them without touching production data.
+built-in sample logs in `examples/` so you can try them without touching production data.
 
 ## 1. Fast Filters & Projections
 
