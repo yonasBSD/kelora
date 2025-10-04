@@ -2,6 +2,20 @@
 
 Kelora is a Rust log processor; this guide keeps contributions aligned with current workflows.
 
+## Documentation Sources
+
+- **README.md** - User-facing overview, quick start, core concepts, CLI feature tour, format recipes
+- **examples/README.md** - 37 example files demonstrating all formats and usage patterns
+- **Built-in help screens** (run `./target/release/kelora <flag>` or `cargo run -- <flag>`):
+  - `--help` - Complete CLI reference with all flags and options
+  - `--help-rhai` - Rhai language guide for Kelora scripting
+  - `--help-functions` - All 40+ built-in Rhai functions organized by category
+  - `--help-examples` - Practical log analysis patterns and common idioms
+  - `--help-time` - Timestamp format reference (chrono format strings)
+  - `--help-multiline` - Multiline strategy reference
+
+**Always verify current behavior** by running help commands or reading markdown files rather than assuming based on this document.
+
 ## Project Structure & Module Organization
 - Core CLI and pipeline code live in `src/`; `main.rs` wires the Clap interface and `engine.rs` orchestrates parsing, filtering, and formatting stages.
 - Parsers sit under `src/parsers/`, stream helpers in `readers.rs` and `decompression.rs`; extend these instead of introducing standalone binaries.

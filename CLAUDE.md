@@ -6,6 +6,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Kelora is a command-line log analysis tool written in Rust that uses the Rhai scripting engine for flexible log processing. It processes structured logs (JSON, CSV, etc.) and allows users to filter, transform, and analyze log data using embedded Rhai scripts.
 
+## Documentation Sources
+
+- **README.md** - User-facing overview, quick start, core concepts, CLI feature tour, format recipes
+- **examples/README.md** - 37 example files with usage patterns across all formats and complexity levels
+- **Built-in help screens** (run `./target/release/kelora <flag>`):
+  - `--help` - Complete CLI reference with all flags and options
+  - `--help-rhai` - Rhai language guide for Kelora scripting
+  - `--help-functions` - All 40+ built-in Rhai functions organized by category
+  - `--help-examples` - Practical log analysis patterns and common idioms
+  - `--help-time` - Timestamp format reference (chrono format strings)
+  - `--help-multiline` - Multiline strategy reference
+
+When questions arise about features, syntax, or capabilities, **run the relevant help command** or **read the relevant markdown file** rather than relying on this document alone.
+
 ## Key Commands
 
 ### Build and Test
