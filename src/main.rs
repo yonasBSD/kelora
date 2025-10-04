@@ -1498,6 +1498,12 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
         std::process::exit(0);
     }
 
+    // Check for --help-quick (short cheat sheet)
+    if raw_args.iter().any(|arg| arg == "--help-quick") {
+        print_quick_help();
+        std::process::exit(0);
+    }
+
     // Check for --help-examples
     if raw_args.iter().any(|arg| arg == "--help-examples") {
         print_examples_help();
@@ -1663,6 +1669,36 @@ fn print_functions_help() {
 /// Print practical Rhai examples
 fn print_examples_help() {
     let help_text = rhai_functions::docs::generate_examples_text();
+    println!("{}", help_text);
+}
+
+fn print_quick_help() {
+    let help_text = r#"Kelora Quick Help
+
+Workflows:
+  kelora -f logfmt --level error examples/simple_logfmt.log
+  kelora -j examples/simple_json.jsonl --filter 'e.level == "ERROR"' -k timestamp,message
+  kelora -f combined examples/web_access_large.log.gz --parallel --stats
+
+High-frequency flags:
+  -f, --input-format <FORMAT>   Choose parser (json, logfmt, combined, cols:<spec>)
+  --filter <expr>               Rhai boolean guard (repeatable)
+  --level <levels>              Comma-separated log levels to include
+  -e, --exec <expr>             Transform events or emit metrics
+  -k, --keys <fields>           Pick or reorder output fields
+  -F, --output-format <FORMAT>  Switch formatter (default, json, logfmt, levelmap, none)
+  --stats / --metrics           Show throughput stats or tracked counters
+
+Docs & references:
+  kelora --help          Full CLI reference grouped by stage
+  kelora --help-rhai     Rhai language guide + stage semantics
+  kelora --help-functions  Built-in function catalogue
+  https://github.com/dloss/kelora/blob/main/docs/COOKBOOK.md (Cookbook)
+  https://github.com/dloss/kelora/blob/main/examples/README.md (Examples index)
+
+Need the timestamp catalogue?  kelora --help-time
+Multiline strategies?          kelora --help-multiline
+"#;
     println!("{}", help_text);
 }
 

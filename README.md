@@ -47,7 +47,7 @@ Kelora parses log streams into structured events and runs them through a program
 | --- | --- | --- |
 | Input | `kelora [FILES]` | Accept files or stdin (gzip auto-detect supported) |
 | Parse | `-f/--input-format`, `--extract-prefix`, `-M/--multiline` | Normalize raw text into structured events |
-| Filter | `--filter`, `-l/--levels`, `--since/--until` | Keep only events that matter |
+| Filter | `--filter`, `--level`, `--since/--until` | Keep only events that matter |
 | Transform | `-e/--exec`, `--begin`, `--window` | Enrich, fan out, and compute metrics via Rhai |
 | Format | `-F/--output-format`, `-k/--keys`, `--stats` | Choose display or machine output |
 
@@ -55,6 +55,7 @@ Kelora parses log streams into structured events and runs them through a program
 
 - `-f/--input-format <FORMAT>`: Swap parsers (JSON, logfmt, combined, `cols:<spec>`, etc.).
 - `--filter <expr>`: Rhai boolean expression to keep events (repeatable).
+- `--level <levels>`: Comma-separated list of standard levels to include.
 - `-e/--exec <expr>`: Transform events in place; combine with `--metrics` or `--window`.
 - `-k/--keys <fields>`: Pick output fields or reorder columns without changing the data.
 - `-F/--output-format <FORMAT>`: Toggle renderers (`default`, `json`, `logfmt`, `levelmap`, `none`).
@@ -67,13 +68,13 @@ Kelora parses log streams into structured events and runs them through a program
 - Focused drill-down: `kelora -j examples/simple_json.jsonl --filter 'e.service == "auth"' -k timestamp,message`
 
 > [!TIP]
-> The fixtures in `examples/` map to the categories in [examples/README.md](examples/README.md#file-categories). Start there before pointing Kelora at production data.
+> The fixtures in `examples/` map to the categories in [examples/README.md](examples/README.md#file-categories). Start there before pointing Kelora at production data. Need a fast reminder of the core flags? Run `kelora --help-quick`.
 
 ## First Commands
 
 ```bash
 # Filter error-level events from the logfmt sample
-kelora -f logfmt -l error examples/simple_logfmt.log
+kelora -f logfmt --level error examples/simple_logfmt.log
 
 # Work with JSON logs and print selected fields
 kelora -j examples/simple_json.jsonl \
@@ -132,7 +133,7 @@ cargo install --path .
 ### Filtering & Selection
 
 - `--filter 'expression'` runs boolean Rhai expressions; chain multiple occurrences.
-- `-l/--levels` and `-L/--exclude-levels` gate standard log levels.
+- `--level` and `--exclude-levels` gate standard log levels.
 - `--since`, `--until`, and `--take` trim by time range or limit output volume.
 - `-A/--after-context`, `-B/--before-context`, and `-C/--context` show surrounding lines around matches (requires filtering).
 - `--keep-lines`/`--ignore-lines` pair well with `--strict` to enforce hygiene.
@@ -319,7 +320,7 @@ Define repeatable pipelines in `~/.config/kelora/config.ini`:
 defaults = --stats --parallel --input-tz UTC
 
 [aliases]
-errors = -l error --since 1h --stats
+errors = --level error --since 1h --stats
 warnings = --filter 'e.level == "WARN" || e.level == "WARNING"'
 slow-queries = --filter 'e.duration > 1000' --exec 'e.slow = true' --keys timestamp,query,duration
 ```
@@ -332,7 +333,7 @@ kelora --config-file custom.ini examples/simple_line.log  # Swap configuration f
 kelora --no-stats examples/simple_line.log                # Override a default
 kelora -a errors examples/simple_json.jsonl  # Run the alias
 kelora --show-config                        # Inspect the merged configuration
-kelora -l error --stats --save-alias errors # Save current command as alias
+kelora --level error --stats --save-alias errors # Save current command as alias
 ```
 
 Pair configs with `--ignore-config` for hermetic runs or CI pipelines.
@@ -414,11 +415,14 @@ Each milestone builds on the previous one; you can be productive early, then lay
 ## Documentation Shortcuts
 
 ```bash
-kelora --help            # CLI overview, option catalog, examples
+kelora --help-quick      # One-screen cheat sheet of common flags and recipes
+kelora --help            # Full CLI reference grouped by stage
 kelora --help-rhai       # Rhai syntax and scripting patterns
 kelora --help-functions  # Built-in functions grouped by domain
 kelora --help-multiline  # Multiline strategy reference
 kelora --help-time       # Timestamp parsing and formatting guide
+https://github.com/dloss/kelora/blob/main/docs/COOKBOOK.md     # Cookbook of Rhai and pipeline patterns
+https://github.com/dloss/kelora/blob/main/examples/README.md   # Catalogue of sample log files
 ```
 
 ## When to Reach for Kelora

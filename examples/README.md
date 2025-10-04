@@ -6,7 +6,7 @@
 
 ```bash
 # Try some examples
-kelora -j simple_json.jsonl -l ERROR
+kelora -j simple_json.jsonl --level ERROR
 kelora -f combined web_access_large.log.gz --parallel --stats
 kelora -j json_arrays.jsonl -e 'if "users" in e { emit_each(e.users) }' -k id,name,score
 ```
@@ -87,7 +87,7 @@ Each pattern aligns with the CLI tour in [README.md](../README.md#cli-feature-to
 
 **Filter and select:**
 ```bash
-kelora -j simple_json.jsonl -l ERROR -k timestamp,service,message
+kelora -j simple_json.jsonl --level ERROR -k timestamp,service,message
 ```
 
 **Visual level distribution:**
@@ -156,3 +156,5 @@ kelora -j errors_json_mixed.jsonl --verbose      # Show each error
 
 - `kelora --help-rhai` - Rhai basics and idioms
 - `kelora --help-functions` - All Rhai functions
+- `kelora --help-quick` - One-screen cheat sheet of the busiest flags
+- [Cookbook](https://github.com/dloss/kelora/blob/main/docs/COOKBOOK.md) - Expanded recipes
