@@ -74,7 +74,7 @@ kelora -j examples/simple_json.jsonl \
 | Parse | `-f/--input-format`, `--extract-prefix`, `-M/--multiline` | Turn raw text into structured events |
 | Filter | `--filter`, `--level`, `--since/--until` | Keep only the events you care about |
 | Transform | `-e/--exec`, `--begin`, `--window` | Enrich, fan out, and compute stateful metrics |
-| Format | `-F/--output-format`, `-k/--keys`, `--stats` | Control output shape and telemetry |
+| Format | `-F/--output-format`, `-k/--keys`, `--stats` | Control output shape and statistics |
 
 #### Workload Recipes
 
