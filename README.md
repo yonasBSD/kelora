@@ -67,7 +67,7 @@ More quick commands to copy-paste:
 
 - Stream-level error watch: `tail -f examples/simple_json.jsonl | kelora -j --level warn,error --exec 'track_count(e.service)' --metrics`
 - Fan out nested arrays: `kelora -j examples/json_arrays.jsonl --exec 'emit_each(e.get_path(\"users\", []))' --keys id,name,score`
-- Mask sensitive fields: `kelora -j examples/security_audit.jsonl --exec 'e.ip_masked = e.ip.mask_ip(1); e.user_hash = e.user.hash(\"xxh3\")' --keys timestamp,event,user_hash,ip_masked`
+- Mask sensitive fields: `kelora -j examples/security_audit.jsonl --exec 'e.ip_masked = e.ip.mask_ip(1); e.user_hash = e.user.hash(\"xxh3\")' --keys timestamp,event,user_alias,ip_masked`
 
 > [!TIP]
 > The sample logs in `examples/` map to the categories in [examples/README.md](examples/README.md#file-categories). Start there before pointing Kelora at production data. Need a fast reminder of the core flags? Run `kelora --help-quick`.
@@ -358,9 +358,9 @@ kelora -f syslog examples/simple_syslog.log \
 
 # Anonymize sensitive fields while keeping sessions linkable
 kelora -j examples/security_audit.jsonl \
-  --exec 'e.user_hash = e.user.hash("xxh3"); e.ip_masked = e.ip.mask_ip(1)' \
+  --exec 'e.user_alias = pseudonym(e.user, "users"); e.ip_masked = e.ip.mask_ip(1)' \
   --filter 'e.event == "login"' \
-  --keys timestamp,user_hash,ip_masked,event
+  --keys timestamp,event,user_alias,ip_masked
 ```
 
 ### Advanced Pipelines

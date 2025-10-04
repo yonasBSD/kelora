@@ -52,8 +52,8 @@ kelora -f combined examples/web_access_large.log.gz \
 ### Anonymise while keeping linkability
 ```bash
 kelora -j examples/security_audit.jsonl \
-  --exec 'e.user_hash = e.user.hash("xxh3"); e.ip_masked = e.ip.mask_ip(1)' \
-  --keys timestamp,event,user_hash,ip_masked
+  --exec 'e.user_alias = pseudonym(e.user, "users"); e.ip_masked = e.ip.mask_ip(1)' \
+  --keys timestamp,event,user_alias,ip_masked
 ```
 
 ## 4. Fan-Out & Nested Data
