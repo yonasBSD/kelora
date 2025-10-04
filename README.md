@@ -12,9 +12,9 @@ Scriptable log processor for the command line. Treats logs as structured events 
 ## Table of Contents
 - [Overview](#overview)
 - [Getting Started](#getting-started)
+  - [First Commands](#first-commands)
   - [Quick Reference](#quick-reference)
   - [Installation](#installation)
-  - [First Commands](#first-commands)
 - [Everyday Use](#everyday-use)
   - [Core Concepts](#core-concepts)
   - [CLI Feature Tour](#cli-feature-tour)
@@ -40,6 +40,28 @@ Kelora parses log streams into structured events and runs them through a program
 - Emits metrics and processing stats so you can observe pipelines while they run.
 
 ## Getting Started
+
+### First Commands
+
+```bash
+# Filter error-level events from the logfmt sample
+kelora -f logfmt --level error examples/simple_logfmt.log
+
+# Work with JSON logs and print selected fields
+kelora -j examples/simple_json.jsonl \
+  --filter 'e.message.contains("timeout")' \
+  --keys timestamp,service,message,duration_ms
+
+# Parse Apache/Nginx access logs, keep key fields, and surface stats
+kelora -f combined examples/web_access_large.log.gz \
+  --keys ip,status,request_time,request \
+  --stats
+
+# Show login-related events with surrounding context (like grep -A/-B/-C)
+kelora -j examples/simple_json.jsonl \
+  --filter 'e.message.contains("login")' \
+  --after-context 2 --before-context 1
+```
 
 ### Quick Reference
 
@@ -72,6 +94,8 @@ Kelora parses log streams into structured events and runs them through a program
 > [!TIP]
 > The fixtures in `examples/` map to the categories in [examples/README.md](examples/README.md#file-categories). Start there before pointing Kelora at production data. Need a fast reminder of the core flags? Run `kelora --help-quick`.
 
+
+
 ### Installation
 
 #### Binary releases (recommended)
@@ -92,27 +116,7 @@ cd kelora
 cargo install --path .
 ```
 
-### First Commands
 
-```bash
-# Filter error-level events from the logfmt sample
-kelora -f logfmt --level error examples/simple_logfmt.log
-
-# Work with JSON logs and print selected fields
-kelora -j examples/simple_json.jsonl \
-  --filter 'e.message.contains("timeout")' \
-  --keys timestamp,service,message,duration_ms
-
-# Parse Apache/Nginx access logs, keep key fields, and surface stats
-kelora -f combined examples/web_access_large.log.gz \
-  --keys ip,status,request_time,request \
-  --stats
-
-# Show login-related events with surrounding context (like grep -A/-B/-C)
-kelora -j examples/simple_json.jsonl \
-  --filter 'e.message.contains("login")' \
-  --after-context 2 --before-context 1
-```
 
 
 
