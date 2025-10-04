@@ -1677,7 +1677,7 @@ fn print_quick_help() {
 
 Workflows:
   kelora -f logfmt --level error examples/simple_logfmt.log
-  kelora -j examples/simple_json.jsonl --filter 'e.level == "ERROR"' -k timestamp,message
+  kelora -j examples/simple_json.jsonl --filter 'e.message.contains("timeout")' -k timestamp,service,message,duration_ms
   kelora -f combined examples/web_access_large.log.gz --parallel --stats
 
 High-frequency flags:

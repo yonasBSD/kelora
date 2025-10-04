@@ -7,8 +7,8 @@ built-in fixtures in `examples/` so you can try them without touching production
 
 ### Narrow to interesting events
 ```bash
-kelora -j examples/simple_json.jsonl --filter 'e.level == "ERROR"' \
-  --keys timestamp,service,message
+kelora -j examples/simple_json.jsonl --filter 'e.message.contains("timeout")' \
+  --keys timestamp,service,message,duration_ms
 ```
 
 ### Slice by text before parsing

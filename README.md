@@ -78,17 +78,17 @@ kelora -f logfmt --level error examples/simple_logfmt.log
 
 # Work with JSON logs and print selected fields
 kelora -j examples/simple_json.jsonl \
-  --filter 'e.level == "ERROR"' \
-  --keys timestamp,level,message
+  --filter 'e.message.contains("timeout")' \
+  --keys timestamp,service,message,duration_ms
 
 # Parse Apache/Nginx access logs, keep key fields, and surface stats
 kelora -f combined examples/web_access_large.log.gz \
   --keys ip,status,request_time,request \
   --stats
 
-# Show errors with surrounding context (like grep -A/-B/-C)
+# Show login-related events with surrounding context (like grep -A/-B/-C)
 kelora -j examples/simple_json.jsonl \
-  --filter 'e.level == "ERROR"' \
+  --filter 'e.message.contains("login")' \
   --after-context 2 --before-context 1
 ```
 
