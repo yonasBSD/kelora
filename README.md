@@ -81,8 +81,8 @@ kelora -j examples/simple_json.jsonl \
 Short one-liners for common tasks:
 
 - Streaming triage: `tail -f examples/simple_json.jsonl | kelora -j --level warn,error --exec 'track_count(e.service)' --metrics`
-- Archive summary: `kelora -f combined --parallel examples/web_access_large.log.gz --exec 'track_bucket("status_family", e.status / 100 * 100)' --end 'print(metrics.status_family)' -F none`
-- Targeted syslog filter: `kelora -f syslog examples/simple_syslog.log --filter 'e.msg.contains("Failed login")' -F json`
+- Fan out nested arrays: `kelora -j examples/json_arrays.jsonl --exec 'emit_each(e.get_path("users", []))' --keys id,name,score`
+- Mask sensitive fields: `kelora -j examples/security_audit.jsonl --exec 'e.ip_masked = e.ip.mask_ip(1); e.user_hash = e.user.hash("xxh3")' --keys timestamp,event,user_hash,ip_masked`
 
 > [!TIP]
 > The sample logs in `examples/` map to the categories in [examples/README.md](examples/README.md#file-categories). Start there before pointing Kelora at production data. Need a fast reminder of the core flags? Run `kelora --help-quick`.
