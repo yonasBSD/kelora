@@ -67,20 +67,22 @@ More quick commands to copy-paste:
 
 - Stream-level error watch: `tail -f examples/simple_json.jsonl | kelora -j --level warn,error --exec 'track_count(e.service)' --metrics`
 - Fan out nested arrays: `kelora -j examples/json_arrays.jsonl --exec 'emit_each(e.get_path(\"users\", []))' --keys id,name,score`
-- Mask sensitive fields: `kelora -j examples/security_audit.jsonl --exec 'e.ip_masked = e.ip.mask_ip(1); e.user_hash = e.user.hash(\"xxh3\")' --keys timestamp,event,user_alias,ip_masked`
+- Alias sensitive fields: `kelora -j examples/security_audit.jsonl --exec 'e.user_alias = pseudonym(e.user, \"users\"); e.ip_masked = e.ip.mask_ip(1)' --keys timestamp,event,user_alias,ip_masked`
 
 > [!TIP]
 > The sample logs in `examples/` map to the categories in [examples/README.md](examples/README.md#file-categories). Start there before pointing Kelora at production data. Need a fast reminder of the core flags? Run `kelora --help-quick`.
 
 ### Installation
 
-#### Binary releases (recommended)
+#### Prebuilt binaries (recommended)
 
 1. Download the archive for your platform from the [GitHub releases](https://github.com/dloss/kelora/releases) page (macOS, Linux, and Windows builds are provided).
 2. Unpack the archive and move `kelora` or `kelora.exe` somewhere on your `PATH`.
 3. Run `kelora --help` to ensure the binary starts up correctly.
 
 If you prefer to manage the build yourself, Kelora targets stable Rust; keep your toolchain fresh (`rustup update`) for best results.
+
+#### Install from crates.io or source
 
 ```bash
 # Install from crates.io
