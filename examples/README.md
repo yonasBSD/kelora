@@ -81,6 +81,12 @@ Extremely challenging scenarios:
 kelora -f json simple_json.jsonl -l ERROR -k timestamp,service,message
 ```
 
+**Visual level distribution:**
+```bash
+kelora -f logfmt simple_logfmt.log -F levelmap
+```
+The `levelmap` formatter fills the available terminal width, prefixing each block with the first event's timestamp so you can spot bursts of specific levels at a glance.
+
 **Safe nested access:**
 ```bash
 kelora -f json json_nested_deep.jsonl \

@@ -1637,6 +1637,17 @@ Naive timestamp + timezone example:
 Shell tip: wrap the entire format in single quotes or escape % symbols to keep
   your shell from expanding them.
 
+Timestamp filtering with --since and --until:
+  kelora --since "2024-01-15T10:00:00Z" app.log   # Events after timestamp
+  kelora --until "yesterday" app.log              # Events before yesterday
+  kelora --since 1h app.log                       # Last hour (1h, 30m, 2d, etc.)
+  kelora --since +1h app.log                      # Future events (+ means ahead)
+
+  Common timestamp field names are auto-detected: ts, timestamp, time, @timestamp
+  Events without valid timestamps are filtered out in resilient mode (default)
+  Use --strict to abort processing on missing/invalid timestamps
+  Use --verbose to see detailed timestamp parsing errors
+
 For the full chrono format reference, see:
 https://docs.rs/chrono/latest/chrono/format/strftime/index.html
 "#;
