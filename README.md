@@ -1,5 +1,9 @@
 # Kelora
 
+<p align="center">
+  <img src="kelora-logo.svg" alt="Kelora Logo" width="300">
+</p>
+
 Scriptable log processor for the command line. Treats logs as structured events and lets you filter, transform, and analyze them using embedded [Rhai](https://rhai.rs) scripts with 40+ built-in functions.
 
 > [!WARNING]
