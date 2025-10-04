@@ -1496,8 +1496,11 @@ fn test_syslog_severity_analysis() {
 
 #[test]
 fn test_syslog_with_file() {
-    let syslog_content = std::fs::read_to_string("example_logs/sample.syslog")
-        .expect("Should be able to read sample syslog file");
+    let syslog_content = r#"<34>Jan 15 10:00:00 webserver nginx: 192.168.1.10 - - [15/Jan/2024:10:00:00 +0000] "GET /index.html HTTP/1.1" 200 612
+<27>Jan 15 10:00:30 batch01 cron: nightly job started
+<27>Jan 15 10:00:45 webserver nginx: 192.168.1.30 - - [15/Jan/2024:10:00:45 +0000] "GET /api/data HTTP/1.1" 500 0
+<27>Jan 15 10:00:55 db01 postgres: connection accepted
+"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_file(
         &[
@@ -1508,7 +1511,7 @@ fn test_syslog_with_file() {
             "-F",
             "json",
         ],
-        &syslog_content,
+        syslog_content,
     );
     assert_eq!(exit_code, 0, "syslog file processing should succeed");
 
