@@ -35,27 +35,27 @@ Kelora parses log streams into structured events and runs them through a program
 ## Quick Start
 
 > [!TIP]
-> Use the fixtures in `example_logs/` when experimenting—no need to point at production logs.
+> Use the fixtures in `examples/` when experimenting—no need to point at production logs.
 
 ### Basics
 
 ```bash
 # Filter error-level events from the logfmt sample
-kelora -f logfmt -l error example_logs/sample.logfmt
+kelora -f logfmt -l error examples/simple_logfmt.log
 
 # Work with JSON logs and enrich the event before printing selected fields
-kelora -j example_logs/sample.jsonl \
+kelora -j examples/simple_json.jsonl \
   --filter 'e.level == "ERROR"' \
   --exec 'e.retry_count = e.get_path("retry", 0)' \
   --keys timestamp,level,message,retry_count
 
 # Parse Apache/Nginx access logs, keep key fields, and surface stats
-kelora -f combined example_logs/sample.nginx \
+kelora -f combined examples/web_access_large.log.gz \
   --keys ip,status,request_time,request \
   --stats
 
 # Show errors with surrounding context (like grep -A/-B/-C)
-kelora -j example_logs/sample.jsonl \
+kelora -j examples/simple_json.jsonl \
   --filter 'e.level == "ERROR"' \
   --after-context 2 --before-context 1
 ```
@@ -64,9 +64,9 @@ kelora -j example_logs/sample.jsonl \
 
 ```bash
 # Count slow responses and surface metrics alongside real-time output
-kelora -f logfmt example_logs/sample.logfmt \
-  --filter 'e.duration.to_int() >= 1000' \
-  --exec 'track_count("slow_requests"); e.bucket = if e.duration.to_int() >= 2000 { "very_slow" } else { "slow" }' \
+kelora -f logfmt examples/simple_logfmt.log \
+  --filter 'e.duration.to_int_or(0) >= 1000' \
+  --exec 'track_count("slow_requests"); e.bucket = if e.duration.to_int_or(0) >= 2000 { "very_slow" } else { "slow" }' \
   --metrics
 
 # Sliding window alerting for login failures (stream from any source)
@@ -76,7 +76,7 @@ kubectl logs -f deploy/auth | \
     --exec 'let users = window_values("user"); if users.len() >= 3 { eprint("🚨 brute force detected for " + e.user); }'
 
 # Run a scripted pipeline from disk (save your Rhai to pipelines/critical_filter.rhai first)
-kelora -j example_logs/sample.jsonl \
+kelora -j examples/simple_json.jsonl \
   --begin 'conf.critical_components = ["database", "auth"]' \
   --exec-file pipelines/critical_filter.rhai \
   --output-file filtered.json
@@ -177,11 +177,11 @@ Choose the right baseline for text pre-processing. `-f line` is the default: it 
 
 ```bash
 # Preserve every byte (newline-sensitive analyses)
-kelora -f raw example_logs/sample.log \
+kelora -f raw examples/simple_line.log \
   --exec 'e.byte_len = e.raw.len()'
 
 # Treat each line as plain text for simple filtering
-kelora -f line example_logs/sample.log \
+kelora -f line examples/simple_line.log \
   --filter 'e.line.contains("ERROR")'
 ```
 
@@ -266,7 +266,7 @@ Kelora exposes the full Rhai language plus domain-specific helpers.
 Example pipeline with shared configuration and sliding logic:
 
 ```bash
-kelora -j example_logs/sample.jsonl \
+kelora -j examples/simple_json.jsonl \
   --begin 'conf.error_levels = ["ERROR", "FATAL"]; conf.retry_threshold = 2' \
   --filter 'conf.error_levels.contains(e.level)' \
   --exec 'if e.get_path("retry", 0) >= conf.retry_threshold { track_count("retries"); }' \
@@ -314,10 +314,10 @@ slow-queries = --filter 'e.duration > 1000' --exec 'e.slow = true' --keys timest
 Usage:
 
 ```bash
-kelora example_logs/sample.jsonl            # Uses defaults
-kelora --config-file custom.ini example_logs/sample.log  # Swap configuration files
-kelora --no-stats example_logs/sample.log                # Override a default
-kelora -a errors example_logs/sample.jsonl  # Run the alias
+kelora examples/simple_json.jsonl            # Uses defaults
+kelora --config-file custom.ini examples/simple_line.log  # Swap configuration files
+kelora --no-stats examples/simple_line.log                # Override a default
+kelora -a errors examples/simple_json.jsonl  # Run the alias
 kelora --show-config                        # Inspect the merged configuration
 kelora -l error --stats --save-alias errors # Save current command as alias
 ```
@@ -336,14 +336,14 @@ tail -f /var/log/nginx/access.log | \
     --metrics
 
 # Authentication watch with sliding windows and unique counters
-kelora -f syslog example_logs/sample.syslog \
-  --filter 'e.message.contains("Failed login")' \
+kelora -f syslog examples/simple_syslog.log \
+  --filter '"msg" in e && e.msg.contains("Failed login")' \
   --window 4 \
-  --exec 'let count = 0; for msg in window_values("message") { if msg.contains("Failed login") { count += 1; } } if count >= 3 { eprint("🚨 repeated failures: " + e.message.extract_ip()); track_unique("alert_ips", e.message.extract_ip()); }' \
+  --exec 'let count = 0; for msg in window_values("msg") { if msg.contains("Failed login") { count += 1; } } if count >= 3 { eprint("🚨 repeated failures: " + e.msg.extract_ip()); track_unique("alert_ips", e.msg.extract_ip()); }' \
   --metrics
 
 # Convert syslog to structured JSON and redact sensitive fields
-kelora -f syslog example_logs/sample.syslog \
+kelora -f syslog examples/simple_syslog.log \
   --exec 'e.severity_label = if e.severity <= 3 { "critical" } else if e.severity <= 4 { "error" } else { "info" }; e.host = e.host.mask_ip(1);' \
   -J
 
