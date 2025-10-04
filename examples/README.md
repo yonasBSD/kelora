@@ -8,7 +8,7 @@
 # Try some examples
 kelora -j simple_json.jsonl -l ERROR
 kelora -f combined web_access_large.log.gz --parallel --stats
-kelora -j json_arrays.jsonl -e 'emit_each(e.users)' -k id,name,score
+kelora -j json_arrays.jsonl -e 'if "users" in e { emit_each(e.users) }' -k id,name,score
 ```
 
 ## File Categories
@@ -92,7 +92,7 @@ kelora -j json_nested_deep.jsonl \
 
 **Array fan-out:**
 ```bash
-kelora -j json_arrays.jsonl -e 'emit_each(e.users)' -k id,name,score
+kelora -j json_arrays.jsonl -e 'if "users" in e { emit_each(e.users) }' -k id,name,score
 ```
 
 **Multi-level fan-out:**
