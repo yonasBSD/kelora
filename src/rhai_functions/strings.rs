@@ -1524,6 +1524,16 @@ pub fn register_functions(engine: &mut Engine) {
             .to_string()
     });
 
+    engine.register_fn("lclip", |text: &str| -> String {
+        text.trim_start_matches(|c: char| !c.is_alphanumeric())
+            .to_string()
+    });
+
+    engine.register_fn("rclip", |text: &str| -> String {
+        text.trim_end_matches(|c: char| !c.is_alphanumeric())
+            .to_string()
+    });
+
     engine.register_fn("join", |separator: &str, items: rhai::Array| -> String {
         items
             .into_iter()
@@ -3789,6 +3799,106 @@ mod tests {
         scope.push("empty", "");
         let result: String = engine
             .eval_with_scope(&mut scope, r#"empty.clip()"#)
+            .unwrap();
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_lclip_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+
+        // Basic left clip
+        scope.push("parens", "(error)");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"parens.lclip()"#)
+            .unwrap();
+        assert_eq!(result, "error)");
+
+        // Only left side cleaned
+        scope.push("brackets", "!!![WARNING]!!");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"brackets.lclip()"#)
+            .unwrap();
+        assert_eq!(result, "WARNING]!!");
+
+        // Already clean on left
+        scope.push("clean", "abc123!!!");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"clean.lclip()"#)
+            .unwrap();
+        assert_eq!(result, "abc123!!!");
+
+        // Unicode
+        scope.push("unicode", "¡Hola!");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"unicode.lclip()"#)
+            .unwrap();
+        assert_eq!(result, "Hola!");
+
+        // All non-alnum
+        scope.push("symbols", "!!!");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"symbols.lclip()"#)
+            .unwrap();
+        assert_eq!(result, "");
+
+        // Empty string
+        scope.push("empty", "");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"empty.lclip()"#)
+            .unwrap();
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_rclip_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+
+        // Basic right clip
+        scope.push("parens", "(error)");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"parens.rclip()"#)
+            .unwrap();
+        assert_eq!(result, "(error");
+
+        // Only right side cleaned
+        scope.push("brackets", "!!![WARNING]!!");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"brackets.rclip()"#)
+            .unwrap();
+        assert_eq!(result, "!!![WARNING");
+
+        // Already clean on right
+        scope.push("clean", "!!!abc123");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"clean.rclip()"#)
+            .unwrap();
+        assert_eq!(result, "!!!abc123");
+
+        // Unicode
+        scope.push("unicode", "¡Hola!");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"unicode.rclip()"#)
+            .unwrap();
+        assert_eq!(result, "¡Hola");
+
+        // All non-alnum
+        scope.push("symbols", "!!!");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"symbols.rclip()"#)
+            .unwrap();
+        assert_eq!(result, "");
+
+        // Empty string
+        scope.push("empty", "");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"empty.rclip()"#)
             .unwrap();
         assert_eq!(result, "");
     }

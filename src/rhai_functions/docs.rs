@@ -39,6 +39,7 @@ text.is_in_cidr(cidr)                Check if IP address is in CIDR network (e.g
 text.is_ipv4()                       Check if text is a valid IPv4 address
 text.is_ipv6()                       Check if text is a valid IPv6 address
 text.is_private_ip()                 Check if IP is in private ranges
+text.lclip()                         Remove leading non-alphanumeric characters (left side only)
 text.len                             Get string length (builtin)
 text.lower()                         Convert text to lowercase
 text.mask_ip([octets])               Mask IP address (default: last octet)
@@ -57,6 +58,7 @@ text.parse_query_params()            Parse URL query string into map
 text.parse_syslog()                  Parse syslog line into structured fields
 text.parse_url()                     Parse URL into structured components
 text.parse_user_agent()              Parse common user-agent strings into components
+text.rclip()                         Remove trailing non-alphanumeric characters (right side only)
 text.replace(pattern, replacement)   Replace all occurrences of pattern (builtin)
 text.slice(spec)                     Slice text using Python notation (e.g., "1:5", ":3", "-2:")
 text.split_re(pattern)               Split text by regex pattern
