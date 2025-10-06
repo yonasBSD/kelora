@@ -1518,6 +1518,12 @@ pub fn register_functions(engine: &mut Engine) {
             .to_string()
     });
 
+    engine.register_fn("clip", |text: &str| -> String {
+        text.trim_start_matches(|c: char| !c.is_alphanumeric())
+            .trim_end_matches(|c: char| !c.is_alphanumeric())
+            .to_string()
+    });
+
     engine.register_fn("join", |separator: &str, items: rhai::Array| -> String {
         items
             .into_iter()
@@ -3714,6 +3720,77 @@ mod tests {
             .eval_with_scope(&mut scope, r##"mixed.strip(" #")"##)
             .unwrap();
         assert_eq!(result, "hello world");
+    }
+
+    #[test]
+    fn test_clip_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+
+        // Basic punctuation removal
+        scope.push("parens", "(error)");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"parens.clip()"#)
+            .unwrap();
+        assert_eq!(result, "error");
+
+        // Mixed symbols
+        scope.push("brackets", "[WARNING]!!");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"brackets.clip()"#)
+            .unwrap();
+        assert_eq!(result, "WARNING");
+
+        // Empty result - all non-alnum
+        scope.push("symbols", "!!!");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"symbols.clip()"#)
+            .unwrap();
+        assert_eq!(result, "");
+
+        // Already clean
+        scope.push("clean", "abc123");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"clean.clip()"#)
+            .unwrap();
+        assert_eq!(result, "abc123");
+
+        // Unicode support
+        scope.push("unicode", "¡Hola!");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"unicode.clip()"#)
+            .unwrap();
+        assert_eq!(result, "Hola");
+
+        // Unicode non-Latin alphanumeric
+        scope.push("japanese", "[日本語]");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"japanese.clip()"#)
+            .unwrap();
+        assert_eq!(result, "日本語");
+
+        // Mixed whitespace and symbols
+        scope.push("mixed", "  [ERROR]!!  ");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"mixed.clip()"#)
+            .unwrap();
+        assert_eq!(result, "ERROR");
+
+        // Preserves internal non-alnum
+        scope.push("internal", "!hello-world!");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"internal.clip()"#)
+            .unwrap();
+        assert_eq!(result, "hello-world");
+
+        // Empty string
+        scope.push("empty", "");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"empty.clip()"#)
+            .unwrap();
+        assert_eq!(result, "");
     }
 
     #[test]

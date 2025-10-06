@@ -11,6 +11,7 @@ text.after(delimiter [,nth])         Text after occurrence of delimiter (nth: 1=
 text.before(delimiter [,nth])        Text before occurrence of delimiter (nth: 1=first, -1=last)
 text.between(start, end)             Text between start and end delimiters
 text.bucket()                        Fast hash for sampling/grouping (returns INT for modulo operations)
+text.clip()                          Remove leading/trailing non-alphanumeric characters
 text.col(spec [,separator])          Extract columns by index/range/list (e.g., '1', '1,3,5', '1:4')
 text.contains(pattern)               Check if text contains pattern (builtin)
 text.count(pattern)                  Count occurrences of pattern in text
