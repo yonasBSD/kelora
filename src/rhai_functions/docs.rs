@@ -124,14 +124,19 @@ to_datetime(text [,fmt [,tz]])       Convert string into DateTimeWrapper with op
 to_duration("1h30m")                 Convert duration string into DurationWrapper
 duration_from_<unit>(n)              Create duration from seconds/minutes/hours/days/ms/ns
 humanize_duration(ms)                Convert milliseconds to human-readable format (e.g., "1h 30m")
-dt.format("format_string")           Format datetime using custom format string
+dt.to_iso()                          Convert datetime to ISO 8601 string
+dt.format("format_string")           Format datetime using custom format string (see --help-time)
 dt.year(), dt.month(), dt.day()      Extract date components
 dt.hour(), dt.minute(), dt.second()  Extract time components
 dt.to_utc(), dt.to_local()           Convert timezone
 dt.to_timezone("tz_name")            Convert to named timezone
+dt.timezone_name()                   Get timezone name as string
 dt.ts_nanos()                        Get timestamp as nanoseconds
 dt + duration, dt - duration         Add/subtract duration from datetime
 dt1 - dt2                            Get duration between datetimes (returns DurationWrapper)
+dt1 == dt2, dt1 != dt2               Compare datetimes for equality
+dt1 > dt2, dt1 < dt2                 Compare datetimes (greater/less than)
+dt1 >= dt2, dt1 <= dt2               Compare datetimes (greater/less or equal)
 duration.as_seconds()                Convert duration to seconds
 duration.as_milliseconds()           Convert duration to milliseconds
 duration.as_nanoseconds()            Convert duration to nanoseconds
@@ -141,6 +146,9 @@ duration.as_days()                   Convert duration to days
 duration.to_string()                 Format duration as human-readable string (e.g., "1h 30m")
 duration1 + duration2                Add durations
 duration1 - duration2                Subtract durations (always returns positive result)
+duration1 == duration2               Compare durations for equality
+duration1 > duration2, duration1 < duration2  Compare durations (greater/less than)
+duration1 >= duration2, duration1 <= duration2  Compare durations (greater/less or equal)
 
 MATH FUNCTIONS:
 abs(x)                               Absolute value of number

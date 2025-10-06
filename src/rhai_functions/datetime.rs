@@ -404,6 +404,10 @@ pub fn register_functions(engine: &mut Engine) {
         },
     );
 
+    engine.register_fn("to_iso", |dt: &mut DateTimeWrapper| -> String {
+        dt.inner.to_rfc3339()
+    });
+
     engine.register_fn("format", |dt: &mut DateTimeWrapper, fmt: &str| -> String {
         dt.inner.format(fmt).to_string()
     });
