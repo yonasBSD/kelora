@@ -42,6 +42,7 @@ text.is_private_ip()                 Check if IP is in private ranges
 text.lclip()                         Remove leading non-alphanumeric characters (left side only)
 text.len                             Get string length (builtin)
 text.lower()                         Convert text to lowercase
+text.lstrip([chars])                 Remove leading whitespace or specified characters
 text.mask_ip([octets])               Mask IP address (default: last octet)
 text.parse_cef()                     Parse Common Event Format line into fields
 text.parse_cols(spec [,sep])         Parse columns according to spec
@@ -60,6 +61,7 @@ text.parse_url()                     Parse URL into structured components
 text.parse_user_agent()              Parse common user-agent strings into components
 text.rclip()                         Remove trailing non-alphanumeric characters (right side only)
 text.replace(pattern, replacement)   Replace all occurrences of pattern (builtin)
+text.rstrip([chars])                 Remove trailing whitespace or specified characters
 text.slice(spec)                     Slice text using Python notation (e.g., "1:5", ":3", "-2:")
 text.split_re(pattern)               Split text by regex pattern
 text.split(separator)                Split string into array by delimiter (builtin)

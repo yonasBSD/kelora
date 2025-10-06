@@ -1518,6 +1518,26 @@ pub fn register_functions(engine: &mut Engine) {
             .to_string()
     });
 
+    engine.register_fn("lstrip", |text: &str| -> String {
+        text.trim_start().to_string()
+    });
+
+    engine.register_fn("lstrip", |text: &str, chars: &str| -> String {
+        let chars_to_remove: std::collections::HashSet<char> = chars.chars().collect();
+        text.trim_start_matches(|c: char| chars_to_remove.contains(&c))
+            .to_string()
+    });
+
+    engine.register_fn("rstrip", |text: &str| -> String {
+        text.trim_end().to_string()
+    });
+
+    engine.register_fn("rstrip", |text: &str, chars: &str| -> String {
+        let chars_to_remove: std::collections::HashSet<char> = chars.chars().collect();
+        text.trim_end_matches(|c: char| chars_to_remove.contains(&c))
+            .to_string()
+    });
+
     engine.register_fn("clip", |text: &str| -> String {
         text.trim_start_matches(|c: char| !c.is_alphanumeric())
             .trim_end_matches(|c: char| !c.is_alphanumeric())
@@ -3730,6 +3750,92 @@ mod tests {
             .eval_with_scope(&mut scope, r##"mixed.strip(" #")"##)
             .unwrap();
         assert_eq!(result, "hello world");
+    }
+
+    #[test]
+    fn test_lstrip_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+
+        // Default whitespace stripping
+        scope.push("text", "  hello world  ");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.lstrip()"#)
+            .unwrap();
+        assert_eq!(result, "hello world  ");
+
+        // Custom character stripping
+        scope.push("custom", "###hello world###");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"custom.lstrip("#")"##)
+            .unwrap();
+        assert_eq!(result, "hello world###");
+
+        // Mixed characters
+        scope.push("mixed", "  ##hello world##  ");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"mixed.lstrip(" #")"##)
+            .unwrap();
+        assert_eq!(result, "hello world##  ");
+
+        // Already clean on left
+        scope.push("clean", "hello world  ");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"clean.lstrip()"#)
+            .unwrap();
+        assert_eq!(result, "hello world  ");
+
+        // Empty result
+        scope.push("spaces", "   ");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"spaces.lstrip()"#)
+            .unwrap();
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_rstrip_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+
+        // Default whitespace stripping
+        scope.push("text", "  hello world  ");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"text.rstrip()"#)
+            .unwrap();
+        assert_eq!(result, "  hello world");
+
+        // Custom character stripping
+        scope.push("custom", "###hello world###");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"custom.rstrip("#")"##)
+            .unwrap();
+        assert_eq!(result, "###hello world");
+
+        // Mixed characters
+        scope.push("mixed", "  ##hello world##  ");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"mixed.rstrip(" #")"##)
+            .unwrap();
+        assert_eq!(result, "  ##hello world");
+
+        // Already clean on right
+        scope.push("clean", "  hello world");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"clean.rstrip()"#)
+            .unwrap();
+        assert_eq!(result, "  hello world");
+
+        // Empty result
+        scope.push("spaces", "   ");
+        let result: String = engine
+            .eval_with_scope(&mut scope, r#"spaces.rstrip()"#)
+            .unwrap();
+        assert_eq!(result, "");
     }
 
     #[test]
