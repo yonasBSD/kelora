@@ -270,7 +270,7 @@ Kelora exposes the full Rhai language plus domain-specific helpers.
 
 - **Text & parsing** - `extract_re`, `parse_logfmt`, `parse_cols`, `mask_ip`, `encode_*` / `decode_*`.
 - **Arrays & maps** - `sorted`, `sorted_by`, `array.flatten`, `map.get_path`, `map.flatten`, `emit_each`.
-- **Hashing & anonymization** - `bucket` (fast sampling), `hash` (multi-algo), `anonymize` (salted SHA-256), `pseudonym` (short IDs).
+- **Hashing & pseudonymization** - `bucket` (fast sampling), `hash` (multi-algo), `pseudonym` (short IDs).
 - **Metrics** - `track_count`, `track_avg`, `track_bucket`, `track_unique` power `--metrics` and `--end` reports.
 - **Datetime** - `to_datetime`, `to_duration`, `now_utc`, formatting helpers, arithmetic.
 - **Environment & control** - `get_env`, `read_file`, `read_lines`, `exit`.
