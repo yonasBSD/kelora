@@ -107,14 +107,16 @@ kelora -f csv examples/simple_csv.csv \
 
 ### Stream Processing
 
-Process logs as they're written (Unix/Linux/macOS):
+Process logs as they're written:
 
-```bash
-> tail -f /var/log/app.log | kelora -j --levels error
-```
+=== "Unix/Linux/macOS"
 
-!!! tip "Windows Users"
-    On Windows, use PowerShell's `Get-Content -Wait`:
+    ```bash
+    > tail -f /var/log/app.log | kelora -j --levels error
+    ```
+
+=== "Windows (PowerShell)"
+
     ```powershell
     > Get-Content -Wait app.log | kelora -j --levels error
     ```
