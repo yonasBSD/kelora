@@ -24,9 +24,9 @@ Kelora is a Rust log processor; this guide keeps contributions aligned with curr
 
 ## Build, Test, and Development Commands
 - `cargo build --release` or `cargo run -- <flags>` produce local binaries for smoke testing.
-- `make test`, `make test-unit`, and `make test-integration` wrap targeted `cargo test` runs for faster iteration.
-- `make fmt`, `make lint`, `make audit`, and `make deny` keep formatting, linting, and supply-chain policy clean; `make check` runs the whole bundle.
-- `make bench-quick` samples hot paths; use `make bench` for the full suite and `make bench-update` when you intentionally refresh the stored baseline.
+- `just test`, `just test-unit`, and `just test-integration` wrap targeted `cargo test` runs for faster iteration.
+- `just fmt`, `just lint`, `just audit`, and `just deny` keep formatting, linting, and supply-chain policy clean; `just check` runs the whole bundle.
+- `just bench-quick` samples hot paths; use `just bench` for the full suite and `just bench-update` when you intentionally refresh the stored baseline.
 
 ## Coding Style & Naming Conventions
 - Default to `cargo fmt` output: four-space indentation, trailing commas, module/file snake_case; structs and enums in PascalCase, constants in SCREAMING_SNAKE_CASE.
@@ -35,7 +35,7 @@ Kelora is a Rust log processor; this guide keeps contributions aligned with curr
 
 ## Testing Guidelines
 - Place focused unit tests in-module behind `#[cfg(test)]`; add scenario coverage in `tests/` named `<feature>_integration_test.rs`.
-- Run `cargo test -q` or `make test` before submitting changes.
+- Run `cargo test -q` or `just test` before submitting changes.
 - When output shifts, regenerate `help-screen.txt` via `cargo run -- --help > help-screen.txt` and refresh sample fixtures in `example_logs/` as needed.
 - Keep tests deterministic by leaning on `tempfile` or bundled fixtures instead of randomness.
 

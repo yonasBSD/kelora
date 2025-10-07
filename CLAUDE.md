@@ -31,21 +31,21 @@ cargo build --release
 time ./target/release/kelora -f json <logfile> --filter "expression" > /dev/null
 
 # Run benchmark suite to detect performance regressions
-make bench-quick              # Quick benchmarks (10k dataset)
-make bench                    # Full benchmark suite (10k + 50k datasets)
-make bench-update             # Refresh the stored baseline intentionally
+just bench-quick              # Quick benchmarks (10k dataset)
+just bench                    # Full benchmark suite (10k + 50k datasets)
+just bench-update             # Refresh the stored baseline intentionally
 
 # Run formatting, lint, and dependency policy checks
-make fmt
-make lint
-make audit
-make deny
-make check
+just fmt
+just lint
+just audit
+just deny
+just check
 
 # Run tests
-make test               # Unit and integration tests
-make test-unit          # Binary/unit tests only
-make test-integration   # Integration tests only
+just test               # Unit and integration tests
+just test-unit          # Binary/unit tests only
+just test-integration   # Integration tests only
 ```
 
 ### Error Handling and Automation Examples
@@ -421,7 +421,7 @@ kelora -qq suspicious.log || mail -s "Log errors detected" admin@company.com
 
 **Performance Tests:**
 - Benchmark suites for regression detection
-- Run with `make bench` for comprehensive testing
+- Run with `just bench` for comprehensive testing
 - Use `time` command for quick performance checks
 
 ### Timestamp Parsing and Timezone Handling
