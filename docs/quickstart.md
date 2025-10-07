@@ -11,8 +11,8 @@ Get started with Kelora in 5 minutes. This guide will walk you through parsing, 
 
 Let's start with a simple JSON log file. Parse it and see all events:
 
-```bash exec="on" result="ansi"
-kelora -f json examples/simple_json.jsonl | head -3
+```bash exec="on" source="above" result="ansi"
+kelora -f json examples/simple_json.jsonl --take 3
 ```
 
 The `-f json` flag tells Kelora to parse each line as JSON. By default, Kelora outputs events in `key=value` format.
@@ -21,7 +21,7 @@ The `-f json` flag tells Kelora to parse each line as JSON. By default, Kelora o
 
 Show only error-level events:
 
-```bash exec="on" result="ansi"
+```bash exec="on" source="above" result="ansi"
 kelora -f json examples/simple_json.jsonl --levels error
 ```
 
@@ -31,8 +31,10 @@ The `--levels` flag filters events by their log level field. You can specify mul
 
 Extract just the fields you care about:
 
-```bash exec="on" result="ansi"
-kelora -f json examples/simple_json.jsonl --keys timestamp,service,message | head -3
+```bash exec="on" source="above" result="ansi"
+kelora -f json examples/simple_json.jsonl \
+  --keys timestamp,service,message \
+  --take 3
 ```
 
 The `--keys` flag limits output to specified top-level fields.
@@ -41,7 +43,7 @@ The `--keys` flag limits output to specified top-level fields.
 
 Use Rhai scripts to filter events with custom conditions:
 
-```bash exec="on" result="ansi"
+```bash exec="on" source="above" result="ansi"
 kelora -f json examples/simple_json.jsonl \
   --filter 'e.service == "database"' \
   --keys timestamp,service,message
@@ -53,7 +55,7 @@ The `--filter` flag evaluates a Rhai expression. Events where the expression ret
 
 Add computed fields using `--exec`:
 
-```bash exec="on" result="ansi"
+```bash exec="on" source="above" result="ansi"
 kelora -f json examples/simple_json.jsonl \
   --filter 'e.service == "database"' \
   --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' \
@@ -66,7 +68,7 @@ The `--exec` flag runs Rhai code to modify events. Here we convert milliseconds 
 
 Count events by service and show statistics:
 
-```bash exec="on" result="ansi"
+```bash exec="on" source="above" result="ansi"
 kelora -f json examples/simple_json.jsonl \
   --exec 'track_count(e.service)' \
   --stats
@@ -80,22 +82,25 @@ Kelora supports many formats out of the box:
 
 ### Logfmt
 
-```bash exec="on" result="ansi"
+```bash exec="on" source="above" result="ansi"
 kelora -f logfmt examples/simple_logfmt.log --levels error
 ```
 
 ### Apache/Nginx Access Logs
 
-```bash exec="on" result="ansi"
+```bash exec="on" source="above" result="ansi"
 kelora -f combined examples/web_access_large.log.gz \
   --filter 'e.status >= 400' \
-  --keys ip,status,request | head -3
+  --keys ip,status,request \
+  --take 3
 ```
 
 ### CSV
 
-```bash exec="on" result="ansi"
-kelora -f csv examples/simple_csv.csv --keys name,age | head -5
+```bash exec="on" source="above" result="ansi"
+kelora -f csv examples/simple_csv.csv \
+  --keys name,age \
+  --take 5
 ```
 
 ## Common Patterns
@@ -105,7 +110,7 @@ kelora -f csv examples/simple_csv.csv --keys name,age | head -5
 Process logs as they're written:
 
 ```bash
-tail -f /var/log/app.log | kelora -j --levels error
+> tail -f /var/log/app.log | kelora -j --levels error
 ```
 
 ### Gzipped Files
@@ -113,7 +118,7 @@ tail -f /var/log/app.log | kelora -j --levels error
 Kelora automatically decompresses `.gz` files:
 
 ```bash
-kelora -f json app.log.gz --levels error
+> kelora -f json app.log.gz --levels error
 ```
 
 ### Multiple Files
@@ -121,7 +126,7 @@ kelora -f json app.log.gz --levels error
 Process multiple files in sequence:
 
 ```bash
-kelora -f json logs/*.jsonl --levels error
+> kelora -f json logs/*.jsonl --levels error
 ```
 
 ### Output to JSON
@@ -129,7 +134,7 @@ kelora -f json logs/*.jsonl --levels error
 Change the output format:
 
 ```bash
-kelora -f logfmt examples/simple_logfmt.log -F json
+> kelora -f logfmt examples/simple_logfmt.log -F json
 ```
 
 ## Next Steps
