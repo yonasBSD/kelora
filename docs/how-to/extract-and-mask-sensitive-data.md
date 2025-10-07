@@ -399,6 +399,6 @@ e.legacy_id = e.user_id.hash("sha256")  # Cryptographic
 ## See Also
 
 - [Function Reference](../reference/functions.md) - Complete list of masking and hashing functions
-- [Security Best Practices](../concepts/security.md) - Comprehensive security guidance
+- [Configuration System](../concepts/configuration-system.md) - Centralize redaction defaults
 - [Monitor Application Health](monitor-application-health.md) - Health metrics without exposing PII
 - [Analyze Web Traffic](analyze-web-traffic.md) - Web log analysis with IP masking

@@ -501,7 +501,7 @@ find /var/log -name "*.log" -mtime +7 | \
 
 ## See Also
 
-- [Performance Best Practices](../concepts/performance.md) - Optimization guide
+- [Performance Model](../concepts/performance-model.md) - Optimization guide
 - [Build Streaming Alerts](build-streaming-alerts.md) - Real-time processing
 - [CLI Reference](../reference/cli-reference.md) - All command-line options
-- [Parallel Processing Concepts](../concepts/parallel-processing.md) - How parallel mode works
+- [Execution Modes](../concepts/performance-model.md#execution-modes) - How parallel mode works

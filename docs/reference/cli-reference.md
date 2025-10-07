@@ -155,7 +155,7 @@ Ignore input lines matching regex pattern.
 > kelora --ignore-lines '^#' app.log    # Skip comments
 ```
 
-### Timestamp Configuration
+### Timestamp Configuration {#timestamp-options}
 
 #### `--ts-field <FIELD>`
 

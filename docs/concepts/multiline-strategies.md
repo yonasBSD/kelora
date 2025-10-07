@@ -76,7 +76,7 @@ records with guard strings such as `BEGIN`/`END` or XML tags.
 
 ```bash exec="on" source="above" result="ansi"
 kelora -f raw examples/multiline_boundary.log \
-  --multiline 'regex:match=^BEGIN:end=^END' \
+  --multiline 'boundary:start=^BEGIN:end=^END' \
   --filter 'e.raw.contains("database_backup")' \
   -F json --take 1
 ```

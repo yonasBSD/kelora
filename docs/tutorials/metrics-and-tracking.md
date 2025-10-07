@@ -85,7 +85,7 @@ cardinality analysis.
 kelora -f json examples/simple_json.jsonl \
   -F none \
   --exec 'track_unique("services", e.service)' \
-  --exec 'track_unique("error_messages", e.message) if e.level == "ERROR"' \
+  --exec 'if e.level == "ERROR" { track_unique("error_messages", e.message) }' \
   --metrics
 ```
 
@@ -106,7 +106,7 @@ if values.len() > 0 {
     let avg = sum / values.len();
     e.avg_last_5 = round(avg * 100.0) / 100.0;
     if values.len() >= 3 {
-        e.p95_last_5 = round(values.percentile(95) * 100.0) / 100.0;
+        e.p95_last_5 = round(values.percentile(95.0) * 100.0) / 100.0;
     }
 }' \
   --take 5
@@ -123,11 +123,13 @@ script and invoke it with `--end-file` so the same layout works across platforms
 
 ```bash exec="on" source="above" result="ansi"
 cat <<'RHAI' > metrics_summary.rhai
-let keys = metrics.keys();
-keys.sort();
-for key in keys {
-    if !key.starts_with("__op_") {
-        print(key + ": " + metrics[key].to_string());
+fn summarize_metrics() {
+    let keys = metrics.keys();
+    keys.sort();
+    for key in keys {
+        if !key.starts_with("__op_") {
+            print(key + ": " + metrics[key].to_string());
+        }
     }
 }
 RHAI
@@ -137,14 +139,14 @@ kelora -f json examples/simple_json.jsonl \
   --exec 'track_count(e.service)' \
   --exec 'track_count(e.level)' \
   --metrics \
-  --end-file metrics_summary.rhai
+  -I metrics_summary.rhai \
+  --end 'summarize_metrics()'
+
+rm metrics_summary.rhai
 ```
 
 The automatically printed `--metrics` block remains, while `--end` gives you a
 clean text summary that you can redirect or feed into alerts.
-
-!!! tip
-    Remove temporary helper files after running the tutorial: `rm metrics_summary.rhai`.
 
 ## Step 6 – Persist Metrics to Disk
 
@@ -171,7 +173,7 @@ This command watches a gzipped access log and surfaces top status classes.
 
 ```bash exec="on" source="above" result="ansi"
 kelora -f combined examples/web_access_large.log.gz \
-  --exec 'let klass = floor(e.status / 100) * 100; track_count(klass)' \
+  --exec 'let klass = ((e.status / 100) * 100).to_string(); track_count(klass)' \
   --metrics -F none \
   --take 0
 ```

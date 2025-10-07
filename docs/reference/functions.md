@@ -960,6 +960,8 @@ e.avg_time = recent_times.reduce(|s, x| s + x, 0) / recent_times.len()
 
 All tracking functions require the `--metrics` flag.
 
+### Tracking Functions {#tracking-functions}
+
 #### `track_count(key)`
 Increment counter for key by 1.
 
