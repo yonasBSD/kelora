@@ -1,6 +1,1117 @@
-# $(echo $file | sed 's/-/ /g' | sed 's/\b\(.\)/\u\1/g')
+# Function Reference
 
-!!! info "Coming Soon"
-    This reference page is under development and will be available soon.
+Complete reference for all 40+ built-in Rhai functions available in Kelora. Functions are organized by category for easy lookup.
 
-*This reference will be available in a future update.*
+!!! tip "Function Call Syntax"
+    Rhai allows two styles: `value.method(args)` or `function(value, args)`. Use whichever feels more natural.
+
+## Quick Navigation
+
+- [String Functions](#string-functions) - Text manipulation, parsing, encoding
+- [Array Functions](#array-functions) - Array operations, sorting, filtering
+- [Map/Object Functions](#mapobject-functions) - Field access, manipulation, conversion
+- [DateTime Functions](#datetime-functions) - Time parsing, formatting, arithmetic
+- [Math Functions](#math-functions) - Numeric operations
+- [Type Conversion](#type-conversion-functions) - Safe type conversions
+- [Utility Functions](#utility-functions) - Environment, files, pseudonyms
+- [Tracking/Metrics](#trackingmetrics-functions) - Counters, aggregations
+- [File Output](#file-output-functions) - Writing data to files
+- [Event Manipulation](#event-manipulation) - Field removal, fan-out
+
+---
+
+## String Functions
+
+### Extraction and Searching
+
+#### `text.extract_re(pattern [, group])`
+Extract first regex match or capture group.
+
+```rhai
+e.error_code = e.message.extract_re(r"ERR-(\d+)", 1)  // "ERR-404" → "404"
+e.full_match = e.line.extract_re(r"\d{3}")            // First 3-digit number
+```
+
+#### `text.extract_all_re(pattern [, group])`
+Extract all regex matches as array.
+
+```rhai
+e.numbers = e.line.extract_all_re(r"\d+")             // All numbers
+e.codes = e.message.extract_all_re(r"ERR-(\d+)", 1)   // All error codes
+```
+
+#### `text.extract_re_maps(pattern, field)`
+Extract regex matches as array of maps for fan-out with `emit_each()`.
+
+```rhai
+// Extract all error codes with context
+let errors = e.log.extract_re_maps(r"(?P<code>ERR-\d+): (?P<msg>[^\n]+)", "error");
+emit_each(errors)  // Each match becomes an event with 'code' and 'msg' fields
+```
+
+#### `text.extract_ip([nth])`
+Extract IP address from text (nth: 1=first, -1=last).
+
+```rhai
+e.client_ip = e.headers.extract_ip()                  // First IP
+e.origin_ip = e.forwarded.extract_ip(-1)              // Last IP
+```
+
+#### `text.extract_ips()`
+Extract all IP addresses as array.
+
+```rhai
+e.all_ips = e.headers.extract_ips()                   // ["192.168.1.1", "10.0.0.1"]
+```
+
+#### `text.extract_url([nth])`
+Extract URL from text (nth: 1=first, -1=last).
+
+```rhai
+e.link = e.message.extract_url()                      // First URL
+```
+
+#### `text.extract_domain()`
+Extract domain from URL or email address.
+
+```rhai
+e.domain = "https://api.example.com/path".extract_domain()  // "example.com"
+e.mail_domain = "user@corp.example.com".extract_domain()    // "corp.example.com"
+```
+
+### String Slicing and Position
+
+#### `text.before(delimiter [, nth])`
+Text before occurrence of delimiter (nth: 1=first, -1=last).
+
+```rhai
+e.user = e.email.before("@")                          // "user@host.com" → "user"
+e.path = e.url.before("?")                            // Strip query string
+```
+
+#### `text.after(delimiter [, nth])`
+Text after occurrence of delimiter (nth: 1=first, -1=last).
+
+```rhai
+e.extension = e.filename.after(".")                   // "file.txt" → "txt"
+e.domain = e.email.after("@")                         // "user@host.com" → "host.com"
+```
+
+#### `text.between(start, end)`
+Text between start and end delimiters.
+
+```rhai
+e.quoted = e.line.between('"', '"')                   // Extract quoted string
+```
+
+#### `text.starting_with(prefix [, nth])`
+Return substring from prefix to end (nth: 1=first, -1=last).
+
+```rhai
+e.from_error = e.log.starting_with("ERROR:")          // "INFO: ok ERROR: bad" → "ERROR: bad"
+```
+
+#### `text.ending_with(suffix [, nth])`
+Return substring from start to end of suffix (nth: 1=first, -1=last).
+
+```rhai
+e.up_to_end = e.log.ending_with(".txt")               // "file.txt more" → "file.txt"
+```
+
+#### `text.slice(spec)`
+Slice text using Python notation (e.g., "1:5", ":3", "-2:").
+
+```rhai
+e.first_three = e.code.slice(":3")                    // "ABCDEF" → "ABC"
+e.last_two = e.code.slice("-2:")                      // "ABCDEF" → "EF"
+e.middle = e.code.slice("2:5")                        // "ABCDEF" → "CDE"
+```
+
+### Column Extraction
+
+#### `text.col(spec [, separator])`
+Extract columns by index/range/list (e.g., '1', '1,3,5', '1:4').
+
+```rhai
+e.first = e.line.col("1")                             // First column (1-indexed)
+e.cols = e.line.col("1,3,5")                          // Columns 1, 3, 5
+e.range = e.line.col("2:5", "\t")                     // Columns 2-5, tab-separated
+```
+
+### Parsing Functions
+
+#### `text.parse_json()`
+Parse JSON string into map/array.
+
+```rhai
+e.data = e.payload.parse_json()
+e.value = e.data["key"]
+```
+
+#### `text.parse_logfmt()`
+Parse logfmt line into structured fields.
+
+```rhai
+let fields = e.line.parse_logfmt()
+e.level = fields["level"]
+```
+
+#### `text.parse_syslog()`
+Parse syslog line into structured fields.
+
+```rhai
+let syslog = e.line.parse_syslog()
+e.priority = syslog["priority"]
+e.message = syslog["message"]
+```
+
+#### `text.parse_combined()`
+Parse Apache/Nginx combined log line.
+
+```rhai
+let access = e.line.parse_combined()
+e.ip = access["ip"]
+e.status = access["status"]
+```
+
+#### `text.parse_cef()`
+Parse Common Event Format line into fields.
+
+```rhai
+let cef = e.line.parse_cef()
+e.severity = cef["severity"]
+```
+
+#### `text.parse_kv([sep [, kv_sep]])`
+Parse key-value pairs from text.
+
+```rhai
+e.params = e.query.parse_kv("&", "=")                 // "a=1&b=2" → {a: "1", b: "2"}
+```
+
+#### `text.parse_url()`
+Parse URL into structured components.
+
+```rhai
+let url = e.request.parse_url()
+e.scheme = url["scheme"]
+e.host = url["host"]
+e.path = url["path"]
+```
+
+#### `text.parse_query_params()`
+Parse URL query string into map.
+
+```rhai
+e.params = e.query_string.parse_query_params()        // "a=1&b=2" → {a: "1", b: "2"}
+```
+
+#### `text.parse_email()`
+Parse email address into parts.
+
+```rhai
+let email = "User Name <user@example.com>".parse_email()
+e.name = email["name"]       // "User Name"
+e.address = email["address"] // "user@example.com"
+```
+
+#### `text.parse_user_agent()`
+Parse common user-agent strings into components.
+
+```rhai
+let ua = e.user_agent.parse_user_agent()
+e.browser = ua["browser"]
+e.os = ua["os"]
+```
+
+#### `text.parse_jwt()`
+Parse JWT header/payload without verification.
+
+```rhai
+let jwt = e.token.parse_jwt()
+e.user_id = jwt["payload"]["sub"]
+```
+
+#### `text.parse_path()`
+Parse filesystem path into components.
+
+```rhai
+let path = "/var/log/app.log".parse_path()
+e.dir = path["dir"]          // "/var/log"
+e.file = path["file"]        // "app.log"
+```
+
+#### `text.parse_media_type()`
+Parse media type tokens and parameters.
+
+```rhai
+let mt = "text/html; charset=utf-8".parse_media_type()
+e.type = mt["type"]          // "text"
+e.subtype = mt["subtype"]    // "html"
+```
+
+#### `text.parse_content_disposition()`
+Parse Content-Disposition header parameters.
+
+```rhai
+let cd = e.header.parse_content_disposition()
+e.filename = cd["filename"]
+```
+
+### Encoding and Hashing
+
+#### `text.encode_b64()` / `text.decode_b64()`
+Base64 encoding/decoding.
+
+```rhai
+e.encoded = e.data.encode_b64()
+e.decoded = e.payload.decode_b64()
+```
+
+#### `text.encode_hex()` / `text.decode_hex()`
+Hexadecimal encoding/decoding.
+
+```rhai
+e.hex = e.bytes.encode_hex()
+e.bytes = e.hex_string.decode_hex()
+```
+
+#### `text.encode_url()` / `text.decode_url()`
+URL percent encoding/decoding.
+
+```rhai
+e.encoded = e.param.encode_url()                      // "hello world" → "hello%20world"
+e.decoded = e.url_param.decode_url()
+```
+
+#### `text.escape_json()` / `text.unescape_json()`
+JSON escape sequence handling.
+
+```rhai
+e.escaped = e.text.escape_json()
+e.unescaped = e.json_string.unescape_json()
+```
+
+#### `text.escape_html()` / `text.unescape_html()`
+HTML entity escaping/unescaping.
+
+```rhai
+e.safe = e.user_input.escape_html()                   // "<script>" → "&lt;script&gt;"
+e.text = e.html_entity.unescape_html()
+```
+
+#### `text.hash([algo])`
+Hash with algorithm (default: sha256, also: sha1, md5, xxh3, blake3).
+
+```rhai
+e.checksum = e.content.hash()                         // SHA-256
+e.md5 = e.file.hash("md5")
+e.fast = e.data.hash("xxh3")                          // Fast non-crypto hash
+```
+
+#### `text.bucket()`
+Fast hash for sampling/grouping (returns INT for modulo operations).
+
+```rhai
+// Sample 10% of events
+if e.user_id.bucket() % 10 == 0 {
+    e.sampled = true
+}
+```
+
+### IP Address Functions
+
+#### `text.is_ipv4()` / `text.is_ipv6()`
+Check if text is a valid IP address.
+
+```rhai
+if e.addr.is_ipv4() {
+    e.ip_version = 4
+}
+```
+
+#### `text.is_private_ip()`
+Check if IP is in private ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16).
+
+```rhai
+if e.ip.is_private_ip() {
+    e.internal = true
+}
+```
+
+#### `text.is_in_cidr(cidr)`
+Check if IP address is in CIDR network.
+
+```rhai
+if e.ip.is_in_cidr("10.0.0.0/8") {
+    e.corp_network = true
+}
+```
+
+#### `text.mask_ip([octets])`
+Mask IP address (default: last octet).
+
+```rhai
+e.masked_ip = e.client_ip.mask_ip()                   // "192.168.1.100" → "192.168.1.0"
+e.partial = e.ip.mask_ip(2)                           // Mask last 2 octets
+```
+
+### String Manipulation
+
+#### `text.strip([chars])` / `text.lstrip([chars])` / `text.rstrip([chars])`
+Remove whitespace or specified characters.
+
+```rhai
+e.clean = e.text.strip()                              // Remove leading/trailing whitespace
+e.trimmed = e.line.lstrip("# ")                       // Remove "# " from left
+e.path = e.filename.rstrip("/")                       // Remove trailing slashes
+```
+
+#### `text.clip()` / `text.lclip()` / `text.rclip()`
+Remove non-alphanumeric characters from edges.
+
+```rhai
+e.word = "'hello!'".clip()                            // → "hello"
+e.left = "...start".lclip()                           // → "start"
+e.right = "end...".rclip()                            // → "end"
+```
+
+#### `text.upper()` / `text.lower()`
+Case conversion.
+
+```rhai
+e.normalized = e.country_code.upper()                 // "us" → "US"
+e.lowercase = e.name.lower()
+```
+
+#### `text.replace(pattern, replacement)`
+Replace all occurrences of pattern.
+
+```rhai
+e.cleaned = e.text.replace("ERROR", "WARN")
+```
+
+#### `text.split(separator)` / `text.split_re(pattern)`
+Split string into array.
+
+```rhai
+e.parts = e.path.split("/")
+e.tokens = e.line.split_re(r"\s+")                    // Split on whitespace
+```
+
+### String Testing
+
+#### `text.contains(pattern)`
+Check if text contains pattern.
+
+```rhai
+if e.message.contains("timeout") {
+    e.timeout_error = true
+}
+```
+
+#### `text.has_matches(pattern)`
+Check if text matches regex pattern.
+
+```rhai
+if e.code.has_matches(r"^ERR-\d+$") {
+    e.valid_error_code = true
+}
+```
+
+#### `text.is_digit()`
+Check if text contains only digits.
+
+```rhai
+if e.status.is_digit() {
+    e.status_code = e.status.to_int()
+}
+```
+
+#### `text.count(pattern)`
+Count occurrences of pattern in text.
+
+```rhai
+e.error_count = e.log.count("ERROR")
+```
+
+#### `text.index_of(pattern)`
+Find position of substring (-1 if not found).
+
+```rhai
+e.at_pos = e.url.index_of("?")
+```
+
+---
+
+## Array Functions
+
+### Sorting and Filtering
+
+#### `array.sorted()`
+Return new sorted array (numeric/lexicographic).
+
+```rhai
+e.sorted_scores = sorted(e.scores)                    // [3, 1, 2] → [1, 2, 3]
+e.sorted_names = sorted(e.names)                      // Alphabetical
+```
+
+#### `array.sorted_by(field)`
+Sort array of objects by field name.
+
+```rhai
+let sorted_users = sorted_by(e.users, "age")
+e.oldest = sorted_users[-1]
+```
+
+#### `array.reversed()`
+Return new array in reverse order.
+
+```rhai
+e.reversed = reversed(e.items)
+```
+
+#### `array.unique()`
+Remove all duplicate elements (preserves first occurrence).
+
+```rhai
+e.unique_tags = unique(e.tags)                        // [1, 2, 1, 3] → [1, 2, 3]
+```
+
+#### `array.filter(|item| condition)`
+Keep elements matching condition.
+
+```rhai
+e.errors = e.logs.filter(|log| log.level == "ERROR")
+```
+
+### Aggregation
+
+#### `array.max()` / `array.min()`
+Find maximum/minimum value in array.
+
+```rhai
+e.max_score = e.scores.max()
+e.min_time = e.times.min()
+```
+
+#### `array.percentile(pct)`
+Calculate percentile of numeric array.
+
+```rhai
+e.p95 = e.latencies.percentile(95)
+e.median = e.values.percentile(50)
+```
+
+#### `array.reduce(|acc, item| expr, init)`
+Aggregate array into single value.
+
+```rhai
+e.total = e.amounts.reduce(|sum, x| sum + x, 0)
+```
+
+### Transformation
+
+#### `array.map(|item| expression)`
+Transform each element.
+
+```rhai
+e.doubled = e.numbers.map(|n| n * 2)
+e.names = e.users.map(|u| u.name)
+```
+
+#### `array.flatten([style [, max_depth]])`
+Flatten nested arrays/objects.
+
+```rhai
+e.flat = [[1, 2], [3, 4]].flatten()                   // [1, 2, 3, 4]
+e.fields = e.nested.flatten("dot", 2)                 // Flatten to dot notation
+```
+
+### Testing
+
+#### `array.contains(value)`
+Check if array contains value.
+
+```rhai
+if e.roles.contains("admin") {
+    e.is_admin = true
+}
+```
+
+#### `array.contains_any(search_array)`
+Check if array contains any search values.
+
+```rhai
+if e.tags.contains_any(["error", "critical"]) {
+    e.alert = true
+}
+```
+
+#### `array.starts_with_any(search_array)`
+Check if array starts with any search values.
+
+```rhai
+if e.path_parts.starts_with_any(["/api", "/v1"]) {
+    e.api_call = true
+}
+```
+
+#### `array.all(|item| condition)` / `array.some(|item| condition)`
+Check if all/any elements match condition.
+
+```rhai
+e.all_valid = e.scores.all(|s| s >= 0)
+e.has_errors = e.logs.some(|l| l.level == "ERROR")
+```
+
+### Other Operations
+
+#### `array.join(separator)`
+Join array elements with separator.
+
+```rhai
+e.path = e.parts.join("/")
+e.csv = e.values.join(",")
+```
+
+#### `array.push(item)` / `array.pop()`
+Add/remove items from array.
+
+```rhai
+e.tags.push("new_tag")
+let last = e.items.pop()
+```
+
+---
+
+## Map/Object Functions
+
+### Field Access
+
+#### `map.get_path("field.path" [, default])`
+Safe nested field access with fallback.
+
+```rhai
+e.user_name = e.get_path("user.profile.name", "unknown")
+e.score = e.get_path("stats.score", 0)
+```
+
+#### `map.has_path("field.path")`
+Check if nested field path exists.
+
+```rhai
+if e.has_path("error.details.code") {
+    e.detailed_error = true
+}
+```
+
+#### `map.path_equals("path", value)`
+Safe nested field comparison.
+
+```rhai
+if path_equals(e, "user.role", "admin") {
+    e.elevated = true
+}
+```
+
+#### `map.has_field("key")`
+Check if map contains key with non-unit value.
+
+```rhai
+if e.has_field("error_code") {
+    // Field exists and has a value
+}
+```
+
+### Field Manipulation
+
+#### `map.rename_field("old", "new")`
+Rename a field, returns true if successful.
+
+```rhai
+e.rename_field("old_name", "new_name")
+```
+
+#### `map.merge(other_map)`
+Merge another map into this one.
+
+```rhai
+e.merge(#{status: "ok", timestamp: now_utc()})
+```
+
+#### `map.flatten([separator [, style]])`
+Flatten nested object to dot notation.
+
+```rhai
+let flat = e.nested.flatten(".", "dot")               // {a: {b: 1}} → {"a.b": 1}
+```
+
+#### `map.unflatten([separator])`
+Reconstruct nested object from flat keys.
+
+```rhai
+let nested = e.flat.unflatten(".")                    // {"a.b": 1} → {a: {b: 1}}
+```
+
+### Format Conversion
+
+#### `map.to_json([pretty])`
+Convert map to JSON string.
+
+```rhai
+e.payload = e.data.to_json()
+e.readable = e.data.to_json(true)                     // Pretty-printed
+```
+
+#### `map.to_logfmt()`
+Convert map to logfmt format string.
+
+```rhai
+e.formatted = e.fields.to_logfmt()                    // {a: 1, b: 2} → "a=1 b=2"
+```
+
+#### `map.to_kv([sep [, kv_sep]])`
+Convert map to key-value string with separators.
+
+```rhai
+e.query = e.params.to_kv("&", "=")                    // {a: 1, b: 2} → "a=1&b=2"
+```
+
+#### `map.to_syslog()` / `map.to_cef()` / `map.to_combined()`
+Convert map to specific log format.
+
+```rhai
+e.syslog_line = e.fields.to_syslog()
+e.cef_line = e.security_event.to_cef()
+e.access_log = e.request.to_combined()
+```
+
+---
+
+## DateTime Functions
+
+### Creation
+
+#### `now_utc()` / `now_local()`
+Current timestamp.
+
+```rhai
+e.timestamp = now_utc()
+e.local_time = now_local()
+```
+
+#### `to_datetime(text [, fmt [, tz]])`
+Convert string into DateTimeWrapper with optional hints.
+
+```rhai
+e.parsed = to_datetime("2024-01-15 10:30:00", "%Y-%m-%d %H:%M:%S", "UTC")
+e.auto = to_datetime("2024-01-15T10:30:00Z")          // Auto-detect format
+```
+
+#### `to_duration("1h30m")`
+Convert duration string into DurationWrapper.
+
+```rhai
+let timeout = to_duration("5m")
+e.deadline = now_utc() + timeout
+```
+
+#### `duration_from_seconds(n)`, `duration_from_minutes(n)`, etc.
+Create duration from specific units.
+
+```rhai
+let hour = duration_from_hours(1)
+let day = duration_from_days(1)
+```
+
+### Formatting
+
+#### `dt.to_iso()`
+Convert datetime to ISO 8601 string.
+
+```rhai
+e.iso_timestamp = e.timestamp.to_iso()                // "2024-01-15T10:30:00Z"
+```
+
+#### `dt.format("format_string")`
+Format datetime using custom format string (see `--help-time`).
+
+```rhai
+e.date = e.timestamp.format("%Y-%m-%d")               // "2024-01-15"
+e.time = e.timestamp.format("%H:%M:%S")               // "10:30:00"
+```
+
+### Component Extraction
+
+#### `dt.year()`, `dt.month()`, `dt.day()`
+Extract date components.
+
+```rhai
+e.year = e.timestamp.year()
+e.month = e.timestamp.month()
+e.day = e.timestamp.day()
+```
+
+#### `dt.hour()`, `dt.minute()`, `dt.second()`
+Extract time components.
+
+```rhai
+e.hour = e.timestamp.hour()
+```
+
+### Timezone Conversion
+
+#### `dt.to_utc()` / `dt.to_local()`
+Convert timezone.
+
+```rhai
+e.utc_time = e.local_timestamp.to_utc()
+e.local_time = e.utc_timestamp.to_local()
+```
+
+#### `dt.to_timezone("tz_name")`
+Convert to named timezone.
+
+```rhai
+e.ny_time = e.timestamp.to_timezone("America/New_York")
+```
+
+#### `dt.timezone_name()`
+Get timezone name as string.
+
+```rhai
+e.tz = e.timestamp.timezone_name()                    // "UTC"
+```
+
+### Arithmetic and Comparison
+
+#### `dt + duration`, `dt - duration`
+Add/subtract duration from datetime.
+
+```rhai
+e.future = now_utc() + duration_from_hours(1)
+e.past = now_utc() - duration_from_days(7)
+```
+
+#### `dt1 - dt2`
+Get duration between datetimes.
+
+```rhai
+let elapsed = now_utc() - e.start_time
+e.duration_ms = elapsed.as_milliseconds()
+```
+
+#### `dt1 == dt2`, `dt1 > dt2`, etc.
+Compare datetimes.
+
+```rhai
+if e.timestamp > to_datetime("2024-01-01") {
+    e.this_year = true
+}
+```
+
+### Duration Operations
+
+#### `duration.as_seconds()`, `duration.as_milliseconds()`, etc.
+Convert duration to specific units.
+
+```rhai
+e.seconds = duration.as_seconds()
+e.ms = duration.as_milliseconds()
+e.hours = duration.as_hours()
+```
+
+#### `duration.to_string()` / `humanize_duration(ms)`
+Format duration as human-readable string.
+
+```rhai
+e.readable = duration.to_string()                     // "1h 30m"
+e.humanized = humanize_duration(5400000)              // "1h 30m"
+```
+
+---
+
+## Math Functions
+
+#### `abs(x)`
+Absolute value of number.
+
+```rhai
+e.magnitude = abs(e.value)
+```
+
+#### `clamp(value, min, max)`
+Constrain value to be within min/max range.
+
+```rhai
+e.bounded = clamp(e.score, 0, 100)
+```
+
+#### `floor(x)` / `round(x)`
+Rounding operations.
+
+```rhai
+e.floored = floor(e.value)
+e.rounded = round(e.value)
+```
+
+#### `mod(a, b)` / `a % b`
+Modulo operation with division-by-zero protection.
+
+```rhai
+e.bucket = e.id % 10
+```
+
+#### `rand()` / `rand_int(min, max)`
+Random number generation.
+
+```rhai
+if rand() < 0.1 {                                     // 10% sampling
+    e.sampled = true
+}
+e.random_id = rand_int(1000, 9999)
+```
+
+---
+
+## Type Conversion Functions
+
+#### `to_int(value)` / `to_float(value)` / `to_bool(value)`
+Convert value to type (returns `()` on error).
+
+```rhai
+e.status = to_int(e.status_string)
+e.score = to_float(e.score_string)
+```
+
+#### `to_int_or(value, default)` / `to_float_or(value, default)` / `to_bool_or(value, default)`
+Convert value to type with fallback.
+
+```rhai
+e.status = to_int_or(e.status_string, 0)
+e.score = to_float_or(e.score_string, 0.0)
+```
+
+---
+
+## Utility Functions
+
+#### `get_env(var [, default])`
+Get environment variable with optional default.
+
+```rhai
+e.branch = get_env("CI_BRANCH", "main")
+e.build_id = get_env("BUILD_ID")
+```
+
+#### `pseudonym(value, domain)`
+Generate domain-separated pseudonym (requires `KELORA_SECRET`).
+
+```rhai
+e.user_alias = pseudonym(e.username, "users")
+e.ip_alias = pseudonym(e.client_ip, "ips")
+```
+
+#### `read_file(path)` / `read_lines(path)`
+Read file contents.
+
+```rhai
+e.config = read_file("config.json")
+e.lines = read_lines("data.txt")
+```
+
+#### `print(message)` / `eprint(message)`
+Print to stdout/stderr (suppressed with `-qqq`).
+
+```rhai
+print("Processing event: " + e.id)
+eprint("Warning: " + e.error)
+```
+
+#### `exit(code)`
+Exit kelora with given exit code.
+
+```rhai
+if e.critical {
+    exit(1)
+}
+```
+
+#### `type_of(value)`
+Get type name as string.
+
+```rhai
+e.value_type = type_of(e.value)                       // "string", "int", "array", etc.
+```
+
+#### `window_values(field)` / `window_numbers(field)`
+Get field values from current window (requires `--window`).
+
+```rhai
+let recent_statuses = window_values("status")
+let recent_times = window_numbers("response_time")
+e.avg_time = recent_times.reduce(|s, x| s + x, 0) / recent_times.len()
+```
+
+---
+
+## Tracking/Metrics Functions
+
+All tracking functions require the `--metrics` flag.
+
+#### `track_count(key)`
+Increment counter for key by 1.
+
+```rhai
+track_count(e.service)                                // Count by service
+track_count("total")                                  // Global counter
+```
+
+#### `track_sum(key, value)`
+Accumulate numeric values for key.
+
+```rhai
+track_sum("total_bytes", e.bytes)
+track_sum(e.endpoint, e.response_time)
+```
+
+#### `track_min(key, value)` / `track_max(key, value)`
+Track minimum/maximum value for key.
+
+```rhai
+track_min("fastest", e.response_time)
+track_max("slowest", e.response_time)
+```
+
+#### `track_unique(key, value)`
+Track unique values for key.
+
+```rhai
+track_unique("users", e.user_id)
+track_unique("ips", e.client_ip)
+```
+
+#### `track_bucket(key, bucket)`
+Track values in buckets for histograms.
+
+```rhai
+let bucket = floor(e.response_time / 100) * 100
+track_bucket("latency", bucket)
+```
+
+---
+
+## File Output Functions
+
+All file output functions require the `--allow-fs-writes` flag.
+
+#### `append_file(path, text_or_array)`
+Append line(s) to file; arrays append one line per element.
+
+```rhai
+append_file("errors.log", e.message)
+append_file("batch.log", [e.line1, e.line2, e.line3])
+```
+
+#### `truncate_file(path)`
+Create or zero-length a file for fresh output.
+
+```rhai
+truncate_file("output.log")
+```
+
+#### `mkdir(path [, recursive])`
+Create directory (set recursive=true to create parents).
+
+```rhai
+mkdir("logs")
+mkdir("deep/nested/path", true)
+```
+
+---
+
+## Event Manipulation
+
+#### `emit_each(array [, base_map])`
+Fan out array elements as separate events (returns emitted count).
+
+```rhai
+emit_each(e.users)                                    // Each user becomes an event
+emit_each(e.items, #{batch_id: e.batch_id})           // Add batch_id to each
+```
+
+#### `e = ()`
+Clear entire event (remove all fields).
+
+```rhai
+if e.should_drop {
+    e = ()  // Event is filtered out
+}
+```
+
+#### `e.field = ()`
+Remove individual field from event.
+
+```rhai
+e.password = ()                                       // Remove sensitive field
+e.temp_data = ()                                      // Clean up temporary field
+```
+
+---
+
+## Quick Reference by Use Case
+
+**Error Extraction:**
+```rhai
+e.error_code = e.message.extract_re(r"ERR-(\d+)", 1)
+```
+
+**IP Anonymization:**
+```rhai
+e.masked_ip = e.client_ip.mask_ip()
+e.ip_alias = pseudonym(e.client_ip, "ips")
+```
+
+**Time Filtering:**
+```rhai
+if e.timestamp > to_datetime("2024-01-01") {
+    // Process recent events
+}
+```
+
+**Metrics Tracking:**
+```rhai
+track_count(e.service)
+track_sum("bytes", e.response_size)
+track_unique("users", e.user_id)
+```
+
+**Array Fan-Out:**
+```rhai
+emit_each(e.users, #{batch_id: e.batch_id})
+```
+
+**Safe Field Access:**
+```rhai
+e.user_name = e.get_path("user.profile.name", "unknown")
+if e.has_path("error.details.code") {
+    e.detailed = true
+}
+```
+
+---
+
+## See Also
+
+- [CLI Reference](cli-reference.md) - Command-line flags and options
+- [Rhai Cheatsheet](rhai-cheatsheet.md) - Rhai language syntax
+- [Scripting Transforms Tutorial](../tutorials/scripting-transforms.md) - Learn advanced scripting
+- [How-To: Extract and Mask Sensitive Data](../how-to/extract-and-mask-sensitive-data.md) - Practical examples
+
+For more details, run:
+```bash
+kelora --help-functions    # This reference in CLI form
+kelora --help-rhai         # Rhai language guide
+kelora --help-examples     # Common usage patterns
+```
