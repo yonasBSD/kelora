@@ -6,6 +6,8 @@ repo_name: dloss/kelora
 
 theme:
   name: material
+  logo: kelora-logo.svg
+  favicon: kelora-logo.svg
   palette:
     # Light/dark mode toggle
     - scheme: default
