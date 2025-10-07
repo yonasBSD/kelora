@@ -21,25 +21,22 @@ Kelora turns log lines into structured events you can manipulate programmaticall
 
 ### Find errors in application logs
 
-```bash exec="on" result="ansi"
+```bash exec="on" source="above" result="ansi"
 kelora -f json examples/simple_json.jsonl --levels error --keys timestamp,service,message
 ```
 
 ### Analyze web server traffic
 
-```bash
-kelora -f combined examples/web_access_large.log.gz \
-  --filter 'e.status >= 400' \
-  --keys ip,timestamp,status,request
+```bash exec="on" source="above" result="ansi"
+kelora -f combined examples/web_access_large.log.gz --filter 'e.status >= 400' --keys ip,timestamp,status,request | head -3
 ```
 
 ### Track metrics from streaming logs
 
-```bash
-tail -f app.log | kelora -j \
-  --exec 'track_count(e.service)' \
-  --exec 'track_avg("response_time", e.response_time)' \
-  --metrics
+Process logs as they arrive (example with static file):
+
+```bash exec="on" source="above" result="ansi"
+kelora -f json examples/simple_json.jsonl --exec 'track_count(e.service)' --metrics | tail -8
 ```
 
 ## Installation
