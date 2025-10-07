@@ -2,7 +2,16 @@
 
 ## Executive Summary
 
-This plan outlines a comprehensive documentation system for Kelora using Material for MkDocs + mike versioning + executable code examples. The structure follows the Diátaxis framework (tutorials/how-tos/reference/explanation) and focuses on solving real user problems rather than mechanically documenting features.
+Kelora's documentation system is now live on top of Material for MkDocs, powered by mike for versioned releases and `markdown-exec` for executable examples. The structure follows the Diátaxis framework (tutorials / how-tos / reference / explanation) and keeps the focus on solving real operator problems instead of enumerating features. This document captures the architecture decisions, the implemented stack, and the maintenance workflow so future contributors can extend the docs without rediscovering the model.
+
+## Current Implementation Snapshot
+
+- **Stack in production**: `mkdocs.yml` configures Material for MkDocs, mike, and markdown-exec; `uvx` drives repeatable builds (see `Justfile` recipes and `.github/workflows/docs.yml`).
+- **Content coverage**: Quickstart, four tutorials, ten how-to guides, seven concept pages, and five reference chapters ship today. Additional deep dives such as `docs/integration-guide.md` and `docs/COOKBOOK.md` live alongside the main navigation for contributor reuse.
+- **Executable docs**: Quickstart and the majority of tutorials/how-tos run real Kelora commands via `markdown-exec`, sourcing fixtures from `examples/`. Commands are written with `source="above"` where possible so they stay portable.
+- **Versioning**: `mike` publishes `latest` and `dev` aliases from CI. Release tags (`v*`) automatically generate frozen snapshots, keeping historical behavior accessible without extra maintenance.
+- **Deployment path**: `just docs-build` runs `uvx mkdocs build`, while the docs workflow builds the Rust binary first (`cargo build --release`) so executable snippets resolve against the current tree.
+- **Authoring ergonomics**: Material search, tabs, and code-copy affordances are enabled. `pymdownx.snippets` pulls shared fragments straight from `examples/` to eliminate drift between docs and fixtures.
 
 ## Stack
 
@@ -261,52 +270,77 @@ mike deploy --push dev
 
 ## Implementation Phases
 
-### Phase 1: Foundation (Days 1-3)
-**Goal**: Prove the system works end-to-end
+### Phase 1: Foundation ✅
+**Status**: Complete — see `mkdocs.yml`, `Justfile`, and the initial gh-pages deployment history.
 
-- [ ] Create mkdocs.yml with Material theme + plugins
-- [ ] Configure mike for versioning
-- [ ] Setup markdown-exec with examples/ directory access
-- [ ] Create basic structure: index.md + navigation skeleton
-- [ ] Write one executable example and verify it runs
-- [ ] Deploy test version to gh-pages branch
-- [ ] Verify version selector works
+- [x] Create mkdocs.yml with Material theme + plugins
+- [x] Configure mike for versioning
+- [x] Setup markdown-exec with examples/ directory access
+- [x] Create basic structure: index.md + navigation skeleton
+- [x] Write one executable example and verify it runs (`docs/quickstart.md`)
+- [x] Deploy test version to gh-pages branch
+- [x] Verify version selector works
 
-### Phase 2: Core Content (Days 4-10)
-**Goal**: Ship minimum viable docs that add value
+### Phase 2: Core Content ✅
+**Status**: Complete — minimum viable docs shipped with quickstart, flagship how-tos, and reference foundation.
 
-- [ ] Write quickstart.md (most important page!)
-- [ ] Write 3-4 key how-tos:
-  - find-errors-in-logs.md
-  - analyze-web-traffic.md
-  - monitor-application-health.md
-- [ ] Create single-page function reference (all 40+ functions)
-- [ ] Write CLI reference (enhanced --help)
-- [ ] Write 2 core concept pages:
-  - pipeline-model.md
-  - events-and-fields.md
+- [x] Write quickstart.md (most important page!)
+- [x] Write 3-4 key how-tos:
+  - [x] find-errors-in-logs.md
+  - [x] analyze-web-traffic.md
+  - [x] monitor-application-health.md
+- [x] Create single-page function reference (all 40+ functions)
+- [x] Write CLI reference (enhanced --help)
+- [x] Write 2 core concept pages:
+  - [x] pipeline-model.md
+  - [x] events-and-fields.md
 
-**Ship after Phase 2**: Docs are useful even if incomplete
+**Ship after Phase 2**: Complete — this milestone matches the first public docs release.
 
-### Phase 3: Expand (Days 11-20)
-**Goal**: Comprehensive coverage
+### Phase 3: Expand ✅
+**Status**: Complete — tutorials, how-tos, concepts, and reference chapters now mirror the architecture diagram.
 
-- [ ] Complete remaining how-to guides (7 more)
-- [ ] Write all 4 tutorials
-- [ ] Complete concepts section (5 more pages)
-- [ ] Add remaining reference pages (formats, exit-codes, rhai-cheatsheet)
-- [ ] Add executable examples to all tutorials
+- [x] Complete remaining how-to guides (7 more)
+- [x] Write all 4 tutorials
+- [x] Complete concepts section (5 more pages)
+- [x] Add remaining reference pages (formats, exit-codes, rhai-cheatsheet)
+- [x] Add executable examples to all tutorials
 
-### Phase 4: Polish (Days 21-25)
-**Goal**: Professional finish
+### Phase 4: Polish 🚧
+**Status**: In progress — quality-of-life refinement items tracked below.
 
-- [ ] Add internal cross-links between related pages
+- [ ] Add internal cross-links between related pages (partially done, continue deep-linking key flows)
 - [ ] Improve search metadata (keywords, descriptions)
 - [ ] Test on mobile and tablet viewports
-- [ ] Setup GitHub Actions for automatic deployment
+- [x] Setup GitHub Actions for automatic deployment
 - [ ] Add diagrams to concept pages
 - [ ] Review with fresh eyes, iterate on clarity
 - [ ] Write contributing guide for docs
+
+## Maintenance Workflow
+
+### Working Locally
+- Build the CLI first so `markdown-exec` can call the fresh binary: `cargo build --release` (CI follows the same order).
+- Use `just docs-serve` for live previews; the recipe shells out to `uvx mkdocs serve` with all plugins predeclared.
+- Run `just docs-build` before opening a PR to catch broken snippets, missing includes, or navigation drift.
+- Keep example inputs in `examples/` so both tests and docs share the same fixtures; prefer reusing an existing file over adding new ad-hoc samples.
+
+### Executable Snippet Rules
+- Default to ```` ```bash exec="on" result="ansi" ```` blocks; add `source="above"` when piping inline data makes the example clearer.
+- Commands must be deterministic, run in under ~3 seconds, and avoid network, environment mutation, or temp-file churn. If that is impossible, fall back to static output and leave a comment explaining why.
+- Use `pymdownx.snippets` for larger inputs instead of pasting raw content — e.g. `--8<-- "simple_json.jsonl"` keeps docs in sync with fixtures.
+- Highlight failure modes with admonitions (`!!! note`, `!!! warning`) rather than inline text walls; Material renders them consistently.
+
+### Content Updates
+- When CLI flags change, update `docs/reference/cli-reference.md` and regenerate `help-screen.txt` via `cargo run -- --help > help-screen.txt` so terminal help stays accurate.
+- New Rhai helpers belong in `docs/reference/functions.md`; keep the single-page layout and cross-link to relevant how-tos.
+- Tutorials and how-tos should link forward to deeper explanations (`concepts/`) and backward to quickstart or reference pages. Add at least one contextual cross-link when touching a page.
+- For larger restructures, mirror the navigation order in `mkdocs.yml` and the `docs/` directory so contributors can grep for filenames without chasing aliases.
+
+### Deployment
+- `just docs-deploy-dev` pushes the `dev` alias from the current branch (handy for staging reviews).
+- `just docs-deploy-release <version>` publishes tagged releases and refreshes the `latest` alias — bump version numbers without the leading `v`.
+- The `Deploy Docs` GitHub Action mirrors the manual process: checkout → build binary → deploy with mike. Keep it green; manual deploys should be rare.
 
 ## Technical Configuration
 
@@ -320,6 +354,8 @@ repo_name: dloss/kelora
 
 theme:
   name: material
+  logo: kelora-logo.svg
+  favicon: kelora-logo.svg
   palette:
     # Light/dark mode toggle
     - scheme: default
@@ -561,6 +597,6 @@ Source: Command Line Interface Guidelines (clig.dev)
 
 ---
 
-**Document Status**: Architecture plan, ready for implementation
-**Last Updated**: 2025-10-07
-**Author**: Claude Code (with user feedback)
+**Document Status**: Architecture reference for the live documentation stack
+**Last Updated**: 2025-10-08
+**Maintainers**: Kelora docs team (updates via PRs)
