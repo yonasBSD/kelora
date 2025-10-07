@@ -103,6 +103,11 @@ The first exec fans out orders while copying batch metadata. The second exec
 fans out individual items, enriching each emitted event with both batch and
 order identifiers.
 
+!!! tip
+    If this chaining feels dense, try the same pattern with fewer steps first:
+    run a single `emit_each(e.orders)` call, inspect the output, and then add the
+    second `emit_each(e.items, …)` once you’re comfortable with the flow.
+
 ## Step 5 – Window-Aware Enrichment
 
 Enable the sliding window to compare the current event to recent history.

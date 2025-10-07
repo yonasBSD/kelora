@@ -189,7 +189,9 @@ kelora -f combined examples/web_access_large.log.gz \
   --metrics \
   --exec 'track_bucket("status_family", (e.status / 100) * 100)' \
   --end '
-    for bucket in metrics.status_family.keys() {
+    let buckets = metrics.status_family.keys();
+    buckets.sort();
+    for bucket in buckets {
         let counts = metrics.status_family[bucket];
         print(bucket.to_string() + ": " + counts.to_string());
     }

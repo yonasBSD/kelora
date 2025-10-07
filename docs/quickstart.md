@@ -157,7 +157,8 @@ Now that you've seen the basics, dive deeper:
 ## Quick Recipes
 
 Need a refresher later? These bite-sized snippets mirror the built-in fixtures so
-you can rehearse common tasks quickly.
+you can rehearse common tasks quickly. Run them from the repository root so the
+`examples/` paths resolve.
 
 ### Narrow to a specific service
 

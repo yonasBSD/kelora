@@ -106,6 +106,11 @@ Use exit codes to detect processing issues:
     || (echo "✗ Errors found" && exit 1)
 ```
 
+!!! note
+    Practicing locally? Swap `tail -f` for a short fixture like
+    `examples/simple_logfmt.log` piped through `cat` so you can stop the command
+    easily with Ctrl+C.
+
 **Exit codes:**
 - `0`: Success (no parsing or runtime errors)
 - `1`: Parse errors or Rhai runtime errors occurred
