@@ -573,6 +573,7 @@ impl ConfigFile {
 mod tests {
     use super::*;
     use std::io::Write;
+    use std::path::Path;
     use tempfile::NamedTempFile;
 
     #[test]
@@ -702,6 +703,26 @@ mod tests {
         );
     }
 
+    // RAII guard to restore working directory on drop
+    struct WorkingDirGuard {
+        original_dir: PathBuf,
+    }
+
+    impl WorkingDirGuard {
+        fn new(new_dir: &Path) -> std::io::Result<Self> {
+            let original_dir = std::env::current_dir()?;
+            std::env::set_current_dir(new_dir)?;
+            Ok(Self { original_dir })
+        }
+    }
+
+    impl Drop for WorkingDirGuard {
+        fn drop(&mut self) {
+            // Best effort to restore - ignore errors during unwinding
+            let _ = std::env::set_current_dir(&self.original_dir);
+        }
+    }
+
     #[test]
     fn test_project_config_discovery() {
         use tempfile::TempDir;
@@ -717,13 +738,9 @@ mod tests {
         std::fs::write(&config_path, "defaults = --project-test").unwrap();
 
         // Change to subdirectory and test discovery
-        let original_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&subdir).unwrap();
+        let _guard = WorkingDirGuard::new(&subdir).unwrap();
 
         let found_config = ConfigFile::find_project_config();
-
-        // Restore original directory
-        std::env::set_current_dir(&original_dir).unwrap();
 
         assert_eq!(found_config, Some(config_path));
     }
@@ -806,12 +823,9 @@ mod tests {
         let subdir = temp_dir.path().join("no-config");
         std::fs::create_dir_all(&subdir).unwrap();
 
-        let original_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&subdir).unwrap();
+        let _guard = WorkingDirGuard::new(&subdir).unwrap();
 
         let found_config = ConfigFile::find_project_config();
-
-        std::env::set_current_dir(&original_dir).unwrap();
 
         assert_eq!(found_config, None);
     }
@@ -865,12 +879,9 @@ mod tests {
         let config_path = project_root.join(".kelora.ini");
         std::fs::write(&config_path, "test").unwrap();
 
-        let original_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&project_root).unwrap();
+        let _guard = WorkingDirGuard::new(&project_root).unwrap();
 
         let paths = ConfigFile::get_config_paths();
-
-        std::env::set_current_dir(&original_dir).unwrap();
 
         // First path should be the project config
         assert_eq!(paths[0], config_path);
