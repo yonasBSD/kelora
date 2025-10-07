@@ -1,4 +1,4 @@
-# $(echo $file | sed 's/-/ /g' | sed 's/\b\(.\)/\u\1/g')
+# Performance Model
 
 !!! info "Coming Soon"
     This concept page is under development and will be available soon.
