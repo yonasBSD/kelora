@@ -109,13 +109,13 @@ kelora -f csv examples/simple_csv.csv \
 
 Process logs as they're written:
 
-=== "Unix/Linux/macOS"
+=== "Linux/macOS"
 
     ```bash
     > tail -f /var/log/app.log | kelora -j --levels error
     ```
 
-=== "Windows (PowerShell)"
+=== "Windows"
 
     ```powershell
     > Get-Content -Wait app.log | kelora -j --levels error
