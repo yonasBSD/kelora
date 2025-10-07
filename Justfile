@@ -60,16 +60,32 @@ bench-update:
 
 # Serve documentation locally
 docs-serve:
+    mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools
+    UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
+    UV_DATA_DIR={{justfile_directory()}}/.uv/data \
+    UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
     uvx --with mkdocs-material --with mike --with markdown-exec mkdocs serve
 
 # Build documentation
 docs-build:
+    mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools
+    UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
+    UV_DATA_DIR={{justfile_directory()}}/.uv/data \
+    UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
     uvx --with mkdocs-material --with mike --with markdown-exec mkdocs build
 
 # Deploy dev documentation
 docs-deploy-dev:
+    mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools
+    UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
+    UV_DATA_DIR={{justfile_directory()}}/.uv/data \
+    UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
     uvx --with mkdocs-material --with mike --with markdown-exec mike deploy dev
 
 # Deploy release documentation (requires version tag)
 docs-deploy-release version:
+    mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools
+    UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
+    UV_DATA_DIR={{justfile_directory()}}/.uv/data \
+    UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
     uvx --with mkdocs-material --with mike --with markdown-exec mike deploy --update-aliases {{version}} latest
