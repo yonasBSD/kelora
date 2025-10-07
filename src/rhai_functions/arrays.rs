@@ -10,6 +10,9 @@ pub fn register_functions(engine: &mut Engine) {
     // Register reversed function - like Python's reversed(), reverses array order
     engine.register_fn("reversed", reversed_array);
 
+    // Register unique function - remove all duplicates from array
+    engine.register_fn("unique", unique_array);
+
     // Register sorted_by function - sort objects/maps by field name
     engine.register_fn("sorted_by", sorted_by_field);
 
@@ -174,6 +177,57 @@ fn get_number_value(value: &Dynamic) -> Result<f64, ()> {
 fn reversed_array(mut arr: Array) -> Array {
     arr.reverse();
     arr
+}
+
+/// Remove all duplicate elements from an array, preserving first occurrence order
+///
+/// Takes an array and returns a new array with all duplicate elements removed.
+/// Unlike Rhai's built-in `dedup()` which only removes consecutive duplicates,
+/// `unique()` removes ALL duplicates from anywhere in the array.
+///
+/// The first occurrence of each element is preserved in the order it appears.
+/// Comparison is done by converting elements to strings.
+///
+/// # Arguments
+/// * `arr` - The array to deduplicate
+///
+/// # Returns
+/// A new array containing only unique elements in first-occurrence order
+///
+/// # Examples
+/// ```rhai
+/// let numbers = [1, 2, 2, 3, 2, 1];
+/// let unique_nums = unique(numbers);  // [1, 2, 3]
+/// let deduped = dedup(numbers);       // [1, 2, 3, 2, 1] - only consecutive removed
+///
+/// let tags = ["bug", "urgent", "bug", "frontend", "urgent"];
+/// let unique_tags = unique(tags);  // ["bug", "urgent", "frontend"]
+///
+/// // Useful for aggregating unique values
+/// let events = [
+///     {"user": "alice", "action": "login"},
+///     {"user": "bob", "action": "login"},
+///     {"user": "alice", "action": "logout"}
+/// ];
+/// let users = events.map(|e| e.user);  // ["alice", "bob", "alice"]
+/// let unique_users = unique(users);     // ["alice", "bob"]
+/// ```
+///
+/// # Comparison with dedup()
+/// - `unique([1, 2, 2, 3, 2, 1])` → `[1, 2, 3]` (all duplicates removed)
+/// - `dedup([1, 2, 2, 3, 2, 1])` → `[1, 2, 3, 2, 1]` (only consecutive removed)
+fn unique_array(arr: Array) -> Array {
+    let mut seen = std::collections::HashSet::new();
+    let mut result = Array::new();
+
+    for item in arr {
+        let item_str = item.to_string();
+        if seen.insert(item_str) {
+            result.push(item);
+        }
+    }
+
+    result
 }
 
 /// Sort an array of objects/maps by a specific field name
@@ -782,6 +836,117 @@ mod tests {
         let arr = Array::new();
         let reversed = reversed_array(arr);
         assert_eq!(reversed.len(), 0);
+    }
+
+    #[test]
+    fn test_unique_numbers() {
+        let arr = vec![
+            Dynamic::from(1i64),
+            Dynamic::from(2i64),
+            Dynamic::from(2i64),
+            Dynamic::from(3i64),
+            Dynamic::from(2i64),
+            Dynamic::from(1i64),
+        ];
+
+        let unique = unique_array(arr);
+
+        assert_eq!(unique.len(), 3);
+        assert_eq!(unique[0].as_int().unwrap(), 1i64);
+        assert_eq!(unique[1].as_int().unwrap(), 2i64);
+        assert_eq!(unique[2].as_int().unwrap(), 3i64);
+    }
+
+    #[test]
+    fn test_unique_strings() {
+        let arr = vec![
+            Dynamic::from("bug"),
+            Dynamic::from("urgent"),
+            Dynamic::from("bug"),
+            Dynamic::from("frontend"),
+            Dynamic::from("urgent"),
+        ];
+
+        let unique = unique_array(arr);
+
+        assert_eq!(unique.len(), 3);
+        assert_eq!(unique[0].to_string(), "bug");
+        assert_eq!(unique[1].to_string(), "urgent");
+        assert_eq!(unique[2].to_string(), "frontend");
+    }
+
+    #[test]
+    fn test_unique_empty_array() {
+        let arr = Array::new();
+        let unique = unique_array(arr);
+        assert_eq!(unique.len(), 0);
+    }
+
+    #[test]
+    fn test_unique_no_duplicates() {
+        let arr = vec![
+            Dynamic::from(1i64),
+            Dynamic::from(2i64),
+            Dynamic::from(3i64),
+        ];
+
+        let unique = unique_array(arr.clone());
+
+        assert_eq!(unique.len(), 3);
+        assert_eq!(unique[0].as_int().unwrap(), 1i64);
+        assert_eq!(unique[1].as_int().unwrap(), 2i64);
+        assert_eq!(unique[2].as_int().unwrap(), 3i64);
+    }
+
+    #[test]
+    fn test_unique_all_duplicates() {
+        let arr = vec![
+            Dynamic::from(42i64),
+            Dynamic::from(42i64),
+            Dynamic::from(42i64),
+        ];
+
+        let unique = unique_array(arr);
+
+        assert_eq!(unique.len(), 1);
+        assert_eq!(unique[0].as_int().unwrap(), 42i64);
+    }
+
+    #[test]
+    fn test_unique_mixed_types() {
+        let arr = vec![
+            Dynamic::from(1i64),
+            Dynamic::from("hello"),
+            Dynamic::from(1i64),
+            Dynamic::from("hello"),
+            Dynamic::from(true),
+        ];
+
+        let unique = unique_array(arr);
+
+        assert_eq!(unique.len(), 3);
+        assert_eq!(unique[0].as_int().unwrap(), 1i64);
+        assert_eq!(unique[1].to_string(), "hello");
+        assert!(unique[2].as_bool().unwrap());
+    }
+
+    #[test]
+    fn test_unique_preserves_order() {
+        let arr = vec![
+            Dynamic::from("z"),
+            Dynamic::from("a"),
+            Dynamic::from("m"),
+            Dynamic::from("a"),
+            Dynamic::from("z"),
+        ];
+
+        let unique = unique_array(arr);
+
+        // Should preserve first occurrence order: z, a, m
+        assert_eq!(unique.len(), 3);
+        assert_eq!(unique[0].to_string(), "z");
+        assert_eq!(unique[1].to_string(), "a");
+        assert_eq!(unique[2].to_string(), "m");
     }
 
     #[test]

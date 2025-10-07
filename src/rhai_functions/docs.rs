@@ -99,6 +99,7 @@ array.sort()                         Sort array in place (builtin)
 array.sorted_by(field)               Sort array of objects by field name
 array.sorted()                       Return new sorted array (numeric/lexicographic)
 array.starts_with_any(search_array)  Check if array starts with any search values
+array.unique()                       Remove all duplicate elements (preserves first occurrence)
   
 MAP/OBJECT FUNCTIONS:
 map.contains("key")                  Check if map contains key (ignores value) (builtin)
@@ -152,6 +153,7 @@ duration1 >= duration2, duration1 <= duration2  Compare durations (greater/less 
 
 MATH FUNCTIONS:
 abs(x)                               Absolute value of number
+clamp(value, min, max)               Constrain value to be within min/max range
 floor(x)                             Round down to nearest integer
 mod(a, b) / a % b                    Modulo operation with division-by-zero protection
 rand()                               Random float between 0 and 1
@@ -303,6 +305,9 @@ kelora -f json --exec 'emit_each(e.batches)' \
 kelora -f json --exec 'e.top_scores = sorted(e.scores)[-3:]' \
   --exec 'e.winners = sorted_by(e.players, "score")[-5:].map(|p| p.name)'
 
+# Remove duplicate elements
+kelora -f json --exec 'e.unique_tags = unique(e.tags)'
+
 DATETIME & FILTERING:
 # Recent events (last 2 hours)
 kelora -f json --since -2h --until now
@@ -354,6 +359,8 @@ COMMON IDIOMS:
 # Regex capture groups         → e.log.extract_re(r"duration: (\d+)", 1)
 # Array bounds safety          → if e.items.len() > 0 { e.first = e.items[0] }
 # Negative indexing            → e.last_score = e.scores[-1]
+# Clamp values to range        → e.normalized = clamp(e.value, 0, 100)
+# Remove duplicate elements    → unique([1,2,2,3,2,1]) = [1,2,3]
 
 See --help-functions for complete function reference. Visit https://rhai.rs for Rhai language details.
 "#
