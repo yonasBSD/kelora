@@ -138,6 +138,8 @@ docs/
 
 **No auto-generation complexity**: CLI help and web docs serve different needs. CLI help stays concise and terminal-friendly. Web docs go deeper with more examples. Don't try to maintain perfect sync - that's a maintenance trap.
 
+**No external search services**: Material for MkDocs built-in search is excellent and requires no external dependencies. Keep it simple.
+
 ### 4. Concepts Section (Understanding)
 
 **Essential for**:
@@ -213,7 +215,7 @@ The combined log format includes these fields: ip, timestamp, method, path, stat
 - ✅ Quick reference when you're in terminal
 - ✅ No internet required
 - ✅ Concise, terminal-optimized
-- Add one line: "Full documentation: https://kelora.dev"
+- Add one line: "Full documentation: https://dloss.github.io/kelora/"
 
 ### Web Docs
 - ✅ More examples, more depth
@@ -408,16 +410,39 @@ nav:
       - concepts/configuration-system.md
 ```
 
-### requirements.txt
-```txt
-mkdocs>=1.5.0
-mkdocs-material>=9.4.0
-mike>=2.0.0
-markdown-exec>=1.8.0
-pymdown-extensions>=10.4
+### Justfile Integration
+
+Add documentation commands to the existing Justfile:
+
+```just
+# Serve documentation locally
+docs-serve:
+    uvx --with mkdocs-material --with mike --with markdown-exec mkdocs serve
+
+# Build documentation
+docs-build:
+    uvx --with mkdocs-material --with mike --with markdown-exec mkdocs build
+
+# Deploy dev documentation
+docs-deploy-dev:
+    uvx --with mkdocs-material --with mike --with markdown-exec mike deploy dev
+
+# Deploy release documentation (requires version tag)
+docs-deploy-release version:
+    uvx --with mkdocs-material --with mike --with markdown-exec mike deploy --update-aliases {{version}} latest
 ```
 
+**Benefits of using uvx:**
+- No virtual environment management
+- No dependency conflicts or requirements.txt
+- Reproducible across machines
+- Works immediately in CI/CD
+- Isolated execution per command
+
 ### GitHub Actions Workflow
+
+Create `.github/workflows/docs.yml`:
+
 ```yaml
 name: Deploy Docs
 
@@ -438,13 +463,13 @@ jobs:
         with:
           fetch-depth: 0  # mike needs full history
 
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v5
         with:
-          python-version: '3.11'
+          enable-cache: true
 
-      - name: Install dependencies
+      - name: Build Kelora (for executable examples)
         run: |
-          pip install -r requirements.txt
+          cargo build --release
 
       - name: Configure Git
         run: |
@@ -454,14 +479,20 @@ jobs:
       - name: Deploy dev version
         if: github.ref == 'refs/heads/main'
         run: |
-          mike deploy --push dev
+          uvx --with mkdocs-material --with mike --with markdown-exec mike deploy --push dev
 
       - name: Deploy release version
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
-          mike deploy --push --update-aliases $VERSION latest
+          uvx --with mkdocs-material --with mike --with markdown-exec mike deploy --push --update-aliases $VERSION latest
 ```
+
+**Key changes from traditional approach:**
+- Uses `astral-sh/setup-uv@v5` for uv/uvx installation
+- No `pip install -r requirements.txt` needed
+- Builds Kelora binary for markdown-exec to use in examples
+- All Python tools run via `uvx` with inline dependencies
 
 ## Success Metrics
 
@@ -518,6 +549,7 @@ Source: Command Line Interface Guidelines (clig.dev)
 3. **API stability**: Once 1.0, maintain old version docs how long?
 4. **Contribution workflow**: How do external contributors submit doc PRs?
 5. **Diagram tools**: What to use for pipeline/architecture diagrams?
+6. **Code snippet validation**: How to validate static (non-executable) examples without slowing builds?
 
 ## Next Steps
 

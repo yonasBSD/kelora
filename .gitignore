@@ -4,3 +4,4 @@ target/
 .cargo-deny/
 .DS_Store
 myexamples
+site/

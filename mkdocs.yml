@@ -1,0 +1,96 @@
+site_name: Kelora
+site_description: Scriptable log processor with embedded Rhai scripting
+site_url: https://dloss.github.io/kelora/
+repo_url: https://github.com/dloss/kelora
+repo_name: dloss/kelora
+
+theme:
+  name: material
+  palette:
+    # Light/dark mode toggle
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant        # Fast page loads
+    - navigation.tracking       # Update URL with scroll
+    - navigation.tabs          # Top-level tabs
+    - navigation.sections      # Expand sections
+    - search.suggest           # Search suggestions
+    - search.highlight         # Highlight search terms
+    - content.code.copy        # Copy code blocks
+    - content.code.annotate    # Annotate code with numbers
+
+plugins:
+  - search:
+      lang: en
+  - mike:
+      version_selector: true
+      alias_type: symlink
+  - markdown-exec
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: [examples]
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/dloss/kelora
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Tutorials:
+      - tutorials/parsing-custom-formats.md
+      - tutorials/working-with-time.md
+      - tutorials/metrics-and-tracking.md
+      - tutorials/scripting-transforms.md
+  - How-To Guides:
+      - how-to/find-errors-in-logs.md
+      - how-to/analyze-web-traffic.md
+      - how-to/monitor-application-health.md
+      - how-to/parse-syslog-files.md
+      - how-to/handle-multiline-stacktraces.md
+      - how-to/extract-and-mask-sensitive-data.md
+      - how-to/process-csv-data.md
+      - how-to/fan-out-nested-structures.md
+      - how-to/build-streaming-alerts.md
+      - how-to/batch-process-archives.md
+  - Reference:
+      - reference/functions.md
+      - reference/cli-reference.md
+      - reference/formats.md
+      - reference/exit-codes.md
+      - reference/rhai-cheatsheet.md
+  - Concepts:
+      - concepts/pipeline-model.md
+      - concepts/events-and-fields.md
+      - concepts/scripting-stages.md
+      - concepts/error-handling.md
+      - concepts/multiline-strategies.md
+      - concepts/performance-model.md
+      - concepts/configuration-system.md

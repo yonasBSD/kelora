@@ -57,3 +57,19 @@ bench-quick:
 # Update benchmark baseline
 bench-update:
     ./benchmarks/run_benchmarks.sh --update-baseline
+
+# Serve documentation locally
+docs-serve:
+    uvx --with mkdocs-material --with mike --with markdown-exec mkdocs serve
+
+# Build documentation
+docs-build:
+    uvx --with mkdocs-material --with mike --with markdown-exec mkdocs build
+
+# Deploy dev documentation
+docs-deploy-dev:
+    uvx --with mkdocs-material --with mike --with markdown-exec mike deploy dev
+
+# Deploy release documentation (requires version tag)
+docs-deploy-release version:
+    uvx --with mkdocs-material --with mike --with markdown-exec mike deploy --update-aliases {{version}} latest
