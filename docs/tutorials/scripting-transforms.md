@@ -50,6 +50,21 @@ kelora -f json examples/errors_exec_transform.jsonl \
 Filters run between exec scripts. Any fields you create earlier are immediately
 available to later filters or transformations.
 
+### Enrich Logs with Derived Fields
+
+```bash exec="on" source="above" result="ansi"
+kelora -f combined examples/web_access_large.log.gz \
+  --exec 'let status = to_int_or(e.status, 0); if status >= 500 { e.family = "server_error"; } else if status >= 400 { e.family = "client_error"; } else { e.family = "ok"; }'
+```
+
+### Pseudonymise Sensitive Attributes
+
+```bash exec="on" source="above" result="ansi"
+kelora -f json examples/security_audit.jsonl \
+  --exec 'e.user_alias = pseudonym(e.user, "users"); e.ip_masked = e.ip.mask_ip(1)' \
+  --keys timestamp,event,user_alias,ip_masked
+```
+
 ## Step 3 – Guard Against Bad Data
 
 Kelora defaults to resilient mode: exec errors roll back the event and

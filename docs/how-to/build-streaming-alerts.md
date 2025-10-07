@@ -48,6 +48,19 @@ Use `eprint()` to write alerts to stderr while suppressing normal output:
     --filter 'e.get_path("request_time", "0").to_float() > 2.0' \
     --exec 'eprint("SLOW: " + e.path + " took " + e.request_time + "s")' \
     -qq
+
+### Count Incidents While Streaming
+
+```bash
+> tail -f examples/simple_logfmt.log | \
+    kelora -f logfmt \
+      --filter '"duration" in e && e.duration.to_int_or(0) >= 1000' \
+      --exec 'track_count("slow_requests")' \
+      --metrics
+```
+
+Aggregating with `track_count()` keeps a running tally without printing each
+event. Combine with `-qq` if you want the counter but not the event stream.
 ```
 
 ### Quiet Modes for Automation
@@ -127,6 +140,20 @@ Collect metrics during processing and alert at the end:
     --metrics \
     --end 'if metrics.contains("high_memory") && metrics.high_memory > 10 { eprint("Memory warnings: " + metrics.high_memory) }'
 ```
+
+### Sliding-Window Anomaly Detection
+
+```bash
+> kelora -f syslog examples/simple_syslog.log \
+    --filter '"msg" in e && e.msg.contains("Failed login")' \
+    --window 5 \
+    --exec 'let hits = window_values("msg").filter(|m| m.contains("Failed login"));\
+             if hits.len() >= 3 { e.alert = true; }' \
+    --filter 'e.alert == true'
+```
+
+Use a short sliding window to spot bursts of suspicious activity and feed the
+resulting events to downstream tooling (e.g., Slack webhook, SIEM pipeline).
 
 ### Write Alerts to File
 

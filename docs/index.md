@@ -128,6 +128,17 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - **[Reference](reference/functions.md)** - Information-oriented lookup
 - **[Concepts](concepts/pipeline-model.md)** - Understanding-oriented explanations
 
+## Works Well With
+
+Kelora focuses on normalising noisy logs. Pair it with complementary CLI tools
+when you need deeper analysis:
+
+- **jq/jaq** — slice JSONL output for downstream scripts or human-readable TSV.
+- **qsv** — crunch CSV exports with lightning-fast aggregations.
+- **rg**/**fd**/**xz** — keep pre-processing simple before Kelora takes over.
+- **Rhai libraries** — share helper scripts via `-I` to reuse transformations
+  across pipelines.
+
 ## Need Help?
 
 - **CLI help**: Run `kelora --help` for comprehensive CLI reference

@@ -154,6 +154,28 @@ Now that you've seen the basics, dive deeper:
 - **[Function Reference](reference/functions.md)** - Explore all 40+ built-in functions
 - **[CLI Reference](reference/cli-reference.md)** - Complete flag documentation
 
+## Quick Recipes
+
+Need a refresher later? These bite-sized snippets mirror the built-in fixtures so
+you can rehearse common tasks quickly.
+
+### Narrow to a specific service
+
+```bash exec="on" source="above" result="ansi"
+kelora -f json examples/simple_json.jsonl \
+  --filter 'e.service == "database"' \
+  --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' \
+  --keys timestamp,message,duration_s
+```
+
+### Slice logs by prefix before parsing
+
+```bash exec="on" source="above" result="ansi"
+cat examples/prefix_docker.log | \
+  kelora --extract-prefix container --prefix-sep ' | ' \
+    --filter 'e.container == "web_1"'
+```
+
 ## Quick Reference
 
 ```bash

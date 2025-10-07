@@ -113,6 +113,29 @@ Real-world gains depend on disk speed, decompression cost, and script workload.
 - **Gzip bottlenecks** – Pre-decompress with `zcat file.gz | kelora -f combined -`
   if CPU is the limiting factor and disk is fast.
 
+## Quick Checklist
+
+1. Streaming workloads? Stay sequential and stream to stdout for the lowest
+   latency.
+2. Batch archives? Combine `--parallel --stats` and tune `--batch-size` /
+   `--batch-timeout` after inspecting skew.
+3. Heavy windowing? Keep `--window` small (50 or less) or sample upstream to
+   cap memory.
+4. Verbose diagnostics? Drop to `-q` once the pipeline is stable to reduce
+   stderr noise.
+5. Ordering critical? Avoid `--unordered`; otherwise enabling it can flush
+   parallel batches faster.
+
+## Troubleshooting Cheats
+
+- Inspect parse hiccups with `-F inspect` or by raising `--verbose`.
+- Timestamp drift? Pin down `--ts-field`, `--ts-format`, or `--input-tz`
+  (see `kelora --help-time`).
+- Rhai panics? Guard lookups with `e.get_path("field", ())` and conversions with
+  `to_int_or` / `to_float_or`.
+- Abundant `.gz` files? No need for extra tooling—Kelora already detects and
+  decompresses them automatically.
+
 ## Related Guides
 
 - [Metrics and Tracking Tutorial](../tutorials/metrics-and-tracking.md) – build

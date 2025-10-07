@@ -182,6 +182,24 @@ Passing `--take 0` (or omitting it) keeps processing the entire file. When you r
 Kelora against a stream (`tail -f | kelora ...`), the metrics snapshot updates when
 you terminate the process.
 
+Need full histograms instead of counts? Swap in `track_bucket()`:
+
+```bash exec="on" source="above" result="ansi"
+kelora -f combined examples/web_access_large.log.gz \
+  --metrics \
+  --exec 'track_bucket("status_family", (e.status / 100) * 100)' \
+  --end '
+    for bucket in metrics.status_family.keys() {
+        let counts = metrics.status_family[bucket];
+        print(bucket.to_string() + ": " + counts.to_string());
+    }
+  ' \
+  -F none --take 0
+```
+
+`track_bucket(key, bucket_value)` keeps nested counters so you can emit a
+human-readable histogram once processing finishes.
+
 ## Troubleshooting
 
 - **No metrics printed**: Ensure you pass `--metrics` or consume `metrics` within
