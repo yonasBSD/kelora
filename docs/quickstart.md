@@ -15,7 +15,7 @@ Let's start with a simple JSON log file. Parse it and see all events:
 kelora -f json examples/simple_json.jsonl --take 3
 ```
 
-The `-f json` flag tells Kelora to parse each line as JSON. By default, Kelora outputs events in `key=value` format.
+The `-f json` flag tells Kelora to parse each line as JSON. By default, Kelora outputs events in `key=value` format. The `--take 3` flag limits output to the first 3 events.
 
 ## Step 2: Filter by Log Level
 
@@ -66,15 +66,15 @@ The `--exec` flag runs Rhai code to modify events. Here we convert milliseconds 
 
 ## Step 6: Track Metrics
 
-Count events by service and show statistics:
+Count events by service and show metrics:
 
 ```bash exec="on" source="above" result="ansi"
 kelora -f json examples/simple_json.jsonl \
   --exec 'track_count(e.service)' \
-  --stats
+  --metrics
 ```
 
-The `track_count()` function increments a counter. The `--stats` flag shows accumulated metrics at the end.
+The `track_count()` function increments a counter. The `--metrics` flag shows accumulated metrics at the end.
 
 ## Step 7: Parse Other Formats
 
@@ -99,7 +99,7 @@ kelora -f combined examples/web_access_large.log.gz \
 
 ```bash exec="on" source="above" result="ansi"
 kelora -f csv examples/simple_csv.csv \
-  --keys name,age \
+  --keys method,path,status \
   --take 5
 ```
 
@@ -200,7 +200,8 @@ kelora --help-rhai         # Rhai scripting guide
 # Transformation
 --exec 'expression'       # Transform events
 --keys field1,field2      # Select fields
---stats                   # Show statistics
+--stats                   # Show processing statistics
+--metrics                 # Show tracked metrics
 
 # Performance
 --parallel                # Use multiple cores
