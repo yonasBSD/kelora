@@ -128,9 +128,7 @@ fn summarize_metrics() {
     let keys = metrics.keys();
     keys.sort();
     for key in keys {
-        if !key.starts_with("__op_") {
-            print(key + ": " + metrics[key].to_string());
-        }
+        print(key + ": " + metrics[key].to_string());
     }
 }
 RHAI
@@ -210,9 +208,9 @@ human-readable histogram once processing finishes.
 - **Huge maps**: Reset counters between runs by clearing your terminal or using
   `rm metrics.json` when exporting to disk. Large cardinality sets from
   `track_unique()` are the usual culprit.
-- **Unexpected `__op_*` keys**: Kelora stores internal operator metadata
-  alongside user metrics. Filter them (as in the `metrics_summary.rhai` script)
-  before displaying the report.
+- **Operation metadata**: Kelora keeps operator hints (the `__op_*` keys)
+  in the internal tracker now, so user metric maps print cleanly. If you need
+  those hints for custom aggregation, read them from the internal metrics map.
 - **Sliding window functions return empty arrays**: `window_numbers(window, ...)`
   only works after you enable `--window` and the requested field exists in the
   buffered events.

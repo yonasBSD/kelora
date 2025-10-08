@@ -45,6 +45,15 @@ where
     })
 }
 
+fn record_operation_metadata(key: &str, operation: &str) {
+    with_internal_tracking(|internal| {
+        internal.insert(
+            format!("__op_{}", key),
+            Dynamic::from(operation.to_string()),
+        );
+    });
+}
+
 pub fn set_thread_tracking_state(metrics: &HashMap<String, Dynamic>) {
     THREAD_TRACKING_STATE.with(|state| {
         let mut snapshot = state.borrow_mut();
@@ -448,46 +457,45 @@ pub fn register_functions(engine: &mut Engine) {
         with_user_tracking(|state| {
             let updated = merge_numeric(state.get(key).cloned(), Dynamic::from(1_i64));
             state.insert(key.to_string(), updated);
-            // Store operation type metadata for parallel merging
-            state.insert(format!("__op_{}", key), Dynamic::from("count"));
         });
+        record_operation_metadata(key, "count");
     });
 
     engine.register_fn("track_sum", |key: &str, value: i64| {
         with_user_tracking(|state| {
             let updated = merge_numeric(state.get(key).cloned(), Dynamic::from(value));
             state.insert(key.to_string(), updated);
-            state.insert(format!("__op_{}", key), Dynamic::from("sum"));
         });
+        record_operation_metadata(key, "sum");
     });
 
     engine.register_fn("track_sum", |key: &str, value: i32| {
         with_user_tracking(|state| {
             let updated = merge_numeric(state.get(key).cloned(), Dynamic::from(value));
             state.insert(key.to_string(), updated);
-            state.insert(format!("__op_{}", key), Dynamic::from("sum"));
         });
+        record_operation_metadata(key, "sum");
     });
 
     engine.register_fn("track_sum", |key: &str, value: f64| {
         with_user_tracking(|state| {
             let updated = merge_numeric(state.get(key).cloned(), Dynamic::from(value));
             state.insert(key.to_string(), updated);
-            state.insert(format!("__op_{}", key), Dynamic::from("sum"));
         });
+        record_operation_metadata(key, "sum");
     });
 
     engine.register_fn("track_sum", |key: &str, value: f32| {
         with_user_tracking(|state| {
             let updated = merge_numeric(state.get(key).cloned(), Dynamic::from(value));
             state.insert(key.to_string(), updated);
-            state.insert(format!("__op_{}", key), Dynamic::from("sum"));
         });
+        record_operation_metadata(key, "sum");
     });
 
     // track_min overloads for different number types
     engine.register_fn("track_min", |key: &str, value: i64| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             let current = state
                 .get(key)
                 .cloned()
@@ -500,14 +508,18 @@ pub fn register_functions(engine: &mut Engine) {
             let value_f64 = value as f64;
             if value_f64 < current_val {
                 state.insert(key.to_string(), Dynamic::from(value));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("min"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "min");
+        }
     });
 
     engine.register_fn("track_min", |key: &str, value: i32| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             let current = state
                 .get(key)
                 .cloned()
@@ -520,14 +532,18 @@ pub fn register_functions(engine: &mut Engine) {
             let value_f64 = value as f64;
             if value_f64 < current_val {
                 state.insert(key.to_string(), Dynamic::from(value));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("min"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "min");
+        }
     });
 
     engine.register_fn("track_min", |key: &str, value: f64| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             let current = state
                 .get(key)
                 .cloned()
@@ -539,14 +555,18 @@ pub fn register_functions(engine: &mut Engine) {
             };
             if value < current_val {
                 state.insert(key.to_string(), Dynamic::from(value));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("min"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "min");
+        }
     });
 
     engine.register_fn("track_min", |key: &str, value: f32| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             let current = state
                 .get(key)
                 .cloned()
@@ -559,15 +579,19 @@ pub fn register_functions(engine: &mut Engine) {
             let value_f64 = value as f64;
             if value_f64 < current_val {
                 state.insert(key.to_string(), Dynamic::from(value));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("min"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "min");
+        }
     });
 
     // track_max overloads for different number types
     engine.register_fn("track_max", |key: &str, value: i64| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             let current = state
                 .get(key)
                 .cloned()
@@ -580,14 +604,18 @@ pub fn register_functions(engine: &mut Engine) {
             let value_f64 = value as f64;
             if value_f64 > current_val {
                 state.insert(key.to_string(), Dynamic::from(value));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("max"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "max");
+        }
     });
 
     engine.register_fn("track_max", |key: &str, value: i32| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             let current = state
                 .get(key)
                 .cloned()
@@ -600,14 +628,18 @@ pub fn register_functions(engine: &mut Engine) {
             let value_f64 = value as f64;
             if value_f64 > current_val {
                 state.insert(key.to_string(), Dynamic::from(value));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("max"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "max");
+        }
     });
 
     engine.register_fn("track_max", |key: &str, value: f64| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             let current = state
                 .get(key)
                 .cloned()
@@ -619,14 +651,18 @@ pub fn register_functions(engine: &mut Engine) {
             };
             if value > current_val {
                 state.insert(key.to_string(), Dynamic::from(value));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("max"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "max");
+        }
     });
 
     engine.register_fn("track_max", |key: &str, value: f32| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             let current = state
                 .get(key)
                 .cloned()
@@ -639,14 +675,18 @@ pub fn register_functions(engine: &mut Engine) {
             let value_f64 = value as f64;
             if value_f64 > current_val {
                 state.insert(key.to_string(), Dynamic::from(value));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("max"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "max");
+        }
     });
 
     engine.register_fn("track_unique", |key: &str, value: &str| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             // Get existing set or create new one
             let current = state.get(key).cloned().unwrap_or_else(|| {
                 // Create a new array to store unique values
@@ -663,14 +703,18 @@ pub fn register_functions(engine: &mut Engine) {
                     arr.push(value_dynamic);
                 }
                 state.insert(key.to_string(), Dynamic::from(arr));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("unique"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "unique");
+        }
     });
 
     engine.register_fn("track_unique", |key: &str, value: i64| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             // Get existing set or create new one
             let current = state.get(key).cloned().unwrap_or_else(|| {
                 // Create a new array to store unique values
@@ -684,14 +728,18 @@ pub fn register_functions(engine: &mut Engine) {
                     arr.push(value_dynamic);
                 }
                 state.insert(key.to_string(), Dynamic::from(arr));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("unique"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "unique");
+        }
     });
 
     engine.register_fn("track_unique", |key: &str, value: i32| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             // Get existing set or create new one
             let current = state.get(key).cloned().unwrap_or_else(|| {
                 // Create a new array to store unique values
@@ -708,14 +756,18 @@ pub fn register_functions(engine: &mut Engine) {
                     arr.push(value_dynamic);
                 }
                 state.insert(key.to_string(), Dynamic::from(arr));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("unique"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "unique");
+        }
     });
 
     engine.register_fn("track_unique", |key: &str, value: f64| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             // Get existing set or create new one
             let current = state.get(key).cloned().unwrap_or_else(|| {
                 // Create a new array to store unique values
@@ -732,14 +784,18 @@ pub fn register_functions(engine: &mut Engine) {
                     arr.push(value_dynamic);
                 }
                 state.insert(key.to_string(), Dynamic::from(arr));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("unique"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "unique");
+        }
     });
 
     engine.register_fn("track_unique", |key: &str, value: f32| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             // Get existing set or create new one
             let current = state.get(key).cloned().unwrap_or_else(|| {
                 // Create a new array to store unique values
@@ -756,14 +812,18 @@ pub fn register_functions(engine: &mut Engine) {
                     arr.push(value_dynamic);
                 }
                 state.insert(key.to_string(), Dynamic::from(arr));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("unique"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "unique");
+        }
     });
 
     engine.register_fn("track_bucket", |key: &str, bucket: &str| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             // Get existing map or create new one
             let current = state
                 .get(key)
@@ -775,14 +835,18 @@ pub fn register_functions(engine: &mut Engine) {
                 let new_count = count.as_int().unwrap_or(0) + 1;
                 map.insert(bucket.into(), Dynamic::from(new_count));
                 state.insert(key.to_string(), Dynamic::from(map));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("bucket"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "bucket");
+        }
     });
 
     engine.register_fn("track_bucket", |key: &str, bucket: i64| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             // Get existing map or create new one
             let current = state
                 .get(key)
@@ -798,14 +862,18 @@ pub fn register_functions(engine: &mut Engine) {
                 let new_count = count.as_int().unwrap_or(0) + 1;
                 map.insert(bucket_str.into(), Dynamic::from(new_count));
                 state.insert(key.to_string(), Dynamic::from(map));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("bucket"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "bucket");
+        }
     });
 
     engine.register_fn("track_bucket", |key: &str, bucket: i32| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             // Get existing map or create new one
             let current = state
                 .get(key)
@@ -821,14 +889,18 @@ pub fn register_functions(engine: &mut Engine) {
                 let new_count = count.as_int().unwrap_or(0) + 1;
                 map.insert(bucket_str.into(), Dynamic::from(new_count));
                 state.insert(key.to_string(), Dynamic::from(map));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("bucket"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "bucket");
+        }
     });
 
     engine.register_fn("track_bucket", |key: &str, bucket: f64| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             // Get existing map or create new one
             let current = state
                 .get(key)
@@ -844,14 +916,18 @@ pub fn register_functions(engine: &mut Engine) {
                 let new_count = count.as_int().unwrap_or(0) + 1;
                 map.insert(bucket_str.into(), Dynamic::from(new_count));
                 state.insert(key.to_string(), Dynamic::from(map));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("bucket"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "bucket");
+        }
     });
 
     engine.register_fn("track_bucket", |key: &str, bucket: f32| {
-        with_user_tracking(|state| {
+        let updated = with_user_tracking(|state| {
             // Get existing map or create new one
             let current = state
                 .get(key)
@@ -867,10 +943,14 @@ pub fn register_functions(engine: &mut Engine) {
                 let new_count = count.as_int().unwrap_or(0) + 1;
                 map.insert(bucket_str.into(), Dynamic::from(new_count));
                 state.insert(key.to_string(), Dynamic::from(map));
-                // Store operation type metadata for parallel merging
-                state.insert(format!("__op_{}", key), Dynamic::from("bucket"));
+                true
+            } else {
+                false
             }
         });
+        if updated {
+            record_operation_metadata(key, "bucket");
+        }
     });
 }
 

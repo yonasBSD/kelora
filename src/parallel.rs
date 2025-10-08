@@ -241,32 +241,47 @@ impl GlobalTracker {
     ) -> Result<()> {
         {
             let mut global_user = self.user_tracked.lock().unwrap();
-            Self::merge_state_into(&mut global_user, user_state);
+            Self::merge_state_with_lookup(
+                &mut global_user,
+                &user_state,
+                |op_key| user_state.get(op_key).cloned(),
+                false,
+            );
         }
 
         {
             let mut global_internal = self.internal_tracked.lock().unwrap();
-            Self::merge_state_into(&mut global_internal, internal_state);
+            Self::merge_state_with_lookup(
+                &mut global_internal,
+                &internal_state,
+                |op_key| internal_state.get(op_key).cloned(),
+                true,
+            );
         }
 
         Ok(())
     }
 
-    fn merge_state_into(
+    fn merge_state_with_lookup<F>(
         target: &mut HashMap<String, Dynamic>,
-        worker_state: HashMap<String, Dynamic>,
-    ) {
-        for (key, value) in &worker_state {
+        worker_state: &HashMap<String, Dynamic>,
+        mut op_lookup: F,
+        copy_metadata: bool,
+    ) where
+        F: FnMut(&str) -> Option<Dynamic>,
+    {
+        for (key, value) in worker_state {
             if key.starts_with("__op_") {
-                target.insert(key.clone(), value.clone());
+                if copy_metadata {
+                    target.insert(key.clone(), value.clone());
+                }
                 continue;
             }
 
             if let Some(existing) = target.get(key) {
                 let op_key = format!("__op_{}", key);
-                let operation = worker_state
-                    .get(&op_key)
-                    .and_then(|v| v.clone().into_string().ok())
+                let operation = op_lookup(&op_key)
+                    .and_then(|v| v.into_string().ok())
                     .unwrap_or_else(|| "replace".to_string());
 
                 match operation.as_str() {
@@ -2001,12 +2016,26 @@ impl ParallelProcessor {
                     flush_user_updates.insert(key.clone(), value.clone());
                 }
 
+                for (key, value) in ctx
+                    .internal_tracker
+                    .iter()
+                    .filter(|(k, _)| k.starts_with("__op_"))
+                {
+                    flush_user_updates.insert(key.clone(), value.clone());
+                }
+
                 let thread_user = tracking::get_thread_tracking_state();
                 for (key, value) in thread_user {
                     flush_user_updates.insert(key, value);
                 }
 
                 let thread_internal = tracking::get_thread_internal_state();
+                for (key, value) in thread_internal
+                    .iter()
+                    .filter(|(k, _)| k.starts_with("__op_"))
+                {
+                    flush_user_updates.insert(key.clone(), value.clone());
+                }
                 for (key, value) in thread_internal {
                     flush_internal_updates.insert(key, value);
                 }
@@ -2214,6 +2243,14 @@ impl ParallelProcessor {
         let thread_user = tracking::get_thread_tracking_state();
         for (key, value) in thread_user {
             user_deltas.insert(key, value);
+        }
+
+        let thread_internal_meta = tracking::get_thread_internal_state();
+        for (key, value) in thread_internal_meta
+            .iter()
+            .filter(|(k, _)| k.starts_with("__op_"))
+        {
+            user_deltas.insert(key.clone(), value.clone());
         }
 
         let batch_result = BatchResult {
