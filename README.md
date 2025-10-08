@@ -421,7 +421,6 @@ kelora --help-rhai       # Rhai syntax and scripting patterns
 kelora --help-functions  # Built-in functions grouped by domain
 kelora --help-multiline  # Multiline strategy reference
 kelora --help-time       # Timestamp parsing and formatting guide
-https://github.com/dloss/kelora/blob/main/docs/COOKBOOK.md     # Cookbook of Rhai and pipeline patterns
 https://github.com/dloss/kelora/blob/main/examples/README.md   # Catalogue of sample log files
 ```
 

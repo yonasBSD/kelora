@@ -157,4 +157,3 @@ kelora -j errors_json_mixed.jsonl --verbose      # Show each error
 - `kelora --help-rhai` - Rhai basics and idioms
 - `kelora --help-functions` - All Rhai functions
 - `kelora --help-quick` - One-screen cheat sheet of the busiest flags
-- [Cookbook](https://github.com/dloss/kelora/blob/main/docs/COOKBOOK.md) - Expanded recipes
