@@ -55,7 +55,7 @@ Input → Parse → Filter → Transform → Output
 ```bash
 > kelora -f json app.log
 > kelora -f combined access.log
-> kelora -f "cols:timestamp:ts level:5 message:*" custom.log
+> kelora -f "cols:timestamp level *message" custom.log --ts-field timestamp
 ```
 
 **Output:** Structured event (map) with fields accessible as `e.field`.
@@ -183,7 +183,7 @@ Kelora processes events one at a time (or in batches with `--parallel`):
 **Parallel (`--parallel`):**
 - Events processed in batches across cores
 - Higher throughput
-- May reorder output (use `--ordered` to preserve)
+- Keeps output order by default; add `--unordered` to trade ordering for throughput
 - Higher memory usage
 
 ### Event Lifecycle

@@ -119,7 +119,8 @@ for raw strings.
 ## Step 5 – Custom Reports with `--end`
 
 Sometimes you need a formatted report instead of raw maps. Store a short Rhai
-script and invoke it with `--end-file` so the same layout works across platforms.
+script and include it with `-I` so the same layout works across platforms, then
+call the helper from `--end`.
 
 ```bash exec="on" source="above" result="ansi"
 cat <<'RHAI' > metrics_summary.rhai

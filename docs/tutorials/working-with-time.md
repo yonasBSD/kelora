@@ -78,12 +78,14 @@ When your timestamps don't match standard formats, use `--ts-format`:
 ```bash
 # Python logging format with milliseconds
 > echo '2024-01-15 10:30:45,123 INFO User login' | \
-    kelora -f 'cols:timestamp:ts level message' \
+    kelora -f 'cols:timestamp(2) level *message' \
+    --ts-field timestamp \
     --ts-format '%Y-%m-%d %H:%M:%S,%3f'
 
 # Apache access log format
 > echo '15/Jan/2024:10:30:45 +0000 GET /api/users 200' | \
-    kelora -f 'cols:timestamp:ts method path status:int' \
+    kelora -f 'cols:timestamp(2) method path status:int' \
+    --ts-field timestamp \
     --ts-format '%d/%b/%Y:%H:%M:%S %z'
 
 # Syslog format without year
@@ -495,8 +497,8 @@ Use `now_utc()` and `now_local()` for relative time calculations:
 # Debug: Show detected timestamp
 > kelora -f json app.log --take 3
 
-# Use custom field with :ts annotation
-> kelora -f 'cols:my_time:ts level message' app.log --since 1h
+# Point Kelora at your timestamp field explicitly
+> kelora -f 'cols:my_time level *message' app.log --since 1h --ts-field my_time
 ```
 
 ### Timezone Confusion
@@ -520,7 +522,8 @@ Use `now_utc()` and `now_local()` for relative time calculations:
 ```bash
 # Test format with verbose errors
 > echo '2024-01-15 10:30:45,123 Test' | \
-    kelora -f 'cols:timestamp:ts message' \
+    kelora -f 'cols:timestamp(2) *message' \
+    --ts-field timestamp \
     --ts-format '%Y-%m-%d %H:%M:%S,%3f' \
     --verbose
 

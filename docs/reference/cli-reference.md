@@ -90,7 +90,7 @@ Specify input format. Supports standard formats, column parsing, and CSV with ty
 
 **Column Parsing:**
 ```bash
--f 'cols:timestamp:ts level:5 message:*'
+-f 'cols:timestamp(2) level *message'
 ```
 
 **CSV with Types:**
@@ -102,7 +102,7 @@ Specify input format. Supports standard formats, column parsing, and CSV with ty
 ```bash
 > kelora -f json app.log
 > kelora -f combined nginx.log
-> kelora -f 'cols:ts level:5 *msg' custom.log
+> kelora -f 'cols:ts(2) level *msg' custom.log  # `ts` is auto-detected as a timestamp
 ```
 
 #### `-j`

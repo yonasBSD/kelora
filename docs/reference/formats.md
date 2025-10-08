@@ -16,7 +16,7 @@ Kelora supports multiple input formats for parsing log files:
 | `combined` | Apache/Nginx combined format | Web server access logs |
 | `clf` | Apache Common Log Format | Web server access logs |
 | `cef` | ArcSight Common Event Format | Security logs, SIEM data |
-| `cols:<spec>` | Custom column parsing | Fixed-width or delimited logs |
+| `cols:<spec>` | Custom column parsing | Column-based logs (whitespace or custom separators) |
 | `auto` | Auto-detect format | Mixed or unknown formats |
 
 ## JSON Format
@@ -375,30 +375,22 @@ CEF:0|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 d
 
 ### Description
 
-Parse custom column-based formats with field specifications.
+Parse custom column-based formats with field specifications. The parser splits each line by whitespace by default (or a custom separator) and applies the tokens you provide.
 
 ### Specification Syntax
 
 ```
-cols:field1:width field2:width field3:*
+cols:field1 field2 field3
 ```
 
-**Width types:**
-- `N` - Fixed width of N characters
-- `:ts` - Timestamp field (special handling)
-- `*` - Remainder of line (greedy)
+**Token types:**
+- `field` - Consume one column and assign it to `field`
+- `field(N)` - Consume `N` columns and join them into `field`
+- `-` / `-(N)` - Skip one or `N` columns
+- `*field` - Capture every remaining column into `field` (must be last)
+- `field:type` - Apply a type annotation (`int`, `float`, `bool`, `string`)
 
-### Input Example
-
-**Fixed-width:**
-```
-2024-01-15T10:30:00Z ERROR Connection failed
-```
-
-**Spec:**
-```bash
--f 'cols:timestamp:ts level:5 message:*'
-```
+### Input Examples
 
 **Whitespace-delimited:**
 ```
@@ -407,32 +399,42 @@ ERROR api "Connection failed"
 
 **Spec:**
 ```bash
--f 'cols:level service message'
+-f 'cols:level service *message'
+```
+
+**Timestamp spread across columns:**
+```
+2024-01-15 10:30:00 INFO Connection failed
+```
+
+**Spec:**
+```bash
+-f 'cols:timestamp(2) level *message'
 ```
 
 ### Output Fields
 
-Field names from specification.
+Field names come from the specification. Type annotations convert values after extraction.
 
 ### Usage
 
 ```bash
-# Fixed-width columns
-> kelora -f 'cols:timestamp:ts level:5 message:*' app.log
-
 # Whitespace-delimited
-> kelora -f 'cols:level service message' app.log
+> kelora -f 'cols:level service *message' app.log
+
+# Multi-token timestamp with type annotations
+> kelora -f 'cols:timestamp(2) level status:int *message' app.log --ts-field timestamp
 
 # Custom separator
-> kelora -f 'cols:name age city' --cols-sep ',' data.txt
+> kelora -f 'cols:name age:int city' --cols-sep ',' data.txt
 ```
 
 ### Notes
 
 - Default separator: whitespace
-- Use `--cols-sep` to specify custom separator
-- `:ts` extracts timestamp field automatically
-- `*` must be last field (consumes remainder)
+- Use `--cols-sep` to specify a custom separator
+- Give timestamps recognizable names (`timestamp`, `ts`, `time`) or set `--ts-field`
+- `*field` must be the final token because it consumes the remainder of the line
 
 ## Auto-Detection
 
@@ -618,7 +620,8 @@ Convert between formats by combining input and output formats:
 ### Parse Custom Format
 
 ```bash
-> kelora -f 'cols:timestamp:ts level:5 service:10 message:*' app.log \
+> kelora -f 'cols:timestamp level service *message' app.log \
+    --ts-field timestamp \
     --levels error
 ```
 

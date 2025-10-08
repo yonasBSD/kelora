@@ -80,9 +80,8 @@ match the regex `^[a-zA-Z_][a-zA-Z0-9_-]{0,63}$`.
 2. **Alias expansion** – each `--alias name` (or `-a name`) is replaced with the
    corresponding argument list. Aliases can reference other aliases by using
    `--alias other-alias` inside their definition.
-3. **CLI parsing** – the augmented argument vector is passed to Clap. The final
-   flags appear in `kelora --debug-config` output (future feature) and are what
-   the pipeline sees.
+3. **CLI parsing** – the augmented argument vector is passed to Clap, and those
+   resolved flags are what the pipeline sees.
 
 Implications:
 
