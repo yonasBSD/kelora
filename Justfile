@@ -84,7 +84,7 @@ docs-deploy-dev:
     UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
     UV_DATA_DIR={{justfile_directory()}}/.uv/data \
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
-    uvx --with mkdocs-material --with mike --with markdown-exec mike deploy dev
+    uvx --with mkdocs-material --with mike --with markdown-exec mike deploy dev --push
 
 # Set default documentation version
 docs-set-default version:
@@ -100,4 +100,4 @@ docs-deploy-release version:
     UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
     UV_DATA_DIR={{justfile_directory()}}/.uv/data \
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
-    uvx --with mkdocs-material --with mike --with markdown-exec mike deploy --update-aliases {{version}} latest
+    uvx --with mkdocs-material --with mike --with markdown-exec mike deploy --update-aliases {{version}} latest --push
