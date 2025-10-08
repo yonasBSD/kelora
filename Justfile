@@ -68,7 +68,9 @@ docs-serve:
 
 # Build documentation
 docs-build:
+    cargo build --release
     mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools
+    PATH="{{justfile_directory()}}/target/release:${PATH}" \
     UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
     UV_DATA_DIR={{justfile_directory()}}/.uv/data \
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
@@ -76,7 +78,9 @@ docs-build:
 
 # Deploy dev documentation
 docs-deploy-dev:
+    cargo build --release
     mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools
+    PATH="{{justfile_directory()}}/target/release:${PATH}" \
     UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
     UV_DATA_DIR={{justfile_directory()}}/.uv/data \
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
