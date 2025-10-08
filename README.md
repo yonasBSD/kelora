@@ -9,6 +9,8 @@ Scriptable log processor for the command line. Treats logs as structured events 
 > [!WARNING]
 > Experimental tool. [Vibe-coded](https://en.wikipedia.org/wiki/Vibe_coding). APIs may change without notice.
 
+📚 **[Documentation](https://dloss.github.io/kelora)** | [Quickstart](https://dloss.github.io/kelora/quickstart/) | [Tutorials](https://dloss.github.io/kelora/tutorials/parsing-custom-formats/) | [Reference](https://dloss.github.io/kelora/reference/cli-reference/)
+
 ## Table of Contents
 - [Overview](#overview)
 - [Getting Started](#getting-started)
