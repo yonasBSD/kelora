@@ -63,6 +63,7 @@ Errors are recorded but don't stop processing:
 ```
 
 If `e.timestamp` is missing or invalid:
+
 - Filter evaluates to `false`
 - Event is skipped
 - Error is recorded
@@ -134,11 +135,13 @@ Occur when input lines can't be parsed in the specified format.
 ```
 
 **Resilient behavior:**
+
 - Line 1: Parsed successfully
 - Line 2: Skipped (parse error recorded)
 - Line 3: Parsed successfully
 
 **Strict behavior:**
+
 - Line 1: Parsed successfully
 - Line 2: Error shown, processing aborts
 - Line 3: Never processed
@@ -155,11 +158,13 @@ Occur when `--filter` expressions fail during evaluation.
 If `e.timestamp` is missing:
 
 **Resilient behavior:**
+
 - Filter evaluates to `false`
 - Event is skipped
 - Error recorded
 
 **Strict behavior:**
+
 - Error shown immediately
 - Processing aborts
 
@@ -175,11 +180,13 @@ Occur when `--exec` scripts fail during execution.
 If `e.value` is not a valid integer:
 
 **Resilient behavior:**
+
 - Transformation rolled back (atomic)
 - Original event returned unchanged
 - Error recorded
 
 **Strict behavior:**
+
 - Error shown immediately
 - Processing aborts
 
@@ -332,6 +339,7 @@ In resilient mode, `--exec` scripts execute **atomically**:
 ```
 
 If `e.value.to_int()` fails:
+
 - Changes to `e.a` are **rolled back**
 - `e.b` is never set
 - `e.c` is never set
@@ -371,10 +379,12 @@ Each `--exec` script is atomic independently:
 ```
 
 If first `--exec` fails:
+
 - First transformation rolled back
 - Second `--exec` **still runs** on original event
 
 If second `--exec` fails:
+
 - First transformation **preserved** (it succeeded)
 - Second transformation rolled back
 

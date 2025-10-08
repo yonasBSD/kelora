@@ -28,6 +28,7 @@ Enable parallel processing for faster throughput:
 ```
 
 **Parallel processing:**
+
 - Automatically uses available CPU cores (`--threads 0`)
 - Higher throughput than sequential mode
 - May reorder output (use `--unordered` for maximum speed)
@@ -72,6 +73,7 @@ Adjust batch size for memory vs throughput tradeoffs:
 ```
 
 **Batch size guidelines:**
+
 - Default: 1000 (good balance)
 - High memory available: 5000-10000
 - Memory constrained: 100-500
@@ -98,6 +100,7 @@ Disable output ordering for best performance:
 ```
 
 **When to use `--unordered`:**
+
 - Processing for metrics/stats only
 - Order doesn't matter for analysis
 - Maximum throughput is priority
@@ -122,6 +125,7 @@ Control which order files are processed:
 ```
 
 **File order options:**
+
 - `cli`: Command-line order (default)
 - `name`: Alphabetical by filename
 - `mtime`: Modification time (oldest first)
@@ -391,6 +395,7 @@ Process many archives efficiently:
 ## Tips
 
 **Performance:**
+
 - Use `--parallel` for files > 100MB
 - Use `--unordered` when order doesn't matter (20-30% faster)
 - Increase `--batch-size` for simple operations (5000-10000)
@@ -399,6 +404,7 @@ Process many archives efficiently:
 - I/O-bound tasks benefit from more threads than cores
 
 **Memory Management:**
+
 - Default batch size (1000) uses ~10-50MB per thread
 - Large batch sizes can use significant memory with many threads
 - Reduce batch size if you see OOM errors
@@ -406,6 +412,7 @@ Process many archives efficiently:
 - Window functions increase memory proportionally
 
 **File Processing:**
+
 - `.gz` files are automatically decompressed
 - Use `--file-order mtime` to process chronologically
 - Use `--file-order name` for predictable ordering

@@ -38,6 +38,7 @@ kelora --multiline indent examples/multiline_indent.log
 ```
 
 Common for:
+
 - Python/Java stack traces
 - YAML-like logs
 - Indented continuation lines
@@ -167,27 +168,32 @@ kelora --multiline timestamp app.log \
 ## Multiline Strategy Selection
 
 **Use `timestamp` when:**
+
 - Logs have consistent timestamp prefixes
 - Each event starts with a timestamp
 - Mixed single-line and multi-line events
 
 **Use `indent` when:**
+
 - Stack traces or continuations are indented
 - Clear visual structure with whitespace
 - Python, YAML, or similar formats
 
 **Use `regex:match` when:**
+
 - Custom event boundaries
 - Specific start/end markers
 - Complex event detection logic
 - Multiple possible start patterns (use `|` for alternation)
 
 **Use `regex:match:end` when:**
+
 - Events have explicit terminators
 - Need both start and end markers
 - BEGIN/END style blocks
 
 **Use `all` when:**
+
 - Processing single document files
 - Need entire input as context
 - Small files only (memory limit)
@@ -195,29 +201,34 @@ kelora --multiline timestamp app.log \
 ## Tips
 
 **Performance:**
+
 - Multiline buffering increases memory usage
 - Use `--batch-size` to limit buffer growth with `--parallel`
 - `--batch-timeout` controls flush timing for streaming
 
 **Debugging:**
+
 - Use `--take 5` to inspect first few events
 - Add `--stats` to see event counts
 - Use `--verbose` to see parsing issues
 - Check line count with `--exec 'e.lines = e.line.count("\n")'`
 
 **Pattern Matching:**
+
 - Test regex patterns carefully
 - Use `^` for line start anchors
 - Common patterns: `^\d{4}-` (timestamp), `^[A-Z]+:` (severity), `^\s+` (indent)
 - Combine patterns with `|`: `^(ERROR|WARN|Exception)`
 
 **Edge Cases:**
+
 - Empty lines may break grouping (filter with `--ignore-lines '^$'`)
 - Very long events can cause memory issues
 - Incomplete events at EOF are emitted as-is
 - With `--parallel`, events may be reordered (use `--batch-size` carefully)
 
 **Format After Grouping:**
+
 - `-f line` keeps full multiline text in `line` field
 - `-f json` if continuation contains JSON
 - Parse after grouping: `--exec 'e.data = e.line.parse_json()'`

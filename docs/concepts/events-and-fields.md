@@ -16,6 +16,7 @@ e.message    // And so on
 ## Event Structure
 
 Events are maps (key-value pairs) where:
+
 - **Keys** are field names (strings)
 - **Values** can be any JSON-compatible type
 
@@ -34,6 +35,7 @@ Events are maps (key-value pairs) where:
 ```
 
 After parsing, this becomes an event with fields accessible as:
+
 - `e.timestamp` → `"2024-01-15T10:30:00Z"`
 - `e.level` → `"ERROR"`
 - `e.service` → `"api"`
@@ -231,18 +233,23 @@ Empty events are counted as "filtered" in statistics.
 Kelora recognizes these standard field names across formats:
 
 **Timestamps:**
+
 - `timestamp`, `ts`, `time`, `@timestamp`
 
 **Log Levels:**
+
 - `level`, `severity`, `loglevel`
 
 **Messages:**
+
 - `message`, `msg`, `text`
 
 **Identifiers:**
+
 - `id`, `request_id`, `trace_id`, `span_id`
 
 **Metadata:**
+
 - `service`, `host`, `hostname`, `source`
 
 ### Format-Specific Fields
@@ -250,24 +257,29 @@ Kelora recognizes these standard field names across formats:
 Different parsers add format-specific fields:
 
 **JSON (`-f json`):**
+
 - Preserves all original fields
 - Nested structures maintained
 
 **Syslog (`-f syslog`):**
+
 - `hostname`, `appname`, `procid`, `msgid`
 - `facility`, `severity`
 
 **Combined/Apache (`-f combined`):**
+
 - `ip`, `timestamp`, `request`, `status`, `bytes`
 - `method`, `path`, `protocol`
 - `referer`, `user_agent`
 - `request_time` (NGINX only)
 
 **CSV (`-f csv`):**
+
 - Column names from header row
 - Or `col_0`, `col_1`, `col_2`, etc. without header
 
 **Logfmt (`-f logfmt`):**
+
 - All key-value pairs as top-level fields
 
 ## Working with Nested Structures

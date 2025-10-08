@@ -80,6 +80,7 @@ Use graduated quiet levels to control output:
 ```
 
 **Quiet mode behavior:**
+
 - `-q`: Suppress error summaries, stats, format detection messages
 - `-qq`: Additionally suppress event output (automatically enables `-F none`)
 - `-qqq`: Additionally suppress `print()` and `eprint()` from Rhai scripts
@@ -112,6 +113,7 @@ Use exit codes to detect processing issues:
     easily with Ctrl+C.
 
 **Exit codes:**
+
 - `0`: Success (no parsing or runtime errors)
 - `1`: Parse errors or Rhai runtime errors occurred
 - `2`: Invalid CLI usage or configuration errors
@@ -463,18 +465,21 @@ kelora -f json /var/log/app.log \
 ## Tips
 
 **Real-Time Monitoring:**
+
 - Use `tail -f` for active logs, `tail -F` for logs that rotate
 - Use `-qq` to suppress event output, showing only alerts
 - Use `-qqq` for complete silence when only exit codes matter
 - Combine with `--metrics` and `--end` for batch summaries
 
 **Alert Design:**
+
 - Use `eprint()` for alerts (goes to stderr, separate from events)
 - Write structured alerts with context: timestamp, service, severity
 - Consider alert fatigue - use thresholds and deduplication
 - Use `track_unique()` to count distinct values (IPs, users, etc.)
 
 **Performance:**
+
 - Use `--parallel` for high-throughput log streams
 - Adjust `--batch-timeout` for latency vs throughput balance
 - Lower batch timeout = lower latency, higher CPU usage

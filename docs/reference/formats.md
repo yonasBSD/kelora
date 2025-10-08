@@ -182,6 +182,7 @@ Specify field types for automatic conversion:
 ```
 
 **Supported types:**
+
 - `int` - Parse as integer
 - `float` - Parse as floating-point number
 - `bool` - Parse as boolean
@@ -219,6 +220,7 @@ Parse syslog messages (RFC5424 and RFC3164).
 ### Output Fields
 
 **RFC5424:**
+
 - `facility` - Syslog facility code
 - `severity` - Syslog severity level
 - `timestamp` - Parsed timestamp
@@ -229,6 +231,7 @@ Parse syslog messages (RFC5424 and RFC3164).
 - `message` - Log message
 
 **RFC3164:**
+
 - `facility` - Syslog facility code
 - `severity` - Syslog severity level
 - `timestamp` - Parsed timestamp
@@ -384,6 +387,7 @@ cols:field1 field2 field3
 ```
 
 **Token types:**
+
 - `field` - Consume one column and assign it to `field`
 - `field(N)` - Consume `N` columns and join them into `field`
 - `-` / `-(N)` - Skip one or `N` columns

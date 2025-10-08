@@ -171,11 +171,13 @@ kelora -f json app.log --levels error \
 ## Tips
 
 **Performance:**
+
 - Use `--levels` instead of `--filter` when possible (faster)
 - Add `--parallel` for large files
 - Use `--take 100` to limit output when exploring
 
 **Debugging:**
+
 - Use `--verbose` to see parsing errors
 - Use `--stats` to see processing summary
 - Use `-F json | jq` for complex JSON analysis

@@ -77,6 +77,7 @@ Input files to process. If omitted, reads from stdin. Use `-` to explicitly spec
 Specify input format. Supports standard formats, column parsing, and CSV with type annotations.
 
 **Standard Formats:**
+
 - `json` - JSON lines (one JSON object per line)
 - `line` - Plain text (default, one line per event)
 - `csv` - CSV with header row
@@ -121,6 +122,7 @@ Shortcut for `-f json`.
 Control file processing order.
 
 **Values:**
+
 - `cli` - Process files in command-line order (default)
 - `name` - Sort files alphabetically by name
 - `mtime` - Sort files by modification time (oldest first)
@@ -179,6 +181,7 @@ Custom timestamp format using chrono format strings. See `--help-time` for forma
 Timezone for naive input timestamps (without timezone info). Default: UTC.
 
 **Values:**
+
 - `UTC` - Coordinated Universal Time
 - `local` - System local time
 - Named timezones: `Europe/Berlin`, `America/New_York`, etc.
@@ -236,6 +239,7 @@ Column separator for `cols:<spec>` format. Default: whitespace.
 Run Rhai script once before processing any events. Typical use: initialize lookup tables or shared context in the global `conf` map.
 
 **Available helpers:**
+
 - `read_lines(path)` - Read file as array of lines
 - `read_file(path)` - Read file as string
 
@@ -407,6 +411,7 @@ Exclude specified fields from output (comma-separated list).
 Include events from this time onward. Accepts journalctl-style timestamps.
 
 **Formats:**
+
 - Absolute: `2024-01-15T12:00:00Z`, `2024-01-15 12:00`
 - Relative: `1h`, `-30m`, `yesterday`
 
@@ -421,6 +426,7 @@ Include events from this time onward. Accepts journalctl-style timestamps.
 Include events until this time. Accepts journalctl-style timestamps.
 
 **Formats:**
+
 - Absolute: `2024-01-15T12:00:00Z`, `2024-01-15 12:00`
 - Relative: `1h`, `+30m`, `tomorrow`
 
@@ -476,6 +482,7 @@ Show N lines before and after each match (requires filtering).
 Output format. Default: `default`
 
 **Values:**
+
 - `default` - Key-value format with colors
 - `json` - JSON lines (one object per line)
 - `logfmt` - Key-value pairs (logfmt format)

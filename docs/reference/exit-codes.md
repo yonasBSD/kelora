@@ -338,6 +338,7 @@ Both return `1` if any errors occurred.
 ### Resilient vs Strict
 
 **Resilient mode (default):**
+
 - Collects all errors
 - Returns `1` if any errors occurred
 - Processing completes
@@ -350,6 +351,7 @@ Both return `1` if any errors occurred.
 ```
 
 **Strict mode:**
+
 - Aborts on first error
 - Returns `1` immediately
 - Processing incomplete
@@ -500,6 +502,7 @@ To ignore SIGPIPE:
 **Problem:** Getting exit code `2` but command looks correct.
 
 **Check:**
+
 - File exists and is readable
 - Configuration file is valid
 - Permissions are correct
@@ -514,6 +517,7 @@ To ignore SIGPIPE:
 **Problem:** Different exit codes in CI/CD vs local development.
 
 **Possible causes:**
+
 - Different file permissions
 - Different file paths
 - Different configuration files

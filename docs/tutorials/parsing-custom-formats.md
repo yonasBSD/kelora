@@ -35,6 +35,7 @@ The basic syntax for column parsing is:
 Each token in the specification describes how many delimited columns to consume and which field name to assign.
 
 **Token types:**
+
 - `field` - Consume a single column into `field`
 - `field(N)` - Consume `N` columns (joined with spaces or the provided separator)
 - `-` / `-(N)` - Skip one or `N` columns entirely
@@ -66,6 +67,7 @@ WARN  api Slow response time" | kelora -f 'cols:level service message'
 ```
 
 **How it works:**
+
 - `level` - First whitespace-delimited column
 - `service` - Second column
 - `message` - Third column
@@ -80,6 +82,7 @@ Sometimes a field spans more than one column. Use the `(N)` suffix to join multi
 ```
 
 **How it works:**
+
 - `timestamp(2)` - Consumes the first two columns (`2024-01-15` and `10:30:00`)
 - `level` - Third column
 - `*message` - Everything else in the line
@@ -96,6 +99,7 @@ Convert fields to specific types using annotations:
 ```
 
 **Supported types:**
+
 - `int` - Integer (`i64`) conversion
 - `float` - Floating-point (`f64`) conversion
 - `bool` - Boolean conversion (`true/false`, `yes/no`, `1/0`)

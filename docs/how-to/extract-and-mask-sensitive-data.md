@@ -27,6 +27,7 @@ Mask IP addresses to protect privacy while maintaining network analysis capabili
 ```
 
 **Results:**
+
 - `192.168.1.100` with `mask_ip(1)` becomes `192.168.1.0`
 - `192.168.1.100` with `mask_ip(2)` becomes `192.168.0.0`
 - `192.168.1.100` with `mask_ip(3)` becomes `192.0.0.0`
@@ -53,6 +54,7 @@ Create consistent pseudonyms using domain separation (requires `KELORA_SECRET` e
 ```
 
 **Benefits:**
+
 - Same input always produces same pseudonym (consistency)
 - Different domains produce different pseudonyms (separation)
 - Cannot reverse back to original (one-way)
@@ -314,6 +316,7 @@ kelora -f json /var/log/app-$(date +%Y-%m-%d).log \
 ## Tips
 
 **Security:**
+
 - Always use strong, random `KELORA_SECRET` for pseudonymization
 - Store secrets securely (environment variables, secret managers)
 - Use domain separation in `pseudonym()` to prevent cross-context correlation
@@ -321,6 +324,7 @@ kelora -f json /var/log/app-$(date +%Y-%m-%d).log \
 - Use `hash("xxh3")` for grouping without cryptographic security needs
 
 **Compliance:**
+
 - Document your masking strategy for audit purposes
 - Test redaction patterns against sample sensitive data
 - Use `--stats` to track how many events were processed
@@ -328,6 +332,7 @@ kelora -f json /var/log/app-$(date +%Y-%m-%d).log \
 - Validate output before sharing with third parties
 
 **Performance:**
+
 - Use `--parallel` for large-scale sanitization
 - Hash with `xxh3` is faster than cryptographic hashes for grouping
 - Remove fields early in pipeline to reduce processing overhead

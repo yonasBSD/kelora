@@ -21,6 +21,7 @@ kelora -f syslog examples/simple_syslog.log
 ```
 
 Syslog format includes:
+
 - `priority` - Combined facility/severity number
 - `facility` - Facility code (0-23)
 - `severity` - Severity level (0-7)
@@ -46,6 +47,7 @@ kelora -f syslog /var/log/syslog --filter 'e.severity <= 4'
 ```
 
 Severity levels:
+
 - 0: Emergency (system unusable)
 - 1: Alert (immediate action required)
 - 2: Critical
@@ -71,6 +73,7 @@ kelora -f syslog /var/log/syslog --filter 'e.facility == 3'
 ```
 
 Common facilities:
+
 - 0: Kernel
 - 1: User-level
 - 2: Mail
@@ -257,29 +260,34 @@ kelora -f syslog network.log \
 ## Tips
 
 **Severity Filtering:**
+
 - Use numeric comparison for severity ranges
 - Lower numbers = higher severity (0 is most critical)
 - Filter `<= 3` for error-level and above
 - Filter `>= 6` for debug/info only
 
 **Facility Codes:**
+
 - Different systems use different facilities
 - Check your syslog.conf for facility mappings
 - Security logs often use facility 4 or 10
 - Custom applications typically use 16-23
 
 **Performance:**
+
 - Add `--parallel` for large syslog files
 - Use `--since`/`--until` to reduce processing
 - Filter by severity early in pipeline
 
 **Message Parsing:**
+
 - Message format varies by application
 - Use `extract_re()` for pattern extraction
 - Use `parse_kv()` for structured messages
 - Consider `--filter` before expensive parsing
 
 **Hostname Handling:**
+
 - Hostname may be IP or FQDN
 - Normalize with `.to_lower()` for consistency
 - Use `extract_domain()` for FQDN analysis

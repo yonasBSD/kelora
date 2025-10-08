@@ -33,6 +33,7 @@ kelora -f 'csv status:int bytes:int duration:int' examples/csv_typed.csv --take 
 ```
 
 Type annotations enable:
+
 - Numeric comparisons and arithmetic
 - Sorting by numeric values
 - Proper aggregations (sum, average, etc.)
@@ -207,22 +208,26 @@ kelora -f csv raw_data.csv \
 ## Tips
 
 **Type Handling:**
+
 - Use `:int` for status codes, counts, IDs
 - Use `:float` for durations, measurements, rates
 - Use `:bool` for flags (accepts: true/false, 1/0, yes/no)
 - Untyped fields remain as strings
 
 **Performance:**
+
 - Add `--parallel` for large CSV files
 - Use `--batch-size` to control memory usage
 - Filter early to reduce processing overhead
 
 **Error Handling:**
+
 - Use `--verbose` to see parsing errors
 - Use `--stats` to see skip/error counts
 - Ragged CSV (missing fields) creates partial events
 
 **Field Access:**
+
 - Headers become field names (spaces → underscores)
 - Without headers, use `_1`, `_2`, `_3` etc.
 - Use `to_int_or()` / `to_float_or()` for safe type conversion

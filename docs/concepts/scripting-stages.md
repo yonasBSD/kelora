@@ -170,6 +170,7 @@ In resilient mode (default), exec scripts execute **atomically**:
 ```
 
 If `e.value` is not a valid integer:
+
 - Error is recorded
 - Event passes through unchanged
 - No partial modifications

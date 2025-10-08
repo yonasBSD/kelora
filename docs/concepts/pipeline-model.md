@@ -17,6 +17,7 @@ Input → Parse → Filter → Transform → Output
 **Purpose:** Read and preprocess log lines from files or stdin.
 
 **Operations:**
+
 - Read files (including `.gz` compressed)
 - Handle stdin from pipes
 - Split into lines
@@ -24,6 +25,7 @@ Input → Parse → Filter → Transform → Output
 - Apply `--extract-prefix` if configured
 
 **Key Flags:**
+
 - Files specified as positional arguments
 - `--extract-prefix` - Extract prefixed text before parsing
 - `--prefix-sep` - Separator for prefix extraction
@@ -40,12 +42,14 @@ Input → Parse → Filter → Transform → Output
 **Purpose:** Convert raw log lines into structured events (maps/objects).
 
 **Operations:**
+
 - Detect or apply format (`-f json`, `-f logfmt`, etc.)
 - Parse line into fields
 - Handle parse errors (skip in resilient mode, abort in strict mode)
 - Apply `--ts-format` and `--input-tz` for timestamps
 
 **Key Flags:**
+
 - `-f, --input-format` - Specify format (json, logfmt, syslog, combined, etc.)
 - `--ts-format` - Custom timestamp format
 - `--input-tz` - Timezone for naive timestamps
@@ -65,12 +69,14 @@ Input → Parse → Filter → Transform → Output
 **Purpose:** Select which events to process further.
 
 **Operations:**
+
 - Level filtering (`--levels`)
 - Time filtering (`--since`, `--until`)
 - Custom Rhai expressions (`--filter`)
 - Context lines (`--before-context`, `--after-context`)
 
 **Key Flags:**
+
 - `--levels` - Filter by log level
 - `--since` / `--until` - Time-based filtering
 - `--filter` - Custom Rhai expression (must return true/false)
@@ -90,6 +96,7 @@ Input → Parse → Filter → Transform → Output
 ```
 
 **Behavior:**
+
 - Filters return `true` (keep) or `false` (skip)
 - In resilient mode: filter errors return `false`
 - In strict mode: filter errors abort processing
@@ -99,6 +106,7 @@ Input → Parse → Filter → Transform → Output
 **Purpose:** Modify, enrich, or aggregate event data.
 
 **Operations:**
+
 - Execute Rhai scripts (`--exec`)
 - Run `--begin` scripts once at start
 - Run `--end` scripts once at finish
@@ -107,6 +115,7 @@ Input → Parse → Filter → Transform → Output
 - Remove fields (`e.field = ()`)
 
 **Key Flags:**
+
 - `--begin` - Run once before processing
 - `--exec` - Run for each event (multiple allowed)
 - `--end` - Run once after processing
@@ -132,6 +141,7 @@ Input → Parse → Filter → Transform → Output
 ```
 
 **Behavior:**
+
 - Transformations modify events in place
 - In resilient mode: errors return original event unchanged
 - In strict mode: transformation errors abort processing
@@ -142,6 +152,7 @@ Input → Parse → Filter → Transform → Output
 **Purpose:** Format and emit events.
 
 **Operations:**
+
 - Apply `--keys` field selection
 - Convert timestamps (`--convert-ts`, `--show-ts-local`, `--show-ts-utc`)
 - Format events (default, JSON, CSV, etc.)
@@ -149,6 +160,7 @@ Input → Parse → Filter → Transform → Output
 - Write to stdout or files
 
 **Key Flags:**
+
 - `--keys` - Select top-level fields to output
 - `-F, --output-format` - Output format (default, json, csv, etc.)
 - `--convert-ts` - Convert timestamp fields to RFC3339
@@ -175,12 +187,14 @@ Kelora processes events one at a time (or in batches with `--parallel`):
 ### Sequential vs Parallel
 
 **Sequential (default):**
+
 - Events processed in order
 - Lower memory usage
 - Predictable output order
 - Simpler debugging
 
 **Parallel (`--parallel`):**
+
 - Events processed in batches across cores
 - Higher throughput
 - Keeps output order by default; add `--unordered` to trade ordering for throughput
@@ -282,6 +296,7 @@ Pipeline: Input → Parse → Transform (fan-out) → Filter → Output
 ### Stateless Processing
 
 Most operations are stateless:
+
 - Each event processed independently
 - No memory of previous events
 - Can process infinite streams

@@ -36,6 +36,7 @@ echo '{"ts": "2024-01-15T10:30:00Z", "message": "User login"}
 ```
 
 **Auto-detected field names:**
+
 - `ts`, `timestamp`, `time`, `@timestamp`
 - Case-insensitive detection
 - First matching field in the event is used
@@ -62,12 +63,14 @@ Use `--since` and `--until` to filter logs by time range:
 ```
 
 **Duration syntax:**
+
 - `1h` - One hour ago
 - `30m` - Thirty minutes ago
 - `2d` - Two days ago
 - `1h30m` - One hour and thirty minutes ago
 
 **Future filtering:**
+
 - `--since +1h` - Events starting one hour from now
 - `--until +2d` - Events up to two days from now
 
@@ -94,6 +97,7 @@ When your timestamps don't match standard formats, use `--ts-format`:
 ```
 
 **Common format tokens:**
+
 - `%Y` - Year with century (2024)
 - `%m` - Month (01-12)
 - `%d` - Day (01-31)
@@ -169,6 +173,7 @@ Understand the difference between data conversion and display formatting:
 ```
 
 **Key differences:**
+
 - `--convert-ts` - Changes the event data
 - `-z / -Z` - Only affects default formatter display
 - JSON/CSV output ignores `-z/-Z` flags
@@ -225,6 +230,7 @@ Extract components and format timestamps:
 ```
 
 **Available methods:**
+
 - `.year()`, `.month()`, `.day()` - Date components
 - `.hour()`, `.minute()`, `.second()` - Time components
 - `.format(fmt)` - Custom formatting
@@ -265,12 +271,14 @@ Calculate time differences between events:
 ```
 
 **Duration functions:**
+
 - `to_duration("1h30m")` - Parse duration string
 - `duration_from_seconds(n)`, `duration_from_minutes(n)`
 - `duration_from_hours(n)`, `duration_from_days(n)`
 - `duration_from_ms(n)`, `duration_from_ns(n)`
 
 **Duration methods:**
+
 - `.as_seconds()`, `.as_milliseconds()`, `.as_nanoseconds()`
 - `.as_minutes()`, `.as_hours()`, `.as_days()`
 - `.to_string()` - Human-readable format
@@ -341,6 +349,7 @@ Use datetime comparison in filters:
 ```
 
 **Comparison operators:**
+
 - `==`, `!=` - Equality
 - `>`, `<` - Greater/less than
 - `>=`, `<=` - Greater/less or equal

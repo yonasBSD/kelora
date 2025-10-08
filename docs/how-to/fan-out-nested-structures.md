@@ -215,11 +215,13 @@ kelora -f json data.jsonl \
 ### Error Handling
 
 **Resilient mode (default):**
+
 - Invalid arrays are skipped
 - Original event is suppressed
 - Processing continues
 
 **Strict mode:**
+
 - Errors abort processing
 - Use `--strict` for fail-fast behavior
 
@@ -231,20 +233,24 @@ kelora -f json data.jsonl --exec 'emit_each(e.users)' --verbose
 ## Tips
 
 **Performance:**
+
 - Fan-out increases event count significantly
 - Use `--parallel` for large datasets
 - Filter before fan-out when possible to reduce processing
 
 **Memory:**
+
 - Each fanned-out event is a separate allocation
 - Large arrays can increase memory usage
 - Consider batch processing with `--take` for testing
 
 **Field Access:**
+
 - After fan-out, access element fields directly: `e.name` not `e.users[0].name`
 - Base fields are merged: `e.batch_id` available after fan-out with base map
 
 **Metrics:**
+
 - Track fan-out count: `e.count = emit_each(...)`
 - Aggregate after fan-out: `track_sum()`, `track_count()`, etc.
 - Use `--metrics` to see tracked values
