@@ -7,7 +7,7 @@
 Scriptable log processor for the command line. Treats logs as structured events and lets you filter, transform, and analyze them using embedded [Rhai](https://rhai.rs) scripts with 40+ built-in functions.
 
 > [!WARNING]
-> Experimental tool. [Vibe-coded](https://en.wikipedia.org/wiki/Vibe_coding). APIs may change without notice.
+> Experimental tool. [Vibe-coded](https://en.wikipedia.org/wiki/Vibe_coding). APIs and behaviour may change without notice.
 
 ## Table of Contents
 - [Overview](#overview)
@@ -421,7 +421,6 @@ kelora --help-rhai       # Rhai syntax and scripting patterns
 kelora --help-functions  # Built-in functions grouped by domain
 kelora --help-multiline  # Multiline strategy reference
 kelora --help-time       # Timestamp parsing and formatting guide
-https://github.com/dloss/kelora/blob/main/examples/README.md   # Catalogue of sample log files
 ```
 
 ### When to Reach for Kelora

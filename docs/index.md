@@ -5,7 +5,7 @@
 Kelora parses log streams into structured events and lets you filter, transform, and analyze them using embedded [Rhai](https://rhai.rs) scripting with 40+ built-in functions.
 
 !!! warning "Experimental Tool"
-    Kelora is an experimental tool under active development. APIs may change without notice.
+    Kelora is a [vibe-coded](https://en.wikipedia.org/wiki/Vibe_coding) experimental tool under active development. APIs and behaviour may change without notice.
 
 ## What is Kelora?
 
