@@ -2,7 +2,7 @@
 
 **Scriptable log processor for the command line.**
 
-Kelora parses log streams into structured events and lets you filter, transform, and analyze them using embedded [Rhai](https://rhai.rs) scripting with 40+ built-in functions.
+Kelora parses log streams into structured events and lets you filter, transform, and analyze them using embedded [Rhai](https://rhai.rs) scripting with 100+ built-in functions.
 
 !!! warning "Experimental Tool"
     Kelora is a [vibe-coded](https://en.wikipedia.org/wiki/Vibe_coding) experimental tool under active development. APIs and behaviour may change without notice.
@@ -15,7 +15,7 @@ Kelora turns log lines into structured events you can manipulate programmaticall
 - **Filter** - Keep only events that match your conditions
 - **Transform** - Enrich, redact, extract, or restructure event data
 - **Analyze** - Track metrics, compute aggregations, detect patterns
-- **Output** - Default key=value format, JSON, CSV, or custom templates
+- **Output** - key=value (Logfmt), JSON, or CSV formats
 
 ## Quick Examples
 
@@ -32,8 +32,7 @@ kelora -f json examples/simple_json.jsonl \
 ```bash exec="on" source="above" result="ansi"
 kelora -f combined examples/web_access_large.log.gz \
   --filter 'e.status >= 400' \
-  --keys ip,timestamp,status,request \
-  --take 3
+  -F json --take 3
 ```
 
 ### Track metrics from streaming logs
@@ -43,33 +42,20 @@ Process logs as they arrive (example with static file):
 ```bash exec="on" source="above" result="ansi"
 kelora -f json examples/simple_json.jsonl \
   --exec 'track_count(e.service)' \
-  --metrics
+  --metrics -F none
 ```
 
 ## Installation
 
-### Prebuilt Binaries (Recommended)
+**[Download from GitHub Releases](https://github.com/dloss/kelora/releases)** (macOS, Linux, Windows) — unpack and move `kelora` to your `PATH`.
 
-Download the latest release for your platform from [GitHub Releases](https://github.com/dloss/kelora/releases):
-
-- macOS (Intel and Apple Silicon)
-- Linux (x86_64)
-- Windows (x86_64)
-
-Unpack the archive and move `kelora` to somewhere on your `PATH`.
-
-### From Source
-
-Requires Rust stable toolchain:
+Or install from source:
 
 ```bash
-# Install from crates.io
-cargo install kelora
+cargo install kelora  # From crates.io
 
-# Or build from source
-git clone https://github.com/dloss/kelora
-cd kelora
-cargo install --path .
+# Or from source
+git clone https://github.com/dloss/kelora && cd kelora && cargo install --path .
 ```
 
 ## Getting Started
@@ -92,11 +78,12 @@ Built-in parsers for common formats:
 - **Syslog** (`-f syslog`) - RFC3164 and RFC5424
 - **Combined** (`-f combined`) - Apache/Nginx access logs
 - **CSV/TSV** (`-f csv`, `-f tsv`) - Tabular data
+- **Line** (`-f line`) - Plain text lines (each line becomes an event)
 - **Custom** (`-f cols:<spec>`) - Define your own column-based format
 
-### Powerful Scripting
+### Scripting
 
-Embedded Rhai scripting with 40+ built-in functions:
+Embedded Rhai scripting with built-in functions:
 
 - String manipulation: `extract_re()`, `parse_json()`, `contains()`
 - Type conversion: `to_int()`, `to_float()`, `to_bool()`
@@ -135,9 +122,8 @@ when you need deeper analysis:
 
 - **jq/jaq** — slice JSONL output for downstream scripts or human-readable TSV.
 - **qsv** — crunch CSV exports with lightning-fast aggregations.
-- **rg**/**fd**/**xz** — keep pre-processing simple before Kelora takes over.
-- **Rhai libraries** — share helper scripts via `-I` to reuse transformations
-  across pipelines.
+- **DuckDB**/**sqlite** — query exported data with SQL for complex analysis.
+- **miller** — reshape and aggregate tabular data.
 
 ## Need Help?
 
