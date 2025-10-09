@@ -65,13 +65,12 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 
 ## Works Well With
 
-Kelora focuses on normalising noisy logs. Pair it with complementary CLI tools
-when you need deeper analysis:
+Kelora focuses on normalising noisy logs. Pair it with complementary CLI tools when you need deeper analysis:
 
-- **jq/jaq** — slice JSONL output for downstream scripts or human-readable TSV.
-- **qsv** — crunch CSV exports with lightning-fast aggregations.
-- **DuckDB**/**sqlite** — query exported data with SQL for complex analysis.
-- **miller** — reshape and aggregate tabular data.
+- **jq/jaq** — slice JSONL output for downstream scripts or human-readable TSV
+- **qsv** — crunch CSV exports with lightning-fast aggregations
+- **DuckDB/sqlite** — query exported data with SQL for complex analysis
+- **miller** — reshape and aggregate tabular data
 
 ## Need Help?
 
