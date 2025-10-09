@@ -1,110 +1,58 @@
-# Kelora Documentation
+# Kelora
 
 **Scriptable log processor for the command line.**
 
-Kelora parses log streams into structured events and lets you filter, transform, and analyze them using embedded [Rhai](https://rhai.rs) scripting with 100+ built-in functions.
+Parse messy logs into structured events, then filter, transform, and analyze them with embedded [Rhai](https://rhai.rs) scripting.
 
 !!! warning "Experimental Tool"
     Kelora is a [vibe-coded](https://en.wikipedia.org/wiki/Vibe_coding) experimental tool under active development. APIs and behaviour may change without notice.
 
-## What is Kelora?
-
-Kelora turns log lines into structured events you can manipulate programmatically:
-
-- **Parse** - JSON, logfmt, syslog, CSV/TSV, Apache/Nginx combined format, or custom column specs
-- **Filter** - Keep only events that match your conditions
-- **Transform** - Enrich, redact, extract, or restructure event data
-- **Analyze** - Track metrics, compute aggregations, detect patterns
-- **Output** - key=value (Logfmt), JSON, or CSV formats
-
-## Quick Examples
-
-### Find errors in application logs
+## Quick Start
 
 ```bash exec="on" source="above" result="ansi"
+# Find errors across JSON logs
+kelora -f json examples/simple_json.jsonl --levels error
+
+# Enrich logs - calculate derived fields on the fly
 kelora -f json examples/simple_json.jsonl \
-  --levels error \
-  --keys timestamp,service,message
-```
+  --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' \
+  --keys timestamp,service,duration_s
 
-### Analyze web server traffic
-
-```bash exec="on" source="above" result="ansi"
+# Analyze web server failures with classification
 kelora -f combined examples/web_access_large.log.gz \
-  --filter 'e.status >= 400' \
-  -F json --take 3
-```
+  --exec 'e.error_type = if e.status >= 500 { "server" } else { "client" }' \
+  --filter 'e.status >= 400' --take 3
 
-### Track metrics from streaming logs
-
-Process logs as they arrive (example with static file):
-
-```bash exec="on" source="above" result="ansi"
+# Track metrics from streaming logs
 kelora -f json examples/simple_json.jsonl \
-  --exec 'track_count(e.service)' \
-  --metrics -F none
+  --exec 'track_count(e.service)' --metrics
 ```
 
-## Installation
+## What It Does
 
-**[Download from GitHub Releases](https://github.com/dloss/kelora/releases)** (macOS, Linux, Windows) — unpack and move `kelora` to your `PATH`.
+- **Parse** JSON, logfmt, syslog, CSV/TSV, Apache/Nginx logs, or custom formats
+- **Filter** with Rhai expressions - keep events matching your conditions
+- **Transform** with 100+ built-in functions - enrich, redact, extract, restructure
+- **Analyze** with built-in metrics - track counts, sums, averages, distributions
+- **Output** as logfmt, JSON, or CSV
 
-Or install from source:
+## Install
+
+**[Download from GitHub Releases](https://github.com/dloss/kelora/releases)** (macOS, Linux, Windows) or:
 
 ```bash
-cargo install kelora  # From crates.io
-
-# Or from source
-git clone https://github.com/dloss/kelora && cd kelora && cargo install --path .
+cargo install kelora
 ```
 
-## Getting Started
+## Learn More
 
-New to Kelora? Start here:
+- **[Quickstart](quickstart.md)** - 5-minute tour
+- **[Tutorials](tutorials/parsing-custom-formats.md)** - Step-by-step guides
+- **[How-To](how-to/find-errors-in-logs.md)** - Solve specific problems
+- **[Concepts](concepts/pipeline-model.md)** - Understanding how Kelora works
+- **[Reference](reference/functions.md)** - Functions, formats, CLI options
 
-1. **[Quickstart](quickstart.md)** - Get up and running in 5 minutes
-2. **[Tutorials](tutorials/parsing-custom-formats.md)** - Learn core skills step-by-step
-3. **[How-To Guides](how-to/find-errors-in-logs.md)** - Solve real problems
-4. **[Reference](reference/functions.md)** - Look up functions, formats, and CLI options
-
-## Key Features
-
-### Flexible Parsing
-
-Built-in parsers for common formats:
-
-- **JSON** (`-f json`) - Standard JSON logs
-- **Logfmt** (`-f logfmt`) - key=value format
-- **Syslog** (`-f syslog`) - RFC3164 and RFC5424
-- **Combined** (`-f combined`) - Apache/Nginx access logs
-- **CSV/TSV** (`-f csv`, `-f tsv`) - Tabular data
-- **Line** (`-f line`) - Plain text lines (each line becomes an event)
-- **Custom** (`-f cols:<spec>`) - Define your own column-based format
-
-### Scripting
-
-Embedded Rhai scripting with built-in functions:
-
-- String manipulation: `extract_re()`, `parse_json()`, `contains()`
-- Type conversion: `to_int()`, `to_float()`, `to_bool()`
-- Time handling: `parse_datetime()`, `format_datetime()`, `now_utc()`
-- Metrics tracking: `track_count()`, `track_sum()`, `track_avg()`
-- Array processing: `sorted()`, `unique()`, `emit_each()`
-- Field operations: `get_path()`, `has_path()`, `path_equals()`
-
-### Performance Options
-
-- **Sequential mode** (default) - Maintains order, lower memory
-- **Parallel mode** (`--parallel`) - Higher throughput, uses multiple cores
-- **Streaming** - Process data as it arrives
-- **Batch** - Process large archives efficiently
-
-### Resilient Processing
-
-- Skip unparseable lines by default
-- Continue processing on script errors
-- Strict mode (`--strict`) for fail-fast behavior
-- Comprehensive error reporting
+Run `kelora --help` for comprehensive CLI docs, or `kelora --help-functions` for all built-in Rhai functions.
 
 ## Documentation Structure
 
