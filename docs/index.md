@@ -82,12 +82,13 @@ Run `kelora --help` for comprehensive CLI docs, or `kelora --help-functions` for
 
 ## Works Well With
 
-Kelora focuses on normalising noisy logs. Pair it with complementary CLI tools when you need deeper analysis:
+Kelora focuses on normalising noisy logs into structured data. Pipe or export Kelora's output to complementary tools for deeper analysis:
 
-- **[jq](https://jqlang.github.io/jq/)** — slice JSONL output for downstream scripts or human-readable TSV
-- **[qsv](https://github.com/jqnatividad/qsv)** — crunch CSV exports with lightning-fast aggregations
-- **[SQLite](https://www.sqlite.org/)/[DuckDB](https://duckdb.org/)** — query exported data with SQL for complex analysis
-- **[miller](https://github.com/johnkerl/miller)** — reshape and aggregate tabular data
+- **[jq](https://jqlang.github.io/jq/)** — process Kelora's JSON output for complex transformations, filtering, or reformatting
+- **[lnav](https://lnav.org/)** — explore Kelora's output in an interactive TUI with live filtering, histograms, and ad-hoc SQL queries
+- **[qsv](https://github.com/jqnatividad/qsv)** — analyze Kelora's CSV output with statistical operations, joins, and aggregations
+- **[SQLite](https://www.sqlite.org/)/[DuckDB](https://duckdb.org/)** — load Kelora's CSV/JSON output into a database for SQL queries and reporting
+- **[miller](https://github.com/johnkerl/miller)** — transform Kelora's CSV output for reshaping, aggregating, and format conversion
 
 ## Need Help?
 
