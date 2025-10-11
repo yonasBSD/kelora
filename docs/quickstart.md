@@ -66,15 +66,16 @@ The `--exec` flag runs Rhai code to modify events. Here we convert milliseconds 
 
 ## Step 6: Track Metrics
 
-Count events by service and show metrics:
+Count events by service and show metrics, suppressing event output:
 
 ```bash exec="on" source="above" result="ansi"
 kelora -f json examples/simple_json.jsonl \
   --exec 'track_count(e.service)' \
+  -F none \
   --metrics
 ```
 
-The `track_count()` function increments a counter. The `--metrics` flag shows accumulated metrics at the end.
+The `track_count()` function increments a counter for each unique value. The `-F none` flag suppresses event output, and `--metrics` displays the accumulated counts.
 
 ## Step 7: Parse Other Formats
 
