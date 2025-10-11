@@ -1,66 +1,25 @@
 # Quickstart
 
-Get started with Kelora in 5 minutes. This guide will walk you through parsing, filtering, and transforming logs using real example files.
+Get started with Kelora in minutes. This guide shows real examples from parsing to advanced transformations.
 
 ## Prerequisites
 
 - Kelora installed and on your PATH
-- Clone the repository to access example files: `git clone https://github.com/dloss/kelora`
+- Clone the repository: `git clone https://github.com/dloss/kelora`
 
-## Step 1: Parse JSON Logs
+## Parse and Filter Logs
 
-Let's start with a simple JSON log file. Parse it and see all events:
-
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/simple_json.jsonl -n 3
-```
-
-The `-j` flag (short for `-f json`) tells Kelora to parse each line as JSON. By default, Kelora outputs events in `key=value` format. The `-n 3` flag limits output to the first 3 events.
-
-## Step 2: Filter by Log Level
-
-Show only error-level events:
+Parse JSON logs and filter by level, showing only specific fields:
 
 ```bash exec="on" source="above" result="ansi"
-kelora -j examples/simple_json.jsonl -l error
+kelora -j examples/simple_json.jsonl -l error -k timestamp,service,message
 ```
 
-The `-l` (or `--levels`) flag filters events by their log level field. You can specify multiple levels: `-l warn,error`.
+The `-j` flag parses JSON, `-l` filters by log level (comma-separated for multiple: `-l warn,error`), and `-k` selects which fields to show. Use `-b` for brief output (values only).
 
-## Step 3: Select Specific Fields
+## Filter and Transform with Scripts
 
-Extract just the fields you care about:
-
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/simple_json.jsonl \
-  -k timestamp,service,message \
-  -n 3
-```
-
-The `-k` (or `--keys`) flag limits output to specified top-level fields. Use `-b` (or `--brief`) to show only values:
-
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/simple_json.jsonl \
-  -k timestamp,service,message \
-  -b \
-  -n 3
-```
-
-## Step 4: Filter with Custom Logic
-
-Use Rhai scripts to filter events with custom conditions:
-
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/simple_json.jsonl \
-  --filter 'e.service == "database"' \
-  -k timestamp,service,message
-```
-
-The `--filter` flag evaluates a Rhai expression. Events where the expression returns `true` are kept.
-
-## Step 5: Transform Event Data
-
-Add computed fields using `-e` (or `--exec`):
+Filter events and add computed fields using Rhai expressions:
 
 ```bash exec="on" source="above" result="ansi"
 kelora -j examples/simple_json.jsonl \
@@ -69,144 +28,79 @@ kelora -j examples/simple_json.jsonl \
   -k timestamp,message,duration_s
 ```
 
-The `-e` flag runs Rhai code to modify events. Here we convert milliseconds to seconds.
+The `--filter` keeps events where the expression returns `true`. The `-e` flag transforms events by adding or modifying fields.
 
-## Step 6: Track Metrics
+## Track Metrics
 
-Count events by service and show metrics, suppressing event output:
+Count events by service, suppressing event output:
 
 ```bash exec="on" source="above" result="ansi"
 kelora -j examples/simple_json.jsonl \
   -e 'track_count(e.service)' \
-  -F none \
-  -m
+  -F none -m
 ```
 
-The `track_count()` function increments a counter for each unique value. The `-F none` flag suppresses event output, and `-m` (or `--metrics`) displays the accumulated counts.
+Use `track_count()`, `track_sum()`, `track_min()`, and `track_max()` to collect metrics. The `-m` flag displays results at the end.
 
-## Step 7: Convert Between Formats
+## Convert Between Formats
 
-Kelora can convert logs from any input format to any output format:
-
-### Syslog to JSON
+Kelora converts between any formats. Examples:
 
 ```bash exec="on" source="above" result="ansi"
-kelora -f syslog examples/simple_syslog.log -J -n 3
+kelora -f syslog examples/simple_syslog.log -F json -n 3
 ```
-
-### Logfmt to JSON
 
 ```bash exec="on" source="above" result="ansi"
-kelora -f logfmt examples/simple_logfmt.log -J -n 3
+kelora -f combined examples/web_access_large.log.gz -F csv -k ip,status,request -n 3
 ```
 
-### Apache/Nginx Logs to CSV
-
-```bash exec="on" source="above" result="ansi"
-kelora -f combined examples/web_access_large.log.gz \
-  -F csv \
-  -k ip,status,request \
-  -n 3
-```
-
-The `-f` flag specifies input format, `-F` (or `-J` for JSON) specifies output format. Kelora normalizes all formats to a common event structure.
+The `-f` flag specifies input format, `-F` specifies output format (we could have used `-J` as a shortcut for JSON). Gzipped files are automatically decompressed.
 
 ## Common Patterns
 
-### Stream Processing
-
-Process logs as they're written:
-
-=== "Linux/macOS"
-
-    ```bash
-    > tail -f /var/log/app.log | kelora -j -l error
-    ```
-
-=== "Windows"
-
-    ```powershell
-    > Get-Content -Wait app.log | kelora -j -l error
-    ```
-
-### Gzipped Files
-
-Kelora automatically decompresses `.gz` files:
-
 ```bash
-> kelora -j app.log.gz -l error
-```
+# Stream processing
+tail -f /var/log/app.log | kelora -j -l error
 
-### Multiple Files
+# Multiple files with wildcards
+kelora -j logs/*.jsonl -l error
 
-Process multiple files in sequence:
-
-```bash
-> kelora -j logs/*.jsonl -l error
+# Extract prefixes (Docker Compose logs, etc.)
+docker compose logs | kelora --extract-prefix container --filter 'e.container == "web_1"'
 ```
 
 ## Next Steps
-
-Now that you've seen the basics, dive deeper:
 
 - **[Tutorials](tutorials/parsing-custom-formats.md)** - Learn core skills step-by-step
 - **[How-To Guides](how-to/find-errors-in-logs.md)** - Solve specific problems
 - **[Function Reference](reference/functions.md)** - Explore all 40+ built-in functions
 - **[CLI Reference](reference/cli-reference.md)** - Complete flag documentation
 
-## Quick Recipes
-
-Need a refresher later? These bite-sized snippets mirror the built-in fixtures so
-you can rehearse common tasks quickly. Run them from the repository root so the
-`examples/` paths resolve.
-
-### Narrow to a specific service
-
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/simple_json.jsonl \
-  --filter 'e.service == "database"' \
-  -e 'e.duration_s = e.get_path("duration_ms", 0) / 1000' \
-  -k timestamp,message,duration_s
-```
-
-### Slice logs by prefix before parsing
-
-```bash exec="on" source="above" result="ansi"
-cat examples/prefix_docker.log | \
-  kelora --extract-prefix container --prefix-sep ' | ' \
-    --filter 'e.container == "web_1"'
-```
-
 ## Quick Reference
 
 ```bash
-# Common flags
+# Get help
 kelora --help              # Complete CLI reference
 kelora --help-functions    # All built-in Rhai functions
-kelora --help-examples     # Common usage patterns
 kelora --help-rhai         # Rhai scripting guide
 
-# Format shortcuts
--j                        # Shorthand for -f json
+# Input/output formats
+-j                        # Parse JSON (short for -f json)
+-J                        # Output JSON (short for -F json)
 -f auto                   # Auto-detect format
--F json                   # Output as JSON
 
-# Filtering
--l error                  # Filter by log level (--levels)
+# Filtering and selection
+-l error,warn             # Filter by log level
+-k field1,field2          # Select specific fields
 --filter 'expression'     # Custom Rhai filter
 --since "1 hour ago"      # Time-based filtering
---until "2024-01-01"      # Upper time bound
 
-# Transformation
--e 'expression'           # Transform events (--exec)
--k field1,field2          # Select fields (--keys)
--s                        # Show processing statistics (--stats)
--m                        # Show tracked metrics (--metrics)
+# Transformation and metrics
+-e 'expression'           # Transform events with Rhai
+-m                        # Show tracked metrics
+-s                        # Show processing statistics
 
-# Output
--b                        # Brief mode - values only (--brief)
--n 100                    # Limit to first 100 events (--take)
-
-# Performance
---parallel                # Use multiple cores
+# Output control
+-b                        # Brief mode (values only)
+-n 100                    # Limit output (--take)
 ```
