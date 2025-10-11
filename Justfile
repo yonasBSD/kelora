@@ -58,13 +58,13 @@ bench-quick:
 bench-update:
     ./benchmarks/run_benchmarks.sh --update-baseline
 
-# Serve documentation locally
+# Serve documentation locally with auto-reload
 docs-serve:
     mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools
     UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
     UV_DATA_DIR={{justfile_directory()}}/.uv/data \
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
-    uvx --with mkdocs-material --with mike --with markdown-exec mkdocs serve
+    uvx --with mkdocs-material --with mike --with markdown-exec mkdocs serve --watch docs --watch mkdocs.yml --livereload
 
 # Build documentation (for local testing)
 docs-build:
