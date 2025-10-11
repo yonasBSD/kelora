@@ -9,24 +9,27 @@ Parse messy logs into structured events, then filter, transform, and analyze the
 
 ## Quick Start
 
-```bash exec="on" source="above" result="ansi"
+```bash
 # Find errors across JSON logs
 kelora -f json examples/simple_json.jsonl --levels error
 
 # Enrich logs - calculate derived fields on the fly
 kelora -f json examples/simple_json.jsonl \
   --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' \
-  --keys timestamp,service,duration_s
+  --keys timestamp,service,duration_s \
+  --take 5
 
-# Analyze web server failures with classification
+# Analyze web server failures - add custom fields with Rhai
 kelora -f combined examples/web_access_large.log.gz \
   --exec 'e.error_type = if e.status >= 500 { "server" } else { "client" }' \
   --filter 'e.status >= 400' --take 3
 
-# Track metrics from streaming logs
+# Track metrics - suppress events, show only counts
 kelora -f json examples/simple_json.jsonl \
-  --exec 'track_count(e.service)' --metrics
+  --exec 'track_count(e.service)' --metrics -F none
 ```
+
+See the [Quickstart](quickstart.md) for a step-by-step tour with full output.
 
 ## What It Does
 
@@ -35,6 +38,29 @@ kelora -f json examples/simple_json.jsonl \
 - **Transform** with 100+ built-in functions - enrich, redact, extract, restructure
 - **Analyze** with built-in metrics - track counts, sums, averages, distributions
 - **Output** as logfmt, JSON, or CSV
+
+## How It Works
+
+Kelora processes logs through a streaming pipeline:
+
+```
+Input → Parse → Filter → Transform → Output
+  ↓       ↓        ↓         ↓           ↓
+Files   JSON    --levels  --exec      logfmt
+stdin   syslog  --filter  --begin     JSON
+.gz     custom  --since   --end       CSV
+```
+
+Each stage transforms data and passes it forward. Read the [Pipeline Model](concepts/pipeline-model.md) to understand how stages work together.
+
+## Key Features
+
+- **Resilient Processing** - Skip bad lines automatically, continue processing
+- **Parallel Mode** - Process large archives using all CPU cores with `--parallel`
+- **Sliding Windows** - Analyze events in context with `--window`
+- **100+ Functions** - Rich built-in library for transformation and analysis
+- **Format Conversion** - Read any format, write any format
+- **Metrics Tracking** - Built-in counters, sums, averages, distributions
 
 ## Install
 
@@ -53,15 +79,6 @@ cargo install kelora
 - **[Reference](reference/functions.md)** - Functions, formats, CLI options
 
 Run `kelora --help` for comprehensive CLI docs, or `kelora --help-functions` for all built-in Rhai functions.
-
-## Documentation Structure
-
-This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
-
-- **[Tutorials](tutorials/parsing-custom-formats.md)** - Learning-oriented lessons
-- **[How-To Guides](how-to/find-errors-in-logs.md)** - Task-oriented solutions
-- **[Reference](reference/functions.md)** - Information-oriented lookup
-- **[Concepts](concepts/pipeline-model.md)** - Understanding-oriented explanations
 
 ## Works Well With
 
