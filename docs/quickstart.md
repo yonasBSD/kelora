@@ -50,7 +50,7 @@ Count requests by status code and track response sizes:
 
 ```bash exec="on" source="above" result="ansi"
 kelora -f combined examples/simple_combined.log \
-  -e 'track_count(e.status); track_sum("total_bytes", e.bytes)' \
+  -e 'track_count(e.status.to_string()); track_sum("total_bytes", e.bytes)' \
   -F none -m
 ```
 
