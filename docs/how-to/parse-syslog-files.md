@@ -14,7 +14,7 @@ Parse standard syslog format:
 
 ```bash
 # Auto-detect and parse syslog
-kelora -f syslog /var/log/syslog --take 5
+kelora -f syslog /var/log/syslog -n 5
 
 # Explicit syslog format
 kelora -f syslog examples/simple_syslog.log
@@ -110,13 +110,13 @@ kelora -f syslog /var/log/auth.log \
 # Sudo usage
 kelora -f syslog /var/log/auth.log \
   --filter 'e.process == "sudo"' \
-  --keys timestamp,hostname,message
+  -k timestamp,hostname,message
 
 # Track unique users attempting auth
 kelora -f syslog /var/log/auth.log \
   --filter 'e.message.contains("Failed")' \
-  --exec 'e.user = e.message.extract_re(r"for ([^ ]+)", 1)' \
-  --exec 'track_unique("failed_users", e.user)' \
+  -e 'e.user = e.message.extract_re(r"for ([^ ]+)", 1)' \
+  -e 'track_unique("failed_users", e.user)' \
   --metrics
 ```
 
@@ -127,18 +127,18 @@ Parse structured information from messages:
 ```bash
 # Extract IP addresses from messages
 kelora -f syslog /var/log/syslog \
-  --exec 'e.ip = e.message.extract_ip()' \
+  -e 'e.ip = e.message.extract_ip()' \
   --filter 'e.ip != ""'
 
 # Extract error codes
 kelora -f syslog /var/log/syslog \
-  --exec 'e.error_code = e.message.extract_re(r"error[: ](\d+)", 1)' \
+  -e 'e.error_code = e.message.extract_re(r"error[: ](\d+)", 1)' \
   --filter 'e.error_code != ""'
 
 # Parse key-value pairs in message
 kelora -f syslog /var/log/syslog \
-  --exec 'e.details = e.message.parse_kv(" ", "=")' \
-  --exec 'e.status = e.get_path("details.status", "")'
+  -e 'e.details = e.message.parse_kv(" ", "=")' \
+  -e 'e.status = e.get_path("details.status", "")'
 ```
 
 ### Aggregate by Hostname
@@ -148,19 +148,19 @@ Track activity across multiple hosts:
 ```bash
 # Count messages per host
 kelora -f syslog /var/log/syslog \
-  --exec 'track_count(e.hostname)' \
+  -e 'track_count(e.hostname)' \
   --metrics
 
 # Track errors per host
 kelora -f syslog /var/log/syslog \
   --filter 'e.severity <= 3' \
-  --exec 'track_count(e.hostname)' \
+  -e 'track_count(e.hostname)' \
   --metrics
 
 # Find most active hosts
 kelora -f syslog /var/log/syslog \
-  --exec 'track_count(e.hostname)' \
-  --exec 'track_unique("processes", e.hostname + ":" + e.process)' \
+  -e 'track_count(e.hostname)' \
+  -e 'track_unique("processes", e.hostname + ":" + e.process)' \
   --metrics
 ```
 
@@ -182,8 +182,8 @@ kelora -f syslog /var/log/syslog \
 # Group errors by hour
 kelora -f syslog /var/log/syslog \
   --filter 'e.severity <= 3' \
-  --exec 'e.hour = to_datetime(e.timestamp).format("%Y-%m-%d %H:00")' \
-  --exec 'track_count(e.hour)' \
+  -e 'e.hour = to_datetime(e.timestamp).format("%Y-%m-%d %H:00")' \
+  -e 'track_count(e.hour)' \
   --metrics
 ```
 
@@ -193,16 +193,16 @@ Export syslog to JSON for further processing:
 
 ```bash
 # Convert to JSON
-kelora -f syslog /var/log/syslog -F json > syslog.json
+kelora -f syslog /var/log/syslog -J > syslog.json
 
 # Convert with selected fields
 kelora -f syslog /var/log/syslog \
-  --keys timestamp,hostname,process,severity,message \
-  -F json > syslog.json
+  -k timestamp,hostname,process,severity,message \
+  -J > syslog.json
 
 # Add enrichment before export
 kelora -f syslog /var/log/syslog \
-  --exec 'e.severity_name = switch e.severity {
+  -e 'e.severity_name = switch e.severity {
     0 => "EMERG", 1 => "ALERT", 2 => "CRIT",
     3 => "ERROR", 4 => "WARN", 5 => "NOTICE",
     6 => "INFO", _ => "DEBUG"
@@ -218,11 +218,11 @@ kelora -f syslog /var/log/syslog \
 # Monitor failed SSH attempts from external IPs
 kelora -f syslog /var/log/auth.log \
   --filter 'e.process == "sshd" && e.message.contains("Failed")' \
-  --exec 'e.ip = e.message.extract_ip()' \
-  --exec 'e.external = !e.ip.is_private_ip()' \
+  -e 'e.ip = e.message.extract_ip()' \
+  -e 'e.external = !e.ip.is_private_ip()' \
   --filter 'e.external' \
-  --exec 'track_count(e.ip)' \
-  --keys timestamp,ip,message --metrics
+  -e 'track_count(e.ip)' \
+  -k timestamp,ip,message --metrics
 ```
 
 ### Service Health Check
@@ -231,8 +231,8 @@ kelora -f syslog /var/log/auth.log \
 # Track service starts/stops
 kelora -f syslog /var/log/syslog \
   --filter 'e.message.contains("Started") || e.message.contains("Stopped")' \
-  --exec 'e.action = if e.message.contains("Started") { "start" } else { "stop" }' \
-  --exec 'track_count(e.process + ":" + e.action)' \
+  -e 'e.action = if e.message.contains("Started") { "start" } else { "stop" }' \
+  -e 'track_count(e.process + ":" + e.action)' \
   --metrics
 ```
 
@@ -242,8 +242,8 @@ kelora -f syslog /var/log/syslog \
 # Track disk space warnings
 kelora -f syslog /var/log/syslog \
   --filter 'e.message.contains("disk") && e.message.contains("full")' \
-  --exec 'e.disk = e.message.extract_re(r"(/[^ ]+)", 1)' \
-  --keys timestamp,hostname,disk,message
+  -e 'e.disk = e.message.extract_re(r"(/[^ ]+)", 1)' \
+  -k timestamp,hostname,disk,message
 ```
 
 ### Network Device Logs
@@ -252,8 +252,8 @@ kelora -f syslog /var/log/syslog \
 # Parse router/switch logs
 kelora -f syslog network.log \
   --filter 'e.facility == 16' \
-  --exec 'e.interface = e.message.extract_re(r"interface ([^ ]+)", 1)' \
-  --exec 'track_count(e.interface)' \
+  -e 'e.interface = e.message.extract_re(r"interface ([^ ]+)", 1)' \
+  -e 'track_count(e.interface)' \
   --metrics
 ```
 

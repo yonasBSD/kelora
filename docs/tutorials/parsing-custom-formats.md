@@ -176,10 +176,10 @@ But the timestamp is wrapped in brackets. We need to clean it up.
 
 ```bash
 > kelora -f 'cols:raw_ts level service *message' app.log \
-    --exec 'e.timestamp = e.raw_ts.extract_re(r"\[(.*?)\]", 1)' \
-    --exec 'e.raw_ts = ()' \
+    -e 'e.timestamp = e.raw_ts.extract_re(r"\[(.*?)\]", 1)' \
+    -e 'e.raw_ts = ()' \
     --ts-field timestamp \
-    --keys timestamp,level,service,message
+    -k timestamp,level,service,message
 ```
 
 **What this does:**
@@ -196,9 +196,9 @@ Parse a custom format and add computed fields:
 > cat app.log | \
     kelora -f 'cols:timestamp level service *message' \
     --ts-field timestamp \
-    --exec 'if e.message.contains("ms") { e.duration = e.message.extract_re(r"(\d+)ms", 1).to_int() }' \
+    -e 'if e.message.contains("ms") { e.duration = e.message.extract_re(r"(\d+)ms", 1).to_int() }' \
     --filter 'e.has_path("duration") && e.duration > 1000' \
-    --keys timestamp,service,duration,message
+    -k timestamp,service,duration,message
 ```
 
 **Pipeline:**
@@ -243,13 +243,13 @@ Let's parse a complex custom format with everything we've learned:
 **Parse specification:**
 ```bash
 > kelora -f 'cols:raw_ts status:int service bytes:int latency:float *message' custom_app.log \
-    --exec 'e.timestamp = e.raw_ts.extract_re(r"\[(.*?)\]", 1)' \
-    --exec 'e.raw_ts = ()' \
+    -e 'e.timestamp = e.raw_ts.extract_re(r"\[(.*?)\]", 1)' \
+    -e 'e.raw_ts = ()' \
     --ts-field timestamp \
-    --exec 'e.is_error = e.status >= 400' \
-    --exec 'e.is_slow = e.latency > 0.5' \
+    -e 'e.is_error = e.status >= 400' \
+    -e 'e.is_slow = e.latency > 0.5' \
     --filter 'e.is_error || e.is_slow' \
-    --keys timestamp,status,service,message
+    -k timestamp,status,service,message
 ```
 
 **What happens:**
@@ -264,7 +264,7 @@ Let's parse a complex custom format with everything we've learned:
 ### Pattern 1: Log Level + Message
 
 ```bash
-> kelora -f 'cols:level message' app.log --levels error,warn
+> kelora -f 'cols:level message' app.log -l error,warn
 ```
 
 ### Pattern 2: Timestamp + Level + Service + Message
@@ -280,8 +280,8 @@ Let's parse a complex custom format with everything we've learned:
 ```bash
 > kelora -f 'cols:status:int bytes:int duration:float *path' access.log \
     --filter 'e.status >= 500' \
-    --exec 'track_avg("latency", e.duration)' \
-    --metrics
+    -e 'track_avg("latency", e.duration)' \
+    -m
 ```
 
 ### Pattern 4: Extract and Transform
@@ -289,9 +289,9 @@ Let's parse a complex custom format with everything we've learned:
 ```bash
 > kelora -f 'cols:timestamp level *data' app.log \
     --ts-field timestamp \
-    --exec 'e.values = e.data.split(",")' \
-    --exec 'e.count = e.values.len()' \
-    --keys timestamp,level,count
+    -e 'e.values = e.data.split(",")' \
+    -e 'e.count = e.values.len()' \
+    -k timestamp,level,count
 ```
 
 ## Tips and Best Practices
@@ -317,7 +317,7 @@ Convert types during parsing, not in exec:
 > kelora -f 'cols:status:int bytes:int' --filter 'e.status >= 400'
 
 # Less efficient - convert in exec
-> kelora -f 'cols:status bytes' --exec 'e.status = e.status.to_int()' --filter 'e.status >= 400'
+> kelora -f 'cols:status bytes' -e 'e.status = e.status.to_int()' --filter 'e.status >= 400'
 ```
 
 ### Name Fields Descriptively
@@ -372,10 +372,10 @@ Inline type annotations and strict mode are perfect for catching malformed rows 
 **Solution:** Check separators and column counts:
 ```bash
 # Debug by outputting all fields
-> kelora -f 'cols:field1 field2 *field3' app.log --take 3
+> kelora -f 'cols:field1 field2 *field3' app.log -n 3
 
 # Try different separator
-> kelora -f 'cols:field1 field2 field3' --cols-sep '|' app.log --take 3
+> kelora -f 'cols:field1 field2 field3' --cols-sep '|' app.log -n 3
 ```
 
 ### Timestamp Not Recognized
@@ -395,7 +395,7 @@ Inline type annotations and strict mode are perfect for catching malformed rows 
 
 **Solution:** Use `get_path` with defaults in resilient mode:
 ```bash
-> kelora -f 'cols:status bytes' --exec 'e.status_int = to_int_or(e.status, 0)'
+> kelora -f 'cols:status bytes' -e 'e.status_int = to_int_or(e.status, 0)'
 ```
 
 ### Greedy Field Capturing Too Much

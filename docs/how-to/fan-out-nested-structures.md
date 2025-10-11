@@ -14,10 +14,10 @@ Convert array elements to individual events:
 
 ```bash
 # Fan out users array
-kelora -f json data.jsonl --exec 'emit_each(e.users)'
+kelora -j data.jsonl -e 'emit_each(e.users)'
 
 # Example with actual data
-kelora -f json examples/json_arrays.jsonl --exec 'emit_each(e.users)' --take 5
+kelora -j examples/json_arrays.jsonl -e 'emit_each(e.users)' -n 5
 ```
 
 The original event is suppressed; each array element becomes a new event.
@@ -28,8 +28,8 @@ Preserve context from parent event:
 
 ```bash
 # Add batch_id to each user event
-kelora -f json data.jsonl \
-  --exec 'let base = #{batch_id: e.batch_id, timestamp: e.timestamp};
+kelora -j data.jsonl \
+  -e 'let base = #{batch_id: e.batch_id, timestamp: e.timestamp};
           emit_each(e.users, base)'
 
 # Result: Each user event includes batch_id and timestamp fields
@@ -41,9 +41,9 @@ Fan out nested structures in stages:
 
 ```bash
 # Orders → Items (two-level fan-out)
-kelora -f json examples/fan_out_batches.jsonl \
-  --exec 'let ctx = #{batch_id: e.batch_id}; emit_each(e.orders, ctx)' \
-  --exec 'let order_ctx = #{batch_id: e.batch_id, order_id: e.order_id}; emit_each(e.items, order_ctx)'
+kelora -j examples/fan_out_batches.jsonl \
+  -e 'let ctx = #{batch_id: e.batch_id}; emit_each(e.orders, ctx)' \
+  -e 'let order_ctx = #{batch_id: e.batch_id, order_id: e.order_id}; emit_each(e.items, order_ctx)'
 
 # Now each item is a separate event with batch_id and order_id
 ```
@@ -54,15 +54,15 @@ Process specific elements only:
 
 ```bash
 # Fan out users, then filter by score
-kelora -f json data.jsonl \
-  --exec 'emit_each(e.users)' \
+kelora -j data.jsonl \
+  -e 'emit_each(e.users)' \
   --filter 'e.score > 90'
 
 # Fan out and filter in one pipeline
-kelora -f json data.jsonl \
-  --exec 'emit_each(e.users)' \
+kelora -j data.jsonl \
+  -e 'emit_each(e.users)' \
   --filter 'e.score > 90' \
-  --keys id,name,score
+  -k id,name,score
 ```
 
 ### Count Emitted Events
@@ -71,9 +71,9 @@ Track how many events were created:
 
 ```bash
 # emit_each returns count of emitted events
-kelora -f json data.jsonl \
-  --exec 'e.user_count = emit_each(e.users)' \
-  --exec 'track_sum("total_users", e.user_count)' \
+kelora -j data.jsonl \
+  -e 'e.user_count = emit_each(e.users)' \
+  -e 'track_sum("total_users", e.user_count)' \
   --metrics
 ```
 
@@ -83,13 +83,13 @@ Fan out only when conditions are met:
 
 ```bash
 # Only fan out batches with more than 2 items
-kelora -f json data.jsonl \
+kelora -j data.jsonl \
   --filter 'e.users.len() > 2' \
-  --exec 'emit_each(e.users)'
+  -e 'emit_each(e.users)'
 
 # Fan out high-priority items only
-kelora -f json data.jsonl \
-  --exec 'let high_priority = e.items.filter(|item| item.priority == "high");
+kelora -j data.jsonl \
+  -e 'let high_priority = e.items.filter(|item| item.priority == "high");
           emit_each(high_priority)'
 ```
 
@@ -99,23 +99,23 @@ kelora -f json data.jsonl \
 
 ```bash
 # Batch → Orders → Items (3-level fan-out)
-kelora -f json orders.jsonl \
-  --exec 'let batch = #{batch_id: e.batch_id, created: e.created};
+kelora -j orders.jsonl \
+  -e 'let batch = #{batch_id: e.batch_id, created: e.created};
           emit_each(e.orders, batch)' \
-  --exec 'let order = #{batch_id: e.batch_id, order_id: e.order_id};
+  -e 'let order = #{batch_id: e.batch_id, order_id: e.order_id};
           emit_each(e.items, order)' \
-  --exec 'e.total = e.qty * e.price' \
+  -e 'e.total = e.qty * e.price' \
   --filter 'e.total > 100' \
-  --keys batch_id,order_id,sku,qty,price,total
+  -k batch_id,order_id,sku,qty,price,total
 ```
 
 ### Analyze User Activity
 
 ```bash
 # Fan out user events and track activity types
-kelora -f json activity.jsonl \
-  --exec 'emit_each(e.events)' \
-  --exec 'track_count(e.event_type)' \
+kelora -j activity.jsonl \
+  -e 'emit_each(e.events)' \
+  -e 'track_count(e.event_type)' \
   --metrics
 ```
 
@@ -123,11 +123,11 @@ kelora -f json activity.jsonl \
 
 ```bash
 # Fan out email list and extract domains
-kelora -f json data.jsonl \
-  --exec 'emit_each(e.emails)' \
-  --exec 'e.email = e.line' \
-  --exec 'e.domain = e.email.extract_domain()' \
-  --exec 'track_unique("domains", e.domain)' \
+kelora -j data.jsonl \
+  -e 'emit_each(e.emails)' \
+  -e 'e.email = e.line' \
+  -e 'e.domain = e.email.extract_domain()' \
+  -e 'track_unique("domains", e.domain)' \
   --metrics
 ```
 
@@ -135,23 +135,23 @@ kelora -f json data.jsonl \
 
 ```bash
 # Fan out log arrays with severity filtering
-kelora -f json logs.jsonl \
-  --exec 'let ctx = #{source: e.source, timestamp: e.timestamp};
+kelora -j logs.jsonl \
+  -e 'let ctx = #{source: e.source, timestamp: e.timestamp};
           emit_each(e.logs, ctx)' \
   --filter 'e.level == "error" || e.level == "warn"' \
-  --keys timestamp,source,level,msg
+  -k timestamp,source,level,msg
 ```
 
 ### Transaction Analysis
 
 ```bash
 # Fan out purchases and calculate totals
-kelora -f json transactions.jsonl \
-  --exec 'let tx = #{transaction_id: e.id, user: e.user};
+kelora -j transactions.jsonl \
+  -e 'let tx = #{transaction_id: e.id, user: e.user};
           emit_each(e.purchases, tx)' \
-  --exec 'e.line_total = e.price * e.qty' \
-  --exec 'track_sum("revenue", e.line_total)' \
-  --exec 'track_count(e.item)' \
+  -e 'e.line_total = e.price * e.qty' \
+  -e 'track_sum("revenue", e.line_total)' \
+  -e 'track_count(e.item)' \
   --metrics
 ```
 
@@ -159,23 +159,23 @@ kelora -f json transactions.jsonl \
 
 ```bash
 # Multi-level with filtering at each stage
-kelora -f json examples/fan_out_batches.jsonl \
-  --exec 'emit_each(e.batches)' \
-  --exec 'let batch_ctx = #{batch_name: e.name}; emit_each(e.items, batch_ctx)' \
+kelora -j examples/fan_out_batches.jsonl \
+  -e 'emit_each(e.batches)' \
+  -e 'let batch_ctx = #{batch_name: e.name}; emit_each(e.items, batch_ctx)' \
   --filter 'e.status == "active"' \
   --filter 'e.priority == "high"' \
-  --keys batch_name,id,status,priority
+  -k batch_name,id,status,priority
 ```
 
 ### Aggregate Nested Statistics
 
 ```bash
 # Fan out and calculate per-item statistics
-kelora -f json data.jsonl \
-  --exec 'emit_each(e.items)' \
-  --exec 'track_sum("total_quantity", e.qty)' \
-  --exec 'track_sum("total_revenue", e.price * e.qty)' \
-  --exec 'track_unique("skus", e.sku)' \
+kelora -j data.jsonl \
+  -e 'emit_each(e.items)' \
+  -e 'track_sum("total_quantity", e.qty)' \
+  -e 'track_sum("total_revenue", e.price * e.qty)' \
+  -e 'track_unique("skus", e.sku)' \
   --metrics
 ```
 
@@ -183,10 +183,10 @@ kelora -f json data.jsonl \
 
 ```bash
 # Fan out nested data and export as CSV
-kelora -f json nested.jsonl \
-  --exec 'let parent = #{parent_id: e.id, created: e.timestamp};
+kelora -j nested.jsonl \
+  -e 'let parent = #{parent_id: e.id, created: e.timestamp};
           emit_each(e.children, parent)' \
-  --keys parent_id,created,child_id,name,value \
+  -k parent_id,created,child_id,name,value \
   -F csv > flattened.csv
 ```
 
@@ -196,7 +196,7 @@ kelora -f json nested.jsonl \
 
 ```bash
 # Original event is suppressed after emit_each
-kelora -f json data.jsonl --exec 'emit_each(e.users)'
+kelora -j data.jsonl -e 'emit_each(e.users)'
 # Output: Only user events, not the original batch event
 
 # To keep original + fanned out events, emit before fan-out
@@ -207,9 +207,9 @@ kelora -f json data.jsonl --exec 'emit_each(e.users)'
 
 ```bash
 # Empty arrays emit 0 events
-kelora -f json data.jsonl \
-  --exec 'e.count = emit_each(e.items)' \
-  --exec 'track_count(if e.count == 0 { "empty" } else { "has_items" })'
+kelora -j data.jsonl \
+  -e 'e.count = emit_each(e.items)' \
+  -e 'track_count(if e.count == 0 { "empty" } else { "has_items" })'
 ```
 
 ### Error Handling
@@ -227,7 +227,7 @@ kelora -f json data.jsonl \
 
 ```bash
 # See errors if fan-out fails
-kelora -f json data.jsonl --exec 'emit_each(e.users)' --verbose
+kelora -j data.jsonl -e 'emit_each(e.users)' --verbose
 ```
 
 ## Tips

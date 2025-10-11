@@ -20,7 +20,7 @@ kelora --multiline timestamp app.log
 kelora --multiline 'timestamp:format=%Y-%m-%d %H:%M:%S' app.log
 
 # Example: Process stack traces as single events
-kelora --multiline timestamp examples/multiline_stacktrace.log --take 2
+kelora --multiline timestamp examples/multiline_stacktrace.log -n 2
 ```
 
 When a line starts with a timestamp, it begins a new event. Lines without timestamps are continuation lines that belong to the previous event.
@@ -81,8 +81,8 @@ kelora --multiline all config.json
 ```bash
 # Group Python exceptions
 kelora --multiline 'regex:match=^Traceback|^Exception|^\d{4}-' app.log \
-  --exec 'e.error_type = e.line.extract_re(r"^(\w+Error|Exception)", 1)' \
-  --exec 'track_count(e.error_type)' \
+  -e 'e.error_type = e.line.extract_re(r"^(\w+Error|Exception)", 1)' \
+  -e 'track_count(e.error_type)' \
   --metrics
 ```
 
@@ -92,7 +92,7 @@ kelora --multiline 'regex:match=^Traceback|^Exception|^\d{4}-' app.log \
 # Group Java stack traces (look for timestamps or exception class names)
 kelora --multiline 'regex:match=^\d{4}-\d{2}-\d{2}|^[a-z]+\.\w+\.Exception' app.log \
   --filter 'e.line.contains("Exception")' \
-  --exec 'e.exception = e.line.extract_re(r"(\w+Exception)", 1)'
+  -e 'e.exception = e.line.extract_re(r"(\w+Exception)", 1)'
 ```
 
 ### HTTP Request/Response Logs
@@ -100,8 +100,8 @@ kelora --multiline 'regex:match=^\d{4}-\d{2}-\d{2}|^[a-z]+\.\w+\.Exception' app.
 ```bash
 # Group multi-line HTTP logs
 kelora --multiline 'regex:match=^> Request|^< Response' http.log \
-  --exec 'e.is_request = e.line.starts_with("> Request")' \
-  --exec 'e.status = e.line.extract_re(r"HTTP/\d\.\d (\d+)", 1)'
+  -e 'e.is_request = e.line.starts_with("> Request")' \
+  -e 'e.status = e.line.extract_re(r"HTTP/\d\.\d (\d+)", 1)'
 ```
 
 ### JSON Arrays in Logs
@@ -109,7 +109,7 @@ kelora --multiline 'regex:match=^> Request|^< Response' http.log \
 ```bash
 # Process logs with embedded multi-line JSON
 kelora --multiline timestamp examples/multiline_json_arrays.log \
-  --exec 'let json_match = e.line.extract_re(r"\{.*\}", 0);
+  -e 'let json_match = e.line.extract_re(r"\{.*\}", 0);
           if json_match != "" {
             e.data = json_match.parse_json()
           }'
@@ -127,11 +127,11 @@ kelora --multiline 'regex:match=^[^\s]' app.log  # New event if NOT starting wit
 ```bash
 kelora --multiline timestamp app.log \
   --filter 'e.line.contains("Traceback") || e.line.contains("Exception")' \
-  --exec 'e.file = e.line.extract_re(r"File \"([^\"]+)\"", 1)' \
-  --exec 'e.line_no = e.line.extract_re(r"line (\d+)", 1)' \
-  --exec 'e.function = e.line.extract_re(r"in (\w+)", 1)' \
-  --exec 'track_unique("error_files", e.file)' \
-  --keys timestamp,file,line_no,function --metrics
+  -e 'e.file = e.line.extract_re(r"File \"([^\"]+)\"", 1)' \
+  -e 'e.line_no = e.line.extract_re(r"line (\d+)", 1)' \
+  -e 'e.function = e.line.extract_re(r"in (\w+)", 1)' \
+  -e 'track_unique("error_files", e.file)' \
+  -k timestamp,file,line_no,function --metrics
 ```
 
 ### Filter Complete Stack Traces
@@ -140,7 +140,7 @@ kelora --multiline timestamp app.log \
 # Find errors with specific patterns in full trace
 kelora --multiline timestamp app.log \
   --filter 'e.line.contains("DatabaseError")' \
-  --exec 'e.has_timeout = e.line.contains("timeout")' \
+  -e 'e.has_timeout = e.line.contains("timeout")' \
   --filter 'e.has_timeout'
 ```
 
@@ -148,9 +148,9 @@ kelora --multiline timestamp app.log \
 
 ```bash
 kelora --multiline 'regex:match=^\d{4}-|\w+Error:|Exception:' app.log \
-  --exec 'e.exception_type = e.line.extract_re(r"(\w+(?:Error|Exception))", 1)' \
+  -e 'e.exception_type = e.line.extract_re(r"(\w+(?:Error|Exception))", 1)' \
   --filter 'e.exception_type != ""' \
-  --exec 'track_count(e.exception_type)' \
+  -e 'track_count(e.exception_type)' \
   --metrics
 ```
 
@@ -160,8 +160,8 @@ kelora --multiline 'regex:match=^\d{4}-|\w+Error:|Exception:' app.log \
 # Get timestamp and full stack trace
 kelora --multiline timestamp app.log \
   --filter 'e.line.contains("ERROR")' \
-  --exec 'e.timestamp = e.line.extract_re(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", 1)' \
-  --exec 'e.trace_length = e.line.split("\n").len()' \
+  -e 'e.timestamp = e.line.extract_re(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", 1)' \
+  -e 'e.trace_length = e.line.split("\n").len()' \
   --filter 'e.trace_length > 5'  # Only substantial traces
 ```
 

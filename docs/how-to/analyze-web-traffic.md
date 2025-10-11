@@ -13,7 +13,7 @@ You have Apache or Nginx access logs and need to find slow requests, 4xx/5xx err
 Parse Apache/Nginx combined format logs:
 
 ```bash
-> kelora -f combined /var/log/nginx/access.log --take 5
+> kelora -f combined /var/log/nginx/access.log -n 5
 ```
 
 The combined format includes: `ip`, `timestamp`, `request`, `method`, `path`, `protocol`, `status`, `bytes`, `referer`, `user_agent`, and optionally `request_time`.
@@ -23,7 +23,7 @@ The combined format includes: `ip`, `timestamp`, `request`, `method`, `path`, `p
 ```bash
 > kelora -f combined /var/log/nginx/access.log \
     --filter 'e.status >= 500' \
-    --keys ip,timestamp,status,request
+    -k ip,timestamp,status,request
 ```
 
 ### Find Client Errors (4xx)
@@ -31,7 +31,7 @@ The combined format includes: `ip`, `timestamp`, `request`, `method`, `path`, `p
 ```bash
 > kelora -f combined /var/log/nginx/access.log \
     --filter 'e.status >= 400 && e.status < 500' \
-    --keys ip,timestamp,status,request
+    -k ip,timestamp,status,request
 ```
 
 ### Find Slow Requests
@@ -41,7 +41,7 @@ For Nginx logs with `request_time`:
 ```bash
 > kelora -f combined /var/log/nginx/access.log \
     --filter 'e.get_path("request_time", "0").to_float() > 1.0' \
-    --keys ip,request,request_time,status
+    -k ip,request,request_time,status
 ```
 
 ### Traffic by Status Code
@@ -50,7 +50,7 @@ Count requests by status code:
 
 ```bash
 > kelora -f combined /var/log/nginx/access.log \
-    --exec 'track_count(e.status)' \
+    -e 'track_count(e.status)' \
     --metrics
 ```
 
@@ -58,7 +58,7 @@ Count requests by status code:
 
 ```bash
 > kelora -f combined /var/log/nginx/access.log \
-    --exec 'track_count(e.ip)' \
+    -e 'track_count(e.ip)' \
     --metrics
 ```
 
@@ -67,7 +67,7 @@ Count requests by status code:
 ```bash
 > kelora -f combined /var/log/nginx/access.log \
     --filter 'e.path.contains("/api/")' \
-    --exec 'track_count(e.path)' \
+    -e 'track_count(e.path)' \
     --metrics
 ```
 
@@ -78,18 +78,18 @@ Look for unusual patterns:
 ```bash
 # High request rates from single IP
 > kelora -f combined /var/log/nginx/access.log \
-    --exec 'track_count(e.ip)' \
+    -e 'track_count(e.ip)' \
     --metrics
 
 # POST requests to unusual paths
 > kelora -f combined /var/log/nginx/access.log \
     --filter 'e.method == "POST" && !e.path.starts_with("/api/")' \
-    --keys ip,timestamp,method,path
+    -k ip,timestamp,method,path
 
 # Large response sizes
 > kelora -f combined /var/log/nginx/access.log \
     --filter 'e.get_path("bytes", "0").to_int() > 10000000' \
-    --keys ip,path,bytes,timestamp
+    -k ip,path,bytes,timestamp
 ```
 
 ### Time-Based Analysis
@@ -106,7 +106,7 @@ Analyze traffic in specific time windows:
 > kelora -f combined /var/log/nginx/access.log \
     --since "2024-01-15 09:00:00" \
     --until "2024-01-15 17:00:00" \
-    --exec 'track_count(e.status)' \
+    -e 'track_count(e.status)' \
     --metrics
 ```
 
@@ -116,7 +116,7 @@ Calculate performance metrics for Nginx logs with `request_time`:
 
 ```bash
 > kelora -f combined /var/log/nginx/access.log \
-    --exec 'track_bucket("latency", floor(e.get_path("request_time", "0").to_float() * 1000 / 100) * 100)' \
+    -e 'track_bucket("latency", floor(e.get_path("request_time", "0").to_float() * 1000 / 100) * 100)' \
     --metrics
 ```
 
@@ -127,9 +127,9 @@ Calculate performance metrics for Nginx logs with `request_time`:
 ```bash
 > kelora -f combined /var/log/nginx/access.log* \
     --filter 'e.status >= 400' \
-    --exec 'e.hour = e.timestamp.extract_re(r"(\d{2}):\d{2}:\d{2}", 1)' \
-    --exec 'track_count(e.hour)' \
-    --exec 'track_count(e.status)' \
+    -e 'e.hour = e.timestamp.extract_re(r"(\d{2}):\d{2}:\d{2}", 1)' \
+    -e 'track_count(e.hour)' \
+    -e 'track_count(e.status)' \
     --metrics
 ```
 
@@ -138,9 +138,9 @@ Calculate performance metrics for Nginx logs with `request_time`:
 ```bash
 > kelora -f combined /var/log/nginx/access.log \
     --filter 'e.path.starts_with("/api/")' \
-    --exec 'e.endpoint = e.path.extract_re(r"(/api/[^/]+)", 1)' \
-    --exec 'track_count(e.endpoint)' \
-    --exec 'track_avg(e.endpoint, e.get_path("request_time", "0").to_float())' \
+    -e 'e.endpoint = e.path.extract_re(r"(/api/[^/]+)", 1)' \
+    -e 'track_count(e.endpoint)' \
+    -e 'track_avg(e.endpoint, e.get_path("request_time", "0").to_float())' \
     --metrics
 ```
 
@@ -149,8 +149,8 @@ Calculate performance metrics for Nginx logs with `request_time`:
 ```bash
 > kelora -f combined /var/log/nginx/access.log \
     --filter 'e.user_agent.contains("bot") || e.user_agent.contains("crawler")' \
-    --exec 'track_count(e.user_agent)' \
-    --keys ip,user_agent,path \
+    -e 'track_count(e.user_agent)' \
+    -k ip,user_agent,path \
     --metrics
 ```
 
@@ -161,8 +161,8 @@ Find where traffic is coming from:
 ```bash
 > kelora -f combined /var/log/nginx/access.log \
     --filter 'e.referer != "-" && !e.referer.contains("yourdomain.com")' \
-    --exec 'e.domain = e.referer.extract_domain()' \
-    --exec 'track_count(e.domain)' \
+    -e 'e.domain = e.referer.extract_domain()' \
+    -e 'track_count(e.domain)' \
     --metrics
 ```
 
@@ -171,8 +171,8 @@ Find where traffic is coming from:
 ```bash
 > kelora -f combined /var/log/nginx/access.log \
     --filter 'e.path.contains("/login") && e.status == 401' \
-    --exec 'track_count(e.ip)' \
-    --keys timestamp,ip,path,status \
+    -e 'track_count(e.ip)' \
+    -k timestamp,ip,path,status \
     --metrics
 ```
 
@@ -180,8 +180,8 @@ Find where traffic is coming from:
 
 ```bash
 > kelora -f combined /var/log/nginx/access.log \
-    --exec 'e.size_kb = floor(e.get_path("bytes", "0").to_int() / 1024)' \
-    --exec 'track_bucket("response_size_kb", e.size_kb)' \
+    -e 'e.size_kb = floor(e.get_path("bytes", "0").to_int() / 1024)' \
+    -e 'track_bucket("response_size_kb", e.size_kb)' \
     --metrics
 ```
 
@@ -191,7 +191,7 @@ Find where traffic is coming from:
 
 ```bash
 > kelora -f combined /var/log/nginx/access.log \
-    --keys ip,timestamp,status,bytes,request \
+    -k ip,timestamp,status,bytes,request \
     -F csv > access.csv
 ```
 
@@ -200,7 +200,7 @@ Find where traffic is coming from:
 ```bash
 > kelora -f combined /var/log/nginx/access.log \
     --filter 'e.status >= 400' \
-    -F json > errors.json
+    -J > errors.json
 ```
 
 ## Performance Tips
@@ -213,7 +213,7 @@ Find where traffic is coming from:
     --filter 'e.status >= 500'
 
 # Limit output
-> kelora -f combined access.log --take 1000
+> kelora -f combined access.log -n 1000
 ```
 
 **Gzipped Archives:**
@@ -227,7 +227,7 @@ Find where traffic is coming from:
 ```bash
 # Process all access logs
 > kelora -f combined /var/log/nginx/access.log* \
-    --exec 'track_count(e.status)' \
+    -e 'track_count(e.status)' \
     --metrics
 ```
 
@@ -237,30 +237,30 @@ Find where traffic is coming from:
 ```bash
 > kelora -f combined access.log \
     --filter 'e.status >= 400' \
-    --exec 'track_count(e.ip)' \
+    -e 'track_count(e.ip)' \
     --metrics
 ```
 
 **Hourly request distribution:**
 ```bash
 > kelora -f combined access.log \
-    --exec 'e.hour = e.timestamp.extract_re(r"(\d{2}):\d{2}:\d{2}", 1)' \
-    --exec 'track_count(e.hour)' \
+    -e 'e.hour = e.timestamp.extract_re(r"(\d{2}):\d{2}:\d{2}", 1)' \
+    -e 'track_count(e.hour)' \
     --metrics
 ```
 
 **Method distribution:**
 ```bash
 > kelora -f combined access.log \
-    --exec 'track_count(e.method)' \
+    -e 'track_count(e.method)' \
     --metrics
 ```
 
 **Status code summary:**
 ```bash
 > kelora -f combined access.log \
-    --exec 'e.status_class = floor(e.status / 100) + "xx"' \
-    --exec 'track_count(e.status_class)' \
+    -e 'e.status_class = floor(e.status / 100) + "xx"' \
+    -e 'track_count(e.status_class)' \
     --metrics
 ```
 

@@ -14,13 +14,13 @@ Filter by log level using `--levels`:
 
 ```bash
 # JSON logs
-kelora -f json app.log --levels error
+kelora -j app.log -l error
 
 # Logfmt logs
-kelora -f logfmt service.log --levels error,critical
+kelora -f logfmt service.log -l error,critical
 
 # Multiple levels (error, warn, critical)
-kelora -f json app.log --levels warn,error
+kelora -j app.log -l warn,error
 ```
 
 ### Errors from Specific Time Range
@@ -29,15 +29,15 @@ Combine level filtering with time bounds:
 
 ```bash
 # Errors from the last hour
-kelora -f json app.log --levels error --since "1 hour ago"
+kelora -j app.log -l error --since "1 hour ago"
 
 # Errors in specific date range
-kelora -f json app.log --levels error \
+kelora -j app.log -l error \
   --since "2024-01-15 09:00:00" \
   --until "2024-01-15 17:00:00"
 
 # Today's errors only
-kelora -f json app.log --levels error --since "today"
+kelora -j app.log -l error --since "today"
 ```
 
 ### Errors from Specific Services
@@ -46,15 +46,15 @@ Use `--filter` for fine-grained control:
 
 ```bash
 # Errors from database service only
-kelora -f json app.log --levels error \
+kelora -j app.log -l error \
   --filter 'e.service == "database"'
 
 # Errors matching specific pattern
-kelora -f json app.log --levels error \
+kelora -j app.log -l error \
   --filter 'e.message.contains("timeout")'
 
 # Errors with high severity
-kelora -f json app.log --levels error \
+kelora -j app.log -l error \
   --filter 'e.get_path("severity", 0) >= 8'
 ```
 
@@ -64,13 +64,13 @@ Show surrounding events for context (like `grep -A/-B/-C`):
 
 ```bash
 # Show 2 lines after each error
-kelora -f json app.log --levels error --after-context 2
+kelora -j app.log -l error --after-context 2
 
 # Show 1 line before each error
-kelora -f json app.log --levels error --before-context 1
+kelora -j app.log -l error --before-context 1
 
 # Show 2 lines before and after each error
-kelora -f json app.log --levels error \
+kelora -j app.log -l error \
   --before-context 2 --after-context 2
 ```
 
@@ -80,13 +80,13 @@ Focus on relevant information:
 
 ```bash
 # Show only timestamp, service, and message
-kelora -f json app.log --levels error \
-  --keys timestamp,service,message
+kelora -j app.log -l error \
+  -k timestamp,service,message
 
 # Include error code if present
-kelora -f json app.log --levels error \
-  --exec 'e.error_code = e.get_path("error.code", "unknown")' \
-  --keys timestamp,service,error_code,message
+kelora -j app.log -l error \
+  -e 'e.error_code = e.get_path("error.code", "unknown")' \
+  -k timestamp,service,error_code,message
 ```
 
 ### Multiple Files
@@ -95,13 +95,13 @@ Search across many log files:
 
 ```bash
 # All logs in directory
-kelora -f json logs/*.jsonl --levels error
+kelora -j logs/*.jsonl -l error
 
 # Recursive search with find
-find /var/log -name "*.log" -exec kelora -f auto {} --levels error \;
+find /var/log -name "*.log" -exec kelora -f auto {} -l error \;
 
 # Gzipped archives
-kelora -f json logs/2024-01-*.log.gz --levels error
+kelora -j logs/2024-01-*.log.gz -l error
 ```
 
 ### Extract Error Patterns
@@ -110,13 +110,13 @@ Identify error codes and patterns:
 
 ```bash
 # Extract error codes using regex
-kelora -f json app.log --levels error \
-  --exec 'e.error_code = e.message.extract_re(r"ERR-(\d+)", 1)' \
-  --keys timestamp,error_code,message
+kelora -j app.log -l error \
+  -e 'e.error_code = e.message.extract_re(r"ERR-(\d+)", 1)' \
+  -k timestamp,error_code,message
 
 # Count error types
-kelora -f json app.log --levels error \
-  --exec 'track_count(e.get_path("error.type", "unknown"))' \
+kelora -j app.log -l error \
+  -e 'track_count(e.get_path("error.type", "unknown"))' \
   --metrics
 ```
 
@@ -126,11 +126,11 @@ Export errors for further analysis:
 
 ```bash
 # JSON output
-kelora -f logfmt app.log --levels error -F json > errors.json
+kelora -f logfmt app.log -l error -J > errors.json
 
 # CSV for spreadsheets
-kelora -f json app.log --levels error \
-  --keys timestamp,service,message -F csv > errors.csv
+kelora -j app.log -l error \
+  -k timestamp,service,message -F csv > errors.csv
 ```
 
 ## Real-World Examples
@@ -138,9 +138,9 @@ kelora -f json app.log --levels error \
 ### Find Database Errors
 
 ```bash
-kelora -f json db.log --levels error \
+kelora -j db.log -l error \
   --filter 'e.message.contains("deadlock") || e.message.contains("constraint")' \
-  --keys timestamp,query,error_message
+  -k timestamp,query,error_message
 ```
 
 ### API Errors with Status Codes
@@ -148,13 +148,13 @@ kelora -f json db.log --levels error \
 ```bash
 kelora -f combined /var/log/nginx/access.log \
   --filter 'e.status >= 500' \
-  --keys ip,timestamp,status,request,user_agent
+  -k ip,timestamp,status,request,user_agent
 ```
 
 ### Application Crashes
 
 ```bash
-kelora -f json app.log --levels error,critical \
+kelora -j app.log -l error,critical \
   --filter 'e.message.contains("panic") || e.message.contains("fatal")' \
   --before-context 5 --after-context 2
 ```
@@ -162,9 +162,9 @@ kelora -f json app.log --levels error,critical \
 ### Errors by Hour
 
 ```bash
-kelora -f json app.log --levels error \
-  --exec 'e.hour = e.timestamp.format("%Y-%m-%d %H:00")' \
-  --exec 'track_count(e.hour)' \
+kelora -j app.log -l error \
+  -e 'e.hour = e.timestamp.format("%Y-%m-%d %H:00")' \
+  -e 'track_count(e.hour)' \
   --metrics
 ```
 
@@ -185,7 +185,7 @@ kelora -f json app.log --levels error \
 **Automation:**
 ```bash
 # Alert on errors (exit code 0 = no errors, 1 = has errors)
-if kelora -q -f json app.log --levels error --since "5 minutes ago"; then
+if kelora -q -f json app.log -l error --since "5 minutes ago"; then
     echo "No errors found"
 else
     echo "Errors detected!" | mail -s "Alert" admin@example.com

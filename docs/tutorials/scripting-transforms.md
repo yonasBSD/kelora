@@ -23,10 +23,10 @@ into your own pipelines.
 Start with `examples/errors_exec_transform.jsonl`, which includes messy values.
 
 ```bash exec="on" source="above" result="ansi"
-kelora -f json examples/errors_exec_transform.jsonl \
-  --exec 'e.status_code = to_int_or(e.status, -1)' \
-  --exec 'e.bytes_int = to_int_or(e.bytes, 0)' \
-  -F json --take 3
+kelora -j examples/errors_exec_transform.jsonl \
+  -e 'e.status_code = to_int_or(e.status, -1)' \
+  -e 'e.bytes_int = to_int_or(e.bytes, 0)' \
+  -J -n 3
 ```
 
 `to_int_or(value, fallback)` converts strings to integers and substitutes the
@@ -39,11 +39,11 @@ Use the normalized values to add severity classification, then keep only error
 events.
 
 ```bash exec="on" source="above" result="ansi"
-kelora -f json examples/errors_exec_transform.jsonl \
-  --exec 'e.status_code = to_int_or(e.status, -1)' \
-  --exec 'e.severity = if e.status_code >= 500 { "critical" } else if e.status_code >= 400 { "error" } else { "ok" }' \
+kelora -j examples/errors_exec_transform.jsonl \
+  -e 'e.status_code = to_int_or(e.status, -1)' \
+  -e 'e.severity = if e.status_code >= 500 { "critical" } else if e.status_code >= 400 { "error" } else { "ok" }' \
   --filter 'e.severity != "ok"' \
-  --keys timestamp,status_code,severity \
+  -k timestamp,status_code,severity \
   -F json
 ```
 
@@ -54,15 +54,15 @@ available to later filters or transformations.
 
 ```bash exec="on" source="above" result="ansi"
 kelora -f combined examples/web_access_large.log.gz \
-  --exec 'let status = to_int_or(e.status, 0); if status >= 500 { e.family = "server_error"; } else if status >= 400 { e.family = "client_error"; } else { e.family = "ok"; }'
+  -e 'let status = to_int_or(e.status, 0); if status >= 500 { e.family = "server_error"; } else if status >= 400 { e.family = "client_error"; } else { e.family = "ok"; }'
 ```
 
 ### Pseudonymise Sensitive Attributes
 
 ```bash exec="on" source="above" result="ansi"
-kelora -f json examples/security_audit.jsonl \
-  --exec 'e.user_alias = pseudonym(e.user, "users"); e.ip_masked = e.ip.mask_ip(1)' \
-  --keys timestamp,event,user_alias,ip_masked
+kelora -j examples/security_audit.jsonl \
+  -e 'e.user_alias = pseudonym(e.user, "users"); e.ip_masked = e.ip.mask_ip(1)' \
+  -k timestamp,event,user_alias,ip_masked
 ```
 
 ## Step 3 – Guard Against Bad Data
@@ -72,8 +72,8 @@ processing continues. Still, it is better to guard the data and drop malformed
 records explicitly.
 
 ```bash exec="on" source="above" result="ansi"
-kelora -f json examples/errors_exec_transform.jsonl \
-  --exec 'if !("tags" in e) || type_of(e.tags) != "array" { e = () } else { e.tag_count = e.tags.len(); }' \
+kelora -j examples/errors_exec_transform.jsonl \
+  -e 'if !("tags" in e) || type_of(e.tags) != "array" { e = () } else { e.tag_count = e.tags.len(); }' \
   -F json
 ```
 
@@ -91,12 +91,12 @@ errors when the `tags` field contains a string instead of an array.
 orders fixture demonstrates nested arrays that you can flatten in two stages.
 
 ```bash exec="on" source="above" result="ansi"
-kelora -f json examples/fan_out_batches.jsonl \
-  --exec 'if e.has_path("orders") { emit_each(e.orders, #{batch_id: e.batch_id, created: e.created}) }' \
-  --exec 'if e.has_path("items") { emit_each(e.items, #{batch_id: e.batch_id, order_id: e.order_id}) }' \
+kelora -j examples/fan_out_batches.jsonl \
+  -e 'if e.has_path("orders") { emit_each(e.orders, #{batch_id: e.batch_id, created: e.created}) }' \
+  -e 'if e.has_path("items") { emit_each(e.items, #{batch_id: e.batch_id, order_id: e.order_id}) }' \
   --filter 'e.has_path("sku")' \
-  --keys batch_id,order_id,sku,qty,price \
-  -F json --take 4
+  -k batch_id,order_id,sku,qty,price \
+  -J -n 4
 ```
 
 The first exec fans out orders while copying batch metadata. The second exec
@@ -113,16 +113,16 @@ order identifiers.
 Enable the sliding window to compare the current event to recent history.
 
 ```bash exec="on" source="above" result="ansi"
-kelora -f json examples/window_metrics.jsonl \
+kelora -j examples/window_metrics.jsonl \
   --filter 'e.metric == "cpu"' \
   --window 3 \
-  --exec $'let values = window_numbers(window, "value");
+  -e $'let values = window_numbers(window, "value");
 if values.len() >= 2 {
     let diff = values[0] - values[1];
     e.delta_vs_prev = round(diff * 100.0) / 100.0;
 }' \
-  --keys timestamp,value,delta_vs_prev \
-  -F json --take 5
+  -k timestamp,value,delta_vs_prev \
+  -J -n 5
 ```
 
 `window` holds the current event plus the previous `N` events (here `N = 3`).
@@ -150,18 +150,18 @@ fn classify_status(status) {
 }
 RHAI
 
-kelora -f json examples/errors_exec_transform.jsonl \
+kelora -j examples/errors_exec_transform.jsonl \
   -I classifiers.rhai \
-  --exec 'e.severity = classify_status(e.status)' \
-  --keys timestamp,status,severity \
-  -F json --take 3
+  -e 'e.severity = classify_status(e.status)' \
+  -k timestamp,status,severity \
+  -J -n 3
 rm classifiers.rhai
 ```
 
 You can also move long exec blocks to a dedicated Rhai file:
 
 ```bash
-kelora -f json app.jsonl --exec-file transforms.rhai
+kelora -j app.jsonl --exec-file transforms.rhai
 ```
 
 Put shared helpers under `scripts/` or `dev/` and version them alongside your

@@ -14,10 +14,10 @@ Parse CSV files with automatic header detection:
 
 ```bash
 # Parse CSV with headers
-kelora -f csv data.csv --take 5
+kelora -f csv data.csv -n 5
 
 # Parse TSV (tab-separated)
-kelora -f tsv data.tsv --take 5
+kelora -f tsv data.tsv -n 5
 ```
 
 ### CSV with Type Annotations
@@ -29,7 +29,7 @@ Specify field types for proper numeric handling:
 kelora -f 'csv status:int bytes:int duration:float' data.csv
 
 # Example with typed CSV
-kelora -f 'csv status:int bytes:int duration:int' examples/csv_typed.csv --take 3
+kelora -f 'csv status:int bytes:int duration:int' examples/csv_typed.csv -n 3
 ```
 
 Type annotations enable:
@@ -47,7 +47,7 @@ Process CSV files without header rows:
 kelora -f csvnh data.csv
 
 # Access by index: _1, _2, _3, etc.
-kelora -f csvnh data.csv --exec 'e.timestamp = e._1; e.status = e._2.to_int()'
+kelora -f csvnh data.csv -e 'e.timestamp = e._1; e.status = e._2.to_int()'
 
 # TSV without headers
 kelora -f tsvnh data.tsv
@@ -78,17 +78,17 @@ Calculate statistics across rows:
 ```bash
 # Count by status code
 kelora -f 'csv status:int' data.csv \
-  --exec 'track_count(e.status)' \
+  -e 'track_count(e.status)' \
   --metrics
 
 # Sum bytes transferred
 kelora -f 'csv bytes:int' data.csv \
-  --exec 'track_sum("total_bytes", e.bytes)' \
+  -e 'track_sum("total_bytes", e.bytes)' \
   --metrics
 
 # Track unique values
 kelora -f csv data.csv \
-  --exec 'track_unique("methods", e.method)' \
+  -e 'track_unique("methods", e.method)' \
   --metrics
 ```
 
@@ -99,16 +99,16 @@ Create new fields or modify existing ones:
 ```bash
 # Calculate derived fields
 kelora -f 'csv bytes:int duration:int' data.csv \
-  --exec 'e.throughput = e.bytes / e.duration'
+  -e 'e.throughput = e.bytes / e.duration'
 
 # Normalize timestamps
 kelora -f csv data.csv \
-  --exec 'e.hour = to_datetime(e.timestamp).hour()'
+  -e 'e.hour = to_datetime(e.timestamp).hour()'
 
 # Extract path components
 kelora -f csv data.csv \
-  --exec 'e.endpoint = e.path.split("/")[1]' \
-  --exec 'track_count(e.endpoint)' \
+  -e 'e.endpoint = e.path.split("/")[1]' \
+  -e 'track_count(e.endpoint)' \
   --metrics
 ```
 
@@ -116,13 +116,13 @@ kelora -f csv data.csv \
 
 ```bash
 # CSV to JSON
-kelora -f csv data.csv -F json > output.json
+kelora -f csv data.csv -J > output.json
 
 # CSV to logfmt
 kelora -f csv data.csv -F logfmt > output.log
 
 # CSV to JSON with selected fields
-kelora -f csv data.csv --keys timestamp,status,bytes -F json
+kelora -f csv data.csv -k timestamp,status,bytes -F json
 ```
 
 ### Handle Ragged/Malformed CSV
@@ -146,13 +146,13 @@ Output only desired fields:
 
 ```bash
 # Select specific fields
-kelora -f csv data.csv --keys timestamp,method,status
+kelora -f csv data.csv -k timestamp,method,status
 
 # Exclude sensitive fields
 kelora -f csv data.csv --exclude-keys email,ip_address
 
 # Reorder fields in output
-kelora -f csv data.csv --keys status,method,path -F csv
+kelora -f csv data.csv -k status,method,path -F csv
 ```
 
 ## Real-World Examples
@@ -162,8 +162,8 @@ kelora -f csv data.csv --keys status,method,path -F csv
 ```bash
 kelora -f 'csv path method status:int duration:int' api_log.csv \
   --filter 'e.duration > 1000' \
-  --exec 'track_count(e.path)' \
-  --keys path,method,duration --metrics
+  -e 'track_count(e.path)' \
+  -k path,method,duration --metrics
 ```
 
 ### Calculate Response Time Percentiles
@@ -183,15 +183,15 @@ kelora -f 'csv duration:int' data.csv \
 ```bash
 kelora -f 'csv status:int' data.csv \
   --filter 'e.status >= 500' \
-  -F json > errors.json
+  -J > errors.json
 ```
 
 ### Group by Time Windows
 
 ```bash
 kelora -f csv data.csv \
-  --exec 'e.hour = to_datetime(e.timestamp).format("%Y-%m-%d %H:00")' \
-  --exec 'track_count(e.hour)' \
+  -e 'e.hour = to_datetime(e.timestamp).format("%Y-%m-%d %H:00")' \
+  -e 'track_count(e.hour)' \
   --metrics
 ```
 
@@ -199,9 +199,9 @@ kelora -f csv data.csv \
 
 ```bash
 kelora -f csv raw_data.csv \
-  --exec 'e.email = e.email.to_lower().strip()' \
-  --exec 'e.status = to_int_or(e.status, 0)' \
-  --exec 'e.timestamp = to_datetime(e.timestamp).to_iso()' \
+  -e 'e.email = e.email.to_lower().strip()' \
+  -e 'e.status = to_int_or(e.status, 0)' \
+  -e 'e.timestamp = to_datetime(e.timestamp).to_iso()' \
   -F csv > cleaned.csv
 ```
 
