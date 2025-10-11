@@ -66,7 +66,7 @@ docs-serve:
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
     uvx --with mkdocs-material --with mike --with markdown-exec mkdocs serve
 
-# Build documentation
+# Build documentation (for local testing)
 docs-build:
     cargo build --release
     mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools
@@ -75,29 +75,3 @@ docs-build:
     UV_DATA_DIR={{justfile_directory()}}/.uv/data \
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
     uvx --with mkdocs-material --with mike --with markdown-exec mkdocs build
-
-# Deploy dev documentation
-docs-deploy-dev:
-    cargo build --release
-    mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools
-    PATH="{{justfile_directory()}}/target/release:${PATH}" \
-    UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
-    UV_DATA_DIR={{justfile_directory()}}/.uv/data \
-    UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
-    uvx --with mkdocs-material --with mike --with markdown-exec mike deploy dev --push
-
-# Set default documentation version
-docs-set-default version:
-    mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools
-    UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
-    UV_DATA_DIR={{justfile_directory()}}/.uv/data \
-    UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
-    uvx --with mkdocs-material --with mike --with markdown-exec mike set-default {{version}}
-
-# Deploy release documentation (requires version tag)
-docs-deploy-release version:
-    mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools
-    UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
-    UV_DATA_DIR={{justfile_directory()}}/.uv/data \
-    UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
-    uvx --with mkdocs-material --with mike --with markdown-exec mike deploy --update-aliases {{version}} latest --push
