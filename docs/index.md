@@ -84,10 +84,10 @@ Run `kelora --help` for comprehensive CLI docs, or `kelora --help-functions` for
 
 Kelora focuses on normalising noisy logs. Pair it with complementary CLI tools when you need deeper analysis:
 
-- **jq/jaq** — slice JSONL output for downstream scripts or human-readable TSV
-- **qsv** — crunch CSV exports with lightning-fast aggregations
-- **DuckDB/sqlite** — query exported data with SQL for complex analysis
-- **miller** — reshape and aggregate tabular data
+- **[jq](https://jqlang.github.io/jq/)** — slice JSONL output for downstream scripts or human-readable TSV
+- **[qsv](https://github.com/jqnatividad/qsv)** — crunch CSV exports with lightning-fast aggregations
+- **[SQLite](https://www.sqlite.org/)/[DuckDB](https://duckdb.org/)** — query exported data with SQL for complex analysis
+- **[miller](https://github.com/johnkerl/miller)** — reshape and aggregate tabular data
 
 ## Need Help?
 
