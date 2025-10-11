@@ -37,7 +37,14 @@ kelora -f json examples/simple_json.jsonl \
   --take 3
 ```
 
-The `--keys` flag limits output to specified top-level fields.
+The `--keys` flag limits output to specified top-level fields. Use `--brief` to show only values:
+
+```bash exec="on" source="above" result="ansi"
+kelora -f json examples/simple_json.jsonl \
+  --keys timestamp,service,message \
+  --brief \
+  --take 3
+```
 
 ## Step 4: Filter with Custom Logic
 
@@ -77,32 +84,32 @@ kelora -f json examples/simple_json.jsonl \
 
 The `track_count()` function increments a counter for each unique value. The `-F none` flag suppresses event output, and `--metrics` displays the accumulated counts.
 
-## Step 7: Parse Other Formats
+## Step 7: Convert Between Formats
 
-Kelora supports many formats out of the box:
+Kelora can convert logs from any input format to any output format:
 
-### Logfmt
+### Syslog to JSON
 
 ```bash exec="on" source="above" result="ansi"
-kelora -f logfmt examples/simple_logfmt.log --levels error
+kelora -f syslog examples/simple_syslog.log -F json --take 3
 ```
 
-### Apache/Nginx Access Logs
+### Logfmt to JSON
+
+```bash exec="on" source="above" result="ansi"
+kelora -f logfmt examples/simple_logfmt.log -F json --take 3
+```
+
+### Apache/Nginx Logs to CSV
 
 ```bash exec="on" source="above" result="ansi"
 kelora -f combined examples/web_access_large.log.gz \
-  --filter 'e.status >= 400' \
+  -F csv \
   --keys ip,status,request \
   --take 3
 ```
 
-### CSV
-
-```bash exec="on" source="above" result="ansi"
-kelora -f csv examples/simple_csv.csv \
-  --keys method,path,status \
-  --take 5
-```
+The `-f` flag specifies input format, `-F` specifies output format. Kelora normalizes all formats to a common event structure.
 
 ## Common Patterns
 
@@ -136,14 +143,6 @@ Process multiple files in sequence:
 
 ```bash
 > kelora -f json logs/*.jsonl --levels error
-```
-
-### Output to JSON
-
-Change the output format:
-
-```bash
-> kelora -f logfmt examples/simple_logfmt.log -F json
 ```
 
 ## Next Steps
