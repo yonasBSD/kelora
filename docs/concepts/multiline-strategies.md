@@ -41,12 +41,23 @@ Best for logs where each entry begins with a timestamp. Detection uses Kelora's
 adaptive timestamp parser; you can hint a specific format with
 `timestamp:format=<chrono>`.
 
-```bash exec="on" source="above" result="ansi"
-kelora -f raw examples/multiline_stacktrace.log \
-  --multiline timestamp \
-  --filter 'e.raw.contains("Traceback")' \
-  -F json --take 1
-```
+=== "Command"
+
+    ```bash
+    kelora -f raw examples/multiline_stacktrace.log \
+      --multiline timestamp \
+      --filter 'e.raw.contains("Traceback")' \
+      -F json --take 1
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f raw examples/multiline_stacktrace.log \
+      --multiline timestamp \
+      --filter 'e.raw.contains("Traceback")' \
+      -F json --take 1
+    ```
 
 The event now contains the full Python traceback until the next timestamped
 header. Pair this strategy with `--ts-format` if you also need chronological
@@ -57,12 +68,23 @@ filtering later in the pipeline.
 Combine lines that start with leading whitespace. This matches Java stack traces
 and similar outputs where continuation lines are indented.
 
-```bash exec="on" source="above" result="ansi"
-kelora -f raw examples/multiline_stacktrace.log \
-  --multiline indent \
-  --filter 'e.raw.contains("SQLException")' \
-  -F json --take 1
-```
+=== "Command"
+
+    ```bash
+    kelora -f raw examples/multiline_stacktrace.log \
+      --multiline indent \
+      --filter 'e.raw.contains("SQLException")' \
+      -F json --take 1
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f raw examples/multiline_stacktrace.log \
+      --multiline indent \
+      --filter 'e.raw.contains("SQLException")' \
+      -F json --take 1
+    ```
 
 In this example the stack trace block remains an atomic event. If the first line
 of a block is not indented (for example, `Traceback ...`), combine strategies by
@@ -74,12 +96,23 @@ included.
 Define explicit start and optional end markers. This is ideal for logs that wrap
 records with guard strings such as `BEGIN`/`END` or XML tags.
 
-```bash exec="on" source="above" result="ansi"
-kelora -f raw examples/multiline_boundary.log \
-  --multiline 'regex:match=^BEGIN:end=^END' \
-  --filter 'e.raw.contains("database_backup")' \
-  -F json --take 1
-```
+=== "Command"
+
+    ```bash
+    kelora -f raw examples/multiline_boundary.log \
+      --multiline 'regex:match=^BEGIN:end=^END' \
+      --filter 'e.raw.contains("database_backup")' \
+      -F json --take 1
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f raw examples/multiline_boundary.log \
+      --multiline 'regex:match=^BEGIN:end=^END' \
+      --filter 'e.raw.contains("database_backup")' \
+      -F json --take 1
+    ```
 
 If no `end=` is provided, a new `match=` line flushes the previous block. Regex
 patterns are Rust regular expressions—the same engine used by `--filter`.

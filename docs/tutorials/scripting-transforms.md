@@ -22,12 +22,23 @@ into your own pipelines.
 
 Start with `examples/errors_exec_transform.jsonl`, which includes messy values.
 
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/errors_exec_transform.jsonl \
-  -e 'e.status_code = to_int_or(e.status, -1)' \
-  -e 'e.bytes_int = to_int_or(e.bytes, 0)' \
-  -J -n 3
-```
+=== "Command"
+
+    ```bash
+    kelora -j examples/errors_exec_transform.jsonl \
+      -e 'e.status_code = to_int_or(e.status, -1)' \
+      -e 'e.bytes_int = to_int_or(e.bytes, 0)' \
+      -J -n 3
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/errors_exec_transform.jsonl \
+      -e 'e.status_code = to_int_or(e.status, -1)' \
+      -e 'e.bytes_int = to_int_or(e.bytes, 0)' \
+      -J -n 3
+    ```
 
 `to_int_or(value, fallback)` converts strings to integers and substitutes the
 fallback when conversion fails. Stacking `--exec` scripts lets you layer
@@ -38,32 +49,64 @@ transformations without writing monolithic expressions.
 Use the normalized values to add severity classification, then keep only error
 events.
 
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/errors_exec_transform.jsonl \
-  -e 'e.status_code = to_int_or(e.status, -1)' \
-  -e 'e.severity = if e.status_code >= 500 { "critical" } else if e.status_code >= 400 { "error" } else { "ok" }' \
-  --filter 'e.severity != "ok"' \
-  -k timestamp,status_code,severity \
-  -F json
-```
+=== "Command"
+
+    ```bash
+    kelora -j examples/errors_exec_transform.jsonl \
+      -e 'e.status_code = to_int_or(e.status, -1)' \
+      -e 'e.severity = if e.status_code >= 500 { "critical" } else if e.status_code >= 400 { "error" } else { "ok" }' \
+      --filter 'e.severity != "ok"' \
+      -k timestamp,status_code,severity \
+      -F json
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/errors_exec_transform.jsonl \
+      -e 'e.status_code = to_int_or(e.status, -1)' \
+      -e 'e.severity = if e.status_code >= 500 { "critical" } else if e.status_code >= 400 { "error" } else { "ok" }' \
+      --filter 'e.severity != "ok"' \
+      -k timestamp,status_code,severity \
+      -F json
+    ```
 
 Filters run between exec scripts. Any fields you create earlier are immediately
 available to later filters or transformations.
 
 ### Enrich Logs with Derived Fields
 
-```bash exec="on" source="above" result="ansi"
-kelora -f combined examples/web_access_large.log.gz \
-  -e 'let status = to_int_or(e.status, 0); if status >= 500 { e.family = "server_error"; } else if status >= 400 { e.family = "client_error"; } else { e.family = "ok"; }'
-```
+=== "Command"
+
+    ```bash
+    kelora -f combined examples/web_access_large.log.gz \
+      -e 'let status = to_int_or(e.status, 0); if status >= 500 { e.family = "server_error"; } else if status >= 400 { e.family = "client_error"; } else { e.family = "ok"; }'
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f combined examples/web_access_large.log.gz \
+      -e 'let status = to_int_or(e.status, 0); if status >= 500 { e.family = "server_error"; } else if status >= 400 { e.family = "client_error"; } else { e.family = "ok"; }'
+    ```
 
 ### Pseudonymise Sensitive Attributes
 
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/security_audit.jsonl \
-  -e 'e.user_alias = pseudonym(e.user, "users"); e.ip_masked = e.ip.mask_ip(1)' \
-  -k timestamp,event,user_alias,ip_masked
-```
+=== "Command"
+
+    ```bash
+    kelora -j examples/security_audit.jsonl \
+      -e 'e.user_alias = pseudonym(e.user, "users"); e.ip_masked = e.ip.mask_ip(1)' \
+      -k timestamp,event,user_alias,ip_masked
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/security_audit.jsonl \
+      -e 'e.user_alias = pseudonym(e.user, "users"); e.ip_masked = e.ip.mask_ip(1)' \
+      -k timestamp,event,user_alias,ip_masked
+    ```
 
 ## Step 3 – Guard Against Bad Data
 
@@ -71,11 +114,21 @@ Kelora defaults to resilient mode: exec errors roll back the event and
 processing continues. Still, it is better to guard the data and drop malformed
 records explicitly.
 
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/errors_exec_transform.jsonl \
-  -e 'if !("tags" in e) || type_of(e.tags) != "array" { e = () } else { e.tag_count = e.tags.len(); }' \
-  -F json
-```
+=== "Command"
+
+    ```bash
+    kelora -j examples/errors_exec_transform.jsonl \
+      -e 'if !("tags" in e) || type_of(e.tags) != "array" { e = () } else { e.tag_count = e.tags.len(); }' \
+      -F json
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/errors_exec_transform.jsonl \
+      -e 'if !("tags" in e) || type_of(e.tags) != "array" { e = () } else { e.tag_count = e.tags.len(); }' \
+      -F json
+    ```
 
 `e = ()` removes the event from the pipeline. The type check avoids runtime
 errors when the `tags` field contains a string instead of an array.
@@ -90,14 +143,27 @@ errors when the `tags` field contains a string instead of an array.
 `emit_each()` converts arrays into individual events while keeping context. The
 orders fixture demonstrates nested arrays that you can flatten in two stages.
 
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/fan_out_batches.jsonl \
-  -e 'if e.has_path("orders") { emit_each(e.orders, #{batch_id: e.batch_id, created: e.created}) }' \
-  -e 'if e.has_path("items") { emit_each(e.items, #{batch_id: e.batch_id, order_id: e.order_id}) }' \
-  --filter 'e.has_path("sku")' \
-  -k batch_id,order_id,sku,qty,price \
-  -J -n 4
-```
+=== "Command"
+
+    ```bash
+    kelora -j examples/fan_out_batches.jsonl \
+      -e 'if e.has_path("orders") { emit_each(e.orders, #{batch_id: e.batch_id, created: e.created}) }' \
+      -e 'if e.has_path("items") { emit_each(e.items, #{batch_id: e.batch_id, order_id: e.order_id}) }' \
+      --filter 'e.has_path("sku")' \
+      -k batch_id,order_id,sku,qty,price \
+      -J -n 4
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/fan_out_batches.jsonl \
+      -e 'if e.has_path("orders") { emit_each(e.orders, #{batch_id: e.batch_id, created: e.created}) }' \
+      -e 'if e.has_path("items") { emit_each(e.items, #{batch_id: e.batch_id, order_id: e.order_id}) }' \
+      --filter 'e.has_path("sku")' \
+      -k batch_id,order_id,sku,qty,price \
+      -J -n 4
+    ```
 
 The first exec fans out orders while copying batch metadata. The second exec
 fans out individual items, enriching each emitted event with both batch and
@@ -112,18 +178,35 @@ order identifiers.
 
 Enable the sliding window to compare the current event to recent history.
 
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/window_metrics.jsonl \
-  --filter 'e.metric == "cpu"' \
-  --window 3 \
-  -e $'let values = window_numbers(window, "value");
-if values.len() >= 2 {
-    let diff = values[0] - values[1];
-    e.delta_vs_prev = round(diff * 100.0) / 100.0;
-}' \
-  -k timestamp,value,delta_vs_prev \
-  -J -n 5
-```
+=== "Command"
+
+    ```bash
+    kelora -j examples/window_metrics.jsonl \
+      --filter 'e.metric == "cpu"' \
+      --window 3 \
+      -e $'let values = window_numbers(window, "value");
+    if values.len() >= 2 {
+        let diff = values[0] - values[1];
+        e.delta_vs_prev = round(diff * 100.0) / 100.0;
+    }' \
+      -k timestamp,value,delta_vs_prev \
+      -J -n 5
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/window_metrics.jsonl \
+      --filter 'e.metric == "cpu"' \
+      --window 3 \
+      -e $'let values = window_numbers(window, "value");
+    if values.len() >= 2 {
+        let diff = values[0] - values[1];
+        e.delta_vs_prev = round(diff * 100.0) / 100.0;
+    }' \
+      -k timestamp,value,delta_vs_prev \
+      -J -n 5
+    ```
 
 `window` holds the current event plus the previous `N` events (here `N = 3`).
 Using `window_numbers(window, FIELD)` avoids manual parsing and gracefully
@@ -134,29 +217,57 @@ skips missing values.
 Keep complex logic in separate files. The snippet below defines a helper and
 reuses it across multiple commands.
 
-```bash exec="on" source="above" result="ansi"
-cat <<'RHAI' > classifiers.rhai
-fn classify_status(status) {
-    let code = to_int_or(status, -1);
-    if code >= 500 {
-        "critical"
-    } else if code >= 400 {
-        "error"
-    } else if code >= 200 {
-        "ok"
-    } else {
-        "other"
-    }
-}
-RHAI
+=== "Command"
 
-kelora -j examples/errors_exec_transform.jsonl \
-  -I classifiers.rhai \
-  -e 'e.severity = classify_status(e.status)' \
-  -k timestamp,status,severity \
-  -J -n 3
-rm classifiers.rhai
-```
+    ```bash
+    cat <<'RHAI' > classifiers.rhai
+    fn classify_status(status) {
+        let code = to_int_or(status, -1);
+        if code >= 500 {
+            "critical"
+        } else if code >= 400 {
+            "error"
+        } else if code >= 200 {
+            "ok"
+        } else {
+            "other"
+        }
+    }
+    RHAI
+
+    kelora -j examples/errors_exec_transform.jsonl \
+      -I classifiers.rhai \
+      -e 'e.severity = classify_status(e.status)' \
+      -k timestamp,status,severity \
+      -J -n 3
+    rm classifiers.rhai
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    cat <<'RHAI' > classifiers.rhai
+    fn classify_status(status) {
+        let code = to_int_or(status, -1);
+        if code >= 500 {
+            "critical"
+        } else if code >= 400 {
+            "error"
+        } else if code >= 200 {
+            "ok"
+        } else {
+            "other"
+        }
+    }
+    RHAI
+
+    kelora -j examples/errors_exec_transform.jsonl \
+      -I classifiers.rhai \
+      -e 'e.severity = classify_status(e.status)' \
+      -k timestamp,status,severity \
+      -J -n 3
+    rm classifiers.rhai
+    ```
 
 You can also move long exec blocks to a dedicated Rhai file:
 

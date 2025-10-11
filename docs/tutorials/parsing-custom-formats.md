@@ -60,11 +60,21 @@ Each line has three whitespace-delimited fields: level, service, message.
 
 For whitespace-delimited fields, just list the field names:
 
-```bash exec="on" source="above" result="ansi"
-echo "ERROR api Connection failed
-INFO  db  Query executed
-WARN  api Slow response time" | kelora -f 'cols:level service message'
-```
+=== "Command"
+
+    ```bash
+    echo "ERROR api Connection failed
+    INFO  db  Query executed
+    WARN  api Slow response time" | kelora -f 'cols:level service message'
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    echo "ERROR api Connection failed
+    INFO  db  Query executed
+    WARN  api Slow response time" | kelora -f 'cols:level service message'
+    ```
 
 **How it works:**
 
@@ -351,15 +361,29 @@ For Docker Compose-style logs:
 
 ### More Recipes to Practice
 
-```bash exec="on" source="above" result="ansi"
-kelora -f "csv status:int bytes:int duration_ms:int" examples/simple_csv.csv
+=== "Command"
 
-kelora -f "tsv: user_id:int success:bool" examples/simple_tsv.tsv
+    ```bash
+    kelora -f "csv status:int bytes:int duration_ms:int" examples/simple_csv.csv
 
-kelora -f "cols:ts(2) level *msg:string" examples/cols_fixed.log
+    kelora -f "tsv: user_id:int success:bool" examples/simple_tsv.tsv
 
-kelora -f "csv status:int" --strict examples/errors_csv_ragged.csv
-```
+    kelora -f "cols:ts(2) level *msg:string" examples/cols_fixed.log
+
+    kelora -f "csv status:int" --strict examples/errors_csv_ragged.csv
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f "csv status:int bytes:int duration_ms:int" examples/simple_csv.csv
+
+    kelora -f "tsv: user_id:int success:bool" examples/simple_tsv.tsv
+
+    kelora -f "cols:ts(2) level *msg:string" examples/cols_fixed.log
+
+    kelora -f "csv status:int" --strict examples/errors_csv_ragged.csv
+    ```
 
 Inline type annotations and strict mode are perfect for catching malformed rows during ingestion before they reach downstream systems.
 

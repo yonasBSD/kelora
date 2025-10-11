@@ -28,9 +28,17 @@ curl -L https://github.com/dloss/kelora/archive/refs/heads/main.zip -o kelora.zi
 
 Turn raw web server logs into structured, queryable data:
 
-```bash exec="on" source="above" result="ansi"
-kelora -f combined examples/simple_combined.log -k ip,status,method,path -n 5
-```
+=== "Command"
+
+    ```bash
+    kelora -f combined examples/simple_combined.log -k ip,status,method,path -n 5
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f combined examples/simple_combined.log -k ip,status,method,path -n 5
+    ```
 
 The `-f combined` parses Apache/NGINX access logs into fields. The `-k` flag selects which fields to display, and `-n` limits output. Kelora automatically extracts `ip`, `timestamp`, `method`, `path`, `status`, `user_agent`, and more from each line.
 
@@ -38,12 +46,23 @@ The `-f combined` parses Apache/NGINX access logs into fields. The `-k` flag sel
 
 Filter by HTTP status codes and add computed fields:
 
-```bash exec="on" source="above" result="ansi"
-kelora -f combined examples/simple_combined.log \
-  --filter 'e.status >= 400' \
-  -e 'e.error_type = if e.status >= 500 { "server" } else { "client" }' \
-  -k ip,status,error_type,path -n 5
-```
+=== "Command"
+
+    ```bash
+    kelora -f combined examples/simple_combined.log \
+      --filter 'e.status >= 400' \
+      -e 'e.error_type = if e.status >= 500 { "server" } else { "client" }' \
+      -k ip,status,error_type,path -n 5
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f combined examples/simple_combined.log \
+      --filter 'e.status >= 400' \
+      -e 'e.error_type = if e.status >= 500 { "server" } else { "client" }' \
+      -k ip,status,error_type,path -n 5
+    ```
 
 The `--filter` expression keeps only error responses (4xx and 5xx). The `-e` flag adds a computed `error_type` field based on the status code.
 
@@ -51,11 +70,21 @@ The `--filter` expression keeps only error responses (4xx and 5xx). The `-e` fla
 
 Count requests by status code and track response sizes:
 
-```bash exec="on" source="above" result="ansi"
-kelora -f combined examples/simple_combined.log \
-  -e 'track_count(e.status.to_string()); track_sum("total_bytes", e.bytes)' \
-  -F none -m
-```
+=== "Command"
+
+    ```bash
+    kelora -f combined examples/simple_combined.log \
+      -e 'track_count(e.status.to_string()); track_sum("total_bytes", e.bytes)' \
+      -F none -m
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f combined examples/simple_combined.log \
+      -e 'track_count(e.status.to_string()); track_sum("total_bytes", e.bytes)' \
+      -F none -m
+    ```
 
 Use `track_count()`, `track_sum()`, `track_min()`, and `track_max()` to collect metrics. The `-F none` suppresses event output, `-m` displays metrics at the end.
 
@@ -63,13 +92,29 @@ Use `track_count()`, `track_sum()`, `track_min()`, and `track_max()` to collect 
 
 Kelora converts between any formats. Examples:
 
-```bash exec="on" source="above" result="ansi"
-kelora -f syslog examples/simple_syslog.log -F json -n 3
-```
+=== "Command"
 
-```bash exec="on" source="above" result="ansi"
-kelora -f combined examples/web_access_large.log.gz -F csv -k ip,status,request -n 3
-```
+    ```bash
+    kelora -f syslog examples/simple_syslog.log -F json -n 3
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f syslog examples/simple_syslog.log -F json -n 3
+    ```
+
+=== "Command"
+
+    ```bash
+    kelora -f combined examples/web_access_large.log.gz -F csv -k ip,status,request -n 3
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f combined examples/web_access_large.log.gz -F csv -k ip,status,request -n 3
+    ```
 
 The `-f` flag specifies input format, `-F` specifies output format (we could have used `-J` as a shortcut for JSON). Gzipped files are automatically decompressed.
 

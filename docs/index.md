@@ -16,13 +16,12 @@ kelora -f json examples/simple_json.jsonl --levels error
 # Enrich logs - calculate derived fields on the fly
 kelora -f json examples/simple_json.jsonl \
   --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' \
-  --keys timestamp,service,duration_s \
-  --take 5
+  --keys timestamp,service,duration_s
 
 # Analyze web server failures - add custom fields with Rhai
 kelora -f combined examples/web_access_large.log.gz \
   --exec 'e.error_type = if e.status >= 500 { "server" } else { "client" }' \
-  --filter 'e.status >= 400' --take 3
+  --filter 'e.status >= 400'
 
 # Track metrics - suppress events, show only counts
 kelora -f json examples/simple_json.jsonl \

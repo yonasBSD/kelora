@@ -288,13 +288,25 @@ Different parsers add format-specific fields:
 
 Access nested maps using dot notation:
 
-```bash exec="on" source="above" result="ansi"
-kelora -f json examples/simple_json.jsonl \
-  --filter 'e.service == "api"' \
-  --exec 'e.req_method = e.get_path("request.method", "UNKNOWN")' \
-  --keys timestamp,service,req_method \
-  --take 3
-```
+=== "Command"
+
+    ```bash
+    kelora -f json examples/simple_json.jsonl \
+      --filter 'e.service == "api"' \
+      --exec 'e.req_method = e.get_path("request.method", "UNKNOWN")' \
+      --keys timestamp,service,req_method \
+      --take 3
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f json examples/simple_json.jsonl \
+      --filter 'e.service == "api"' \
+      --exec 'e.req_method = e.get_path("request.method", "UNKNOWN")' \
+      --keys timestamp,service,req_method \
+      --take 3
+    ```
 
 ### Arrays
 

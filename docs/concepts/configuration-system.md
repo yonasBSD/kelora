@@ -18,9 +18,17 @@ Project files override user files. You can override both by passing
 
 Inspect what Kelora currently sees with `--show-config`:
 
-```bash exec="on" source="above" result="ansi"
-kelora --show-config
-```
+=== "Command"
+
+    ```bash
+    kelora --show-config
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora --show-config
+    ```
 
 If no file exists you will see an example template and the paths that were
 searched.
@@ -61,14 +69,27 @@ the invocation. `kelora --alias errors app.log` expands to
 example below stores an alias in a temporary file under `dev/` and then removes
 it so the repository stays clean.
 
-```bash exec="on" source="above" result="ansi"
-kelora --save-alias stacktrace \
-  --config-file dev/kelora-demo.ini \
-  -f raw --multiline timestamp --filter 'e.raw.contains("Traceback")'
+=== "Command"
 
-cat dev/kelora-demo.ini
-rm dev/kelora-demo.ini
-```
+    ```bash
+    kelora --save-alias stacktrace \
+      --config-file dev/kelora-demo.ini \
+      -f raw --multiline timestamp --filter 'e.raw.contains("Traceback")'
+
+    cat dev/kelora-demo.ini
+    rm dev/kelora-demo.ini
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora --save-alias stacktrace \
+      --config-file dev/kelora-demo.ini \
+      -f raw --multiline timestamp --filter 'e.raw.contains("Traceback")'
+
+    cat dev/kelora-demo.ini
+    rm dev/kelora-demo.ini
+    ```
 
 Kelora reports whether the alias replaced an existing value. Alias names must
 match the regex `^[a-zA-Z_][a-zA-Z0-9_-]{0,63}$`.

@@ -29,11 +29,21 @@ Time handling is critical for log analysis. Kelora provides powerful timestamp p
 
 Kelora automatically detects common timestamp field names in your logs:
 
-```bash exec="on" source="above" result="ansi"
-echo '{"ts": "2024-01-15T10:30:00Z", "message": "User login"}
-{"timestamp": "2024-01-15T10:31:00Z", "message": "Request processed"}
-{"time": "2024-01-15T10:32:00Z", "message": "Response sent"}' | kelora -j --stats
-```
+=== "Command"
+
+    ```bash
+    echo '{"ts": "2024-01-15T10:30:00Z", "message": "User login"}
+    {"timestamp": "2024-01-15T10:31:00Z", "message": "Request processed"}
+    {"time": "2024-01-15T10:32:00Z", "message": "Response sent"}' | kelora -j --stats
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    echo '{"ts": "2024-01-15T10:30:00Z", "message": "User login"}
+    {"timestamp": "2024-01-15T10:31:00Z", "message": "Request processed"}
+    {"time": "2024-01-15T10:32:00Z", "message": "Response sent"}' | kelora -j --stats
+    ```
 
 **Auto-detected field names:**
 

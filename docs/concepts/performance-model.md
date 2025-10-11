@@ -36,13 +36,25 @@ pipelines.
 
 #### Sequential vs Parallel in Practice
 
-```bash exec="on" source="above" result="ansi"
-kelora -f combined examples/web_access_large.log.gz \
-  -F none --stats
+=== "Command"
 
-kelora -f combined examples/web_access_large.log.gz \
-  -F none --stats --parallel
-```
+    ```bash
+    kelora -f combined examples/web_access_large.log.gz \
+      -F none --stats
+
+    kelora -f combined examples/web_access_large.log.gz \
+      -F none --stats --parallel
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f combined examples/web_access_large.log.gz \
+      -F none --stats
+
+    kelora -f combined examples/web_access_large.log.gz \
+      -F none --stats --parallel
+    ```
 
 On this synthetic access log (`1200` lines), parallel mode yields higher
 throughput because the CPU-bound combined parser is spread across cores.

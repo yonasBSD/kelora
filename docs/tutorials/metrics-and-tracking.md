@@ -32,12 +32,23 @@ expressions and rerun them locally.
 
 Count how many events belong to each service while suppressing event output.
 
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/simple_json.jsonl \
-  -F none \
-  -e 'track_count(e.service)' \
-  --metrics
-```
+=== "Command"
+
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'track_count(e.service)' \
+      --metrics
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'track_count(e.service)' \
+      --metrics
+    ```
 
 `--metrics` prints the aggregated map when processing finishes. Use this pattern
 any time you want a quick histogram after a batch run.
@@ -46,12 +57,23 @@ any time you want a quick histogram after a batch run.
 
 Pair `--metrics` with `--stats` when you need throughput details as well:
 
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/simple_json.jsonl \
-  -F none \
-  -e 'track_count(e.service)' \
-  -m --stats
-```
+=== "Command"
+
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'track_count(e.service)' \
+      -m --stats
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'track_count(e.service)' \
+      -m --stats
+    ```
 
 `--stats` adds processing totals, time span, and field inventory without touching
 your metrics map.
@@ -61,14 +83,27 @@ your metrics map.
 Kelora ships several helpers for numeric metrics. The following example treats
 response sizes and latency as rolling aggregates.
 
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/simple_json.jsonl \
-  -F none \
-  -e 'track_sum("response_bytes", to_int_or(e.get_path("bytes"), 0))' \
-  -e 'track_avg("response_time_ms", to_int_or(e.get_path("duration_ms"), 0))' \
-  -e 'if e.has_path("duration_ms") { track_bucket("slow_requests", clamp(to_int_or(e.duration_ms, 0) / 250 * 250, 0, 2000)) }' \
-  --metrics
-```
+=== "Command"
+
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'track_sum("response_bytes", to_int_or(e.get_path("bytes"), 0))' \
+      -e 'track_avg("response_time_ms", to_int_or(e.get_path("duration_ms"), 0))' \
+      -e 'if e.has_path("duration_ms") { track_bucket("slow_requests", clamp(to_int_or(e.duration_ms, 0) / 250 * 250, 0, 2000)) }' \
+      --metrics
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'track_sum("response_bytes", to_int_or(e.get_path("bytes"), 0))' \
+      -e 'track_avg("response_time_ms", to_int_or(e.get_path("duration_ms"), 0))' \
+      -e 'if e.has_path("duration_ms") { track_bucket("slow_requests", clamp(to_int_or(e.duration_ms, 0) / 250 * 250, 0, 2000)) }' \
+      --metrics
+    ```
 
 - `track_sum` accumulates totals (suitable for throughput or volume).
 - `track_avg` automatically maintains a running average per key.
@@ -81,13 +116,25 @@ Buckets show up as nested maps where each bucket value keeps its own count.
 `track_unique()` stores distinct values for a key—handy for unique user counts or
 cardinality analysis.
 
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/simple_json.jsonl \
-  -F none \
-  -e 'track_unique("services", e.service)' \
-  -e 'if e.level == "ERROR" { track_unique("error_messages", e.message) }' \
-  --metrics
-```
+=== "Command"
+
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'track_unique("services", e.service)' \
+      -e 'if e.level == "ERROR" { track_unique("error_messages", e.message) }' \
+      --metrics
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'track_unique("services", e.service)' \
+      -e 'if e.level == "ERROR" { track_unique("error_messages", e.message) }' \
+      --metrics
+    ```
 
 Use `metrics["services"].len()` later to compute the number of distinct members.
 
@@ -96,21 +143,41 @@ Use `metrics["services"].len()` later to compute the number of distinct members.
 Enable the window buffer to examine recent events. The example below tracks a
 five-event moving average and P95 latency for CPU metrics.
 
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/window_metrics.jsonl \
-  --filter 'e.metric == "cpu"' \
-  --window 5 \
-  -e $'let values = window_numbers(window, "value");
-if values.len() > 0 {
-    let sum = values.reduce(|s, x| s + x, 0.0);
-    let avg = sum / values.len();
-    e.avg_last_5 = round(avg * 100.0) / 100.0;
-    if values.len() >= 3 {
-        e.p95_last_5 = round(values.percentile(95.0) * 100.0) / 100.0;
-    }
-}' \
-  -n 5
-```
+=== "Command"
+
+    ```bash
+    kelora -j examples/window_metrics.jsonl \
+      --filter 'e.metric == "cpu"' \
+      --window 5 \
+      -e $'let values = window_numbers(window, "value");
+    if values.len() > 0 {
+        let sum = values.reduce(|s, x| s + x, 0.0);
+        let avg = sum / values.len();
+        e.avg_last_5 = round(avg * 100.0) / 100.0;
+        if values.len() >= 3 {
+            e.p95_last_5 = round(values.percentile(95.0) * 100.0) / 100.0;
+        }
+    }' \
+      -n 5
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/window_metrics.jsonl \
+      --filter 'e.metric == "cpu"' \
+      --window 5 \
+      -e $'let values = window_numbers(window, "value");
+    if values.len() > 0 {
+        let sum = values.reduce(|s, x| s + x, 0.0);
+        let avg = sum / values.len();
+        e.avg_last_5 = round(avg * 100.0) / 100.0;
+        if values.len() >= 3 {
+            e.p95_last_5 = round(values.percentile(95.0) * 100.0) / 100.0;
+        }
+    }' \
+      -n 5
+    ```
 
 The special `window` variable becomes available once you pass `--window`. Use
 `window_numbers(window, FIELD)` for numeric arrays and `window_values(window, FIELD)`
@@ -122,27 +189,53 @@ Sometimes you need a formatted report instead of raw maps. Store a short Rhai
 script and include it with `-I` so the same layout works across platforms, then
 call the helper from `--end`.
 
-```bash exec="on" source="above" result="ansi"
-cat <<'RHAI' > metrics_summary.rhai
-fn summarize_metrics() {
-    let keys = metrics.keys();
-    keys.sort();
-    for key in keys {
-        print(key + ": " + metrics[key].to_string());
+=== "Command"
+
+    ```bash
+    cat <<'RHAI' > metrics_summary.rhai
+    fn summarize_metrics() {
+        let keys = metrics.keys();
+        keys.sort();
+        for key in keys {
+            print(key + ": " + metrics[key].to_string());
+        }
     }
-}
-RHAI
+    RHAI
 
-kelora -j examples/simple_json.jsonl \
-  -F none \
-  -e 'track_count(e.service)' \
-  -e 'track_count(e.level)' \
-  -m \
-  -I metrics_summary.rhai \
-  --end 'summarize_metrics()'
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'track_count(e.service)' \
+      -e 'track_count(e.level)' \
+      -m \
+      -I metrics_summary.rhai \
+      --end 'summarize_metrics()'
 
-rm metrics_summary.rhai
-```
+    rm metrics_summary.rhai
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    cat <<'RHAI' > metrics_summary.rhai
+    fn summarize_metrics() {
+        let keys = metrics.keys();
+        keys.sort();
+        for key in keys {
+            print(key + ": " + metrics[key].to_string());
+        }
+    }
+    RHAI
+
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'track_count(e.service)' \
+      -e 'track_count(e.level)' \
+      -m \
+      -I metrics_summary.rhai \
+      --end 'summarize_metrics()'
+
+    rm metrics_summary.rhai
+    ```
 
 The automatically printed `--metrics` block remains, while `--end` gives you a
 clean text summary that you can redirect or feed into alerts.
@@ -151,16 +244,31 @@ clean text summary that you can redirect or feed into alerts.
 
 Use `--metrics-file` to serialize the metrics map as JSON for other tools.
 
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/simple_json.jsonl \
-  -F none \
-  -e 'track_count(e.service)' \
-  -m \
-  --metrics-file metrics.json
+=== "Command"
 
-cat metrics.json
-rm metrics.json
-```
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'track_count(e.service)' \
+      -m \
+      --metrics-file metrics.json
+
+    cat metrics.json
+    rm metrics.json
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'track_count(e.service)' \
+      -m \
+      --metrics-file metrics.json
+
+    cat metrics.json
+    rm metrics.json
+    ```
 
 The JSON structure mirrors the in-memory map, so you can load it with `jq`, a
 dashboard agent, or any scripting language.
@@ -170,12 +278,23 @@ dashboard agent, or any scripting language.
 Kelora keeps metrics up to date even when tailing files or processing archives.
 This command watches a gzipped access log and surfaces top status classes.
 
-```bash exec="on" source="above" result="ansi"
-kelora -f combined examples/web_access_large.log.gz \
-  -e 'let klass = ((e.status / 100) * 100).to_string(); track_count(klass)' \
-  -m -F none \
-  -n 0
-```
+=== "Command"
+
+    ```bash
+    kelora -f combined examples/web_access_large.log.gz \
+      -e 'let klass = ((e.status / 100) * 100).to_string(); track_count(klass)' \
+      -m -F none \
+      -n 0
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f combined examples/web_access_large.log.gz \
+      -e 'let klass = ((e.status / 100) * 100).to_string(); track_count(klass)' \
+      -m -F none \
+      -n 0
+    ```
 
 Passing `--take 0` (or omitting it) keeps processing the entire file. When you run
 Kelora against a stream (`tail -f | kelora ...`), the metrics snapshot updates when
@@ -183,20 +302,39 @@ you terminate the process.
 
 Need full histograms instead of counts? Swap in `track_bucket()`:
 
-```bash exec="on" source="above" result="ansi"
-kelora -f combined examples/web_access_large.log.gz \
-  -m \
-  -e 'track_bucket("status_family", (e.status / 100) * 100)' \
-  --end '
-    let buckets = metrics.status_family.keys();
-    buckets.sort();
-    for bucket in buckets {
-        let counts = metrics.status_family[bucket];
-        print(bucket.to_string() + ": " + counts.to_string());
-    }
-  ' \
-  -F none -n 0
-```
+=== "Command"
+
+    ```bash
+    kelora -f combined examples/web_access_large.log.gz \
+      -m \
+      -e 'track_bucket("status_family", (e.status / 100) * 100)' \
+      --end '
+        let buckets = metrics.status_family.keys();
+        buckets.sort();
+        for bucket in buckets {
+            let counts = metrics.status_family[bucket];
+            print(bucket.to_string() + ": " + counts.to_string());
+        }
+      ' \
+      -F none -n 0
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f combined examples/web_access_large.log.gz \
+      -m \
+      -e 'track_bucket("status_family", (e.status / 100) * 100)' \
+      --end '
+        let buckets = metrics.status_family.keys();
+        buckets.sort();
+        for bucket in buckets {
+            let counts = metrics.status_family[bucket];
+            print(bucket.to_string() + ": " + counts.to_string());
+        }
+      ' \
+      -F none -n 0
+    ```
 
 `track_bucket(key, bucket_value)` keeps nested counters so you can emit a
 human-readable histogram once processing finishes.
