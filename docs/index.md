@@ -7,7 +7,7 @@ Parse messy logs into structured events, then filter, transform, and analyze the
 !!! warning "Experimental Tool"
     Kelora is a [vibe-coded](https://en.wikipedia.org/wiki/Vibe_coding) experimental tool under active development. APIs and behaviour may change without notice.
 
-## Quick Start
+## Examples
 
 ```bash
 # Find errors across JSON logs
@@ -41,17 +41,17 @@ See the [Quickstart](quickstart.md) for a step-by-step tour with full output.
 
 ## How It Works
 
-Kelora processes logs through a streaming pipeline:
+Kelora processes logs through a streaming pipeline with composable stages:
 
 ```
-Input → Parse → Filter → Transform → Output
-  ↓       ↓        ↓         ↓           ↓
-Files   JSON    --levels  --exec      logfmt
-stdin   syslog  --filter  --begin     JSON
-.gz     custom  --since   --end       CSV
+Input → Parse → --exec → --filter → --exec → --filter → ... → Output
+  ↓       ↓         ↓         ↓         ↓         ↓              ↓
+Files   JSON   transform  narrow   enrich    narrow        logfmt
+stdin   syslog                                              JSON
+.gz     custom                                              CSV
 ```
 
-Each stage transforms data and passes it forward. Read the [Pipeline Model](concepts/pipeline-model.md) to understand how stages work together.
+Each `--filter` and `--exec` runs in the order specified, passing events forward. Chain them in any sequence to build multi-stage processing logic. Read the [Pipeline Model](concepts/pipeline-model.md) for details.
 
 ## Key Features
 
