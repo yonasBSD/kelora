@@ -12,12 +12,23 @@ You have JSON logs from microservices and need to monitor health, track errors, 
 
 Monitor overall service health:
 
-```bash
-> kelora -j app.log \
-    -e 'track_count(e.level)' \
-    -e 'track_count(e.service)' \
-    --metrics
-```
+=== "Command"
+
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+        -e 'track_count(e.level)' \
+        -e 'track_count(e.service)' \
+        --metrics
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/simple_json.jsonl \
+        -e 'track_count(e.level)' \
+        -e 'track_count(e.service)' \
+        --metrics
+    ```
 
 ### Error Rate Monitoring
 

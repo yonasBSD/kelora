@@ -124,14 +124,32 @@ See `kelora --help-time` for complete format reference.
 
 Handle naive timestamps (without timezone info) using `--input-tz`:
 
+=== "Command"
+
+    ```bash
+    # Parse timestamps with mixed timezones, all normalized to UTC display
+    kelora -f 'cols:timestamp *message' examples/timezones_mixed.log \
+        --ts-field timestamp -Z -n 5
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    # Parse timestamps with mixed timezones, all normalized to UTC display
+    kelora -f 'cols:timestamp *message' examples/timezones_mixed.log \
+        --ts-field timestamp -Z -n 5
+    ```
+
+Other timezone examples:
+
 ```bash
-# Parse timestamps as UTC
+# Parse naive timestamps as UTC
 > kelora -j --input-tz UTC app.log
 
-# Parse timestamps as local time
+# Parse naive timestamps as local time
 > kelora -j --input-tz local app.log
 
-# Parse timestamps in specific timezone
+# Parse naive timestamps in specific timezone
 > kelora -j --input-tz Europe/Berlin app.log
 > kelora -j --input-tz America/New_York app.log
 ```

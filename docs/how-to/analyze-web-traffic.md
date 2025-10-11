@@ -12,19 +12,37 @@ You have Apache or Nginx access logs and need to find slow requests, 4xx/5xx err
 
 Parse Apache/Nginx combined format logs:
 
-```bash
-> kelora -f combined /var/log/nginx/access.log -n 5
-```
+=== "Command"
+
+    ```bash
+    kelora -f combined examples/simple_combined.log -n 5
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f combined examples/simple_combined.log -n 5
+    ```
 
 The combined format includes: `ip`, `timestamp`, `request`, `method`, `path`, `protocol`, `status`, `bytes`, `referer`, `user_agent`, and optionally `request_time`.
 
 ### Find Server Errors (5xx)
 
-```bash
-> kelora -f combined /var/log/nginx/access.log \
-    --filter 'e.status >= 500' \
-    -k ip,timestamp,status,request
-```
+=== "Command"
+
+    ```bash
+    kelora -f combined examples/simple_combined.log \
+        --filter 'e.status >= 500' \
+        -k ip,timestamp,status,request
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f combined examples/simple_combined.log \
+        --filter 'e.status >= 500' \
+        -k ip,timestamp,status,request
+    ```
 
 ### Find Client Errors (4xx)
 
@@ -48,11 +66,21 @@ For Nginx logs with `request_time`:
 
 Count requests by status code:
 
-```bash
-> kelora -f combined /var/log/nginx/access.log \
-    -e 'track_count(e.status)' \
-    --metrics
-```
+=== "Command"
+
+    ```bash
+    kelora -f combined examples/simple_combined.log \
+        -e 'track_count("status_" + e.status)' \
+        --metrics
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f combined examples/simple_combined.log \
+        -e 'track_count("status_" + e.status)' \
+        --metrics
+    ```
 
 ### Top IPs by Request Count
 

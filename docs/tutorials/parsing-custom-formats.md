@@ -63,17 +63,13 @@ For whitespace-delimited fields, just list the field names:
 === "Command"
 
     ```bash
-    echo "ERROR api Connection failed
-    INFO  db  Query executed
-    WARN  api Slow response time" | kelora -f 'cols:level service message'
+    kelora -f 'cols:ts(2) level *msg' examples/cols_fixed.log -n 3
     ```
 
 === "Output"
 
     ```bash exec="on" source="above" result="ansi"
-    echo "ERROR api Connection failed
-    INFO  db  Query executed
-    WARN  api Slow response time" | kelora -f 'cols:level service message'
+    kelora -f 'cols:ts(2) level *msg' examples/cols_fixed.log -n 3
     ```
 
 **How it works:**
@@ -145,11 +141,23 @@ Kelora will parse the `timestamp` field so that `--since`, `--until`, and timest
 
 For non-whitespace separators, use `--cols-sep`:
 
-```bash
-> echo "ERROR|api|Connection failed
-INFO|db|Query executed" | \
-    kelora -f 'cols:level service message' --cols-sep '|'
-```
+=== "Command"
+
+    ```bash
+    # Multi-character separator with prefix extraction
+    kelora --extract-prefix node --prefix-sep ' >>> ' \
+        -f 'cols:timestamp *message' \
+        examples/prefix_custom.log -n 5
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    # Multi-character separator with prefix extraction
+    kelora --extract-prefix node --prefix-sep ' >>> ' \
+        -f 'cols:timestamp *message' \
+        examples/prefix_custom.log -n 5
+    ```
 
 Works with any separator string:
 

@@ -24,13 +24,19 @@ kelora -f tsv data.tsv -n 5
 
 Specify field types for proper numeric handling:
 
-```bash
-# Type annotations: :int, :float, :bool
-kelora -f 'csv status:int bytes:int duration:float' data.csv
+=== "Command"
 
-# Example with typed CSV
-kelora -f 'csv status:int bytes:int duration:int' examples/csv_typed.csv -n 3
-```
+    ```bash
+    # Type annotations can be in the CSV header itself
+    kelora -f csv examples/csv_typed.csv -n 3
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    # Type annotations can be in the CSV header itself
+    kelora -f csv examples/csv_typed.csv -n 3
+    ```
 
 Type annotations enable:
 
@@ -57,19 +63,21 @@ kelora -f tsvnh data.tsv
 
 Filter based on field values:
 
-```bash
-# Filter by status code
-kelora -f 'csv status:int bytes:int' data.csv \
-  --filter 'e.status >= 400'
+=== "Command"
 
-# Filter by multiple conditions
-kelora -f 'csv status:int duration:int' data.csv \
-  --filter 'e.status == 200 && e.duration > 1000'
+    ```bash
+    # Filter by status code using CLI type annotations
+    kelora -f 'csv status:int' examples/simple_csv.csv \
+      --filter 'e.status >= 400'
+    ```
 
-# Filter by text patterns
-kelora -f csv data.csv \
-  --filter 'e.method == "POST" && e.path.contains("/api/")'
-```
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    # Filter by status code using CLI type annotations
+    kelora -f 'csv status:int' examples/simple_csv.csv \
+      --filter 'e.status >= 400'
+    ```
 
 ### Aggregate CSV Data
 

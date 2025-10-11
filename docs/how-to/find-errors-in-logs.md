@@ -12,10 +12,23 @@ You need to find error-level events in your logs, possibly across multiple files
 
 Filter by log level using `--levels`:
 
-```bash
-# JSON logs
-kelora -j app.log -l error
+=== "Command"
 
+    ```bash
+    # JSON logs - filter for errors and critical
+    kelora -j examples/simple_json.jsonl -l error,critical
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    # JSON logs - filter for errors and critical
+    kelora -j examples/simple_json.jsonl -l error,critical
+    ```
+
+Other level filtering examples:
+
+```bash
 # Logfmt logs
 kelora -f logfmt service.log -l error,critical
 
