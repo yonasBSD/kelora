@@ -15,10 +15,13 @@ cargo install kelora
 ```bash
 # With git
 git clone https://github.com/dloss/kelora && cd kelora
+```
 
+```bash
 # Without git
-curl -L https://github.com/dloss/kelora/archive/refs/heads/main.zip -o kelora.zip
-unzip kelora.zip && cd kelora-main
+curl -L https://github.com/dloss/kelora/archive/refs/heads/main.zip -o kelora.zip && \
+  unzip kelora.zip && \
+  cd kelora-main
 ```
 
 ## Parse Unstructured Logs
