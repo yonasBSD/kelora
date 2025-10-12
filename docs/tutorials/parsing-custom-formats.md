@@ -369,27 +369,59 @@ For Docker Compose-style logs:
 
 ### More Recipes to Practice
 
+CSV with type annotations:
+
 === "Command"
 
     ```bash
     kelora -f "csv status:int bytes:int duration_ms:int" examples/simple_csv.csv
-
-    kelora -f "tsv: user_id:int success:bool" examples/simple_tsv.tsv
-
-    kelora -f "cols:ts(2) level *msg:string" examples/cols_fixed.log
-
-    kelora -f "csv status:int" --strict examples/errors_csv_ragged.csv
     ```
 
 === "Output"
 
     ```bash exec="on" source="above" result="ansi"
     kelora -f "csv status:int bytes:int duration_ms:int" examples/simple_csv.csv
+    ```
 
+TSV with type annotations:
+
+=== "Command"
+
+    ```bash
     kelora -f "tsv: user_id:int success:bool" examples/simple_tsv.tsv
+    ```
 
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f "tsv: user_id:int success:bool" examples/simple_tsv.tsv
+    ```
+
+Columns format with multi-token timestamp:
+
+=== "Command"
+
+    ```bash
     kelora -f "cols:ts(2) level *msg:string" examples/cols_fixed.log
+    ```
 
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f "cols:ts(2) level *msg:string" examples/cols_fixed.log
+    ```
+
+Strict mode for catching malformed rows:
+
+=== "Command"
+
+    ```bash
+    kelora -f "csv status:int" --strict examples/errors_csv_ragged.csv
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
     kelora -f "csv status:int" --strict examples/errors_csv_ragged.csv
     ```
 
