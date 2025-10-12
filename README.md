@@ -21,8 +21,6 @@ Kelora parses log streams into structured events and runs them through a program
 
 ## Quick Examples
 
-### First Commands
-
 ```bash
 # Filter error-level events from the logfmt sample
 kelora -f logfmt --level error examples/simple_logfmt.log
