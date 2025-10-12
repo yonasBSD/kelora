@@ -10,22 +10,24 @@ Parse messy logs into structured events, then filter, transform, and analyze the
 ## Examples
 
 ```bash
-# Find errors across JSON logs
-kelora -f json examples/simple_json.jsonl --levels error
+# Parse multi-line stacktraces - keeps errors with their full traces
+kelora examples/multiline_stacktrace.log --multiline timestamp \
+  --filter 'e.line.contains("ERROR")'
 
-# Enrich logs - calculate derived fields on the fly
-kelora -f json examples/simple_json.jsonl \
-  --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' \
-  --keys timestamp,service,duration_s
+# Fan out nested arrays - turn one event with 3 users into 3 separate events
+kelora -j examples/json_arrays.jsonl \
+  --exec 'if e.has_path("users") { emit_each(e.users) }' \
+  --keys id,name,score
 
-# Analyze web server failures - add custom fields with Rhai
-kelora -f combined examples/web_access_large.log.gz \
-  --exec 'e.error_type = if e.status >= 500 { "server" } else { "client" }' \
-  --filter 'e.status >= 400'
+# Parse mixed formats - handles JSON, logfmt, and syslog in one file
+kelora examples/nightmare_mixed_formats.log \
+  --exec 'if e.line.starts_with("{") { e = e.line.parse_json() }
+          else if e.line.contains("=") { e = e.line.parse_logfmt() }
+          else { e = e.line.parse_syslog() }'
 
-# Track metrics - suppress events, show only counts
-kelora -f json examples/simple_json.jsonl \
-  --exec 'track_count(e.service)' --metrics -F none
+# Track errors by service - parses Docker container prefixes, counts by source
+kelora examples/prefix_docker.log --extract-prefix service --prefix-sep '|' \
+  --metrics --exec 'if e.line.contains("ERROR") { track_count(e.service) }'
 ```
 
 See the [Quickstart](quickstart.md) for a step-by-step tour with full output.
