@@ -24,34 +24,17 @@ When Kelora is interrupted by signals:
 
 ## Exit Code 0: Success
 
-### When It Occurs
+Indicates **successful processing** with no errors. All lines parsed successfully, no filter/exec errors, and processing completed normally.
 
-Exit code `0` indicates **successful processing** with no errors:
-
-- All lines parsed successfully
-- No filter errors
-- No exec/transform errors
-- Processing completed normally
-
-### Example
+**Important:** Filtering events is **not** an error. If all events are filtered out, exit code is still `0`.
 
 ```bash
-kelora -j app.log --levels info
-echo $?
-0
-```
-
-**Note:** Filtering events is **not** considered an error. If all events are filtered out, exit code is still `0` (as long as no errors occurred).
-
-### Filtering vs Errors
-
-```bash
-# This returns 0 (filtering is not an error)
+# Returns 0 - filtering is not an error
 kelora -j app.log --levels critical
 echo $?
 0
 
-# This returns 1 (parse error occurred)
+# Returns 1 - parse error occurred
 kelora -j malformed.log
 echo $?
 1
@@ -59,17 +42,17 @@ echo $?
 
 ## Exit Code 1: Processing Errors
 
-### When It Occurs
+Indicates errors occurred during processing. Three types:
 
-Exit code `1` indicates **processing errors** occurred:
-
-- **Parse errors**: Lines that couldn't be parsed in specified format
-- **Filter errors**: `--filter` expressions that failed during evaluation
-- **Exec errors**: `--exec` scripts that failed during execution
+| Error Type | Cause | Example |
+|------------|-------|---------|
+| **Parse errors** | Lines couldn't be parsed in specified format | Invalid JSON/logfmt syntax |
+| **Filter errors** | `--filter` expressions failed during evaluation | Missing field access, type errors |
+| **Exec errors** | `--exec` scripts failed during execution | Runtime errors in Rhai code |
 
 ### Resilient Mode (Default)
 
-In resilient mode, errors are recorded but processing continues. Exit code `1` is returned at the end if any errors occurred:
+Errors are recorded but processing continues. Exit code `1` returned at the end if any errors occurred:
 
 ```bash
 kelora -j app.log --exec 'e.result = e.value.to_int()'
@@ -80,68 +63,38 @@ echo $?
 
 ### Strict Mode
 
-In strict mode (`--strict`), processing aborts immediately on first error:
+Processing aborts immediately on first error with `--strict`:
 
 ```bash
 kelora -j --strict app.log
 # ... aborts on first error ...
 echo $?
-1  # Processing aborted due to error
+1  # Processing aborted
 ```
 
-### Parse Errors
+### Examples
 
-**Example:**
 ```bash
-echo '{"valid": "json"}' > test.log
-echo '{invalid json}' >> test.log
-kelora -j test.log
-echo $?
-1  # Parse error occurred
-```
-
-### Filter Errors
-
-**Example:**
-```bash
-kelora -j app.log --filter 'e.timestamp.to_unix() > 1000000'
-# If e.timestamp is missing or invalid
-echo $?
-1  # Filter error occurred
-```
-
-### Exec Errors
-
-**Example:**
-```bash
-kelora -j app.log --exec 'e.result = e.value.to_int()'
-# If e.value is not a valid integer
-echo $?
-1  # Exec error occurred
+# Parse error
+echo '{invalid json}' | kelora -j
+# Filter error
+kelora -j app.log --filter 'e.missing_field.to_int()'
+# Exec error
+kelora -j app.log --exec 'e.result = e.invalid.to_int()'
+# All return exit code 1
 ```
 
 ## Exit Code 2: Usage Errors
 
-### When It Occurs
+Indicates **command-line usage errors** before processing begins:
 
-Exit code `2` indicates **command-line usage errors**:
-
-- **Invalid flags**: Unknown or malformed options
-- **Missing required arguments**: Required values not provided
-- **File not found**: Input files don't exist
-- **Configuration errors**: Invalid configuration file
-- **Permission denied**: Can't read input files
-
-### Invalid Flags
-
-```bash
-kelora --invalid-flag app.log
-kelora: error: unrecognized option '--invalid-flag'
-echo $?
-2
-```
-
-### File Not Found
+| Error Type | Example |
+|------------|---------|
+| Invalid flags | `kelora --invalid-flag app.log` |
+| Missing arguments | `kelora --filter` (no expression provided) |
+| File not found | `kelora -j nonexistent.log` |
+| Permission denied | `kelora -j /root/secure.log` (without permission) |
+| Invalid configuration | `kelora --config-file invalid.ini app.log` |
 
 ```bash
 kelora -j nonexistent.log
@@ -150,140 +103,106 @@ echo $?
 2
 ```
 
-### Invalid Configuration
+## Mode Interactions
+
+### Processing Modes
+
+| Mode | Behavior | Exit Code 1 Timing | Use Case |
+|------|----------|-------------------|----------|
+| **Resilient** (default) | Continue on errors | At end if any errors occurred | Production, collect all errors |
+| **Strict** (`--strict`) | Abort on first error | Immediately on first error | Validation, fail-fast |
+| **Parallel** (`--parallel`) | Same as sequential | Same as non-parallel | Performance (exit code behavior unchanged) |
+
+### Quiet Modes
+
+Exit codes preserved at all quiet levels:
+
+| Level | Suppresses | Exit Code | Use Case |
+|-------|-----------|-----------|----------|
+| `-q` | Diagnostics only | Preserved | Hide error details, keep events |
+| `-qq` | Diagnostics + events | Preserved | Silent validation, check exit code only |
+| `-qqq` | All output (including script) | Preserved | Complete silence, automation |
 
 ```bash
-kelora --config-file invalid.ini app.log
-kelora: error: failed to parse configuration file
-echo $?
-2
-```
-
-## Signal Exit Codes
-
-### Exit Code 130: SIGINT (Ctrl+C)
-
-User interrupted processing with Ctrl+C:
-
-```bash
-kelora -j large.log
-# Press Ctrl+C
-^C
-echo $?
-130
-```
-
-### Exit Code 141: SIGPIPE (Broken Pipe)
-
-Output pipe closed (normal in Unix pipelines):
-
-```bash
-kelora -j large.log | head -n 10
-# Kelora receives SIGPIPE when head closes
-echo $?
-141
-```
-
-**Note:** Exit code `141` is **normal** in pipelines and typically not an error condition.
-
-### Exit Code 143: SIGTERM
-
-Process terminated by system or user:
-
-```bash
-kelora -j large.log &
-[1] 12345
-kill 12345
-[1]+  Terminated              kelora -j large.log
-echo $?
-143
+# All return 1 if errors occurred, just with different output
+kelora -q -j app.log      # Show events only
+kelora -qq -j app.log     # No output
+kelora -qqq -j app.log    # Complete silence
 ```
 
 ## Using Exit Codes in Scripts
 
-### Basic Success/Failure Check
+### Comprehensive Example
 
 ```bash
-if kelora -j app.log > /dev/null 2>&1; then
-    echo "✓ No errors in logs"
+#!/bin/bash
+# Production log processing script
+
+# Check for usage errors first
+if ! kelora -j --strict app.log > /dev/null 2>&1; then
+    exit_code=$?
+    case $exit_code in
+        1)
+            echo "✗ Parse errors detected, check log format"
+            kelora -j --verbose app.log 2>&1 | grep "error:" | head -5
+            exit 1
+            ;;
+        2)
+            echo "✗ Usage error, check command syntax"
+            exit 2
+            ;;
+        130)
+            echo "⚠️  Interrupted by user"
+            exit 130
+            ;;
+        141)
+            # SIGPIPE is normal in pipelines
+            exit 0
+            ;;
+        *)
+            echo "✗ Unknown error (exit code: $exit_code)"
+            exit $exit_code
+            ;;
+    esac
+fi
+
+# Process validated logs
+if kelora -j app.log --levels error,critical -F json > errors.json; then
+    echo "✓ No errors found"
 else
-    echo "✗ Errors detected in logs"
+    echo "✗ Processing failed"
     exit 1
 fi
 ```
 
-### Check Specific Exit Codes
+### Common Patterns
 
 ```bash
-kelora -j app.log
-exit_code=$?
+# Basic validation
+kelora -qq -j --strict app.log && echo "✓ Valid" || echo "✗ Invalid"
 
-case $exit_code in
-    0)
-        echo "✓ Success - no errors"
-        ;;
-    1)
-        echo "✗ Processing errors occurred"
-        exit 1
-        ;;
-    2)
-        echo "✗ Usage error - check command syntax"
-        exit 2
-        ;;
-    130)
-        echo "⚠️  Interrupted by user"
-        exit 130
-        ;;
-    *)
-        echo "✗ Unknown error (exit code: $exit_code)"
-        exit $exit_code
-        ;;
-esac
-```
+# Ignore SIGPIPE in pipelines
+kelora -j large.log | head -n 10 || [ $? -eq 141 ]
 
-### With Quiet Mode
-
-Use quiet modes to suppress output, rely on exit code:
-
-```bash
-# Level 1: Suppress diagnostics
-kelora -q -j app.log > /dev/null
-if [ $? -eq 0 ]; then
-    echo "No errors"
-fi
-
-# Level 2: Suppress events too
-kelora -qq -j app.log
-if [ $? -eq 0 ]; then
-    echo "No errors"
-fi
-
-# Level 3: Complete silence
-kelora -qqq -j app.log
-if [ $? -eq 0 ]; then
-    echo "No errors"
-fi
-```
-
-### CI/CD Pipeline
-
-```bash
-#!/bin/bash
-set -e  # Exit on any error
-
-# Validate log format
-kelora -j --strict app.log > /dev/null || {
+# CI/CD validation
+kelora -j --strict logs/*.json > /dev/null || {
     echo "✗ Log validation failed"
     exit 1
 }
 
-# Check for errors in logs
+# Check for critical events
 if ! kelora -qq -j app.log --levels error,critical; then
-    echo "✗ Found error-level events in logs"
+    echo "✗ Found critical errors"
     exit 1
 fi
 
-echo "✓ All checks passed"
+# Validation loop
+for file in logs/*.json; do
+    kelora -j --strict "$file" > /dev/null 2>&1 || {
+        echo "✗ Invalid: $file"
+        exit 1
+    }
+done
 ```
 
 ### Makefile Integration
@@ -300,228 +219,45 @@ validate-logs:
 		(echo "Log validation failed" && exit 1)
 ```
 
-### GitHub Actions
-
-```yaml
-- name: Validate logs
-  run: |
-    kelora -j --strict app.log || exit 1
-
-- name: Check for errors
-  run: |
-    if kelora -qq -j app.log --levels error,critical; then
-      echo "✓ No critical errors"
-    else
-      echo "✗ Critical errors found"
-      exit 1
-    fi
-```
-
-## Exit Codes with Different Modes
-
-### Sequential vs Parallel
-
-Exit codes work the same in both modes:
-
-```bash
-# Sequential
-kelora -j app.log
-echo $?
-
-# Parallel
-kelora -j --parallel app.log
-echo $?
-```
-
-Both return `1` if any errors occurred.
-
-### Resilient vs Strict
-
-**Resilient mode (default):**
-
-- Collects all errors
-- Returns `1` if any errors occurred
-- Processing completes
-
-```bash
-kelora -j app.log
-# Processes all lines despite errors
-echo $?
-1  # Errors occurred
-```
-
-**Strict mode:**
-
-- Aborts on first error
-- Returns `1` immediately
-- Processing incomplete
-
-```bash
-kelora -j --strict app.log
-# Aborts on first error
-echo $?
-1  # Aborted due to error
-```
-
-### With Quiet Modes
-
-Exit codes are preserved at all quiet levels:
-
-```bash
-# Level 1: Suppress diagnostics
-kelora -q -j app.log
-echo $?
-1  # Error occurred (not shown, but exit code preserved)
-
-# Level 2: Suppress events
-kelora -qq -j app.log
-echo $?
-1  # Error occurred
-
-# Level 3: Complete silence
-kelora -qqq -j app.log
-echo $?
-1  # Error occurred
-```
-
-## Common Patterns
-
-### Validation Pipeline
-
-```bash
-#!/bin/bash
-# Validate log files before processing
-
-for file in logs/*.json; do
-    if ! kelora -j --strict "$file" > /dev/null 2>&1; then
-        echo "✗ Invalid format: $file"
-        exit 1
-    fi
-done
-
-echo "✓ All log files valid"
-```
-
-### Data Quality Check
-
-```bash
-#!/bin/bash
-# Check for errors in logs
-
-kelora -qq -j app.log --levels error,critical
-exit_code=$?
-
-if [ $exit_code -eq 1 ]; then
-    echo "✗ Parse errors in log file"
-    exit 1
-elif [ $exit_code -eq 0 ]; then
-    # Check if any critical events found
-    count=$(kelora -j app.log --levels critical -F none --stats 2>&1 | grep -oP '\d+(?= events output)')
-    if [ "$count" -gt 0 ]; then
-        echo "✗ Found $count critical events"
-        exit 1
-    fi
-fi
-
-echo "✓ No critical issues"
-```
-
-### Automation with Retry
-
-```bash
-#!/bin/bash
-# Process logs with retry on failure
-
-max_attempts=3
-attempt=1
-
-while [ $attempt -le $max_attempts ]; do
-    if kelora -j app.log -F json > output.json; then
-        echo "✓ Processing succeeded"
-        exit 0
-    else
-        echo "✗ Attempt $attempt failed"
-        attempt=$((attempt + 1))
-        sleep 5
-    fi
-done
-
-echo "✗ Processing failed after $max_attempts attempts"
-exit 1
-```
-
-### Conditional Processing
-
-```bash
-#!/bin/bash
-# Process only if no errors
-
-if kelora -qq -j --strict app.log; then
-    echo "✓ No errors, processing..."
-    kelora -j app.log --exec 'track_count(e.service)' --metrics
-else
-    echo "✗ Errors detected, skipping processing"
-    exit 1
-fi
-```
-
 ## Troubleshooting
 
 ### Exit Code 1 When Expecting 0
 
 **Problem:** Getting exit code `1` but don't see errors.
 
-**Solution:** Use `--verbose` to see errors:
+**Solution:** Use `--verbose` to see all errors, or check stats:
+
 ```bash
 kelora -j --verbose app.log
-```
-
-Or check stats:
-```bash
 kelora -j --stats app.log
 ```
 
-### Exit Code 141 in Pipelines
+### Exit Code 141 (SIGPIPE)
 
-**Problem:** Getting exit code `141` (SIGPIPE) in pipelines.
-
-**This is normal:** When downstream commands close the pipe (like `head`), Kelora receives SIGPIPE.
+**This is normal** in pipelines when downstream commands close early:
 
 ```bash
 kelora -j large.log | head -n 10
-# Exit code 141 is normal here
-```
+# Exit code 141 is expected and normal
 
-To ignore SIGPIPE:
-```bash
+# Ignore SIGPIPE if needed
 kelora -j large.log | head -n 10 || [ $? -eq 141 ]
 ```
 
 ### Exit Code 2 with Valid Syntax
 
-**Problem:** Getting exit code `2` but command looks correct.
-
 **Check:**
-
-- File exists and is readable
+- File exists and is readable: `ls -l app.log`
+- Permissions are correct: `stat app.log`
 - Configuration file is valid
-- Permissions are correct
-
-```bash
-ls -l app.log
-kelora -j app.log
-```
+- Try ignoring config: `kelora --ignore-config -j app.log`
 
 ### Different Exit Codes in CI vs Local
 
-**Problem:** Different exit codes in CI/CD vs local development.
-
 **Possible causes:**
-
-- Different file permissions
-- Different file paths
+- Different file permissions/paths
 - Different configuration files
-- Different environment variables
+- Environment variables
 
 **Solution:** Test with same conditions:
 ```bash
