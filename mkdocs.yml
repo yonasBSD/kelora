@@ -82,12 +82,6 @@ nav:
       - how-to/fan-out-nested-structures.md
       - how-to/build-streaming-alerts.md
       - how-to/batch-process-archives.md
-  - Reference:
-      - reference/functions.md
-      - reference/cli-reference.md
-      - reference/formats.md
-      - reference/exit-codes.md
-      - reference/rhai-cheatsheet.md
   - Concepts:
       - concepts/pipeline-model.md
       - concepts/events-and-fields.md
@@ -96,3 +90,9 @@ nav:
       - concepts/multiline-strategies.md
       - concepts/performance-model.md
       - concepts/configuration-system.md
+  - Reference:
+      - reference/functions.md
+      - reference/cli-reference.md
+      - reference/formats.md
+      - reference/exit-codes.md
+      - reference/rhai-cheatsheet.md
