@@ -13,8 +13,7 @@ Kelora supports multiple input formats for parsing log files:
 | `logfmt` | Key-value pairs | Heroku-style logs, simple structured logs |
 | `csv` / `tsv` | Comma/tab-separated values | Spreadsheet data, exports |
 | `syslog` | Syslog RFC5424 and RFC3164 | System logs, network devices |
-| `combined` | Apache/Nginx combined format | Web server access logs |
-| `clf` | Apache Common Log Format | Web server access logs |
+| `combined` | Apache/Nginx log formats (Common + Combined) | Web server access logs |
 | `cef` | ArcSight Common Event Format | Security logs, SIEM data |
 | `cols:<spec>` | Custom column parsing | Column-based logs (whitespace or custom separators) |
 | `auto` | Auto-detect format | Mixed or unknown formats |
@@ -261,76 +260,64 @@ Parse syslog messages (RFC5424 and RFC3164).
 
 ### Description
 
-Parse Apache/Nginx combined log format (web server access logs).
+Parse Apache and Nginx web server access logs. Automatically handles three format variants:
+- **Apache Common Log Format (CLF)** - Basic format without referer/user-agent
+- **Apache Combined Log Format** - Extended format with referer and user-agent
+- **Nginx Combined with request_time** - Combined format plus request processing time
 
-### Input Example
+### Input Examples
 
-**Apache Combined:**
+**Apache Common Log Format:**
+```
+192.168.1.1 - user [15/Jan/2024:10:30:00 +0000] "GET /index.html HTTP/1.0" 200 1234
+```
+
+**Apache Combined Log Format:**
 ```
 192.168.1.1 - user [15/Jan/2024:10:30:00 +0000] "GET /api/data HTTP/1.1" 200 1234 "http://example.com/" "Mozilla/5.0"
 ```
 
-**Nginx with request_time:**
+**Nginx Combined with request_time:**
 ```
 192.168.1.1 - - [15/Jan/2024:10:30:00 +0000] "GET /api/data HTTP/1.1" 200 1234 "-" "curl/7.68.0" "0.123"
 ```
 
 ### Output Fields
 
-- `ip` - Client IP address
-- `identity` - RFC 1413 identity (usually `-`)
-- `user` - HTTP authenticated username (or `-`)
-- `timestamp` - Request timestamp
-- `request` - Full HTTP request line
-- `method` - HTTP method (extracted from request)
-- `path` - Request path (extracted from request)
-- `protocol` - HTTP protocol version (extracted from request)
-- `status` - HTTP status code
-- `bytes` - Response size in bytes (or `-`)
-- `referer` - HTTP referer header (or `-`)
-- `user_agent` - HTTP user agent header
-- `request_time` - Request processing time in seconds (Nginx only, or `-`)
+**Common to all variants:**
+- `ip` - Client IP address (required)
+- `identity` - RFC 1413 identity (omitted when `-`)
+- `user` - HTTP authenticated username (omitted when `-`)
+- `timestamp` - Request timestamp (required)
+- `request` - Full HTTP request line (required)
+- `method` - HTTP method (auto-extracted from request)
+- `path` - Request path (auto-extracted from request)
+- `protocol` - HTTP protocol version (auto-extracted from request)
+- `status` - HTTP status code (required)
+- `bytes` - Response size in bytes (omitted when `-`, included when `0`)
+
+**Additional fields in Combined format:**
+- `referer` - HTTP referer header (omitted when `-`)
+- `user_agent` - HTTP user agent header (omitted when `-`)
+
+**Additional field in Nginx variant:**
+- `request_time` - Request processing time in seconds (omitted when `-`)
 
 ### Usage
 
 ```bash
+# Works with all three format variants
 > kelora -f combined /var/log/nginx/access.log --filter 'e.status >= 400'
+> kelora -f combined /var/log/apache2/access.log --filter 'e.status == 404'
 > kelora -f combined access.log --keys ip,status,request,request_time
 ```
 
 ### Notes
 
-- Supports Apache Common Log Format (subset of combined)
+- Parser automatically detects which variant is present in each log line
 - Auto-extracts method, path, protocol from request line
-- `request_time` only available in Nginx logs with custom format
-
-## Common Log Format (CLF)
-
-### Syntax
-
-```bash
--f clf
-```
-
-### Description
-
-Parse Apache Common Log Format (older format without referer/user-agent).
-
-### Input Example
-
-```
-192.168.1.1 - user [15/Jan/2024:10:30:00 +0000] "GET /index.html HTTP/1.0" 200 1234
-```
-
-### Output Fields
-
-Same as combined format, but without `referer`, `user_agent`, `request_time`.
-
-### Usage
-
-```bash
-> kelora -f clf /var/log/apache2/access.log --filter 'e.status == 404'
-```
+- `request_time` only available in Nginx logs configured with `$request_time` variable
+- Fields with `-` values are omitted from output (except `bytes` which includes `0`)
 
 ## CEF Format
 
@@ -457,7 +444,7 @@ Automatically detect input format from first line.
 1. JSON (if line starts with `{`)
 2. Syslog (if line starts with `<NNN>`)
 3. CEF (if line starts with `CEF:`)
-4. Combined/CLF (if matches Apache/Nginx pattern)
+4. Combined (if matches Apache/Nginx Common or Combined log pattern)
 5. Logfmt (if contains `key=value` pairs)
 6. CSV (if contains commas with consistent pattern)
 7. Line (fallback)
