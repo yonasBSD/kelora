@@ -124,8 +124,9 @@ The `-f` flag specifies input format, `-F` specifies output format (we could hav
 # Stream processing (tail -f, kubectl logs, etc.)
 kubectl logs -f deployment/api | kelora -f json -l error
 
-# Multiple files and gzipped archives
-kelora -f syslog logs/*.log logs/*.log.gz -l error
+# Multiple files - track which files have errors
+kelora -f json logs/*.log --metrics \
+  --exec 'if e.level == "ERROR" { track_count(meta.filename) }'
 
 # Time-based filtering
 kelora -f combined access.log --since "1 hour ago" --until "10 minutes ago"
