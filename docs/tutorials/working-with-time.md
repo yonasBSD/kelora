@@ -57,19 +57,19 @@ Use `--since` and `--until` to filter logs by time range:
 
 ```bash
 # Last hour of logs
-> kelora -j --since 1h app.log
+kelora -j --since 1h app.log
 
 # Last 30 minutes
-> kelora -j --since 30m app.log
+kelora -j --since 30m app.log
 
 # Last 2 days
-> kelora -j --since 2d app.log
+kelora -j --since 2d app.log
 
 # Specific timestamp range
-> kelora -j --since "2024-01-15T10:00:00Z" --until "2024-01-15T11:00:00Z" app.log
+kelora -j --since "2024-01-15T10:00:00Z" --until "2024-01-15T11:00:00Z" app.log
 
 # Natural language (yesterday)
-> kelora -j --since yesterday app.log
+kelora -j --since yesterday app.log
 ```
 
 **Duration syntax:**
@@ -90,19 +90,19 @@ When your timestamps don't match standard formats, use `--ts-format`:
 
 ```bash
 # Python logging format with milliseconds
-> echo '2024-01-15 10:30:45,123 INFO User login' | \
+echo '2024-01-15 10:30:45,123 INFO User login' | \
     kelora -f 'cols:timestamp(2) level *message' \
     --ts-field timestamp \
     --ts-format '%Y-%m-%d %H:%M:%S,%3f'
 
 # Apache access log format
-> echo '15/Jan/2024:10:30:45 +0000 GET /api/users 200' | \
+echo '15/Jan/2024:10:30:45 +0000 GET /api/users 200' | \
     kelora -f 'cols:timestamp(2) method path status:int' \
     --ts-field timestamp \
     --ts-format '%d/%b/%Y:%H:%M:%S %z'
 
 # Syslog format without year
-> echo 'Jan 15 10:30:45 webserver nginx: Connection accepted' | \
+echo 'Jan 15 10:30:45 webserver nginx: Connection accepted' | \
     kelora -f syslog --ts-format '%b %d %H:%M:%S'
 ```
 
@@ -144,14 +144,14 @@ Other timezone examples:
 
 ```bash
 # Parse naive timestamps as UTC
-> kelora -j --input-tz UTC app.log
+kelora -j --input-tz UTC app.log
 
 # Parse naive timestamps as local time
-> kelora -j --input-tz local app.log
+kelora -j --input-tz local app.log
 
 # Parse naive timestamps in specific timezone
-> kelora -j --input-tz Europe/Berlin app.log
-> kelora -j --input-tz America/New_York app.log
+kelora -j --input-tz Europe/Berlin app.log
+kelora -j --input-tz America/New_York app.log
 ```
 
 **Timezone precedence:**
@@ -167,11 +167,11 @@ Use `--convert-ts` to convert timestamp fields to RFC3339 format:
 
 ```bash
 # Convert timestamp field to RFC3339
-> echo '{"ts": "2024-01-15 10:30:00", "user": "alice"}' | \
+echo '{"ts": "2024-01-15 10:30:00", "user": "alice"}' | \
     kelora -j --input-tz UTC --convert-ts ts
 
 # Convert multiple timestamp fields
-> echo '{"created": "2024-01-15 10:00:00", "modified": "2024-01-15 10:30:00"}' | \
+echo '{"created": "2024-01-15 10:00:00", "modified": "2024-01-15 10:30:00"}' | \
     kelora -j --convert-ts created,modified
 ```
 
@@ -188,15 +188,15 @@ Understand the difference between data conversion and display formatting:
 
 ```bash
 # --convert-ts: Modifies event data (affects all formats)
-> echo '{"ts": "2024-01-15 10:30:00"}' | \
+echo '{"ts": "2024-01-15 10:30:00"}' | \
     kelora -j --convert-ts ts -F json
 
 # -z: Display formatting only (default format only)
-> echo '{"ts": "2024-01-15T10:30:00Z"}' | \
+echo '{"ts": "2024-01-15T10:30:00Z"}' | \
     kelora -j -z
 
 # -Z: Display as UTC (default format only)
-> echo '{"ts": "2024-01-15T10:30:00Z"}' | \
+echo '{"ts": "2024-01-15T10:30:00Z"}' | \
     kelora -j -Z
 ```
 
@@ -212,17 +212,17 @@ Use `to_datetime()` to parse timestamps in Rhai scripts:
 
 ```bash
 # Parse timestamp from string
-> echo '{"log": "Event at 2024-01-15T10:30:00Z completed"}' | \
+echo '{"log": "Event at 2024-01-15T10:30:00Z completed"}' | \
     kelora -j \
     -e 'e.event_time = to_datetime(e.log.extract_re(r"at (\S+)", 1))'
 
 # Parse with custom format
-> echo '{"log": "Event at 15/Jan/2024:10:30:45"}' | \
+echo '{"log": "Event at 15/Jan/2024:10:30:45"}' | \
     kelora -j \
     -e 'e.event_time = to_datetime(e.log.extract_re(r"at (\S+)", 1), "%d/%b/%Y:%H:%M:%S")'
 
 # Parse with timezone hint
-> echo '{"log": "Event at 2024-01-15 10:30:00"}' | \
+echo '{"log": "Event at 2024-01-15 10:30:00"}' | \
     kelora -j \
     -e 'e.event_time = to_datetime(e.log.extract_re(r"at (.+)$", 1), "%Y-%m-%d %H:%M:%S", "Europe/Berlin")'
 ```
@@ -233,7 +233,7 @@ Extract components and format timestamps:
 
 ```bash
 # Extract time components
-> echo '{"timestamp": "2024-01-15T10:30:45Z"}' | \
+echo '{"timestamp": "2024-01-15T10:30:45Z"}' | \
     kelora -j \
     -e 'let dt = to_datetime(e.timestamp)' \
     -e 'e.hour = dt.hour()' \
@@ -243,13 +243,13 @@ Extract components and format timestamps:
     -k hour,day,month,year
 
 # Format timestamp
-> echo '{"timestamp": "2024-01-15T10:30:45Z"}' | \
+echo '{"timestamp": "2024-01-15T10:30:45Z"}' | \
     kelora -j \
     -e 'let dt = to_datetime(e.timestamp)' \
     -e 'e.formatted = dt.format("%b %d, %Y at %I:%M %p")'
 
 # Convert timezone
-> echo '{"timestamp": "2024-01-15T10:30:45Z"}' | \
+echo '{"timestamp": "2024-01-15T10:30:45Z"}' | \
     kelora -j \
     -e 'let dt = to_datetime(e.timestamp)' \
     -e 'e.utc = dt.to_utc().to_iso()' \
@@ -273,7 +273,7 @@ Calculate time differences between events:
 
 ```bash
 # Calculate duration between timestamps
-> echo '{"start": "2024-01-15T10:00:00Z", "end": "2024-01-15T10:30:00Z"}' | \
+echo '{"start": "2024-01-15T10:00:00Z", "end": "2024-01-15T10:30:00Z"}' | \
     kelora -j \
     -e 'let start_dt = to_datetime(e.start)' \
     -e 'let end_dt = to_datetime(e.end)' \
@@ -284,14 +284,14 @@ Calculate time differences between events:
     -k duration_seconds,duration_minutes,duration_human
 
 # Add duration to timestamp
-> echo '{"timestamp": "2024-01-15T10:00:00Z"}' | \
+echo '{"timestamp": "2024-01-15T10:00:00Z"}' | \
     kelora -j \
     -e 'let dt = to_datetime(e.timestamp)' \
     -e 'let hour_later = dt + to_duration("1h")' \
     -e 'e.plus_1h = hour_later.to_iso()'
 
 # Duration from number
-> echo '{"timestamp": "2024-01-15T10:00:00Z"}' | \
+echo '{"timestamp": "2024-01-15T10:00:00Z"}' | \
     kelora -j \
     -e 'let dt = to_datetime(e.timestamp)' \
     -e 'let offset = duration_from_minutes(90)' \
@@ -317,14 +317,14 @@ Analyze API request durations with proper time handling:
 
 ```bash
 # Sample log data
-> cat api_logs.json
+cat api_logs.json
 {"timestamp": "2024-01-15T10:00:00Z", "endpoint": "/api/users", "duration_ms": 45}
 {"timestamp": "2024-01-15T10:00:05Z", "endpoint": "/api/orders", "duration_ms": 230}
 {"timestamp": "2024-01-15T10:00:10Z", "endpoint": "/api/users", "duration_ms": 1200}
 {"timestamp": "2024-01-15T10:00:15Z", "endpoint": "/api/products", "duration_ms": 89}
 
 # Analyze slow requests in the last hour
-> kelora -j api_logs.json \
+kelora -j api_logs.json \
     --since 1h \
     -e 'e.duration_human = humanize_duration(e.duration_ms)' \
     --filter 'e.duration_ms > 1000' \
@@ -340,14 +340,14 @@ Filter logs during business hours across timezones:
 
 ```bash
 # Filter for events during business hours (9 AM - 5 PM)
-> kelora -j app.log \
+kelora -j app.log \
     --input-tz America/New_York \
     -e 'let dt = to_datetime(e.timestamp)' \
     -e 'e.hour = dt.hour()' \
     --filter 'e.hour >= 9 && e.hour < 17'
 
 # Weekend vs weekday analysis
-> kelora -j app.log \
+kelora -j app.log \
     -e 'let dt = to_datetime(e.timestamp)' \
     -e 'let dow = dt.format("%w").to_int()' \
     -e 'e.is_weekend = dow == 0 || dow == 6' \
@@ -360,7 +360,7 @@ Use datetime comparison in filters:
 
 ```bash
 # Events after a specific time
-> echo '{"timestamp": "2024-01-15T10:30:00Z", "message": "Event 1"}
+echo '{"timestamp": "2024-01-15T10:30:00Z", "message": "Event 1"}
 {"timestamp": "2024-01-15T11:00:00Z", "message": "Event 2"}
 {"timestamp": "2024-01-15T11:30:00Z", "message": "Event 3"}' | \
     kelora -j \
@@ -369,7 +369,7 @@ Use datetime comparison in filters:
     --filter 'dt > cutoff'
 
 # Events within time window
-> kelora -j app.log \
+kelora -j app.log \
     -e 'let dt = to_datetime(e.timestamp)' \
     -e 'let start = to_datetime("2024-01-15T10:00:00Z")' \
     -e 'let end = to_datetime("2024-01-15T11:00:00Z")' \
@@ -388,17 +388,17 @@ Use `now_utc()` and `now_local()` for relative time calculations:
 
 ```bash
 # Find events in last 5 minutes using script
-> kelora -j app.log \
+kelora -j app.log \
     -e 'let dt = to_datetime(e.timestamp)' \
     -e 'let cutoff = now_utc() - to_duration("5m")' \
     --filter 'dt > cutoff'
 
 # Add processing timestamp
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.processed_at = now_utc().to_iso()'
 
 # Calculate event age
-> kelora -j app.log \
+kelora -j app.log \
     -e 'let dt = to_datetime(e.timestamp)' \
     -e 'let age = now_utc() - dt' \
     -e 'e.age_minutes = age.as_minutes()'
@@ -410,7 +410,7 @@ Use `now_utc()` and `now_local()` for relative time calculations:
 
 ```bash
 # Custom application format
-> kelora -j app.log \
+kelora -j app.log \
     --ts-format '%Y-%m-%d %H:%M:%S,%3f' \
     --input-tz UTC
 ```
@@ -419,7 +419,7 @@ Use `now_utc()` and `now_local()` for relative time calculations:
 
 ```bash
 # Last hour of errors
-> kelora -j app.log \
+kelora -j app.log \
     --since 1h \
     -l error
 ```
@@ -428,17 +428,17 @@ Use `now_utc()` and `now_local()` for relative time calculations:
 
 ```bash
 # Show timestamps in local timezone
-> kelora -j app.log -z
+kelora -j app.log -z
 
 # Show timestamps in UTC
-> kelora -j app.log -Z
+kelora -j app.log -Z
 ```
 
 ### Pattern 4: Calculate Request Duration
 
 ```bash
 # Add duration between start and end timestamps
-> kelora -j app.log \
+kelora -j app.log \
     -e 'let start = to_datetime(e.start_time)' \
     -e 'let end = to_datetime(e.end_time)' \
     -e 'let duration = end - start' \
@@ -449,7 +449,7 @@ Use `now_utc()` and `now_local()` for relative time calculations:
 
 ```bash
 # Filter for business hours in specific timezone
-> kelora -j app.log \
+kelora -j app.log \
     --input-tz America/New_York \
     -e 'let dt = to_datetime(e.timestamp)' \
     -e 'let hour = dt.hour()' \
@@ -460,7 +460,7 @@ Use `now_utc()` and `now_local()` for relative time calculations:
 
 ```bash
 # Convert milliseconds to human-readable format
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.duration_human = humanize_duration(e.response_time_ms)' \
     -k timestamp,endpoint,duration_human
 ```
@@ -471,44 +471,44 @@ Use `now_utc()` and `now_local()` for relative time calculations:
 
 ```bash
 # Good - explicit timezone
-> kelora -j --input-tz UTC app.log
+kelora -j --input-tz UTC app.log
 
 # Avoid - relies on defaults
-> kelora -j app.log
+kelora -j app.log
 ```
 
 ### Use --ts-format for Custom Formats
 
 ```bash
 # Good - explicit format
-> kelora -f syslog --ts-format '%b %d %H:%M:%S' app.log
+kelora -f syslog --ts-format '%b %d %H:%M:%S' app.log
 
 # Avoid - relies on auto-detection
-> kelora -f syslog app.log
+kelora -f syslog app.log
 ```
 
 ### Filter Early with --since/--until
 
 ```bash
 # Good - filter at input stage
-> kelora -j --since 1h app.log
+kelora -j --since 1h app.log
 
 # Less efficient - filter in script
-> kelora -j app.log -e 'let dt = to_datetime(e.timestamp)' --filter 'now_utc() - dt < to_duration("1h")'
+kelora -j app.log -e 'let dt = to_datetime(e.timestamp)' --filter 'now_utc() - dt < to_duration("1h")'
 ```
 
 ### Store Parsed DateTime in Variable
 
 ```bash
 # Good - parse once, use multiple times
-> kelora -j app.log \
+kelora -j app.log \
     -e 'let dt = to_datetime(e.timestamp)' \
     -e 'e.hour = dt.hour()' \
     -e 'e.day = dt.day()' \
     -e 'e.formatted = dt.format("%Y-%m-%d")'
 
 # Less efficient - parse multiple times
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.hour = to_datetime(e.timestamp).hour()' \
     -e 'e.day = to_datetime(e.timestamp).day()'
 ```
@@ -517,10 +517,10 @@ Use `now_utc()` and `now_local()` for relative time calculations:
 
 ```bash
 # Good - ISO 8601 format
-> kelora -j app.log -e 'e.timestamp = to_datetime(e.ts).to_iso()'
+kelora -j app.log -e 'e.timestamp = to_datetime(e.ts).to_iso()'
 
 # Less portable - custom format
-> kelora -j app.log -e 'e.timestamp = to_datetime(e.ts).format("%Y-%m-%d %H:%M:%S")'
+kelora -j app.log -e 'e.timestamp = to_datetime(e.ts).format("%Y-%m-%d %H:%M:%S")'
 ```
 
 ## Troubleshooting
@@ -532,10 +532,10 @@ Use `now_utc()` and `now_local()` for relative time calculations:
 **Solution:** Check field names and add explicit timestamp field:
 ```bash
 # Debug: Show detected timestamp
-> kelora -j app.log -n 3
+kelora -j app.log -n 3
 
 # Point Kelora at your timestamp field explicitly
-> kelora -f 'cols:my_time level *message' app.log --since 1h --ts-field my_time
+kelora -f 'cols:my_time level *message' app.log --since 1h --ts-field my_time
 ```
 
 ### Timezone Confusion
@@ -545,10 +545,10 @@ Use `now_utc()` and `now_local()` for relative time calculations:
 **Solution:** Verify input timezone and display options:
 ```bash
 # Check what timezone is being used
-> kelora -j --input-tz UTC app.log -n 1 -z
+kelora -j --input-tz UTC app.log -n 1 -z
 
 # Verify timestamp includes timezone info
-> kelora -j --convert-ts timestamp app.log -n 1 -F json
+kelora -j --convert-ts timestamp app.log -n 1 -F json
 ```
 
 ### Custom Format Not Parsing
@@ -558,14 +558,14 @@ Use `now_utc()` and `now_local()` for relative time calculations:
 **Solution:** Test format with sample data:
 ```bash
 # Test format with verbose errors
-> echo '2024-01-15 10:30:45,123 Test' | \
+echo '2024-01-15 10:30:45,123 Test' | \
     kelora -f 'cols:timestamp(2) *message' \
     --ts-field timestamp \
     --ts-format '%Y-%m-%d %H:%M:%S,%3f' \
     --verbose
 
 # Check format string escaping
-> kelora --ts-format '%Y-%m-%d %H:%M:%S' app.log  # Ensure proper quoting
+kelora --ts-format '%Y-%m-%d %H:%M:%S' app.log  # Ensure proper quoting
 ```
 
 ### Duration Calculations Wrong
@@ -575,7 +575,7 @@ Use `now_utc()` and `now_local()` for relative time calculations:
 **Solution:** Verify timestamp order and timezone consistency:
 ```bash
 # Check both timestamps are parsed correctly
-> kelora -j app.log \
+kelora -j app.log \
     -e 'print("Start: " + e.start_time + ", End: " + e.end_time)' \
     -e 'let start = to_datetime(e.start_time)' \
     -e 'let end = to_datetime(e.end_time)' \

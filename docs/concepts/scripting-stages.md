@@ -34,7 +34,7 @@ The `--begin` stage runs **once** before any events are processed. Use it to:
 The global `conf` map is **read-write** in `--begin` and **read-only** in later stages.
 
 ```bash
-> kelora -j \
+kelora -j \
     --begin 'conf.valid_users = ["alice", "bob", "charlie"]' \
     --exec 'e.is_valid = e.user in conf.valid_users' \
     app.log
@@ -49,7 +49,7 @@ Special functions available **only** in `--begin`:
 Read file as array of strings (one per line, UTF-8).
 
 ```bash
-> kelora -j \
+kelora -j \
     --begin 'conf.blocked_ips = read_lines("blocked.txt")' \
     --exec 'if e.ip in conf.blocked_ips { e = () }' \
     app.log
@@ -60,7 +60,7 @@ Read file as array of strings (one per line, UTF-8).
 Read entire file as single string (UTF-8).
 
 ```bash
-> kelora -j \
+kelora -j \
     --begin 'conf.template = read_file("template.txt")' \
     --end 'print(conf.template.replace("{count}", metrics["total"].to_string()))' \
     app.log
@@ -71,7 +71,7 @@ Read entire file as single string (UTF-8).
 Parse JSON file (convenience helper).
 
 ```bash
-> kelora -j \
+kelora -j \
     --begin 'conf.users = read_json("users.json")' \
     --exec 'e.user_name = conf.users.get(e.user_id, "unknown")' \
     app.log
@@ -82,7 +82,7 @@ Parse JSON file (convenience helper).
 #### Load Lookup Table
 
 ```bash
-> kelora -j \
+kelora -j \
     --begin 'conf.services = #{api: "API Gateway", db: "Database", cache: "Redis"}' \
     --exec 'e.service_name = conf.services.get(e.service, e.service)' \
     app.log
@@ -91,7 +91,7 @@ Parse JSON file (convenience helper).
 #### Load IP Geolocation Data
 
 ```bash
-> kelora -j \
+kelora -j \
     --begin 'conf.ip_to_country = read_json("geoip.json")' \
     --exec 'e.country = conf.ip_to_country.get(e.ip, "unknown")' \
     app.log
@@ -100,7 +100,7 @@ Parse JSON file (convenience helper).
 #### Initialize Counters
 
 ```bash
-> kelora -j \
+kelora -j \
     --begin 'conf.start_time = now_utc()' \
     --end 'let duration = now_utc() - conf.start_time; print("Processed in " + duration + "s")' \
     app.log
@@ -109,7 +109,7 @@ Parse JSON file (convenience helper).
 #### Load Configuration
 
 ```bash
-> kelora -j \
+kelora -j \
     --begin 'conf.threshold = 1000; conf.alert_email = "ops@company.com"' \
     --exec 'if e.duration_ms > conf.threshold { eprint("⚠️  Slow request: " + e.path) }' \
     app.log
@@ -132,7 +132,7 @@ The `--exec` stage runs **once per event**. Use it to:
 The current event is available as `e`. Modifications to `e` persist through subsequent `--exec` scripts.
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'e.duration_s = e.duration_ms / 1000' \
     --exec 'e.is_slow = e.duration_s > 1.0' \
     app.log
@@ -143,7 +143,7 @@ The current event is available as `e`. Modifications to `e` persist through subs
 Multiple `--exec` scripts run in order. Each sees changes from previous scripts.
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'e.duration_s = e.duration_ms / 1000' \
     --exec 'track_avg("duration", e.duration_s)' \
     --exec 'if e.duration_s > 5.0 { e.alert = true }' \
@@ -164,7 +164,7 @@ In resilient mode (default), exec scripts execute **atomically**:
 - Processing continues with next event
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'e.result = e.value.to_int() * 2' \
     app.log
 ```
@@ -182,7 +182,7 @@ In strict mode (`--strict`), errors abort immediately.
 #### Transform Fields
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'e.level = e.level.to_upper()' \
     --exec 'e.message = e.message.trim()' \
     app.log
@@ -191,7 +191,7 @@ In strict mode (`--strict`), errors abort immediately.
 #### Add Computed Fields
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'e.duration_s = e.duration_ms / 1000' \
     --exec 'e.timestamp_unix = e.timestamp.to_unix()' \
     app.log
@@ -200,7 +200,7 @@ In strict mode (`--strict`), errors abort immediately.
 #### Conditional Field Creation
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'if e.status >= 500 { e.severity = "critical" } else if e.status >= 400 { e.severity = "error" }' \
     app.log
 ```
@@ -208,7 +208,7 @@ In strict mode (`--strict`), errors abort immediately.
 #### Remove Events
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'if e.level == "DEBUG" { e = () }' \
     app.log
 ```
@@ -216,7 +216,7 @@ In strict mode (`--strict`), errors abort immediately.
 #### Track Metrics
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'track_count(e.service)' \
     --exec 'track_avg("response_time", e.duration_ms)' \
     --metrics \
@@ -226,7 +226,7 @@ In strict mode (`--strict`), errors abort immediately.
 #### Fan-Out Arrays
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'emit_each(e.items)' \
     app.log
 ```
@@ -238,7 +238,7 @@ Each array element becomes a separate event.
 The `conf` map from `--begin` is **read-only** in `--exec`:
 
 ```bash
-> kelora -j \
+kelora -j \
     --begin 'conf.multiplier = 2.5' \
     --exec 'e.adjusted = e.value * conf.multiplier' \
     app.log
@@ -249,7 +249,7 @@ The `conf` map from `--begin` is **read-only** in `--exec`:
 The `meta` variable provides event metadata in `--exec` and `--filter`:
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'e.source = meta.filename' \
     server1.log server2.log
 ```
@@ -263,7 +263,7 @@ The `meta` variable provides event metadata in `--exec` and `--filter`:
 **Multi-file tracking example:**
 
 ```bash
-> kelora -j logs/*.log --metrics \
+kelora -j logs/*.log --metrics \
     --exec 'if e.level == "ERROR" { track_count(meta.filename) }' \
     --end 'for file in metrics.keys() { print(file + ": " + metrics[file] + " errors") }'
 ```
@@ -271,7 +271,7 @@ The `meta` variable provides event metadata in `--exec` and `--filter`:
 **Debugging with line numbers:**
 
 ```bash
-> kelora -j --filter 'e.status >= 500' \
+kelora -j --filter 'e.status >= 500' \
     --exec 'eprint("⚠️  Server error at " + meta.filename + ":" + meta.line_num)' \
     app.log
 ```
@@ -279,7 +279,7 @@ The `meta` variable provides event metadata in `--exec` and `--filter`:
 **Re-parsing with raw line:**
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'if e.message.contains("CUSTOM:") { e.custom = meta.line.after("CUSTOM:").parse_json() }' \
     app.log
 ```
@@ -300,7 +300,7 @@ The `--end` stage runs **once** after all events are processed. Use it to:
 The global `metrics` map contains all tracked data from `track_*()` functions:
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'track_count(e.service)' \
     --end 'for key in metrics.keys() { print(key + ": " + metrics[key]) }' \
     app.log
@@ -319,7 +319,7 @@ In `--end`, you have access to:
 #### Print Summary Statistics
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'track_count("total"); if e.level == "ERROR" { track_count("errors") }' \
     --end 'let error_rate = metrics.errors / metrics.total * 100; print("Error rate: " + error_rate + "%")' \
     app.log
@@ -328,7 +328,7 @@ In `--end`, you have access to:
 #### Generate Report
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'track_count(e.service)' \
     --end 'print("=== Service Report ==="); for svc in metrics.keys() { print(svc + ": " + metrics[svc] + " requests") }' \
     app.log
@@ -337,7 +337,7 @@ In `--end`, you have access to:
 #### Export Metrics to File
 
 ```bash
-> kelora -j --allow-fs-writes \
+kelora -j --allow-fs-writes \
     --exec 'track_count(e.service)' \
     --end 'append_file("report.txt", "Total services: " + metrics.len().to_string())' \
     app.log
@@ -346,7 +346,7 @@ In `--end`, you have access to:
 #### Calculate Percentages
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'track_count("total"); track_count(e.level)' \
     --end 'for level in ["INFO", "WARN", "ERROR"] { let pct = metrics.get(level, 0) / metrics.total * 100; print(level + ": " + pct + "%") }' \
     app.log
@@ -371,7 +371,7 @@ In `--end`, you have access to:
 ### Complete Example
 
 ```bash
-> kelora -j \
+kelora -j \
     --begin 'conf.threshold = 1000; conf.start = now_utc()' \
     --exec 'if e.duration_ms > conf.threshold { track_count("slow") }' \
     --exec 'track_count("total")' \
@@ -411,7 +411,7 @@ track_avg("response_time", e.duration_s);
 
 **Usage:**
 ```bash
-> kelora -j -E transform.rhai --metrics app.log
+kelora -j -E transform.rhai --metrics app.log
 ```
 
 ### `-I, --include`
@@ -437,7 +437,7 @@ fn classify_status(status) {
 
 **Usage:**
 ```bash
-> kelora -j \
+kelora -j \
     -I helpers.rhai \
     --exec 'e.status_class = classify_status(e.status)' \
     app.log
@@ -449,7 +449,7 @@ fn classify_status(status) {
 
 **Good:**
 ```bash
-> kelora -j \
+kelora -j \
     --begin 'conf.lookup = read_json("data.json")' \
     --exec 'e.name = conf.lookup.get(e.id, "unknown")' \
     app.log
@@ -457,7 +457,7 @@ fn classify_status(status) {
 
 **Bad:**
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'let lookup = read_json("data.json"); e.name = lookup.get(e.id, "unknown")' \
     app.log
 ```
@@ -470,7 +470,7 @@ Break complex logic into multiple `--exec` scripts:
 
 **Good:**
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'e.duration_s = e.duration_ms / 1000' \
     --exec 'e.is_slow = e.duration_s > 1.0' \
     --exec 'if e.is_slow { track_count("slow_requests") }' \
@@ -479,7 +479,7 @@ Break complex logic into multiple `--exec` scripts:
 
 **Bad:**
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'e.duration_s = e.duration_ms / 1000; e.is_slow = e.duration_s > 1.0; if e.is_slow { track_count("slow_requests") }' \
     app.log
 ```
@@ -490,7 +490,7 @@ The good example is easier to read and debug.
 
 **Good:**
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'track_count(e.service)' \
     --end 'print("Total services: " + metrics.len())' \
     app.log
@@ -498,7 +498,7 @@ The good example is easier to read and debug.
 
 **Bad:**
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'track_count(e.service); print("Processing...")' \
     app.log
 ```
@@ -510,7 +510,7 @@ The bad example prints on every event (noisy).
 For complex logic, use `-E` and `-I`:
 
 ```bash
-> kelora -j -I helpers.rhai -E transform.rhai --metrics app.log
+kelora -j -I helpers.rhai -E transform.rhai --metrics app.log
 ```
 
 This keeps command lines clean and logic maintainable.
@@ -522,7 +522,7 @@ This keeps command lines clean and logic maintainable.
 The `--begin` stage runs once, so file I/O here is acceptable:
 
 ```bash
-> kelora -j \
+kelora -j \
     --begin 'conf.large_dataset = read_json("10mb.json")' \
     --exec 'e.enriched = conf.large_dataset.get(e.id, #{})' \
     app.log
@@ -534,14 +534,14 @@ The `--exec` stage runs per event. Avoid expensive operations:
 
 **Slow:**
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'let lookup = read_json("data.json"); e.name = lookup.get(e.id, "unknown")' \
     app.log
 ```
 
 **Fast:**
 ```bash
-> kelora -j \
+kelora -j \
     --begin 'conf.lookup = read_json("data.json")' \
     --exec 'e.name = conf.lookup.get(e.id, "unknown")' \
     app.log
@@ -552,7 +552,7 @@ The `--exec` stage runs per event. Avoid expensive operations:
 The `--end` stage runs once, so complex calculations are fine:
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'track_count(e.service)' \
     --end 'let sorted = metrics.keys().sort(); for key in sorted { print(key + ": " + metrics[key]) }' \
     app.log
@@ -567,7 +567,7 @@ When using `--parallel`, scripting stages behave differently:
 `--begin` and `--end` run **once** (not parallelized):
 
 ```bash
-> kelora -j --parallel \
+kelora -j --parallel \
     --begin 'conf.start = now_utc()' \
     --exec 'track_count(e.service)' \
     --end 'print("Duration: " + (now_utc() - conf.start))' \
@@ -583,7 +583,7 @@ When using `--parallel`, scripting stages behave differently:
 - Event modifications are isolated per thread
 
 ```bash
-> kelora -j --parallel \
+kelora -j --parallel \
     --exec 'e.duration_s = e.duration_ms / 1000' \
     --exec 'track_count(e.service)' \
     app.log
@@ -605,39 +605,39 @@ You don't need to worry about race conditions in scripts.
 
 **Problem:**
 ```bash
-> kelora -j --exec 'conf.value = 42' app.log
+kelora -j --exec 'conf.value = 42' app.log
 # Error: conf is read-only in exec stage
 ```
 
 **Solution:** Initialize in `--begin`:
 ```bash
-> kelora -j --begin 'conf.value = 42' --exec 'e.result = conf.value * 2' app.log
+kelora -j --begin 'conf.value = 42' --exec 'e.result = conf.value * 2' app.log
 ```
 
 ### metrics Not Available in --exec
 
 **Problem:**
 ```bash
-> kelora -j --exec 'print(metrics["total"])' app.log
+kelora -j --exec 'print(metrics["total"])' app.log
 # Error: metrics not available in exec stage
 ```
 
 **Solution:** Use `--end`:
 ```bash
-> kelora -j --exec 'track_count("total")' --end 'print(metrics["total"])' app.log
+kelora -j --exec 'track_count("total")' --end 'print(metrics["total"])' app.log
 ```
 
 ### File Helpers Not Working
 
 **Problem:**
 ```bash
-> kelora -j --exec 'append_file("out.txt", e.message)' app.log
+kelora -j --exec 'append_file("out.txt", e.message)' app.log
 # Error: filesystem writes not allowed
 ```
 
 **Solution:** Add `--allow-fs-writes`:
 ```bash
-> kelora -j --allow-fs-writes --exec 'append_file("out.txt", e.message)' app.log
+kelora -j --allow-fs-writes --exec 'append_file("out.txt", e.message)' app.log
 ```
 
 ### Script Execution Order
@@ -648,10 +648,10 @@ You don't need to worry about race conditions in scripts.
 
 ```bash
 # This works - both --exec scripts run on same events
-> kelora -j --exec 'e.a = 1' --exec 'e.b = e.a + 1' app.log
+kelora -j --exec 'e.a = 1' --exec 'e.b = e.a + 1' app.log
 
 # This doesn't - filter may remove events before second --exec
-> kelora -j --exec 'e.a = 1' --filter 'e.level == "ERROR"' --exec 'e.b = e.a + 1' app.log
+kelora -j --exec 'e.a = 1' --filter 'e.level == "ERROR"' --exec 'e.b = e.a + 1' app.log
 ```
 
 Filters run **between** exec stages in the pipeline.

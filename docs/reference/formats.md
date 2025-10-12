@@ -46,8 +46,8 @@ All JSON fields become event fields with their original names and types.
 ### Usage
 
 ```bash
-> kelora -j app.log --levels error
-> kelora -f json app.log --keys timestamp,level,message
+kelora -j app.log --levels error
+kelora -f json app.log --keys timestamp,level,message
 ```
 
 ### Notes
@@ -84,8 +84,8 @@ Parse each line as plain text. Each line becomes an event with a single `line` f
 ### Usage
 
 ```bash
-> kelora app.log --filter 'e.line.contains("ERROR")'
-> kelora -f line app.log --exec 'e.level = e.line.extract_re(r"(ERROR|INFO|WARN)")'
+kelora app.log --filter 'e.line.contains("ERROR")'
+kelora -f line app.log --exec 'e.level = e.line.extract_re(r"(ERROR|INFO|WARN)")'
 ```
 
 ### Notes
@@ -120,8 +120,8 @@ All key-value pairs become top-level fields.
 ### Usage
 
 ```bash
-> kelora -f logfmt app.log --levels error
-> kelora -f logfmt app.log --keys timestamp,service,message
+kelora -f logfmt app.log --levels error
+kelora -f logfmt app.log --keys timestamp,service,message
 ```
 
 ### Notes
@@ -168,8 +168,8 @@ timestamp,level,service,message
 ### Usage
 
 ```bash
-> kelora -f csv data.csv --levels error
-> kelora -f csvnh data.csv --keys col_0,col_1,col_2
+kelora -f csv data.csv --levels error
+kelora -f csvnh data.csv --keys col_0,col_1,col_2
 ```
 
 ### Type Annotations
@@ -177,7 +177,7 @@ timestamp,level,service,message
 Specify field types for automatic conversion:
 
 ```bash
-> kelora -f 'csv status:int bytes:int response_time:float' access.csv
+kelora -f 'csv status:int bytes:int response_time:float' access.csv
 ```
 
 **Supported types:**
@@ -241,8 +241,8 @@ Parse syslog messages (RFC5424 and RFC3164).
 ### Usage
 
 ```bash
-> kelora -f syslog /var/log/syslog --filter 'e.severity <= 3'
-> kelora -f syslog messages.log --keys timestamp,hostname,appname,message
+kelora -f syslog /var/log/syslog --filter 'e.severity <= 3'
+kelora -f syslog messages.log --keys timestamp,hostname,appname,message
 ```
 
 ### Notes
@@ -307,9 +307,9 @@ Parse Apache and Nginx web server access logs. Automatically handles three forma
 
 ```bash
 # Works with all three format variants
-> kelora -f combined /var/log/nginx/access.log --filter 'e.status >= 400'
-> kelora -f combined /var/log/apache2/access.log --filter 'e.status == 404'
-> kelora -f combined access.log --keys ip,status,request,request_time
+kelora -f combined /var/log/nginx/access.log --filter 'e.status >= 400'
+kelora -f combined /var/log/apache2/access.log --filter 'e.status == 404'
+kelora -f combined access.log --keys ip,status,request,request_time
 ```
 
 ### Notes
@@ -351,8 +351,8 @@ CEF:0|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 d
 ### Usage
 
 ```bash
-> kelora -f cef security.log --filter 'e.severity > 5'
-> kelora -f cef security.log --keys timestamp,name,src,dst
+kelora -f cef security.log --filter 'e.severity > 5'
+kelora -f cef security.log --keys timestamp,name,src,dst
 ```
 
 ## Column Format
@@ -411,13 +411,13 @@ Field names come from the specification. Type annotations convert values after e
 
 ```bash
 # Whitespace-delimited
-> kelora -f 'cols:level service *message' app.log
+kelora -f 'cols:level service *message' app.log
 
 # Multi-token timestamp with type annotations
-> kelora -f 'cols:timestamp(2) level status:int *message' app.log --ts-field timestamp
+kelora -f 'cols:timestamp(2) level status:int *message' app.log --ts-field timestamp
 
 # Custom separator
-> kelora -f 'cols:name age:int city' --cols-sep ',' data.txt
+kelora -f 'cols:name age:int city' --cols-sep ',' data.txt
 ```
 
 ### Notes
@@ -452,7 +452,7 @@ Automatically detect input format from first line.
 ### Usage
 
 ```bash
-> kelora -f auto mixed.log --levels error
+kelora -f auto mixed.log --levels error
 ```
 
 ### Notes
@@ -470,7 +470,7 @@ Automatically detect input format from first line.
 Specify custom timestamp field name:
 
 ```bash
-> kelora -j --ts-field created_at app.log
+kelora -j --ts-field created_at app.log
 ```
 
 #### `--ts-format <format>`
@@ -478,8 +478,8 @@ Specify custom timestamp field name:
 Specify custom timestamp format (chrono format strings):
 
 ```bash
-> kelora --ts-format '%Y-%m-%d %H:%M:%S' app.log
-> kelora --ts-format '%d/%b/%Y:%H:%M:%S %z' access.log
+kelora --ts-format '%Y-%m-%d %H:%M:%S' app.log
+kelora --ts-format '%d/%b/%Y:%H:%M:%S %z' access.log
 ```
 
 See `--help-time` for format reference.
@@ -489,8 +489,8 @@ See `--help-time` for format reference.
 Timezone for naive timestamps:
 
 ```bash
-> kelora --input-tz local app.log
-> kelora --input-tz Europe/Berlin app.log
+kelora --input-tz local app.log
+kelora --input-tz Europe/Berlin app.log
 ```
 
 ### Column Format Options
@@ -500,7 +500,7 @@ Timezone for naive timestamps:
 Column separator for `cols:<spec>` format:
 
 ```bash
-> kelora -f 'cols:name age city' --cols-sep '|' data.txt
+kelora -f 'cols:name age city' --cols-sep '|' data.txt
 ```
 
 ### Prefix Extraction
@@ -510,7 +510,7 @@ Column separator for `cols:<spec>` format:
 Extract text before separator into field (before parsing):
 
 ```bash
-> docker compose logs | kelora --extract-prefix service -j
+docker compose logs | kelora --extract-prefix service -j
 ```
 
 #### `--prefix-sep <separator>`
@@ -518,7 +518,7 @@ Extract text before separator into field (before parsing):
 Prefix separator (default: `|`):
 
 ```bash
-> kelora --extract-prefix node --prefix-sep ' :: ' cluster.log
+kelora --extract-prefix node --prefix-sep ' :: ' cluster.log
 ```
 
 ### Multi-line Events
@@ -528,9 +528,9 @@ Prefix separator (default: `|`):
 Multi-line event detection:
 
 ```bash
-> kelora -M json app.log              # Multi-line JSON objects
-> kelora -M '^\\d{4}-' app.log        # Events start with year
-> kelora -M '^\\S' app.log            # Events start with non-whitespace
+kelora -M json app.log              # Multi-line JSON objects
+kelora -M '^\\d{4}-' app.log        # Events start with year
+kelora -M '^\\S' app.log            # Events start with non-whitespace
 ```
 
 See `--help-multiline` for strategy reference.
@@ -558,13 +558,13 @@ Control how Kelora outputs events:
 
 ```bash
 # Output as JSON
-> kelora -j app.log -F json
+kelora -j app.log -F json
 
 # Output as CSV
-> kelora -j app.log -F csv --keys timestamp,level,message
+kelora -j app.log -F csv --keys timestamp,level,message
 
 # No event output, only stats
-> kelora -j app.log -F none --stats
+kelora -j app.log -F none --stats
 ```
 
 ## Format Conversion
@@ -573,16 +573,16 @@ Convert between formats by combining input and output formats:
 
 ```bash
 # JSON to CSV
-> kelora -j app.log -F csv --keys timestamp,level,message > output.csv
+kelora -j app.log -F csv --keys timestamp,level,message > output.csv
 
 # Logfmt to JSON
-> kelora -f logfmt app.log -F json > output.jsonl
+kelora -f logfmt app.log -F json > output.jsonl
 
 # CSV to Logfmt
-> kelora -f csv data.csv -F logfmt > output.log
+kelora -f csv data.csv -F logfmt > output.log
 
 # Combined log to JSON
-> kelora -f combined access.log -F json > access.jsonl
+kelora -f combined access.log -F json > access.jsonl
 ```
 
 ## Common Patterns
@@ -590,13 +590,13 @@ Convert between formats by combining input and output formats:
 ### Parse JSON with Auto-Detection
 
 ```bash
-> kelora -f auto app.log --levels error
+kelora -f auto app.log --levels error
 ```
 
 ### Parse Web Logs and Filter
 
 ```bash
-> kelora -f combined /var/log/nginx/access.log \
+kelora -f combined /var/log/nginx/access.log \
     --filter 'e.status >= 400' \
     --keys ip,status,request
 ```
@@ -604,14 +604,14 @@ Convert between formats by combining input and output formats:
 ### Parse CSV with Type Conversion
 
 ```bash
-> kelora -f 'csv status:int bytes:int' data.csv \
+kelora -f 'csv status:int bytes:int' data.csv \
     --filter 'e.status >= 400'
 ```
 
 ### Parse Custom Format
 
 ```bash
-> kelora -f 'cols:timestamp level service *message' app.log \
+kelora -f 'cols:timestamp level service *message' app.log \
     --ts-field timestamp \
     --levels error
 ```
@@ -619,7 +619,7 @@ Convert between formats by combining input and output formats:
 ### Parse Syslog and Extract
 
 ```bash
-> kelora -f syslog /var/log/syslog \
+kelora -f syslog /var/log/syslog \
     --filter 'e.severity <= 3' \
     --keys timestamp,hostname,message
 ```
@@ -627,7 +627,7 @@ Convert between formats by combining input and output formats:
 ### Parse with Prefix Extraction
 
 ```bash
-> docker compose logs | kelora --extract-prefix container -j \
+docker compose logs | kelora --extract-prefix container -j \
     --filter 'e.container == "web_1"'
 ```
 
@@ -639,7 +639,7 @@ Convert between formats by combining input and output formats:
 
 **Solution:** Specify format explicitly:
 ```bash
-> kelora -f json app.log
+kelora -f json app.log
 ```
 
 ### Timestamp Not Parsed
@@ -648,7 +648,7 @@ Convert between formats by combining input and output formats:
 
 **Solution:** Specify timestamp format:
 ```bash
-> kelora --ts-format '%Y-%m-%d %H:%M:%S' app.log
+kelora --ts-format '%Y-%m-%d %H:%M:%S' app.log
 ```
 
 ### CSV Parsing Issues
@@ -666,7 +666,7 @@ Convert between formats by combining input and output formats:
 
 **Solution:** Use multi-line mode:
 ```bash
-> kelora -M json app.log
+kelora -M json app.log
 ```
 
 ### Mixed Formats
@@ -675,8 +675,8 @@ Convert between formats by combining input and output formats:
 
 **Solution:** Use preprocessing or separate files:
 ```bash
-> grep '^{' mixed.log | kelora -j --levels error
-> grep -v '^{' mixed.log | kelora -f line
+grep '^{' mixed.log | kelora -j --levels error
+grep -v '^{' mixed.log | kelora -f line
 ```
 
 ## See Also

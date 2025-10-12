@@ -83,7 +83,7 @@ For whitespace-delimited fields, just list the field names:
 Sometimes a field spans more than one column. Use the `(N)` suffix to join multiple tokens.
 
 ```bash
-> echo "2024-01-15 10:30:00 INFO Connection failed" | \
+echo "2024-01-15 10:30:00 INFO Connection failed" | \
     kelora -f 'cols:timestamp(2) level *message'
 ```
 
@@ -98,7 +98,7 @@ Sometimes a field spans more than one column. Use the `(N)` suffix to join multi
 Convert fields to specific types using annotations:
 
 ```bash
-> echo "200 1234 0.123
+echo "200 1234 0.123
 404 5678 0.456
 500 9012 0.789" | \
     kelora -f 'cols:status:int bytes:int response_time:float'
@@ -114,7 +114,7 @@ Convert fields to specific types using annotations:
 After type conversion, you can use numeric operations immediately:
 
 ```bash
-> echo "200 1234 0.123" | \
+echo "200 1234 0.123" | \
     kelora -f 'cols:status:int bytes:int response_time:float' \
     --filter 'e.status >= 400'
 ```
@@ -124,14 +124,14 @@ After type conversion, you can use numeric operations immediately:
 Kelora automatically looks for common timestamp field names such as `timestamp`, `ts`, or `time`. You can also point it at a specific field with `--ts-field` and describe the format with `--ts-format` when needed.
 
 ```bash
-> echo "2024-01-15T10:30:00Z ERROR Connection failed" | \
+echo "2024-01-15T10:30:00Z ERROR Connection failed" | \
     kelora -f 'cols:timestamp level *message' --ts-field timestamp
 ```
 
 Kelora will parse the `timestamp` field so that `--since`, `--until`, and timestamp-aware formatting work. If your timestamps do not include a timezone, provide `--ts-format` and optionally `--input-tz`:
 
 ```bash
-> kelora -f 'cols:timestamp(2) level *message' \
+kelora -f 'cols:timestamp(2) level *message' \
     --ts-field timestamp \
     --ts-format '%Y-%m-%d %H:%M:%S' \
     --input-tz 'UTC'
@@ -163,13 +163,13 @@ Works with any separator string:
 
 ```bash
 # Comma-separated
-> kelora -f 'cols:level service message' --cols-sep ','
+kelora -f 'cols:level service message' --cols-sep ','
 
 # Tab-separated
-> kelora -f 'cols:level service message' --cols-sep $'\t'
+kelora -f 'cols:level service message' --cols-sep $'\t'
 
 # Multi-character separator
-> kelora -f 'cols:level service message' --cols-sep ' :: '
+kelora -f 'cols:level service message' --cols-sep ' :: '
 ```
 
 ## Step 7: Real-World Example - Application Logs
@@ -185,7 +185,7 @@ Let's parse a custom application log format:
 
 **Column specification:**
 ```bash
-> kelora -f 'cols:raw_ts level service *message' app.log
+kelora -f 'cols:raw_ts level service *message' app.log
 ```
 
 But the timestamp is wrapped in brackets. We need to clean it up.
@@ -193,7 +193,7 @@ But the timestamp is wrapped in brackets. We need to clean it up.
 ### Using Regex in Exec
 
 ```bash
-> kelora -f 'cols:raw_ts level service *message' app.log \
+kelora -f 'cols:raw_ts level service *message' app.log \
     -e 'e.timestamp = e.raw_ts.extract_re(r"\[(.*?)\]", 1)' \
     -e 'e.raw_ts = ()' \
     --ts-field timestamp \
@@ -211,7 +211,7 @@ But the timestamp is wrapped in brackets. We need to clean it up.
 Parse a custom format and add computed fields:
 
 ```bash
-> cat app.log | \
+cat app.log | \
     kelora -f 'cols:timestamp level service *message' \
     --ts-field timestamp \
     -e 'if e.message.contains("ms") { e.duration = e.message.extract_re(r"(\d+)ms", 1).to_int() }' \
@@ -238,13 +238,13 @@ WARN   2024-01-15 High memory usage
 Use whitespace delimiters for flexibility:
 
 ```bash
-> kelora -f 'cols:level date message' app.log
+kelora -f 'cols:level date message' app.log
 ```
 
 If you need to ignore specific columns, use skip tokens and multi-column captures:
 
 ```bash
-> kelora -f 'cols:level - message(2)' app.log
+kelora -f 'cols:level - message(2)' app.log
 ```
 
 ## Step 10: Complete Example
@@ -260,7 +260,7 @@ Let's parse a complex custom format with everything we've learned:
 
 **Parse specification:**
 ```bash
-> kelora -f 'cols:raw_ts status:int service bytes:int latency:float *message' custom_app.log \
+kelora -f 'cols:raw_ts status:int service bytes:int latency:float *message' custom_app.log \
     -e 'e.timestamp = e.raw_ts.extract_re(r"\[(.*?)\]", 1)' \
     -e 'e.raw_ts = ()' \
     --ts-field timestamp \
@@ -282,13 +282,13 @@ Let's parse a complex custom format with everything we've learned:
 ### Pattern 1: Log Level + Message
 
 ```bash
-> kelora -f 'cols:level message' app.log -l error,warn
+kelora -f 'cols:level message' app.log -l error,warn
 ```
 
 ### Pattern 2: Timestamp + Level + Service + Message
 
 ```bash
-> kelora -f 'cols:timestamp level service *message' app.log \
+kelora -f 'cols:timestamp level service *message' app.log \
     --ts-field timestamp \
     --filter 'e.level == "ERROR"'
 ```
@@ -296,7 +296,7 @@ Let's parse a complex custom format with everything we've learned:
 ### Pattern 3: Type Conversion with Greedy Capture
 
 ```bash
-> kelora -f 'cols:status:int bytes:int duration:float *path' access.log \
+kelora -f 'cols:status:int bytes:int duration:float *path' access.log \
     --filter 'e.status >= 500' \
     -e 'track_avg("latency", e.duration)' \
     -m
@@ -305,7 +305,7 @@ Let's parse a complex custom format with everything we've learned:
 ### Pattern 4: Extract and Transform
 
 ```bash
-> kelora -f 'cols:timestamp level *data' app.log \
+kelora -f 'cols:timestamp level *data' app.log \
     --ts-field timestamp \
     -e 'e.values = e.data.split(",")' \
     -e 'e.count = e.values.len()' \
@@ -320,10 +320,10 @@ Simpler and more flexible:
 
 ```bash
 # Good - whitespace delimited
-> kelora -f 'cols:level service message' app.log
+kelora -f 'cols:level service message' app.log
 
 # Skip columns rather than relying on alignment
-> kelora -f 'cols:level - *message' app.log
+kelora -f 'cols:level - *message' app.log
 ```
 
 ### Use Type Annotations Early
@@ -332,20 +332,20 @@ Convert types during parsing, not in exec:
 
 ```bash
 # Good - parse as int
-> kelora -f 'cols:status:int bytes:int' --filter 'e.status >= 400'
+kelora -f 'cols:status:int bytes:int' --filter 'e.status >= 400'
 
 # Less efficient - convert in exec
-> kelora -f 'cols:status bytes' -e 'e.status = e.status.to_int()' --filter 'e.status >= 400'
+kelora -f 'cols:status bytes' -e 'e.status = e.status.to_int()' --filter 'e.status >= 400'
 ```
 
 ### Name Fields Descriptively
 
 ```bash
 # Good
-> kelora -f 'cols:timestamp level service *message'
+kelora -f 'cols:timestamp level service *message'
 
 # Less clear
-> kelora -f 'cols:col1 col2 col3 col4'
+kelora -f 'cols:col1 col2 col3 col4'
 ```
 
 ### Use Greedy Capture for Messages
@@ -353,7 +353,7 @@ Convert types during parsing, not in exec:
 Always use `*` for the last field if it's a free-form message:
 
 ```bash
-> kelora -f 'cols:level service *message'
+kelora -f 'cols:level service *message'
 ```
 
 ### Combine with Prefix Extraction
@@ -361,7 +361,7 @@ Always use `*` for the last field if it's a free-form message:
 For Docker Compose-style logs:
 
 ```bash
-> docker compose logs | \
+docker compose logs | \
     kelora --extract-prefix container \
            -f 'cols:timestamp level *message' \
            --ts-field timestamp
@@ -436,10 +436,10 @@ Inline type annotations and strict mode are perfect for catching malformed rows 
 **Solution:** Check separators and column counts:
 ```bash
 # Debug by outputting all fields
-> kelora -f 'cols:field1 field2 *field3' app.log -n 3
+kelora -f 'cols:field1 field2 *field3' app.log -n 3
 
 # Try different separator
-> kelora -f 'cols:field1 field2 field3' --cols-sep '|' app.log -n 3
+kelora -f 'cols:field1 field2 field3' --cols-sep '|' app.log -n 3
 ```
 
 ### Timestamp Not Recognized
@@ -448,7 +448,7 @@ Inline type annotations and strict mode are perfect for catching malformed rows 
 
 **Solution:** Tell Kelora which field holds the timestamp and provide the format if needed:
 ```bash
-> kelora -f 'cols:timestamp level *message' app.log \
+kelora -f 'cols:timestamp level *message' app.log \
     --ts-field timestamp \
     --ts-format '%Y-%m-%d %H:%M:%S'
 ```
@@ -459,7 +459,7 @@ Inline type annotations and strict mode are perfect for catching malformed rows 
 
 **Solution:** Use `get_path` with defaults in resilient mode:
 ```bash
-> kelora -f 'cols:status bytes' -e 'e.status_int = to_int_or(e.status, 0)'
+kelora -f 'cols:status bytes' -e 'e.status_int = to_int_or(e.status, 0)'
 ```
 
 ### Greedy Field Capturing Too Much
@@ -468,7 +468,7 @@ Inline type annotations and strict mode are perfect for catching malformed rows 
 
 **Solution:** Be specific with earlier fields:
 ```bash
-> kelora -f 'cols:level service message(2) *remainder'
+kelora -f 'cols:level service message(2) *remainder'
 ```
 
 ## Next Steps

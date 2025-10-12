@@ -32,9 +32,9 @@ Input → Parse → Filter → Transform → Output
 
 **Example:**
 ```bash
-> kelora file1.log file2.log.gz
-> tail -f app.log | kelora -j
-> docker compose logs | kelora --extract-prefix service
+kelora file1.log file2.log.gz
+tail -f app.log | kelora -j
+docker compose logs | kelora --extract-prefix service
 ```
 
 ### 2. Parse Stage
@@ -57,9 +57,9 @@ Input → Parse → Filter → Transform → Output
 
 **Example:**
 ```bash
-> kelora -f json app.log
-> kelora -f combined access.log
-> kelora -f "cols:timestamp level *message" custom.log --ts-field timestamp
+kelora -f json app.log
+kelora -f combined access.log
+kelora -f "cols:timestamp level *message" custom.log --ts-field timestamp
 ```
 
 **Output:** Structured event (map) with fields accessible as `e.field`.
@@ -90,9 +90,9 @@ Input → Parse → Filter → Transform → Output
 
 **Example:**
 ```bash
-> kelora -j app.log --levels error
-> kelora -j app.log --since "1 hour ago"
-> kelora -j app.log --filter 'e.service == "database"'
+kelora -j app.log --levels error
+kelora -j app.log --since "1 hour ago"
+kelora -j app.log --filter 'e.service == "database"'
 ```
 
 **Behavior:**
@@ -132,7 +132,7 @@ Input → Parse → Filter → Transform → Output
 
 **Example:**
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --begin 'print("Starting analysis")' \
     --exec 'e.duration_s = e.duration_ms / 1000' \
     --exec 'track_count(e.service)' \
@@ -169,9 +169,9 @@ Input → Parse → Filter → Transform → Output
 
 **Example:**
 ```bash
-> kelora -j app.log --keys timestamp,service,message
-> kelora -j app.log -F json
-> kelora -j app.log --take 100
+kelora -j app.log --keys timestamp,service,message
+kelora -j app.log -F json
+kelora -j app.log --take 100
 ```
 
 ## Pipeline Characteristics
@@ -216,7 +216,7 @@ Kelora processes events one at a time (or in batches with `--parallel`):
 ### Simple Filter-and-Select
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.level == "ERROR"' \
     --keys timestamp,service,message
 ```
@@ -226,7 +226,7 @@ Pipeline: Input → Parse → Filter → Output (with field selection)
 ### Filter-Transform-Output
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.service == "api"' \
     --exec 'e.duration_s = e.duration_ms / 1000' \
     --keys timestamp,duration_s,path
@@ -237,7 +237,7 @@ Pipeline: Input → Parse → Filter → Transform → Output
 ### Aggregate and Report
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --exec 'track_count(e.service)' \
     --exec 'track_avg("response_time", e.duration_ms)' \
     --metrics \
@@ -249,7 +249,7 @@ Pipeline: Input → Parse → Transform (tracking) → Output (metrics only)
 ### Multi-Stage Filtering
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --levels error,warn \
     --since "1 hour ago" \
     --filter 'e.service != "health-check"' \
@@ -261,7 +261,7 @@ Pipeline: Input → Parse → Filter (levels) → Filter (time) → Filter (cust
 ### Fan-Out Processing
 
 ```bash
-> kelora -j batch.log \
+kelora -j batch.log \
     --exec 'emit_each(e.items, #{batch_id: e.batch_id})' \
     --filter 'e.status == "active"' \
     --keys batch_id,item_id,status
@@ -307,7 +307,7 @@ Some features maintain state:
 
 **Metrics Tracking:**
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --exec 'track_count(e.service)' \
     --metrics
 ```
@@ -316,7 +316,7 @@ Maintains counters in memory.
 
 **Window Functions:**
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --window 5 \
     --exec 'e.recent = window_values("status")'
 ```
@@ -325,7 +325,7 @@ Maintains sliding window of recent events.
 
 **Context Lines:**
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.level == "ERROR"' \
     --before-context 2
 ```
@@ -340,12 +340,12 @@ Place cheap filters early to reduce work:
 
 ```bash
 # Good: Level filter before expensive regex
-> kelora -j app.log \
+kelora -j app.log \
     --levels error \
     --filter 'e.message.has_matches(r"complex.*pattern")'
 
 # Less efficient: Expensive filter on all events
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.message.has_matches(r"complex.*pattern")' \
     --filter 'e.level == "ERROR"'
 ```
@@ -355,7 +355,7 @@ Place cheap filters early to reduce work:
 Use `--keys` to reduce output processing:
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --keys timestamp,message \
     -F json
 ```
@@ -365,7 +365,7 @@ Use `--keys` to reduce output processing:
 Use `--parallel` for CPU-bound transformations:
 
 ```bash
-> kelora -j large.log \
+kelora -j large.log \
     --parallel \
     --exec 'e.hash = e.content.hash("sha256")' \
     --batch-size 1000
@@ -376,7 +376,7 @@ Use `--parallel` for CPU-bound transformations:
 Use `--take` for quick exploration:
 
 ```bash
-> kelora -j large.log --take 100
+kelora -j large.log --take 100
 ```
 
 ## See Also

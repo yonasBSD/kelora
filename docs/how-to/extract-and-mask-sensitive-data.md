@@ -14,15 +14,15 @@ Mask IP addresses to protect privacy while maintaining network analysis capabili
 
 ```bash
 # Mask last octet (default)
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.client_ip = e.client_ip.mask_ip()'
 
 # Mask last 2 octets for stronger anonymization
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.client_ip = e.client_ip.mask_ip(2)'
 
 # Mask last 3 octets
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.client_ip = e.client_ip.mask_ip(3)'
 ```
 
@@ -38,15 +38,15 @@ Create consistent pseudonyms using domain separation (requires `KELORA_SECRET` e
 
 ```bash
 # Set secret for pseudonymization
-> export KELORA_SECRET="your-secret-key-here"
+export KELORA_SECRET="your-secret-key-here"
 
 # Pseudonymize user emails
-> kelora -j users.log \
+kelora -j users.log \
     -e 'e.user_pseudo = pseudonym(e.email, "users")' \
     -e 'e.email = ()'
 
 # Pseudonymize with different domains
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.user_id = pseudonym(e.user_email, "users")' \
     -e 'e.session_id = pseudonym(e.session_token, "sessions")' \
     -e 'e.user_email = ()' \
@@ -66,22 +66,22 @@ Hash data for grouping and deduplication without exposing original values:
 
 ```bash
 # SHA-256 hash (default)
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.user_hash = e.username.hash()' \
     -e 'e.username = ()'
 
 # Fast hash for grouping (xxh3)
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.session_hash = e.session_id.hash("xxh3")' \
     -e 'e.session_id = ()'
 
 # MD5 for legacy compatibility
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.email_hash = e.email.hash("md5")' \
     -e 'e.email = ()'
 
 # BLAKE3 for high-speed cryptographic hashing
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.api_key_hash = e.api_key.hash("blake3")' \
     -e 'e.api_key = ()'
 ```
@@ -94,19 +94,19 @@ Delete fields entirely from events:
 
 ```bash
 # Remove single field
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.password = ()'
 
 # Remove multiple sensitive fields
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.password = (); e.api_key = (); e.ssn = (); e.credit_card = ()'
 
 # Conditional removal based on level
-> kelora -j app.log \
+kelora -j app.log \
     -e 'if e.level != "DEBUG" { e.stack_trace = (); e.locals = () }'
 
 # Remove all except specific fields
-> kelora -j app.log \
+kelora -j app.log \
     -e 'let timestamp = e.timestamp; let level = e.level; let message = e.message' \
     -e 'e = ()' \
     -e 'e.timestamp = timestamp; e.level = level; e.message = message'
@@ -118,19 +118,19 @@ Extract sensitive data for analysis, then redact from output:
 
 ```bash
 # Extract credit card type, then redact number
-> kelora -j transactions.log \
+kelora -j transactions.log \
     -e 'e.card_type = e.card_number.extract_re(r"^(\\d{4})", 1)' \
     -e 'e.card_last4 = e.card_number.extract_re(r"(\\d{4})$", 1)' \
     -e 'e.card_number = "REDACTED"'
 
 # Extract email domain, remove local part
-> kelora -j users.log \
+kelora -j users.log \
     -e 'let email = e.email.parse_email()' \
     -e 'e.email_domain = email.domain' \
     -e 'e.email = ()'
 
 # Extract URL domain, remove path/query
-> kelora -j requests.log \
+kelora -j requests.log \
     -e 'let url = e.request_url.parse_url()' \
     -e 'e.domain = url.host' \
     -e 'e.has_query = url.query != ""' \
@@ -143,19 +143,19 @@ Find and mask sensitive patterns in log messages:
 
 ```bash
 # Mask credit card numbers in message
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.message = e.message.replace(r"\\b\\d{16}\\b", "[CARD_REDACTED]")'
 
 # Mask email addresses
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.message = e.message.replace(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "[EMAIL_REDACTED]")'
 
 # Mask API keys (various formats)
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.message = e.message.replace(r"api[_-]?key[=:]\\s*[a-zA-Z0-9]{20,}", "api_key=[REDACTED]")'
 
 # Mask IP addresses in text
-> kelora -j app.log \
+kelora -j app.log \
     -e 'let ip = e.message.extract_ip()' \
     -e 'if ip != "" { e.message = e.message.replace(ip, ip.mask_ip(2)) }'
 ```
@@ -165,8 +165,8 @@ Find and mask sensitive patterns in log messages:
 ### GDPR-Compliant Log Processing
 
 ```bash
-> export KELORA_SECRET="gdpr-compliance-secret"
-> kelora -j user_activity.log \
+export KELORA_SECRET="gdpr-compliance-secret"
+kelora -j user_activity.log \
     -e 'e.user_pseudo = pseudonym(e.user_email, "users")' \
     -e 'e.ip_masked = e.ip_address.mask_ip(2)' \
     -e 'e.user_email = (); e.ip_address = (); e.full_name = ()' \
@@ -177,7 +177,7 @@ Find and mask sensitive patterns in log messages:
 ### Security Audit Log Sanitization
 
 ```bash
-> kelora -j security.log \
+kelora -j security.log \
     -e 'e.username_hash = e.username.hash("sha256")' \
     -e 'e.source_ip = e.source_ip.mask_ip(2)' \
     -e 'e.session_hash = e.session_id.hash("xxh3")' \
@@ -189,7 +189,7 @@ Find and mask sensitive patterns in log messages:
 ### Payment Log Redaction
 
 ```bash
-> kelora -j payments.log \
+kelora -j payments.log \
     -e 'e.card_last4 = e.card_number.extract_re(r"(\\d{4})$", 1)' \
     -e 'e.card_bin = e.card_number.extract_re(r"^(\\d{6})", 1)' \
     -e 'e.amount_bucket = floor(e.amount / 100) * 100' \
@@ -200,8 +200,8 @@ Find and mask sensitive patterns in log messages:
 ### Multi-Tenant Data Isolation
 
 ```bash
-> export KELORA_SECRET="tenant-separation-key"
-> kelora -j multi_tenant.log \
+export KELORA_SECRET="tenant-separation-key"
+kelora -j multi_tenant.log \
     -e 'e.tenant_id = pseudonym(e.tenant_name, "tenants")' \
     -e 'e.user_id = pseudonym(e.user_email, e.tenant_name)' \
     -e 'e.tenant_name = (); e.user_email = (); e.user_name = ()' \
@@ -211,7 +211,7 @@ Find and mask sensitive patterns in log messages:
 ### Database Query Sanitization
 
 ```bash
-> kelora -j db_queries.log \
+kelora -j db_queries.log \
     -e 'e.query_hash = e.query.hash("xxh3")' \
     -e 'e.table = e.query.extract_re(r"FROM\\s+(\\w+)", 1)' \
     -e 'e.has_where = e.query.contains("WHERE")' \
@@ -222,7 +222,7 @@ Find and mask sensitive patterns in log messages:
 ### API Key and Token Redaction
 
 ```bash
-> kelora -f combined access.log \
+kelora -f combined access.log \
     -e 'if e.path.contains("key=") || e.path.contains("token=") {
       let params = e.path.after("?").parse_query_params();
       if params.contains("key") { e.has_api_key = true };
@@ -235,8 +235,8 @@ Find and mask sensitive patterns in log messages:
 ### Healthcare Data De-identification
 
 ```bash
-> export KELORA_SECRET="hipaa-compliance-secret"
-> kelora -j health_records.log \
+export KELORA_SECRET="hipaa-compliance-secret"
+kelora -j health_records.log \
     -e 'e.patient_id = pseudonym(e.patient_ssn, "patients")' \
     -e 'e.provider_id = pseudonym(e.doctor_name, "providers")' \
     -e 'e.age_bracket = floor(e.age / 10) * 10' \
@@ -249,8 +249,8 @@ Find and mask sensitive patterns in log messages:
 ### Session Tracking Without PII
 
 ```bash
-> export KELORA_SECRET="session-tracking-secret"
-> kelora -j app.log \
+export KELORA_SECRET="session-tracking-secret"
+kelora -j app.log \
     -e 'e.session_hash = pseudonym(e.session_id, "sessions")' \
     -e 'e.user_hash = pseudonym(e.user_id, "users")' \
     -e 'e.ip_network = e.ip.mask_ip(2)' \
@@ -262,7 +262,7 @@ Find and mask sensitive patterns in log messages:
 ### Extract URLs Without Query Parameters
 
 ```bash
-> kelora -j web_requests.log \
+kelora -j web_requests.log \
     -e 'let url = e.full_url.parse_url()' \
     -e 'e.base_url = url.scheme + "://" + url.host + url.path' \
     -e 'e.has_params = url.query != ""' \
@@ -291,13 +291,13 @@ kelora -j /var/log/app-$(date +%Y-%m-%d).log \
 
 ```bash
 # Check for common sensitive patterns in output
-> kelora -j sanitized.log -qq \
+kelora -j sanitized.log -qq \
     --filter 'e.message.has_matches("\\b\\d{3}-\\d{2}-\\d{4}\\b")' \
     && echo "WARNING: SSN pattern found!" \
     || echo "No SSN patterns detected"
 
 # Check for email addresses
-> kelora -j sanitized.log -qq \
+kelora -j sanitized.log -qq \
     --filter 'e.message.has_matches("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}")' \
     && echo "WARNING: Email addresses found!" \
     || echo "No email addresses detected"
@@ -306,7 +306,7 @@ kelora -j /var/log/app-$(date +%Y-%m-%d).log \
 ### Export to Secure Storage
 
 ```bash
-> kelora -j sensitive.log \
+kelora -j sensitive.log \
     -e 'e.user_hash = e.email.hash("sha256")' \
     -e 'e.email = ()' \
     --parallel \
@@ -341,13 +341,13 @@ kelora -j /var/log/app-$(date +%Y-%m-%d).log \
 **Validation:**
 ```bash
 # Count events with potential PII
-> kelora -j output.log -q \
+kelora -j output.log -q \
     -e 'if e.message.has_matches("\\b\\d{16}\\b") { track_count("cards") }' \
     -e 'if e.message.has_matches("@") { track_count("emails") }' \
     --metrics
 
 # Sample output for manual inspection
-> kelora -j sanitized.log -n 100 | less
+kelora -j sanitized.log -n 100 | less
 ```
 
 **Common Patterns:**
@@ -372,14 +372,14 @@ for (field, value) in e {
 **Pseudonym consistency issues:**
 ```bash
 # Ensure KELORA_SECRET is set and consistent
-> echo $KELORA_SECRET
+echo $KELORA_SECRET
 # Must be the same across runs for consistent pseudonyms
 ```
 
 **IP masking not working:**
 ```bash
 # Validate IP format first
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.ip.is_ipv4()' \
     -e 'e.ip = e.ip.mask_ip()'
 ```
@@ -387,7 +387,7 @@ for (field, value) in e {
 **Pattern not matching:**
 ```bash
 # Test regex patterns
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.test_match = e.field.has_matches("your_pattern")' \
     --filter 'e.test_match' \
     -n 10

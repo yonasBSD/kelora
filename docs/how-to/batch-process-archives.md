@@ -14,15 +14,15 @@ Enable parallel processing for faster throughput:
 
 ```bash
 # Basic parallel mode (auto-detects CPU cores)
-> kelora -j large-logs.json --parallel \
+kelora -j large-logs.json --parallel \
     --filter 'e.level == "ERROR"'
 
 # Specify thread count explicitly
-> kelora -j logs/*.json --parallel --threads 8 \
+kelora -j logs/*.json --parallel --threads 8 \
     --filter 'e.status >= 500'
 
 # Parallel with metrics
-> kelora -j archive.json --parallel \
+kelora -j archive.json --parallel \
     -e 'track_count(e.service)' \
     --metrics
 ```
@@ -40,16 +40,16 @@ Kelora automatically handles gzip compression:
 
 ```bash
 # Single compressed file
-> kelora -j logs/app.log.gz --parallel \
+kelora -j logs/app.log.gz --parallel \
     --filter 'e.level == "ERROR"'
 
 # Multiple compressed files
-> kelora -j logs/*.log.gz --parallel \
+kelora -j logs/*.log.gz --parallel \
     -e 'track_count(e.level)' \
     --metrics
 
 # Mixed compressed and uncompressed
-> kelora -j logs/*.log logs/*.log.gz --parallel
+kelora -j logs/*.log logs/*.log.gz --parallel
 ```
 
 ### Batch Size Tuning
@@ -58,18 +58,18 @@ Adjust batch size for memory vs throughput tradeoffs:
 
 ```bash
 # Large batches = higher throughput, more memory
-> kelora -j large.log --parallel --batch-size 5000 \
+kelora -j large.log --parallel --batch-size 5000 \
     --filter 'e.level == "ERROR"'
 
 # Small batches = lower memory, more overhead
-> kelora -j large.log --parallel --batch-size 500 \
+kelora -j large.log --parallel --batch-size 500 \
     --filter 'e.level == "ERROR"'
 
 # Default batch size (1000) - good balance
-> kelora -j large.log --parallel
+kelora -j large.log --parallel
 
 # Very large files with memory constraints
-> kelora -j huge.log --parallel --batch-size 100
+kelora -j huge.log --parallel --batch-size 100
 ```
 
 **Batch size guidelines:**
@@ -86,16 +86,16 @@ Disable output ordering for best performance:
 
 ```bash
 # Unordered output (fastest)
-> kelora -j logs/*.json --parallel --unordered \
+kelora -j logs/*.json --parallel --unordered \
     --filter 'e.level == "ERROR"'
 
 # With metrics (order doesn't matter)
-> kelora -j archive.json --parallel --unordered \
+kelora -j archive.json --parallel --unordered \
     -e 'track_count(e.status)' \
     --metrics
 
 # Stats only (no event output, order irrelevant)
-> kelora -j logs/*.json --parallel --unordered \
+kelora -j logs/*.json --parallel --unordered \
     --stats-only
 ```
 
@@ -112,16 +112,16 @@ Control which order files are processed:
 
 ```bash
 # CLI order (default) - as specified on command line
-> kelora -j file1.log file2.log file3.log
+kelora -j file1.log file2.log file3.log
 
 # Name order - alphabetically by filename
-> kelora -j logs/*.json --file-order name
+kelora -j logs/*.json --file-order name
 
 # Modification time - oldest first
-> kelora -j logs/*.json --file-order mtime
+kelora -j logs/*.json --file-order mtime
 
 # Process newest logs first (reverse mtime)
-> kelora -j logs/*.json --file-order mtime --parallel
+kelora -j logs/*.json --file-order mtime --parallel
 ```
 
 **File order options:**
@@ -136,16 +136,16 @@ Process many archives efficiently:
 
 ```bash
 # Process all archives in directory
-> kelora -j /var/log/archives/*.json.gz --parallel \
+kelora -j /var/log/archives/*.json.gz --parallel \
     -e 'track_count(e.level)' \
     --metrics
 
 # Process with wildcard patterns
-> kelora -j logs/2024-*.log.gz --parallel --unordered \
+kelora -j logs/2024-*.log.gz --parallel --unordered \
     --filter 'e.status >= 400'
 
 # Recursive with find
-> find /var/log -name "*.log.gz" -type f -print0 | \
+find /var/log -name "*.log.gz" -type f -print0 | \
     xargs -0 kelora -j --parallel --unordered \
     -e 'track_count(e.service)' \
     --metrics
@@ -157,33 +157,33 @@ Process many archives efficiently:
 
 ```bash
 # Analyze yesterday's logs
-> kelora -j /var/log/app/app-$(date -d yesterday +%Y-%m-%d).log.gz \
+kelora -j /var/log/app/app-$(date -d yesterday +%Y-%m-%d).log.gz \
     --parallel \
     -e 'track_count(e.level)' \
     -e 'track_count(e.service)' \
     -e 'if e.level == "ERROR" { track_count("errors_by_service_" + e.service) }' \
     -m \
-    > daily_report_$(date -d yesterday +%Y-%m-%d).txt
+     daily_report_$(date -d yesterday +%Y-%m-%d).txt
 ```
 
 ### Monthly Archive Processing
 
 ```bash
 # Process entire month of logs
-> kelora -j /var/log/archives/2024-01-*.log.gz \
+kelora -j /var/log/archives/2024-01-*.log.gz \
     --parallel --threads 16 --unordered \
     -e 'track_count(e.level)' \
     -e 'track_unique("active_users", e.user_id)' \
     -e 'if e.has_path("duration_ms") { track_avg("avg_latency", e.duration_ms) }' \
     -m \
-    > monthly_report_2024-01.txt
+     monthly_report_2024-01.txt
 ```
 
 ### Error Analysis Across Archives
 
 ```bash
 # Find all errors in last week of archives
-> kelora -j /var/log/archives/2024-01-{15..21}-*.log.gz \
+kelora -j /var/log/archives/2024-01-{15..21}-*.log.gz \
     --parallel --batch-size 2000 \
     --filter 'e.level == "ERROR"' \
     -e 'e.error_type = e.get_path("error.type", "unknown")' \
@@ -197,7 +197,7 @@ Process many archives efficiently:
 
 ```bash
 # Extract slow requests from archives
-> kelora -f combined /var/log/nginx/access.log.*.gz \
+kelora -f combined /var/log/nginx/access.log.*.gz \
     --parallel --unordered --threads 12 \
     --filter 'e.get_path("request_time", "0").to_float() > 1.0' \
     -e 'e.latency = e.get_path("request_time", "0").to_float()' \
@@ -211,7 +211,7 @@ Process many archives efficiently:
 
 ```bash
 # Find suspicious activity in multiple archives
-> kelora -j /var/log/security/*.log.gz \
+kelora -j /var/log/security/*.log.gz \
     --parallel --batch-size 5000 \
     --filter 'e.severity == "high" || e.severity == "critical"' \
     -e 'track_count(e.event_type)' \
@@ -226,7 +226,7 @@ Process many archives efficiently:
 
 ```bash
 # Analyze slow queries from database archives
-> kelora -j /var/log/postgres/postgres-*.log.gz \
+kelora -j /var/log/postgres/postgres-*.log.gz \
     --parallel --unordered \
     --filter 'e.get_path("duration_ms", 0) > 1000' \
     -e 'e.query_hash = e.query.hash("xxh3")' \
@@ -241,7 +241,7 @@ Process many archives efficiently:
 
 ```bash
 # Aggregate user activity from month of archives
-> kelora -j /var/log/app/2024-01-*.log.gz \
+kelora -j /var/log/app/2024-01-*.log.gz \
     --parallel --threads 16 --batch-size 5000 --unordered \
     --filter 'e.has_path("user_id")' \
     -e 'track_unique("daily_active_users", e.user_id)' \
@@ -254,7 +254,7 @@ Process many archives efficiently:
 
 ```bash
 # Search for specific pattern across years
-> kelora -j /archives/app-{2022,2023,2024}-*.log.gz \
+kelora -j /archives/app-{2022,2023,2024}-*.log.gz \
     --parallel --threads 24 --unordered \
     --filter 'e.message.contains("memory leak") || e.message.contains("out of memory")' \
     -e 'e.year = e.timestamp.format("%Y")' \
@@ -267,7 +267,7 @@ Process many archives efficiently:
 
 ```bash
 # Consolidate web access logs
-> kelora -f combined /var/log/nginx/access.log.*.gz \
+kelora -f combined /var/log/nginx/access.log.*.gz \
     --parallel --batch-size 10000 --unordered \
     -e 'track_count(e.status)' \
     -e 'track_count(e.method)' \
@@ -281,7 +281,7 @@ Process many archives efficiently:
 
 ```bash
 # Process archives within specific time range
-> kelora -j /var/log/archives/*.log.gz \
+kelora -j /var/log/archives/*.log.gz \
     --parallel --batch-size 2000 \
     --since "2024-01-15 00:00:00" \
     --until "2024-01-20 23:59:59" \
@@ -296,7 +296,7 @@ Process many archives efficiently:
 
 ```bash
 # Max out CPU utilization
-> kelora -j huge.log \
+kelora -j huge.log \
     --parallel --threads 0 \
     --batch-size 5000 \
     --unordered \
@@ -307,13 +307,13 @@ Process many archives efficiently:
 
 ```bash
 # Minimize memory usage
-> kelora -j huge.log \
+kelora -j huge.log \
     --parallel --threads 4 \
     --batch-size 200 \
     --filter 'e.level == "ERROR"'
 
 # Sequential processing (lowest memory)
-> kelora -j huge.log \
+kelora -j huge.log \
     --filter 'e.level == "ERROR"'
 ```
 
@@ -321,7 +321,7 @@ Process many archives efficiently:
 
 ```bash
 # More threads than cores for I/O-heavy tasks
-> kelora -j /nfs/logs/*.json.gz \
+kelora -j /nfs/logs/*.json.gz \
     --parallel --threads 32 \
     --batch-size 1000 \
     --unordered
@@ -331,7 +331,7 @@ Process many archives efficiently:
 
 ```bash
 # Good default for most workloads
-> kelora -j logs/*.json.gz \
+kelora -j logs/*.json.gz \
     --parallel \
     --batch-size 1000 \
     -e 'track_count(e.service)' \
@@ -344,15 +344,15 @@ Process many archives efficiently:
 
 ```bash
 # Show detailed processing stats
-> kelora -j large.log.gz --parallel -s \
+kelora -j large.log.gz --parallel -s \
     --filter 'e.level == "ERROR"'
 
 # Stats only (no event output)
-> kelora -j logs/*.json.gz --parallel --unordered \
+kelora -j logs/*.json.gz --parallel --unordered \
     --stats-only
 
 # Combine with metrics
-> kelora -j archive.log.gz --parallel \
+kelora -j archive.log.gz --parallel \
     -e 'track_count(e.level)' \
     -s --metrics
 ```
@@ -361,32 +361,32 @@ Process many archives efficiently:
 
 ```bash
 # Count events in archive
-> kelora -j archive.log.gz --parallel -qq \
+kelora -j archive.log.gz --parallel -qq \
     -e 'track_count("total")' \
     --metrics
 
 # Verify no parsing errors (exit code 0)
-> kelora -j archive.log.gz --parallel -qqq && echo "✓ Clean" || echo "✗ Errors"
+kelora -j archive.log.gz --parallel -qqq && echo "✓ Clean" || echo "✗ Errors"
 
 # Sample output for verification
-> kelora -j archive.log.gz --parallel -n 100 | less
+kelora -j archive.log.gz --parallel -n 100 | less
 ```
 
 ### Performance Benchmarking
 
 ```bash
 # Benchmark sequential vs parallel
-> time kelora -j large.log --filter 'e.level == "ERROR"' > /dev/null
-> time kelora -j large.log --parallel --filter 'e.level == "ERROR"' > /dev/null
+time kelora -j large.log --filter 'e.level == "ERROR"' > /dev/null
+time kelora -j large.log --parallel --filter 'e.level == "ERROR"' > /dev/null
 
 # Benchmark batch sizes
-> for size in 100 1000 5000 10000; do
+for size in 100 1000 5000 10000; do
     echo "Batch size: $size"
     time kelora -j large.log --parallel --batch-size $size -qq
   done
 
 # Compare thread counts
-> for threads in 2 4 8 16; do
+for threads in 2 4 8 16; do
     echo "Threads: $threads"
     time kelora -j large.log --parallel --threads $threads -qq
   done
@@ -432,17 +432,17 @@ find /var/log -name "*.log" -mtime +7 | \
 **Export:**
 ```bash
 # Export to CSV for analysis
-> kelora -j logs/*.gz --parallel --unordered \
+kelora -j logs/*.gz --parallel --unordered \
     -k timestamp,level,service,message \
     -F csv > consolidated.csv
 
 # Export to JSON
-> kelora -j logs/*.gz --parallel \
+kelora -j logs/*.gz --parallel \
     --filter 'e.level == "ERROR"' \
     -J > errors.json
 
 # Persist metrics
-> kelora -j logs/*.gz --parallel --unordered \
+kelora -j logs/*.gz --parallel --unordered \
     -e 'track_count(e.service)' \
     -m --metrics-file daily_metrics.json
 ```
@@ -452,58 +452,58 @@ find /var/log -name "*.log" -mtime +7 | \
 **Out of memory errors:**
 ```bash
 # Reduce batch size
-> kelora -j huge.log --parallel --batch-size 200
+kelora -j huge.log --parallel --batch-size 200
 
 # Reduce thread count
-> kelora -j huge.log --parallel --threads 2
+kelora -j huge.log --parallel --threads 2
 
 # Use sequential mode
-> kelora -j huge.log
+kelora -j huge.log
 ```
 
 **Slow processing:**
 ```bash
 # Enable parallel mode
-> kelora -j large.log --parallel
+kelora -j large.log --parallel
 
 # Increase batch size
-> kelora -j large.log --parallel --batch-size 5000
+kelora -j large.log --parallel --batch-size 5000
 
 # Enable unordered output
-> kelora -j large.log --parallel --unordered
+kelora -j large.log --parallel --unordered
 
 # Increase threads for I/O-bound
-> kelora -j /nfs/logs/*.gz --parallel --threads 32
+kelora -j /nfs/logs/*.gz --parallel --threads 32
 ```
 
 **Inconsistent output:**
 ```bash
 # Use ordered output (default in parallel mode)
-> kelora -j logs/*.json --parallel
+kelora -j logs/*.json --parallel
 
 # Or disable parallel if order is critical
-> kelora -j logs/*.json
+kelora -j logs/*.json
 ```
 
 **Missing events:**
 ```bash
 # Check for parsing errors
-> kelora -j archive.log.gz --parallel --verbose
+kelora -j archive.log.gz --parallel --verbose
 
 # Validate with stats
-> kelora -j archive.log.gz --parallel --stats
+kelora -j archive.log.gz --parallel --stats
 
 # Sample to verify
-> kelora -j archive.log.gz --parallel -n 1000
+kelora -j archive.log.gz --parallel -n 1000
 ```
 
 **Progress monitoring:**
 ```bash
 # Use pv (pipe viewer) for progress
-> pv large.log.gz | gunzip | kelora -j --parallel
+pv large.log.gz | gunzip | kelora -j --parallel
 
 # Process with stats
-> kelora -j large.log.gz --parallel --stats
+kelora -j large.log.gz --parallel --stats
 ```
 
 ## See Also

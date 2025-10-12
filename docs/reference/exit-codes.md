@@ -36,8 +36,8 @@ Exit code `0` indicates **successful processing** with no errors:
 ### Example
 
 ```bash
-> kelora -j app.log --levels info
-> echo $?
+kelora -j app.log --levels info
+echo $?
 0
 ```
 
@@ -47,13 +47,13 @@ Exit code `0` indicates **successful processing** with no errors:
 
 ```bash
 # This returns 0 (filtering is not an error)
-> kelora -j app.log --levels critical
-> echo $?
+kelora -j app.log --levels critical
+echo $?
 0
 
 # This returns 1 (parse error occurred)
-> kelora -j malformed.log
-> echo $?
+kelora -j malformed.log
+echo $?
 1
 ```
 
@@ -72,9 +72,9 @@ Exit code `1` indicates **processing errors** occurred:
 In resilient mode, errors are recorded but processing continues. Exit code `1` is returned at the end if any errors occurred:
 
 ```bash
-> kelora -j app.log --exec 'e.result = e.value.to_int()'
+kelora -j app.log --exec 'e.result = e.value.to_int()'
 # ... processing continues despite errors ...
-> echo $?
+echo $?
 1  # Errors occurred but processing completed
 ```
 
@@ -83,9 +83,9 @@ In resilient mode, errors are recorded but processing continues. Exit code `1` i
 In strict mode (`--strict`), processing aborts immediately on first error:
 
 ```bash
-> kelora -j --strict app.log
+kelora -j --strict app.log
 # ... aborts on first error ...
-> echo $?
+echo $?
 1  # Processing aborted due to error
 ```
 
@@ -93,10 +93,10 @@ In strict mode (`--strict`), processing aborts immediately on first error:
 
 **Example:**
 ```bash
-> echo '{"valid": "json"}' > test.log
-> echo '{invalid json}' >> test.log
-> kelora -j test.log
-> echo $?
+echo '{"valid": "json"}' > test.log
+echo '{invalid json}' >> test.log
+kelora -j test.log
+echo $?
 1  # Parse error occurred
 ```
 
@@ -104,9 +104,9 @@ In strict mode (`--strict`), processing aborts immediately on first error:
 
 **Example:**
 ```bash
-> kelora -j app.log --filter 'e.timestamp.to_unix() > 1000000'
+kelora -j app.log --filter 'e.timestamp.to_unix() > 1000000'
 # If e.timestamp is missing or invalid
-> echo $?
+echo $?
 1  # Filter error occurred
 ```
 
@@ -114,9 +114,9 @@ In strict mode (`--strict`), processing aborts immediately on first error:
 
 **Example:**
 ```bash
-> kelora -j app.log --exec 'e.result = e.value.to_int()'
+kelora -j app.log --exec 'e.result = e.value.to_int()'
 # If e.value is not a valid integer
-> echo $?
+echo $?
 1  # Exec error occurred
 ```
 
@@ -135,27 +135,27 @@ Exit code `2` indicates **command-line usage errors**:
 ### Invalid Flags
 
 ```bash
-> kelora --invalid-flag app.log
+kelora --invalid-flag app.log
 kelora: error: unrecognized option '--invalid-flag'
-> echo $?
+echo $?
 2
 ```
 
 ### File Not Found
 
 ```bash
-> kelora -j nonexistent.log
+kelora -j nonexistent.log
 kelora: error: failed to open file 'nonexistent.log': No such file or directory
-> echo $?
+echo $?
 2
 ```
 
 ### Invalid Configuration
 
 ```bash
-> kelora --config-file invalid.ini app.log
+kelora --config-file invalid.ini app.log
 kelora: error: failed to parse configuration file
-> echo $?
+echo $?
 2
 ```
 
@@ -166,10 +166,10 @@ kelora: error: failed to parse configuration file
 User interrupted processing with Ctrl+C:
 
 ```bash
-> kelora -j large.log
+kelora -j large.log
 # Press Ctrl+C
 ^C
-> echo $?
+echo $?
 130
 ```
 
@@ -178,9 +178,9 @@ User interrupted processing with Ctrl+C:
 Output pipe closed (normal in Unix pipelines):
 
 ```bash
-> kelora -j large.log | head -n 10
+kelora -j large.log | head -n 10
 # Kelora receives SIGPIPE when head closes
-> echo $?
+echo $?
 141
 ```
 
@@ -191,11 +191,11 @@ Output pipe closed (normal in Unix pipelines):
 Process terminated by system or user:
 
 ```bash
-> kelora -j large.log &
+kelora -j large.log &
 [1] 12345
-> kill 12345
+kill 12345
 [1]+  Terminated              kelora -j large.log
-> echo $?
+echo $?
 143
 ```
 
@@ -325,12 +325,12 @@ Exit codes work the same in both modes:
 
 ```bash
 # Sequential
-> kelora -j app.log
-> echo $?
+kelora -j app.log
+echo $?
 
 # Parallel
-> kelora -j --parallel app.log
-> echo $?
+kelora -j --parallel app.log
+echo $?
 ```
 
 Both return `1` if any errors occurred.
@@ -344,9 +344,9 @@ Both return `1` if any errors occurred.
 - Processing completes
 
 ```bash
-> kelora -j app.log
+kelora -j app.log
 # Processes all lines despite errors
-> echo $?
+echo $?
 1  # Errors occurred
 ```
 
@@ -357,9 +357,9 @@ Both return `1` if any errors occurred.
 - Processing incomplete
 
 ```bash
-> kelora -j --strict app.log
+kelora -j --strict app.log
 # Aborts on first error
-> echo $?
+echo $?
 1  # Aborted due to error
 ```
 
@@ -369,18 +369,18 @@ Exit codes are preserved at all quiet levels:
 
 ```bash
 # Level 1: Suppress diagnostics
-> kelora -q -j app.log
-> echo $?
+kelora -q -j app.log
+echo $?
 1  # Error occurred (not shown, but exit code preserved)
 
 # Level 2: Suppress events
-> kelora -qq -j app.log
-> echo $?
+kelora -qq -j app.log
+echo $?
 1  # Error occurred
 
 # Level 3: Complete silence
-> kelora -qqq -j app.log
-> echo $?
+kelora -qqq -j app.log
+echo $?
 1  # Error occurred
 ```
 
@@ -473,12 +473,12 @@ fi
 
 **Solution:** Use `--verbose` to see errors:
 ```bash
-> kelora -j --verbose app.log
+kelora -j --verbose app.log
 ```
 
 Or check stats:
 ```bash
-> kelora -j --stats app.log
+kelora -j --stats app.log
 ```
 
 ### Exit Code 141 in Pipelines
@@ -488,13 +488,13 @@ Or check stats:
 **This is normal:** When downstream commands close the pipe (like `head`), Kelora receives SIGPIPE.
 
 ```bash
-> kelora -j large.log | head -n 10
+kelora -j large.log | head -n 10
 # Exit code 141 is normal here
 ```
 
 To ignore SIGPIPE:
 ```bash
-> kelora -j large.log | head -n 10 || [ $? -eq 141 ]
+kelora -j large.log | head -n 10 || [ $? -eq 141 ]
 ```
 
 ### Exit Code 2 with Valid Syntax
@@ -508,8 +508,8 @@ To ignore SIGPIPE:
 - Permissions are correct
 
 ```bash
-> ls -l app.log
-> kelora -j app.log
+ls -l app.log
+kelora -j app.log
 ```
 
 ### Different Exit Codes in CI vs Local
@@ -525,7 +525,7 @@ To ignore SIGPIPE:
 
 **Solution:** Test with same conditions:
 ```bash
-> kelora --ignore-config -j app.log  # Ignore config files
+kelora --ignore-config -j app.log  # Ignore config files
 ```
 
 ## See Also

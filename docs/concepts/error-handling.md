@@ -32,7 +32,7 @@ In resilient mode (default), Kelora continues processing even when errors occur:
 ### Example Behavior
 
 ```bash
-> kelora -j app.log --exec 'e.result = e.value.to_int() * 2'
+kelora -j app.log --exec 'e.result = e.value.to_int() * 2'
 ```
 
 **Input:**
@@ -59,7 +59,7 @@ result=912
 Errors are recorded but don't stop processing:
 
 ```bash
-> kelora -j app.log --filter 'e.timestamp.to_unix() > 1000000'
+kelora -j app.log --filter 'e.timestamp.to_unix() > 1000000'
 ```
 
 If `e.timestamp` is missing or invalid:
@@ -90,7 +90,7 @@ In strict mode (`--strict`), Kelora fails immediately on the first error:
 ### Example Behavior
 
 ```bash
-> kelora -j --strict app.log --exec 'e.result = e.value.to_int() * 2'
+kelora -j --strict app.log --exec 'e.result = e.value.to_int() * 2'
 ```
 
 **Input:**
@@ -113,7 +113,7 @@ Processing stops at the first error. Line 3 is never processed.
 ### Enabling Strict Mode
 
 ```bash
-> kelora -j --strict app.log
+kelora -j --strict app.log
 ```
 
 ## Error Types
@@ -124,7 +124,7 @@ Occur when input lines can't be parsed in the specified format.
 
 **JSON parse error:**
 ```bash
-> kelora -j app.log
+kelora -j app.log
 ```
 
 **Input:**
@@ -152,7 +152,7 @@ Occur when `--filter` expressions fail during evaluation.
 
 **Example:**
 ```bash
-> kelora -j --filter 'e.timestamp.to_unix() > 1000000' app.log
+kelora -j --filter 'e.timestamp.to_unix() > 1000000' app.log
 ```
 
 If `e.timestamp` is missing:
@@ -174,7 +174,7 @@ Occur when `--exec` scripts fail during execution.
 
 **Example:**
 ```bash
-> kelora -j --exec 'e.result = e.value.to_int()' app.log
+kelora -j --exec 'e.result = e.value.to_int()' app.log
 ```
 
 If `e.value` is not a valid integer:
@@ -197,7 +197,7 @@ If `e.value` is not a valid integer:
 By default, errors are collected and summarized at the end:
 
 ```bash
-> kelora -j app.log --exec 'e.result = e.value.to_int()'
+kelora -j app.log --exec 'e.result = e.value.to_int()'
 ```
 
 **Summary:**
@@ -210,7 +210,7 @@ By default, errors are collected and summarized at the end:
 Show each error immediately as it occurs:
 
 ```bash
-> kelora -j --verbose app.log --exec 'e.result = e.value.to_int()'
+kelora -j --verbose app.log --exec 'e.result = e.value.to_int()'
 ```
 
 **Output:**
@@ -241,7 +241,7 @@ result=789
 Combine for immediate errors and fail-fast:
 
 ```bash
-> kelora -j --strict --verbose app.log
+kelora -j --strict --verbose app.log
 ```
 
 Errors are shown immediately, then processing aborts.
@@ -261,7 +261,7 @@ Suppress output for automation:
 ### Level 1: Suppress Diagnostics
 
 ```bash
-> kelora -q -j app.log --stats
+kelora -q -j app.log --stats
 ```
 
 - Errors not shown
@@ -272,7 +272,7 @@ Suppress output for automation:
 ### Level 2: Suppress Events
 
 ```bash
-> kelora -qq -j app.log --exec 'track_count(e.service)' --metrics
+kelora -qq -j app.log --exec 'track_count(e.service)' --metrics
 ```
 
 - Errors not shown
@@ -283,7 +283,7 @@ Suppress output for automation:
 ### Level 3: Complete Silence
 
 ```bash
-> kelora -qqq -j app.log
+kelora -qqq -j app.log
 ```
 
 - No output at all
@@ -291,7 +291,7 @@ Suppress output for automation:
 - Useful for validation pipelines
 
 ```bash
-> kelora -qqq -j app.log && echo "Clean" || echo "Has errors"
+kelora -qqq -j app.log && echo "Clean" || echo "Has errors"
 ```
 
 ## Exit Codes
@@ -335,7 +335,7 @@ kelora -qqq app.log; echo "Exit code: $?"
 In resilient mode, `--exec` scripts execute **atomically**:
 
 ```bash
-> kelora -j --exec 'e.a = 1; e.b = e.value.to_int(); e.c = 3' app.log
+kelora -j --exec 'e.a = 1; e.b = e.value.to_int(); e.c = 3' app.log
 ```
 
 If `e.value.to_int()` fails:
@@ -372,7 +372,7 @@ Prevents partial transformations from corrupting data:
 Each `--exec` script is atomic independently:
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'e.a = e.x.to_int()' \
     --exec 'e.b = e.y.to_int()' \
     app.log
@@ -394,70 +394,70 @@ If second `--exec` fails:
 
 **Problem:**
 ```bash
-> kelora -j --filter 'e.timestamp > "2024-01-01"' app.log
+kelora -j --filter 'e.timestamp > "2024-01-01"' app.log
 ```
 
 Some events missing `timestamp` field.
 
 **Solution:** Use safe access:
 ```bash
-> kelora -j --filter 'e.has_path("timestamp") && e.timestamp > "2024-01-01"' app.log
+kelora -j --filter 'e.has_path("timestamp") && e.timestamp > "2024-01-01"' app.log
 ```
 
 ### Type Mismatches
 
 **Problem:**
 ```bash
-> kelora -j --exec 'e.result = e.value * 2' app.log
+kelora -j --exec 'e.result = e.value * 2' app.log
 ```
 
 `e.value` is a string, not a number.
 
 **Solution:** Use type conversion with defaults:
 ```bash
-> kelora -j --exec 'e.result = to_int_or(e.value, 0) * 2' app.log
+kelora -j --exec 'e.result = to_int_or(e.value, 0) * 2' app.log
 ```
 
 ### Invalid Timestamps
 
 **Problem:**
 ```bash
-> kelora -j --filter 'e.timestamp.to_unix() > 1000000' app.log
+kelora -j --filter 'e.timestamp.to_unix() > 1000000' app.log
 ```
 
 `e.timestamp` is not a valid timestamp.
 
 **Solution:** Use safe access:
 ```bash
-> kelora -j --filter 'e.has_path("timestamp") && e.timestamp.to_unix() > 1000000' app.log
+kelora -j --filter 'e.has_path("timestamp") && e.timestamp.to_unix() > 1000000' app.log
 ```
 
 ### Array Index Out of Bounds
 
 **Problem:**
 ```bash
-> kelora -j --exec 'e.first = e.items[0]' app.log
+kelora -j --exec 'e.first = e.items[0]' app.log
 ```
 
 `e.items` is empty or missing.
 
 **Solution:** Check array length:
 ```bash
-> kelora -j --exec 'if e.has_path("items") && e.items.len() > 0 { e.first = e.items[0] }' app.log
+kelora -j --exec 'if e.has_path("items") && e.items.len() > 0 { e.first = e.items[0] }' app.log
 ```
 
 ### Division by Zero
 
 **Problem:**
 ```bash
-> kelora -j --exec 'e.ratio = e.success / e.total' app.log
+kelora -j --exec 'e.ratio = e.success / e.total' app.log
 ```
 
 `e.total` is zero.
 
 **Solution:** Add guard:
 ```bash
-> kelora -j --exec 'if e.total > 0 { e.ratio = e.success / e.total } else { e.ratio = 0.0 }' app.log
+kelora -j --exec 'if e.total > 0 { e.ratio = e.success / e.total } else { e.ratio = 0.0 }' app.log
 ```
 
 ## Debugging Strategies
@@ -467,7 +467,7 @@ Some events missing `timestamp` field.
 See errors as they happen:
 
 ```bash
-> kelora -j --verbose app.log --exec 'e.result = e.value.to_int()'
+kelora -j --verbose app.log --exec 'e.result = e.value.to_int()'
 ```
 
 ### Enable Strict Mode
@@ -475,7 +475,7 @@ See errors as they happen:
 Find first error quickly:
 
 ```bash
-> kelora -j --strict app.log
+kelora -j --strict app.log
 ```
 
 ### Inspect Problematic Lines
@@ -483,7 +483,7 @@ Find first error quickly:
 Use `--take` to limit processing:
 
 ```bash
-> kelora -j --strict --take 100 app.log
+kelora -j --strict --take 100 app.log
 ```
 
 Process only first 100 lines to find issues faster.
@@ -493,7 +493,7 @@ Process only first 100 lines to find issues faster.
 Verify fields exist before accessing:
 
 ```bash
-> kelora -j --exec 'if !e.has_path("value") { eprint("Line missing value: " + e) }' app.log
+kelora -j --exec 'if !e.has_path("value") { eprint("Line missing value: " + e) }' app.log
 ```
 
 ### Use Type Checking
@@ -501,7 +501,7 @@ Verify fields exist before accessing:
 Verify field types before operations:
 
 ```bash
-> kelora -j --exec 'if type_of(e.value) != "i64" { eprint("Value is not integer: " + e.value) }' app.log
+kelora -j --exec 'if type_of(e.value) != "i64" { eprint("Value is not integer: " + e.value) }' app.log
 ```
 
 ### Validate Input Format
@@ -509,7 +509,7 @@ Verify field types before operations:
 Test parsing with strict mode:
 
 ```bash
-> kelora -j --strict --stats-only app.log
+kelora -j --strict --stats-only app.log
 ```
 
 No output, but exits with error if parsing fails.
@@ -558,7 +558,7 @@ Error examples:
 Production logs are messy - resilient mode handles gracefully:
 
 ```bash
-> kelora -j app.log --levels error --keys timestamp,message
+kelora -j app.log --levels error --keys timestamp,message
 ```
 
 ### Use Strict Mode for Validation
@@ -566,7 +566,7 @@ Production logs are messy - resilient mode handles gracefully:
 Validate data quality in pipelines:
 
 ```bash
-> kelora -j --strict app.log > /dev/null && echo "✓ Valid"
+kelora -j --strict app.log > /dev/null && echo "✓ Valid"
 ```
 
 ### Combine Quiet and Exit Codes
@@ -574,7 +574,7 @@ Validate data quality in pipelines:
 For automation, use exit codes:
 
 ```bash
-> kelora -qq app.log
+kelora -qq app.log
 if [ $? -eq 0 ]; then
     echo "No errors"
 else
@@ -587,7 +587,7 @@ fi
 Use safe field access patterns:
 
 ```bash
-> kelora -j --exec 'e.result = e.get_path("nested.value", 0) * 2' app.log
+kelora -j --exec 'e.result = e.get_path("nested.value", 0) * 2' app.log
 ```
 
 ### Log Errors to File
@@ -595,7 +595,7 @@ Use safe field access patterns:
 Capture errors for later analysis:
 
 ```bash
-> kelora -j --verbose app.log 2> errors.log
+kelora -j --verbose app.log 2> errors.log
 ```
 
 ### Use Stats for Summary
@@ -603,7 +603,7 @@ Capture errors for later analysis:
 Get error counts without verbose output:
 
 ```bash
-> kelora -j --stats app.log
+kelora -j --stats app.log
 ```
 
 Shows error count in summary.
@@ -615,7 +615,7 @@ Shows error count in summary.
 When using `--parallel`, error handling works the same:
 
 ```bash
-> kelora -j --parallel app.log
+kelora -j --parallel app.log
 ```
 
 - Errors still recorded per event
@@ -627,7 +627,7 @@ When using `--parallel`, error handling works the same:
 Verbose errors are shown immediately, but may be interleaved:
 
 ```bash
-> kelora -j --parallel --verbose app.log
+kelora -j --parallel --verbose app.log
 ```
 
 Errors from different threads may appear out of order.
@@ -637,7 +637,7 @@ Errors from different threads may appear out of order.
 First error from any thread aborts all processing:
 
 ```bash
-> kelora -j --parallel --strict app.log
+kelora -j --parallel --strict app.log
 ```
 
 ## See Also

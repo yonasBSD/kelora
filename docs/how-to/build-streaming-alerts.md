@@ -14,15 +14,15 @@ Monitor logs as they're written using `tail -f`:
 
 ```bash
 # Monitor JSON logs for errors
-> tail -f /var/log/app.log | kelora -j \
+tail -f /var/log/app.log | kelora -j \
     -l error,critical
 
 # Monitor with custom filter
-> tail -f /var/log/app.log | kelora -j \
+tail -f /var/log/app.log | kelora -j \
     --filter 'e.response_time > 1000'
 
 # Monitor multiple log levels
-> tail -f /var/log/app.log | kelora -j \
+tail -f /var/log/app.log | kelora -j \
     -l warn,error,critical \
     -k timestamp,level,service,message
 ```
@@ -33,18 +33,18 @@ Use `eprint()` to write alerts to stderr while suppressing normal output:
 
 ```bash
 # Alert on critical level
-> tail -f /var/log/app.log | kelora -j \
+tail -f /var/log/app.log | kelora -j \
     -e 'if e.level == "CRITICAL" { eprint("ALERT: " + e.service + " - " + e.message) }' \
     -qq
 
 # Alert on high error rate
-> tail -f /var/log/app.log | kelora -j \
+tail -f /var/log/app.log | kelora -j \
     -e 'track_count("total"); track_count(e.level)' \
     -e 'if e.level == "ERROR" { eprint("Error in " + e.service) }' \
     -q
 
 # Alert on slow requests
-> tail -f /var/log/nginx/access.log | kelora -f combined \
+tail -f /var/log/nginx/access.log | kelora -f combined \
     --filter 'e.get_path("request_time", "0").to_float() > 2.0' \
     -e 'eprint("SLOW: " + e.path + " took " + e.request_time + "s")' \
     -qq
@@ -52,7 +52,7 @@ Use `eprint()` to write alerts to stderr while suppressing normal output:
 ### Count Incidents While Streaming
 
 ```bash
-> tail -f examples/simple_logfmt.log | \
+tail -f examples/simple_logfmt.log | \
     kelora -f logfmt \
       --filter '"duration" in e && e.duration.to_int_or(0) >= 1000' \
       -e 'track_count("slow_requests")' \
@@ -69,14 +69,14 @@ Use graduated quiet levels to control output:
 
 ```bash
 # Level 1 (-q): Suppress diagnostics, show events
-> tail -f app.log | kelora -j -q --filter 'e.level == "ERROR"'
+tail -f app.log | kelora -j -q --filter 'e.level == "ERROR"'
 
 # Level 2 (-qq): Suppress events too, show only script output
-> tail -f app.log | kelora -j -qq \
+tail -f app.log | kelora -j -qq \
     -e 'if e.level == "CRITICAL" { eprint("CRITICAL: " + e.message) }'
 
 # Level 3 (-qqq): Complete silence except exit code
-> tail -f app.log | kelora -j -qqq --filter 'e.level == "CRITICAL"'
+tail -f app.log | kelora -j -qqq --filter 'e.level == "CRITICAL"'
 ```
 
 **Quiet mode behavior:**
@@ -91,18 +91,18 @@ Use exit codes to detect processing issues:
 
 ```bash
 # Check for errors (exit code 1 if parsing/runtime errors occurred)
-> kelora -j app.log --filter 'e.level == "ERROR"'
-> echo "Exit code: $?"
+kelora -j app.log --filter 'e.level == "ERROR"'
+echo "Exit code: $?"
 
 # Alert based on exit code
-> if tail -100 /var/log/app.log | kelora -j -qqq --filter 'e.level == "CRITICAL"'; then
+if tail -100 /var/log/app.log | kelora -j -qqq --filter 'e.level == "CRITICAL"'; then
     echo "No critical errors"
   else
     echo "Critical errors detected!" | mail -s "Alert" ops@company.com
   fi
 
 # CI/CD pipeline integration
-> kelora -qq -f json logs/*.json --filter 'e.level == "ERROR"' \
+kelora -qq -f json logs/*.json --filter 'e.level == "ERROR"' \
     && echo "✓ No errors" \
     || (echo "✗ Errors found" && exit 1)
 ```
@@ -126,7 +126,7 @@ Collect metrics during processing and alert at the end:
 
 ```bash
 # Alert if error rate exceeds threshold
-> tail -100 /var/log/app.log | kelora -j -q \
+tail -100 /var/log/app.log | kelora -j -q \
     -e 'track_count("total")' \
     -e 'if e.level == "ERROR" { track_count("errors") }' \
     -m \
@@ -142,7 +142,7 @@ Collect metrics during processing and alert at the end:
     '
 
 # Alert on memory threshold breaches
-> tail -f /var/log/app.log | kelora -j -qq \
+tail -f /var/log/app.log | kelora -j -qq \
     -e 'if e.get_path("memory_percent", 0) > 90 { track_count("high_memory") }' \
     -m \
     --end 'if metrics.contains("high_memory") && metrics.high_memory > 10 { eprint("Memory warnings: " + metrics.high_memory) }'
@@ -151,7 +151,7 @@ Collect metrics during processing and alert at the end:
 ### Sliding-Window Anomaly Detection
 
 ```bash
-> kelora -f syslog examples/simple_syslog.log \
+kelora -f syslog examples/simple_syslog.log \
     --filter '"msg" in e && e.msg.contains("Failed login")' \
     --window 5 \
     -e 'let hits = window_values("msg").filter(|m| m.contains("Failed login"));\
@@ -168,17 +168,17 @@ Use `--allow-fs-writes` to persist alerts:
 
 ```bash
 # Write critical events to alert file
-> tail -f /var/log/app.log | kelora -j --allow-fs-writes \
+tail -f /var/log/app.log | kelora -j --allow-fs-writes \
     --filter 'e.level == "CRITICAL"' \
     -e 'append_file("/var/log/alerts.log", e.timestamp + " " + e.service + " " + e.message)'
 
 # JSON alert log
-> tail -f /var/log/app.log | kelora -j --allow-fs-writes \
+tail -f /var/log/app.log | kelora -j --allow-fs-writes \
     --filter 'e.severity >= 8' \
     -e 'append_file("/var/log/alerts.json", e.to_json())'
 
 # Separate files by severity
-> tail -f /var/log/app.log | kelora -j --allow-fs-writes \
+tail -f /var/log/app.log | kelora -j --allow-fs-writes \
     -e 'if e.level == "ERROR" { append_file("/tmp/errors.log", e.to_json()) }' \
     -e 'if e.level == "CRITICAL" { append_file("/tmp/critical.log", e.to_json()) }'
 ```
@@ -188,7 +188,7 @@ Use `--allow-fs-writes` to persist alerts:
 ### Web Server Error Monitor
 
 ```bash
-> tail -f /var/log/nginx/access.log | kelora -f combined -qq \
+tail -f /var/log/nginx/access.log | kelora -f combined -qq \
     --filter 'e.status >= 500' \
     -e 'track_count("5xx_errors")' \
     -e 'eprint("5xx Error: " + e.status + " " + e.path + " from " + e.ip)' \
@@ -199,7 +199,7 @@ Use `--allow-fs-writes` to persist alerts:
 ### Database Deadlock Detection
 
 ```bash
-> tail -f /var/log/postgresql/postgresql.log | kelora -f line -qq \
+tail -f /var/log/postgresql/postgresql.log | kelora -f line -qq \
     --filter 'e.line.contains("deadlock")' \
     -e 'eprint("DEADLOCK DETECTED: " + e.line)' \
     --allow-fs-writes \
@@ -209,7 +209,7 @@ Use `--allow-fs-writes` to persist alerts:
 ### Application Health Dashboard
 
 ```bash
-> tail -f /var/log/app.log | kelora -j -q \
+tail -f /var/log/app.log | kelora -j -q \
     -e 'track_count(e.service + "_" + e.level)' \
     -e 'if e.has_path("duration_ms") { track_avg(e.service + "_latency", e.duration_ms) }' \
     -m \
@@ -228,7 +228,7 @@ Use `--allow-fs-writes` to persist alerts:
 ### Failed Login Monitor
 
 ```bash
-> tail -f /var/log/auth.log | kelora -f syslog -qq \
+tail -f /var/log/auth.log | kelora -f syslog -qq \
     --filter 'e.message.contains("Failed password")' \
     -e 'let ip = e.message.extract_ip(); track_count(ip)' \
     -m \
@@ -244,7 +244,7 @@ Use `--allow-fs-writes` to persist alerts:
 ### Memory Leak Detection
 
 ```bash
-> tail -f /var/log/app.log | kelora -j --window 100 -qq \
+tail -f /var/log/app.log | kelora -j --window 100 -qq \
     -e 'if e.has_path("memory_mb") {
       let recent_mem = window_numbers("memory_mb");
       if recent_mem.len() >= 10 {
@@ -259,7 +259,7 @@ Use `--allow-fs-writes` to persist alerts:
 ### API Rate Limit Violations
 
 ```bash
-> tail -f /var/log/api.log | kelora -j -qq \
+tail -f /var/log/api.log | kelora -j -qq \
     --filter 'e.status == 429' \
     -e 'track_count(e.client_id)' \
     -e 'eprint("Rate limit hit: " + e.client_id + " on " + e.path)' \
@@ -276,7 +276,7 @@ Use `--allow-fs-writes` to persist alerts:
 ### Deployment Error Spike Detection
 
 ```bash
-> tail -f /var/log/app.log | kelora -j --window 50 -qq \
+tail -f /var/log/app.log | kelora -j --window 50 -qq \
     -e 'if e.level == "ERROR" {
       let recent_errors = window_values("level").filter(|l| l == "ERROR");
       let error_rate = recent_errors.len().to_float() / 50 * 100;
@@ -289,7 +289,7 @@ Use `--allow-fs-writes` to persist alerts:
 ### Disk Space Warning
 
 ```bash
-> tail -f /var/log/syslog | kelora -f syslog -qq \
+tail -f /var/log/syslog | kelora -f syslog -qq \
     --filter 'e.message.contains("disk") && e.message.contains("full")' \
     -e 'eprint("DISK ALERT: " + e.hostname + " - " + e.message)' \
     --allow-fs-writes \
@@ -299,7 +299,7 @@ Use `--allow-fs-writes` to persist alerts:
 ### Security Event Aggregation
 
 ```bash
-> tail -f /var/log/security.log | kelora -j -q \
+tail -f /var/log/security.log | kelora -j -q \
     -e 'if e.severity == "high" || e.severity == "critical" { track_count(e.event_type) }' \
     -e 'if e.severity == "critical" { eprint("SECURITY: " + e.event_type + " from " + e.source_ip) }' \
     -m \
@@ -318,7 +318,7 @@ Use `--allow-fs-writes` to persist alerts:
 
 ```bash
 # Alert via email when critical events occur
-> tail -f /var/log/app.log | kelora -j -qqq \
+tail -f /var/log/app.log | kelora -j -qqq \
     --filter 'e.level == "CRITICAL"' \
     && echo "No critical events" \
     || echo "Critical events detected" | mail -s "Alert" ops@company.com
@@ -328,7 +328,7 @@ Use `--allow-fs-writes` to persist alerts:
 
 ```bash
 # Post to Slack when errors exceed threshold
-> tail -100 /var/log/app.log | kelora -j -q \
+tail -100 /var/log/app.log | kelora -j -q \
     -e 'track_count("total"); if e.level == "ERROR" { track_count("errors") }' \
     -m \
     --end '
@@ -369,7 +369,7 @@ done
 
 ```bash
 # Generate Prometheus metrics from streaming logs
-> tail -f /var/log/app.log | kelora -j --allow-fs-writes -qq \
+tail -f /var/log/app.log | kelora -j --allow-fs-writes -qq \
     -e 'track_count("http_requests_total")' \
     -e 'if e.status >= 500 { track_count("http_errors_total") }' \
     -e 'if e.has_path("duration_ms") { track_avg("http_duration_ms", e.duration_ms) }' \
@@ -426,7 +426,7 @@ kelora -j /var/log/app.log \
 
 ```bash
 # Reduce latency in parallel mode with batch timeout
-> tail -f /var/log/app.log | kelora -j --parallel \
+tail -f /var/log/app.log | kelora -j --parallel \
     --batch-size 100 \
     --batch-timeout 50 \
     --filter 'e.level == "ERROR"'
@@ -436,17 +436,17 @@ kelora -j /var/log/app.log \
 
 ```bash
 # Use tail -F to follow through log rotation
-> tail -F /var/log/app.log | kelora -j --filter 'e.level == "ERROR"'
+tail -F /var/log/app.log | kelora -j --filter 'e.level == "ERROR"'
 
 # Monitor with logrotate awareness
-> tail -F /var/log/app.log /var/log/app.log.1 | kelora -j -l error
+tail -F /var/log/app.log /var/log/app.log.1 | kelora -j -l error
 ```
 
 ### Reliability with Restart
 
 ```bash
 # Auto-restart monitoring on failure
-> while true; do
+while true; do
     tail -f /var/log/app.log | kelora -j -qq \
       --filter 'e.level == "CRITICAL"' \
       -e 'eprint("CRITICAL: " + e.message)'
@@ -458,7 +458,7 @@ kelora -j /var/log/app.log \
 
 ```bash
 # Prevent memory bloat with take limit on window functions
-> tail -f /var/log/app.log | kelora -j --window 100 \
+tail -f /var/log/app.log | kelora -j --window 100 \
     -e 'if window_values("level").len() == 100 { eprint("Window full, analyzing...") }'
 ```
 
@@ -488,11 +488,11 @@ kelora -j /var/log/app.log \
 **Automation:**
 ```bash
 # Test alerts without actual monitoring
-> echo '{"level":"CRITICAL","message":"test"}' | kelora -j -qq \
+echo '{"level":"CRITICAL","message":"test"}' | kelora -j -qq \
     -e 'if e.level == "CRITICAL" { eprint("Alert triggered") }'
 
 # Validate alert logic with recent logs
-> tail -100 /var/log/app.log | kelora -j -q \
+tail -100 /var/log/app.log | kelora -j -q \
     -e 'if e.level == "CRITICAL" { eprint(e.message) }'
 ```
 
@@ -510,39 +510,39 @@ kelora -qq -l error input.log && echo "Clean" || echo "Has errors"
 **Alerts not triggering:**
 ```bash
 # Test filter logic
-> echo '{"level":"ERROR","message":"test"}' | kelora -j \
+echo '{"level":"ERROR","message":"test"}' | kelora -j \
     --filter 'e.level == "ERROR"'
 
 # Verify eprint output
-> echo '{"level":"ERROR"}' | kelora -j -qq \
+echo '{"level":"ERROR"}' | kelora -j -qq \
     -e 'eprint("Test alert: " + e.level)'
 ```
 
 **High memory usage:**
 ```bash
 # Reduce window size
-> tail -f app.log | kelora -j --window 50  # Instead of 1000
+tail -f app.log | kelora -j --window 50  # Instead of 1000
 
 # Disable metrics if not needed
-> tail -f app.log | kelora -j --filter 'e.level == "ERROR"'  # No --metrics
+tail -f app.log | kelora -j --filter 'e.level == "ERROR"'  # No --metrics
 ```
 
 **Missing events:**
 ```bash
 # Check if logs are being written
-> tail -f /var/log/app.log | kelora -j --stats
+tail -f /var/log/app.log | kelora -j --stats
 
 # Verify parsing
-> tail -10 /var/log/app.log | kelora -j
+tail -10 /var/log/app.log | kelora -j
 ```
 
 **Tail behavior:**
 ```bash
 # Tail stops after log rotation - use -F
-> tail -F /var/log/app.log | kelora -j  # Follows through rotation
+tail -F /var/log/app.log | kelora -j  # Follows through rotation
 
 # Start from current position (no history)
-> tail -f -n 0 /var/log/app.log | kelora -j  # Only new lines
+tail -f -n 0 /var/log/app.log | kelora -j  # Only new lines
 ```
 
 ## See Also

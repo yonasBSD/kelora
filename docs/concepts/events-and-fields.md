@@ -313,7 +313,7 @@ Access nested maps using dot notation:
 Process arrays with Rhai array functions:
 
 ```bash
-> kelora -f json input.log \
+kelora -f json input.log \
     --exec 'e.tag_count = e.tags.len()' \
     --exec 'e.first_tag = e.get_path("tags[0]", "none")' \
     --exec 'e.unique_tags = unique(e.tags)' \
@@ -325,7 +325,7 @@ Process arrays with Rhai array functions:
 Convert array elements to individual events:
 
 ```bash
-> kelora -f json batch.log \
+kelora -f json batch.log \
     --exec 'emit_each(e.items)' \
     --keys item_id,status
 ```
@@ -385,16 +385,16 @@ The `--keys` parameter operates on **top-level fields only**:
 
 ```bash
 # ✅ Supported: Select top-level fields
-> kelora -f json input.log --keys user,timestamp,message
+kelora -f json input.log --keys user,timestamp,message
 
 # ❌ Not supported: Nested paths in --keys
-> kelora -f json input.log --keys user.name,scores[0]
+kelora -f json input.log --keys user.name,scores[0]
 ```
 
 To extract nested fields, use `--exec` to promote them to top-level:
 
 ```bash
-> kelora -f json input.log \
+kelora -f json input.log \
     --exec 'e.user_name = e.get_path("user.name", "")' \
     --exec 'e.first_score = e.get_path("scores[0]", 0)' \
     --keys user_name,first_score
@@ -405,7 +405,7 @@ To extract nested fields, use `--exec` to promote them to top-level:
 ### Extract Nested Fields
 
 ```bash
-> kelora -f json app.log \
+kelora -f json app.log \
     --exec 'e.user_name = e.get_path("user.name", "unknown")' \
     --exec 'e.user_role = e.get_path("user.role", "guest")' \
     --keys timestamp,user_name,user_role
@@ -414,7 +414,7 @@ To extract nested fields, use `--exec` to promote them to top-level:
 ### Flatten Structures
 
 ```bash
-> kelora -f json app.log \
+kelora -f json app.log \
     --exec 'e.request_method = e.request.method' \
     --exec 'e.request_path = e.request.path' \
     --exec 'e.request = ()' \
@@ -424,7 +424,7 @@ To extract nested fields, use `--exec` to promote them to top-level:
 ### Combine Fields
 
 ```bash
-> kelora -f json app.log \
+kelora -f json app.log \
     --exec 'e.full_name = e.first_name + " " + e.last_name' \
     --exec 'e.endpoint = e.method + " " + e.path' \
     --keys timestamp,full_name,endpoint
@@ -433,7 +433,7 @@ To extract nested fields, use `--exec` to promote them to top-level:
 ### Conditional Field Creation
 
 ```bash
-> kelora -f json app.log \
+kelora -f json app.log \
     --exec 'if e.status >= 500 { e.severity = "critical" } else if e.status >= 400 { e.severity = "warning" } else { e.severity = "normal" }' \
     --keys timestamp,status,severity
 ```
@@ -441,7 +441,7 @@ To extract nested fields, use `--exec` to promote them to top-level:
 ### Array Transformations
 
 ```bash
-> kelora -f json app.log \
+kelora -f json app.log \
     --exec 'e.tag_count = e.tags.len()' \
     --exec 'e.sorted_tags = sorted(e.tags)' \
     --exec 'e.unique_tags = unique(e.tags)' \
@@ -451,7 +451,7 @@ To extract nested fields, use `--exec` to promote them to top-level:
 ### Safe Deep Access
 
 ```bash
-> kelora -f json app.log \
+kelora -f json app.log \
     --exec 'e.city = e.get_path("user.address.city", "N/A")' \
     --exec 'e.zip = e.get_path("user.address.zip", "00000")' \
     --exec 'e.country = e.get_path("user.address.country", "Unknown")' \

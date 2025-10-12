@@ -35,7 +35,7 @@ Monitor overall service health:
 Track error rates over time:
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     -e 'if e.level == "ERROR" || e.level == "CRITICAL" { track_count("errors") }' \
     -e 'track_count("total")' \
     --metrics
@@ -48,7 +48,7 @@ Calculate error percentage from metrics output.
 Monitor individual service health:
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.service == "database"' \
     -e 'track_count(e.level)' \
     -e 'track_avg("duration", e.get_path("duration_ms", 0))' \
@@ -60,7 +60,7 @@ Monitor individual service health:
 Track performance metrics:
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.has_path("duration_ms")' \
     -e 'track_avg("response_time", e.duration_ms)' \
     -e 'track_min("fastest", e.duration_ms)' \
@@ -73,7 +73,7 @@ Track performance metrics:
 Monitor memory consumption:
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.has_path("memory_percent")' \
     -e 'track_avg("memory", e.memory_percent)' \
     -e 'track_max("peak_memory", e.memory_percent)' \
@@ -85,7 +85,7 @@ Monitor memory consumption:
 Analyze API endpoint health:
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.has_path("path")' \
     -e 'track_count(e.path)' \
     -e 'track_avg(e.path, e.get_path("duration_ms", 0))' \
@@ -99,7 +99,7 @@ Analyze API endpoint health:
 Generate a comprehensive health report:
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     -e 'track_count(e.service)' \
     -e 'track_count(e.level)' \
     -e 'if e.level == "ERROR" { track_count(e.service + "_errors") }' \
@@ -112,7 +112,7 @@ Generate a comprehensive health report:
 Track operations that fail:
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.get_path("status", "success") != "success"' \
     -e 'e.operation = e.get_path("operation", "unknown")' \
     -e 'track_count(e.operation)' \
@@ -125,7 +125,7 @@ Track operations that fail:
 Monitor database performance:
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.service == "database"' \
     -e 'if e.get_path("duration_ms", 0) > 1000 { e.slow = true }' \
     -e 'track_count("queries")' \
@@ -139,7 +139,7 @@ Monitor database performance:
 Track login and auth issues:
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.service == "auth"' \
     --filter 'e.message.contains("failed") || e.message.contains("locked")' \
     -e 'track_count(e.username)' \
@@ -153,7 +153,7 @@ Track login and auth issues:
 Monitor cache hit rates:
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.service == "cache"' \
     -e 'if e.message.contains("hit") { track_count("cache_hits") }' \
     -e 'if e.message.contains("miss") { track_count("cache_misses") }' \
@@ -166,7 +166,7 @@ Monitor cache hit rates:
 Track which services are interacting:
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.has_path("downstream_service")' \
     -e 'e.call = e.service + " -> " + e.downstream_service' \
     -e 'track_count(e.call)' \
@@ -178,7 +178,7 @@ Track which services are interacting:
 Break down health by time:
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.hour = e.timestamp.format("%Y-%m-%d %H:00")' \
     -e 'track_count(e.hour)' \
     -e 'if e.level == "ERROR" { track_count(e.hour + "_errors") }' \
@@ -190,7 +190,7 @@ Break down health by time:
 Find resource pressure points:
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.level == "WARN" || e.level == "ERROR"' \
     --filter 'e.message.contains("memory") || e.message.contains("disk") || e.message.contains("connection")' \
     -e 'track_count(e.service)' \
@@ -202,7 +202,7 @@ Find resource pressure points:
 Monitor user-facing operations:
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.has_path("user_id")' \
     -e 'track_unique("active_users", e.user_id)' \
     -e 'track_count(e.get_path("operation", "unknown"))' \
@@ -214,7 +214,7 @@ Monitor user-facing operations:
 ### Last Hour's Health
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --since "1 hour ago" \
     -e 'track_count(e.level)' \
     -e 'track_count(e.service)' \
@@ -225,14 +225,14 @@ Monitor user-facing operations:
 
 ```bash
 # Morning traffic
-> kelora -j app.log \
+kelora -j app.log \
     --since "2024-01-15 06:00:00" \
     --until "2024-01-15 12:00:00" \
     -e 'track_count(e.level)' \
     --metrics
 
 # Afternoon traffic
-> kelora -j app.log \
+kelora -j app.log \
     --since "2024-01-15 12:00:00" \
     --until "2024-01-15 18:00:00" \
     -e 'track_count(e.level)' \
@@ -244,7 +244,7 @@ Monitor user-facing operations:
 === "Linux/macOS"
 
     ```bash
-    > tail -f /var/log/app.log | kelora -j \
+    tail -f /var/log/app.log | kelora -j \
         -e 'track_count(e.level)' \
         -e 'if e.level == "ERROR" { eprint("⚠️  ERROR in " + e.service) }' \
         --metrics
@@ -253,7 +253,7 @@ Monitor user-facing operations:
 === "Windows"
 
     ```powershell
-    > Get-Content -Wait app.log | kelora -j \
+    Get-Content -Wait app.log | kelora -j \
         -e 'track_count(e.level)' \
         -e 'if e.level == "ERROR" { eprint("⚠️  ERROR in " + e.service) }' \
         --metrics
@@ -264,7 +264,7 @@ Monitor user-facing operations:
 ### Critical Error Detection
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.level == "CRITICAL"' \
     -e 'eprint("🚨 CRITICAL: " + e.service + " - " + e.message)' \
     -qq
@@ -275,7 +275,7 @@ The `-qq` flag suppresses event output, showing only alerts.
 ### Threshold Alerts
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     -e 'if e.get_path("memory_percent", 0) > 90 { eprint("⚠️  High memory: " + e.service + " at " + e.memory_percent + "%") }' \
     -e 'if e.get_path("duration_ms", 0) > 5000 { eprint("⚠️  Slow request: " + e.get_path("path", "unknown") + " took " + e.duration_ms + "ms") }' \
     -qq
@@ -284,7 +284,7 @@ The `-qq` flag suppresses event output, showing only alerts.
 ### Service Down Detection
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.message.contains("unavailable") || e.message.contains("timeout") || e.message.contains("unreachable")' \
     -e 'eprint("🔴 Service issue: " + e.service + " - " + e.message)' \
     -k timestamp,service,message
@@ -295,7 +295,7 @@ The `-qq` flag suppresses event output, showing only alerts.
 ### Prometheus-Style Metrics
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     -e 'track_count("http_requests_total")' \
     -e 'if e.status >= 500 { track_count("http_requests_errors") }' \
     -e 'track_avg("http_request_duration_ms", e.get_path("duration_ms", 0))' \
@@ -305,7 +305,7 @@ The `-qq` flag suppresses event output, showing only alerts.
 ### JSON Export for Dashboards
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.level == "ERROR"' \
     -e 'e.error_type = e.get_path("error.type", "unknown")' \
     -k timestamp,service,error_type,message \
@@ -315,7 +315,7 @@ The `-qq` flag suppresses event output, showing only alerts.
 ### CSV for Spreadsheets
 
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     -e 'e.hour = e.timestamp.format("%Y-%m-%d %H:00")' \
     -k hour,service,level,message \
     -F csv > health_report.csv
@@ -325,7 +325,7 @@ The `-qq` flag suppresses event output, showing only alerts.
 
 **Large Log Files:**
 ```bash
-> kelora -j large-app.log.gz \
+kelora -j large-app.log.gz \
     --parallel \
     -e 'track_count(e.service)' \
     --metrics
@@ -333,14 +333,14 @@ The `-qq` flag suppresses event output, showing only alerts.
 
 **Sampling for Quick Analysis:**
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     -e 'if e.user_id.bucket() % 10 == 0 { track_count("sampled") }' \
     --metrics
 ```
 
 **Focus on Recent Events:**
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --since "30 minutes ago" \
     -e 'track_count(e.level)' \
     --metrics
@@ -350,14 +350,14 @@ The `-qq` flag suppresses event output, showing only alerts.
 
 **Service health summary:**
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     -e 'track_count(e.service + "_" + e.level)' \
     --metrics
 ```
 
 **Error rate calculation:**
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     -e 'track_count("total")' \
     -e 'if e.level == "ERROR" { track_count("errors") }' \
     --metrics
@@ -366,14 +366,14 @@ The `-qq` flag suppresses event output, showing only alerts.
 
 **Unique users:**
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     -e 'track_unique("users", e.user_id)' \
     --metrics
 ```
 
 **Service call patterns:**
 ```bash
-> kelora -j app.log \
+kelora -j app.log \
     --filter 'e.has_path("operation")' \
     -e 'track_count(e.service + "::" + e.operation)' \
     --metrics

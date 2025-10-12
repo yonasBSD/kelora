@@ -21,13 +21,13 @@ Kelora supports two processing modes:
 
 ```bash
 # Find errors in access logs
-> kelora access.log --levels error,critical
+kelora access.log --levels error,critical
 
 # Transform JSON logs with Rhai
-> kelora -j app.json --exec 'e.duration_ms = e.end_time - e.start_time'
+kelora -j app.json --exec 'e.duration_ms = e.end_time - e.start_time'
 
 # Extract specific fields from NGINX logs
-> kelora nginx.log -f combined --keys method,status,path
+kelora nginx.log -f combined --keys method,status,path
 ```
 
 ## Arguments
@@ -42,11 +42,11 @@ Input files to process. If omitted, reads from stdin. Use `-` to explicitly spec
 
 **Examples:**
 ```bash
-> kelora app.log                    # Single file
-> kelora logs/*.jsonl               # Multiple files with glob
-> kelora file1.log file2.log        # Multiple files explicit
-> tail -f app.log | kelora -j       # From stdin
-> kelora -                          # Explicitly read stdin
+kelora app.log                    # Single file
+kelora logs/*.jsonl               # Multiple files with glob
+kelora file1.log file2.log        # Multiple files explicit
+tail -f app.log | kelora -j       # From stdin
+kelora -                          # Explicitly read stdin
 ```
 
 ## Global Options
@@ -100,9 +100,9 @@ Specify input format. Supports standard formats, column parsing, and CSV with ty
 
 **Examples:**
 ```bash
-> kelora -f json app.log
-> kelora -f combined nginx.log
-> kelora -f 'cols:ts(2) level *msg' custom.log  # `ts` is auto-detected as a timestamp
+kelora -f json app.log
+kelora -f combined nginx.log
+kelora -f 'cols:ts(2) level *msg' custom.log  # `ts` is auto-detected as a timestamp
 ```
 
 #### `-j`
@@ -110,7 +110,7 @@ Specify input format. Supports standard formats, column parsing, and CSV with ty
 Shortcut for `-f json`.
 
 ```bash
-> kelora -j app.jsonl
+kelora -j app.jsonl
 # Equivalent to: kelora -f json app.jsonl
 ```
 
@@ -127,7 +127,7 @@ Control file processing order.
 - `mtime` - Sort files by modification time (oldest first)
 
 ```bash
-> kelora --file-order mtime logs/*.log
+kelora --file-order mtime logs/*.log
 ```
 
 ### Line Filtering
@@ -137,7 +137,7 @@ Control file processing order.
 Skip the first N input lines.
 
 ```bash
-> kelora --skip-lines 10 app.log
+kelora --skip-lines 10 app.log
 ```
 
 #### `--keep-lines <REGEX>`
@@ -145,7 +145,7 @@ Skip the first N input lines.
 Keep only input lines matching regex pattern (applied before `--ignore-lines`).
 
 ```bash
-> kelora --keep-lines 'ERROR|WARN' app.log
+kelora --keep-lines 'ERROR|WARN' app.log
 ```
 
 #### `--ignore-lines <REGEX>`
@@ -153,7 +153,7 @@ Keep only input lines matching regex pattern (applied before `--ignore-lines`).
 Ignore input lines matching regex pattern.
 
 ```bash
-> kelora --ignore-lines '^#' app.log    # Skip comments
+kelora --ignore-lines '^#' app.log    # Skip comments
 ```
 
 ### Timestamp Configuration {#timestamp-options}
@@ -163,7 +163,7 @@ Ignore input lines matching regex pattern.
 Custom timestamp field name for parsing.
 
 ```bash
-> kelora -j --ts-field created_at app.log
+kelora -j --ts-field created_at app.log
 ```
 
 #### `--ts-format <FORMAT>`
@@ -171,8 +171,8 @@ Custom timestamp field name for parsing.
 Custom timestamp format using chrono format strings. See `--help-time` for format reference.
 
 ```bash
-> kelora --ts-format '%Y-%m-%d %H:%M:%S' app.log
-> kelora --ts-format '%d/%b/%Y:%H:%M:%S %z' access.log
+kelora --ts-format '%Y-%m-%d %H:%M:%S' app.log
+kelora --ts-format '%d/%b/%Y:%H:%M:%S %z' access.log
 ```
 
 #### `--input-tz <TIMEZONE>`
@@ -186,8 +186,8 @@ Timezone for naive input timestamps (without timezone info). Default: UTC.
 - Named timezones: `Europe/Berlin`, `America/New_York`, etc.
 
 ```bash
-> kelora --input-tz local app.log
-> kelora --input-tz Europe/Berlin app.log
+kelora --input-tz local app.log
+kelora --input-tz Europe/Berlin app.log
 ```
 
 ### Multi-line Events
@@ -197,8 +197,8 @@ Timezone for naive input timestamps (without timezone info). Default: UTC.
 Multi-line event detection strategy. See `--help-multiline` for details.
 
 ```bash
-> kelora -M json app.log              # JSON events across lines
-> kelora -M '^\\d{4}-' app.log        # Events start with date
+kelora -M json app.log              # JSON events across lines
+kelora -M '^\\d{4}-' app.log        # Events start with date
 ```
 
 ### Prefix Extraction
@@ -208,7 +208,7 @@ Multi-line event detection strategy. See `--help-multiline` for details.
 Extract text before separator to specified field (runs before parsing).
 
 ```bash
-> docker compose logs | kelora --extract-prefix service
+docker compose logs | kelora --extract-prefix service
 ```
 
 #### `--prefix-sep <STRING>`
@@ -216,7 +216,7 @@ Extract text before separator to specified field (runs before parsing).
 Separator string for prefix extraction. Default: `|`
 
 ```bash
-> kelora --extract-prefix node --prefix-sep ' :: ' cluster.log
+kelora --extract-prefix node --prefix-sep ' :: ' cluster.log
 ```
 
 ### Column Format Options
@@ -226,7 +226,7 @@ Separator string for prefix extraction. Default: `|`
 Column separator for `cols:<spec>` format. Default: whitespace.
 
 ```bash
-> kelora -f 'cols:name age city' --cols-sep ',' data.txt
+kelora -f 'cols:name age city' --cols-sep ',' data.txt
 ```
 
 ## Processing Options
@@ -243,7 +243,7 @@ Run Rhai script once before processing any events. Typical use: initialize looku
 - `read_file(path)` - Read file as string
 
 ```bash
-> kelora -j --begin 'conf.users = read_json("users.json")' app.log
+kelora -j --begin 'conf.users = read_json("users.json")' app.log
 ```
 
 #### `--filter <EXPRESSION>`
@@ -251,8 +251,8 @@ Run Rhai script once before processing any events. Typical use: initialize looku
 Boolean filter expression. Events where expression returns `true` are kept. Multiple filters are combined with AND logic.
 
 ```bash
-> kelora -j --filter 'e.status >= 400' app.log
-> kelora -j --filter 'e.service == "api"' --filter 'e.level == "ERROR"' app.log
+kelora -j --filter 'e.status >= 400' app.log
+kelora -j --filter 'e.service == "api"' --filter 'e.level == "ERROR"' app.log
 ```
 
 #### `-e, --exec <SCRIPT>`
@@ -260,8 +260,8 @@ Boolean filter expression. Events where expression returns `true` are kept. Mult
 Transform/process script evaluated on each event. Multiple `--exec` scripts run in order.
 
 ```bash
-> kelora -j --exec 'e.duration_s = e.duration_ms / 1000' app.log
-> kelora -j --exec 'track_count(e.service)' app.log
+kelora -j --exec 'e.duration_s = e.duration_ms / 1000' app.log
+kelora -j --exec 'track_count(e.service)' app.log
 ```
 
 #### `-E, --exec-file <FILE>`
@@ -269,7 +269,7 @@ Transform/process script evaluated on each event. Multiple `--exec` scripts run 
 Execute Rhai script from file (runs in exec stage).
 
 ```bash
-> kelora -j -E transform.rhai app.log
+kelora -j -E transform.rhai app.log
 ```
 
 #### `-I, --include <FILE>`
@@ -277,7 +277,7 @@ Execute Rhai script from file (runs in exec stage).
 Include Rhai files before script stages (library imports).
 
 ```bash
-> kelora -j -I helpers.rhai --exec 'e.custom = my_helper(e)' app.log
+kelora -j -I helpers.rhai --exec 'e.custom = my_helper(e)' app.log
 ```
 
 #### `--end <SCRIPT>`
@@ -285,7 +285,7 @@ Include Rhai files before script stages (library imports).
 Run once after processing completes (post-processing stage). Access global `metrics` map from `track_*()` calls here.
 
 ```bash
-> kelora -j \
+kelora -j \
     --exec 'track_count(e.service)' \
     --end 'print("Total services: " + metrics.len())' \
     app.log
@@ -298,7 +298,7 @@ Run once after processing completes (post-processing stage). Access global `metr
 Allow Rhai scripts to create directories and write files. Required for file helpers like `append_file()` or `mkdir()`.
 
 ```bash
-> kelora -j --allow-fs-writes --exec 'append_file("errors.txt", e.message)' app.log
+kelora -j --allow-fs-writes --exec 'append_file("errors.txt", e.message)' app.log
 ```
 
 ### Window Functions
@@ -308,7 +308,7 @@ Allow Rhai scripts to create directories and write files. Required for file help
 Enable sliding window of N+1 recent events. Required for `window_*()` functions.
 
 ```bash
-> kelora -j --window 5 --exec 'e.recent_statuses = window_values("status")' app.log
+kelora -j --window 5 --exec 'e.recent_statuses = window_values("status")' app.log
 ```
 
 ### Timestamp Conversion
@@ -318,7 +318,7 @@ Enable sliding window of N+1 recent events. Required for `window_*()` functions.
 Convert timestamp fields to RFC3339 format (ISO 8601 compatible). Modifies event data - affects all output formats.
 
 ```bash
-> kelora -j --convert-ts timestamp,created_at app.log
+kelora -j --convert-ts timestamp,created_at app.log
 ```
 
 ## Error Handling Options
@@ -330,7 +330,7 @@ Convert timestamp fields to RFC3339 format (ISO 8601 compatible). Modifies event
 Exit on first error (fail-fast behavior). Parsing errors, filter errors, or exec errors will immediately abort processing.
 
 ```bash
-> kelora -j --strict app.log
+kelora -j --strict app.log
 ```
 
 #### `--no-strict`
@@ -344,7 +344,7 @@ Disable strict mode explicitly (resilient mode is default).
 Show detailed error information. Use multiple times for more verbosity: `-v`, `-vv`, `-vvv`.
 
 ```bash
-> kelora -j --verbose app.log
+kelora -j --verbose app.log
 ```
 
 ### Quiet Mode
@@ -360,8 +360,8 @@ Graduated quiet mode with explicit levels:
 | `-qqq` | Additionally suppress script side effects (`print()`, `eprint()`) |
 
 ```bash
-> kelora -qq --exec 'track_count("errors")' app.log     # Only metrics
-> kelora -qqq app.log; echo "Exit: $?"                  # Exit code only
+kelora -qq --exec 'track_count("errors")' app.log     # Only metrics
+kelora -qqq app.log; echo "Exit: $?"                  # Exit code only
 ```
 
 ## Filtering Options
@@ -373,8 +373,8 @@ Graduated quiet mode with explicit levels:
 Include only events with specified log levels (comma-separated, case-insensitive).
 
 ```bash
-> kelora -j --levels error app.log
-> kelora -j --levels error,warn,critical app.log
+kelora -j --levels error app.log
+kelora -j --levels error,warn,critical app.log
 ```
 
 #### `-L, --exclude-levels <LEVELS>`
@@ -382,7 +382,7 @@ Include only events with specified log levels (comma-separated, case-insensitive
 Exclude events with specified log levels (comma-separated, case-insensitive).
 
 ```bash
-> kelora -j --exclude-levels debug,trace app.log
+kelora -j --exclude-levels debug,trace app.log
 ```
 
 ### Field Selection
@@ -392,7 +392,7 @@ Exclude events with specified log levels (comma-separated, case-insensitive).
 Output only specified top-level fields (comma-separated list).
 
 ```bash
-> kelora -j --keys timestamp,level,message app.log
+kelora -j --keys timestamp,level,message app.log
 ```
 
 #### `-K, --exclude-keys <FIELDS>`
@@ -400,7 +400,7 @@ Output only specified top-level fields (comma-separated list).
 Exclude specified fields from output (comma-separated list).
 
 ```bash
-> kelora -j --exclude-keys password,token,secret app.log
+kelora -j --exclude-keys password,token,secret app.log
 ```
 
 ### Time Range Filtering
@@ -415,9 +415,9 @@ Include events from this time onward. Accepts journalctl-style timestamps.
 - Relative: `1h`, `-30m`, `yesterday`
 
 ```bash
-> kelora -j --since '1 hour ago' app.log
-> kelora -j --since yesterday app.log
-> kelora -j --since 2024-01-15T10:00:00Z app.log
+kelora -j --since '1 hour ago' app.log
+kelora -j --since yesterday app.log
+kelora -j --since 2024-01-15T10:00:00Z app.log
 ```
 
 #### `--until <TIME>`
@@ -430,9 +430,9 @@ Include events until this time. Accepts journalctl-style timestamps.
 - Relative: `1h`, `+30m`, `tomorrow`
 
 ```bash
-> kelora -j --until '30 minutes ago' app.log
-> kelora -j --until tomorrow app.log
-> kelora -j --until 2024-01-15T18:00:00Z app.log
+kelora -j --until '30 minutes ago' app.log
+kelora -j --until tomorrow app.log
+kelora -j --until 2024-01-15T18:00:00Z app.log
 ```
 
 ### Output Limiting
@@ -442,8 +442,8 @@ Include events until this time. Accepts journalctl-style timestamps.
 Limit output to the first N events (after filtering).
 
 ```bash
-> kelora -j --take 100 app.log
-> kelora -j --levels error --take 10 app.log
+kelora -j --take 100 app.log
+kelora -j --levels error --take 10 app.log
 ```
 
 ### Context Lines
@@ -453,7 +453,7 @@ Limit output to the first N events (after filtering).
 Show N lines before each match (requires filtering with `--filter` or `--levels`).
 
 ```bash
-> kelora -j --levels error --before-context 2 app.log
+kelora -j --levels error --before-context 2 app.log
 ```
 
 #### `-A, --after-context <N>`
@@ -461,7 +461,7 @@ Show N lines before each match (requires filtering with `--filter` or `--levels`
 Show N lines after each match (requires filtering).
 
 ```bash
-> kelora -j --levels error --after-context 3 app.log
+kelora -j --levels error --after-context 3 app.log
 ```
 
 #### `-C, --context <N>`
@@ -469,7 +469,7 @@ Show N lines after each match (requires filtering).
 Show N lines before and after each match (requires filtering).
 
 ```bash
-> kelora -j --levels error --context 2 app.log
+kelora -j --levels error --context 2 app.log
 ```
 
 ## Output Options
@@ -494,9 +494,9 @@ Output format. Default: `default`
 - `none` - No event output (only metrics/stats)
 
 ```bash
-> kelora -j -F json app.log
-> kelora -j -F csv app.log
-> kelora -j -F none --stats app.log
+kelora -j -F json app.log
+kelora -j -F csv app.log
+kelora -j -F none --stats app.log
 ```
 
 #### `-J`
@@ -504,7 +504,7 @@ Output format. Default: `default`
 Shortcut for `-F json`.
 
 ```bash
-> kelora -j -J app.log
+kelora -j -J app.log
 # Equivalent to: kelora -f json -F json app.log
 ```
 
@@ -515,7 +515,7 @@ Shortcut for `-F json`.
 Write formatted events to file instead of stdout.
 
 ```bash
-> kelora -j -F json -o output.json app.log
+kelora -j -F json -o output.json app.log
 ```
 
 ### Core Fields
@@ -525,7 +525,7 @@ Write formatted events to file instead of stdout.
 Output only core fields (timestamp, level, message).
 
 ```bash
-> kelora -j --core app.log
+kelora -j --core app.log
 ```
 
 ## Default Format Options
@@ -539,7 +539,7 @@ These options only affect the default formatter (`-F default`).
 Output only field values (omit field names).
 
 ```bash
-> kelora -j --brief app.log
+kelora -j --brief app.log
 ```
 
 ### Nested Structures
@@ -549,7 +549,7 @@ Output only field values (omit field names).
 Expand nested structures (maps/arrays) with indentation.
 
 ```bash
-> kelora -j --expand-nested app.log
+kelora -j --expand-nested app.log
 ```
 
 ### Word Wrapping
@@ -563,7 +563,7 @@ Enable word-wrapping (default: on).
 Disable word-wrapping (overrides `--wrap`).
 
 ```bash
-> kelora -j --no-wrap app.log
+kelora -j --no-wrap app.log
 ```
 
 ### Timestamp Display
@@ -573,7 +573,7 @@ Disable word-wrapping (overrides `--wrap`).
 Display timestamps as local RFC3339 (ISO 8601 compatible). Display-only - only affects default formatter output.
 
 ```bash
-> kelora -j -z app.log
+kelora -j -z app.log
 # Output: 2024-01-15T10:30:00+01:00
 ```
 
@@ -582,7 +582,7 @@ Display timestamps as local RFC3339 (ISO 8601 compatible). Display-only - only a
 Display timestamps as UTC RFC3339 (ISO 8601 compatible). Display-only - only affects default formatter output.
 
 ```bash
-> kelora -j -Z app.log
+kelora -j -Z app.log
 # Output: 2024-01-15T09:30:00Z
 ```
 
@@ -595,7 +595,7 @@ Display timestamps as UTC RFC3339 (ISO 8601 compatible). Display-only - only aff
 Force colored output (even when piping to file).
 
 ```bash
-> kelora -j --force-color app.log > output.txt
+kelora -j --force-color app.log > output.txt
 ```
 
 #### `--no-color`
@@ -603,7 +603,7 @@ Force colored output (even when piping to file).
 Disable colored output.
 
 ```bash
-> kelora -j --no-color app.log
+kelora -j --no-color app.log
 ```
 
 ### Gap Markers
@@ -613,8 +613,8 @@ Disable colored output.
 Insert centered marker when time delta between events exceeds duration.
 
 ```bash
-> kelora -j --mark-gaps 30s app.log    # Mark 30+ second gaps
-> kelora -j --mark-gaps 5m app.log     # Mark 5+ minute gaps
+kelora -j --mark-gaps 30s app.log    # Mark 30+ second gaps
+kelora -j --mark-gaps 5m app.log     # Mark 5+ minute gaps
 ```
 
 ### Emoji
@@ -624,7 +624,7 @@ Insert centered marker when time delta between events exceeds duration.
 Disable emoji prefixes in output.
 
 ```bash
-> kelora -j --no-emoji app.log
+kelora -j --no-emoji app.log
 ```
 
 ## Performance Options
@@ -636,7 +636,7 @@ Disable emoji prefixes in output.
 Enable parallel processing across multiple cores. Higher throughput, may reorder output.
 
 ```bash
-> kelora -j --parallel app.log
+kelora -j --parallel app.log
 ```
 
 #### `--no-parallel`
@@ -648,7 +648,7 @@ Disable parallel processing explicitly (sequential mode is default).
 Number of worker threads for parallel processing. Default: 0 (auto-detect cores).
 
 ```bash
-> kelora -j --parallel --threads 4 app.log
+kelora -j --parallel --threads 4 app.log
 ```
 
 #### `--batch-size <N>`
@@ -656,7 +656,7 @@ Number of worker threads for parallel processing. Default: 0 (auto-detect cores)
 Batch size for parallel processing. Larger batches improve throughput but increase memory usage.
 
 ```bash
-> kelora -j --parallel --batch-size 5000 app.log
+kelora -j --parallel --batch-size 5000 app.log
 ```
 
 #### `--batch-timeout <MS>`
@@ -666,7 +666,7 @@ Flush partially full batches after idle period (milliseconds). Lower values redu
 Default: 200ms
 
 ```bash
-> kelora -j --parallel --batch-timeout 100 app.log
+kelora -j --parallel --batch-timeout 100 app.log
 ```
 
 #### `--unordered`
@@ -674,7 +674,7 @@ Default: 200ms
 Disable ordered output for maximum parallel performance.
 
 ```bash
-> kelora -j --parallel --unordered app.log
+kelora -j --parallel --unordered app.log
 ```
 
 ## Metrics and Statistics
@@ -686,7 +686,7 @@ Disable ordered output for maximum parallel performance.
 Show processing statistics at end (default: off).
 
 ```bash
-> kelora -j --stats app.log
+kelora -j --stats app.log
 ```
 
 #### `--no-stats`
@@ -698,7 +698,7 @@ Disable processing statistics explicitly (default: off).
 Print processing statistics only (implies `-F none`).
 
 ```bash
-> kelora -j --stats-only app.log
+kelora -j --stats-only app.log
 ```
 
 ### Tracked Metrics
@@ -708,7 +708,7 @@ Print processing statistics only (implies `-F none`).
 Show metrics recorded via `track_*()` functions in Rhai scripts.
 
 ```bash
-> kelora -j --exec 'track_count(e.service)' --metrics app.log
+kelora -j --exec 'track_count(e.service)' --metrics app.log
 ```
 
 #### `--no-metrics`
@@ -720,7 +720,7 @@ Disable tracked metrics explicitly (default: off).
 Persist metrics map to disk as JSON.
 
 ```bash
-> kelora -j --exec 'track_count(e.service)' --metrics-file metrics.json app.log
+kelora -j --exec 'track_count(e.service)' --metrics-file metrics.json app.log
 ```
 
 ## Configuration Options
@@ -734,7 +734,7 @@ Kelora uses a configuration file for defaults and aliases. See [Configuration Sy
 Use alias from configuration file.
 
 ```bash
-> kelora -a errors app.log
+kelora -a errors app.log
 ```
 
 #### `--config-file <FILE>`
@@ -742,7 +742,7 @@ Use alias from configuration file.
 Specify custom configuration file path.
 
 ```bash
-> kelora --config-file /path/to/custom.ini app.log
+kelora --config-file /path/to/custom.ini app.log
 ```
 
 #### `--show-config`
@@ -750,7 +750,7 @@ Specify custom configuration file path.
 Show current configuration with precedence information and exit.
 
 ```bash
-> kelora --show-config
+kelora --show-config
 ```
 
 #### `--edit-config`
@@ -758,7 +758,7 @@ Show current configuration with precedence information and exit.
 Edit configuration file in default editor and exit.
 
 ```bash
-> kelora --edit-config
+kelora --edit-config
 ```
 
 #### `--ignore-config`
@@ -766,7 +766,7 @@ Edit configuration file in default editor and exit.
 Ignore configuration file (use built-in defaults only).
 
 ```bash
-> kelora --ignore-config app.log
+kelora --ignore-config app.log
 ```
 
 #### `--save-alias <NAME>`
@@ -774,7 +774,7 @@ Ignore configuration file (use built-in defaults only).
 Save current command as alias to configuration file.
 
 ```bash
-> kelora -j --levels error --keys timestamp,message --save-alias errors
+kelora -j --levels error --keys timestamp,message --save-alias errors
 # Later use: kelora -a errors app.log
 ```
 
@@ -792,8 +792,8 @@ Kelora uses standard Unix exit codes:
 
 **Examples:**
 ```bash
-> kelora -j app.log && echo "Clean" || echo "Has errors"
-> kelora -qq app.log; echo "Exit code: $?"
+kelora -j app.log && echo "Clean" || echo "Has errors"
+kelora -qq app.log; echo "Exit code: $?"
 ```
 
 ## Environment Variables
@@ -807,7 +807,7 @@ Kelora uses standard Unix exit codes:
 Access environment variables in scripts using `get_env()`:
 
 ```bash
-> kelora -j --exec 'e.build = get_env("BUILD_ID", "unknown")' app.log
+kelora -j --exec 'e.build = get_env("BUILD_ID", "unknown")' app.log
 ```
 
 ## Common Option Combinations
@@ -816,20 +816,20 @@ Access environment variables in scripts using `get_env()`:
 
 ```bash
 # Find errors with context
-> kelora -j --levels error --context 2 app.log
+kelora -j --levels error --context 2 app.log
 
 # Count errors by service
-> kelora -j --levels error --exec 'track_count(e.service)' --metrics app.log
+kelora -j --levels error --exec 'track_count(e.service)' --metrics app.log
 ```
 
 ### Performance Analysis
 
 ```bash
 # Find slow requests
-> kelora -f combined --filter 'e.request_time.to_float() > 1.0' nginx.log
+kelora -f combined --filter 'e.request_time.to_float() > 1.0' nginx.log
 
 # Track response time percentiles
-> kelora -f combined \
+kelora -f combined \
     --exec 'track_bucket("latency", e.request_time.to_float() * 1000)' \
     --metrics nginx.log
 ```
@@ -838,10 +838,10 @@ Access environment variables in scripts using `get_env()`:
 
 ```bash
 # Export to JSON
-> kelora -j -F json -o output.json app.log
+kelora -j -F json -o output.json app.log
 
 # Export to CSV
-> kelora -j -F csv --keys timestamp,level,service,message -o report.csv app.log
+kelora -j -F csv --keys timestamp,level,service,message -o report.csv app.log
 ```
 
 ### Real-Time Monitoring
@@ -849,23 +849,23 @@ Access environment variables in scripts using `get_env()`:
 === "Linux/macOS"
 
     ```bash
-    > tail -f app.log | kelora -j --levels error,warn
+    tail -f app.log | kelora -j --levels error,warn
     ```
 
 === "Windows"
 
     ```powershell
-    > Get-Content -Wait app.log | kelora -j --levels error,warn
+    Get-Content -Wait app.log | kelora -j --levels error,warn
     ```
 
 ### High-Performance Batch Processing
 
 ```bash
 # Parallel processing with optimal batch size
-> kelora -j --parallel --batch-size 5000 --unordered large.log
+kelora -j --parallel --batch-size 5000 --unordered large.log
 
 # Compressed archives
-> kelora -j --parallel logs/*.log.gz
+kelora -j --parallel logs/*.log.gz
 ```
 
 ## See Also
