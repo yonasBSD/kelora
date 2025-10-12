@@ -6,6 +6,7 @@ use base64::Engine as _;
 use once_cell::sync::Lazy;
 use rhai::{Array, Dynamic, Engine, Map};
 use std::cell::RefCell;
+use std::convert::TryFrom;
 use std::path::Path;
 use url::Url;
 
@@ -113,6 +114,43 @@ fn is_valid_http_token(token: &str) -> bool {
                     | '+' | '-' | '.' | '^' | '_' | '`' | '|' | '~'
             )
         })
+}
+
+fn edit_distance_impl(lhs: &str, rhs: &str) -> i64 {
+    if lhs == rhs {
+        return 0;
+    }
+
+    let lhs_chars: Vec<char> = lhs.chars().collect();
+    let rhs_chars: Vec<char> = rhs.chars().collect();
+    let len_lhs = lhs_chars.len();
+    let len_rhs = rhs_chars.len();
+
+    if len_lhs == 0 {
+        return i64::try_from(len_rhs).unwrap_or(i64::MAX);
+    }
+    if len_rhs == 0 {
+        return i64::try_from(len_lhs).unwrap_or(i64::MAX);
+    }
+
+    let mut prev: Vec<usize> = (0..=len_rhs).collect();
+    let mut curr: Vec<usize> = vec![0; len_rhs + 1];
+
+    for (i, &lhs_ch) in lhs_chars.iter().enumerate() {
+        curr[0] = i + 1;
+
+        for (j, &rhs_ch) in rhs_chars.iter().enumerate() {
+            let cost = usize::from(lhs_ch != rhs_ch);
+            let insertion = curr[j] + 1;
+            let deletion = prev[j + 1] + 1;
+            let substitution = prev[j] + cost;
+            curr[j + 1] = insertion.min(deletion).min(substitution);
+        }
+
+        std::mem::swap(&mut prev, &mut curr);
+    }
+
+    i64::try_from(prev[len_rhs]).unwrap_or(i64::MAX)
 }
 
 fn percent_decode_to_vec(input: &str) -> Option<Vec<u8>> {
@@ -1509,6 +1547,8 @@ pub fn register_functions(engine: &mut Engine) {
         }
         text.matches(pattern).count() as i64
     });
+
+    engine.register_fn("edit_distance", edit_distance_impl);
 
     engine.register_fn("strip", |text: &str| -> String { text.trim().to_string() });
 
@@ -5989,6 +6029,37 @@ mod tests {
         assert!(result.contains("\"https://example.com/\""));
         assert!(result.contains("\"Mozilla/5.0\""));
         assert!(result.ends_with(" \"0.045\""));
+    }
+
+    #[test]
+    fn test_edit_distance_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let distance = engine
+            .eval::<i64>(r#""kitten".edit_distance("sitting")"#)
+            .unwrap();
+        assert_eq!(distance, 3);
+
+        let symmetric = engine
+            .eval::<i64>(r#""sitting".edit_distance("kitten")"#)
+            .unwrap();
+        assert_eq!(symmetric, 3);
+
+        let same = engine
+            .eval::<i64>(r#""kelora".edit_distance("kelora")"#)
+            .unwrap();
+        assert_eq!(same, 0);
+
+        let empty_case = engine
+            .eval::<i64>(
+                r#"
+                let empty = "";
+                empty.edit_distance("logs")
+            "#,
+            )
+            .unwrap();
+        assert_eq!(empty_case, 4);
     }
 
     #[test]

@@ -435,6 +435,15 @@ Count occurrences of pattern in text.
 e.error_count = e.log.count("ERROR")
 ```
 
+#### `text.edit_distance(other)`
+Compute Levenshtein edit distance between two strings.
+
+```rhai
+if e.message.edit_distance("connection reset") <= 3 {
+    e.is_connection_issue = true
+}
+```
+
 #### `text.index_of(pattern)`
 Find position of substring (-1 if not found).
 

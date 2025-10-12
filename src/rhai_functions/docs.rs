@@ -18,6 +18,7 @@ text.count(pattern)                  Count occurrences of pattern in text
 text.decode_b64()                    Decode base64 string to text
 text.decode_hex()                    Decode hexadecimal string to text
 text.decode_url()                    Decode URL-encoded string
+text.edit_distance(other)            Compute Levenshtein edit distance between two strings
 text.encode_b64()                    Encode text to base64 string
 text.encode_hex()                    Encode text to hexadecimal string
 text.encode_url()                    URL-encode text (percent encoding)
