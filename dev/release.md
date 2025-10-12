@@ -13,6 +13,7 @@ just release-prepare
 The command will:
 
 - read the version from `Cargo.toml` and make sure it is valid SemVer;
+- ensure the version differs from the most recent `v*` git tag (helpful when you forget to bump the version);
 - run `just docs-build` and `just check`;
 - ensure the git tag `v<version>` does not already exist;
 - create the new tag and print the push commands so you can run them manually.

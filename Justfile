@@ -91,6 +91,13 @@ release-prepare:
         exit 1
     fi
 
+    LATEST_TAG="$(git tag --list 'v*' --sort=-v:refname | head -n 1 || true)"
+
+    if [[ -n "$LATEST_TAG" && "$LATEST_TAG" == "$TAG" ]]; then
+        echo "error: Cargo.toml version '$VERSION' matches the latest release tag '$LATEST_TAG'. Update the version before releasing." >&2
+        exit 1
+    fi
+
     if [[ -n "$(git status --porcelain)" ]]; then
         echo "error: working tree is not clean. Commit or stash changes before releasing." >&2
         exit 1
