@@ -780,21 +780,18 @@ kelora -j --levels error --keys timestamp,message --save-alias errors
 
 ## Exit Codes
 
-Kelora uses standard Unix exit codes:
+Kelora uses standard Unix exit codes to indicate success or failure:
 
 | Code | Meaning |
 |------|---------|
-| `0` | Success (no errors) |
+| `0` | Success - no errors occurred |
 | `1` | Processing errors (parse/filter/exec errors) |
-| `2` | Invalid usage (CLI errors, file not found) |
-| `130` | Interrupted (Ctrl+C) |
-| `141` | Broken pipe (normal in Unix pipelines) |
+| `2` | Usage errors (invalid flags, file not found, config errors) |
+| `130` | Interrupted (Ctrl+C / SIGINT) |
+| `141` | Broken pipe (SIGPIPE - normal in pipelines) |
+| `143` | Terminated (SIGTERM) |
 
-**Examples:**
-```bash
-kelora -j app.log && echo "Clean" || echo "Has errors"
-kelora -qq app.log; echo "Exit code: $?"
-```
+For detailed information on exit codes, error handling modes, scripting patterns, and troubleshooting, see the [Exit Codes Reference](exit-codes.md).
 
 ## Environment Variables
 
