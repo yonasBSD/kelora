@@ -83,6 +83,19 @@ e.user.id            // Another nested field
 e.metadata.region    // Deeper nesting
 ```
 
+**Important:** Direct nested access requires the field to exist. If the field might be missing, check first or use `get_path()`:
+
+```rhai
+// Safe: Check before access
+if "user" in e && "name" in e.user {
+    e.user.name
+}
+
+// Safer: Use get_path with default
+e.get_path("user.name", "unknown")      // Returns "unknown" if missing
+e.get_path("metadata.region", "us-west")  // Fallback value
+```
+
 ### Array Access
 
 Access array elements by index:
@@ -506,19 +519,41 @@ if type_of(e.field) == "()" { /* null/empty */ }
 
 ### Direct vs Path Access
 
-**Direct access** is fastest:
+**Direct access** is fastest for known fields:
 ```rhai
 e.level           // Fast: direct map lookup
 e.user.name       // Fast: two map lookups
 ```
 
-**Path access** is more flexible but slightly slower:
+**Use direct access when:**
+- Field names are known at script time
+- Fields are guaranteed to exist (e.g., parser output)
+- Performance is critical
+
+**Path access** provides safety and flexibility:
 ```rhai
-e.get_path("level", "INFO")              // Parses path string
-e.get_path("user.name", "unknown")       // More overhead
+e.get_path("level", "INFO")              // Safe with default
+e.get_path("user.name", "unknown")       // Handles missing fields
 ```
 
-Use direct access when field names are known and simple.
+**Use `get_path()` when:**
+- Fields might not exist (optional data)
+- Working with inconsistent log formats
+- You need default values for missing fields
+- Path is dynamic or comes from configuration
+
+**Hybrid approach for best results:**
+```rhai
+// Check existence, then use direct access for speed
+if "user" in e {
+    e.user_name = e.user.name              // Fast once verified
+} else {
+    e.user_name = "unknown"
+}
+
+// Or use get_path for one-liners
+e.user_name = e.get_path("user.name", "unknown")  // Simpler but slower
+```
 
 ### Field Existence Checks
 
@@ -588,20 +623,25 @@ e.status_code = to_int_or(e.status, 0)
 e.duration = to_float_or(e.duration_ms, 0.0)
 ```
 
-### Nested Field Changes Not Persisting
+### Nested Field Access Errors
 
-**Problem:** Modifying nested fields doesn't work as expected.
+**Problem:** Accessing non-existent nested fields causes errors.
 
-**Solution:** Reassign the parent object:
+**Solution:** Check field existence before access or use `get_path()`:
 ```rhai
-// This might not work
+// Error if user or name doesn't exist
 e.user.name = "alice"
 
-// Do this instead
-let user = e.user;
-user.name = "alice";
-e.user = user;
+// Safe: Check first
+if "user" in e {
+    e.user.name = "alice"
+}
+
+// Safest: Use get_path for reading
+let current = e.get_path("user.name", "default")
 ```
+
+**Note:** Direct nested assignment (`e.user.name = "alice"`) works fine when the parent object exists.
 
 ### Field Name with Special Characters
 
