@@ -1,51 +1,99 @@
-# Repository Guidelines
+# AGENTS.md
 
-Kelora is a Rust log processor; this guide keeps contributions aligned with current workflows.
+Kelora is a Rust-based command-line log analysis tool using the Rhai scripting engine. This guide provides essentials for AI agents working on the codebase.
 
-## Documentation Sources
+## Documentation - Don't Duplicate, Reference!
 
-- **README.md** - User-facing overview, quick start, core concepts, CLI feature tour, format recipes
-- **examples/README.md** - 37 example files demonstrating all formats and usage patterns
-- **Built-in help screens** (run `./target/release/kelora <flag>` or `cargo run -- <flag>`):
-  - `--help` - Complete CLI reference with all flags and options
-  - `--help-rhai` - Rhai language guide for Kelora scripting
-  - `--help-functions` - All 40+ built-in Rhai functions organized by category
-  - `--help-examples` - Practical log analysis patterns and common idioms
-  - `--help-time` - Timestamp format reference (chrono format strings)
-  - `--help-multiline` - Multiline strategy reference
+**First, check these sources instead of guessing:**
+- **README.md** - User overview, quick start, CLI feature tour
+- **examples/README.md** - 37 example files with usage patterns
+- **Built-in help** - Run `./target/release/kelora --help-*` for detailed references:
+  - `--help` - CLI reference
+  - `--help-rhai` - Rhai scripting guide
+  - `--help-functions` - All 40+ built-in functions
+  - `--help-examples` - Common patterns
+  - `--help-time` - Timestamp formats
+  - `--help-multiline` - Multiline strategies
 
-**Always verify current behavior** by running help commands or reading markdown files rather than assuming based on this document.
+## Essential Commands (Using Just)
 
-## Project Structure & Module Organization
-- Core CLI and pipeline code live in `src/`; `main.rs` wires the Clap interface and `engine.rs` orchestrates parsing, filtering, and formatting stages.
-- Parsers sit under `src/parsers/`, stream helpers in `readers.rs` and `decompression.rs`; extend these instead of introducing standalone binaries.
-- Rhai built-ins and utilities are in `src/rhai_functions/`; update `docs/` or `dev/` notes whenever scripting behavior shifts.
-- Integration coverage belongs in `tests/`, fixtures in `example_logs/`, and performance harnesses in `benchmarks/`.
+```bash
+# Quality checks before commit (REQUIRED)
+just fmt                # Format code
+just lint               # Run clippy
+just test               # All tests
 
-## Build, Test, and Development Commands
-- `cargo build --release` or `cargo run -- <flags>` produce local binaries for smoke testing.
-- `just test`, `just test-unit`, and `just test-integration` wrap targeted `cargo test` runs for faster iteration.
-- `just fmt`, `just lint`, `just audit`, and `just deny` keep formatting, linting, and supply-chain policy clean; `just check` runs the whole bundle.
-- `just bench-quick` samples hot paths; use `just bench` for the full suite and `just bench-update` when you intentionally refresh the stored baseline.
+# Additional checks
+just check              # fmt + lint + audit + deny + test
+just audit              # Security audit
+just deny               # License/dependency policy
 
-## Coding Style & Naming Conventions
-- Default to `cargo fmt` output: four-space indentation, trailing commas, module/file snake_case; structs and enums in PascalCase, constants in SCREAMING_SNAKE_CASE.
-- Handle fallible CLI paths with `anyhow::Result` and `?`; choose slices or references over owned allocations inside tight loops.
-- Add concise Rustdoc for new flags or Rhai functions so `--help`, `help-screen.txt`, and docs stay synchronized.
+# Benchmarking (for performance changes)
+just bench-quick        # Quick benchmarks
+just bench              # Full suite
+just bench-update       # Update baseline
 
-## Testing Guidelines
-- Place focused unit tests in-module behind `#[cfg(test)]`; add scenario coverage in `tests/` named `<feature>_integration_test.rs`.
-- Run `cargo test -q` or `just test` before submitting changes.
-- When output shifts, regenerate `help-screen.txt` via `cargo run -- --help > help-screen.txt` and refresh sample fixtures in `example_logs/` as needed.
-- Keep tests deterministic by leaning on `tempfile` or bundled fixtures instead of randomness.
+# Documentation
+just docs-serve         # Serve with auto-reload
+just docs-build         # Build locally
+```
 
-## Commit & Pull Request Guidelines
-- Add `Co-authored-by: GPT-5 <ai@example.com>` as a trailer in every commit message.
-- Follow existing history: imperative commit subjects under ~72 characters, optional bodies explaining rationale, and `Fixes #123` lines for linked issues.
-- PRs need a summary of behavior changes, testing evidence, and notes about new flags, Rhai APIs, or performance considerations.
-- Attach before/after CLI snippets when formatting shifts and mention any updated docs or benchmarking results.
-- Coordinate major parser or engine adjustments with maintainers early, especially if they affect `benchmarks/` expectations or default outputs.
+## Code Quality Rules (REQUIRED Before Commit)
 
-## No Backwards Compatiblity
+1. **Always run `just fmt`** (or `cargo fmt --all`)
+2. **Always run `just lint`** (or `cargo clippy --all-targets --all-features -- -D warnings`)
+3. **Run tests** with `just test`
+4. **For performance changes**: Run `just bench` to check for regressions
 
-Do not care for backwards compatiblity.
+## Key Development Conventions
+
+**Architecture:** Streaming pipeline: Input → Parsing → Processing (Rhai) → Output
+
+**Adding Rhai Functions:**
+- Implement in `src/rhai_functions/`
+- **ALWAYS update `src/rhai_functions/docs.rs`** for `--help-functions`
+- Remember: Rhai allows method-style calls on first argument
+
+**Emoji Output:**
+- 🔹 (blue diamond) for general output
+- ⚠️ (warning) for errors
+- Support `--no-emoji` flag
+
+**Exit Codes:**
+- 0: Success
+- 1: Parse/runtime errors
+- 2: Invalid CLI usage
+
+**No Backwards Compatibility:** Breaking changes are acceptable. Prioritize correctness and performance.
+
+## Project Structure
+
+```
+src/
+├── main.rs              # CLI entry point
+├── config/              # Configuration system
+├── formats/             # Format parsers
+├── processing/          # Pipeline stages
+├── rhai_functions/      # Rhai functions (update docs.rs!)
+└── output/              # Output formatters
+tests/integration_tests.rs
+examples/                # Usage examples
+benchmarks/              # Performance tests
+Justfile                 # Build automation
+```
+
+## Common Tasks
+
+**Add Format Parser:** Create in `src/formats/`, add to `mod.rs`, update auto-detection, write tests
+
+**Add Rhai Function:** Implement in `src/rhai_functions/`, register in `mod.rs`, **update `docs.rs`**, write tests
+
+**Performance Work:** Run `just bench` before/after, compare, use `just bench-update` if improved
+
+## Quick Reference
+
+**Test quickly:** `time ./target/release/kelora -f json logfile.json --filter "e.level == 'ERROR'" > /dev/null`
+
+**Quiet modes:** `-q` (suppress diagnostics), `-qq` (also suppress events), `-qqq` (also suppress script output)
+
+**Config precedence:** CLI args > `.kelora.ini` (project) > `~/.config/kelora/kelora.ini` (user) > defaults
