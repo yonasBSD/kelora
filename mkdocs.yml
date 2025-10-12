@@ -23,14 +23,14 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
   features:
-    - navigation.instant        # Fast page loads
-    - navigation.tracking       # Update URL with scroll
-    - navigation.tabs          # Top-level tabs
-    - navigation.sections      # Expand sections
-    - search.suggest           # Search suggestions
-    - search.highlight         # Highlight search terms
-    - content.code.copy        # Copy code blocks
-    - content.code.annotate    # Annotate code with numbers
+    - navigation.instant # Fast page loads
+    - navigation.tracking # Update URL with scroll
+    - navigation.tabs # Top-level tabs
+    - navigation.sections # Expand sections
+    - search.suggest # Search suggestions
+    - search.highlight # Highlight search terms
+    - content.code.copy # Copy code blocks
+    - content.code.annotate # Annotate code with numbers
 
 plugins:
   - search:
@@ -90,8 +90,6 @@ nav:
       - concepts/multiline-strategies.md
       - concepts/performance-model.md
       - concepts/configuration-system.md
-  - Project:
-      - project/releasing.md
   - Reference:
       - reference/functions.md
       - reference/cli-reference.md
