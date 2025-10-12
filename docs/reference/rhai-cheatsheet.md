@@ -231,38 +231,6 @@ type_of(e.field)                      // Get type as string
 type_of(e.field) != "()"              // Check if field has value
 ```
 
-## Kelora Pipeline Stages
-
-```rhai
---begin         // Pre-run once before parsing
-                // Populate global `conf` map (becomes read-only)
-
---filter        // Boolean gate per event
-                // true = keep, false = drop
-                // Repeatable, executed in order
-
---exec / -e     // Transform per event
-                // Modify event fields
-                // Repeatable, executed in order
-
---exec-file     // Same as --exec, reads script from file
-
---end           // Post-run once after all processing
-                // Access global `metrics` map for reports
-```
-
-**Example pipeline:**
-
-```bash
-kelora -f json \
-  --begin 'conf.threshold = 100' \
-  --filter 'e.count > conf.threshold' \
-  --exec 'e.category = if e.count > 1000 { "high" } else { "medium" }' \
-  --metrics \
-  --exec 'track_sum("total", e.count)' \
-  --end 'print("Total: " + metrics.total)'
-```
-
 ## Common Patterns
 
 ### Safe Nested Access
