@@ -8,19 +8,6 @@ Scriptable log processor for the command line. Treats logs as structured events 
 
 > [!WARNING]
 > Experimental tool. [Vibe-coded](https://en.wikipedia.org/wiki/Vibe_coding). APIs and behaviour may change without notice.
->
-> [!TIP]
-> Looking for the full docs? Head to [kelora.dev](https://kelora.dev) for the complete quickstart, conceptual guides, tutorials, and references. Use this README for a fast overview before diving deeper.
-
-## Table of Contents
-- [Overview](#overview)
-- [Documentation](#documentation)
-- [Quickstart](#quickstart)
-  - [First Commands](#first-commands)
-- [Installation](#installation)
-- [Highlights](#highlights)
-- [Works Well With](#works-well-with)
-- [License](#license)
 
 ## Overview
 
@@ -32,15 +19,7 @@ Kelora parses log streams into structured events and runs them through a program
 - Handles streaming or batch workloads with sequential and `--parallel` execution modes.
 - Emits metrics and processing stats so you can observe pipelines while they run.
 
-## Documentation
-
-- [Quickstart](https://kelora.dev/quickstart/) — 5-minute tour with annotated output
-- [Concepts](https://kelora.dev/concepts/pipeline-model/) — deep dive into the streaming pipeline
-- [How-To Guides](https://kelora.dev/how-to/) — solutions for common tasks
-- [Reference](https://kelora.dev/reference/) — CLI flags, Rhai functions, formats, and configuration
-- [Tutorials](https://kelora.dev/tutorials/) — step-by-step guides for building custom pipelines
-
-## Quickstart
+## Quick Examples
 
 ### First Commands
 
@@ -72,40 +51,37 @@ More quick commands to copy-paste:
 - Alias sensitive fields: `kelora -j examples/security_audit.jsonl --exec 'e.user_alias = pseudonym(e.user, \"users\"); e.ip_masked = e.ip.mask_ip(1)' --keys timestamp,event,user_alias,ip_masked`
 
 > [!TIP]
-> The sample logs in `examples/` map to the categories in [examples/README.md](examples/README.md#file-categories). Start there before pointing Kelora at production data. Need a fast reminder of the core flags? Run `kelora --help-quick`.
+> These examples use files in `examples/` — see [examples/README.md](examples/README.md#file-categories) for the full catalog. For a complete walkthrough with annotated output, visit the [Quickstart Guide](https://kelora.dev/quickstart/).
 
-### Installation
+## Installation
 
-#### Prebuilt binaries (recommended)
-
-1. Download the archive for your platform from the [GitHub releases](https://github.com/dloss/kelora/releases) page (macOS, Linux, and Windows builds are provided).
-2. Unpack the archive and move `kelora` or `kelora.exe` somewhere on your `PATH`.
-3. Run `kelora --help` to ensure the binary starts up correctly.
-
-If you prefer to manage the build yourself, Kelora targets stable Rust; keep your toolchain fresh (`rustup update`) for best results.
-
-#### Install from crates.io or source
+Download from **[GitHub Releases](https://github.com/dloss/kelora/releases)** (macOS, Linux, Windows) or:
 
 ```bash
-# Install from crates.io
 cargo install kelora
-
-# Build from source
-git clone https://github.com/dloss/kelora
-cd kelora
-cargo install --path .
 ```
+
+## Documentation
+
+> [!TIP]
+> Full documentation is available at [kelora.dev](https://kelora.dev)
+
+- [Quickstart](https://kelora.dev/quickstart/) — 5-minute tour with annotated output
+- [How-To Guides](https://kelora.dev/how-to/) — solutions for common tasks
+- [Tutorials](https://kelora.dev/tutorials/) — step-by-step guides for building custom pipelines
+- [Concepts](https://kelora.dev/concepts/pipeline-model/) — deep dive into the streaming pipeline
+- [Reference](https://kelora.dev/reference/) — CLI flags, Rhai functions, formats, and configuration
 
 ## Highlights
 
 Kelora is built for streaming-first log analysis with a programmable Rhai core.
 
-- **Streaming pipeline** — Parse, filter, transform, and output logs in one flow. Read the [Pipeline Model](docs/concepts/pipeline-model.md) for a stage-by-stage breakdown.
-- **Built-in Rhai toolbox** — 100+ helpers for enrichment, parsing, time-window analysis, and metrics. Scan the [Functions Reference](docs/reference/functions.md) for the full catalog.
-- **Format flexibility** — JSON, logfmt, syslog, Apache/Nginx combined, CSV/TSV, column specs, and gzip. See [Input Formats](docs/reference/input-formats.md).
-- **Powerful filtering** — Chain `--filter`, `--level`, `--since/--until`, and context flags to zero in on events. Walkthroughs in [Filtering How-To](docs/how-to/find-errors-in-logs.md).
-- **Observability built in** — `--metrics`, `--stats`, and window helpers expose throughput and aggregations for live pipelines. Learn more in [Metrics & Telemetry](docs/concepts/metrics-and-telemetry.md).
-- **Parallel or streaming** — Stay sequential for tailing or enable `--parallel` for archive crunching. Tuning guidance in [Parallel Processing](docs/how-to/tune-parallel-processing.md).
+- **Streaming pipeline** — Parse, filter, transform, and output logs in one flow. Read the [Pipeline Model](https://kelora.dev/concepts/pipeline-model/) for a stage-by-stage breakdown.
+- **Built-in Rhai toolbox** — 100+ helpers for enrichment, parsing, time-window analysis, and metrics. Scan the [Functions Reference](https://kelora.dev/reference/functions/) for the full catalog.
+- **Format flexibility** — JSON, logfmt, syslog, Apache/Nginx combined, CSV/TSV, column specs, and gzip. See [Input Formats](https://kelora.dev/reference/formats/).
+- **Powerful filtering** — Chain `--filter`, `--level`, `--since/--until`, and context flags to zero in on events. Walkthroughs in [Filtering How-To](https://kelora.dev/how-to/find-errors-in-logs/).
+- **Observability built in** — `--metrics`, `--stats`, and window helpers expose throughput and aggregations for live pipelines. Learn more in [Metrics & Telemetry](https://kelora.dev/concepts/metrics-and-telemetry/).
+- **Parallel or streaming** — Stay sequential for tailing or enable `--parallel` for archive crunching. Tuning guidance in [Parallel Processing](https://kelora.dev/how-to/tune-parallel-processing/).
 
 ```
 Input → Parse → --exec → --filter → --exec → --filter → ... → Output

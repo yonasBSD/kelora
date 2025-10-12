@@ -157,7 +157,9 @@ kelora --help-time         # Timestamp format reference
 
 ## Next Steps
 
-- **[Tutorials](tutorials/parsing-custom-formats.md)** - Learn core skills step-by-step
-- **[How-To Guides](how-to/find-errors-in-logs.md)** - Solve specific problems
-- **[Function Reference](reference/functions.md)** - Explore all 40+ built-in functions
-- **[CLI Reference](reference/cli-reference.md)** - Complete flag documentation
+- **Start with events** — Practice accessing and mutating `e.field` values on JSON or logfmt samples. Then branch into [How-To: Find Errors in Logs](how-to/find-errors-in-logs.md).
+- **Explore parsers** — Try `-f json`, `-f combined`, and `-f 'cols:...'`, then dig into the [Input Formats reference](reference/formats.md).
+- **Layer scripts** — Combine `--filter`, `--exec`, and `--keys` for enrichment. Deepen your skills with the [Scripting Transforms tutorial](tutorials/scripting-transforms.md).
+- **Add metrics** — Introduce `track_count`, `track_sum`, and `--metrics`, then read the [Metrics & Tracking tutorial](tutorials/metrics-and-tracking.md).
+- **Tune pipelines** — Experiment with multi-stage workflows, `--begin`/`--end`, and configs; the [Pipeline Model concept](concepts/pipeline-model.md) and [Configuration System guide](concepts/configuration-system.md) explain the moving pieces.
+- **Control output** — Swap `-F` formats, use `-k`/`-K`, and convert timestamps. Reference the [CLI options](reference/cli-reference.md) when you need exact flag behaviour.
