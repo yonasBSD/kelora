@@ -90,6 +90,8 @@ nav:
       - concepts/multiline-strategies.md
       - concepts/performance-model.md
       - concepts/configuration-system.md
+  - Project:
+      - project/releasing.md
   - Reference:
       - reference/functions.md
       - reference/cli-reference.md

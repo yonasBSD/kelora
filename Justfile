@@ -4,6 +4,9 @@
 default:
     @just --list
 
+# Extract package version from Cargo.toml (used by release workflow)
+RELEASE_VERSION := `rg --max-count 1 --replace '$1' '^version\s*=\s*"([^"]+)"' Cargo.toml`
+
 # Format code
 fmt:
     cargo fmt --all
@@ -75,3 +78,43 @@ docs-build:
     UV_DATA_DIR={{justfile_directory()}}/.uv/data \
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
     uvx --with mkdocs-material --with mike --with markdown-exec mkdocs build
+
+# Prepare a release: verify version, run checks, and create the tag (no pushes)
+release-prepare:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    VERSION="{{RELEASE_VERSION}}"
+    TAG="v${VERSION}"
+
+    if [[ ! "$VERSION" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$ ]]; then
+        echo "error: Cargo.toml version '$VERSION' is not valid SemVer" >&2
+        exit 1
+    fi
+
+    if [[ -n "$(git status --porcelain)" ]]; then
+        echo "error: working tree is not clean. Commit or stash changes before releasing." >&2
+        exit 1
+    fi
+
+    CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+    TARGET_BRANCH="${RELEASE_BRANCH:-$CURRENT_BRANCH}"
+    REMOTE="${RELEASE_REMOTE:-origin}"
+
+    echo "==> Running documentation build..."
+    "{{just_executable()}}" docs-build
+
+    echo "==> Running full check suite..."
+    "{{just_executable()}}" check
+
+    if git rev-parse "$TAG" >/dev/null 2>&1; then
+        echo "error: git tag '$TAG' already exists" >&2
+        exit 1
+    fi
+
+    git tag "$TAG"
+    echo "==> Created tag $TAG"
+
+    echo
+    echo "Release tag created locally. Push when ready:"
+    echo "  git push ${REMOTE} ${TARGET_BRANCH}"
+    echo "  git push ${REMOTE} ${TAG}"
