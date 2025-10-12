@@ -16,7 +16,7 @@ Kelora supports multiple input formats for parsing log files:
 | `combined` | Apache/Nginx log formats (Common + Combined) | Web server access logs |
 | `cef` | ArcSight Common Event Format | Security logs, SIEM data |
 | `cols:<spec>` | Custom column parsing | Column-based logs (whitespace or custom separators) |
-| `auto` | Auto-detect format | Mixed or unknown formats |
+| `auto` | Auto-detect format | Any supported format |
 
 ## JSON Format
 
