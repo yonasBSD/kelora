@@ -90,7 +90,9 @@ Use `track_count()`, `track_sum()`, `track_min()`, and `track_max()` to collect 
 
 ## Convert Between Formats
 
-Kelora converts between any formats. Examples:
+Kelora converts between all supported formats. Some examples:
+
+Convert syslog to JSON:
 
 === "Command"
 
@@ -103,6 +105,8 @@ Kelora converts between any formats. Examples:
     ```bash exec="on" source="above" result="ansi"
     kelora -f syslog examples/simple_syslog.log -F json -n 3
     ```
+
+Convert web logs to CSV:
 
 === "Command"
 
