@@ -348,6 +348,50 @@ kelora -f json --allow-fs-writes --exec '
   }
 '
 
+MULTI-FILE & METADATA:
+# Track errors by source file (meta.filename)
+kelora -f json logs/*.log --metrics --exec '
+  if e.level == "ERROR" {
+    track_count(meta.filename)
+  }
+'
+
+# Add source context to each event
+kelora -f json server1.log server2.log --exec 'e.source = meta.filename'
+
+# Debugging with line numbers (meta.line_num)
+kelora -f json --filter 'e.status >= 500' --exec '
+  eprint("⚠️  Server error at " + meta.filename + ":" + meta.line_num)
+'
+
+# Conditional processing based on filename
+kelora -f json prod-*.log staging-*.log --exec '
+  e.environment = if meta.filename.contains("prod") { "production" } else { "staging" }
+' --filter 'e.environment == "production" && e.level == "ERROR"'
+
+# Access raw line for re-parsing (meta.line)
+kelora -f json --exec '
+  if e.message.contains("CUSTOM:") {
+    let custom = meta.line.after("CUSTOM:").parse_json();
+    e.custom_data = custom
+  }
+'
+
+# Track unique files with errors
+kelora -f json logs/**/*.log --metrics --exec '
+  if e.level == "ERROR" {
+    track_unique("error_files", meta.filename)
+  }
+' --end 'print("Files with errors: " + metrics.error_files.len())'
+
+# Create audit trail with source location
+kelora -f json --allow-fs-writes --exec '
+  if e.action == "admin_action" {
+    let audit = "File: " + meta.filename + " Line: " + meta.line_num + " Event: " + e.to_json();
+    append_file("audit.log", audit)
+  }
+'
+
 COMMON IDIOMS:
 # Method chaining              → e.domain = e.url.extract_domain().to_lower().strip()
 # Safe nested access           → e.get_path("user.role", "guest")

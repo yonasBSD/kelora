@@ -1738,16 +1738,8 @@ impl RhaiEngine {
             meta_map.insert("filename".into(), Dynamic::from(filename.clone()));
         }
 
-        // Add raw line for quarantine mode
+        // Add raw line to metadata
         meta_map.insert("line".into(), Dynamic::from(event.original_line.clone()));
-
-        // Check for quarantine metadata
-        if let Some(parse_error) = event.fields.get("__kelora_quarantine_parse_error") {
-            meta_map.insert("parse_error".into(), parse_error.clone());
-        }
-        if let Some(decode_error) = event.fields.get("__kelora_quarantine_decode_error") {
-            meta_map.insert("decode_error".into(), decode_error.clone());
-        }
 
         scope.set_value("meta", meta_map);
 

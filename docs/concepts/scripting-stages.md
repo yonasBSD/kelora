@@ -15,7 +15,7 @@ Kelora provides three scripting stages for transforming log data with Rhai scrip
 | Stage | Runs | Purpose | Access |
 |-------|------|---------|--------|
 | `--begin` | Once before processing | Initialize state, load data | `conf` map, file helpers |
-| `--exec` | Once per event | Transform events | `e` (event), `conf`, tracking |
+| `--exec` | Once per event | Transform events | `e` (event), `conf`, `meta`, tracking |
 | `--end` | Once after processing | Summarize, report | `metrics`, `conf` |
 
 ## Begin Stage
@@ -241,6 +241,46 @@ The `conf` map from `--begin` is **read-only** in `--exec`:
 > kelora -j \
     --begin 'conf.multiplier = 2.5' \
     --exec 'e.adjusted = e.value * conf.multiplier' \
+    app.log
+```
+
+### Access to meta
+
+The `meta` variable provides event metadata in `--exec` and `--filter`:
+
+```bash
+> kelora -j \
+    --exec 'e.source = meta.filename' \
+    server1.log server2.log
+```
+
+**Available metadata attributes:**
+
+- `meta.line` - Original raw line from input (always available)
+- `meta.line_num` - Line number, 1-based (available when processing files)
+- `meta.filename` - Source filename (available with multiple files or explicit file arguments)
+
+**Multi-file tracking example:**
+
+```bash
+> kelora -j logs/*.log --metrics \
+    --exec 'if e.level == "ERROR" { track_count(meta.filename) }' \
+    --end 'for file in metrics.keys() { print(file + ": " + metrics[file] + " errors") }'
+```
+
+**Debugging with line numbers:**
+
+```bash
+> kelora -j --filter 'e.status >= 500' \
+    --exec 'eprint("⚠️  Server error at " + meta.filename + ":" + meta.line_num)' \
+    app.log
+```
+
+**Re-parsing with raw line:**
+
+```bash
+> kelora -j \
+    --exec 'if e.message.contains("CUSTOM:") { e.custom = meta.line.after("CUSTOM:").parse_json() }' \
     app.log
 ```
 

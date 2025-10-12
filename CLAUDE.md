@@ -458,6 +458,21 @@ kelora -qq suspicious.log || mail -s "Log errors detected" admin@company.com
 ### Rhai Scripting Best Practices
 
 - **Event Variable**: Use `e` to access the current event (renamed from `event` for brevity)
+- **Metadata Variable**: Use `meta` to access event metadata in `--filter` and `--exec` stages:
+  - `meta.line` - Original raw line from input (always available)
+  - `meta.line_num` - Line number, 1-based (available when processing files)
+  - `meta.filename` - Source filename (available with multiple files or explicit file arguments)
+  - Examples:
+    ```bash
+    # Track errors by filename
+    kelora -f json logs/*.log --metrics --exec 'if e.level == "ERROR" { track_count(meta.filename) }'
+
+    # Debug with line numbers
+    kelora -f json --filter 'e.status >= 500' --exec 'eprint("Error at " + meta.filename + ":" + meta.line_num)'
+
+    # Re-parse using raw line
+    kelora -f json --exec 'if e.message.contains("CUSTOM:") { e.custom = meta.line.after("CUSTOM:").parse_json() }'
+    ```
 - **Variable Declaration**: Always use "let" when using new Rhai variables (e.g. 'let myfield=e.col("1,2")' or 'let myfield=e.col(1,2)')
 - **Field Access**: Use direct field access for nested structures:
   - `e.user.name` - Access nested fields directly

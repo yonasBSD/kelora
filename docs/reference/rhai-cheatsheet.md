@@ -345,11 +345,23 @@ e.active_count = e.active_items.len();
 ```rhai
 conf                                  // Global config map (read-only after --begin)
 metrics                               // Global metrics map (from track_* calls)
+meta                                  // Event metadata (filename, line numbers, raw line)
 get_env("VAR", "default")             // Environment variable access
+
+// meta attributes:
+meta.line                             // Original raw line (always available)
+meta.line_num                         // Line number, 1-based (available with files)
+meta.filename                         // Source filename (multi-file processing)
 
 // Example usage:
 --begin 'conf.env = get_env("ENVIRONMENT", "dev")'
 --filter 'conf.env == "prod" || e.level == "ERROR"'
+
+// Multi-file tracking
+--exec 'if e.level == "ERROR" { track_count(meta.filename) }'
+
+// Debugging with line numbers
+--exec 'eprint("Error at " + meta.filename + ":" + meta.line_num)'
 ```
 
 ## Error Handling Modes
@@ -430,10 +442,13 @@ e.text.strip()                        // Trim whitespace
 e.text.contains("word")               // Substring check
 e.text.extract_re(r"(\d+)", 1)        // Regex extraction
 
-// Environment
+// Environment & Context
 get_env("VAR", "default")             // Get env var
 conf.key                              // Read config (from --begin)
 metrics.key                           // Read metrics (in --end)
+meta.filename                         // Current source filename
+meta.line_num                         // Current line number (1-based)
+meta.line                             // Original raw line
 ```
 
 ## See Also

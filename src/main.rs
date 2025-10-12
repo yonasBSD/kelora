@@ -1806,6 +1806,18 @@ KELORA EVENT ACCESS:
   e.field = ()                         Remove field (unit assignment)
   e = ()                               Remove entire event (becomes empty, filtered out)
 
+EVENT METADATA:
+  meta                                 Event metadata (global variable in --filter/--exec)
+  meta.line                            Original raw line from input (always available)
+  meta.line_num                        Line number (1-based, available with files)
+  meta.filename                        Source filename (available when processing multiple files)
+
+  # Example: Track errors by filename
+  --exec 'if e.level == "ERROR" { track_count(meta.filename) }'
+
+  # Example: Debug with line numbers
+  --filter 'e.status >= 500' --exec 'eprint("Error at line " + meta.line_num)'
+
 ARRAY & MAP OPERATIONS:
   JSON arrays → native Rhai arrays (full functionality)
   sorted(e.scores)                     Sort numerically/lexicographically
