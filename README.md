@@ -63,8 +63,7 @@ cargo install kelora
 
 ## Documentation
 
-> [!TIP]
-> Full documentation is available at [kelora.dev](https://kelora.dev)
+Full documentation is available at **[kelora.dev](https://kelora.dev)**. Some quick links:
 
 - [Quickstart](https://kelora.dev/quickstart/) — 5-minute tour with annotated output
 - [How-To Guides](https://kelora.dev/how-to/) — solutions for common tasks
