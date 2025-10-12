@@ -63,7 +63,7 @@ Each `--filter` and `--exec` runs in the order specified, passing events forward
 
 ## Install
 
-**[Download from GitHub Releases](https://github.com/dloss/kelora/releases)** (macOS, Linux, Windows) or:
+Download from **[GitHub Releases](https://github.com/dloss/kelora/releases)** (macOS, Linux, Windows) or:
 
 ```bash
 cargo install kelora
@@ -77,7 +77,9 @@ cargo install kelora
 - **[Concepts](concepts/pipeline-model.md)** - Understanding how Kelora works
 - **[Reference](reference/functions.md)** - Functions, formats, CLI options
 
-Run `kelora --help` for comprehensive CLI docs, or `kelora --help-functions` for all built-in Rhai functions.
+**Command-line help:** `kelora --help` (CLI reference) · `--help-functions` (Rhai functions) · `--help-examples` (common patterns)
+
+**[Browse 37 example files on GitHub](https://github.com/dloss/kelora/tree/main/examples)** · [Report issues](https://github.com/dloss/kelora/issues)
 
 ## Works Well With
 
@@ -88,13 +90,6 @@ Kelora focuses on normalising noisy logs into structured data. Pipe or export Ke
 - **[qsv](https://github.com/jqnatividad/qsv)** — analyze Kelora's CSV output with statistical operations, joins, and aggregations
 - **[SQLite](https://www.sqlite.org/)/[DuckDB](https://duckdb.org/)** — load Kelora's CSV/JSON output into a database for SQL queries and reporting
 - **[miller](https://github.com/johnkerl/miller)** — transform Kelora's CSV output for reshaping, aggregating, and format conversion
-
-## Need Help?
-
-- **CLI help**: Run `kelora --help` for comprehensive CLI reference
-- **Function reference**: `kelora --help-functions` for all built-in Rhai functions
-- **Examples**: `kelora --help-examples` for common patterns
-- **GitHub**: [Report issues or request features](https://github.com/dloss/kelora/issues)
 
 ## License
 
