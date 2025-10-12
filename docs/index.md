@@ -77,9 +77,7 @@ cargo install kelora
 - **[Concepts](concepts/pipeline-model.md)** - Understanding how Kelora works
 - **[Reference](reference/functions.md)** - Functions, formats, CLI options
 
-**Command-line help:** `kelora --help` (CLI reference) · `--help-functions` (Rhai functions) · `--help-examples` (common patterns)
-
-**[Browse 37 example files on GitHub](https://github.com/dloss/kelora/tree/main/examples)** · [Report issues](https://github.com/dloss/kelora/issues)
+Run `kelora --help` for comprehensive command-line help screens, or browse the [example files on GitHub](https://github.com/dloss/kelora/tree/main/examples).
 
 ## Works Well With
 
