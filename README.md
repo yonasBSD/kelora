@@ -22,31 +22,41 @@ Kelora parses log streams into structured events and runs them through a program
 ## Quick Examples
 
 ```bash
-# Filter error-level events from the logfmt sample
-kelora -f logfmt --level error examples/simple_logfmt.log
+# Parse embedded formats - extract logfmt from within syslog messages
+kelora -f syslog examples/simple_syslog.log \
+  --exec 'if e.message.contains("=") { e += e.message.parse_logfmt() }' \
+  --keys timestamp,host,message,user,action \
+  -F json
 
-# Focus on database events and surface slow queries
-kelora -j examples/simple_json.jsonl \
-  --filter 'e.service == "database"' \
-  --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' \
-  --keys timestamp,message,duration_s
+# Keep full stacktraces together with case-insensitive search
+kelora examples/multiline_stacktrace.log \
+  --multiline timestamp \
+  --filter 'e.line.lower().contains("valueerror")' \
+  --before-context 1 --after-context 1
 
-# Parse Apache/Nginx access logs, keep key fields, and surface stats
-kelora -f combined examples/web_access_large.log.gz \
-  --keys ip,status,request_time,request \
-  --stats
+# Extract container prefixes, track log volume by source
+kelora examples/prefix_docker.log --extract-prefix container \
+  --exec 'e.level = e.line.between("[", "]")' \
+  --metrics \
+  --exec 'track_count(e.container); track_count(e.level)' \
+  -F csv
 
-# Show login-related events with surrounding context (like grep -A/-B/-C)
-kelora -j examples/simple_json.jsonl \
-  --filter 'e.message.contains("login")' \
-  --after-context 2 --before-context 1
+# Parse JWT tokens, mask IPs for privacy-safe log sharing
+kelora -j examples/security_audit.jsonl \
+  --exec 'if e.has_field("token") {
+            let jwt = e.token.parse_jwt();
+            e.role = jwt.get_path("claims.role", "guest")
+          }' \
+  --exec 'e.ip = e.ip.mask_ip(2)' \
+  --keys timestamp,event,role,ip \
+  -F json
 ```
 
 More quick commands to copy-paste:
 
 - Stream-level error watch: `tail -f examples/simple_json.jsonl | kelora -j --level warn,error --exec 'track_count(e.service)' --metrics`
 - Fan out nested arrays: `kelora -j examples/json_arrays.jsonl --exec 'emit_each(e.get_path(\"users\", []))' --keys id,name,score`
-- Alias sensitive fields: `kelora -j examples/security_audit.jsonl --exec 'e.user_alias = pseudonym(e.user, \"users\"); e.ip_masked = e.ip.mask_ip(1)' --keys timestamp,event,user_alias,ip_masked`
+- Visual level distribution: `kelora -f logfmt examples/simple_logfmt.log -F levelmap`
 
 > [!TIP]
 > These examples use files in `examples/` — see [examples/README.md](examples/README.md#file-categories) for the full catalog. For a complete walkthrough with annotated output, visit the [Quickstart Guide](https://kelora.dev/quickstart/).

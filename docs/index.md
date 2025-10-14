@@ -10,24 +10,34 @@ Parse messy logs into structured events, then filter, transform, and analyze the
 ## Examples
 
 ```bash
-# Parse multi-line stacktraces - keeps errors with their full traces
-kelora examples/multiline_stacktrace.log --multiline timestamp \
-  --filter 'e.line.contains("ERROR")'
+# Parse embedded formats - extract logfmt from within syslog messages
+kelora -f syslog examples/simple_syslog.log \
+  --exec 'if e.message.contains("=") { e += e.message.parse_logfmt() }' \
+  --keys timestamp,host,message,user,action \
+  -F json
 
-# Fan out nested arrays - turn one event with 3 users into 3 separate events
-kelora -j examples/json_arrays.jsonl \
-  --exec 'if e.has_path("users") { emit_each(e.users) }' \
-  --keys id,name,score
+# Keep full stacktraces together with case-insensitive search
+kelora examples/multiline_stacktrace.log \
+  --multiline timestamp \
+  --filter 'e.line.lower().contains("valueerror")' \
+  --before-context 1 --after-context 1
 
-# Parse mixed formats - handles JSON, logfmt, and syslog in one file
-kelora examples/nightmare_mixed_formats.log \
-  --exec 'if e.line.starts_with("{") { e = e.line.parse_json() }
-          else if e.line.contains("=") { e = e.line.parse_logfmt() }
-          else { e = e.line.parse_syslog() }'
+# Extract container prefixes, track log volume by source
+kelora examples/prefix_docker.log --extract-prefix container \
+  --exec 'e.level = e.line.between("[", "]")' \
+  --metrics \
+  --exec 'track_count(e.container); track_count(e.level)' \
+  -F csv
 
-# Track errors by service - parses Docker container prefixes, counts by source
-kelora examples/prefix_docker.log --extract-prefix service --prefix-sep '|' \
-  --metrics --exec 'if e.line.contains("ERROR") { track_count(e.service) }'
+# Parse JWT tokens, mask IPs for privacy-safe log sharing
+kelora -j examples/security_audit.jsonl \
+  --exec 'if e.has_field("token") {
+            let jwt = e.token.parse_jwt();
+            e.role = jwt.get_path("claims.role", "guest")
+          }' \
+  --exec 'e.ip = e.ip.mask_ip(2)' \
+  --keys timestamp,event,role,ip \
+  -F json
 ```
 
 See the [Quickstart](quickstart.md) for a step-by-step tour with full output.
