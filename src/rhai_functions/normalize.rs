@@ -117,9 +117,10 @@ static PATTERNS: Lazy<HashMap<&'static str, Vec<Regex>>> = Lazy::new(|| {
     );
 
     // Generic number (most aggressive - place last)
+    // Requires at least one digit before decimal point to avoid matching ".123" in IPs/paths
     map.insert(
         "num",
-        vec![Regex::new(r"[+-]?(?:\d*\.?\d+|\d+\.?\d*)(?:[eE][+-]?\d+)?").unwrap()],
+        vec![Regex::new(r"[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?").unwrap()],
     );
 
     map
@@ -413,5 +414,47 @@ mod tests {
 
         let result = normalized_str_impl("MAC: 001A.2B3C.4D5E", &["mac".to_string()]);
         assert_eq!(result, "MAC: <mac>");
+    }
+
+    #[test]
+    fn test_normalized_num_no_leading_dot() {
+        // The integer part after leading dot will match, but not the dot itself
+        let result = normalized_str_impl("value .113 found", &["num".to_string()]);
+        assert_eq!(result, "value .<num> found");
+
+        // Valid decimals with leading digit still work
+        let result = normalized_str_impl("value 0.113 found", &["num".to_string()]);
+        assert_eq!(result, "value <num> found");
+    }
+
+    #[test]
+    fn test_normalized_num_with_ip_address() {
+        // IP addresses with num pattern: matches decimal numbers like "203.0" and "113.1"
+        // This is better than old behavior but still not ideal - use ipv4 pattern instead
+        let result = normalized_str_impl("Server at 203.0.113.1 failed", &["num".to_string()]);
+        assert_eq!(result, "Server at <num>.<num> failed");
+
+        // Proper way: use ipv4 pattern for IP addresses
+        let result = normalized_str_impl("Server at 203.0.113.1 failed", &["ipv4".to_string()]);
+        assert_eq!(result, "Server at <ipv4> failed");
+    }
+
+    #[test]
+    fn test_normalized_num_valid_numbers() {
+        // Integers
+        let result = normalized_str_impl("count: 42", &["num".to_string()]);
+        assert_eq!(result, "count: <num>");
+
+        // Decimals with leading digit
+        let result = normalized_str_impl("pi: 3.14159", &["num".to_string()]);
+        assert_eq!(result, "pi: <num>");
+
+        // Negative numbers
+        let result = normalized_str_impl("temp: -42.5", &["num".to_string()]);
+        assert_eq!(result, "temp: <num>");
+
+        // Scientific notation
+        let result = normalized_str_impl("val: 1.23e-10", &["num".to_string()]);
+        assert_eq!(result, "val: <num>");
     }
 }
