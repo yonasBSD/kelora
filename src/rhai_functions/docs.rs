@@ -110,7 +110,7 @@ map.get_path("field.path" [,default]) Safe nested field access with fallback
 map.has_field("key")                 Check if map contains key with non-unit value
 map.has_path("field.path")           Check if nested field path exists
 map.merge(other_map)                 Merge another map into this one
-map.normalized([patterns])           Normalize all string fields with pattern placeholders
+map.normalized([patterns])           Return new map with all string fields normalized
 map.path_equals("path", value)       Safe nested field comparison
 map.rename_field("old", "new")       Rename a field, returns true if successful
 map.to_cef()                         Convert map to Common Event Format (CEF) string
@@ -246,7 +246,7 @@ kelora -f json --metrics --exec 'track_unique("patterns", e.message.normalized()
   --end 'print("Unique patterns: " + metrics.patterns.len())' -F none
 
 # Normalize events for pattern identification
-kelora -f json --exec 'e.normalized(["ipv4", "email", "uuid"])'
+kelora -f json --exec 'e = e.normalized(["ipv4", "email", "uuid"])'
 
 # Time-based error clustering (5min windows)
 kelora -f json -l error --window 100 --exec '
