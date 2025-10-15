@@ -45,6 +45,7 @@ text.len                             Get string length (builtin)
 text.lower()                         Convert text to lowercase
 text.lstrip([chars])                 Remove leading whitespace or specified characters
 text.mask_ip([octets])               Mask IP address (default: last octet)
+text.normalized([patterns])          Replace variable patterns with placeholders (e.g., <ipv4>, <email>)
 text.parse_cef()                     Parse Common Event Format line into fields
 text.parse_cols(spec [,sep])         Parse columns according to spec
 text.parse_combined()                Parse Apache/Nginx combined log line
@@ -109,6 +110,7 @@ map.get_path("field.path" [,default]) Safe nested field access with fallback
 map.has_field("key")                 Check if map contains key with non-unit value
 map.has_path("field.path")           Check if nested field path exists
 map.merge(other_map)                 Merge another map into this one
+map.normalized([patterns])           Normalize all string fields with pattern placeholders
 map.path_equals("path", value)       Safe nested field comparison
 map.rename_field("old", "new")       Rename a field, returns true if successful
 map.to_cef()                         Convert map to Common Event Format (CEF) string
@@ -238,6 +240,13 @@ kelora -f json --filter 'e.level == "ERROR"' --exec '
 # Group errors by hash for deduplication
 kelora -f json -l error --exec 'e.error_hash = e.message.hash("xxh3")' \
   --metrics --exec 'track_unique("errors", e.error_hash)'
+
+# Pattern analysis - find unique log patterns
+kelora -f json --metrics --exec 'track_unique("patterns", e.message.normalized())' \
+  --end 'print("Unique patterns: " + metrics.patterns.len())' -F none
+
+# Normalize events for pattern identification
+kelora -f json --exec 'e.normalized(["ipv4", "email", "uuid"])'
 
 # Time-based error clustering (5min windows)
 kelora -f json -l error --window 100 --exec '
@@ -406,6 +415,7 @@ COMMON IDIOMS:
 # Negative indexing            → e.last_score = e.scores[-1]
 # Clamp values to range        → e.normalized = clamp(e.value, 0, 100)
 # Remove duplicate elements    → unique([1,2,2,3,2,1]) = [1,2,3]
+# Pattern normalization        → e.message.normalized("ipv4,email,uuid")
 
 See --help-functions for complete function reference. Visit https://rhai.rs for Rhai language details.
 "#

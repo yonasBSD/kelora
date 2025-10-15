@@ -356,6 +356,37 @@ e.masked_ip = e.client_ip.mask_ip()                   // "192.168.1.100" → "19
 e.partial = e.ip.mask_ip(2)                           // Mask last 2 octets
 ```
 
+### Pattern Normalization
+
+#### `text.normalized([patterns])`
+Replace variable patterns with placeholders (e.g., `<ipv4>`, `<email>`).
+
+Useful for identifying unique log patterns by normalizing variable data like IP addresses, UUIDs, and email addresses to fixed placeholders.
+
+```rhai
+// Default patterns (IPs, emails, UUIDs, hashes, etc.)
+e.pattern = e.message.normalized()
+// "User user@test.com from 192.168.1.5" → "User <email> from <ipv4>"
+
+// CSV-style pattern list
+e.simple = e.message.normalized("ipv4,email")
+
+// Array-style pattern list
+e.custom = e.message.normalized(["uuid", "sha256", "url"])
+```
+
+**Default patterns** (when no argument provided):
+`ipv4_port`, `ipv4`, `ipv6`, `email`, `url`, `fqdn`, `uuid`, `mac`, `md5`, `sha1`, `sha256`, `path`, `oauth`, `function`, `hexcolor`, `version`
+
+**Available patterns** (opt-in):
+`hexnum`, `duration`, `num`
+
+**Common use case** - Pattern analysis with `track_unique()`:
+```rhai
+// Count unique log patterns
+track_unique("patterns", e.message.normalized())
+```
+
 ### String Manipulation
 
 #### `text.strip([chars])` / `text.lstrip([chars])` / `text.rstrip([chars])`
