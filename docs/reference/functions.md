@@ -381,11 +381,29 @@ e.custom = e.message.normalized(["uuid", "sha256", "url"])
 **Available patterns** (opt-in):
 `hexnum`, `duration`, `num`
 
-**Common use case** - Pattern analysis with `track_unique()`:
-```rhai
-// Count unique log patterns
-track_unique("patterns", e.message.normalized())
+**Common use case** - Pattern discovery:
+```bash
+# Recommended alias for easy pattern discovery
+kelora --save-alias patterns \
+  --exec 'track_unique("patterns", e.message.normalized())' \
+  --metrics -qq
+
+# Usage
+kelora -a patterns app.log
 ```
+
+**Output with many patterns:**
+```
+patterns     (127 unique):
+  User <email> from <ipv4>
+  Request to <url> failed
+  Error <uuid> occurred
+  Connection <ipv4_port> established
+  Processing <fqdn> with <sha256>
+  [+122 more. Use --metrics-file or --end script for full list]
+```
+
+For custom analysis, access full data in `--end` scripts or `--metrics-file`.
 
 ### String Manipulation
 

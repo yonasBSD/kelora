@@ -991,25 +991,25 @@ pub fn format_metrics_output(metrics: &HashMap<String, Dynamic>) -> String {
     user_values.sort_by_key(|(k, _)| k.as_str());
 
     for (key, value) in user_values {
-        if value.is::<rhai::Map>() {
-            // Handle unique tracking format: { count: N, sample: [...] }
-            if let Some(map) = value.clone().try_cast::<rhai::Map>() {
-                if let (Some(count), Some(sample)) = (map.get("count"), map.get("sample")) {
-                    if let Ok(sample_array) = sample.clone().into_array() {
-                        let sample_strings: Vec<String> = sample_array
-                            .iter()
-                            .take(3) // Only show first 3 in output
-                            .map(|v| format!("\"{}\"", v.clone().into_string().unwrap_or_default()))
-                            .collect();
-                        output.push_str(&format!(
-                            "{:<12} = {{ count: {}, sample: [{}] }}\n",
-                            key,
-                            count.as_int().unwrap_or(0),
-                            sample_strings.join(", ")
-                        ));
-                        continue;
+        // Handle arrays (from track_unique) with smart truncation
+        if value.is::<rhai::Array>() {
+            if let Ok(arr) = value.clone().into_array() {
+                let len = arr.len();
+                if len <= 10 {
+                    // Small arrays: show inline
+                    output.push_str(&format!("{:<12} = {}\n", key, value));
+                } else {
+                    // Large arrays: show count + preview + hint
+                    output.push_str(&format!("{:<12} ({} unique):\n", key, len));
+                    for item in arr.iter().take(5) {
+                        output.push_str(&format!("  {}\n", item));
                     }
+                    output.push_str(&format!(
+                        "  [+{} more. Use --metrics-file or --end script for full list]\n",
+                        len - 5
+                    ));
                 }
+                continue;
             }
         }
 
@@ -1030,6 +1030,51 @@ pub fn format_metrics_output(metrics: &HashMap<String, Dynamic>) -> String {
     output.trim_end().to_string()
 }
 
+fn dynamic_to_json(value: Dynamic) -> serde_json::Value {
+    if value.is_unit() {
+        return serde_json::Value::Null;
+    }
+
+    if value.is::<rhai::Array>() {
+        if let Ok(array) = value.clone().into_array() {
+            let json_array = array.into_iter().map(dynamic_to_json).collect();
+            return serde_json::Value::Array(json_array);
+        }
+    }
+
+    if value.is::<rhai::Map>() {
+        if let Some(map) = value.clone().try_cast::<rhai::Map>() {
+            let mut json_map = serde_json::Map::new();
+            for (k, v) in map {
+                json_map.insert(k.into(), dynamic_to_json(v));
+            }
+            return serde_json::Value::Object(json_map);
+        }
+    }
+
+    if value.is_int() {
+        return serde_json::Value::Number(serde_json::Number::from(
+            value.as_int().unwrap_or_default(),
+        ));
+    }
+
+    if value.is_float() {
+        if let Some(num) = serde_json::Number::from_f64(value.as_float().unwrap_or_default()) {
+            return serde_json::Value::Number(num);
+        }
+    }
+
+    if let Some(boolean) = value.clone().try_cast::<bool>() {
+        return serde_json::Value::Bool(boolean);
+    }
+
+    if let Some(string) = value.clone().try_cast::<rhai::ImmutableString>() {
+        return serde_json::Value::String(string.into());
+    }
+
+    serde_json::Value::String(value.to_string())
+}
+
 /// Format metrics for JSON output
 #[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
 pub fn format_metrics_json(
@@ -1046,52 +1091,7 @@ pub fn format_metrics_json(
             continue;
         }
 
-        if value.is::<rhai::Map>() {
-            if let Some(map) = value.clone().try_cast::<rhai::Map>() {
-                if let (Some(count), Some(sample)) = (map.get("count"), map.get("sample")) {
-                    // Handle unique tracking format
-                    let mut unique_obj = serde_json::Map::new();
-                    unique_obj.insert(
-                        "count".to_string(),
-                        serde_json::Value::Number(serde_json::Number::from(
-                            count.as_int().unwrap_or(0),
-                        )),
-                    );
-
-                    if let Ok(sample_array) = sample.clone().into_array() {
-                        let sample_values: Vec<serde_json::Value> = sample_array
-                            .iter()
-                            .map(|v| {
-                                serde_json::Value::String(
-                                    v.clone().into_string().unwrap_or_default(),
-                                )
-                            })
-                            .collect();
-                        unique_obj.insert(
-                            "sample".to_string(),
-                            serde_json::Value::Array(sample_values),
-                        );
-                    }
-
-                    json_obj.insert(key.clone(), serde_json::Value::Object(unique_obj));
-                    continue;
-                }
-            }
-        }
-
-        // Handle regular values
-        if value.is_int() {
-            json_obj.insert(
-                key.clone(),
-                serde_json::Value::Number(serde_json::Number::from(value.as_int().unwrap_or(0))),
-            );
-        } else if value.is_float() {
-            if let Some(num) = serde_json::Number::from_f64(value.as_float().unwrap_or(0.0)) {
-                json_obj.insert(key.clone(), serde_json::Value::Number(num));
-            }
-        } else {
-            json_obj.insert(key.clone(), serde_json::Value::String(value.to_string()));
-        }
+        json_obj.insert(key.clone(), dynamic_to_json(value.clone()));
     }
 
     serde_json::to_string_pretty(&json_obj)

@@ -1046,6 +1046,53 @@ fn test_track_unique_parallel_mode() {
 }
 
 #[test]
+fn test_track_unique_metrics_file_outputs_array() {
+    let input = r#"{"pattern": "User logged in"}
+{"pattern": "User logged out"}
+{"pattern": "User logged in"}"#;
+
+    let temp_file = NamedTempFile::new().expect("Failed to create temp file");
+    let metrics_file_path = temp_file.path().to_str().unwrap();
+
+    let (_stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "track_unique(\"patterns\", e.pattern);",
+            "--metrics-file",
+            metrics_file_path,
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let metrics_content =
+        std::fs::read_to_string(metrics_file_path).expect("Failed to read metrics file");
+    let metrics_json: serde_json::Value =
+        serde_json::from_str(&metrics_content).expect("Metrics file should contain valid JSON");
+
+    let patterns = metrics_json["patterns"]
+        .as_array()
+        .expect("patterns should be an array");
+    assert_eq!(
+        patterns.len(),
+        2,
+        "Should store exactly two unique patterns"
+    );
+    assert_eq!(
+        patterns[0],
+        serde_json::Value::String("User logged in".to_string()),
+        "Should preserve insertion order for first pattern"
+    );
+    assert_eq!(
+        patterns[1],
+        serde_json::Value::String("User logged out".to_string()),
+        "Should preserve insertion order for second pattern"
+    );
+}
+
+#[test]
 fn test_track_bucket_parallel_mode() {
     let input = r#"{"status": "200"}
 {"status": "404"}

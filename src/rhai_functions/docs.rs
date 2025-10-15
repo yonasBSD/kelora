@@ -241,9 +241,11 @@ kelora -f json --filter 'e.level == "ERROR"' --exec '
 kelora -f json -l error --exec 'e.error_hash = e.message.hash("xxh3")' \
   --metrics --exec 'track_unique("errors", e.error_hash)'
 
-# Pattern analysis - find unique log patterns
-kelora -f json --metrics --exec 'track_unique("patterns", e.message.normalized())' \
-  --end 'print("Unique patterns: " + metrics.patterns.len())' -F none
+# Pattern discovery with reusable alias
+kelora --save-alias patterns \
+  --exec 'track_unique("patterns", e.message.normalized())' \
+  --metrics -qq
+kelora -a patterns app.log
 
 # Normalize events for pattern identification
 kelora -f json --exec 'e = e.normalized(["ipv4", "email", "uuid"])'
