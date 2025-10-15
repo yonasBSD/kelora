@@ -84,7 +84,7 @@ array.all(|item| condition)          Check if all elements match condition (buil
 array.contains_any(search_array)     Check if array contains any search values
 array.contains(value)                Check if array contains value (builtin)
 array.filter(|item| condition)       Keep elements matching condition (builtin)
-array.flatten([style [,max_depth]])  Flatten nested arrays/objects
+array.flattened([style [,max_depth]]) Return new flattened map from nested arrays/objects
 array.join(separator)                Join array elements with separator
 array.len                            Get array length (builtin)
 array.map(|item| expression)         Transform each element (builtin)
@@ -105,7 +105,7 @@ array.unique()                       Remove all duplicate elements (preserves fi
   
 MAP/OBJECT FUNCTIONS:
 map.contains("key")                  Check if map contains key (ignores value) (builtin)
-map.flatten([separator [,style]])    Flatten nested object to dot notation
+map.flattened([style [,max_depth]])  Return new flattened map from nested object
 map.get_path("field.path" [,default]) Safe nested field access with fallback
 map.has_field("key")                 Check if map contains key with non-unit value
 map.has_path("field.path")           Check if nested field path exists

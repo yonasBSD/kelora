@@ -28,15 +28,15 @@ pub fn register_functions(engine: &mut Engine) {
 
     // Array flattening functions
 
-    // Default flatten() for arrays - uses bracket style, unlimited depth
-    engine.register_fn("flatten", |array: Array| -> Map {
+    // Default flattened() for arrays - uses bracket style, unlimited depth
+    engine.register_fn("flattened", |array: Array| -> Map {
         let dynamic_array = Dynamic::from(array);
         let flattened = flatten_dynamic(&dynamic_array, FlattenStyle::default(), 0);
         convert_indexmap_to_rhai_map(flattened)
     });
 
-    // flatten(style) for arrays - specify style, unlimited depth
-    engine.register_fn("flatten", |array: Array, style: &str| -> Map {
+    // flattened(style) for arrays - specify style, unlimited depth
+    engine.register_fn("flattened", |array: Array, style: &str| -> Map {
         let flatten_style = match style {
             "dot" => FlattenStyle::Dot,
             "bracket" => FlattenStyle::Bracket,
@@ -48,9 +48,9 @@ pub fn register_functions(engine: &mut Engine) {
         convert_indexmap_to_rhai_map(flattened)
     });
 
-    // flatten(style, max_depth) for arrays - full control
+    // flattened(style, max_depth) for arrays - full control
     engine.register_fn(
-        "flatten",
+        "flattened",
         |array: Array, style: &str, max_depth: i64| -> Map {
             let flatten_style = match style {
                 "dot" => FlattenStyle::Dot,

@@ -27,15 +27,15 @@ pub fn register_functions(engine: &mut Engine) {
 
     // Flattening functions
 
-    // Default flatten() - uses bracket style, unlimited depth
-    engine.register_fn("flatten", |map: Map| -> Map {
+    // Default flattened() - uses bracket style, unlimited depth
+    engine.register_fn("flattened", |map: Map| -> Map {
         let dynamic_map = Dynamic::from(map);
         let flattened = flatten_dynamic(&dynamic_map, FlattenStyle::default(), 0);
         convert_indexmap_to_rhai_map(flattened)
     });
 
-    // flatten(style) - specify style, unlimited depth
-    engine.register_fn("flatten", |map: Map, style: &str| -> Map {
+    // flattened(style) - specify style, unlimited depth
+    engine.register_fn("flattened", |map: Map, style: &str| -> Map {
         let flatten_style = match style {
             "dot" => FlattenStyle::Dot,
             "bracket" => FlattenStyle::Bracket,
@@ -47,19 +47,22 @@ pub fn register_functions(engine: &mut Engine) {
         convert_indexmap_to_rhai_map(flattened)
     });
 
-    // flatten(style, max_depth) - full control
-    engine.register_fn("flatten", |map: Map, style: &str, max_depth: i64| -> Map {
-        let flatten_style = match style {
-            "dot" => FlattenStyle::Dot,
-            "bracket" => FlattenStyle::Bracket,
-            "underscore" => FlattenStyle::Underscore,
-            _ => FlattenStyle::default(),
-        };
-        let max_depth = if max_depth < 0 { 0 } else { max_depth as usize }; // negative = unlimited
-        let dynamic_map = Dynamic::from(map);
-        let flattened = flatten_dynamic(&dynamic_map, flatten_style, max_depth);
-        convert_indexmap_to_rhai_map(flattened)
-    });
+    // flattened(style, max_depth) - full control
+    engine.register_fn(
+        "flattened",
+        |map: Map, style: &str, max_depth: i64| -> Map {
+            let flatten_style = match style {
+                "dot" => FlattenStyle::Dot,
+                "bracket" => FlattenStyle::Bracket,
+                "underscore" => FlattenStyle::Underscore,
+                _ => FlattenStyle::default(),
+            };
+            let max_depth = if max_depth < 0 { 0 } else { max_depth as usize }; // negative = unlimited
+            let dynamic_map = Dynamic::from(map);
+            let flattened = flatten_dynamic(&dynamic_map, flatten_style, max_depth);
+            convert_indexmap_to_rhai_map(flattened)
+        },
+    );
 
     // flatten_field(field_name) - flatten just one field from the map
     engine.register_fn("flatten_field", |map: &Map, field_name: &str| -> Map {
