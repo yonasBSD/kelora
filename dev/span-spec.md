@@ -30,7 +30,7 @@ Time source & alignment (time-based mode)
 
 Missing/invalid ts:
 	•	Strict mode: event is an error.
-	•	Resilient (default): event is processed normally (--filter and --exec run) but excluded from time-span aggregation. It is NOT added to any span buffer and does NOT appear in span_events() or contribute to span_size(). Metadata assigned: meta.span_late = true, meta.span_key = "unassigned", meta.span_start and meta.span_end are omitted or null.
+	•	Resilient (default): event is processed normally (--filter and --exec run) but excluded from time-span aggregation. It is NOT added to any span buffer and does NOT appear in span_events() or contribute to span_size(). Metadata assigned: meta.span_status = "unassigned", meta.span_key = null, meta.span_start and meta.span_end are null.
 
 ⸻
 
@@ -41,14 +41,14 @@ An event is late iff its ts falls into a span that has already been closed.
 Policy (no flags):
 	1.	We do not reopen or mutate closed spans.
 	2.	Event is tagged:
-	•	meta.span_late = true
+	•	meta.span_status = "late"
 	•	meta.span_key = "<start ISO8601>/<duration>" of the closed span it would've belonged to.
 	•	meta.span_start, meta.span_end reflect that window's bounds.
 	3.	Per-event scripts (--exec, --filter) still run.
 	4.	Late events are emitted to output (unless suppressed by --filter or --exec).
 	5.	Internal counter late_events increments (visible in --stats).
 
-If an event belongs to the currently open span, it's included and meta.span_late = false.
+If an event belongs to the currently open span, it's included and meta.span_status = "included".
 
 Count-based mode has no late events (spans follow arrival order).
 
@@ -69,32 +69,39 @@ Functions:
 	•	span_events() → Array of events in the span, in arrival order
 	•	span_size() → Int (event count)
 
-Metadata (injected into each buffered event immediately before --span-close runs):
-	•	e.meta.span_key (String)
-	•	e.meta.span_start (DateTime)
-	•	e.meta.span_end (DateTime)
-	•	e.meta.span_late (Bool; always false for in-span events)
+Metadata (assigned during per-event processing, available in --exec, --filter, and --span-close):
+	•	e.meta.span_status (String: "included" | "late" | "unassigned" | "filtered")
+	•	e.meta.span_key (String or null)
+	•	e.meta.span_start (DateTime or null)
+	•	e.meta.span_end (DateTime or null)
 
-Note: For events passing through without entering a span (late/unassigned), metadata is set during per-event processing phase.
+Status values:
+	•	"included" → Event is buffered in current span (normal case)
+	•	"late" → Valid ts but arrived after its span closed (time mode only)
+	•	"unassigned" → Missing/invalid ts (time mode only)
+	•	"filtered" → Failed --filter, not buffered or emitted
 
 ⸻
 
 Processor semantics
 	1.	Per-event phase (always):
-	•	Run --filter / --exec.
-	•	Assign/update e.meta.* for spanning (see above).
-	•	Events are emitted as they arrive (unless suppressed by filter/exec).
+	•	Determine event disposition (included/late/unassigned/filtered based on ts and --filter).
+	•	Assign e.meta.span_* metadata immediately.
+	•	Run --filter / --exec (can access metadata).
+	•	Emit event to output (unless filtered).
+	•	If event is "included", add to internal span buffer for span_events().
 	2.	Boundary detection:
-	•	Count: when N events that passed --filter (if specified) have accumulated → close.
-	•	Time: when an event's ts (valid or invalid) falls in a newer interval than the current open one → close the current.
-	•	Time mode: All events participate in boundary detection, but only events with valid ts and passing --filter are added to the span buffer.
-	3.	Close phase:
-	•	Inject span metadata into buffered events.
-	•	Run --span-close once with span helpers. This is in addition to per-event output; --span-close can emit span-level summaries via emit_each().
-	•	Reset span state and start the next span with the current event (time) or with an empty buffer (count).
+	•	Count: when N events with status "included" have accumulated → close.
+	•	Time: when an event's ts crosses into a newer interval → close the current span.
+	•	Filtered events: in count mode, don't count toward N; in time mode, advance boundaries but aren't buffered.
+	3.	Close phase (only if span_size() > 0):
+	•	Run --span-close once with span helpers and access to buffered events via span_events().
+	•	--span-close can emit span-level summaries via emit_each().
+	•	Reset span state and start the next span.
 	4.	End of input or interrupt signal (SIGINT/SIGTERM):
-	•	If a span is open, close it gracefully and run --span-close before termination.
-	•	If SIGINT/SIGTERM is received during --span-close execution, defer signal until script completes.
+	•	If a span is open with buffered events, close it and run --span-close before termination.
+	•	First SIGINT/SIGTERM during --span-close: defer signal until script completes.
+	•	Second SIGINT/SIGTERM within 2 seconds: force immediate exit (code 130/143).
 
 No synthetic empty spans are emitted (gaps with no events produce no span).
 
@@ -109,8 +116,70 @@ Interactions
 	•	--stats shows:
 	•	total_spans_closed (number of spans that closed)
 	•	avg_events_per_span (mean span size)
-	•	late_events (time-based only; count of events with meta.span_late = true)
-	•	--metrics works as usual; use track_* in per-event or --span-close. Use pop_metric(key) or pop_metrics() to read-and-reset metrics between spans.
+	•	late_events (time-based only; count of events with meta.span_status = "late")
+	•	unassigned_events (time-based only; count of events with meta.span_status = "unassigned")
+	•	--metrics works as usual; use track_* in per-event or --span-close. See "Metrics access" below for reading metrics.
+
+⸻
+
+Metrics access
+
+In --span-close context, metrics accumulated during the span can be accessed:
+
+	•	metrics → Read-only dict of all metrics (same as end stage --end)
+	•	metrics[key] → Read single metric value without side effects
+	•	pop_metric(key) → Read metric value and reset it to 0
+	•	pop_metrics() → Read all metrics as map and reset all to 0
+
+Pattern for per-span aggregation:
+	•	Use track_* in --exec to accumulate during span
+	•	Use pop_metric(key) or pop_metrics() in --span-close to read and reset
+
+Pattern for cross-span state:
+	•	Use metrics[key] or metrics dict to read without resetting
+	•	Use track_* to update the value for next span
+	•	Use pop_metric(key) for metrics you're done with
+
+Warning: Un-popped metrics persist across spans and will accumulate. If metrics remain after --span-close completes, a warning is printed.
+
+Note: The metrics dict is read-only; metrics.pop() won't work. Use the pop_metric() function instead.
+
+⸻
+
+Filter interaction decision table
+
+Event disposition by mode and condition:
+
+┌─────────────────┬──────────────┬────────────────┬──────────────────┬─────────────────┐
+│ Condition       │ Counted for  │ Buffered for   │ Emitted to       │ span_status     │
+│                 │ Boundary?    │ span_events()? │ Output?          │                 │
+├─────────────────┼──────────────┼────────────────┼──────────────────┼─────────────────┤
+│ COUNT MODE                                                                            │
+├─────────────────┼──────────────┼────────────────┼──────────────────┼─────────────────┤
+│ Passes --filter │ Yes (N++)    │ Yes            │ Yes              │ "included"      │
+├─────────────────┼──────────────┼────────────────┼──────────────────┼─────────────────┤
+│ Fails --filter  │ No           │ No             │ No               │ "filtered"      │
+├─────────────────┼──────────────┼────────────────┼──────────────────┼─────────────────┤
+│ TIME MODE                                                                             │
+├─────────────────┼──────────────┼────────────────┼──────────────────┼─────────────────┤
+│ Valid ts,       │ Yes (closes  │ Yes            │ Yes              │ "included"      │
+│ passes filter   │ if new       │                │                  │                 │
+│                 │ interval)    │                │                  │                 │
+├─────────────────┼──────────────┼────────────────┼──────────────────┼─────────────────┤
+│ Valid ts,       │ Yes (closes  │ No             │ No               │ "filtered"      │
+│ fails filter    │ if new       │                │                  │                 │
+│                 │ interval)    │                │                  │                 │
+├─────────────────┼──────────────┼────────────────┼──────────────────┼─────────────────┤
+│ Missing/invalid │ No           │ No             │ Yes              │ "unassigned"    │
+│ ts, passes      │              │                │                  │                 │
+│ filter          │              │                │                  │                 │
+├─────────────────┼──────────────┼────────────────┼──────────────────┼─────────────────┤
+│ Late ts (after  │ No           │ No             │ Yes              │ "late"          │
+│ span closed),   │              │                │                  │                 │
+│ passes filter   │              │                │                  │                 │
+└─────────────────┴──────────────┴────────────────┴──────────────────┴─────────────────┘
+
+Key principle: In time mode, all events with valid ts participate in boundary detection (deterministic span boundaries regardless of filter logic). Only "included" events are buffered.
 
 ⸻
 
@@ -121,7 +190,7 @@ Error handling
 	•	Duration: <int>(ms|s|m|h) (e.g., 500ms, 10s, 1m, 2h)
 	•	Time-based with missing ts:
 	•	Strict: error per event (Exit 1 if encountered).
-	•	Resilient: mark late/unassigned as described; proceed.
+	•	Resilient: mark as "unassigned" status; proceed.
 	•	If --parallel is set: print a warning "--span forces sequential execution" and continue sequentially.
 	•	If count N > 100,000: print a warning about potential memory usage. Consider breaking into smaller spans or using time-based mode.
 
@@ -150,8 +219,12 @@ Time spans, log late arrivals
 
 kelora -j --span 1m \
   --exec '
-    if e.meta.span_late { eprint("late -> " + e.meta.span_key); }
-    track_count("hits");
+    if e.meta.span_status == "late" {
+      eprint("⚠️  Late: " + e.ts + " → " + e.meta.span_key);
+    }
+    if e.meta.span_status == "included" {
+      track_count("hits");
+    }
   ' \
   --span-close '
     emit_each([#{start: span_start(), end: span_end(), hits: pop_metric("hits")}]);
@@ -162,10 +235,23 @@ Time spans, emit histogram per minute
 kelora -j --span 1m \
   --exec 'track_bucket("status", e.status.to_int())' \
   --span-close '
-    let s = span_start();
-    let e = span_end();
-    let m = pop_metrics();   // whole metrics map
-    emit_each([#{start: s, end: e, status_hist: m.status}]);
+    let m = pop_metrics();   // read all and reset all
+    emit_each([#{start: span_start(), end: span_end(), status_hist: m.status}]);
+  '
+
+Running total across spans
+
+kelora -j --span 500 \
+  --exec 'track_count("hits")' \
+  --span-close '
+    let span_hits = pop_metric("hits");         // reset this
+    let cumulative = metrics["total"];          // read without reset
+    track_sum("total", cumulative + span_hits); // update for next span
+    emit_each([#{
+      span: span_key(),
+      span_hits: span_hits,
+      total: cumulative + span_hits
+    }]);
   '
 
 
@@ -177,20 +263,29 @@ Help text additions (concise)
                         Sequential only; forces sequential mode if --parallel is set.
                         Time mode uses event ts; spans are [start, end). Late events never mutate closed spans.
 
---span-close <RHAI>    Run once when a span closes. Available: span_start(), span_end(),
-                        span_key(), span_events(), span_size().
-                        Each event carries meta.span_key, meta.span_start, meta.span_end, meta.span_late.
+--span-close <RHAI>    Run once when a span closes (only if span_size() > 0).
+                        Available: span_start(), span_end(), span_key(), span_events(), span_size().
+                        Metrics: pop_metric(key), pop_metrics(), metrics dict (read-only).
+                        Each event carries meta.span_status, meta.span_key, meta.span_start, meta.span_end.
 
 
 ⸻
 
-Design notes (fit with Kelora ethos)
-	•	Two knobs only keeps the surface area small and legible.
-	•	Determinism over cleverness: no reopening, no watermark heuristics.
-	•	meta.* ledger makes the processor's bookkeeping explicit and non-invasive.
-	•	Sequential by design avoids "stream processor" creep while covering the common CLI/pipe cases.
+Design philosophy
 
-If you want one optional hard edge later, a single --strict-span could treat any meta.span_late as a hard error—same model, stricter hygiene.
+	1.	Arrival order is truth: Spans form based on when events arrive, not when they claim to have occurred. Late events never mutate history.
+
+	2.	Streaming by default: Events flow through immediately with metadata assigned. Buffering is internal and minimal (current span only).
+
+	3.	Explicit over implicit: Event disposition is visible in meta.span_status. No silent drops or state mutations.
+
+	4.	Fail-safe defaults: Missing timestamps mark events as unassigned but don't halt processing. Use --strict-span for hard errors.
+
+	5.	Single responsibility: Spans aggregate; filters filter. A filtered event in time mode still advances the clock (deterministic boundaries).
+
+	6.	Two knobs only: Minimal surface area keeps the feature legible and composable.
+
+If you want one optional hard edge later, a single --strict-span could treat any meta.span_status = "late" or "unassigned" as a hard error—same model, stricter hygiene.
 
 ⸻
 
@@ -219,19 +314,46 @@ Edge cases & clarifications:
 	•	Recommendation: use time-based mode for high-volume streams.
 
 5. Signal handling during close
-	•	SIGINT/SIGTERM during --span-close execution: defer signal until script completes.
+	•	First SIGINT/SIGTERM during --span-close: defer signal until script completes.
 	•	This ensures span summaries are not corrupted by interruption.
-	•	After --span-close completes, terminate gracefully.
+	•	Second SIGINT/SIGTERM within 2 seconds: force immediate exit (code 130/143).
+	•	Recommendation: Print "Received signal, waiting for span close... (Ctrl+C again to force quit)" on first signal.
 
 6. Empty time spans
 	•	Time gaps between events do NOT produce synthetic empty spans.
 	•	Example: --span 1m with events at 12:00 and 12:05 → only 2 spans emitted.
 	•	Users expecting regular time series should generate synthetic events upstream.
 
-7. Metrics and pop_metric/pop_metrics
-	•	track_* functions operate globally across all spans (not automatically scoped).
-	•	Use pop_metric(key) or pop_metrics() in --span-close to read-and-reset per-span aggregations.
-	•	Pattern: --exec increments, --span-close pops metrics and emits.
+7. Metrics access patterns
+	•	track_* functions operate globally (not automatically scoped to spans).
+	•	Read without side effects: Use metrics dict or metrics[key].
+	•	Read and reset: Use pop_metric(key) or pop_metrics().
+	•	Un-popped metrics persist across spans (will accumulate).
+	•	Warn if metrics remain after --span-close completes.
+
+⸻
+
+Troubleshooting
+
+Common issues and solutions:
+
+Q: Why is span_size() always 0?
+A: Check if events are failing --filter. Filtered events (span_status="filtered") don't enter the buffer. Only "included" events count.
+
+Q: Late events not appearing in output?
+A: They are emitted (check span_status="late" in output) but not in span_events(). Late events never enter closed spans.
+
+Q: Metrics growing unexpectedly across spans?
+A: Forgot to call pop_metric(). Un-popped metrics accumulate. Use pop_metric() or pop_metrics() to reset, or access via metrics dict to read without side effects.
+
+Q: First span seems wrong or partial?
+A: First event with valid ts anchors time alignment. If first event is mid-interval (e.g., 12:03:27 with --span 1m), first span is [12:03:00, 12:04:00). Pre-sort logs by timestamp for accuracy.
+
+Q: Getting "unassigned" events in time mode?
+A: Events have missing or invalid ts field. Check timestamp parsing. Use --strict-span to treat as errors, or fix upstream data.
+
+Q: Span boundaries seem inconsistent?
+A: In time mode, all events with valid ts advance the clock, even filtered ones. This ensures deterministic boundaries regardless of filter logic.
 
 ⸻
 
@@ -244,7 +366,7 @@ Critical edge cases to cover in integration tests:
 	•	SIGINT/SIGTERM mid-stream: current span closes gracefully.
 
 2. Events without timestamps (time-based)
-	•	Missing ts: marked as unassigned, not buffered, but emitted.
+	•	Missing ts: span_status="unassigned", not buffered, but emitted.
 	•	Invalid ts format: same handling as missing.
 	•	First event has missing ts: next valid ts anchors alignment.
 
@@ -263,7 +385,7 @@ Critical edge cases to cover in integration tests:
 	•	First span after anchor may be partial if first event is mid-interval.
 
 6. Late events
-	•	Event arrives after span closed: meta.span_late = true, not buffered.
+	•	Event arrives after span closed: span_status="late", not buffered.
 	•	Late event still runs through --exec and --filter.
 	•	late_events counter increments.
 
@@ -280,8 +402,10 @@ Critical edge cases to cover in integration tests:
 	•	SIGINT during --span-close: script completes before exit.
 	•	SIGINT during per-event --exec: current span closes gracefully.
 
-10. Metrics pop operations
-	•	pop_metric(key) reads and resets a single metric between spans.
-	•	pop_metrics() reads and resets all metrics, returning a map.
-	•	Multiple metrics tracked independently.
+10. Metrics access operations
+	•	metrics dict or metrics[key]: read without side effects.
+	•	pop_metric(key): read and reset single metric.
+	•	pop_metrics(): read and reset all metrics, returning a map.
+	•	Un-popped metrics persist and accumulate across spans.
+	•	Warning printed if metrics remain after --span-close.
 
