@@ -21,10 +21,12 @@ Sequential only. If --parallel is supplied, Kelora prints a warning and runs seq
 
 Time source & alignment (time-based mode)
 	•	Time is taken from the event's ts (Kelora's canonical timestamp field).
-	•	First event anchors the cadence to absolute boundaries:
+	•	First event with valid ts anchors the cadence to absolute boundaries:
 	•	Compute the boundary period containing the first event, aligned to the duration.
 	•	Example: first ts = 12:03:27 with --span 1m → first span is [12:03:00, 12:04:00), then [12:04:00, 12:05:00), etc.
+	•	Events with missing/invalid ts do not affect anchor selection.
 	•	Intervals are half-open: [start, end).
+	•	Implementation note: Use integer milliseconds for timestamp comparisons to avoid floating-point precision issues.
 
 Missing/invalid ts:
 	•	Strict mode: event is an error.
@@ -43,11 +45,14 @@ Policy (no flags):
 	•	meta.span_key = "<start ISO8601>/<duration>" of the closed span it would've belonged to.
 	•	meta.span_start, meta.span_end reflect that window's bounds.
 	3.	Per-event scripts (--exec, --filter) still run.
-	4.	Internal counter late_events increments (visible in --stats).
+	4.	Late events are emitted to output (unless suppressed by --filter or --exec).
+	5.	Internal counter late_events increments (visible in --stats).
 
 If an event belongs to the currently open span, it's included and meta.span_late = false.
 
 Count-based mode has no late events (spans follow arrival order).
+
+Note: For accurate time-based aggregation, users should pre-sort logs by timestamp (e.g., `sort -k <timestamp-field>`).
 
 ⸻
 
@@ -61,14 +66,16 @@ Functions:
 	•	span_key() → String
 	•	Time: "{ISO_START}/{DURATION}" (e.g., 2025-10-15T12:03:00Z/1m)
 	•	Count: "#<index>" (0-based)
-	•	span_events() → Array of events in the span
+	•	span_events() → Array of events in the span, in arrival order
 	•	span_size() → Int (event count)
 
-Metadata (also injected into each event in the span before close):
+Metadata (injected into each buffered event immediately before --span-close runs):
 	•	e.meta.span_key (String)
 	•	e.meta.span_start (DateTime)
 	•	e.meta.span_end (DateTime)
 	•	e.meta.span_late (Bool; always false for in-span events)
+
+Note: For events passing through without entering a span (late/unassigned), metadata is set during per-event processing phase.
 
 ⸻
 
@@ -78,14 +85,20 @@ Processor semantics
 	•	Assign/update e.meta.* for spanning (see above).
 	•	Events are emitted as they arrive (unless suppressed by filter/exec).
 	2.	Boundary detection:
-	•	Count: when N events accumulated → close.
-	•	Time: when an event's ts falls in a newer interval than the current open one → close the current.
+	•	Count: when N events that passed --filter (if specified) have accumulated → close.
+	•	Time: when an event's ts (valid or invalid) falls in a newer interval than the current open one → close the current.
+	•	Time mode: All events participate in boundary detection, but only events with valid ts and passing --filter are added to the span buffer.
 	3.	Close phase:
+	•	Inject span metadata into buffered events.
 	•	Run --span-close once with span helpers. This is in addition to per-event output; --span-close can emit span-level summaries via emit_each().
 	•	Reset span state and start the next span with the current event (time) or with an empty buffer (count).
-	4.	End of input or interrupt signal (SIGINT/SIGTERM): if a span is open, close it gracefully and run --span-close before termination.
+	4.	End of input or interrupt signal (SIGINT/SIGTERM):
+	•	If a span is open, close it gracefully and run --span-close before termination.
+	•	If SIGINT/SIGTERM is received during --span-close execution, defer signal until script completes.
 
 No synthetic empty spans are emitted (gaps with no events produce no span).
+
+Example: With --span 1m and events at 12:00, 12:05, only the two spans containing events are emitted (not 12:01, 12:02, 12:03, 12:04).
 
 ⸻
 
@@ -110,6 +123,7 @@ Error handling
 	•	Strict: error per event (Exit 1 if encountered).
 	•	Resilient: mark late/unassigned as described; proceed.
 	•	If --parallel is set: print a warning "--span forces sequential execution" and continue sequentially.
+	•	If count N > 100,000: print a warning about potential memory usage. Consider breaking into smaller spans or using time-based mode.
 
 ⸻
 
@@ -177,4 +191,97 @@ Design notes (fit with Kelora ethos)
 	•	Sequential by design avoids "stream processor" creep while covering the common CLI/pipe cases.
 
 If you want one optional hard edge later, a single --strict-span could treat any meta.span_late as a hard error—same model, stricter hygiene.
+
+⸻
+
+Implementation notes
+
+Edge cases & clarifications:
+
+1. Timestamp comparison precision
+	•	Use integer milliseconds (or nanoseconds) for all timestamp comparisons internally.
+	•	Avoid floating-point comparisons to prevent boundary detection bugs.
+	•	Events with ts at exact boundary (e.g., 12:04:00.000 when span ends at 12:04:00) belong to the next span per half-open interval semantics.
+
+2. Filter interaction with boundaries (time-based)
+	•	All events (including those failing --filter) participate in span boundary detection.
+	•	Filtered-out events advance the span clock but are not buffered.
+	•	This ensures deterministic span boundaries regardless of filter logic.
+
+3. First event anchoring (time-based)
+	•	Only the first event with a valid ts anchors the time alignment.
+	•	Events with missing/invalid ts are skipped during anchor selection.
+	•	Once anchored, all subsequent boundary calculations are deterministic.
+
+4. Large count spans
+	•	Count mode buffers all N events in memory until close.
+	•	For N > 100,000, warn about potential OOM risk.
+	•	Recommendation: use time-based mode for high-volume streams.
+
+5. Signal handling during close
+	•	SIGINT/SIGTERM during --span-close execution: defer signal until script completes.
+	•	This ensures span summaries are not corrupted by interruption.
+	•	After --span-close completes, terminate gracefully.
+
+6. Empty time spans
+	•	Time gaps between events do NOT produce synthetic empty spans.
+	•	Example: --span 1m with events at 12:00 and 12:05 → only 2 spans emitted.
+	•	Users expecting regular time series should generate synthetic events upstream.
+
+7. Metrics and track_snapshot()
+	•	track_* functions operate globally across all spans (not automatically scoped).
+	•	Use track_snapshot(key) in --span-close to read-and-reset per-span aggregations.
+	•	Pattern: --exec increments, --span-close snapshots and emits.
+
+⸻
+
+Testing recommendations
+
+Critical edge cases to cover in integration tests:
+
+1. End-of-stream handling
+	•	Partial span at EOF is closed and --span-close runs.
+	•	SIGINT/SIGTERM mid-stream: current span closes gracefully.
+
+2. Events without timestamps (time-based)
+	•	Missing ts: marked as unassigned, not buffered, but emitted.
+	•	Invalid ts format: same handling as missing.
+	•	First event has missing ts: next valid ts anchors alignment.
+
+3. Boundary precision
+	•	Events at exact boundary time (e.g., 12:04:00.000) belong to next span.
+	•	Multiple events with identical timestamps stay in same span.
+	•	Millisecond-level precision maintained throughout.
+
+4. Filter interactions
+	•	Count mode: --filter affects span size (only filtered events count toward N).
+	•	Time mode: --filter doesn't affect boundary detection, but filtered events not buffered.
+	•	Late events still pass through --filter.
+
+5. Empty spans
+	•	Time gap produces no synthetic spans (e.g., 12:00 → 12:05 with --span 1m = 2 spans, not 6).
+	•	First span after anchor may be partial if first event is mid-interval.
+
+6. Late events
+	•	Event arrives after span closed: meta.span_late = true, not buffered.
+	•	Late event still runs through --exec and --filter.
+	•	late_events counter increments.
+
+7. Large counts
+	•	--span 100000 triggers warning but works.
+	•	Memory usage scales linearly with N in count mode.
+
+8. Interaction with other flags
+	•	--take N: closes current span before stopping.
+	•	--since/--until: spans form over filtered stream.
+	•	--window N: orthogonal; window helpers work in per-event context.
+
+9. Signal handling
+	•	SIGINT during --span-close: script completes before exit.
+	•	SIGINT during per-event --exec: current span closes gracefully.
+
+10. Metrics snapshots
+	•	track_snapshot() reads and resets correctly between spans.
+	•	Multiple metrics tracked independently.
+	•	Snapshot without key returns entire metrics map.
 
