@@ -11,7 +11,7 @@ CLI
 --span <N|DURATION>
 --span-close '<Rhai>'
 
-	•	--span <N> → count-based: close after every N events.
+	•	--span <N> → count-based: close after every N events that pass --filter (if specified). The count applies to the filtered event stream.
 	•	--span <DURATION> → time-based: close on fixed time boundaries derived from the events' timestamp field (see "Time source").
 	•	--span-close → Rhai snippet executed once when a span closes. Span helpers are available only here.
 
@@ -28,7 +28,7 @@ Time source & alignment (time-based mode)
 
 Missing/invalid ts:
 	•	Strict mode: event is an error.
-	•	Resilient (default): event is processed normally but excluded from time-span aggregation; it gets meta.span_late = true and meta.span_key = "unassigned".
+	•	Resilient (default): event is processed normally (--filter and --exec run) but excluded from time-span aggregation. It is NOT added to any span buffer and does NOT appear in span_events() or contribute to span_size(). Metadata assigned: meta.span_late = true, meta.span_key = "unassigned", meta.span_start and meta.span_end are omitted or null.
 
 ⸻
 
@@ -53,6 +53,8 @@ Count-based mode has no late events (spans follow arrival order).
 
 Span context (Rhai) — available only during --span-close
 
+Note: Window helpers (window_events(), window_size(), etc.) are NOT available in --span-close context. Use span helpers exclusively.
+
 Functions:
 	•	span_start() → DateTime (start bound)
 	•	span_end() → DateTime (end bound)
@@ -74,13 +76,14 @@ Processor semantics
 	1.	Per-event phase (always):
 	•	Run --filter / --exec.
 	•	Assign/update e.meta.* for spanning (see above).
+	•	Events are emitted as they arrive (unless suppressed by filter/exec).
 	2.	Boundary detection:
 	•	Count: when N events accumulated → close.
 	•	Time: when an event's ts falls in a newer interval than the current open one → close the current.
 	3.	Close phase:
-	•	Run --span-close once with span helpers.
+	•	Run --span-close once with span helpers. This is in addition to per-event output; --span-close can emit span-level summaries via emit_each().
 	•	Reset span state and start the next span with the current event (time) or with an empty buffer (count).
-	4.	End of input: if a span is open, close it and run --span-close.
+	4.	End of input or interrupt signal (SIGINT/SIGTERM): if a span is open, close it gracefully and run --span-close before termination.
 
 No synthetic empty spans are emitted (gaps with no events produce no span).
 
@@ -88,9 +91,12 @@ No synthetic empty spans are emitted (gaps with no events produce no span).
 
 Interactions
 	•	--window N (sliding) is unchanged and orthogonal. If both are provided, --span still governs close hooks; window helpers reflect the sliding window within each per-event execution.
-	•	--take limits overall output; it does not truncate internal span formation.
+	•	--take limits overall output. If the take limit is reached mid-span, the current span is closed and --span-close runs before termination.
 	•	--since/--until filter which events enter the stream; spans form over what remains.
-	•	--stats shows late_events (time-based only), span counts, and average span size.
+	•	--stats shows:
+	•	total_spans_closed (number of spans that closed)
+	•	avg_events_per_span (mean span size)
+	•	late_events (time-based only; count of events with meta.span_late = true)
 	•	--metrics works as usual; use track_* in per-event or --span-close. A track_snapshot(key?) helper is recommended (existing pattern) to read-and-reset between spans.
 
 ⸻
