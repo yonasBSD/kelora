@@ -110,7 +110,7 @@ Interactions
 	•	total_spans_closed (number of spans that closed)
 	•	avg_events_per_span (mean span size)
 	•	late_events (time-based only; count of events with meta.span_late = true)
-	•	--metrics works as usual; use track_* in per-event or --span-close. A track_snapshot(key?) helper is recommended (existing pattern) to read-and-reset between spans.
+	•	--metrics works as usual; use track_* in per-event or --span-close. Use pop_metric(key) or pop_metrics() to read-and-reset metrics between spans.
 
 ⸻
 
@@ -142,7 +142,7 @@ kelora -j --span 500 \
   --exec 'track_sum("lat", e.latency.to_int())' \
   --span-close '
     let n = span_size();
-    let sum = track_snapshot("lat");
+    let sum = pop_metric("lat");
     emit_each([#{span: span_key(), n: n, avg_latency: if n>0 { sum / n } else { 0 }}]);
   '
 
@@ -154,7 +154,7 @@ kelora -j --span 1m \
     track_count("hits");
   ' \
   --span-close '
-    emit_each([#{start: span_start(), end: span_end(), hits: track_snapshot("hits")}]);
+    emit_each([#{start: span_start(), end: span_end(), hits: pop_metric("hits")}]);
   '
 
 Time spans, emit histogram per minute
@@ -164,7 +164,7 @@ kelora -j --span 1m \
   --span-close '
     let s = span_start();
     let e = span_end();
-    let m = track_snapshot();   // whole metrics map
+    let m = pop_metrics();   // whole metrics map
     emit_each([#{start: s, end: e, status_hist: m.status}]);
   '
 
@@ -228,10 +228,10 @@ Edge cases & clarifications:
 	•	Example: --span 1m with events at 12:00 and 12:05 → only 2 spans emitted.
 	•	Users expecting regular time series should generate synthetic events upstream.
 
-7. Metrics and track_snapshot()
+7. Metrics and pop_metric/pop_metrics
 	•	track_* functions operate globally across all spans (not automatically scoped).
-	•	Use track_snapshot(key) in --span-close to read-and-reset per-span aggregations.
-	•	Pattern: --exec increments, --span-close snapshots and emits.
+	•	Use pop_metric(key) or pop_metrics() in --span-close to read-and-reset per-span aggregations.
+	•	Pattern: --exec increments, --span-close pops metrics and emits.
 
 ⸻
 
@@ -280,8 +280,8 @@ Critical edge cases to cover in integration tests:
 	•	SIGINT during --span-close: script completes before exit.
 	•	SIGINT during per-event --exec: current span closes gracefully.
 
-10. Metrics snapshots
-	•	track_snapshot() reads and resets correctly between spans.
+10. Metrics pop operations
+	•	pop_metric(key) reads and resets a single metric between spans.
+	•	pop_metrics() reads and resets all metrics, returning a map.
 	•	Multiple metrics tracked independently.
-	•	Snapshot without key returns entire metrics map.
 
