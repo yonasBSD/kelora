@@ -36,14 +36,21 @@ Missing/invalid ts:
 
 Late events (time-based)
 
-An event is late iff its ts falls into a span that has already been closed.
+Definitions assume duration_ms is the configured span length (milliseconds) and anchor_start_ms is the start of the first window (derived from the first valid timestamp).
+
+An event is late iff its ts falls into a span that has already been closed, including windows that chronologically precede the anchor event.
 
 Policy (no flags):
 	1.	We do not reopen or mutate closed spans.
 	2.	Event is tagged:
 		•	meta.span_status = "late"
 		•	meta.span_id = "<start ISO8601>/<duration>" of the closed span it would've belonged to.
-	•	meta.span_start, meta.span_end reflect that window's bounds.
+		•	meta.span_start, meta.span_end reflect that window's bounds.
+	•	Window bounds use integer math to avoid float precision bugs:
+		•	delta_ms = event_ts_ms - anchor_start_ms
+		•	k = delta_ms.div_euclid(duration_ms) // floor division handles negatives
+		•	window_start_ms = anchor_start_ms + k * duration_ms
+		•	window_end_ms = window_start_ms + duration_ms
 	3.	Per-event scripts (--exec, --filter) still run.
 	4.	Late events are emitted to output (unless suppressed by --filter or --exec).
 	5.	Internal counter late_events increments (visible in --stats).
@@ -59,7 +66,7 @@ Note: For accurate time-based aggregation, users should pre-sort logs by timesta
 Span context (Rhai) — available only during --span-close
 
 Note: Window helpers (window_events(), window_size(), etc.) are NOT available in --span-close context. Use span helpers exclusively.
-The hook fires after the event that closed the span finishes all per-event stages, so span_events() only contains events that survived the pipeline.
+The hook fires after the event that closed the span finishes all per-event stages, so span_events() only contains events that survived the pipeline. The hook still runs even if span_size() == 0 (e.g., every event was filtered or marked unassigned); scripts decide whether to emit anything.
 
 Functions:
 	•	span_start() → DateTime (start bound)
@@ -95,8 +102,8 @@ Processor semantics
 	•	Count: when N events with status "included" have accumulated → close.
 	•	Time: when an event's ts crosses into a newer interval → close the current span.
 	•	Filtered events: in count mode, don't count toward N; in time mode, advance boundaries but aren't buffered.
-	3.	Close phase (only if span_size() > 0):
-	•	After the event that triggered the boundary finishes the per-event pipeline, run --span-close once with span helpers and access to buffered events via span_events().
+	3.	Close phase:
+	•	After the event that triggered the boundary finishes the per-event pipeline, run --span-close once with span helpers and access to buffered events via span_events(). span_size() may be 0 if every event was filtered or marked unassigned.
 	•	span_metrics snapshots tracked values for the span; the snapshot is cleared after --span-close finishes.
 	•	--span-close can emit span-level summaries via emit_each().
 	•	Reset span state and start the next span.
@@ -239,12 +246,12 @@ kelora -j --span 500 \
   --exec 'track_count("hits")' \
   --span-close '
     let span_hits = if span_metrics.contains("hits") { span_metrics["hits"] } else { 0 };
+    track_sum("total", span_hits); // add just this span's delta
     let cumulative = if metrics.contains("total") { metrics["total"] } else { 0 };
-    track_sum("total", cumulative + span_hits); // update for next span
     emit_each([#{
       span: span_id(),
       span_hits: span_hits,
-      total: cumulative + span_hits
+      total: cumulative
     }]);
   '
 
@@ -257,7 +264,7 @@ Help text additions (concise)
                         Sequential only; forces sequential mode if --parallel is set.
                         Time mode uses event ts; spans are [start, end). Late events never mutate closed spans.
 
---span-close <RHAI>    Run once when a span closes (only if span_size() > 0).
+--span-close <RHAI>    Run once whenever a span closes.
                         Available: span_start(), span_end(), span_id(), span_events(), span_size(), span_metrics.
                         Metrics: span_metrics (per span, read-only), metrics dict (global, read-only).
                         Each event carries meta.span_status, meta.span_id, meta.span_start, meta.span_end.
@@ -314,6 +321,7 @@ Edge cases & clarifications:
 6. Empty time spans
 	•	Time gaps between events do NOT produce synthetic empty spans.
 	•	Example: --span 1m with events at 12:00 and 12:05 → only 2 spans emitted.
+	•	Spans can still close with span_size() == 0 if every event in the interval was filtered or marked unassigned; --span-close still runs so scripts can emit zeros or diagnostics.
 	•	Users expecting regular time series should generate synthetic events upstream.
 
 7. Metrics access patterns
