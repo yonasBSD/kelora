@@ -29,7 +29,7 @@ Time source & alignment (time-based mode)
 	•	Implementation note: Use integer milliseconds for timestamp comparisons to avoid floating-point precision issues.
 
 Missing/invalid ts:
-	•	Strict mode: event is an error.
+	•	Strict mode (`--strict`): event is an error (fail-fast).
 	•	Resilient (default): event is processed normally (--filter and --exec run) but excluded from time-span aggregation. It is NOT added to any span buffer and does NOT appear in span_events() or contribute to span_size(). Metadata assigned: meta.span_status = "unassigned", meta.span_id = null, meta.span_start and meta.span_end are null.
 
 ⸻
@@ -59,6 +59,7 @@ Note: For accurate time-based aggregation, users should pre-sort logs by timesta
 Span context (Rhai) — available only during --span-close
 
 Note: Window helpers (window_events(), window_size(), etc.) are NOT available in --span-close context. Use span helpers exclusively.
+The hook fires after the event that closed the span finishes all per-event stages, so span_events() only contains events that survived the pipeline.
 
 Functions:
 	•	span_start() → DateTime (start bound)
@@ -86,17 +87,16 @@ Status values:
 
 Processor semantics
 	1.	Per-event phase (always):
-	•	Determine event disposition (included/late/unassigned/filtered based on ts and --filter).
-	•	Assign meta.span_* metadata immediately.
-	•	Run --filter / --exec (can access metadata).
-	•	Emit event to output (unless filtered).
-	•	If event is "included", add to internal span buffer for span_events().
+	•	Before the first user-provided stage runs, compute span alignment for the event and assign provisional metadata: meta.span_id/span_start/span_end plus meta.span_status = "included", "late", or "unassigned". This metadata is visible to every --exec/--filter stage.
+	•	Run CLI-ordered --exec/--filter stages. Each stage can inspect meta.span_*.
+	•	If a --filter returns false, immediately set meta.span_status = "filtered", skip any later stages, and do not emit or buffer the event.
+	•	When the event exits the per-event pipeline without being filtered, emit it normally. If meta.span_status is still "included", append it to the current span buffer for span_events(); "late" and "unassigned" events continue to flow but never enter the buffer.
 	2.	Boundary detection:
 	•	Count: when N events with status "included" have accumulated → close.
 	•	Time: when an event's ts crosses into a newer interval → close the current span.
 	•	Filtered events: in count mode, don't count toward N; in time mode, advance boundaries but aren't buffered.
 	3.	Close phase (only if span_size() > 0):
-	•	Run --span-close once with span helpers and access to buffered events via span_events().
+	•	After the event that triggered the boundary finishes the per-event pipeline, run --span-close once with span helpers and access to buffered events via span_events().
 	•	span_metrics snapshots tracked values for the span; the snapshot is cleared after --span-close finishes.
 	•	--span-close can emit span-level summaries via emit_each().
 	•	Reset span state and start the next span.
@@ -273,13 +273,11 @@ Design philosophy
 
 	3.	Explicit over implicit: Event disposition is visible in meta.span_status. No silent drops or state mutations.
 
-	4.	Fail-safe defaults: Missing timestamps mark events as unassigned but don't halt processing. Use --strict-span for hard errors.
+	4.	Fail-safe defaults: Missing timestamps mark events as unassigned but don't halt processing. Run with --strict if you prefer fail-fast timestamp handling.
 
 	5.	Single responsibility: Spans aggregate; filters filter. A filtered event in time mode still advances the clock (deterministic boundaries).
 
 	6.	Two knobs only: Minimal surface area keeps the feature legible and composable.
-
-If you want one optional hard edge later, a single --strict-span could treat any meta.span_status = "late" or "unassigned" as a hard error—same model, stricter hygiene.
 
 ⸻
 
@@ -343,7 +341,7 @@ Q: First span seems wrong or partial?
 A: First event with valid ts anchors time alignment. If first event is mid-interval (e.g., 12:03:27 with --span 1m), first span is [12:03:00, 12:04:00). Pre-sort logs by timestamp for accuracy.
 
 Q: Getting "unassigned" events in time mode?
-A: Events have missing or invalid ts field. Check timestamp parsing. Use --strict-span to treat as errors, or fix upstream data.
+A: Events have missing or invalid ts field. Check timestamp parsing. Run with --strict to turn them into hard errors, or fix upstream data.
 
 Q: Span boundaries seem inconsistent?
 A: In time mode, all events with valid ts advance the clock, even filtered ones. This ensures deterministic boundaries regardless of filter logic.
@@ -369,7 +367,7 @@ Critical edge cases to cover in integration tests:
 	•	Millisecond-level precision maintained throughout.
 
 4. Filter interactions
-	•	Count mode: --filter affects span size (only filtered events count toward N).
+	•	Count mode: --filter affects span size (only events that pass every filter count toward N).
 	•	Time mode: --filter doesn't affect boundary detection, but filtered events not buffered.
 	•	Late events still pass through --filter.
 
