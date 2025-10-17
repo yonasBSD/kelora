@@ -30,7 +30,7 @@ Time source & alignment (time-based mode)
 
 Missing/invalid ts:
 	•	Strict mode: event is an error.
-	•	Resilient (default): event is processed normally (--filter and --exec run) but excluded from time-span aggregation. It is NOT added to any span buffer and does NOT appear in span_events() or contribute to span_size(). Metadata assigned: meta.span_status = "unassigned", meta.span_key = null, meta.span_start and meta.span_end are null.
+	•	Resilient (default): event is processed normally (--filter and --exec run) but excluded from time-span aggregation. It is NOT added to any span buffer and does NOT appear in span_events() or contribute to span_size(). Metadata assigned: meta.span_status = "unassigned", meta.span_id = null, meta.span_start and meta.span_end are null.
 
 ⸻
 
@@ -41,8 +41,8 @@ An event is late iff its ts falls into a span that has already been closed.
 Policy (no flags):
 	1.	We do not reopen or mutate closed spans.
 	2.	Event is tagged:
-	•	meta.span_status = "late"
-	•	meta.span_key = "<start ISO8601>/<duration>" of the closed span it would've belonged to.
+		•	meta.span_status = "late"
+		•	meta.span_id = "<start ISO8601>/<duration>" of the closed span it would've belonged to.
 	•	meta.span_start, meta.span_end reflect that window's bounds.
 	3.	Per-event scripts (--exec, --filter) still run.
 	4.	Late events are emitted to output (unless suppressed by --filter or --exec).
@@ -63,17 +63,18 @@ Note: Window helpers (window_events(), window_size(), etc.) are NOT available in
 Functions:
 	•	span_start() → DateTime (start bound)
 	•	span_end() → DateTime (end bound)
-	•	span_key() → String
+	•	span_id() → String
 	•	Time: "{ISO_START}/{DURATION}" (e.g., 2025-10-15T12:03:00Z/1m)
 	•	Count: "#<index>" (0-based)
 	•	span_events() → Array of events in the span, in arrival order
 	•	span_size() → Int (event count)
+	•	span_metrics → Map snapshot of metrics recorded during the span
 
 Metadata (assigned during per-event processing, available in --exec, --filter, and --span-close):
-	•	e.meta.span_status (String: "included" | "late" | "unassigned" | "filtered")
-	•	e.meta.span_key (String or null)
-	•	e.meta.span_start (DateTime or null)
-	•	e.meta.span_end (DateTime or null)
+	•	meta.span_status (String: "included" | "late" | "unassigned" | "filtered")
+	•	meta.span_id (String or null)
+	•	meta.span_start (DateTime or null)
+	•	meta.span_end (DateTime or null)
 
 Status values:
 	•	"included" → Event is buffered in current span (normal case)
@@ -86,7 +87,7 @@ Status values:
 Processor semantics
 	1.	Per-event phase (always):
 	•	Determine event disposition (included/late/unassigned/filtered based on ts and --filter).
-	•	Assign e.meta.span_* metadata immediately.
+	•	Assign meta.span_* metadata immediately.
 	•	Run --filter / --exec (can access metadata).
 	•	Emit event to output (unless filtered).
 	•	If event is "included", add to internal span buffer for span_events().
@@ -96,6 +97,7 @@ Processor semantics
 	•	Filtered events: in count mode, don't count toward N; in time mode, advance boundaries but aren't buffered.
 	3.	Close phase (only if span_size() > 0):
 	•	Run --span-close once with span helpers and access to buffered events via span_events().
+	•	span_metrics snapshots tracked values for the span; the snapshot is cleared after --span-close finishes.
 	•	--span-close can emit span-level summaries via emit_each().
 	•	Reset span state and start the next span.
 	4.	End of input or interrupt signal (SIGINT/SIGTERM):
@@ -118,31 +120,22 @@ Interactions
 	•	avg_events_per_span (mean span size)
 	•	late_events (time-based only; count of events with meta.span_status = "late")
 	•	unassigned_events (time-based only; count of events with meta.span_status = "unassigned")
-	•	--metrics works as usual; use track_* in per-event or --span-close. See "Metrics access" below for reading metrics.
+	•	--metrics works as usual; use track_* in per-event or --span-close. See "Span metrics access" below for reading metrics.
 
 ⸻
 
-Metrics access
+Span metrics access
 
-In --span-close context, metrics accumulated during the span can be accessed:
+In --span-close context, two read-only maps are available:
 
-	•	metrics → Read-only dict of all metrics (same as end stage --end)
-	•	metrics[key] → Read single metric value without side effects
-	•	pop_metric(key) → Read metric value and reset it to 0
-	•	pop_metrics() → Read all metrics as map and reset all to 0
+	•	span_metrics → Metrics collected since the current span opened. The map is refreshed before --span-close runs and cleared afterward.
+	•	metrics → Global metrics accumulated for the whole run (same as --end stage with --metrics enabled).
 
-Pattern for per-span aggregation:
-	•	Use track_* in --exec to accumulate during span
-	•	Use pop_metric(key) or pop_metrics() in --span-close to read and reset
+Patterns:
+	•	Per-span aggregation: Use track_* in --exec to accumulate, then read values directly from span_metrics during --span-close (e.g., `let hits = if span_metrics.contains("hits") { span_metrics["hits"] } else { 0 };`). The map is empty if the span produced no tracked values.
+	•	Cross-span state: Read metrics[...] for cumulative totals and continue updating them with track_* if you need rolling aggregates across spans.
 
-Pattern for cross-span state:
-	•	Use metrics[key] or metrics dict to read without resetting
-	•	Use track_* to update the value for next span
-	•	Use pop_metric(key) for metrics you're done with
-
-Warning: Un-popped metrics persist across spans and will accumulate. If metrics remain after --span-close completes, a warning is printed.
-
-Note: The metrics dict is read-only; metrics.pop() won't work. Use the pop_metric() function instead.
+Both maps are immutable from Rhai scripts; functions such as metrics.pop() are unavailable. Span consumption never mutates the global metrics map, so the final --metrics report remains intact.
 
 ⸻
 
@@ -211,23 +204,24 @@ kelora -j --span 500 \
   --exec 'track_sum("lat", e.latency.to_int())' \
   --span-close '
     let n = span_size();
-    let sum = pop_metric("lat");
-    emit_each([#{span: span_key(), n: n, avg_latency: if n>0 { sum / n } else { 0 }}]);
+    let sum = if span_metrics.contains("lat") { span_metrics["lat"] } else { 0 };
+    emit_each([#{span: span_id(), n: n, avg_latency: if n > 0 { sum / n } else { 0 }}]);
   '
 
 Time spans, log late arrivals
 
 kelora -j --span 1m \
   --exec '
-    if e.meta.span_status == "late" {
-      eprint("⚠️  Late: " + e.ts + " → " + e.meta.span_key);
+    if meta.span_status == "late" {
+      eprint("⚠️  Late: " + e.ts + " → " + meta.span_id);
     }
-    if e.meta.span_status == "included" {
+    if meta.span_status == "included" {
       track_count("hits");
     }
   ' \
   --span-close '
-    emit_each([#{start: span_start(), end: span_end(), hits: pop_metric("hits")}]);
+    let hits = if span_metrics.contains("hits") { span_metrics["hits"] } else { 0 };
+    emit_each([#{start: span_start(), end: span_end(), hits: hits}]);
   '
 
 Time spans, emit histogram per minute
@@ -235,8 +229,8 @@ Time spans, emit histogram per minute
 kelora -j --span 1m \
   --exec 'track_bucket("status", e.status.to_int())' \
   --span-close '
-    let m = pop_metrics();   // read all and reset all
-    emit_each([#{start: span_start(), end: span_end(), status_hist: m.status}]);
+    let hist = if span_metrics.contains("status") { span_metrics["status"] } else { [] };
+    emit_each([#{start: span_start(), end: span_end(), status_hist: hist}]);
   '
 
 Running total across spans
@@ -244,11 +238,11 @@ Running total across spans
 kelora -j --span 500 \
   --exec 'track_count("hits")' \
   --span-close '
-    let span_hits = pop_metric("hits");         // reset this
-    let cumulative = metrics["total"];          // read without reset
+    let span_hits = if span_metrics.contains("hits") { span_metrics["hits"] } else { 0 };
+    let cumulative = if metrics.contains("total") { metrics["total"] } else { 0 };
     track_sum("total", cumulative + span_hits); // update for next span
     emit_each([#{
-      span: span_key(),
+      span: span_id(),
       span_hits: span_hits,
       total: cumulative + span_hits
     }]);
@@ -264,9 +258,9 @@ Help text additions (concise)
                         Time mode uses event ts; spans are [start, end). Late events never mutate closed spans.
 
 --span-close <RHAI>    Run once when a span closes (only if span_size() > 0).
-                        Available: span_start(), span_end(), span_key(), span_events(), span_size().
-                        Metrics: pop_metric(key), pop_metrics(), metrics dict (read-only).
-                        Each event carries meta.span_status, meta.span_key, meta.span_start, meta.span_end.
+                        Available: span_start(), span_end(), span_id(), span_events(), span_size(), span_metrics.
+                        Metrics: span_metrics (per span, read-only), metrics dict (global, read-only).
+                        Each event carries meta.span_status, meta.span_id, meta.span_start, meta.span_end.
 
 
 ⸻
@@ -325,11 +319,10 @@ Edge cases & clarifications:
 	•	Users expecting regular time series should generate synthetic events upstream.
 
 7. Metrics access patterns
-	•	track_* functions operate globally (not automatically scoped to spans).
-	•	Read without side effects: Use metrics dict or metrics[key].
-	•	Read and reset: Use pop_metric(key) or pop_metrics().
-	•	Un-popped metrics persist across spans (will accumulate).
-	•	Warn if metrics remain after --span-close completes.
+	•	track_* functions operate globally; span-level diffs are derived automatically.
+	•	Read span_metrics during --span-close for per-span summaries (e.g., `let hits = span_metrics["hits"];`). The map empties after each close.
+	•	Global metrics remain available via metrics[...] and feed the final --metrics report.
+	•	No manual reset step is required; span metrics never accumulate across spans.
 
 ⸻
 
@@ -344,7 +337,7 @@ Q: Late events not appearing in output?
 A: They are emitted (check span_status="late" in output) but not in span_events(). Late events never enter closed spans.
 
 Q: Metrics growing unexpectedly across spans?
-A: Forgot to call pop_metric(). Un-popped metrics accumulate. Use pop_metric() or pop_metrics() to reset, or access via metrics dict to read without side effects.
+A: track_* updates the global metrics map. Use span_metrics to read the per-span delta; it clears automatically after each close. Global metrics continue to grow until you intentionally track them to a new value.
 
 Q: First span seems wrong or partial?
 A: First event with valid ts anchors time alignment. If first event is mid-interval (e.g., 12:03:27 with --span 1m), first span is [12:03:00, 12:04:00). Pre-sort logs by timestamp for accuracy.
@@ -403,9 +396,6 @@ Critical edge cases to cover in integration tests:
 	•	SIGINT during per-event --exec: current span closes gracefully.
 
 10. Metrics access operations
-	•	metrics dict or metrics[key]: read without side effects.
-	•	pop_metric(key): read and reset single metric.
-	•	pop_metrics(): read and reset all metrics, returning a map.
-	•	Un-popped metrics persist and accumulate across spans.
-	•	Warning printed if metrics remain after --span-close.
-
+	•	span_metrics: contains only the metrics recorded during the current span; cleared after use.
+	•	metrics dict or metrics[key]: read cumulative values without side effects.
+	•	Span metrics do not require manual reset and never pollute later spans.
