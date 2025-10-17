@@ -82,6 +82,7 @@ nav:
       - how-to/fan-out-nested-structures.md
       - how-to/build-streaming-alerts.md
       - how-to/batch-process-archives.md
+      - how-to/span-aggregation-cookbook.md
   - Concepts:
       - concepts/pipeline-model.md
       - concepts/events-and-fields.md

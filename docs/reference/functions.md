@@ -17,6 +17,7 @@ Complete reference for all 40+ built-in Rhai functions available in Kelora. Func
 - [Tracking/Metrics](#trackingmetrics-functions) - Counters, aggregations
 - [File Output](#file-output-functions) - Writing data to files
 - [Event Manipulation](#event-manipulation) - Field removal, fan-out
+- [Span Helpers](#span-helpers---span-close-only) - Per-span metadata & rollups
 
 ---
 
@@ -1116,6 +1117,62 @@ Remove individual field from event.
 ```rhai
 e.password = ()                                       // Remove sensitive field
 e.temp_data = ()                                      // Clean up temporary field
+```
+
+---
+
+## Span Helpers – `--span-close` Only
+
+These helpers are available exclusively inside a `--span-close` script. Use them to emit per-span rollups after `--span` closes a count- or time-based window.
+
+### Span Identity
+
+#### `span_id()`
+Return the current span identifier. Count-based spans use `#<index>` (zero-based). Time-based spans use `ISO_START/DURATION` (e.g. `2024-05-19T12:00:00Z/5m`).
+
+```rhai
+let id = span_id();  // "#0" or "2024-05-19T12:05:00Z/5m"
+```
+
+### Span Boundaries
+
+#### `span_start()`
+Start of the span as a `DateTime`. Returns `()` for count-based spans.
+
+#### `span_end()`
+End of the span (half-open interval) as a `DateTime`. Returns `()` for count-based spans.
+
+```rhai
+if span_start() != () {
+    print("Window: " + span_start().to_string() + " → " + span_end().to_string());
+}
+```
+
+### Span Size and Events
+
+#### `span_size()`
+Number of events that survived filters and were included in the span.
+
+#### `span_events()`
+Array of event maps for the span in arrival order. Each map includes span metadata fields (`span_status`, `span_id`, `span_start`, `span_end`) in addition to the original event data.
+
+```rhai
+let included = span_events()
+    .filter(|evt| evt.span_status == "included")
+    .len();
+```
+
+### Metrics Snapshot
+
+#### `span_metrics()`
+Map containing per-span deltas from `track_*` calls. Values reset automatically after each span closes, so you can emit per-span summaries without manual bookkeeping.
+
+```rhai
+let metrics = span_metrics();
+let hits = metrics["events"];          // from track_count("events")
+let failures = metrics["failures"];    // from track_count("failures")
+let ratio = if hits > 0 { failures * 100 / hits } else { 0 };
+print(span_id() + ": " + ratio.to_string() + "% failure rate");
 ```
 
 ---

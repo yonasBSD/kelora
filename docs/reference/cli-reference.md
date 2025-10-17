@@ -291,6 +291,42 @@ kelora -j \
     app.log
 ```
 
+### Span Aggregation
+
+#### `--span <N | DURATION>`
+
+Group events into non-overlapping spans before running a span-close hook. Sequential mode is required (Kelora prints a warning and falls back to sequential if `--parallel` is also supplied).
+
+- `--span <N>` – Count-based spans. Close after every **N** events that survive all filters. Example: `--span 500`.
+- `--span <DURATION>` – Time-based spans aligned to the events' canonical timestamp (`ts`). The first event with a valid `ts` anchors fixed windows such as `1m`, `5m`, `30s`, `1h`.
+
+How it works:
+
+- Per-event scripts still run for every event.
+- Events missing a timestamp (time mode) are marked `meta.span_status == "unassigned"` and excluded from the span buffer.
+- Events with timestamps that fall into an already-closed window are emitted immediately with `meta.span_status == "late"`. Closed spans are never reopened.
+- Count spans keep buffered events in memory until the span closes. Kelora warns when `N > 100_000`.
+
+#### `--span-close <SCRIPT>`
+
+Run a Rhai snippet once whenever a span closes. Use it to emit per-span summaries, metrics, or rollups. The script runs after the event that triggered the close finishes all per-event stages (filters, execs, etc.).
+
+**Span-only helpers available inside `--span-close`:**
+
+- `span_id()` – Unique span identifier (`#0`, `2024-05-19T12:00:00Z/5m`, etc.)
+- `span_start()` / `span_end()` – Half-open window bounds for time-based spans (count spans return `()`)
+- `span_size()` – Number of events that survived filters and were included in this span
+- `span_events()` – Array of events in arrival order (each map includes `span_status`, `span_start`, etc.)
+- `span_metrics()` – Map of per-span deltas from `track_*` calls (automatically reset after each span)
+
+**Metadata added to `meta` during per-event stages:**
+
+- `meta.span_status` – `"included"`, `"late"`, `"unassigned"`, or `"filtered"`
+- `meta.span_id` – Span identifier (`null` for unassigned events)
+- `meta.span_start`, `meta.span_end` – Boundaries as DateTime values (or `()` when not applicable)
+
+Kelora cleans up span state automatically when processing completes or on graceful shutdown.
+
 ### File System Access
 
 #### `--allow-fs-writes`
