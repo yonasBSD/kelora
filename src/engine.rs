@@ -8,6 +8,7 @@ use rhai::debugger::{DebuggerCommand, DebuggerEvent};
 
 use crate::event::Event;
 use crate::rhai_functions;
+use crate::rhai_functions::datetime::DateTimeWrapper;
 
 /// Truncate text for display, respecting UTF-8 character boundaries
 fn truncate_for_display(text: &str, max_len: usize) -> String {
@@ -1262,6 +1263,17 @@ impl RhaiEngine {
         })
     }
 
+    pub fn compile_span_close(&mut self, script: &str) -> Result<CompiledExpression> {
+        let ast = self
+            .engine
+            .compile(script)
+            .with_context(|| format!("Failed to compile span-close script: {}", script))?;
+        Ok(CompiledExpression {
+            ast,
+            expr: script.to_string(),
+        })
+    }
+
     // Individual execution methods for pipeline stages
     pub fn execute_compiled_filter(
         &mut self,
@@ -1482,6 +1494,41 @@ impl RhaiEngine {
                 let detailed_msg = Self::format_rhai_error(e, "end expression", &compiled.expr);
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
+
+        Ok(())
+    }
+
+    pub fn execute_compiled_span_close(
+        &mut self,
+        compiled: &CompiledExpression,
+        metrics: &mut HashMap<String, Dynamic>,
+        internal: &mut HashMap<String, Dynamic>,
+    ) -> Result<()> {
+        Self::set_thread_tracking_state(metrics, internal);
+
+        let mut scope = self.scope_template.clone();
+        let mut metrics_map = rhai::Map::new();
+
+        for (k, v) in metrics.iter() {
+            metrics_map.insert(k.clone().into(), v.clone());
+        }
+        scope.set_value("metrics", metrics_map);
+
+        crate::rhai_functions::file_ops::clear_pending_ops();
+
+        let _ = self
+            .engine
+            .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
+            .map_err(|e| {
+                let detailed_msg = Self::format_rhai_error(e, "span-close script", &compiled.expr);
+                anyhow::anyhow!("{}", detailed_msg)
+            })?;
+
+        let ops = crate::rhai_functions::file_ops::take_pending_ops();
+        crate::rhai_functions::file_ops::execute_ops(&ops)?;
+
+        *metrics = Self::get_thread_tracking_state();
+        *internal = Self::get_thread_internal_state();
 
         Ok(())
     }
@@ -1737,6 +1784,24 @@ impl RhaiEngine {
         if let Some(filename) = &event.filename {
             meta_map.insert("filename".into(), Dynamic::from(filename.clone()));
         }
+        if let Some(status) = event.span.status {
+            meta_map.insert("span_status".into(), Dynamic::from(status.as_str()));
+        }
+        if let Some(span_id) = &event.span.span_id {
+            meta_map.insert("span_id".into(), Dynamic::from(span_id.clone()));
+        }
+        if let Some(span_start) = event.span.span_start {
+            meta_map.insert(
+                "span_start".into(),
+                Dynamic::from(DateTimeWrapper::from_utc(span_start)),
+            );
+        }
+        if let Some(span_end) = event.span.span_end {
+            meta_map.insert(
+                "span_end".into(),
+                Dynamic::from(DateTimeWrapper::from_utc(span_end)),
+            );
+        }
 
         // Add raw line to metadata
         meta_map.insert("line".into(), Dynamic::from(event.original_line.clone()));
@@ -1770,6 +1835,24 @@ impl RhaiEngine {
                 }
                 if let Some(filename) = &event.filename {
                     event_map.insert("filename".into(), Dynamic::from(filename.clone()));
+                }
+                if let Some(status) = event.span.status {
+                    event_map.insert("span_status".into(), Dynamic::from(status.as_str()));
+                }
+                if let Some(span_id) = &event.span.span_id {
+                    event_map.insert("span_id".into(), Dynamic::from(span_id.clone()));
+                }
+                if let Some(span_start) = event.span.span_start {
+                    event_map.insert(
+                        "span_start".into(),
+                        Dynamic::from(DateTimeWrapper::from_utc(span_start)),
+                    );
+                }
+                if let Some(span_end) = event.span.span_end {
+                    event_map.insert(
+                        "span_end".into(),
+                        Dynamic::from(DateTimeWrapper::from_utc(span_end)),
+                    );
                 }
                 Dynamic::from(event_map)
             })

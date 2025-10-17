@@ -164,6 +164,23 @@ pub struct Cli {
     #[arg(long = "window", help_heading = "Processing Options")]
     pub window_size: Option<usize>,
 
+    /// Aggregate events into fixed-size spans (count or duration) before running a span-close hook.
+    #[arg(
+        long = "span",
+        value_name = "N|DURATION",
+        help_heading = "Processing Options",
+        help = "Aggregate events into consecutive spans.\n  --span <N>        Close after every N events that pass filters.\n  --span <DURATION> Close on aligned time windows (e.g. 5m, 1h, 30s).\nUse with --span-close to run a Rhai snippet when each span finishes."
+    )]
+    pub span: Option<String>,
+
+    /// Rhai snippet executed once every time a span closes.
+    #[arg(
+        long = "span-close",
+        help_heading = "Processing Options",
+        help = "Run a Rhai snippet when each span closes. Within the hook, call span_start(), span_end(), span_id(), span_events(), span_size(), and span_metrics() for span context."
+    )]
+    pub span_close: Option<String>,
+
     /// Exit on first error (fail-fast behavior)
     #[arg(long = "strict", help_heading = "Error Handling")]
     pub strict: bool,

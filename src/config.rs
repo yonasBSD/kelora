@@ -130,6 +130,8 @@ pub struct ProcessingConfig {
     pub take_limit: Option<usize>,
     /// Exit on first error (fail-fast behavior) - new resiliency model
     pub strict: bool,
+    /// Span aggregation configuration (--span / --span-close)
+    pub span: Option<SpanConfig>,
     /// Show detailed error information (levels: 0-3) - new resiliency model
     pub verbose: u8,
     /// Quiet mode level (0=normal, 1=suppress diagnostics, 2=suppress events, 3=suppress script output)
@@ -148,6 +150,20 @@ pub struct PerformanceConfig {
     pub batch_size: Option<usize>,
     pub batch_timeout: u64,
     pub no_preserve_order: bool,
+}
+
+/// Span aggregation mode (--span)
+#[derive(Debug, Clone)]
+pub enum SpanMode {
+    Count { events_per_span: usize },
+    Time { duration_ms: i64 },
+}
+
+/// Span aggregation configuration (--span / --span-close)
+#[derive(Debug, Clone)]
+pub struct SpanConfig {
+    pub mode: SpanMode,
+    pub close_script: Option<String>,
 }
 
 /// Input format enumeration
@@ -604,6 +620,7 @@ impl KeloraConfig {
                 error_report: parse_error_report_config(cli),
                 levels: cli.levels.clone(),
                 exclude_levels: cli.exclude_levels.clone(),
+                span: parse_span_config(cli)?,
                 window_size: cli.window_size.unwrap_or(0),
                 timestamp_filter: None, // Will be set in main() after parsing since/until
                 take_limit: cli.take,
@@ -625,6 +642,9 @@ impl KeloraConfig {
 
     /// Check if parallel processing should be used
     pub fn should_use_parallel(&self) -> bool {
+        if self.processing.span.is_some() {
+            return false;
+        }
         self.performance.parallel
             || self.performance.threads > 0
             || self.performance.batch_size.is_some()
@@ -686,6 +706,7 @@ impl Default for KeloraConfig {
                 error_report: ErrorReportConfig {
                     style: ErrorReportStyle::Summary,
                 },
+                span: None,
                 levels: Vec::new(),
                 exclude_levels: Vec::new(),
                 window_size: 0,
@@ -850,6 +871,61 @@ fn determine_default_timezone(cli: &crate::Cli) -> Option<String> {
 
     // DEFAULT: UTC (per spec, --input-tz defaults to UTC)
     Some("UTC".to_string())
+}
+
+fn parse_span_config(cli: &crate::Cli) -> anyhow::Result<Option<SpanConfig>> {
+    let span_spec = match &cli.span {
+        Some(spec) => spec.trim(),
+        None => {
+            if cli.span_close.is_some() {
+                return Err(anyhow::anyhow!(
+                    "--span-close requires --span to be specified"
+                ));
+            }
+            return Ok(None);
+        }
+    };
+
+    if span_spec.is_empty() {
+        return Err(anyhow::anyhow!("--span value cannot be empty"));
+    }
+
+    if let Ok(count) = span_spec.parse::<usize>() {
+        if count == 0 {
+            return Err(anyhow::anyhow!(
+                "--span <N> must be a positive integer greater than zero"
+            ));
+        }
+
+        return Ok(Some(SpanConfig {
+            mode: SpanMode::Count {
+                events_per_span: count,
+            },
+            close_script: cli.span_close.clone(),
+        }));
+    }
+
+    let duration = humantime::parse_duration(span_spec).map_err(|e| {
+        anyhow::anyhow!(
+            "Invalid --span duration '{}': {}. Use formats like 30s, 5m, 1h.",
+            span_spec,
+            e
+        )
+    })?;
+
+    if duration.is_zero() {
+        return Err(anyhow::anyhow!("--span duration must be greater than zero"));
+    }
+
+    let duration_ms: i64 = duration
+        .as_millis()
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("--span duration is too large"))?;
+
+    Ok(Some(SpanConfig {
+        mode: SpanMode::Time { duration_ms },
+        close_script: cli.span_close.clone(),
+    }))
 }
 
 // Conversion traits to maintain compatibility with existing CLI types

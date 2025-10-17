@@ -14,6 +14,7 @@ pub struct ProcessingStats {
     pub events_created: usize,
     pub events_output: usize,
     pub events_filtered: usize,
+    pub late_events: usize,
     pub files_processed: usize,
     pub script_executions: usize,
     pub errors: usize, // Kept for backward compatibility, but lines_errors is more specific
@@ -70,6 +71,12 @@ pub fn stats_add_event_output() {
 pub fn stats_add_event_filtered() {
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().events_filtered += 1;
+    });
+}
+
+pub fn stats_add_late_event() {
+    THREAD_STATS.with(|stats| {
+        stats.borrow_mut().late_events += 1;
     });
 }
 
@@ -243,6 +250,10 @@ impl ProcessingStats {
             "Events created: {} total, {} output, {} filtered{}\n",
             self.events_created, self.events_output, self.events_filtered, events_filtered_pct
         ));
+
+        if self.late_events > 0 {
+            output.push_str(&format!("Late events: {}\n", self.late_events));
+        }
 
         // Throughput: N lines/s in Nms
         let duration_secs = self.processing_time.as_secs_f64();

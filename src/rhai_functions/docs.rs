@@ -196,6 +196,14 @@ append_file(path, text_or_array)     Append line(s) to file; arrays append one l
 mkdir(path [,recursive])             Create directory (set recursive=true to create parents)
 truncate_file(path)                  Create or zero-length a file for fresh output
 
+SPAN FUNCTIONS (available inside --span-close):
+span_start()                         Span start as DateTime (time spans) or () for count spans
+span_end()                           Span end as DateTime (time spans) or () for count spans
+span_id()                            Span identifier ('#index' for count, 'ISO/DURATION' for time)
+span_size()                          Number of events that survived the span
+span_events()                        Array of event maps for the span in arrival order
+span_metrics()                       Per-span metric deltas from track_* calls (map)
+
 EVENT MANIPULATION:
 emit_each(array [,base_map])         Fan out array elements as separate events (returns emitted count)
 e = ()                               Clear entire event (remove all fields)

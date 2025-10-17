@@ -364,11 +364,41 @@ pub struct Event {
     pub original_line: String,
     pub line_num: Option<usize>,
     pub filename: Option<String>,
+    pub span: SpanInfo,
     /// Parsed timestamp field for efficient timestamp operations
     /// This is populated automatically when timestamps are extracted from fields
     pub parsed_ts: Option<DateTime<Utc>>,
     /// Context type for this event (match, before, after, none)
     pub context_type: ContextType,
+}
+
+/// Span assignment status for events when --span is active
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpanStatus {
+    Included,
+    Late,
+    Unassigned,
+    Filtered,
+}
+
+impl SpanStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SpanStatus::Included => "included",
+            SpanStatus::Late => "late",
+            SpanStatus::Unassigned => "unassigned",
+            SpanStatus::Filtered => "filtered",
+        }
+    }
+}
+
+/// Span metadata stored on each event for Rhai exposure
+#[derive(Debug, Clone, Default)]
+pub struct SpanInfo {
+    pub status: Option<SpanStatus>,
+    pub span_id: Option<String>,
+    pub span_start: Option<DateTime<Utc>>,
+    pub span_end: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -388,6 +418,7 @@ impl Event {
             original_line,
             line_num: None,
             filename: None,
+            span: SpanInfo::default(),
             parsed_ts: None,
             context_type: ContextType::None,
         }
@@ -407,6 +438,10 @@ impl Event {
     pub fn set_metadata(&mut self, line_num: usize, filename: Option<String>) {
         self.line_num = Some(line_num);
         self.filename = filename;
+    }
+
+    pub fn set_span_info(&mut self, info: SpanInfo) {
+        self.span = info;
     }
 
     /// Filter to only show specified keys, keeping only fields that actually exist

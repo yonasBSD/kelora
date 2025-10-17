@@ -87,6 +87,7 @@ Kelora is built for streaming-first log analysis with a programmable Rhai core.
 - **Built-in Rhai toolbox** — 100+ helpers for enrichment, parsing, time-window analysis, and metrics. Scan the [Functions Reference](https://kelora.dev/reference/functions/) for the full catalog.
 - **Format flexibility** — JSON, logfmt, syslog, Apache/Nginx combined, CSV/TSV, column specs, and gzip. See [Input Formats](https://kelora.dev/reference/formats/).
 - **Powerful filtering** — Chain `--filter`, `--level`, `--since/--until`, and context flags to zero in on events. Walkthroughs in [Filtering How-To](https://kelora.dev/how-to/find-errors-in-logs/).
+- **Span aggregations** — `--span` forms count- or time-based spans and triggers `--span-close` hooks for per-span summaries. See [CLI Reference](https://kelora.dev/reference/cli/#processing-options) for usage patterns.
 - **Observability built in** — `--metrics`, `--stats`, and window helpers expose throughput and aggregations for live pipelines. Learn more in [Metrics & Telemetry](https://kelora.dev/concepts/metrics-and-telemetry/).
 - **Parallel or streaming** — Stay sequential for tailing or enable `--parallel` for archive crunching. Tuning guidance in [Parallel Processing](https://kelora.dev/how-to/tune-parallel-processing/).
 

@@ -4,9 +4,10 @@ use rhai::Dynamic;
 use std::collections::HashMap;
 
 use crate::engine::RhaiEngine;
-use crate::event::Event;
+use crate::event::{Event, SpanStatus};
 use crate::rhai_functions::file_ops::{self, FileOp};
 use crate::rhai_functions::tracking;
+use span::SpanProcessor;
 
 // Re-export submodules
 pub mod builders;
@@ -14,6 +15,7 @@ pub mod defaults;
 pub mod multiline;
 pub mod prefix_extractor;
 pub mod prefix_parser;
+mod span;
 pub mod stages;
 
 // Re-export main types for convenience
@@ -211,6 +213,10 @@ pub struct MetaData {
     #[allow(dead_code)]
     pub filename: Option<String>,
     pub line_num: Option<usize>,
+    pub span_status: Option<crate::event::SpanStatus>,
+    pub span_id: Option<String>,
+    pub span_start: Option<DateTime<Utc>>,
+    pub span_end: Option<DateTime<Utc>>,
 }
 
 /// Core pipeline traits
@@ -278,6 +284,7 @@ pub struct Pipeline {
     #[allow(dead_code)]
     pub output: Box<dyn OutputWriter>,
     pub window_manager: Box<dyn WindowManager>,
+    pub span_processor: Option<SpanProcessor>,
 }
 
 impl Pipeline {
@@ -300,7 +307,7 @@ impl Pipeline {
         // Chunker stage (for multi-line records)
         if let Some(chunk) = self.chunker.feed_line(line) {
             // Parse stage
-            let event = match self.parser.parse(&chunk) {
+            let mut event = match self.parser.parse(&chunk) {
                 Ok(mut e) => {
                     // Event was successfully created from chunk
                     crate::stats::stats_add_event_created();
@@ -353,6 +360,10 @@ impl Pipeline {
                     }
                 }
             };
+
+            if let Some(span_processor) = self.span_processor.as_mut() {
+                span_processor.prepare_event(&mut event, ctx)?;
+            }
 
             // Update window manager
             self.window_manager.update(&event);
@@ -449,6 +460,13 @@ impl Pipeline {
             .map(|line| FormattedOutput::new(line, None))
     }
 
+    pub fn finish_spans(&mut self, ctx: &mut PipelineContext) -> Result<()> {
+        if let Some(span_processor) = self.span_processor.as_mut() {
+            span_processor.finish(ctx)?;
+        }
+        Ok(())
+    }
+
     fn apply_script_result(
         &mut self,
         result: ScriptResult,
@@ -456,11 +474,16 @@ impl Pipeline {
         outputs: &mut Vec<FormattedOutput>,
     ) -> Result<()> {
         match result {
-            ScriptResult::Emit(event) => {
+            ScriptResult::Emit(mut event) => {
+                if let Some(span) = self.span_processor.as_mut() {
+                    span.prepare_emitted_event(&mut event);
+                }
+
                 let ops = std::mem::take(&mut ctx.pending_file_ops);
 
                 if self.limiter.as_mut().is_none_or(|l| l.allow()) {
                     if event.fields.is_empty() {
+                        event.span.status = Some(SpanStatus::Filtered);
                         crate::stats::stats_add_event_filtered();
 
                         ctx.internal_tracker
@@ -471,6 +494,10 @@ impl Pipeline {
                             "__op___kelora_stats_events_filtered".to_string(),
                             rhai::Dynamic::from("count"),
                         );
+
+                        if let Some(span) = self.span_processor.as_mut() {
+                            span.handle_skip(ctx);
+                        }
 
                         if !ops.is_empty() {
                             outputs.push(FormattedOutput::with_ops(String::new(), None, ops));
@@ -495,6 +522,10 @@ impl Pipeline {
                             rhai::Dynamic::from("count"),
                         );
 
+                        if let Some(span) = self.span_processor.as_mut() {
+                            span.record_emitted_event(&event, ctx)?;
+                        }
+
                         let formatted = self.formatter.format(&event);
                         let timestamp = event.parsed_ts;
                         outputs.push(FormattedOutput::with_ops(formatted, timestamp, ops));
@@ -511,17 +542,31 @@ impl Pipeline {
                         rhai::Dynamic::from("count"),
                     );
 
+                    event.span.status = Some(SpanStatus::Filtered);
+                    if let Some(span) = self.span_processor.as_mut() {
+                        span.handle_skip(ctx);
+                    }
+
                     if !ops.is_empty() {
                         outputs.push(FormattedOutput::with_ops(String::new(), None, ops));
                     }
+                }
+
+                if let Some(span) = self.span_processor.as_mut() {
+                    span.complete_pending();
                 }
             }
             ScriptResult::EmitMultiple(events) => {
                 let mut ops = std::mem::take(&mut ctx.pending_file_ops);
 
-                for (idx, event) in events.into_iter().enumerate() {
+                for (idx, mut event) in events.into_iter().enumerate() {
+                    if let Some(span) = self.span_processor.as_mut() {
+                        span.prepare_emitted_event(&mut event);
+                    }
+
                     if self.limiter.as_mut().is_none_or(|l| l.allow()) {
                         if event.fields.is_empty() {
+                            event.span.status = Some(SpanStatus::Filtered);
                             crate::stats::stats_add_event_filtered();
 
                             ctx.internal_tracker
@@ -534,6 +579,10 @@ impl Pipeline {
                                 "__op___kelora_stats_events_filtered".to_string(),
                                 rhai::Dynamic::from("count"),
                             );
+
+                            if let Some(span) = self.span_processor.as_mut() {
+                                span.handle_skip(ctx);
+                            }
 
                             if idx == 0 && !ops.is_empty() {
                                 outputs.push(FormattedOutput::with_ops(
@@ -564,6 +613,10 @@ impl Pipeline {
                                 rhai::Dynamic::from("count"),
                             );
 
+                            if let Some(span) = self.span_processor.as_mut() {
+                                span.record_emitted_event(&event, ctx)?;
+                            }
+
                             let formatted = self.formatter.format(&event);
                             let timestamp = event.parsed_ts;
                             let event_ops = if idx == 0 {
@@ -575,6 +628,7 @@ impl Pipeline {
                                 .push(FormattedOutput::with_ops(formatted, timestamp, event_ops));
                         }
                     } else {
+                        event.span.status = Some(SpanStatus::Filtered);
                         crate::stats::stats_add_event_filtered();
 
                         ctx.internal_tracker
@@ -585,6 +639,10 @@ impl Pipeline {
                             "__op___kelora_stats_events_filtered".to_string(),
                             rhai::Dynamic::from("count"),
                         );
+
+                        if let Some(span) = self.span_processor.as_mut() {
+                            span.handle_skip(ctx);
+                        }
 
                         if idx == 0 && !ops.is_empty() {
                             outputs.push(FormattedOutput::with_ops(
@@ -599,6 +657,10 @@ impl Pipeline {
                 if !ops.is_empty() {
                     outputs.push(FormattedOutput::with_ops(String::new(), None, ops));
                 }
+
+                if let Some(span) = self.span_processor.as_mut() {
+                    span.complete_pending();
+                }
             }
             ScriptResult::Skip => {
                 crate::stats::stats_add_event_filtered();
@@ -612,6 +674,11 @@ impl Pipeline {
                     rhai::Dynamic::from("count"),
                 );
 
+                if let Some(span) = self.span_processor.as_mut() {
+                    span.handle_skip(ctx);
+                    span.complete_pending();
+                }
+
                 let ops = std::mem::take(&mut ctx.pending_file_ops);
                 if !ops.is_empty() {
                     outputs.push(FormattedOutput::with_ops(String::new(), None, ops));
@@ -620,6 +687,10 @@ impl Pipeline {
             ScriptResult::Error(msg) => {
                 ctx.pending_file_ops.clear();
                 file_ops::clear_pending_ops();
+
+                if let Some(span) = self.span_processor.as_mut() {
+                    span.complete_pending();
+                }
 
                 crate::rhai_functions::tracking::track_error(
                     "script",
@@ -652,7 +723,7 @@ impl Pipeline {
         let mut results = Vec::new();
 
         // This is the same logic as in process_line starting from the "Parse stage" comment
-        let event = match self.parser.parse(&chunk) {
+        let mut event = match self.parser.parse(&chunk) {
             Ok(mut e) => {
                 // Event was successfully created from chunk
                 crate::stats::stats_add_event_created();
@@ -705,6 +776,10 @@ impl Pipeline {
                 }
             }
         };
+
+        if let Some(span_processor) = self.span_processor.as_mut() {
+            span_processor.prepare_event(&mut event, ctx)?;
+        }
 
         // Update window manager
         self.window_manager.update(&event);

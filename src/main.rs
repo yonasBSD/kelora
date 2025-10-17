@@ -35,7 +35,7 @@ use platform::{
 
 // Internal CLI imports
 use cli::{Cli, FileOrder, InputFormat, OutputFormat};
-use config::{MultilineConfig, TimestampFilterConfig};
+use config::{MultilineConfig, SpanMode, TimestampFilterConfig};
 
 /// Detect format from a peekable reader
 /// Returns the detected format without consuming the first line
@@ -678,6 +678,8 @@ fn run_pipeline_sequential_internal<W: Write>(
         write_formatted_output(formatted, output, &mut gap_tracker)?;
     }
 
+    pipeline.finish_spans(&mut ctx)?;
+
     if let Some(result) = pipeline.finish_formatter() {
         write_formatted_output(result, output, &mut gap_tracker)?;
     }
@@ -1005,6 +1007,29 @@ fn main() -> Result<()> {
     // Set the ordered stages directly
     config.processing.stages = ordered_stages;
 
+    if config.processing.span.is_some()
+        && config.processing.quiet_level == 0
+        && (config.performance.parallel
+            || config.performance.threads > 0
+            || config.performance.batch_size.is_some())
+    {
+        let warning = config.format_error_message(
+            "span aggregation requires sequential mode; ignoring --parallel settings",
+        );
+        stderr.writeln(&warning).unwrap_or(());
+    }
+
+    if let Some(span_cfg) = &config.processing.span {
+        if let SpanMode::Count { events_per_span } = span_cfg.mode {
+            if events_per_span > 100_000 && config.processing.quiet_level == 0 {
+                let warning = config.format_error_message(
+                    "span size above 100000 may require substantial memory; consider time-based spans",
+                );
+                stderr.writeln(&warning).unwrap_or(());
+            }
+        }
+    }
+
     // Set processed begin/end scripts with includes applied
     let (processed_begin, processed_end) = cli.get_processed_begin_end(&matches)?;
     config.processing.begin = processed_begin;
@@ -1299,6 +1324,12 @@ fn validate_cli_args(cli: &Cli) -> Result<()> {
     // Validate thread count
     if cli.threads > 1000 {
         return Err(anyhow::anyhow!("Thread count too high (max 1000)"));
+    }
+
+    if cli.span_close.is_some() && cli.span.is_none() {
+        return Err(anyhow::anyhow!(
+            "--span-close requires --span to be specified"
+        ));
     }
 
     // Check for --core with CSV/TSV formats (not allowed with these formats)

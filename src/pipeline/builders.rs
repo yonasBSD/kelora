@@ -76,6 +76,7 @@ pub struct PipelineBuilder {
     cols_spec: Option<String>,
     cols_sep: Option<String>,
     context_config: crate::config::ContextConfig,
+    span: Option<crate::config::SpanConfig>,
     strict: bool,
 }
 
@@ -119,6 +120,7 @@ impl PipelineBuilder {
             cols_spec: None,
             cols_sep: None,
             context_config: crate::config::ContextConfig::disabled(),
+            span: None,
             strict: false,
         }
     }
@@ -389,6 +391,20 @@ impl PipelineBuilder {
         let begin_stage = BeginStage::new(self.begin, &mut rhai_engine)?;
         let end_stage = EndStage::new(self.end, &mut rhai_engine)?;
 
+        let span_processor = if let Some(ref span_config) = self.span {
+            let compiled = if let Some(ref script) = span_config.close_script {
+                Some(rhai_engine.compile_span_close(script)?)
+            } else {
+                None
+            };
+            Some(crate::pipeline::span::SpanProcessor::new(
+                span_config.clone(),
+                compiled,
+            ))
+        } else {
+            None
+        };
+
         // Create pipeline context
         let ctx = PipelineContext {
             config: self.config,
@@ -425,6 +441,7 @@ impl PipelineBuilder {
             formatter,
             output: Box::new(StdoutWriter),
             window_manager,
+            span_processor,
         };
 
         Ok((pipeline, begin_stage, end_stage, ctx))
@@ -751,6 +768,7 @@ impl PipelineBuilder {
             formatter,
             output: Box::new(StdoutWriter), // This won't actually be used in parallel mode
             window_manager,
+            span_processor: None,
         };
 
         Ok((pipeline, ctx))
@@ -878,6 +896,7 @@ pub fn create_pipeline_builder_from_config(
     builder.extract_prefix = config.input.extract_prefix.clone();
     builder.prefix_sep = config.input.prefix_sep.clone();
     builder.take_limit = config.processing.take_limit;
+    builder.span = config.processing.span.clone();
     builder.context_config = config.processing.context.clone();
     builder.strict = config.processing.strict;
     builder

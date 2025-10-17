@@ -17,6 +17,7 @@ pub mod normalize;
 pub mod process;
 pub mod random;
 pub mod safety;
+pub mod span;
 pub mod strings;
 pub mod tracking;
 pub mod window;
@@ -41,4 +42,5 @@ pub fn register_all_functions(engine: &mut Engine) {
     emit::register_functions(engine);
     file_ops::register_functions(engine);
     hashing::register_functions(engine);
+    span::register_functions(engine);
 }

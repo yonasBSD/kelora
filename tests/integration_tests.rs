@@ -200,6 +200,105 @@ fn test_parallel_stats_output_counts_lines_and_events() {
 }
 
 #[test]
+fn test_span_count_closes_on_n() {
+    let input = r#"{"msg": "a"}
+{"msg": "b"}
+{"msg": "c"}
+{"msg": "d"}
+{"msg": "e"}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "-F",
+            "none",
+            "--span",
+            "2",
+            "--span-close",
+            r#"print(span_id() + ":" + span_size().to_string());"#,
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code, 0, "span count mode should exit successfully");
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines, vec!["#0:2", "#1:2", "#2:1"]);
+}
+
+#[test]
+fn test_span_metadata_statuses() {
+    let input = r#"{"ts": "2023-01-01T00:00:05Z", "msg": "first"}
+{"ts": "2023-01-01T00:01:10Z", "msg": "second"}
+{"ts": "2023-01-01T00:00:20Z", "msg": "late"}
+{"msg": "missing"}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "-F",
+            "none",
+            "--span",
+            "1m",
+            "--exec",
+            r#"let id = if meta.span_id == () { "null" } else { meta.span_id }; print(meta.span_status + ":" + id);"#,
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code, 0, "span metadata check should exit successfully");
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(
+        lines,
+        vec![
+            "included:2023-01-01T00:00:00Z/1m",
+            "included:2023-01-01T00:01:00Z/1m",
+            "late:2023-01-01T00:00:00Z/1m",
+            "unassigned:null",
+        ]
+    );
+}
+
+#[test]
+fn test_span_metrics_track_counts() {
+    let input = r#"{"msg": "one"}
+{"msg": "two"}
+{"msg": "three"}
+{"msg": "four"}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "-F",
+            "none",
+            "--span",
+            "2",
+            "--exec",
+            "track_count(\"events\");",
+            "--span-close",
+            r#"let metrics = span_metrics(); let count = metrics["events"]; print(span_id() + ":" + count.to_string());"#,
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code, 0, "span metrics should exit successfully");
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines, vec!["#0:2", "#1:2"]);
+}
+
+#[test]
+fn test_span_close_requires_span() {
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(&["--span-close", "print(1);"], "");
+    assert_eq!(exit_code, 2, "missing --span should return invalid usage");
+    assert!(
+        stderr.contains("--span-close requires --span"),
+        "error message should explain dependency"
+    );
+}
+
+#[test]
 fn test_exec_script() {
     let input = r#"{"level": "INFO", "status": 200}
 {"level": "ERROR", "status": 500}"#;
