@@ -17,7 +17,7 @@ Complete reference for all 40+ built-in Rhai functions available in Kelora. Func
 - [Tracking/Metrics](#trackingmetrics-functions) - Counters, aggregations
 - [File Output](#file-output-functions) - Writing data to files
 - [Event Manipulation](#event-manipulation) - Field removal, fan-out
-- [Span Helpers](#span-helpers---span-close-only) - Per-span metadata & rollups
+- [Span Context](#span-context-span-close-only) - Per-span metadata & rollups
 
 ---
 
