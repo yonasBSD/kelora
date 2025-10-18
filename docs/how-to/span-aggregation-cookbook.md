@@ -114,6 +114,31 @@ kelora -f json --span 10m logs.jsonl \
 - Late events still pass through filters/exec but do not reopen closed spans.
 - For strict timestamp enforcement, add `--strict` (events without valid `ts` become hard errors).
 
+### Use Span Metadata Without a Close Hook
+
+Skip `--span-close` when you only need Kelora to tag events; the span processor stays lightweight but emits per-event metadata you can forward downstream.
+
+```bash
+kelora -f json access.log --span 5m \
+  --exec 'e.window = #{id: meta.span_id, start: meta.span_start, end: meta.span_end};'
+```
+
+Every event now carries its tumbling window so tools like `jq`, DuckDB, or spreadsheets can group by `e.window.id`.
+
+```bash
+kelora -f json errors.log --span 2m --output jsonl |
+  jq -sc 'group_by(.meta.span_id)
+          | map({span: .[0].meta.span_id, errors: length})'
+```
+
+Or filter in-line by span status while still emitting the rest:
+
+```bash
+kelora -f json access.log --span 5m \
+  --filter 'meta.span_status != "late"' \
+  --exec 'if meta.span_status == "late" { eprint("Late: " + e.ts + " → " + meta.span_id); }'
+```
+
 ### Tips
 
 - Time spans align to the first valid timestamp in the stream; ensure ordering or use upstream sort.
