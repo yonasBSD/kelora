@@ -177,7 +177,7 @@ pub struct Cli {
     #[arg(
         long = "span-close",
         help_heading = "Processing Options",
-        help = "Run a Rhai snippet when each span closes. Within the hook, call span_start(), span_end(), span_id(), span_events(), span_size(), and span_metrics() for span context."
+        help = "Run a Rhai snippet when each span closes. Within the hook, read span.start, span.end, span.id, span.events, span.size, and span.metrics for span context."
     )]
     pub span_close: Option<String>,
 

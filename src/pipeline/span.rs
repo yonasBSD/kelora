@@ -376,7 +376,7 @@ impl SpanProcessor {
         };
 
         let metrics_delta = compute_span_metrics(&span, &ctx.tracker, &ctx.internal_tracker);
-        let context = span_functions::SpanContextData::new(
+        let span_binding = span_functions::SpanBinding::new(
             span.span_id.clone(),
             span.span_start,
             span.span_end,
@@ -384,15 +384,12 @@ impl SpanProcessor {
             metrics_delta,
         );
 
-        span_functions::set_span_context(context);
-
         let result = ctx.rhai.execute_compiled_span_close(
             compiled,
             &mut ctx.tracker,
             &mut ctx.internal_tracker,
+            span_binding,
         );
-
-        span_functions::clear_span_context();
 
         result?;
 

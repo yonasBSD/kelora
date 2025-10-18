@@ -17,17 +17,17 @@ kelora -f json access.log \
   --filter 'e.status >= 400' \
   --span 500 \
   --span-close '
-    let errors = span_size();
-    print(span_id() + ",errors=" + errors.to_string());
+    let errors = span.size;
+    print(span.id + ",errors=" + errors.to_string());
   '
 ```
 
 - Works in arrival order; no late-event concept.
-- `span_size()` reflects post-filter events, so remove empty spans if needed:
+- `span.size` reflects post-filter events, so remove empty spans if needed:
 
 ```rhai
-if span_size() > 0 {
-    print(span_id() + ":" + span_size());
+if span.size > 0 {
+    print(span.id + ":" + span.size);
 }
 ```
 
@@ -38,11 +38,11 @@ Emit metrics aligned to fixed wall-clock windows by duration.
 ```bash
 kelora -f json --span 5m app.log \
   --span-close '
-    let metrics = span_metrics();
+    let metrics = span.metrics;
     let hits = metrics.get_path("hits", 0);
     let slow = metrics.get_path("slow", 0);
     let rate = if hits > 0 { slow * 100 / hits } else { 0 };
-    print(span_id() + "," +
+    print(span.id + "," +
           "hits=" + hits.to_string() + "," +
           "slow_pct=" + rate.to_string());
   ' \
@@ -55,27 +55,27 @@ kelora -f json --span 5m app.log \
 Best practices:
 
 - Sort or pre-group logs by timestamp for accurate window assignment.
-- Events lacking `ts` appear with `meta.span_status == "unassigned"` and do not enter `span_events()`.
+- Events lacking `ts` appear with `meta.span_status == "unassigned"` and do not enter `span.events`.
 - Late arrivals keep `meta.span_status == "late"` and include the window they missed.
 
 ### Inspect Span Events
 
-`span_events()` gives the surviving events so you can generate rollups or trace context.
+`span.events` gives the surviving events so you can generate rollups or trace context.
 
 ```bash
 kelora -f json --span 100 requests.jsonl \
   --span-close '
-    let events = span_events();
+    let events = span.events;
     let ids = events.map(|evt| evt.request_id).join(",");
-    print(span_id() + ": " + ids);
+    print(span.id + ": " + ids);
   '
 ```
 
-The maps inside `span_events()` include all original fields plus span metadata (`span_status`, `span_start`, `span_end`).
+The maps inside `span.events` include all original fields plus span metadata (`span_status`, `span_start`, `span_end`).
 
 ### Track Metrics Automatically
 
-`span_metrics()` isolates the deltas for `track_*` calls inside the span.
+`span.metrics` isolates the deltas for `track_*` calls inside the span.
 
 ```bash
 kelora -f json --span 1m api.log \
@@ -84,12 +84,12 @@ kelora -f json --span 1m api.log \
     if e.level == "ERROR" { track_count("errors"); }
   ' \
   --span-close '
-    let metrics = span_metrics();
+    let metrics = span.metrics;
     let total = metrics.get_path("total", 0);
     let errors = metrics.get_path("errors", 0);
     if total > 0 {
       let err_rate = errors * 100 / total;
-      print(span_id() + ",error_rate=" + err_rate.to_string());
+      print(span.id + ",error_rate=" + err_rate.to_string());
     }
   '
 ```
@@ -107,7 +107,7 @@ kelora -f json --span 10m logs.jsonl \
       eprint("Missing ts: line " + meta.line_num.to_string());
     }
   ' \
-  --span-close 'print(span_id() + ":" + span_size())'
+  --span-close 'print(span.id + ":" + span.size)'
 ```
 
 - `meta.span_status` is visible in `--exec` stages, so you can branch on late/unassigned events.
@@ -117,5 +117,5 @@ kelora -f json --span 10m logs.jsonl \
 ### Tips
 
 - Time spans align to the first valid timestamp in the stream; ensure ordering or use upstream sort.
-- Count spans retain all events in memory until `span_size` is reached. Watch for large values.
+- Count spans retain all events in memory until `span.size` is reached. Watch for large values.
 - `--span` disables parallel mode automatically—sequential processing is required for deterministic batching.

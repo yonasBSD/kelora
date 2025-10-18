@@ -1119,60 +1119,49 @@ e.password = ()                                       // Remove sensitive field
 e.temp_data = ()                                      // Clean up temporary field
 ```
 
----
 
-## Span Helpers – `--span-close` Only
+## Span Context – `--span-close` Only
 
-These helpers are available exclusively inside a `--span-close` script. Use them to emit per-span rollups after `--span` closes a count- or time-based window.
+A read-only `span` object is injected into scope whenever a `--span-close` script runs. Use it to emit per-span rollups after Kelora closes a count- or time-based window.
 
 ### Span Identity
 
-#### `span_id()`
-Return the current span identifier. Count-based spans use `#<index>` (zero-based). Time-based spans use `ISO_START/DURATION` (e.g. `2024-05-19T12:00:00Z/5m`).
+`span.id` returns the current span identifier. Count-based spans use `#<index>` (zero-based). Time-based spans use `ISO_START/DURATION` (e.g. `2024-05-19T12:00:00Z/5m`).
 
 ```rhai
-let id = span_id();  // "#0" or "2024-05-19T12:05:00Z/5m"
+let id = span.id;  // "#0" or "2024-05-19T12:05:00Z/5m"
 ```
 
 ### Span Boundaries
 
-#### `span_start()`
-Start of the span as a `DateTime`. Returns `()` for count-based spans.
-
-#### `span_end()`
-End of the span (half-open interval) as a `DateTime`. Returns `()` for count-based spans.
+`span.start` and `span.end` expose the half-open window bounds as `DateTime` values. Count-based spans return `()` for both fields.
 
 ```rhai
-if span_start() != () {
-    print("Window: " + span_start().to_string() + " → " + span_end().to_string());
+if span.start != () {
+    print("Window: " + span.start.to_string() + " → " + span.end.to_string());
 }
 ```
 
 ### Span Size and Events
 
-#### `span_size()`
-Number of events that survived filters and were included in the span.
-
-#### `span_events()`
-Array of event maps for the span in arrival order. Each map includes span metadata fields (`span_status`, `span_id`, `span_start`, `span_end`) in addition to the original event data.
+`span.size` reports how many events survived filters and were buffered in the span. `span.events` returns those events in arrival order. Each map includes span metadata fields (`span_status`, `span_id`, `span_start`, `span_end`) alongside the original event data.
 
 ```rhai
-let included = span_events()
+let included = span.events
     .filter(|evt| evt.span_status == "included")
     .len();
 ```
 
 ### Metrics Snapshot
 
-#### `span_metrics()`
-Map containing per-span deltas from `track_*` calls. Values reset automatically after each span closes, so you can emit per-span summaries without manual bookkeeping.
+`span.metrics` contains per-span deltas from `track_*` calls. Values reset automatically after each span closes, so you can emit per-span summaries without manual bookkeeping.
 
 ```rhai
-let metrics = span_metrics();
+let metrics = span.metrics;
 let hits = metrics["events"];          // from track_count("events")
 let failures = metrics["failures"];    // from track_count("failures")
 let ratio = if hits > 0 { failures * 100 / hits } else { 0 };
-print(span_id() + ": " + ratio.to_string() + "% failure rate");
+print(span.id + ": " + ratio.to_string() + "% failure rate");
 ```
 
 ---

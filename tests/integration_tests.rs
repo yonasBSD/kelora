@@ -216,7 +216,7 @@ fn test_span_count_closes_on_n() {
             "--span",
             "2",
             "--span-close",
-            r#"print(span_id() + ":" + span_size().to_string());"#,
+            r#"print(span.id + ":" + span.size.to_string());"#,
         ],
         input,
     );
@@ -278,7 +278,7 @@ fn test_span_metrics_track_counts() {
             "--exec",
             "track_count(\"events\");",
             "--span-close",
-            r#"let metrics = span_metrics(); let count = metrics["events"]; print(span_id() + ":" + count.to_string());"#,
+            r#"let metrics = span.metrics; let count = metrics["events"]; print(span.id + ":" + count.to_string());"#,
         ],
         input,
     );

@@ -1503,6 +1503,7 @@ impl RhaiEngine {
         compiled: &CompiledExpression,
         metrics: &mut HashMap<String, Dynamic>,
         internal: &mut HashMap<String, Dynamic>,
+        span: crate::rhai_functions::span::SpanBinding,
     ) -> Result<()> {
         Self::set_thread_tracking_state(metrics, internal);
 
@@ -1513,6 +1514,7 @@ impl RhaiEngine {
             metrics_map.insert(k.clone().into(), v.clone());
         }
         scope.set_value("metrics", metrics_map);
+        scope.push_constant("span", Dynamic::from(span));
 
         crate::rhai_functions::file_ops::clear_pending_ops();
 

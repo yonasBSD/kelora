@@ -311,13 +311,13 @@ How it works:
 
 Run a Rhai snippet once whenever a span closes. Use it to emit per-span summaries, metrics, or rollups. The script runs after the event that triggered the close finishes all per-event stages (filters, execs, etc.).
 
-**Span-only helpers available inside `--span-close`:**
+**Read-only span object available inside `--span-close`:**
 
-- `span_id()` – Unique span identifier (`#0`, `2024-05-19T12:00:00Z/5m`, etc.)
-- `span_start()` / `span_end()` – Half-open window bounds for time-based spans (count spans return `()`)
-- `span_size()` – Number of events that survived filters and were included in this span
-- `span_events()` – Array of events in arrival order (each map includes `span_status`, `span_start`, etc.)
-- `span_metrics()` – Map of per-span deltas from `track_*` calls (automatically reset after each span)
+- `span.id` – Unique span identifier (`#0`, `2024-05-19T12:00:00Z/5m`, etc.)
+- `span.start` / `span.end` – Half-open window bounds for time-based spans (count spans return `()`)
+- `span.size` – Number of events that survived filters and were included in this span
+- `span.events` – Array of events in arrival order (each map includes `span_status`, `span_start`, etc.)
+- `span.metrics` – Map of per-span deltas from `track_*` calls (automatically reset after each span)
 
 **Metadata added to `meta` during per-event stages:**
 
