@@ -101,10 +101,16 @@ struct ActiveSpan {
     events_seen: usize,
     included_count: usize,
     baseline_user: HashMap<String, Dynamic>,
+    collect_details: bool,
 }
 
 impl ActiveSpan {
-    fn new_count(sequence: u64, index: usize, ctx: &PipelineContext) -> Self {
+    fn new_count(
+        sequence: u64,
+        index: usize,
+        ctx: &PipelineContext,
+        collect_details: bool,
+    ) -> Self {
         let span_id = format!("#{}", index);
         Self {
             sequence,
@@ -114,11 +120,21 @@ impl ActiveSpan {
             events: Vec::new(),
             events_seen: 0,
             included_count: 0,
-            baseline_user: ctx.tracker.clone(),
+            baseline_user: if collect_details {
+                ctx.tracker.clone()
+            } else {
+                HashMap::new()
+            },
+            collect_details,
         }
     }
 
-    fn new_time(sequence: u64, window: TimeWindow, ctx: &PipelineContext) -> Self {
+    fn new_time(
+        sequence: u64,
+        window: TimeWindow,
+        ctx: &PipelineContext,
+        collect_details: bool,
+    ) -> Self {
         let start = ms_to_datetime(window.start_ms);
         let end = ms_to_datetime(window.end_ms);
         let span_id = format!(
@@ -135,7 +151,12 @@ impl ActiveSpan {
             events: Vec::new(),
             events_seen: 0,
             included_count: 0,
-            baseline_user: ctx.tracker.clone(),
+            baseline_user: if collect_details {
+                ctx.tracker.clone()
+            } else {
+                HashMap::new()
+            },
+            collect_details,
         }
     }
 
@@ -144,7 +165,9 @@ impl ActiveSpan {
     }
 
     fn add_event(&mut self, event: &Event) {
-        self.events.push(event.clone());
+        if self.collect_details {
+            self.events.push(event.clone());
+        }
         self.included_count += 1;
     }
 }
@@ -152,6 +175,7 @@ impl ActiveSpan {
 pub struct SpanProcessor {
     mode: SpanMode,
     compiled_close: Option<CompiledExpression>,
+    collect_details: bool,
     active_span: Option<ActiveSpan>,
     anchor_start_ms: Option<i64>,
     next_count_index: usize,
@@ -163,9 +187,11 @@ pub struct SpanProcessor {
 impl SpanProcessor {
     pub fn new(span: SpanConfig, compiled_close: Option<CompiledExpression>) -> Self {
         let SpanConfig { mode, .. } = span;
+        let collect_details = compiled_close.is_some();
         Self {
             mode,
             compiled_close,
+            collect_details,
             active_span: None,
             anchor_start_ms: None,
             next_count_index: 0,
@@ -353,13 +379,23 @@ impl SpanProcessor {
         self.next_span_sequence += 1;
         let index = self.next_count_index;
         self.next_count_index += 1;
-        self.active_span = Some(ActiveSpan::new_count(sequence, index, ctx));
+        self.active_span = Some(ActiveSpan::new_count(
+            sequence,
+            index,
+            ctx,
+            self.collect_details,
+        ));
     }
 
     fn open_time_span(&mut self, ctx: &PipelineContext, window: TimeWindow) {
         let sequence = self.next_span_sequence;
         self.next_span_sequence += 1;
-        self.active_span = Some(ActiveSpan::new_time(sequence, window, ctx));
+        self.active_span = Some(ActiveSpan::new_time(
+            sequence,
+            window,
+            ctx,
+            self.collect_details,
+        ));
     }
 
     fn close_current_span(&mut self, ctx: &mut PipelineContext) -> Result<()> {
