@@ -1,8 +1,16 @@
 use crate::rhai_functions::datetime::DurationWrapper;
 use chrono::{DateTime, Utc};
+use indexmap::IndexMap;
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
+
+#[derive(Debug, Clone, Default)]
+pub struct TimestampFieldStat {
+    pub detected: usize,
+    pub parsed: usize,
+    pub first_failed_sample: Option<String>,
+}
 
 /// Statistics collected during log processing
 #[derive(Debug, Clone, Default)]
@@ -26,6 +34,10 @@ pub struct ProcessingStats {
     pub last_timestamp: Option<DateTime<Utc>>,
     pub first_result_timestamp: Option<DateTime<Utc>>,
     pub last_result_timestamp: Option<DateTime<Utc>>,
+    pub timestamp_detected_events: usize,
+    pub timestamp_parsed_events: usize,
+    pub timestamp_absent_events: usize,
+    pub timestamp_fields: IndexMap<String, TimestampFieldStat>,
 }
 
 // Thread-local storage for statistics (following track_count pattern)
@@ -104,6 +116,46 @@ pub fn stats_finish_processing() {
 
 pub fn get_thread_stats() -> ProcessingStats {
     THREAD_STATS.with(|stats| stats.borrow().clone())
+}
+
+fn truncate_sample(sample: &str) -> String {
+    const MAX_CHARS: usize = 80;
+    let mut result = String::with_capacity(sample.len().min(MAX_CHARS + 1));
+    for (idx, ch) in sample.chars().enumerate() {
+        if idx == MAX_CHARS {
+            result.push('…');
+            break;
+        }
+        result.push(ch);
+    }
+    result
+}
+
+pub fn stats_record_timestamp_detection(field_name: &str, raw_value: &str, parsed: bool) {
+    let field = field_name.to_string();
+    let raw_value = raw_value.to_string();
+    THREAD_STATS.with(|stats| {
+        let mut stats = stats.borrow_mut();
+        stats.timestamp_detected_events += 1;
+
+        if parsed {
+            stats.timestamp_parsed_events += 1;
+        }
+
+        let entry = stats.timestamp_fields.entry(field).or_default();
+        entry.detected += 1;
+        if parsed {
+            entry.parsed += 1;
+        } else if entry.first_failed_sample.is_none() {
+            entry.first_failed_sample = Some(truncate_sample(&raw_value));
+        }
+    });
+}
+
+pub fn stats_record_timestamp_absent() {
+    THREAD_STATS.with(|stats| {
+        stats.borrow_mut().timestamp_absent_events += 1;
+    });
 }
 
 pub fn stats_update_timestamp(timestamp: DateTime<Utc>) {
@@ -334,6 +386,54 @@ impl ProcessingStats {
             }
         }
 
+        // Timestamp parsing summary
+        if !self.timestamp_fields.is_empty() || self.timestamp_absent_events > 0 {
+            if self.timestamp_detected_events == 0 && self.timestamp_fields.is_empty() {
+                output.push_str(&format!(
+                    "Timestamp parsing: no timestamp fields detected ({} events)\n",
+                    self.timestamp_absent_events
+                ));
+            } else {
+                let overall_pct = if self.timestamp_detected_events > 0 {
+                    (self.timestamp_parsed_events as f64 / self.timestamp_detected_events as f64)
+                        * 100.0
+                } else {
+                    0.0
+                };
+                output.push_str(&format!(
+                    "Timestamp parsing: {} of {} events parsed ({:.1}%)\n",
+                    self.timestamp_parsed_events, self.timestamp_detected_events, overall_pct
+                ));
+
+                for (field, field_stats) in &self.timestamp_fields {
+                    let field_pct = if field_stats.detected > 0 {
+                        (field_stats.parsed as f64 / field_stats.detected as f64) * 100.0
+                    } else {
+                        0.0
+                    };
+                    if let Some(sample) = &field_stats.first_failed_sample {
+                        let safe_sample = sample.replace('\n', "\\n");
+                        output.push_str(&format!(
+                            "  {}: {} of {} parsed ({:.1}%) – example failure: \"{}\"\n",
+                            field, field_stats.parsed, field_stats.detected, field_pct, safe_sample
+                        ));
+                    } else {
+                        output.push_str(&format!(
+                            "  {}: {} of {} parsed ({:.1}%)\n",
+                            field, field_stats.parsed, field_stats.detected, field_pct
+                        ));
+                    }
+                }
+
+                if self.timestamp_absent_events > 0 {
+                    output.push_str(&format!(
+                        "  no timestamp field: {}\n",
+                        self.timestamp_absent_events
+                    ));
+                }
+            }
+        }
+
         // Levels seen: (only if we have discovered levels)
         if !self.discovered_levels.is_empty() {
             let levels: Vec<String> = self.discovered_levels.iter().cloned().collect();
@@ -445,5 +545,31 @@ mod tests {
 
         assert!(stats.discovered_levels.contains("INFO"));
         assert!(stats.discovered_keys.contains("request_id"));
+    }
+
+    #[test]
+    fn timestamp_stats_track_detection_and_absence() {
+        reset_thread_stats();
+
+        stats_record_timestamp_detection("timestamp", "2024-05-19T12:34:56Z", true);
+        stats_record_timestamp_detection("timestamp", "not-a-date", false);
+        stats_record_timestamp_absent();
+
+        let stats = get_thread_stats();
+
+        assert_eq!(stats.timestamp_detected_events, 2);
+        assert_eq!(stats.timestamp_parsed_events, 1);
+        assert_eq!(stats.timestamp_absent_events, 1);
+
+        let field_stats = stats
+            .timestamp_fields
+            .get("timestamp")
+            .expect("field stats");
+        assert_eq!(field_stats.detected, 2);
+        assert_eq!(field_stats.parsed, 1);
+        assert_eq!(
+            field_stats.first_failed_sample.as_deref(),
+            Some("not-a-date")
+        );
     }
 }

@@ -370,6 +370,8 @@ pub struct Event {
     pub parsed_ts: Option<DateTime<Utc>>,
     /// Context type for this event (match, before, after, none)
     pub context_type: ContextType,
+    /// Ensures timestamp parsing statistics are recorded at most once per event
+    pub(crate) timestamp_stats_recorded: bool,
 }
 
 /// Span assignment status for events when --span is active
@@ -421,6 +423,7 @@ impl Event {
             span: SpanInfo::default(),
             parsed_ts: None,
             context_type: ContextType::None,
+            timestamp_stats_recorded: false,
         }
     }
 
@@ -479,9 +482,10 @@ impl Event {
     ) {
         // Extract and parse timestamp with comprehensive field recognition
         if self.parsed_ts.is_none() {
-            if let Some((_field_name, ts_str)) =
+            if let Some((field_name, ts_str)) =
                 crate::timestamp::identify_timestamp_field(&self.fields, ts_config)
             {
+                let mut parsed = false;
                 let parsed_ts = if let Some(parser) = parser {
                     parser.parse_ts_with_config(
                         &ts_str,
@@ -500,7 +504,16 @@ impl Event {
 
                 if let Some(ts) = parsed_ts {
                     self.parsed_ts = Some(ts);
+                    parsed = true;
                 }
+
+                if !self.timestamp_stats_recorded {
+                    crate::stats::stats_record_timestamp_detection(&field_name, &ts_str, parsed);
+                    self.timestamp_stats_recorded = true;
+                }
+            } else if !self.timestamp_stats_recorded {
+                crate::stats::stats_record_timestamp_absent();
+                self.timestamp_stats_recorded = true;
             }
         }
     }

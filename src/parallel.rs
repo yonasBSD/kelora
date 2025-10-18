@@ -146,6 +146,21 @@ impl GlobalTracker {
         // Merge other worker stats
         global_stats.files_processed += worker_stats.files_processed;
         global_stats.script_executions += worker_stats.script_executions;
+        global_stats.timestamp_detected_events += worker_stats.timestamp_detected_events;
+        global_stats.timestamp_parsed_events += worker_stats.timestamp_parsed_events;
+        global_stats.timestamp_absent_events += worker_stats.timestamp_absent_events;
+
+        for (field, worker_field_stats) in &worker_stats.timestamp_fields {
+            let entry = global_stats
+                .timestamp_fields
+                .entry(field.clone())
+                .or_default();
+            entry.detected += worker_field_stats.detected;
+            entry.parsed += worker_field_stats.parsed;
+            if entry.first_failed_sample.is_none() {
+                entry.first_failed_sample = worker_field_stats.first_failed_sample.clone();
+            }
+        }
         // Calculate total processing time from global start time
         if let Some(start_time) = self.start_time {
             global_stats.processing_time = start_time.elapsed();
