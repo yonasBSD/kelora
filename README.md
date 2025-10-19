@@ -59,7 +59,7 @@ More quick commands to copy-paste:
 - Visual level distribution: `kelora -f logfmt examples/simple_logfmt.log -F levelmap`
 
 > [!TIP]
-> These examples use files in `examples/` — see [examples/README.md](examples/README.md#file-categories) for the full catalog. For a complete walkthrough with annotated output, visit the [Quickstart Guide](https://kelora.dev/quickstart/).
+> These examples use files in `examples/` — see [examples/README.md](examples/README.md#file-categories) for the full catalog. For a complete walkthrough with annotated output, visit the [Quickstart Guide](https://kelora.dev/latest/quickstart/).
 
 ## Installation
 
@@ -73,23 +73,23 @@ cargo install kelora
 
 Full documentation is available at **[kelora.dev](https://kelora.dev)**. Some quick links:
 
-- [Quickstart](https://kelora.dev/lates/quickstart/) — 5-minute tour with annotated output
+- [Quickstart](https://kelora.dev/latest/quickstart/) — 5-minute tour with annotated output
 - [How-To Guides](https://kelora.dev/latest/how-to/) — solutions for common tasks
 - [Tutorials](https://kelora.dev/latest/tutorials/) — step-by-step guides for building custom pipelines
-- [Concepts](https://kelora.dev/latest/concepts/pipeline-model/) — deep dive into the streaming pipeline
+- [Concepts](https://kelora.dev/latest/concepts/) — deep dive into the streaming pipeline
 - [Reference](https://kelora.dev/latest/reference/) — CLI flags, Rhai functions, formats, and configuration
 
 ## Highlights
 
 Kelora is built for streaming-first log analysis with a programmable Rhai core.
 
-- **Streaming pipeline** — Parse, filter, transform, and output logs in one flow. Read the [Pipeline Model](https://kelora.dev/concepts/pipeline-model/) for a stage-by-stage breakdown.
-- **Built-in Rhai toolbox** — 100+ helpers for enrichment, parsing, time-window analysis, and metrics. Scan the [Functions Reference](https://kelora.dev/reference/functions/) for the full catalog.
-- **Format flexibility** — JSON, logfmt, syslog, Apache/Nginx combined, CSV/TSV, column specs, and gzip. See [Input Formats](https://kelora.dev/reference/formats/).
-- **Powerful filtering** — Chain `--filter`, `--level`, `--since/--until`, and context flags to zero in on events. Walkthroughs in [Filtering How-To](https://kelora.dev/how-to/find-errors-in-logs/).
-- **Span aggregations** — `--span` forms count- or time-based spans and triggers `--span-close` hooks for per-span summaries. See [CLI Reference](https://kelora.dev/reference/cli/#processing-options) for usage patterns.
-- **Observability built in** — `--metrics`, `--stats`, and window helpers expose throughput and aggregations for live pipelines. Learn more in [Metrics & Telemetry](https://kelora.dev/concepts/metrics-and-telemetry/).
-- **Parallel or streaming** — Stay sequential for tailing or enable `--parallel` for archive crunching. Tuning guidance in [Parallel Processing](https://kelora.dev/how-to/tune-parallel-processing/).
+- **Streaming pipeline** — Parse, filter, transform, and output logs in one flow. Read the [Pipeline Model](https://kelora.dev/latest/concepts/pipeline-model/) for a stage-by-stage breakdown.
+- **Built-in Rhai toolbox** — 100+ helpers for enrichment, parsing, time-window analysis, and metrics. Scan the [Functions Reference](https://kelora.dev/latest/reference/functions/) for the full catalog.
+- **Format flexibility** — JSON, logfmt, syslog, Apache/Nginx combined, CSV/TSV, column specs, and gzip. See [Input Formats](https://kelora.dev/latest/reference/formats/).
+- **Powerful filtering** — Chain `--filter`, `--level`, `--since/--until`, and context flags to zero in on events. Walkthroughs in [Filtering How-To](https://kelora.dev/latest/how-to/find-errors-in-logs/).
+- **Span aggregations** — `--span` forms count- or time-based spans and triggers `--span-close` hooks for per-span summaries. See [CLI Reference](https://kelora.dev/latest/reference/cli/#processing-options) for usage patterns.
+- **Observability built in** — `--metrics`, `--stats`, and window helpers expose throughput and aggregations for live pipelines. Learn more in [Metrics & Telemetry](https://kelora.dev/latest/concepts/metrics-and-telemetry/).
+- **Parallel or streaming** — Stay sequential for tailing or enable `--parallel` for archive crunching. Tuning guidance in [Parallel Processing](https://kelora.dev/latest/how-to/tune-parallel-processing/).
 
 ```
 Input → Parse → --exec → --filter → --exec → --filter → ... → Output
