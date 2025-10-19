@@ -400,6 +400,9 @@ pub fn identify_timestamp_field(
                 return Some((custom_field.clone(), ts_str));
             }
         }
+        // Custom field explicitly requested but absent or not string-convertible;
+        // do not fall back to built-in candidates.
+        return None;
     }
 
     // Otherwise, try the standard timestamp field names
@@ -652,6 +655,47 @@ mod tests {
         let (field_name, value) = result.unwrap();
         assert_eq!(field_name, "custom_time");
         assert_eq!(value, "2023-07-04T12:34:56Z");
+    }
+
+    #[test]
+    fn test_custom_timestamp_field_missing_does_not_fallback() {
+        use indexmap::IndexMap;
+        use rhai::Dynamic;
+
+        let mut fields = IndexMap::new();
+        fields.insert("ts".to_string(), Dynamic::from("2023-07-04T12:34:56Z"));
+
+        let config = TsConfig {
+            custom_field: Some("custom_time".to_string()),
+            custom_format: None,
+            default_timezone: None,
+            auto_parse: true,
+        };
+
+        let result = identify_timestamp_field(&fields, &config);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_custom_timestamp_field_non_string_does_not_fallback() {
+        use indexmap::IndexMap;
+        use rhai::Dynamic;
+
+        let mut fields = IndexMap::new();
+        fields.insert("custom_time".to_string(), Dynamic::from(42));
+        fields.insert("ts".to_string(), Dynamic::from("2023-07-04T12:34:56Z"));
+
+        let config = TsConfig {
+            custom_field: Some("custom_time".to_string()),
+            custom_format: None,
+            default_timezone: None,
+            auto_parse: true,
+        };
+
+        let result = identify_timestamp_field(&fields, &config);
+
+        assert!(result.is_none());
     }
 
     #[test]

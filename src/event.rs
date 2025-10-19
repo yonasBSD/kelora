@@ -533,6 +533,7 @@ impl std::fmt::Display for FieldValue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{TimeZone, Utc};
     use rhai::{Array, Map};
 
     #[test]
@@ -637,6 +638,82 @@ mod tests {
         // Test underscore style
         let underscore = flatten_dynamic(&dynamic_root, FlattenStyle::Underscore, 10);
         assert!(underscore.contains_key("data_0_value"));
+    }
+
+    #[test]
+    fn extract_timestamp_uses_custom_field_when_present() {
+        let mut event = Event::default_with_line("line".to_string());
+        event.set_field(
+            "custom_ts".to_string(),
+            Dynamic::from("2024-05-19T12:34:56Z"),
+        );
+        event.set_field("ts".to_string(), Dynamic::from("2020-01-01T00:00:00Z"));
+
+        let config = crate::timestamp::TsConfig {
+            custom_field: Some("custom_ts".to_string()),
+            custom_format: None,
+            default_timezone: None,
+            auto_parse: true,
+        };
+
+        event.extract_timestamp_with_config(None, &config);
+
+        let parsed = event
+            .parsed_ts
+            .expect("expected timestamp parsed from custom field");
+        assert_eq!(
+            parsed,
+            Utc.with_ymd_and_hms(2024, 5, 19, 12, 34, 56).unwrap()
+        );
+    }
+
+    #[test]
+    fn extract_timestamp_missing_custom_field_does_not_fallback() {
+        let mut event = Event::default_with_line("line".to_string());
+        event.set_field("ts".to_string(), Dynamic::from("2024-05-19T12:34:56Z"));
+
+        let config = crate::timestamp::TsConfig {
+            custom_field: Some("custom_ts".to_string()),
+            custom_format: None,
+            default_timezone: None,
+            auto_parse: true,
+        };
+
+        event.extract_timestamp_with_config(None, &config);
+
+        assert!(
+            event.parsed_ts.is_none(),
+            "timestamp should remain unset when custom field is missing"
+        );
+        assert!(
+            event.timestamp_stats_recorded,
+            "absence should be recorded even when timestamp not parsed"
+        );
+    }
+
+    #[test]
+    fn extract_timestamp_non_string_custom_field_does_not_fallback() {
+        let mut event = Event::default_with_line("line".to_string());
+        event.set_field("custom_ts".to_string(), Dynamic::from(123_i64));
+        event.set_field("ts".to_string(), Dynamic::from("2024-05-19T12:34:56Z"));
+
+        let config = crate::timestamp::TsConfig {
+            custom_field: Some("custom_ts".to_string()),
+            custom_format: None,
+            default_timezone: None,
+            auto_parse: true,
+        };
+
+        event.extract_timestamp_with_config(None, &config);
+
+        assert!(
+            event.parsed_ts.is_none(),
+            "non-string custom timestamp should not be parsed"
+        );
+        assert!(
+            event.timestamp_stats_recorded,
+            "invalid custom timestamp should count as absent"
+        );
     }
 
     #[test]

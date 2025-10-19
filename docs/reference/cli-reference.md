@@ -160,7 +160,7 @@ kelora --ignore-lines '^#' app.log    # Skip comments
 
 #### `--ts-field <FIELD>`
 
-Custom timestamp field name for parsing.
+Custom timestamp field name for parsing. When set, Kelora only inspects that field; the built-in fallbacks are disabled so missing or malformed values stay visible in stats and diagnostics.
 
 ```bash
 kelora -j --ts-field created_at app.log
