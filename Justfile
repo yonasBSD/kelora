@@ -5,7 +5,7 @@ default:
     @just --list
 
 # Extract package version from Cargo.toml (used by release workflow)
-RELEASE_VERSION := `rg --max-count 1 --replace '$1' '^version\s*=\s*"([^"]+)"' Cargo.toml`
+RELEASE_VERSION := `rg --max-count 1 --replace '$1' '^version\s*=\s*"([^"]+)"' Cargo.toml | tr -d '\r\n'`
 
 # Format code
 fmt:
@@ -86,7 +86,7 @@ release-prepare:
     VERSION="{{RELEASE_VERSION}}"
     TAG="v${VERSION}"
 
-    if [[ ! "$VERSION" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$ ]]; then
+    if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
         echo "error: Cargo.toml version '$VERSION' is not valid SemVer" >&2
         exit 1
     fi
