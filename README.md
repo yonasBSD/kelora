@@ -24,8 +24,8 @@ Kelora parses log streams into structured events and runs them through a program
 ```bash
 # Parse embedded formats - extract logfmt from within syslog messages
 kelora -f syslog examples/simple_syslog.log \
-  --exec 'if e.message.contains("=") { e += e.message.parse_logfmt() }' \
-  --keys timestamp,host,message,user,action \
+  --exec 'if e.msg.contains("=") { e += e.msg.parse_logfmt() }' \
+  --keys timestamp,host,user,action,detail,message \
   -F json
 
 # Keep full stacktraces together with case-insensitive search
@@ -39,6 +39,7 @@ kelora examples/prefix_docker.log --extract-prefix container \
   --exec 'e.level = e.line.between("[", "]")' \
   --metrics \
   --exec 'track_count(e.container); track_count(e.level)' \
+  --keys container,level,line \
   -F csv
 
 # Parse JWT tokens, mask IPs for privacy-safe log sharing
@@ -54,7 +55,7 @@ kelora -j examples/security_audit.jsonl \
 
 More quick commands to copy-paste:
 
-- Stream-level error watch: `tail -f examples/simple_json.jsonl | kelora -j --level warn,error --exec 'track_count(e.service)' --metrics`
+- Stream-level error watch: `tail -f examples/simple_json.jsonl | kelora -j --levels warn,error --exec 'track_count(e.service)' --metrics`
 - Fan out nested arrays: `kelora -j examples/json_arrays.jsonl --exec 'emit_each(e.get_path(\"users\", []))' --keys id,name,score`
 - Visual level distribution: `kelora -f logfmt examples/simple_logfmt.log -F levelmap`
 
