@@ -1273,8 +1273,15 @@ fn main() -> Result<()> {
         ExitCode::SignalInt.exit();
     }
 
+    let override_failed = final_stats
+        .as_ref()
+        .is_some_and(|stats| stats.timestamp_override_failed);
+    let override_message = final_stats
+        .as_ref()
+        .and_then(|stats| stats.timestamp_override_warning.clone());
+
     // Determine exit code based on whether any errors occurred during processing
-    let had_errors = if let Some(ref tracking) = tracking_data {
+    let mut had_errors = if let Some(ref tracking) = tracking_data {
         // Check tracking data for errors from processing
         crate::rhai_functions::tracking::has_errors_in_tracking(tracking)
     } else if let Some(ref stats) = final_stats {
@@ -1284,6 +1291,17 @@ fn main() -> Result<()> {
         // No processing results available, assume no errors
         false
     };
+
+    if config.processing.strict && override_failed {
+        if config.processing.quiet_level == 0 && !config.output.stats {
+            if let Some(message) = override_message.clone() {
+                stderr
+                    .writeln(&config.format_error_message(&message))
+                    .unwrap_or(());
+            }
+        }
+        had_errors = true;
+    }
 
     if had_errors {
         ExitCode::GeneralError.exit();

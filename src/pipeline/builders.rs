@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{self, BufRead, BufReader};
 
+use crate::stats::stats_set_timestamp_override;
+
 /// Wrapper parser that applies timestamp configuration after parsing
 struct TimestampConfiguredParser {
     inner: Box<dyn EventParser>,
@@ -162,6 +164,8 @@ impl PipelineBuilder {
         // Create parser
         let custom_ts_config =
             self.ts_field.is_some() || self.ts_format.is_some() || self.default_timezone.is_some();
+
+        stats_set_timestamp_override(self.ts_field.clone(), self.ts_format.clone());
 
         let base_parser: Box<dyn EventParser> = match self.input_format {
             crate::config::InputFormat::Auto => {
@@ -567,6 +571,8 @@ impl PipelineBuilder {
         // Create parser (with pre-processed CSV headers if available)
         let custom_ts_config =
             self.ts_field.is_some() || self.ts_format.is_some() || self.default_timezone.is_some();
+
+        stats_set_timestamp_override(self.ts_field.clone(), self.ts_format.clone());
 
         let base_parser: Box<dyn EventParser> = match self.input_format {
             crate::config::InputFormat::Auto => {

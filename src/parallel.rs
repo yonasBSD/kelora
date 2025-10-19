@@ -149,6 +149,22 @@ impl GlobalTracker {
         global_stats.timestamp_detected_events += worker_stats.timestamp_detected_events;
         global_stats.timestamp_parsed_events += worker_stats.timestamp_parsed_events;
         global_stats.timestamp_absent_events += worker_stats.timestamp_absent_events;
+        global_stats.timestamp_override_failed |= worker_stats.timestamp_override_failed;
+        if global_stats.timestamp_override_field.is_none() {
+            if let Some(field) = &worker_stats.timestamp_override_field {
+                global_stats.timestamp_override_field = Some(field.clone());
+            }
+        }
+        if global_stats.timestamp_override_format.is_none() {
+            if let Some(format) = &worker_stats.timestamp_override_format {
+                global_stats.timestamp_override_format = Some(format.clone());
+            }
+        }
+        if global_stats.timestamp_override_warning.is_none() {
+            if let Some(message) = &worker_stats.timestamp_override_warning {
+                global_stats.timestamp_override_warning = Some(message.clone());
+            }
+        }
 
         for (field, worker_field_stats) in &worker_stats.timestamp_fields {
             let entry = global_stats

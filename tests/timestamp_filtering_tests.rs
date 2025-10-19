@@ -476,6 +476,74 @@ fn test_stats_report_custom_ts_field_failures() {
         "Overall timestamp parsing should reflect the failure.\nSTDERR:\n{}",
         stderr
     );
+    assert!(
+        stderr.contains("Warning: --ts-field service values could not be parsed"),
+        "Should emit a summary warning for the failed --ts-field override.\nSTDERR:\n{}",
+        stderr
+    );
+}
+
+#[test]
+fn test_stats_report_custom_ts_format_failures() {
+    let input = r#"{"timestamp":"not-a-timestamp","message":"event"}"#;
+
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "-S", "--ts-format", "%d"], input);
+
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully. stderr: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("Timestamp parsing: 0 of 1 events parsed"),
+        "Overall timestamp parsing should reflect the failure.\nSTDERR:\n{}",
+        stderr
+    );
+    assert!(
+        stderr.contains("Warning: --ts-format '%d' did not match any timestamp values"),
+        "Should emit a summary warning for the failed --ts-format override.\nSTDERR:\n{}",
+        stderr
+    );
+}
+
+#[test]
+fn test_custom_ts_field_failure_strict_exits() {
+    let input = r#"{"timestamp":"2024-01-15T10:00:00Z","service":"api","message":"event"}"#;
+
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(
+        &["-f", "json", "-S", "--ts-field", "service", "--strict"],
+        input,
+    );
+
+    assert_eq!(
+        exit_code, 1,
+        "strict mode should cause non-zero exit on override failure"
+    );
+    assert!(
+        stderr.contains("Warning: --ts-field service values could not be parsed"),
+        "Strict mode should still display the warning in stats output.\nSTDERR:\n{}",
+        stderr
+    );
+}
+
+#[test]
+fn test_custom_ts_field_failure_strict_without_stats() {
+    let input = r#"{"timestamp":"2024-01-15T10:00:00Z","service":"api","message":"event"}"#;
+
+    let (stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "--ts-field", "service", "--strict"], input);
+
+    assert_eq!(
+        exit_code, 1,
+        "strict mode should cause non-zero exit on override failure"
+    );
+    assert!(
+        stderr.contains("--ts-field service values could not be parsed"),
+        "Strict mode should emit override failure message when stats are disabled.\nSTDERR:\n{}\nSTDOUT:\n{}",
+        stderr,
+        stdout
+    );
 }
 
 #[test]

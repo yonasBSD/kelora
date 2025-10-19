@@ -38,6 +38,10 @@ pub struct ProcessingStats {
     pub timestamp_parsed_events: usize,
     pub timestamp_absent_events: usize,
     pub timestamp_fields: IndexMap<String, TimestampFieldStat>,
+    pub timestamp_override_field: Option<String>,
+    pub timestamp_override_format: Option<String>,
+    pub timestamp_override_failed: bool,
+    pub timestamp_override_warning: Option<String>,
 }
 
 // Thread-local storage for statistics (following track_count pattern)
@@ -86,6 +90,16 @@ pub fn stats_add_event_filtered() {
     });
 }
 
+pub fn stats_set_timestamp_override(field: Option<String>, format: Option<String>) {
+    THREAD_STATS.with(|stats| {
+        let mut stats = stats.borrow_mut();
+        stats.timestamp_override_field = field;
+        stats.timestamp_override_format = format;
+        stats.timestamp_override_failed = false;
+        stats.timestamp_override_warning = None;
+    });
+}
+
 pub fn stats_add_late_event() {
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().late_events += 1;
@@ -111,6 +125,10 @@ pub fn stats_finish_processing() {
         if let Some(start) = stats.start_time {
             stats.processing_time = start.elapsed();
         }
+
+        let warning = stats.build_timestamp_override_warning();
+        stats.timestamp_override_failed = warning.is_some();
+        stats.timestamp_override_warning = warning;
     });
 }
 
@@ -214,6 +232,47 @@ impl ProcessingStats {
             start_time: Some(Instant::now()),
             ..Default::default()
         }
+    }
+
+    fn build_timestamp_override_warning(&self) -> Option<String> {
+        let override_active =
+            self.timestamp_override_field.is_some() || self.timestamp_override_format.is_some();
+        if !override_active
+            || self.events_created == 0
+            || self.timestamp_parsed_events > 0
+            || (self.timestamp_detected_events == 0 && self.timestamp_absent_events == 0)
+        {
+            return None;
+        }
+
+        let mut reasons = Vec::new();
+        if let Some(field) = &self.timestamp_override_field {
+            if self.timestamp_detected_events == 0 {
+                reasons.push(format!("--ts-field {} was not found in the input", field));
+            } else {
+                reasons.push(format!("--ts-field {} values could not be parsed", field));
+            }
+        }
+
+        if let Some(format) = &self.timestamp_override_format {
+            if self.timestamp_detected_events == 0 {
+                reasons.push(format!(
+                    "--ts-format '{}' had no timestamp fields to apply to",
+                    format
+                ));
+            } else {
+                reasons.push(format!(
+                    "--ts-format '{}' did not match any timestamp values",
+                    format
+                ));
+            }
+        }
+
+        if reasons.is_empty() {
+            reasons.push("custom timestamp override did not parse any timestamps".to_string());
+        }
+
+        Some(reasons.join("; "))
     }
 
     /// Extract discovered levels and keys from tracking data (for sequential processing)
@@ -434,6 +493,10 @@ impl ProcessingStats {
             }
         }
 
+        if let Some(message) = &self.timestamp_override_warning {
+            output.push_str(&format!("Warning: {}\n", message));
+        }
+
         // Levels seen: (only if we have discovered levels)
         if !self.discovered_levels.is_empty() {
             let levels: Vec<String> = self.discovered_levels.iter().cloned().collect();
@@ -484,6 +547,12 @@ impl ProcessingStats {
 
         if parts.is_empty() {
             return String::new();
+        }
+
+        if self.timestamp_override_failed {
+            if let Some(message) = &self.timestamp_override_warning {
+                parts.push(message.clone());
+            }
         }
 
         format!("Processing completed with {}", parts.join(", "))
