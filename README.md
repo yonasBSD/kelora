@@ -73,11 +73,11 @@ cargo install kelora
 
 Full documentation is available at **[kelora.dev](https://kelora.dev)**. Some quick links:
 
-- [Quickstart](https://kelora.dev/quickstart/) — 5-minute tour with annotated output
-- [How-To Guides](https://kelora.dev/how-to/) — solutions for common tasks
-- [Tutorials](https://kelora.dev/tutorials/) — step-by-step guides for building custom pipelines
-- [Concepts](https://kelora.dev/concepts/pipeline-model/) — deep dive into the streaming pipeline
-- [Reference](https://kelora.dev/reference/) — CLI flags, Rhai functions, formats, and configuration
+- [Quickstart](https://kelora.dev/lates/quickstart/) — 5-minute tour with annotated output
+- [How-To Guides](https://kelora.dev/latest/how-to/) — solutions for common tasks
+- [Tutorials](https://kelora.dev/latest/tutorials/) — step-by-step guides for building custom pipelines
+- [Concepts](https://kelora.dev/latest/concepts/pipeline-model/) — deep dive into the streaming pipeline
+- [Reference](https://kelora.dev/latest/reference/) — CLI flags, Rhai functions, formats, and configuration
 
 ## Highlights
 
