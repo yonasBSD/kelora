@@ -296,7 +296,9 @@ kelora -f combined access.log \
 
 **Timestamp parsing issues:**
 ```bash
-# If timestamps aren't parsed, try explicit format
+# If auto-detect misses, inspect the stats line:
+# Timestamp: auto-detected timestamp — parsed 0 of 100 detected events (0.0%). Hint: Try --ts-field or --ts-format.
+# Then supply an explicit format:
 kelora -f combined --ts-format "%d/%b/%Y:%H:%M:%S %z" access.log
 ```
 

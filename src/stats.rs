@@ -9,7 +9,6 @@ use std::time::{Duration, Instant};
 pub struct TimestampFieldStat {
     pub detected: usize,
     pub parsed: usize,
-    pub first_failed_sample: Option<String>,
 }
 
 /// Statistics collected during log processing
@@ -136,22 +135,8 @@ pub fn get_thread_stats() -> ProcessingStats {
     THREAD_STATS.with(|stats| stats.borrow().clone())
 }
 
-fn truncate_sample(sample: &str) -> String {
-    const MAX_CHARS: usize = 80;
-    let mut result = String::with_capacity(sample.len().min(MAX_CHARS + 1));
-    for (idx, ch) in sample.chars().enumerate() {
-        if idx == MAX_CHARS {
-            result.push('…');
-            break;
-        }
-        result.push(ch);
-    }
-    result
-}
-
-pub fn stats_record_timestamp_detection(field_name: &str, raw_value: &str, parsed: bool) {
+pub fn stats_record_timestamp_detection(field_name: &str, _raw_value: &str, parsed: bool) {
     let field = field_name.to_string();
-    let raw_value = raw_value.to_string();
     THREAD_STATS.with(|stats| {
         let mut stats = stats.borrow_mut();
         stats.timestamp_detected_events += 1;
@@ -164,8 +149,6 @@ pub fn stats_record_timestamp_detection(field_name: &str, raw_value: &str, parse
         entry.detected += 1;
         if parsed {
             entry.parsed += 1;
-        } else if entry.first_failed_sample.is_none() {
-            entry.first_failed_sample = Some(truncate_sample(&raw_value));
         }
     });
 }
@@ -273,6 +256,114 @@ impl ProcessingStats {
         }
 
         Some(reasons.join("; "))
+    }
+
+    fn format_timestamp_summary(&self) -> String {
+        if self.events_created == 0
+            && self.timestamp_detected_events == 0
+            && self.timestamp_absent_events == 0
+        {
+            if let Some(field) = &self.timestamp_override_field {
+                return format!("Timestamp: user-specified {} — no events processed.", field);
+            }
+            return "Timestamp: no events processed.".to_string();
+        }
+
+        let detected = self.timestamp_detected_events;
+        let parsed = self.timestamp_parsed_events;
+        let pct = if detected > 0 {
+            (parsed as f64 / detected as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        let (descriptor, mut hint) = if let Some(field) = &self.timestamp_override_field {
+            let descriptor = if detected == 0 {
+                format!("user-specified {} (field not found)", field)
+            } else {
+                format!("user-specified {}", field)
+            };
+
+            let hint = if detected == 0 {
+                Some("Verify the field name or remove --ts-field to auto-detect.")
+            } else if parsed < detected {
+                Some("Adjust --ts-format.")
+            } else {
+                None
+            };
+
+            (descriptor, hint)
+        } else {
+            match self.timestamp_fields.len() {
+                0 => {
+                    let events = if self.timestamp_absent_events > 0 {
+                        self.timestamp_absent_events
+                    } else {
+                        self.events_created
+                    };
+                    let descriptor = if events > 0 {
+                        format!("auto-detect found no timestamp field ({} events)", events)
+                    } else {
+                        "auto-detect found no timestamp field".to_string()
+                    };
+                    (descriptor, Some("Try --ts-field or --ts-format."))
+                }
+                1 => {
+                    let field = self.timestamp_fields.keys().next().unwrap();
+                    let descriptor = format!("auto-detected {}", field);
+                    let hint = if parsed < detected {
+                        Some("Try --ts-field or --ts-format.")
+                    } else {
+                        None
+                    };
+                    (descriptor, hint)
+                }
+                _ => {
+                    let names = self
+                        .timestamp_fields
+                        .keys()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    let descriptor = format!("auto-detected fields {}", names);
+                    let hint = if parsed < detected {
+                        Some("Try --ts-field or --ts-format.")
+                    } else {
+                        None
+                    };
+                    (descriptor, hint)
+                }
+            }
+        };
+
+        if detected == 0 && self.timestamp_fields.is_empty() && hint.is_none() {
+            hint = Some("Try --ts-field or --ts-format.");
+        }
+
+        let mut summary = format!(
+            "Timestamp: {} — parsed {} of {} detected events ({:.1}%)",
+            descriptor, parsed, detected, pct
+        );
+
+        if self.timestamp_absent_events > 0 {
+            let missing = if self.timestamp_absent_events == 1 {
+                "1 event missing a timestamp field".to_string()
+            } else {
+                format!(
+                    "{} events missing a timestamp field",
+                    self.timestamp_absent_events
+                )
+            };
+            summary.push_str(&format!("; {}", missing));
+        }
+
+        summary.push('.');
+
+        if let Some(hint_text) = hint {
+            summary.push_str(&format!(" Hint: {}", hint_text));
+        }
+
+        summary
     }
 
     /// Extract discovered levels and keys from tracking data (for sequential processing)
@@ -445,53 +536,7 @@ impl ProcessingStats {
             }
         }
 
-        // Timestamp parsing summary
-        if !self.timestamp_fields.is_empty() || self.timestamp_absent_events > 0 {
-            if self.timestamp_detected_events == 0 && self.timestamp_fields.is_empty() {
-                output.push_str(&format!(
-                    "Timestamp parsing: no timestamp fields detected ({} events)\n",
-                    self.timestamp_absent_events
-                ));
-            } else {
-                let overall_pct = if self.timestamp_detected_events > 0 {
-                    (self.timestamp_parsed_events as f64 / self.timestamp_detected_events as f64)
-                        * 100.0
-                } else {
-                    0.0
-                };
-                output.push_str(&format!(
-                    "Timestamp parsing: {} of {} events parsed ({:.1}%)\n",
-                    self.timestamp_parsed_events, self.timestamp_detected_events, overall_pct
-                ));
-
-                for (field, field_stats) in &self.timestamp_fields {
-                    let field_pct = if field_stats.detected > 0 {
-                        (field_stats.parsed as f64 / field_stats.detected as f64) * 100.0
-                    } else {
-                        0.0
-                    };
-                    if let Some(sample) = &field_stats.first_failed_sample {
-                        let safe_sample = sample.replace('\n', "\\n");
-                        output.push_str(&format!(
-                            "  {}: {} of {} parsed ({:.1}%) – example failure: \"{}\"\n",
-                            field, field_stats.parsed, field_stats.detected, field_pct, safe_sample
-                        ));
-                    } else {
-                        output.push_str(&format!(
-                            "  {}: {} of {} parsed ({:.1}%)\n",
-                            field, field_stats.parsed, field_stats.detected, field_pct
-                        ));
-                    }
-                }
-
-                if self.timestamp_absent_events > 0 {
-                    output.push_str(&format!(
-                        "  no timestamp field: {}\n",
-                        self.timestamp_absent_events
-                    ));
-                }
-            }
-        }
+        output.push_str(&format!("{}\n", self.format_timestamp_summary()));
 
         if let Some(message) = &self.timestamp_override_warning {
             output.push_str(&format!("Warning: {}\n", message));
@@ -636,9 +681,5 @@ mod tests {
             .expect("field stats");
         assert_eq!(field_stats.detected, 2);
         assert_eq!(field_stats.parsed, 1);
-        assert_eq!(
-            field_stats.first_failed_sample.as_deref(),
-            Some("not-a-date")
-        );
     }
 }

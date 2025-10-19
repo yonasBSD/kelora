@@ -173,9 +173,6 @@ impl GlobalTracker {
                 .or_default();
             entry.detected += worker_field_stats.detected;
             entry.parsed += worker_field_stats.parsed;
-            if entry.first_failed_sample.is_none() {
-                entry.first_failed_sample = worker_field_stats.first_failed_sample.clone();
-            }
         }
         // Calculate total processing time from global start time
         if let Some(start_time) = self.start_time {
