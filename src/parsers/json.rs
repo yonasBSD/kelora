@@ -3,11 +3,21 @@ use crate::event::Event;
 use crate::pipeline::EventParser;
 use anyhow::Result;
 
-pub struct JsonlParser;
+pub struct JsonlParser {
+    auto_timestamp: bool,
+}
 
 impl JsonlParser {
     pub fn new() -> Self {
-        Self
+        Self {
+            auto_timestamp: true,
+        }
+    }
+
+    pub fn new_without_auto_timestamp() -> Self {
+        Self {
+            auto_timestamp: false,
+        }
     }
 }
 
@@ -26,7 +36,9 @@ impl EventParser for JsonlParser {
                 event.set_field(key.clone(), dynamic_value);
             }
 
-            event.extract_timestamp();
+            if self.auto_timestamp {
+                event.extract_timestamp();
+            }
             Ok(event)
         } else {
             Err(anyhow::anyhow!("Expected JSON object, got: {}", json_value))

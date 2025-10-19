@@ -98,6 +98,8 @@ fn test_since_basic_iso_format() {
         "kelora should exit successfully. stderr: {}",
         stderr
     );
+    eprintln!("STDOUT>>>{}<<<", stdout);
+    eprintln!("STDERR>>>{}<<<", stderr);
     assert!(stdout.contains("new event"), "Should include recent event");
     assert!(!stdout.contains("old event"), "Should exclude old event");
 }
@@ -449,6 +451,30 @@ fn test_timestamp_filtering_with_other_filters() {
     assert!(
         !stdout.contains("new info"),
         "Should exclude new info (wrong level)"
+    );
+}
+
+#[test]
+fn test_stats_report_custom_ts_field_failures() {
+    let input = r#"{"timestamp":"2024-01-15T10:00:00Z","service":"api","message":"event"}"#;
+
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "-S", "--ts-field", "service"], input);
+
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully. stderr: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("service: 0 of 1 parsed"),
+        "Stats should report failures for the specified timestamp field.\nSTDERR:\n{}",
+        stderr
+    );
+    assert!(
+        stderr.contains("Timestamp parsing: 0 of 1 events parsed"),
+        "Overall timestamp parsing should reflect the failure.\nSTDERR:\n{}",
+        stderr
     );
 }
 

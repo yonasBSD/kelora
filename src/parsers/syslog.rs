@@ -8,10 +8,11 @@ use rhai::Dynamic;
 pub struct SyslogParser {
     rfc5424_regex: Regex,
     rfc3164_regex: Regex,
+    auto_timestamp: bool,
 }
 
 impl SyslogParser {
-    pub fn new() -> Result<Self> {
+    fn build(auto_timestamp: bool) -> Result<Self> {
         let rfc5424_regex = Regex::new(
             r"^<(\d{1,3})>(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)(?:\s+(.*))?(?:\r?\n)?$",
         )
@@ -24,7 +25,16 @@ impl SyslogParser {
         Ok(Self {
             rfc5424_regex,
             rfc3164_regex,
+            auto_timestamp,
         })
+    }
+
+    pub fn new() -> Result<Self> {
+        Self::build(true)
+    }
+
+    pub fn new_without_auto_timestamp() -> Result<Self> {
+        Self::build(false)
     }
 
     /// Parse priority value into facility and severity
@@ -119,7 +129,9 @@ impl SyslogParser {
                 event.set_field("msg".to_string(), Dynamic::from(msg.as_str().to_string()));
             }
 
-            event.extract_timestamp();
+            if self.auto_timestamp {
+                event.extract_timestamp();
+            }
             Some(event)
         } else {
             None
@@ -180,7 +192,9 @@ impl SyslogParser {
                 event.set_field("msg".to_string(), Dynamic::from(msg.as_str().to_string()));
             }
 
-            event.extract_timestamp();
+            if self.auto_timestamp {
+                event.extract_timestamp();
+            }
             Some(event)
         } else {
             None

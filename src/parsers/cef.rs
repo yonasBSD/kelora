@@ -14,11 +14,21 @@ use nom::{
 use rhai::Dynamic;
 use std::collections::HashMap;
 
-pub struct CefParser;
+pub struct CefParser {
+    auto_timestamp: bool,
+}
 
 impl CefParser {
     pub fn new() -> Self {
-        Self
+        Self {
+            auto_timestamp: true,
+        }
+    }
+
+    pub fn new_without_auto_timestamp() -> Self {
+        Self {
+            auto_timestamp: false,
+        }
     }
 
     /// Parse syslog prefix before CEF: (optional timestamp and hostname)
@@ -228,7 +238,9 @@ impl EventParser for CefParser {
         }
 
         // Extract core fields
-        event.extract_timestamp();
+        if self.auto_timestamp {
+            event.extract_timestamp();
+        }
 
         Ok(event)
     }

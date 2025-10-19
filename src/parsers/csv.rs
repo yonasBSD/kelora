@@ -19,6 +19,7 @@ pub struct CsvParser {
     headers: Vec<String>,
     type_map: TypeMap,
     strict: bool,
+    auto_timestamp: bool,
 }
 
 impl CsvParser {
@@ -30,6 +31,7 @@ impl CsvParser {
             headers: Vec::new(),
             type_map: TypeMap::new(),
             strict: false,
+            auto_timestamp: true,
         }
     }
 
@@ -41,6 +43,7 @@ impl CsvParser {
             headers: Vec::new(),
             type_map: TypeMap::new(),
             strict: false,
+            auto_timestamp: true,
         }
     }
 
@@ -52,6 +55,7 @@ impl CsvParser {
             headers: Vec::new(),
             type_map: TypeMap::new(),
             strict: false,
+            auto_timestamp: true,
         }
     }
 
@@ -63,6 +67,7 @@ impl CsvParser {
             headers: Vec::new(),
             type_map: TypeMap::new(),
             strict: false,
+            auto_timestamp: true,
         }
     }
 
@@ -74,6 +79,7 @@ impl CsvParser {
             headers,
             type_map: TypeMap::new(),
             strict: false,
+            auto_timestamp: true,
         }
     }
 
@@ -85,6 +91,7 @@ impl CsvParser {
             headers,
             type_map: TypeMap::new(),
             strict: false,
+            auto_timestamp: true,
         }
     }
 
@@ -96,6 +103,7 @@ impl CsvParser {
             headers,
             type_map: TypeMap::new(),
             strict: false,
+            auto_timestamp: true,
         }
     }
 
@@ -107,6 +115,7 @@ impl CsvParser {
             headers,
             type_map: TypeMap::new(),
             strict: false,
+            auto_timestamp: true,
         }
     }
 
@@ -132,6 +141,11 @@ impl CsvParser {
     /// Set strict mode for type conversion
     pub fn with_strict(mut self, strict: bool) -> Self {
         self.strict = strict;
+        self
+    }
+
+    pub fn with_auto_timestamp(mut self, auto_timestamp: bool) -> Self {
+        self.auto_timestamp = auto_timestamp;
         self
     }
 
@@ -229,7 +243,9 @@ impl CsvParser {
                 }
             }
 
-            event.extract_timestamp();
+            if self.auto_timestamp {
+                event.extract_timestamp();
+            }
             Ok(event)
         } else {
             Err(anyhow::anyhow!("Empty CSV record"))

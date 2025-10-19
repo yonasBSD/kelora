@@ -4,11 +4,21 @@ use crate::pipeline::EventParser;
 use anyhow::Result;
 use rhai::Dynamic;
 
-pub struct LogfmtParser;
+pub struct LogfmtParser {
+    auto_timestamp: bool,
+}
 
 impl LogfmtParser {
     pub fn new() -> Self {
-        Self
+        Self {
+            auto_timestamp: true,
+        }
+    }
+
+    pub fn new_without_auto_timestamp() -> Self {
+        Self {
+            auto_timestamp: false,
+        }
     }
 
     /// Parse logfmt line: key1=value1 key2="value with spaces" key3=value3
@@ -139,7 +149,9 @@ impl EventParser for LogfmtParser {
         }
 
         // Extract timestamp from the parsed data
-        event.extract_timestamp();
+        if self.auto_timestamp {
+            event.extract_timestamp();
+        }
         Ok(event)
     }
 }

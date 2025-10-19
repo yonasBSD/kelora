@@ -9,10 +9,11 @@ pub struct CombinedParser {
     combined_regex: Regex,
     combined_with_request_time_regex: Regex,
     common_regex: Regex,
+    auto_timestamp: bool,
 }
 
 impl CombinedParser {
-    pub fn new() -> Result<Self> {
+    fn build(auto_timestamp: bool) -> Result<Self> {
         // Combined Log Format pattern (Apache/NGINX with referer and user agent)
         // Example: 192.168.1.1 - user [25/Dec/1995:10:00:00 +0000] "GET /index.html HTTP/1.0" 200 1234 "http://www.example.com/" "Mozilla/4.08"
         let combined_regex = Regex::new(
@@ -36,7 +37,16 @@ impl CombinedParser {
             combined_regex,
             combined_with_request_time_regex,
             common_regex,
+            auto_timestamp,
         })
+    }
+
+    pub fn new() -> Result<Self> {
+        Self::build(true)
+    }
+
+    pub fn new_without_auto_timestamp() -> Result<Self> {
+        Self::build(false)
     }
 
     /// Parse HTTP request string into method, path, and protocol
@@ -144,7 +154,9 @@ impl CombinedParser {
                 }
             }
 
-            event.extract_timestamp();
+            if self.auto_timestamp {
+                event.extract_timestamp();
+            }
             Some(event)
         } else {
             None
@@ -211,7 +223,9 @@ impl CombinedParser {
                 Self::set_field_if_not_dash(&mut event, "user_agent", user_agent.as_str());
             }
 
-            event.extract_timestamp();
+            if self.auto_timestamp {
+                event.extract_timestamp();
+            }
             Some(event)
         } else {
             None
@@ -268,7 +282,9 @@ impl CombinedParser {
                 Self::set_numeric_field_if_valid(&mut event, "bytes", bytes.as_str());
             }
 
-            event.extract_timestamp();
+            if self.auto_timestamp {
+                event.extract_timestamp();
+            }
             Some(event)
         } else {
             None
