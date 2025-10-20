@@ -156,6 +156,69 @@ Ignore input lines matching regex pattern.
 kelora --ignore-lines '^#' app.log    # Skip comments
 ```
 
+### Section Selection
+
+Process specific sections of log files with multiple logical sections.
+
+#### `--section-start <REGEX>`
+
+Start including lines when this regex matches (inclusive). Without `--section-end`, processes from the first match until EOF or the start of the next section.
+
+```bash
+kelora --section-start '^== iked Logs' system.log
+```
+
+#### `--section-end <REGEX>`
+
+Stop including lines when this regex matches (exclusive). Only applies to lines within sections started by `--section-start`.
+
+```bash
+kelora --section-start '^== iked Logs' --section-end '^==' system.log
+```
+
+#### `--max-sections <N>`
+
+Maximum number of sections to process. Default: -1 (unlimited).
+
+```bash
+# Process first 2 sections
+kelora --section-start '^== ' --max-sections 2 system.log
+
+# Process only first section
+kelora --section-start '^Session' --section-end '^End' --max-sections 1 app.log
+```
+
+**Processing Order:**
+
+Section selection runs early in the pipeline, before `--keep-lines` and `--ignore-lines`:
+
+1. `--skip-lines` - Skip first N lines
+2. **`--section-start/end`** - Select sections
+3. `--keep-lines` - Keep matching lines within sections
+4. `--ignore-lines` - Ignore matching lines within sections
+5. `-M/--multiline` - Group lines into events
+6. Parsing - Parse into structured events
+
+**Use Cases:**
+
+```bash
+# Extract specific service logs from docker-compose output
+docker compose logs | kelora --section-start '^web_1' --section-end '^(db_1|api_1)' -f line
+
+# Process first 3 user sessions
+kelora --section-start 'User .* logged in' --section-end 'logged out' --max-sections 3 app.log
+
+# Extract iked section, then filter for errors
+kelora --section-start '^== iked' --section-end '^==' --keep-lines 'ERROR' system.log
+```
+
+**Performance:**
+
+- Section selection is single-threaded (even with `--parallel`)
+- Minimal overhead - just regex matching per line
+- Heavy processing (parsing, filtering, Rhai) still parallelizes
+- No full-file buffering - processes line-by-line
+
 ### Timestamp Configuration {#timestamp-options}
 
 #### `--ts-field <FIELD>`

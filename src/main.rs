@@ -499,6 +499,11 @@ fn run_pipeline_sequential_internal<W: Write>(
     let mut last_filename: Option<String> = None;
     let mut line_num = 0usize;
     let mut skipped_lines = 0usize;
+    let mut section_selector = config
+        .input
+        .section
+        .as_ref()
+        .map(|section_config| pipeline::SectionSelector::new(section_config.clone()));
     let mut pending_deadline: Option<Instant> = None;
     let mut shutdown_requested = false;
     let mut immediate_shutdown = false;
@@ -573,6 +578,7 @@ fn run_pipeline_sequential_internal<W: Write>(
                                     output,
                                     line_num: &mut line_num,
                                     skipped_lines: &mut skipped_lines,
+                                    section_selector: &mut section_selector,
                                     current_csv_headers: &mut current_csv_headers,
                                     last_filename: &mut last_filename,
                                     gap_tracker: &mut gap_tracker,
@@ -636,6 +642,7 @@ fn run_pipeline_sequential_internal<W: Write>(
                                     output,
                                     line_num: &mut line_num,
                                     skipped_lines: &mut skipped_lines,
+                                    section_selector: &mut section_selector,
                                     current_csv_headers: &mut current_csv_headers,
                                     last_filename: &mut last_filename,
                                     gap_tracker: &mut gap_tracker,
@@ -700,6 +707,7 @@ struct ReaderContext<'a, W: Write> {
     output: &'a mut W,
     line_num: &'a mut usize,
     skipped_lines: &'a mut usize,
+    section_selector: &'a mut Option<pipeline::SectionSelector>,
     current_csv_headers: &'a mut Option<Vec<String>>,
     last_filename: &'a mut Option<String>,
     gap_tracker: &'a mut Option<crate::formatters::GapTracker>,
@@ -716,6 +724,7 @@ fn handle_reader_message<W: Write>(
         output,
         line_num,
         skipped_lines,
+        section_selector,
         current_csv_headers,
         last_filename,
         gap_tracker,
@@ -726,6 +735,7 @@ fn handle_reader_message<W: Write>(
                 Ok(line),
                 line_num,
                 skipped_lines,
+                section_selector,
                 pipeline,
                 pipeline_ctx,
                 config,
@@ -744,6 +754,7 @@ fn handle_reader_message<W: Write>(
                 Err(error),
                 line_num,
                 skipped_lines,
+                section_selector,
                 pipeline,
                 pipeline_ctx,
                 config,
@@ -773,6 +784,7 @@ fn process_line_sequential<W: Write>(
     line_result: io::Result<String>,
     line_num: &mut usize,
     skipped_lines: &mut usize,
+    section_selector: &mut Option<pipeline::SectionSelector>,
     pipeline: &mut pipeline::Pipeline,
     ctx: &mut pipeline::PipelineContext,
     config: &KeloraConfig,
@@ -798,6 +810,17 @@ fn process_line_sequential<W: Write>(
             stats_add_line_filtered();
         }
         return Ok(ProcessingResult::Continue);
+    }
+
+    // Apply section selection if configured (filters out lines outside selected sections)
+    if let Some(selector) = section_selector {
+        if !selector.should_include_line(&line) {
+            // Count filtered line for stats
+            if config.output.stats {
+                stats_add_line_filtered();
+            }
+            return Ok(ProcessingResult::Continue);
+        }
     }
 
     // Apply keep-lines filter if configured (early filtering before parsing)
@@ -1111,6 +1134,49 @@ fn main() -> Result<()> {
                 ExitCode::InvalidUsage.exit();
             }
         }
+    }
+
+    // Compile section selection regexes if provided
+    if cli.section_start.is_some() || cli.section_end.is_some() {
+        let start_pattern = if let Some(ref pattern) = cli.section_start {
+            match regex::Regex::new(pattern) {
+                Ok(regex) => Some(regex),
+                Err(e) => {
+                    stderr
+                        .writeln(&config.format_error_message(&format!(
+                            "Invalid --section-start regex pattern '{}': {}",
+                            pattern, e
+                        )))
+                        .unwrap_or(());
+                    ExitCode::InvalidUsage.exit();
+                }
+            }
+        } else {
+            None
+        };
+
+        let end_pattern = if let Some(ref pattern) = cli.section_end {
+            match regex::Regex::new(pattern) {
+                Ok(regex) => Some(regex),
+                Err(e) => {
+                    stderr
+                        .writeln(&config.format_error_message(&format!(
+                            "Invalid --section-end regex pattern '{}': {}",
+                            pattern, e
+                        )))
+                        .unwrap_or(());
+                    ExitCode::InvalidUsage.exit();
+                }
+            }
+        } else {
+            None
+        };
+
+        config.input.section = Some(crate::config::SectionConfig {
+            start_pattern,
+            end_pattern,
+            max_sections: cli.max_sections,
+        });
     }
 
     // Parse multiline configuration if provided

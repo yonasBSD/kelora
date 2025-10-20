@@ -15,6 +15,7 @@ pub mod defaults;
 pub mod multiline;
 pub mod prefix_extractor;
 pub mod prefix_parser;
+pub mod section_selector;
 mod span;
 pub mod stages;
 
@@ -24,6 +25,7 @@ pub use defaults::*;
 pub use multiline::*;
 pub use prefix_extractor::*;
 pub use prefix_parser::*;
+pub use section_selector::*;
 pub use stages::*;
 
 /// Formatted output from the pipeline with optional timestamp metadata

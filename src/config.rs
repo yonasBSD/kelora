@@ -17,6 +17,7 @@ pub struct InputConfig {
     pub format: InputFormat,
     pub file_order: FileOrder,
     pub skip_lines: usize,
+    pub section: Option<SectionConfig>,
     pub ignore_lines: Option<regex::Regex>,
     pub keep_lines: Option<regex::Regex>,
     pub multiline: Option<MultilineConfig>,
@@ -255,6 +256,14 @@ pub enum MultilineStrategy {
     Regex { start: String, end: Option<String> },
     /// Read entire input as a single event
     All,
+}
+
+/// Section selection configuration
+#[derive(Debug, Clone)]
+pub struct SectionConfig {
+    pub start_pattern: Option<regex::Regex>,
+    pub end_pattern: Option<regex::Regex>,
+    pub max_sections: i64,
 }
 
 impl MultilineConfig {
@@ -578,6 +587,7 @@ impl KeloraConfig {
                 },
                 file_order: cli.file_order.clone().into(),
                 skip_lines: cli.skip_lines.unwrap_or(0),
+                section: None,      // Will be set after CLI parsing
                 ignore_lines: None, // Will be set after CLI parsing
                 keep_lines: None,   // Will be set after CLI parsing
                 multiline: None,    // Will be set after CLI parsing
@@ -673,6 +683,7 @@ impl Default for KeloraConfig {
                 format: InputFormat::Json,
                 file_order: FileOrder::Cli,
                 skip_lines: 0,
+                section: None,
                 ignore_lines: None,
                 keep_lines: None,
                 multiline: None,

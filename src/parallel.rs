@@ -29,6 +29,7 @@ struct PlainLineContext<'a> {
     skipped_lines_count: &'a mut usize,
     filtered_lines: &'a mut usize,
     skip_lines: usize,
+    section_selector: &'a mut Option<crate::pipeline::SectionSelector>,
     input_format: &'a crate::config::InputFormat,
     ignore_lines: &'a Option<regex::Regex>,
     keep_lines: &'a Option<regex::Regex>,
@@ -557,6 +558,7 @@ impl ParallelProcessor {
             let ignore_lines = config.input.ignore_lines.clone();
             let keep_lines = config.input.keep_lines.clone();
             let skip_lines = config.input.skip_lines;
+            let section_config = config.input.section.clone();
             let global_tracker_clone = self.global_tracker.clone();
             let input_format = config.input.format.clone();
             let ctrl_for_batcher = ctrl_rx.clone();
@@ -571,6 +573,7 @@ impl ParallelProcessor {
                     ignore_lines,
                     keep_lines,
                     skip_lines,
+                    section_config,
                     input_format,
                     preprocessing_line_count,
                     ctrl_for_batcher,
@@ -749,6 +752,7 @@ impl ParallelProcessor {
             let ignore_lines = config.input.ignore_lines.clone();
             let keep_lines = config.input.keep_lines.clone();
             let skip_lines = config.input.skip_lines;
+            let section_config = config.input.section.clone();
             let global_tracker_clone = self.global_tracker.clone();
             let input_format = config.input.format.clone();
             let strict = config.processing.strict;
@@ -764,6 +768,7 @@ impl ParallelProcessor {
                     ignore_lines,
                     keep_lines,
                     skip_lines,
+                    section_config,
                     input_format,
                     strict,
                     ctrl_for_batcher,
@@ -1004,6 +1009,7 @@ impl ParallelProcessor {
         ignore_lines: Option<regex::Regex>,
         keep_lines: Option<regex::Regex>,
         skip_lines: usize,
+        section_config: Option<crate::config::SectionConfig>,
         input_format: crate::config::InputFormat,
         preprocessing_line_count: usize,
         ctrl_rx: Receiver<Ctrl>,
@@ -1015,6 +1021,7 @@ impl ParallelProcessor {
         let mut pending_deadline: Option<Instant> = None;
         let mut skipped_lines_count = 0usize;
         let mut filtered_lines = 0usize;
+        let mut section_selector = section_config.map(crate::pipeline::SectionSelector::new);
 
         let ctrl_rx = ctrl_rx;
 
@@ -1084,6 +1091,7 @@ impl ParallelProcessor {
                                         skipped_lines_count: &mut skipped_lines_count,
                                         filtered_lines: &mut filtered_lines,
                                         skip_lines,
+                                        section_selector: &mut section_selector,
                                         input_format: &input_format,
                                         ignore_lines: &ignore_lines,
                                         keep_lines: &keep_lines,
@@ -1177,6 +1185,7 @@ impl ParallelProcessor {
                                         skipped_lines_count: &mut skipped_lines_count,
                                         filtered_lines: &mut filtered_lines,
                                         skip_lines,
+                                        section_selector: &mut section_selector,
                                         input_format: &input_format,
                                         ignore_lines: &ignore_lines,
                                         keep_lines: &keep_lines,
@@ -1229,6 +1238,7 @@ impl ParallelProcessor {
         ignore_lines: Option<regex::Regex>,
         keep_lines: Option<regex::Regex>,
         skip_lines: usize,
+        section_config: Option<crate::config::SectionConfig>,
         input_format: crate::config::InputFormat,
         strict: bool,
         ctrl_rx: Receiver<Ctrl>,
@@ -1243,6 +1253,7 @@ impl ParallelProcessor {
         let mut filtered_lines = 0usize;
         let mut last_filename: Option<String> = None;
         let mut current_headers: Option<Vec<String>> = None;
+        let mut section_selector = section_config.map(crate::pipeline::SectionSelector::new);
 
         let ctrl_rx = ctrl_rx;
 
@@ -1319,6 +1330,7 @@ impl ParallelProcessor {
                                     &mut skipped_lines_count,
                                     &mut filtered_lines,
                                     skip_lines,
+                                    &mut section_selector,
                                     &input_format,
                                     strict,
                                     &ignore_lines,
@@ -1425,6 +1437,7 @@ impl ParallelProcessor {
                                     &mut skipped_lines_count,
                                     &mut filtered_lines,
                                     skip_lines,
+                                    &mut section_selector,
                                     &input_format,
                                     strict,
                                     &ignore_lines,
@@ -1482,6 +1495,14 @@ impl ParallelProcessor {
             return Ok(());
         }
 
+        // Apply section selection if configured
+        if let Some(selector) = ctx.section_selector {
+            if !selector.should_include_line(&line) {
+                *ctx.filtered_lines += 1;
+                return Ok(());
+            }
+        }
+
         if line.is_empty() && !matches!(ctx.input_format, crate::config::InputFormat::Line) {
             return Ok(());
         }
@@ -1534,6 +1555,7 @@ impl ParallelProcessor {
         skipped_lines_count: &mut usize,
         filtered_lines: &mut usize,
         skip_lines: usize,
+        section_selector: &mut Option<crate::pipeline::SectionSelector>,
         input_format: &crate::config::InputFormat,
         strict: bool,
         ignore_lines: &Option<regex::Regex>,
@@ -1548,6 +1570,14 @@ impl ParallelProcessor {
             *skipped_lines_count += 1;
             *filtered_lines += 1;
             return Ok(());
+        }
+
+        // Apply section selection if configured
+        if let Some(selector) = section_selector {
+            if !selector.should_include_line(&line) {
+                *filtered_lines += 1;
+                return Ok(());
+            }
         }
 
         if line.is_empty() && !matches!(input_format, crate::config::InputFormat::Line) {
