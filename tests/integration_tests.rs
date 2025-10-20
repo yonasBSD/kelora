@@ -5733,7 +5733,14 @@ fn test_section_start_with_end() {
                  b2\n";
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["--section-start", "^== Section A", "--section-end", "^==", "-f", "line"],
+        &[
+            "--section-start",
+            "^== Section A",
+            "--section-end",
+            "^==",
+            "-f",
+            "line",
+        ],
         input,
     );
 
@@ -5754,10 +5761,8 @@ fn test_section_start_only() {
                  b1\n\
                  footer\n";
 
-    let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["--section-start", "^== Section B", "-f", "line"],
-        input,
-    );
+    let (stdout, _stderr, exit_code) =
+        run_kelora_with_input(&["--section-start", "^== Section B", "-f", "line"], input);
 
     assert_eq!(exit_code, 0);
     assert!(stdout.contains("Section B"));
@@ -5776,7 +5781,14 @@ fn test_max_sections_limit() {
                  s3\n";
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["--section-start", "^==", "--max-sections", "2", "-f", "line"],
+        &[
+            "--section-start",
+            "^==",
+            "--max-sections",
+            "2",
+            "-f",
+            "line",
+        ],
         input,
     );
 
@@ -5878,10 +5890,8 @@ fn test_section_parallel_mode() {
 fn test_no_matching_section() {
     let input = "line1\nline2\nline3\n";
 
-    let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["--section-start", "^== NONEXISTENT", "-f", "line"],
-        input,
-    );
+    let (stdout, _stderr, exit_code) =
+        run_kelora_with_input(&["--section-start", "^== NONEXISTENT", "-f", "line"], input);
 
     assert_eq!(exit_code, 0);
     assert!(stdout.is_empty());
@@ -5897,10 +5907,8 @@ fn test_multiple_sections_unlimited() {
                  content3\n";
 
     // Default max-sections is -1 (unlimited)
-    let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &["--section-start", "^==", "-f", "line"],
-        input,
-    );
+    let (stdout, _stderr, exit_code) =
+        run_kelora_with_input(&["--section-start", "^==", "-f", "line"], input);
 
     assert_eq!(exit_code, 0);
     assert!(stdout.contains("S1"));
