@@ -157,6 +157,14 @@ let fields = e.line.parse_logfmt()
 e.level = fields["level"]
 ```
 
+#### `text.parse_lines()`
+Split text into individual lines, returning an array of maps with a `line` field (mirrors `-f line` parser).
+
+```rhai
+let lines = e.payload.parse_lines()
+emit_each(lines)  // Fan-out each line as its own event
+```
+
 #### `text.parse_syslog()`
 Parse syslog line into structured fields.
 

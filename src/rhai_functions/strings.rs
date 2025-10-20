@@ -951,6 +951,25 @@ fn parse_combined_impl(line: &str) -> Map {
     parse_event_with(&*COMBINED_PARSER, line)
 }
 
+fn parse_lines_impl(input: &str) -> Array {
+    if input.is_empty() {
+        return Array::new();
+    }
+
+    if input.len() > MAX_PARSE_LEN {
+        return Array::new();
+    }
+
+    input
+        .lines()
+        .map(|line| {
+            let mut map = Map::new();
+            map.insert("line".into(), Dynamic::from(line.to_string()));
+            Dynamic::from(map)
+        })
+        .collect()
+}
+
 /// Capture a print statement in thread-local storage for parallel processing
 pub fn capture_print(message: String) {
     CAPTURED_PRINTS.with(|prints| {
@@ -1468,6 +1487,7 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("parse_cef", parse_cef_impl);
     engine.register_fn("parse_logfmt", parse_logfmt_impl);
     engine.register_fn("parse_combined", parse_combined_impl);
+    engine.register_fn("parse_lines", parse_lines_impl);
 
     // Parse key-value pairs from a string (like logfmt)
     engine.register_fn("parse_kv", |text: &str| -> rhai::Map {
@@ -3420,6 +3440,45 @@ mod tests {
             .eval_with_scope(&mut scope, r#"parse_jwt(invalid_jwt)"#)
             .unwrap();
         assert!(invalid.is_empty());
+    }
+
+    #[test]
+    fn test_parse_lines_function() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        let result: rhai::Array = engine
+            .eval(r#"parse_lines("first line\nsecond line")"#)
+            .unwrap();
+        assert_eq!(result.len(), 2);
+        let first = result[0]
+            .clone()
+            .try_cast::<rhai::Map>()
+            .expect("first entry should be a map");
+        let second = result[1]
+            .clone()
+            .try_cast::<rhai::Map>()
+            .expect("second entry should be a map");
+        assert_eq!(first.get("line").unwrap().to_string(), "first line");
+        assert_eq!(second.get("line").unwrap().to_string(), "second line");
+
+        let windows_result: rhai::Array = engine
+            .eval(r#""alpha\r\nbravo\r\ncharlie".parse_lines()"#)
+            .unwrap();
+        assert_eq!(windows_result.len(), 3);
+        assert_eq!(
+            windows_result[1]
+                .clone()
+                .try_cast::<rhai::Map>()
+                .unwrap()
+                .get("line")
+                .unwrap()
+                .to_string(),
+            "bravo"
+        );
+
+        let empty: rhai::Array = engine.eval(r#""".parse_lines()"#).unwrap();
+        assert!(empty.is_empty());
     }
 
     #[test]
