@@ -46,11 +46,23 @@ fn should_use_colors_auto() -> bool {
 }
 
 /// Get terminal width for word-wrapping, with fallback to default width
+/// Checks in order: COLUMNS environment variable, terminal size detection, default (100)
 pub fn get_terminal_width() -> usize {
+    // Priority 1: Check COLUMNS environment variable
+    if let Ok(columns_str) = std::env::var("COLUMNS") {
+        if let Ok(columns) = columns_str.parse::<usize>() {
+            if columns > 0 {
+                return columns;
+            }
+        }
+    }
+
+    // Priority 2: Detect terminal size
     if let Some((terminal_size::Width(width), _)) = terminal_size::terminal_size() {
         width as usize
     } else {
-        100 // Default fallback width as requested
+        // Priority 3: Default fallback width
+        100
     }
 }
 
@@ -104,6 +116,46 @@ mod tests {
         with_env_lock(&["NO_COLOR"], || {
             std::env::set_var("NO_COLOR", "1");
             assert!(should_use_colors_with_mode(&ColorMode::Always));
+        });
+    }
+
+    #[test]
+    fn terminal_width_uses_columns_env_var() {
+        with_env_lock(&["COLUMNS"], || {
+            std::env::set_var("COLUMNS", "120");
+            assert_eq!(get_terminal_width(), 120);
+        });
+    }
+
+    #[test]
+    fn terminal_width_ignores_invalid_columns() {
+        with_env_lock(&["COLUMNS"], || {
+            // Non-numeric value should be ignored
+            std::env::set_var("COLUMNS", "invalid");
+            let width = get_terminal_width();
+            // Should fall back to terminal size detection or default (100)
+            // We can't assert the exact value as it depends on actual terminal size
+            assert!(width > 0);
+        });
+    }
+
+    #[test]
+    fn terminal_width_ignores_zero_columns() {
+        with_env_lock(&["COLUMNS"], || {
+            std::env::set_var("COLUMNS", "0");
+            let width = get_terminal_width();
+            // Should fall back to terminal size detection or default (100)
+            assert!(width > 0);
+        });
+    }
+
+    #[test]
+    fn terminal_width_fallback_when_columns_unset() {
+        with_env_lock(&["COLUMNS"], || {
+            std::env::remove_var("COLUMNS");
+            let width = get_terminal_width();
+            // Should use terminal size detection or default fallback
+            assert!(width > 0);
         });
     }
 }
