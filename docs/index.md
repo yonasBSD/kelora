@@ -11,89 +11,97 @@ Parse messy logs into structured events, then filter, transform, and analyze the
 
 **Parse embedded formats inside syslog**
 
-```bash
-kelora -f syslog examples/simple_syslog.log \
-  --exec 'if e.msg.contains("=") { e += e.msg.parse_logfmt() }' \
-  --filter 'e.has_field("user")' \
-  --keys timestamp,host,user,action,detail,message \
-  -F json
-```
+=== "Command"
+
+    ```bash
+    kelora -f syslog examples/simple_syslog.log \
+      --exec 'if e.msg.contains("=") { e += e.msg.parse_logfmt() }' \
+      --filter 'e.has_field("user")' \
+      --keys timestamp,host,user,action,detail,message \
+      -F json
+    ```
 
 === "Output"
 
-```bash exec="on" source="above" result="ansi"
-kelora -f syslog examples/simple_syslog.log \
-  --exec 'if e.msg.contains("=") { e += e.msg.parse_logfmt() }' \
-  --filter 'e.has_field("user")' \
-  --keys timestamp,host,user,action,detail,message \
-  -F json
-```
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f syslog examples/simple_syslog.log \
+      --exec 'if e.msg.contains("=") { e += e.msg.parse_logfmt() }' \
+      --filter 'e.has_field("user")' \
+      --keys timestamp,host,user,action,detail,message \
+      -F json
+    ```
 
 **Keep stacktraces together**
 
-```bash
-kelora examples/multiline_stacktrace.log \
-  --multiline timestamp \
-  --filter 'e.line.lower().contains("valueerror")' \
-  --before-context 1 --after-context 1
-```
+=== "Command"
+
+    ```bash
+    kelora examples/multiline_stacktrace.log \
+      --multiline timestamp \
+      --filter 'e.line.lower().contains("valueerror")' \
+      --before-context 1 --after-context 1
+    ```
 
 === "Output"
 
-```bash exec="on" source="above" result="ansi"
-kelora examples/multiline_stacktrace.log \
-  --multiline timestamp \
-  --filter 'e.line.lower().contains("valueerror")' \
-  --before-context 1 --after-context 1
-```
+    ```bash exec="on" source="above" result="ansi"
+    kelora examples/multiline_stacktrace.log \
+      --multiline timestamp \
+      --filter 'e.line.lower().contains("valueerror")' \
+      --before-context 1 --after-context 1
+    ```
 
 **Track container activity with metrics**
 
-```bash
-kelora examples/prefix_docker.log --extract-prefix container \
-  --exec 'e.level = e.line.between("[", "]")' \
-  --metrics \
-  --exec 'track_count(e.container); track_count(e.level)' \
-  --keys container,level,line \
-  -F csv
-```
+=== "Command"
+
+    ```bash
+    kelora examples/prefix_docker.log --extract-prefix container \
+      --exec 'e.level = e.line.between("[", "]")' \
+      --metrics \
+      --exec 'track_count(e.container); track_count(e.level)' \
+      --keys container,level,line \
+      -F csv
+    ```
 
 === "Output"
 
-```bash exec="on" source="above" result="ansi"
-kelora examples/prefix_docker.log --extract-prefix container \
-  --exec 'e.level = e.line.between("[", "]")' \
-  --metrics \
-  --exec 'track_count(e.container); track_count(e.level)' \
-  --keys container,level,line \
-  -F csv
-```
+    ```bash exec="on" source="above" result="ansi"
+    kelora examples/prefix_docker.log --extract-prefix container \
+      --exec 'e.level = e.line.between("[", "]")' \
+      --metrics \
+      --exec 'track_count(e.container); track_count(e.level)' \
+      --keys container,level,line \
+      -F csv
+    ```
 
 **Mask sensitive fields in JSON logs**
 
-```bash
-kelora -j examples/security_audit.jsonl \
-  --exec 'if e.has_field("token") {
-            let jwt = e.token.parse_jwt();
-            e.role = jwt.get_path("claims.role", "guest")
-          }' \
-  --exec 'e.ip = e.ip.mask_ip(2)' \
-  --keys timestamp,event,role,ip \
-  -F json
-```
+=== "Command"
+
+    ```bash
+    kelora -j examples/security_audit.jsonl \
+      --exec 'if e.has_field("token") {
+                let jwt = e.token.parse_jwt();
+                e.role = jwt.get_path("claims.role", "guest")
+              }' \
+      --exec 'e.ip = e.ip.mask_ip(2)' \
+      --keys timestamp,event,role,ip \
+      -F json
+    ```
 
 === "Output"
 
-```bash exec="on" source="above" result="ansi"
-kelora -j examples/security_audit.jsonl \
-  --exec 'if e.has_field("token") {
-            let jwt = e.token.parse_jwt();
-            e.role = jwt.get_path("claims.role", "guest")
-          }' \
-  --exec 'e.ip = e.ip.mask_ip(2)' \
-  --keys timestamp,event,role,ip \
-  -F json
-```
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/security_audit.jsonl \
+      --exec 'if e.has_field("token") {
+                let jwt = e.token.parse_jwt();
+                e.role = jwt.get_path("claims.role", "guest")
+              }' \
+      --exec 'e.ip = e.ip.mask_ip(2)' \
+      --keys timestamp,event,role,ip \
+      -F json
+    ```
 
 See the [Quickstart](quickstart.md) for a step-by-step tour with full output.
 
