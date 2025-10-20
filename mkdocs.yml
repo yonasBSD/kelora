@@ -38,7 +38,8 @@ plugins:
   - mike:
       version_selector: true
       alias_type: symlink
-  - markdown-exec
+  - markdown-exec:
+      ansi: required
 
 markdown_extensions:
   - pymdownx.highlight:

@@ -67,7 +67,7 @@ docs-serve:
     UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
     UV_DATA_DIR={{justfile_directory()}}/.uv/data \
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
-    uvx --with mkdocs-material --with mike --with markdown-exec mkdocs serve --watch docs --watch mkdocs.yml --livereload
+    uvx --with mkdocs-material --with mike --with markdown-exec[ansi] mkdocs serve --watch docs --watch mkdocs.yml --livereload
 
 # Build documentation (for local testing)
 docs-build:
@@ -77,7 +77,7 @@ docs-build:
     UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
     UV_DATA_DIR={{justfile_directory()}}/.uv/data \
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
-    uvx --with mkdocs-material --with mike --with markdown-exec mkdocs build
+    uvx --with mkdocs-material --with mike --with markdown-exec[ansi] mkdocs build
 
 # Prepare a release: verify version, run checks, and create the tag (no pushes)
 release-prepare:
