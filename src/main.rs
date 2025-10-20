@@ -29,8 +29,8 @@ mod tty;
 use config::KeloraConfig;
 use config_file::ConfigFile;
 use platform::{
-    Ctrl, ExitCode, ProcessCleanup, SafeFileOut, SafeStderr, SafeStdout, SignalHandler,
-    SHOULD_TERMINATE, TERMINATED_BY_SIGNAL,
+    install_broken_pipe_panic_hook, Ctrl, ExitCode, ProcessCleanup, SafeFileOut, SafeStderr,
+    SafeStdout, SignalHandler, SHOULD_TERMINATE, TERMINATED_BY_SIGNAL,
 };
 
 // Internal CLI imports
@@ -985,6 +985,7 @@ fn write_formatted_output<W: Write>(
 }
 
 fn main() -> Result<()> {
+    install_broken_pipe_panic_hook();
     // Broadcast channel for shutdown requests from signal handler or other sources
     let (ctrl_tx, ctrl_rx) = unbounded::<Ctrl>();
 

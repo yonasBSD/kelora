@@ -3,9 +3,11 @@ use anyhow::Result;
 use crossbeam_channel::Sender;
 use std::fs::File;
 use std::io::{self, Write};
+use std::panic::{self, PanicHookInfo};
 use std::path::Path;
 use std::process;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Once;
 use std::thread;
 
 // Cross-platform signal handling
@@ -254,11 +256,25 @@ impl SafeStdout {
 
 impl std::io::Write for SafeStdout {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.stdout.write(buf)
+        match self.stdout.write(buf) {
+            Ok(size) => Ok(size),
+            Err(e) if Self::is_broken_pipe(&e) => {
+                // Exit quietly on broken pipe to match Unix conventions
+                ExitCode::SignalPipe.exit();
+            }
+            Err(e) => Err(e),
+        }
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.stdout.flush()
+        match self.stdout.flush() {
+            Ok(()) => Ok(()),
+            Err(e) if Self::is_broken_pipe(&e) => {
+                // Exit quietly on broken pipe to match Unix conventions
+                ExitCode::SignalPipe.exit();
+            }
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -397,6 +413,46 @@ pub fn check_termination() -> Result<()> {
 /// Process cleanup utilities
 pub struct ProcessCleanup {
     cleanup_tasks: Vec<Box<dyn FnOnce() + Send>>,
+}
+
+static HOOK_INIT: Once = Once::new();
+
+/// Install a panic hook that treats stdout BrokenPipe panics as normal termination.
+pub fn install_broken_pipe_panic_hook() {
+    HOOK_INIT.call_once(|| {
+        let default_hook = panic::take_hook();
+        panic::set_hook(Box::new(move |info| {
+            if is_stdout_broken_pipe_panic(info) {
+                ExitCode::SignalPipe.exit();
+            }
+            default_hook(info);
+        }));
+    });
+}
+
+fn is_stdout_broken_pipe_panic(info: &PanicHookInfo<'_>) -> bool {
+    let payload_matches = |payload: &str| {
+        let lower = payload.to_ascii_lowercase();
+        lower.contains("failed printing to stdout")
+            && (lower.contains("broken pipe")
+                || lower.contains("os error 32")
+                || lower.contains("os error 109")
+                || lower.contains("os error 232"))
+    };
+
+    if let Some(message) = info.payload().downcast_ref::<&str>() {
+        if payload_matches(message) {
+            return true;
+        }
+    }
+
+    if let Some(message) = info.payload().downcast_ref::<String>() {
+        if payload_matches(message) {
+            return true;
+        }
+    }
+
+    false
 }
 
 impl ProcessCleanup {
