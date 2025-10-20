@@ -31,6 +31,12 @@ Parse messy logs into structured events, then filter, transform, and analyze the
       -F json
     ```
 
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    cat examples/simple_syslog.log
+    ```
+
 **Keep stacktraces together**
 
 === "Command"
@@ -49,6 +55,12 @@ Parse messy logs into structured events, then filter, transform, and analyze the
       --multiline timestamp \
       --filter 'e.line.lower().contains("valueerror")' \
       --before-context 1 --after-context 1
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    cat examples/multiline_stacktrace.log
     ```
 
 **Track container activity with metrics**
@@ -73,6 +85,12 @@ Parse messy logs into structured events, then filter, transform, and analyze the
       --exec 'track_count(e.container); track_count(e.level)' \
       --keys container,level,line \
       -F csv
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    cat examples/prefix_docker.log 
     ```
 
 **Mask sensitive fields in JSON logs**
@@ -101,6 +119,12 @@ Parse messy logs into structured events, then filter, transform, and analyze the
       --exec 'e.ip = e.ip.mask_ip(2)' \
       --keys timestamp,event,role,ip \
       -F json
+    ```
+
+=== "Logs Data"
+
+    ```bash exec="on" result="ansi"
+    cat examples/security_audit.jsonl
     ```
 
 See the [Quickstart](quickstart.md) for a step-by-step tour with full output.
