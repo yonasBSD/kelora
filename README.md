@@ -1,5 +1,7 @@
 # Kelora
 
+[![CI](https://github.com/dloss/kelora/workflows/CI/badge.svg)](https://github.com/dloss/kelora/actions) [![Documentation](https://img.shields.io/badge/docs-kelora.dev-blue)](https://kelora.dev)
+
 <p align="center">
   <img src="kelora-logo.svg" alt="Kelora Logo" width="300">
 </p>
