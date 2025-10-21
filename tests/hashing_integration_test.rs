@@ -7,7 +7,11 @@ fn kelora_binary() -> PathBuf {
     }
 
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let exe_name = if cfg!(windows) { "kelora.exe" } else { "kelora" };
+    let exe_name = if cfg!(windows) {
+        "kelora.exe"
+    } else {
+        "kelora"
+    };
 
     let debug_path = manifest_dir.join("target").join("debug").join(exe_name);
     if debug_path.exists() {
