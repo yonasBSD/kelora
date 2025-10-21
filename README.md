@@ -1,6 +1,6 @@
 # Kelora
 
-[![CI](https://github.com/dloss/kelora/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dloss/kelora/actions/workflows/ci.yml) [![Documentation](https://img.shields.io/badge/docs-kelora.dev-blue)](https://kelora.dev)
+[![CI](https://github.com/dloss/kelora/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dloss/kelora/actions/workflows/ci.yml) [![Crates.io](https://img.shields.io/crates/v/kelora.svg)](https://crates.io/crates/kelora) [![Documentation](https://img.shields.io/badge/docs-kelora.dev-blue)](https://kelora.dev)
 
 <p align="center">
   <img src="kelora-logo.svg" alt="Kelora Logo" width="300">
