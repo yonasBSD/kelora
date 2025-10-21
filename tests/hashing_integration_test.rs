@@ -1,9 +1,26 @@
+use std::path::PathBuf;
 use std::process::Command;
+
+fn kelora_binary() -> PathBuf {
+    if let Some(path) = option_env!("CARGO_BIN_EXE_kelora") {
+        return PathBuf::from(path);
+    }
+
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let exe_name = if cfg!(windows) { "kelora.exe" } else { "kelora" };
+
+    let debug_path = manifest_dir.join("target").join("debug").join(exe_name);
+    if debug_path.exists() {
+        return debug_path;
+    }
+
+    manifest_dir.join("target").join("release").join(exe_name)
+}
 
 #[test]
 fn test_bucket_function() {
     // Feed input via stdin
-    let output = Command::new("./target/release/kelora")
+    let output = Command::new(kelora_binary())
         .args(["-f", "line", "--exec", "e.bucket = bucket(e.line)"])
         .arg("-")
         .stdin(std::process::Stdio::piped())
@@ -24,7 +41,7 @@ fn test_bucket_function() {
 
 #[test]
 fn test_hash_function_default() {
-    let output = Command::new("./target/release/kelora")
+    let output = Command::new(kelora_binary())
         .args(["-f", "line", "--exec", "e.hash = hash(e.line)"])
         .arg("-")
         .stdin(std::process::Stdio::piped())
@@ -46,7 +63,7 @@ fn test_hash_function_default() {
 
 #[test]
 fn test_hash_function_with_algorithm() {
-    let output = Command::new("./target/release/kelora")
+    let output = Command::new(kelora_binary())
         .args([
             "-f",
             "line",
@@ -73,7 +90,7 @@ fn test_hash_function_with_algorithm() {
 
 #[test]
 fn test_pseudonym_with_env_secret() {
-    let output = Command::new("./target/release/kelora")
+    let output = Command::new(kelora_binary())
         .env("KELORA_SECRET", "test_secret_12345")
         .args([
             "-vv",
@@ -107,7 +124,7 @@ fn test_pseudonym_with_env_secret() {
 
 #[test]
 fn test_pseudonym_ephemeral_mode() {
-    let output = Command::new("./target/release/kelora")
+    let output = Command::new(kelora_binary())
         .env_remove("KELORA_SECRET")
         .args([
             "-vv",
@@ -141,7 +158,7 @@ fn test_pseudonym_ephemeral_mode() {
 
 #[test]
 fn test_pseudonym_domain_separation() {
-    let output = Command::new("./target/release/kelora")
+    let output = Command::new(kelora_binary())
         .env("KELORA_SECRET", "test_secret_12345")
         .args([
             "-f",
@@ -175,7 +192,7 @@ fn test_pseudonym_domain_separation() {
 #[test]
 fn test_pseudonym_deterministic() {
     // Run twice with same secret
-    let output1 = Command::new("./target/release/kelora")
+    let output1 = Command::new(kelora_binary())
         .env("KELORA_SECRET", "test_secret_12345")
         .args([
             "-f",
@@ -197,7 +214,7 @@ fn test_pseudonym_deterministic() {
         })
         .expect("Failed to execute kelora");
 
-    let output2 = Command::new("./target/release/kelora")
+    let output2 = Command::new(kelora_binary())
         .env("KELORA_SECRET", "test_secret_12345")
         .args([
             "-f",
@@ -228,7 +245,7 @@ fn test_pseudonym_deterministic() {
 
 #[test]
 fn test_pseudonym_empty_domain_error() {
-    let output = Command::new("./target/release/kelora")
+    let output = Command::new(kelora_binary())
         .env("KELORA_SECRET", "test_secret_12345")
         .args([
             "-f",
@@ -256,7 +273,7 @@ fn test_pseudonym_empty_domain_error() {
 
 #[test]
 fn test_pseudonym_empty_secret_error() {
-    let output = Command::new("./target/release/kelora")
+    let output = Command::new(kelora_binary())
         .env("KELORA_SECRET", "")
         .args([
             "-f",
