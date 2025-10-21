@@ -35,7 +35,7 @@ use platform::{
 
 // Internal CLI imports
 use cli::{Cli, FileOrder, InputFormat, OutputFormat};
-use config::{MultilineConfig, SpanMode, TimestampFilterConfig};
+use config::{MultilineConfig, SectionEnd, SectionStart, SpanMode, TimestampFilterConfig};
 
 /// Detect format from a peekable reader
 /// Returns the detected format without consuming the first line
@@ -1138,44 +1138,70 @@ fn main() -> Result<()> {
     }
 
     // Compile section selection regexes if provided
-    if cli.section_start.is_some() || cli.section_end.is_some() {
-        let start_pattern = if let Some(ref pattern) = cli.section_start {
-            match regex::Regex::new(pattern) {
-                Ok(regex) => Some(regex),
-                Err(e) => {
-                    stderr
-                        .writeln(&config.format_error_message(&format!(
-                            "Invalid --section-start regex pattern '{}': {}",
-                            pattern, e
-                        )))
-                        .unwrap_or(());
-                    ExitCode::InvalidUsage.exit();
-                }
+    let section_start = if let Some(ref pattern) = cli.section_from {
+        match regex::Regex::new(pattern) {
+            Ok(regex) => Some(SectionStart::From(regex)),
+            Err(e) => {
+                stderr
+                    .writeln(&config.format_error_message(&format!(
+                        "Invalid --section-from regex pattern '{}': {}",
+                        pattern, e
+                    )))
+                    .unwrap_or(());
+                ExitCode::InvalidUsage.exit();
             }
-        } else {
-            None
-        };
-
-        let end_pattern = if let Some(ref pattern) = cli.section_end {
-            match regex::Regex::new(pattern) {
-                Ok(regex) => Some(regex),
-                Err(e) => {
-                    stderr
-                        .writeln(&config.format_error_message(&format!(
-                            "Invalid --section-end regex pattern '{}': {}",
-                            pattern, e
-                        )))
-                        .unwrap_or(());
-                    ExitCode::InvalidUsage.exit();
-                }
+        }
+    } else if let Some(ref pattern) = cli.section_after {
+        match regex::Regex::new(pattern) {
+            Ok(regex) => Some(SectionStart::After(regex)),
+            Err(e) => {
+                stderr
+                    .writeln(&config.format_error_message(&format!(
+                        "Invalid --section-after regex pattern '{}': {}",
+                        pattern, e
+                    )))
+                    .unwrap_or(());
+                ExitCode::InvalidUsage.exit();
             }
-        } else {
-            None
-        };
+        }
+    } else {
+        None
+    };
 
+    let section_end = if let Some(ref pattern) = cli.section_before {
+        match regex::Regex::new(pattern) {
+            Ok(regex) => Some(SectionEnd::Before(regex)),
+            Err(e) => {
+                stderr
+                    .writeln(&config.format_error_message(&format!(
+                        "Invalid --section-before regex pattern '{}': {}",
+                        pattern, e
+                    )))
+                    .unwrap_or(());
+                ExitCode::InvalidUsage.exit();
+            }
+        }
+    } else if let Some(ref pattern) = cli.section_through {
+        match regex::Regex::new(pattern) {
+            Ok(regex) => Some(SectionEnd::Through(regex)),
+            Err(e) => {
+                stderr
+                    .writeln(&config.format_error_message(&format!(
+                        "Invalid --section-through regex pattern '{}': {}",
+                        pattern, e
+                    )))
+                    .unwrap_or(());
+                ExitCode::InvalidUsage.exit();
+            }
+        }
+    } else {
+        None
+    };
+
+    if section_start.is_some() || section_end.is_some() {
         config.input.section = Some(crate::config::SectionConfig {
-            start_pattern,
-            end_pattern,
+            start: section_start,
+            end: section_end,
             max_sections: cli.max_sections,
         });
     }

@@ -1,4 +1,4 @@
-use crate::config::SectionConfig;
+use crate::config::{SectionConfig, SectionEnd, SectionStart};
 
 /// State machine for section selection
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,7 +24,7 @@ impl SectionSelector {
     /// Create a new section selector
     pub fn new(config: SectionConfig) -> Self {
         // If no start pattern is provided, start immediately
-        let initial_state = if config.start_pattern.is_none() {
+        let initial_state = if config.start.is_none() {
             SectionState::InSection
         } else {
             SectionState::NotStarted
@@ -47,97 +47,104 @@ impl SectionSelector {
             }
             SectionState::NotStarted => {
                 // Looking for the first section start
-                if let Some(ref start_pattern) = self.config.start_pattern {
-                    if start_pattern.is_match(line) {
-                        // Found section start
-                        self.state = SectionState::InSection;
-                        self.sections_seen += 1;
-                        true // Include the start line
-                    } else {
-                        false // Still waiting for section to start
-                    }
+                if let Some(include_line) = self.matches_start(line) {
+                    self.sections_seen += 1;
+                    self.state = SectionState::InSection;
+                    include_line
                 } else {
-                    // No start pattern, so we're always in a section
-                    true
+                    // Still waiting for section to start
+                    false
                 }
             }
             SectionState::InSection => {
                 // Currently in a section, check for end
-                if let Some(ref end_pattern) = self.config.end_pattern {
-                    if end_pattern.is_match(line) {
-                        // Found section end
-
-                        // Check if we've hit the section limit
-                        if self.config.max_sections > 0
-                            && self.sections_seen >= self.config.max_sections
-                        {
-                            self.state = SectionState::Done;
-                        } else {
-                            // More sections to process
-                            self.state = if self.config.start_pattern.is_some() {
-                                SectionState::BetweenSections
-                            } else {
-                                // No start pattern means we're always in a section
-                                SectionState::InSection
-                            };
-                        }
-
-                        false // Don't include the end line (exclusive)
+                if let Some(include_line) = self.matches_end(line) {
+                    if self.limit_reached() {
+                        self.state = SectionState::Done;
+                    } else if self.config.start.is_some() {
+                        self.state = SectionState::BetweenSections;
                     } else {
-                        true // Still in section, include line
+                        // No start pattern means we keep streaming within the same section
+                        self.state = SectionState::InSection;
+                    }
+                    include_line
+                } else if let Some(include_line) = self.matches_start(line) {
+                    // Found start of next section (only happens when no explicit end)
+                    self.sections_seen += 1;
+                    if self.limit_exceeded() {
+                        self.state = SectionState::Done;
+                        false
+                    } else {
+                        include_line
                     }
                 } else {
-                    // No end pattern, check for next section start
-                    if let Some(ref start_pattern) = self.config.start_pattern {
-                        if start_pattern.is_match(line) {
-                            // Found start of next section
-                            self.sections_seen += 1;
-
-                            // Check if we've hit the limit
-                            if self.config.max_sections > 0
-                                && self.sections_seen > self.config.max_sections
-                            {
-                                self.state = SectionState::Done;
-                                false // Over the limit, skip this line
-                            } else {
-                                true // Start of new section, include line
-                            }
-                        } else {
-                            true // Still in section, include line
-                        }
-                    } else {
-                        // No end pattern and no start pattern, always include
-                        true
-                    }
+                    true // Still in section, include line
                 }
             }
             SectionState::BetweenSections => {
-                // Between sections, looking for next section start
-                if let Some(ref start_pattern) = self.config.start_pattern {
-                    if start_pattern.is_match(line) {
-                        // Found start of next section
-                        self.sections_seen += 1;
-
-                        // Check if we've hit the limit
-                        if self.config.max_sections > 0
-                            && self.sections_seen > self.config.max_sections
-                        {
-                            self.state = SectionState::Done;
-                            false // Over the limit, skip this line
-                        } else {
-                            self.state = SectionState::InSection;
-                            true // Start of new section, include line
-                        }
+                if let Some(include_line) = self.matches_start(line) {
+                    self.sections_seen += 1;
+                    if self.limit_exceeded() {
+                        self.state = SectionState::Done;
+                        false
                     } else {
-                        false // Still between sections, skip line
+                        self.state = SectionState::InSection;
+                        include_line
                     }
                 } else {
-                    // No start pattern but we're between sections - shouldn't happen
-                    // but handle it by staying in section
-                    true
+                    // Between sections, skip until we find the next start
+                    false
                 }
             }
         }
+    }
+
+    fn matches_start(&self, line: &str) -> Option<bool> {
+        match &self.config.start {
+            Some(SectionStart::From(pattern)) => {
+                if pattern.is_match(line) {
+                    Some(true)
+                } else {
+                    None
+                }
+            }
+            Some(SectionStart::After(pattern)) => {
+                if pattern.is_match(line) {
+                    Some(false)
+                } else {
+                    None
+                }
+            }
+            None => None,
+        }
+    }
+
+    fn matches_end(&self, line: &str) -> Option<bool> {
+        match &self.config.end {
+            Some(SectionEnd::Before(pattern)) => {
+                if pattern.is_match(line) {
+                    Some(false)
+                } else {
+                    None
+                }
+            }
+            Some(SectionEnd::Through(pattern)) => {
+                if pattern.is_match(line) {
+                    Some(true)
+                } else {
+                    None
+                }
+            }
+            None => None,
+        }
+    }
+
+    fn limit_reached(&self) -> bool {
+        self.config.max_sections > 0 && self.sections_seen >= self.config.max_sections
+    }
+
+    fn limit_exceeded(&self) -> bool {
+        self.config.max_sections > 0 && self.sections_seen > self.config.max_sections
     }
 }
 
@@ -146,117 +153,124 @@ mod tests {
     use super::*;
     use regex::Regex;
 
-    fn create_config(start: Option<&str>, end: Option<&str>, max_sections: i64) -> SectionConfig {
+    fn start_from(pattern: &str) -> SectionStart {
+        SectionStart::From(Regex::new(pattern).unwrap())
+    }
+
+    fn start_after(pattern: &str) -> SectionStart {
+        SectionStart::After(Regex::new(pattern).unwrap())
+    }
+
+    fn end_before(pattern: &str) -> SectionEnd {
+        SectionEnd::Before(Regex::new(pattern).unwrap())
+    }
+
+    fn end_through(pattern: &str) -> SectionEnd {
+        SectionEnd::Through(Regex::new(pattern).unwrap())
+    }
+
+    fn build_config(
+        start: Option<SectionStart>,
+        end: Option<SectionEnd>,
+        max_sections: i64,
+    ) -> SectionConfig {
         SectionConfig {
-            start_pattern: start.map(|s| Regex::new(s).unwrap()),
-            end_pattern: end.map(|s| Regex::new(s).unwrap()),
+            start,
+            end,
             max_sections,
         }
     }
 
     #[test]
-    fn test_single_section_with_start_and_end() {
-        let config = create_config(Some(r"^START"), Some(r"^END"), -1);
+    fn start_from_end_before_matches_legacy_behavior() {
+        let config = build_config(Some(start_from(r"^START")), Some(end_before(r"^END")), -1);
         let mut selector = SectionSelector::new(config);
 
         assert!(!selector.should_include_line("before"));
         assert!(selector.should_include_line("START line"));
         assert!(selector.should_include_line("content1"));
         assert!(selector.should_include_line("content2"));
-        assert!(!selector.should_include_line("END line")); // end is exclusive
+        assert!(!selector.should_include_line("END line"));
         assert!(!selector.should_include_line("after"));
     }
 
     #[test]
-    fn test_multiple_sections() {
-        let config = create_config(Some(r"^START"), Some(r"^END"), -1);
+    fn start_after_skips_marker_line() {
+        let config = build_config(
+            Some(start_after(r"^== HEADER")),
+            Some(end_before(r"^== NEXT")),
+            -1,
+        );
         let mut selector = SectionSelector::new(config);
 
-        // First section
-        assert!(selector.should_include_line("START 1"));
-        assert!(selector.should_include_line("content 1"));
-        assert!(!selector.should_include_line("END 1"));
-
-        // Between sections
-        assert!(!selector.should_include_line("between"));
-
-        // Second section
-        assert!(selector.should_include_line("START 2"));
-        assert!(selector.should_include_line("content 2"));
-        assert!(!selector.should_include_line("END 2"));
+        assert!(!selector.should_include_line("preamble"));
+        assert!(!selector.should_include_line("== HEADER"));
+        assert!(selector.should_include_line("body line"));
+        assert!(!selector.should_include_line("== NEXT"));
     }
 
     #[test]
-    fn test_max_sections_limit() {
-        let config = create_config(Some(r"^START"), Some(r"^END"), 2);
+    fn end_through_includes_terminator() {
+        let config = build_config(Some(start_from(r"^BEGIN")), Some(end_through(r"^END$")), -1);
         let mut selector = SectionSelector::new(config);
 
-        // First section
+        assert!(selector.should_include_line("BEGIN"));
+        assert!(selector.should_include_line("payload"));
+        assert!(selector.should_include_line("END"));
+        assert!(!selector.should_include_line("after"));
+    }
+
+    #[test]
+    fn multiple_sections_respect_limits() {
+        let config = build_config(Some(start_from(r"^START")), Some(end_before(r"^END")), 2);
+        let mut selector = SectionSelector::new(config);
+
         assert!(selector.should_include_line("START 1"));
-        assert!(selector.should_include_line("content 1"));
+        assert!(selector.should_include_line("line 1"));
         assert!(!selector.should_include_line("END 1"));
 
-        // Second section
+        assert!(!selector.should_include_line("noise"));
+
         assert!(selector.should_include_line("START 2"));
-        assert!(selector.should_include_line("content 2"));
+        assert!(selector.should_include_line("line 2"));
         assert!(!selector.should_include_line("END 2"));
 
-        // Third section (should be skipped)
         assert!(!selector.should_include_line("START 3"));
-        assert!(!selector.should_include_line("content 3"));
+        assert!(!selector.should_include_line("line 3"));
         assert!(!selector.should_include_line("END 3"));
     }
 
     #[test]
-    fn test_start_only_no_end() {
-        let config = create_config(Some(r"^== \w+ Logs"), None, -1);
+    fn start_only_with_inclusive_marker() {
+        let config = build_config(Some(start_from(r"^== ")), None, -1);
         let mut selector = SectionSelector::new(config);
 
         assert!(!selector.should_include_line("header"));
-        assert!(selector.should_include_line("== iked Logs"));
-        assert!(selector.should_include_line("log line 1"));
-        assert!(selector.should_include_line("log line 2"));
-
-        // New section starts, previous ends
-        assert!(selector.should_include_line("== UI Logs"));
-        assert!(selector.should_include_line("ui log 1"));
+        assert!(selector.should_include_line("== A"));
+        assert!(selector.should_include_line("a1"));
+        assert!(selector.should_include_line("== B"));
+        assert!(selector.should_include_line("b1"));
     }
 
     #[test]
-    fn test_start_only_with_limit() {
-        let config = create_config(Some(r"^=="), None, 1);
+    fn start_after_respects_limits_without_end() {
+        let config = build_config(Some(start_after(r"^== ")), None, 1);
         let mut selector = SectionSelector::new(config);
 
-        assert!(selector.should_include_line("== Section 1"));
-        assert!(selector.should_include_line("content 1"));
-
-        // Second section should be skipped
-        assert!(!selector.should_include_line("== Section 2"));
-        assert!(!selector.should_include_line("content 2"));
+        assert!(!selector.should_include_line("== A"));
+        assert!(selector.should_include_line("a1"));
+        assert!(selector.should_include_line("a2"));
+        assert!(!selector.should_include_line("== B"));
+        assert!(!selector.should_include_line("b1"));
     }
 
     #[test]
-    fn test_no_patterns_processes_everything() {
-        let config = create_config(None, None, -1);
+    fn no_patterns_include_everything() {
+        let config = build_config(None, None, -1);
         let mut selector = SectionSelector::new(config);
 
-        // With no patterns, everything is included
         assert!(selector.should_include_line("line 1"));
         assert!(selector.should_include_line("line 2"));
         assert!(selector.should_include_line("line 3"));
-    }
-
-    #[test]
-    fn test_end_only() {
-        let config = create_config(None, Some(r"^END"), -1);
-        let mut selector = SectionSelector::new(config);
-
-        // Starts immediately (no start pattern)
-        assert!(selector.should_include_line("content 1"));
-        assert!(selector.should_include_line("content 2"));
-        assert!(!selector.should_include_line("END")); // Exclusive
-
-        // After end, continues processing (no start pattern to resume)
-        assert!(selector.should_include_line("content 3"));
     }
 }

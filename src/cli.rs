@@ -87,13 +87,37 @@ pub struct Cli {
     #[arg(long = "skip-lines", help_heading = "Input Options")]
     pub skip_lines: Option<usize>,
 
-    /// Start including lines when this regex matches (inclusive)
-    #[arg(long = "section-start", help_heading = "Input Options")]
-    pub section_start: Option<String>,
+    /// Start emitting sections from the matching line (inclusive)
+    #[arg(
+        long = "section-from",
+        help_heading = "Input Options",
+        conflicts_with = "section_after"
+    )]
+    pub section_from: Option<String>,
 
-    /// Stop including lines when this regex matches (exclusive)
-    #[arg(long = "section-end", help_heading = "Input Options")]
-    pub section_end: Option<String>,
+    /// Start emitting sections after the matching line (exclusive start)
+    #[arg(
+        long = "section-after",
+        help_heading = "Input Options",
+        conflicts_with = "section_from"
+    )]
+    pub section_after: Option<String>,
+
+    /// Stop before the matching line (exclusive end)
+    #[arg(
+        long = "section-before",
+        help_heading = "Input Options",
+        conflicts_with = "section_through"
+    )]
+    pub section_before: Option<String>,
+
+    /// Stop after emitting the matching line (inclusive end)
+    #[arg(
+        long = "section-through",
+        help_heading = "Input Options",
+        conflicts_with = "section_before"
+    )]
+    pub section_through: Option<String>,
 
     /// Maximum number of sections to process (default: -1 for unlimited)
     #[arg(

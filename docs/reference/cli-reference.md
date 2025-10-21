@@ -160,20 +160,36 @@ kelora --ignore-lines '^#' app.log    # Skip comments
 
 Process specific sections of log files with multiple logical sections.
 
-#### `--section-start <REGEX>`
+#### `--section-from <REGEX>`
 
-Start including lines when this regex matches (inclusive). Without `--section-end`, processes from the first match until EOF or the start of the next section.
+Start emitting a section from the line that matches (inclusive). Without a stop flag, processing continues until EOF or the next occurrence of the start pattern.
 
 ```bash
-kelora --section-start '^== iked Logs' system.log
+kelora --section-from '^== iked Logs' system.log
 ```
 
-#### `--section-end <REGEX>`
+#### `--section-after <REGEX>`
 
-Stop including lines when this regex matches (exclusive). Only applies to lines within sections started by `--section-start`.
+Begin the section after the matching line (exclusive start). Useful when headers are just markers.
 
 ```bash
-kelora --section-start '^== iked Logs' --section-end '^==' system.log
+kelora --section-after '^== HEADER' --section-before '^==' app.log
+```
+
+#### `--section-before <REGEX>`
+
+Stop the section when the regex matches (exclusive end). This mirrors the previous `--section-end` behavior.
+
+```bash
+kelora --section-from '^== iked Logs' --section-before '^==' system.log
+```
+
+#### `--section-through <REGEX>`
+
+Stop only after emitting the matching line (inclusive end). Handy when the footer carries status information.
+
+```bash
+kelora --section-from '^BEGIN' --section-through '^END$' build.log
 ```
 
 #### `--max-sections <N>`
@@ -182,10 +198,10 @@ Maximum number of sections to process. Default: -1 (unlimited).
 
 ```bash
 # Process first 2 sections
-kelora --section-start '^== ' --max-sections 2 system.log
+kelora --section-from '^== ' --max-sections 2 system.log
 
 # Process only first section
-kelora --section-start '^Session' --section-end '^End' --max-sections 1 app.log
+kelora --section-from '^Session' --section-before '^End' --max-sections 1 app.log
 ```
 
 **Processing Order:**
@@ -193,7 +209,7 @@ kelora --section-start '^Session' --section-end '^End' --max-sections 1 app.log
 Section selection runs early in the pipeline, before `--keep-lines` and `--ignore-lines`:
 
 1. `--skip-lines` - Skip first N lines
-2. **`--section-start/end`** - Select sections
+2. **`--section-from/after/before/through`** - Select sections
 3. `--keep-lines` - Keep matching lines within sections
 4. `--ignore-lines` - Ignore matching lines within sections
 5. `-M/--multiline` - Group lines into events
@@ -203,13 +219,13 @@ Section selection runs early in the pipeline, before `--keep-lines` and `--ignor
 
 ```bash
 # Extract specific service logs from docker-compose output
-docker compose logs | kelora --section-start '^web_1' --section-end '^(db_1|api_1)' -f line
+docker compose logs | kelora --section-from '^web_1' --section-before '^(db_1|api_1)' -f line
 
 # Process first 3 user sessions
-kelora --section-start 'User .* logged in' --section-end 'logged out' --max-sections 3 app.log
+kelora --section-from 'User .* logged in' --section-through 'logged out' --max-sections 3 app.log
 
 # Extract iked section, then filter for errors
-kelora --section-start '^== iked' --section-end '^==' --keep-lines 'ERROR' system.log
+kelora --section-after '^== iked' --section-before '^==' --keep-lines 'ERROR' system.log
 ```
 
 **Performance:**

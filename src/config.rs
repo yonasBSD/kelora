@@ -261,9 +261,27 @@ pub enum MultilineStrategy {
 /// Section selection configuration
 #[derive(Debug, Clone)]
 pub struct SectionConfig {
-    pub start_pattern: Option<regex::Regex>,
-    pub end_pattern: Option<regex::Regex>,
+    pub start: Option<SectionStart>,
+    pub end: Option<SectionEnd>,
     pub max_sections: i64,
+}
+
+/// Section start boundary semantics
+#[derive(Debug, Clone)]
+pub enum SectionStart {
+    /// Begin emitting with the matching line
+    From(regex::Regex),
+    /// Begin emitting after the matching line
+    After(regex::Regex),
+}
+
+/// Section end boundary semantics
+#[derive(Debug, Clone)]
+pub enum SectionEnd {
+    /// Stop before the matching line
+    Before(regex::Regex),
+    /// Stop after emitting the matching line
+    Through(regex::Regex),
 }
 
 impl MultilineConfig {

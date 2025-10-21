@@ -5723,7 +5723,7 @@ fn test_network_functions_with_combined_format() {
 // Section Selection Tests
 
 #[test]
-fn test_section_start_with_end() {
+fn test_section_from_with_before() {
     let input = "header line\n\
                  == Section A\n\
                  a1\n\
@@ -5734,9 +5734,9 @@ fn test_section_start_with_end() {
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
         &[
-            "--section-start",
+            "--section-from",
             "^== Section A",
-            "--section-end",
+            "--section-before",
             "^==",
             "-f",
             "line",
@@ -5753,7 +5753,7 @@ fn test_section_start_with_end() {
 }
 
 #[test]
-fn test_section_start_only() {
+fn test_section_from_only() {
     let input = "header\n\
                  == Section A\n\
                  a1\n\
@@ -5762,7 +5762,7 @@ fn test_section_start_only() {
                  footer\n";
 
     let (stdout, _stderr, exit_code) =
-        run_kelora_with_input(&["--section-start", "^== Section B", "-f", "line"], input);
+        run_kelora_with_input(&["--section-from", "^== Section B", "-f", "line"], input);
 
     assert_eq!(exit_code, 0);
     assert!(stdout.contains("Section B"));
@@ -5781,14 +5781,7 @@ fn test_max_sections_limit() {
                  s3\n";
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
-        &[
-            "--section-start",
-            "^==",
-            "--max-sections",
-            "2",
-            "-f",
-            "line",
-        ],
+        &["--section-from", "^==", "--max-sections", "2", "-f", "line"],
         input,
     );
 
@@ -5800,7 +5793,7 @@ fn test_max_sections_limit() {
 }
 
 #[test]
-fn test_section_with_keep_lines() {
+fn test_section_from_with_keep_lines() {
     let input = "header\n\
                  == Target Section\n\
                  ERROR: problem\n\
@@ -5811,9 +5804,9 @@ fn test_section_with_keep_lines() {
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
         &[
-            "--section-start",
+            "--section-from",
             "^== Target",
-            "--section-end",
+            "--section-before",
             "^==",
             "--keep-lines",
             "ERROR",
@@ -5831,7 +5824,7 @@ fn test_section_with_keep_lines() {
 }
 
 #[test]
-fn test_section_with_json_format() {
+fn test_section_from_with_json_format() {
     let input = "header\n\
                  == Important\n\
                  {\"level\":\"error\",\"msg\":\"failed\"}\n\
@@ -5841,9 +5834,9 @@ fn test_section_with_json_format() {
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
         &[
-            "--section-start",
+            "--section-from",
             "^== Important",
-            "--section-end",
+            "--section-before",
             "^== Boring",
             "--ignore-lines",
             "^==",
@@ -5859,7 +5852,7 @@ fn test_section_with_json_format() {
 }
 
 #[test]
-fn test_section_parallel_mode() {
+fn test_section_from_parallel_mode() {
     let input = "== Section A\n\
                  line1\n\
                  line2\n\
@@ -5868,9 +5861,9 @@ fn test_section_parallel_mode() {
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
         &[
-            "--section-start",
+            "--section-from",
             "^== Section A",
-            "--section-end",
+            "--section-before",
             "^==",
             "--parallel",
             "-f",
@@ -5887,11 +5880,62 @@ fn test_section_parallel_mode() {
 }
 
 #[test]
+fn test_section_after_excludes_marker() {
+    let input = "== Section A\n\
+                 line1\n\
+                 == Section B\n\
+                 line2\n";
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "--section-after",
+            "^== Section A",
+            "--section-before",
+            "^==",
+            "-f",
+            "line",
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code, 0);
+    assert!(!stdout.contains("Section A"));
+    assert!(stdout.contains("line1"));
+    assert!(!stdout.contains("Section B"));
+}
+
+#[test]
+fn test_section_through_includes_end_line() {
+    let input = "== Section A START\n\
+                 body1\n\
+                 == END SECTION\n\
+                 tail\n";
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "--section-from",
+            "^== Section A",
+            "--section-through",
+            "^== END SECTION",
+            "-f",
+            "line",
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code, 0);
+    assert!(stdout.contains("Section A START"));
+    assert!(stdout.contains("body1"));
+    assert!(stdout.contains("END SECTION")); // inclusive
+    assert!(!stdout.contains("tail"));
+}
+
+#[test]
 fn test_no_matching_section() {
     let input = "line1\nline2\nline3\n";
 
     let (stdout, _stderr, exit_code) =
-        run_kelora_with_input(&["--section-start", "^== NONEXISTENT", "-f", "line"], input);
+        run_kelora_with_input(&["--section-from", "^== NONEXISTENT", "-f", "line"], input);
 
     assert_eq!(exit_code, 0);
     assert!(stdout.is_empty());
@@ -5908,7 +5952,7 @@ fn test_multiple_sections_unlimited() {
 
     // Default max-sections is -1 (unlimited)
     let (stdout, _stderr, exit_code) =
-        run_kelora_with_input(&["--section-start", "^==", "-f", "line"], input);
+        run_kelora_with_input(&["--section-from", "^==", "-f", "line"], input);
 
     assert_eq!(exit_code, 0);
     assert!(stdout.contains("S1"));
