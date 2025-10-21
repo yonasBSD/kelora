@@ -71,9 +71,6 @@ impl SignalHandler {
     pub fn new(ctrl_sender: Sender<Ctrl>) -> Result<Self> {
         #[cfg(unix)]
         {
-            let mut signals_to_handle = vec![SIGINT, SIGPIPE, SIGTERM, SIGUSR1];
-
-            // Add SIGINFO on BSD-like systems (includes macOS)
             #[cfg(all(
                 unix,
                 any(
@@ -84,7 +81,19 @@ impl SignalHandler {
                     target_os = "dragonfly"
                 )
             ))]
-            signals_to_handle.push(SIGINFO);
+            let signals_to_handle = vec![SIGINT, SIGPIPE, SIGTERM, SIGUSR1, SIGINFO];
+
+            #[cfg(not(all(
+                unix,
+                any(
+                    target_os = "macos",
+                    target_os = "freebsd",
+                    target_os = "openbsd",
+                    target_os = "netbsd",
+                    target_os = "dragonfly"
+                )
+            )))]
+            let signals_to_handle = vec![SIGINT, SIGPIPE, SIGTERM, SIGUSR1];
 
             let mut signals = Signals::new(&signals_to_handle)?;
 

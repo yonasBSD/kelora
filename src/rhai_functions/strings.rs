@@ -856,7 +856,7 @@ fn decode_jwt_segment(segment: &str) -> Option<Vec<u8>> {
         Ok(bytes) => Some(bytes),
         Err(_) => {
             let mut padded = segment.to_string();
-            while padded.len() % 4 != 0 {
+            while !padded.len().is_multiple_of(4) {
                 padded.push('=');
                 if padded.len() > MAX_PARSE_LEN {
                     return None;
