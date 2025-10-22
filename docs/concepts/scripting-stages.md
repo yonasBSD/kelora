@@ -220,7 +220,7 @@ kelora -j \
 ```bash
 kelora -j \
     --begin 'conf.blocked_ips = ["192.168.1.100", "10.0.0.50"]' \
-    --filter '(e.ip in conf.blocked_ips) == false' \
+    --filter '!(e.ip in conf.blocked_ips)' \
     app.log
 ```
 
