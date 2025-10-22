@@ -952,6 +952,60 @@ e.status = to_int_or(e.status_string, 0)
 e.score = to_float_or(e.score_string, 0.0)
 ```
 
+#### `value.or_unit()`
+Convert empty values to Unit `()` for removal/filtering.
+
+Converts conceptually "empty" values to Unit, which:
+- Removes the field when assigned (e.g., `e.field = value.or_unit()`)
+- Gets skipped by `track_*()` functions
+- Works with missing fields (passes Unit through unchanged)
+
+**Supported empty values:**
+- Empty string: `""` → `()`
+- Empty array: `[]` → `()`
+- Empty map: `#{}` → `()`
+- Unit itself: `()` → `()` (pass-through)
+
+**String extraction:**
+```rhai
+// Extract only when prefix exists, otherwise remove field
+e.name = e.message.after("prefix:").or_unit()
+
+// Track only non-empty values
+track_unique("names", e.extracted.or_unit())
+```
+
+**Array filtering:**
+```rhai
+// Only assign tags if array is non-empty
+e.tags = e.tags.or_unit()  // [] becomes (), field removed
+
+// Track only events with items
+track_bucket("item_count", e.items.len())
+if e.items.len() == 0 {
+    e.items = e.items.or_unit()  // Remove empty array
+}
+```
+
+**Map filtering:**
+```rhai
+// Only keep non-empty metadata
+e.metadata = e.parse_json().or_unit()  // {} becomes (), field removed
+
+// Safe chaining with missing fields
+e.optional = e.maybe_field.or_unit()  // Works even if maybe_field is ()
+```
+
+**Common pattern - conditional extraction and tracking:**
+```rhai
+e.extracted = e.message.after("User:").or_unit()
+track_unique("users", e.extracted)  // Only tracks when extraction succeeds
+
+// Filter events with no data
+e.results = e.search_results.or_unit()
+track_unique("result_sets", e.results)  // Skips empty arrays and ()
+```
+
 ---
 
 ## Utility Functions
@@ -1019,6 +1073,9 @@ e.avg_time = recent_times.reduce(|s, x| s + x, 0) / recent_times.len()
 
 All tracking functions require the `--metrics` flag.
 
+!!! tip "Unit Value Handling"
+    All `track_*()` functions that accept values silently skip Unit `()` values. This enables safe tracking of optional or extracted fields without needing conditional checks.
+
 ### Tracking Functions {#tracking-functions}
 
 #### `track_count(key)`
@@ -1030,15 +1087,19 @@ track_count("total")                                  // Global counter
 ```
 
 #### `track_sum(key, value)`
-Accumulate numeric values for key.
+Accumulate numeric values for key. Skips Unit `()` values.
 
 ```rhai
 track_sum("total_bytes", e.bytes)
 track_sum(e.endpoint, e.response_time)
+
+// Safe with conversions that may fail
+let score = e.score_str.to_int()  // Returns () on error
+track_sum("total_score", score)   // Skips () values
 ```
 
 #### `track_min(key, value)` / `track_max(key, value)`
-Track minimum/maximum value for key.
+Track minimum/maximum value for key. Skips Unit `()` values.
 
 ```rhai
 track_min("fastest", e.response_time)
@@ -1046,19 +1107,25 @@ track_max("slowest", e.response_time)
 ```
 
 #### `track_unique(key, value)`
-Track unique values for key.
+Track unique values for key. Skips Unit `()` values.
 
 ```rhai
 track_unique("users", e.user_id)
 track_unique("ips", e.client_ip)
+
+// Combined with .or_unit() for conditional tracking
+track_unique("names", e.message.after("User:").or_unit())
 ```
 
 #### `track_bucket(key, bucket)`
-Track values in buckets for histograms.
+Track values in buckets for histograms. Skips Unit `()` values.
 
 ```rhai
 let bucket = floor(e.response_time / 100) * 100
 track_bucket("latency", bucket)
+
+// Safe with optional fields
+track_bucket("user_types", e.user_type.or_unit())  // Skips empty/missing
 ```
 
 ---

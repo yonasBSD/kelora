@@ -1254,6 +1254,288 @@ fn test_mixed_tracking_functions() {
 }
 
 #[test]
+fn test_or_unit_with_empty_strings() {
+    let input = r#"{"message": "prefix:found"}
+{"message": "no prefix here"}
+{"message": "prefix:also_found"}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "e.extracted = e.message.after(\"prefix:\").or_unit();",
+            "-F",
+            "json",
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    // Parse output to check that empty strings were converted to Unit (missing field)
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 3, "Should output 3 lines");
+
+    // First event should have extracted field
+    assert!(
+        lines[0].contains("\"extracted\":\"found\""),
+        "First event should have extracted field with value"
+    );
+
+    // Second event should NOT have extracted field (Unit removes it)
+    assert!(
+        !lines[1].contains("extracted"),
+        "Second event should not have extracted field (empty string became Unit)"
+    );
+
+    // Third event should have extracted field
+    assert!(
+        lines[2].contains("\"extracted\":\"also_found\""),
+        "Third event should have extracted field with value"
+    );
+}
+
+#[test]
+fn test_track_unique_with_unit_values() {
+    let input = r#"{"user": "alice", "optional": "value1"}
+{"user": "bob"}
+{"user": "charlie", "optional": "value2"}
+{"user": "dave", "optional": "value1"}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "track_unique(\"users\", e.user); track_unique(\"optionals\", e.optional.or_unit());",
+            "--end",
+            "print(`Users: ${metrics[\"users\"].len()}, Optionals: ${metrics[\"optionals\"].len()}`);"
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    // Should track 4 users and 2 optional values (bob's missing optional is skipped)
+    assert!(stdout.contains("Users: 4"), "Should track 4 unique users");
+    assert!(
+        stdout.contains("Optionals: 2"),
+        "Should track 2 unique optional values, skipping Unit"
+    );
+}
+
+#[test]
+fn test_or_unit_prevents_empty_field_assignment() {
+    let input = r#"{"message": "prefix:value1"}
+{"message": "no prefix"}
+{"message": "prefix:value2"}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "e.extracted = e.message.after(\"prefix:\").or_unit(); track_unique(\"values\", e.extracted);",
+            "--end",
+            "print(`Unique: ${metrics[\"values\"].len()}`);",
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    // Should track only 2 unique values (empty string from missing prefix is skipped)
+    assert!(
+        stdout.contains("Unique: 2"),
+        "Should track 2 unique values, skipping empty/Unit"
+    );
+}
+
+#[test]
+fn test_or_unit_with_empty_arrays() {
+    let input = r#"{"id": 1, "tags": ["a", "b"]}
+{"id": 2, "tags": []}
+{"id": 3, "tags": ["c"]}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "e.tags = e.tags.or_unit();",
+            "-F",
+            "json",
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 3, "Should output 3 lines");
+
+    // First event should have tags
+    assert!(
+        lines[0].contains("\"tags\":[\"a\",\"b\"]"),
+        "First event should have tags array"
+    );
+
+    // Second event should NOT have tags field (empty array became Unit)
+    assert!(
+        !lines[1].contains("tags"),
+        "Second event should not have tags field (empty array became Unit)"
+    );
+    assert!(
+        lines[1].contains("\"id\":2"),
+        "Second event should still have id field"
+    );
+
+    // Third event should have tags
+    assert!(
+        lines[2].contains("\"tags\":[\"c\"]"),
+        "Third event should have tags array"
+    );
+}
+
+#[test]
+fn test_or_unit_with_empty_maps() {
+    let input = r#"{"id": 1, "metadata": {"key": "value"}}
+{"id": 2, "metadata": {}}
+{"id": 3, "metadata": {"foo": "bar"}}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "e.metadata = e.metadata.or_unit();",
+            "-F",
+            "json",
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 3, "Should output 3 lines");
+
+    // First event should have metadata
+    assert!(
+        lines[0].contains("\"metadata\":{\"key\":\"value\"}"),
+        "First event should have metadata map"
+    );
+
+    // Second event should NOT have metadata field (empty map became Unit)
+    assert!(
+        !lines[1].contains("metadata"),
+        "Second event should not have metadata field (empty map became Unit)"
+    );
+    assert!(
+        lines[1].contains("\"id\":2"),
+        "Second event should still have id field"
+    );
+
+    // Third event should have metadata
+    assert!(
+        lines[2].contains("\"metadata\":{\"foo\":\"bar\"}"),
+        "Third event should have metadata map"
+    );
+}
+
+#[test]
+fn test_track_unique_with_empty_arrays() {
+    let input = r#"{"id": 1, "tags": ["a", "b"]}
+{"id": 2, "tags": []}
+{"id": 3, "tags": ["c"]}
+{"id": 4, "tags": []}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "let tag_str = e.tags.join(\",\"); track_unique(\"tag_sets\", tag_str.or_unit());",
+            "--end",
+            "print(`Unique: ${metrics[\"tag_sets\"].len()}`);",
+            "--metrics",
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    // Should track only 2 unique tag sets (empty array joins become empty string, then Unit, skipped)
+    assert!(
+        stdout.contains("Unique: 2"),
+        "Should track 2 unique tag sets, skipping empty arrays"
+    );
+}
+
+#[test]
+fn test_track_sum_min_max_with_unit() {
+    let input = r#"{"score": "100"}
+{"score": ""}
+{"score": "50"}
+{"score": "200"}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "let s = e.score.to_int(); track_sum(\"total\", s); track_min(\"min\", s); track_max(\"max\", s);",
+            "--end",
+            "print(`Sum: ${metrics[\"total\"]}, Min: ${metrics[\"min\"]}, Max: ${metrics[\"max\"]}`);"
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    // Empty string to_int() returns Unit, which should be skipped
+    // So sum of 100 + 50 + 200 = 350, min = 50, max = 200
+    assert!(
+        stdout.contains("Sum: 350"),
+        "Should sum only valid integers, skipping Unit"
+    );
+    assert!(
+        stdout.contains("Min: 50"),
+        "Should track minimum, skipping Unit"
+    );
+    assert!(
+        stdout.contains("Max: 200"),
+        "Should track maximum, skipping Unit"
+    );
+}
+
+#[test]
+fn test_track_bucket_with_unit() {
+    let input = r#"{"status": "200", "user": "alice"}
+{"status": "404"}
+{"status": "200", "user": "bob"}
+{"status": "500", "user": ""}
+{"status": "200"}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "track_bucket(\"status_dist\", e.status); track_bucket(\"user_dist\", e.user.or_unit());",
+            "--end",
+            "print(`Status_200: ${metrics[\"status_dist\"].get(\"200\") ?? 0}, Users: ${metrics[\"user_dist\"].len()}`);"
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    // Should bucket status normally, but skip empty users
+    assert!(
+        stdout.contains("Status_200: 3"),
+        "Should count 3 occurrences of status 200"
+    );
+    assert!(
+        stdout.contains("Users: 2"),
+        "Should bucket only 2 users (alice, bob), skipping empty and missing"
+    );
+}
+
+#[test]
 fn test_multiline_real_world_scenario() {
     let input = r#"{"timestamp": "2023-07-18T15:04:23.456Z", "user": "alice", "status": 200, "message": "login successful", "response_time": 45}
 {"timestamp": "2023-07-18T15:04:25.789Z", "user": "bob", "status": 404, "message": "page not found", "response_time": 12}

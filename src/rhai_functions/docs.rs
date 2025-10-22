@@ -72,6 +72,7 @@ text.strip([chars])                  Remove whitespace or specified characters
 text.sub_string(start [,length])     Extract substring from position (builtin)
 text.to_float()                      Convert text to float (returns () on error)
 text.to_int()                        Convert text to integer (returns () on error)
+text.or_unit()                       Convert empty string/array/map to () for removal/filtering
 text.to_lower()                      Convert to lowercase (builtin)
 text.to_upper()                      Convert to uppercase (builtin)
 text.trim()                          Remove whitespace from start and end (builtin)
@@ -184,12 +185,12 @@ window_numbers(field)                Get numeric field values from current windo
 window_values(field)                 Get field values from current window (requires --window)
 
 TRACKING/METRICS FUNCTIONS (requires --metrics):
-track_bucket(key, bucket)            Track values in buckets for histograms
+track_bucket(key, bucket)            Track values in buckets for histograms (skips () values)
 track_count(key)                     Increment counter for key by 1
-track_max(key, value)                Track maximum value for key
-track_min(key, value)                Track minimum value for key
-track_sum(key, value)                Accumulate numeric values for key
-track_unique(key, value)             Track unique values for key
+track_max(key, value)                Track maximum value for key (skips () values)
+track_min(key, value)                Track minimum value for key (skips () values)
+track_sum(key, value)                Accumulate numeric values for key (skips () values)
+track_unique(key, value)             Track unique values for key (skips () values)
 
 FILE OUTPUT (requires --allow-fs-writes):
 append_file(path, text_or_array)     Append line(s) to file; arrays append one line per element

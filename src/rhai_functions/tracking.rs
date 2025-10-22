@@ -493,6 +493,11 @@ pub fn register_functions(engine: &mut Engine) {
         record_operation_metadata(key, "sum");
     });
 
+    // Unit overload - no-op for missing/empty values
+    engine.register_fn("track_sum", |_key: &str, _value: ()| {
+        // Silently ignore Unit values - no tracking occurs
+    });
+
     // track_min overloads for different number types
     engine.register_fn("track_min", |key: &str, value: i64| {
         let updated = with_user_tracking(|state| {
@@ -589,6 +594,11 @@ pub fn register_functions(engine: &mut Engine) {
         }
     });
 
+    // Unit overload - no-op for missing/empty values
+    engine.register_fn("track_min", |_key: &str, _value: ()| {
+        // Silently ignore Unit values - no tracking occurs
+    });
+
     // track_max overloads for different number types
     engine.register_fn("track_max", |key: &str, value: i64| {
         let updated = with_user_tracking(|state| {
@@ -683,6 +693,11 @@ pub fn register_functions(engine: &mut Engine) {
         if updated {
             record_operation_metadata(key, "max");
         }
+    });
+
+    // Unit overload - no-op for missing/empty values
+    engine.register_fn("track_max", |_key: &str, _value: ()| {
+        // Silently ignore Unit values - no tracking occurs
     });
 
     engine.register_fn("track_unique", |key: &str, value: &str| {
@@ -822,6 +837,11 @@ pub fn register_functions(engine: &mut Engine) {
         }
     });
 
+    // Unit overload - no-op for missing/empty values
+    engine.register_fn("track_unique", |_key: &str, _value: ()| {
+        // Silently ignore Unit values - no tracking occurs
+    });
+
     engine.register_fn("track_bucket", |key: &str, bucket: &str| {
         let updated = with_user_tracking(|state| {
             // Get existing map or create new one
@@ -951,6 +971,11 @@ pub fn register_functions(engine: &mut Engine) {
         if updated {
             record_operation_metadata(key, "bucket");
         }
+    });
+
+    // Unit overload - no-op for missing/empty values
+    engine.register_fn("track_bucket", |_key: &str, _value: ()| {
+        // Silently ignore Unit values - no tracking occurs
     });
 }
 

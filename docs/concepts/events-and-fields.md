@@ -58,7 +58,12 @@ Kelora preserves JSON types after parsing:
 | Array | `[1, 2, 3]` | `e.scores` |
 
 **Unit Type `()`:**
-In Rhai, `null` from JSON becomes the unit type `()`, representing "no value" or "empty".
+In Rhai, `null` from JSON becomes the unit type `()`, representing "no value" or "empty". Unit values have special behaviors:
+
+- Assigning `()` to a field removes it from the event
+- Missing fields return `()` when accessed
+- `track_*()` functions silently skip `()` values
+- Use `.or_unit()` to convert empty values (strings, arrays, maps) to `()` for conditional field assignment
 
 ## Field Access Patterns
 
@@ -148,6 +153,12 @@ if e.has_path("user.role") {
 } else {
     "guest"
 }
+
+// Check against Unit (missing fields return ())
+if e.optional_field != () {
+    // Field exists and has a value
+    e.optional_field
+}
 ```
 
 ### Array Bounds Checking
@@ -226,6 +237,63 @@ e.internal_id = ()       // Remove another field
 ```
 
 Removed fields won't appear in output.
+
+### Conditional Field Assignment
+
+Use `.or_unit()` to conditionally assign fields based on empty values. It works with strings, arrays, and maps:
+
+**String extraction:**
+```rhai
+// Only assign field if extraction succeeds
+e.user = e.message.after("User:").or_unit()
+// If "User:" not found → empty string → Unit → field removed
+
+e.code = e.error.extract_re(r"ERR-(\d+)", 1).or_unit()
+// If regex doesn't match → empty string → Unit → field removed
+```
+
+**Array filtering:**
+```rhai
+// Remove field if array is empty
+e.tags = e.tags.or_unit()
+// If tags is [] → Unit → field removed
+
+// Only track events with items
+track_unique("has_items", e.items.or_unit())
+// Skips events where items is [] or ()
+```
+
+**Map/object filtering:**
+```rhai
+// Remove field if map is empty
+e.metadata = e.parse_json().or_unit()
+// If parsed JSON is {} → Unit → field removed
+
+// Only assign config if it has values
+e.config = e.settings.or_unit()
+// If settings is #{} → Unit → field removed
+```
+
+**Combined with tracking:**
+```rhai
+e.extracted = e.text.after("prefix:").or_unit()
+track_unique("values", e.extracted)  // Only tracks non-empty values
+```
+
+The `.or_unit()` method converts empty values (`""`, `[]`, `#{}`) to `()`, enabling clean conditional field creation without explicit `if` statements.
+
+**Pattern comparison:**
+
+```rhai
+// Without .or_unit() - verbose
+let extracted = e.message.after("User:")
+if extracted != "" {
+    e.user = extracted
+}
+
+// With .or_unit() - concise
+e.user = e.message.after("User:").or_unit()
+```
 
 ### Remove Entire Event
 
@@ -434,6 +502,26 @@ kelora -f json app.log \
     --keys timestamp,request_method,request_path
 ```
 
+### Conditional Extraction and Tracking
+
+```bash
+# Extract and track only when pattern exists
+kelora -f json app.log \
+    --exec 'e.user = e.message.after("User:").or_unit()' \
+    --exec 'e.code = e.message.extract_re(r"ERR-(\d+)", 1).or_unit()' \
+    --exec 'track_unique("users", e.user)' \
+    --exec 'track_unique("error_codes", e.code)' \
+    --metrics
+
+# Safe conversion with automatic Unit skipping
+kelora -f json app.log \
+    --exec 'let score = e.score_str.to_int()' \
+    --exec 'track_sum("total_score", score)' \
+    --exec 'track_min("min_score", score)' \
+    --exec 'track_max("max_score", score)' \
+    --metrics
+```
+
 ### Combine Fields
 
 ```bash
@@ -478,6 +566,22 @@ kelora -f json app.log \
 ```rhai
 e.status_code = e.status.to_int()           // String to integer
 e.duration = e.duration_str.to_float()      // String to float
+```
+
+**Note:** Conversion functions return `()` on failure:
+
+```rhai
+"123".to_int()      // → 123
+"abc".to_int()      // → ()  (conversion failed)
+"".to_int()         // → ()  (empty string)
+```
+
+This works seamlessly with `track_*()` functions that skip `()` values:
+
+```rhai
+// Safe: track_sum() skips Unit values from failed conversions
+let score = e.score_str.to_int()
+track_sum("total", score)      // Only tracks valid integers
 ```
 
 With defaults if conversion fails:
