@@ -329,6 +329,8 @@ pub fn register_functions(engine: &mut Engine) {
 }
 
 pub fn parse_cols_whitespace(line: &str, spec: &str) -> Result<Map, Box<rhai::EvalAltResult>> {
+    // Strip trailing newlines for consistency with other structured formats
+    let line = line.trim_end_matches('\n').trim_end_matches('\r');
     let plan = parse_spec(spec)?;
     let (columns, byte_starts) = split_whitespace_columns(line);
     apply_spec(
@@ -350,6 +352,8 @@ pub fn parse_cols_with_sep(
         return Err("parse_cols: separator must not be empty".into());
     }
 
+    // Strip trailing newlines for consistency with other structured formats
+    let line = line.trim_end_matches('\n').trim_end_matches('\r');
     let plan = parse_spec(spec)?;
     let (columns, byte_starts) = split_with_separator(line, sep);
     apply_spec(
