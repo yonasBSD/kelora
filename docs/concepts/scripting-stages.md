@@ -1,22 +1,25 @@
 # Scripting Stages
 
-Deep dive into Kelora's three Rhai scripting stages: `--begin`, `--exec`, and `--end`.
+Deep dive into Kelora's Rhai scripting stages: `--begin`, `--filter`, `--exec`, and `--end`.
 
 ## Overview
 
-Kelora provides three scripting stages for transforming log data with Rhai scripts:
+Kelora provides four scripting stages for transforming log data with Rhai scripts:
 
 ```
 --begin  →  [Process Events]  →  --end
               ↓
-           --exec (per event)
+           --filter + --exec (per event, in CLI order)
 ```
 
 | Stage | Runs | Purpose | Access |
 |-------|------|---------|--------|
 | `--begin` | Once before processing | Initialize state, load data | `conf` map, file helpers |
+| `--filter` | Once per event | Select events to keep/skip | `e` (event), `conf`, `meta` |
 | `--exec` | Once per event | Transform events | `e` (event), `conf`, `meta`, tracking |
 | `--end` | Once after processing | Summarize, report | `metrics`, `conf` |
+
+**Note:** `--filter` and `--exec` can be specified multiple times and execute in exact CLI order.
 
 ## Begin Stage
 
@@ -114,6 +117,152 @@ kelora -j \
     --exec 'if e.duration_ms > conf.threshold { eprint("⚠️  Slow request: " + e.path) }' \
     app.log
 ```
+
+## Filter Stage
+
+### Purpose
+
+The `--filter` stage runs **once per event** to decide whether to keep or skip it. Use it to:
+
+- Select events matching specific criteria
+- Remove unwanted events (debug logs, health checks, etc.)
+- Combine multiple filter conditions in sequence
+- Control which events reach later `--exec` stages
+
+### Boolean Expressions
+
+Filters must return `true` (keep event) or `false` (skip event):
+
+```bash
+kelora -j \
+    --filter 'e.level == "ERROR"' \
+    app.log
+```
+
+**Behavior:**
+- Returns `true` → Event passes to next stage
+- Returns `false` → Event is skipped (removed from pipeline)
+- Error in resilient mode → Treated as `false`, event skipped
+- Error in strict mode → Processing aborts
+
+### Access to Event Data
+
+Filters have access to:
+
+- `e` - The current event (read-only)
+- `conf` - Configuration from `--begin` (read-only)
+- `meta` - Event metadata (line, line_num, filename)
+
+```bash
+kelora -j \
+    --begin 'conf.min_duration = 1000' \
+    --filter 'e.duration_ms > conf.min_duration' \
+    app.log
+```
+
+### Multiple Filters
+
+Multiple `--filter` flags create an **AND** condition - events must pass all filters:
+
+```bash
+kelora -j \
+    --filter 'e.level == "ERROR"' \
+    --filter 'e.service == "api"' \
+    --filter 'e.duration_ms > 1000' \
+    app.log
+```
+
+Only events that are ERROR **AND** from api service **AND** slow will pass.
+
+### Common Patterns
+
+#### Basic Field Matching
+
+```bash
+kelora -j --filter 'e.status >= 400' app.log
+kelora -j --filter 'e.user == "admin"' app.log
+kelora -j --filter 'e.service in ["api", "db"]' app.log
+```
+
+#### String Operations
+
+```bash
+kelora -j --filter 'e.message.contains("timeout")' app.log
+kelora -j --filter 'e.path.starts_with("/api/")' app.log
+kelora -j --filter 'e.level.to_upper() == "ERROR"' app.log
+```
+
+#### Regex Matching
+
+```bash
+kelora -j --filter 'e.message.has_matches(r"\d{3}-\d{3}-\d{4}")' app.log
+kelora -j --filter 'e.ip.has_matches(r"^192\.168\.")' app.log
+```
+
+#### Existence Checks
+
+```bash
+kelora -j --filter 'e.contains("error")' app.log       # Has 'error' field
+kelora -j --filter '"error" in e' app.log              # Same as above
+kelora -j --filter 'e.contains("user_id")' app.log     # Has 'user_id' field
+```
+
+#### Complex Conditions
+
+```bash
+kelora -j \
+    --filter '(e.status >= 500) || (e.status >= 400 && e.duration_ms > 5000)' \
+    app.log
+```
+
+#### Using conf for Dynamic Filtering
+
+```bash
+kelora -j \
+    --begin 'conf.blocked_ips = ["192.168.1.100", "10.0.0.50"]' \
+    --filter '(e.ip in conf.blocked_ips) == false' \
+    app.log
+```
+
+#### Filtering with Metadata
+
+```bash
+# Only process events from specific file
+kelora -j *.log --filter 'meta.filename == "production.log"'
+
+# Skip first 100 lines
+kelora -j app.log --filter 'meta.line_num > 100'
+```
+
+### Filter vs --levels
+
+For simple level filtering, `--levels` is more efficient than `--filter`:
+
+**Prefer:**
+```bash
+kelora -j app.log --levels error,warn
+```
+
+**Over:**
+```bash
+kelora -j app.log --filter 'e.level in ["ERROR", "WARN"]'
+```
+
+However, `--filter` provides more flexibility for complex conditions.
+
+### Filter Output
+
+Filters don't modify events - they only decide pass/skip:
+
+```bash
+# This works - filter just checks level
+kelora -j --filter 'e.level == "ERROR"' app.log
+
+# This does nothing - assignment in filter has no effect
+kelora -j --filter 'e.level = "ERROR"' app.log  # Wrong!
+```
+
+To modify events, use `--exec` instead.
 
 ## Exec Stage
 
