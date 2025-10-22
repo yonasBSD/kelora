@@ -155,6 +155,27 @@ kelora -j \
 2. Track average duration
 3. Add `alert` field for slow requests
 
+### Intermixing --filter and --exec
+
+`--filter` and `--exec` are both script stages and execute in **exact CLI order**:
+
+```bash
+kelora -j \
+    --exec 'e.duration_s = e.duration_ms / 1000' \    # Stage 1: Transform all events
+    --filter 'e.duration_s > 1.0' \                    # Stage 2: Keep only slow events
+    --exec 'track_count("slow")' \                     # Stage 3: Track (slow only)
+    --exec 'e.alert = true' \                          # Stage 4: Add field (slow only)
+    app.log
+```
+
+**What happens:**
+1. First `--exec` adds `duration_s` field to all events
+2. `--filter` removes events under 1.0s
+3. Second `--exec` only processes slow events (tracks count)
+4. Third `--exec` only processes slow events (adds alert field)
+
+Later stages only see events that passed earlier filters. This allows precise control over which events are transformed or tracked.
+
 ### Atomic Execution
 
 In resilient mode (default), exec scripts execute **atomically**:
@@ -640,25 +661,28 @@ kelora -j --exec 'append_file("out.txt", e.message)' app.log
 kelora -j --allow-fs-writes --exec 'append_file("out.txt", e.message)' app.log
 ```
 
-### Script Execution Order
+### Script Stage Ordering
 
-**Problem:** Later `--exec` doesn't see earlier changes.
-
-**Check:** Are you using `--filter` between them?
+**Understanding:** `--filter` and `--exec` execute in **exact CLI order**, intermixed.
 
 ```bash
-# This works - both --exec scripts run on same events
+# Both --exec scripts run on all events
 kelora -j --exec 'e.a = 1' --exec 'e.b = e.a + 1' app.log
 
-# This doesn't - filter may remove events before second --exec
+# Filter runs between execs - second --exec only sees filtered events
 kelora -j --exec 'e.a = 1' --filter 'e.level == "ERROR"' --exec 'e.b = e.a + 1' app.log
 ```
 
-Filters run **between** exec stages in the pipeline.
+**What happens in the second example:**
+1. First `--exec` adds field `a=1` to all events
+2. `--filter` removes non-ERROR events
+3. Second `--exec` adds field `b=2` to ERROR events only
+
+This is **expected behavior** - later stages only process events that passed earlier filters. Each stage (filter or exec) processes the output of the previous stage sequentially.
 
 ## See Also
 
-- [Pipeline Model](pipeline-model.md) - How stages fit into the processing pipeline
+- [Processing Architecture](pipeline-model.md) - Three-layer processing model and script stage ordering
 - [Events and Fields](events-and-fields.md) - Working with event data
 - [Function Reference](../reference/functions.md) - All available Rhai functions
 - [CLI Reference](../reference/cli-reference.md) - Complete flag documentation
