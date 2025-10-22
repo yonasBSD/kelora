@@ -1,369 +1,567 @@
-# Pipeline Model
+# Processing Architecture
 
-Understanding how Kelora processes logs through a multi-stage pipeline.
+Understanding how Kelora processes logs through its multi-layer architecture.
 
 ## Overview
 
-Kelora processes logs through a streaming pipeline with distinct stages. Each stage transforms the data and passes it to the next stage. Understanding this model helps you write more effective log processing commands.
+Kelora's processing model consists of three distinct layers operating on different data types:
 
-## Pipeline Stages
+1. **Input Layer** - File/stdin handling and decompression
+2. **Line-Level Processing** - Raw string filtering and event boundary detection
+3. **Event-Level Processing** - Structured data transformation and output
 
-```
-Input → Parse → Filter → Transform → Output
-```
+This layered architecture enables efficient streaming with low memory usage while supporting both sequential and parallel processing modes.
 
-### 1. Input Stage
+---
 
-**Purpose:** Read and preprocess log lines from files or stdin.
+## Layer 1: Input Layer
 
-**Operations:**
+### Input Sources
 
-- Read files (including `.gz` compressed)
-- Handle stdin from pipes
-- Split into lines
-- Skip empty lines (except `-f line` format)
-- Apply `--extract-prefix` if configured
+**Stdin Mode:**
+- Activated when no files specified or file is `"-"`
+- Background thread reads from stdin via channel
+- Supports one stdin source (error if `"-"` appears multiple times)
+- Useful for piping: `tail -f app.log | kelora -j`
 
-**Key Flags:**
+**File Mode:**
+- Processes one or more files sequentially
+- Tracks current filename for context
+- Supports `--file-order` for processing sequence:
+  - `cli` (default) - Process in CLI argument order
+  - `name` - Sort alphabetically
+  - `mtime` - Sort by modification time (oldest first)
 
-- Files specified as positional arguments
-- `--extract-prefix` - Extract prefixed text before parsing
-- `--prefix-sep` - Separator for prefix extraction
-
-**Example:**
+**Examples:**
 ```bash
-kelora file1.log file2.log.gz
+# Stdin mode
 tail -f app.log | kelora -j
-docker compose logs | kelora --extract-prefix service
+
+# File mode with ordering
+kelora *.log --file-order mtime
+
+# Mixed stdin and files
+kelora file1.log - file2.log  # stdin in middle
 ```
 
-### 2. Parse Stage
+### Automatic Decompression
 
-**Purpose:** Convert raw log lines into structured events (maps/objects).
+Kelora automatically detects and decompresses compressed input using **magic bytes detection** (not file extensions):
 
-**Operations:**
-
-- Detect or apply format (`-f json`, `-f logfmt`, etc.)
-- Parse line into fields
-- Handle parse errors (skip in resilient mode, abort in strict mode)
-- Apply `--ts-format` and `--input-tz` for timestamps
-
-**Key Flags:**
-
-- `-f, --input-format` - Specify format (json, logfmt, syslog, combined, etc.)
-- `--ts-format` - Custom timestamp format
-- `--input-tz` - Timezone for naive timestamps
-- `--strict` - Fail on parse errors
-
-**Example:**
-```bash
-kelora -f json app.log
-kelora -f combined access.log
-kelora -f "cols:timestamp level *message" custom.log --ts-field timestamp
-```
-
-**Output:** Structured event (map) with fields accessible as `e.field`.
-
-### 3. Filter Stage
-
-**Purpose:** Select which events to process further.
-
-**Operations:**
-
-- Level filtering (`--levels`)
-- Time filtering (`--since`, `--until`)
-- Custom Rhai expressions (`--filter`)
-- Context lines (`--before-context`, `--after-context`)
-
-**Key Flags:**
-
-- `--levels` - Filter by log level
-- `--since` / `--until` - Time-based filtering
-- `--filter` - Custom Rhai expression (must return true/false)
-- `--before-context` / `--after-context` - Include surrounding events
-
-**Execution Order:**
-1. Level filtering
-2. Time filtering
-3. Custom filters (each `--filter` in order)
-4. Context lines (if matched)
-
-**Example:**
-```bash
-kelora -j app.log --levels error
-kelora -j app.log --since "1 hour ago"
-kelora -j app.log --filter 'e.service == "database"'
-```
+**Supported Formats:**
+- **Gzip** - Magic bytes `1F 8B 08` (`.gz` files or gzipped stdin)
+- **Zstd** - Magic bytes `28 B5 2F FD` (`.zst` files or zstd stdin)
+- **Plain** - No magic bytes, passthrough
 
 **Behavior:**
+- Transparent decompression before any processing
+- Works on both files and stdin
+- ZIP files explicitly rejected with error message
+- Decompression happens in Input Layer
 
-- Filters return `true` (keep) or `false` (skip)
-- In resilient mode: filter errors return `false`
-- In strict mode: filter errors abort processing
+**Examples:**
+```bash
+kelora app.log.gz                    # Auto-detected gzip
+kelora app.log.zst --parallel        # Auto-detected zstd
+gzip -c app.log | kelora -j          # Gzipped stdin
+```
 
-### 4. Transform Stage
+### Reader Threading
 
-**Purpose:** Modify, enrich, or aggregate event data.
+**Sequential Mode:**
+- Spawns background reader thread
+- Sends lines via bounded channel (1024 line buffer)
+- Main thread processes lines one at a time
+- Supports multiline timeout flush (default: 200ms)
 
-**Operations:**
+**Parallel Mode:**
+- Reader batches lines (default: 1000 lines, 200ms timeout)
+- Worker pool processes batches concurrently
+- No cross-batch state (impacts multiline, spans)
 
-- Execute Rhai scripts (`--exec`)
-- Run `--begin` scripts once at start
-- Run `--end` scripts once at finish
-- Track metrics (`track_count()`, etc.)
-- Fan-out arrays (`emit_each()`)
-- Remove fields (`e.field = ()`)
+---
 
-**Key Flags:**
+## Layer 2: Line-Level Processing
 
-- `--begin` - Run once before processing
-- `--exec` - Run for each event (multiple allowed)
-- `--end` - Run once after processing
-- `--metrics` - Display tracked metrics at end
-- `--window` - Enable windowed analysis
+Operations on raw string lines **before** parsing into events.
 
-**Execution Order:**
-1. `--begin` (once, before any events)
-2. For each event:
-   - Execute each `--exec` in order
-   - Atomic execution (rollback on error in resilient mode)
-3. `--end` (once, after all events)
-4. Display `--metrics` (if enabled)
+### Line Skipping (`--skip-lines`)
+
+Skip first N lines from input (useful for CSV headers, preambles).
+
+```bash
+kelora data.csv --skip-lines 1
+```
+
+### Line Filtering (`--ignore-lines`, `--keep-lines`)
+
+Regex-based filtering on raw lines before parsing:
+
+- `--ignore-lines <REGEX>` - Skip lines matching pattern
+- `--keep-lines <REGEX>` - Keep only lines matching pattern
+
+**Resilient mode:** Skip non-matching lines, continue processing
+**Strict mode:** Abort on regex error
+
+```bash
+# Ignore health checks before parsing
+kelora access.log --ignore-lines 'health-check'
+
+# Keep only lines starting with timestamp
+kelora app.log --keep-lines '^\d{4}-\d{2}-\d{2}'
+```
+
+### Section Selection
+
+Extract specific sections from logs based on start/end markers:
+
+**Flags:**
+- `--section-start <REGEX>` - Begin section (default: exclude marker)
+- `--section-from <REGEX>` - Begin section (include marker)
+- `--section-through <REGEX>` - End section (include marker)
+- `--section-before <REGEX>` - End section (exclude marker)
+- `--max-sections <N>` - Limit number of sections
+
+**State Machine:**
+```
+NotStarted → (match start) → InSection → (match end) → BetweenSections → ...
+```
+
+**Example:**
+```bash
+# Extract sections between markers
+kelora system.log \
+    --section-from '=== Test Started ===' \
+    --section-through '=== Test Completed ==='
+```
+
+### Event Aggregation (Multiline)
+
+Detects event boundaries to combine multiple lines into single events **before parsing**.
+
+**Four Strategies:**
+
+**1. Timestamp Strategy** (auto-detect timestamp headers)
+```bash
+kelora app.log --multiline timestamp
+```
+Detects lines starting with timestamps as new events. Continuation lines (stack traces, wrapped messages) are appended to current event.
+
+**2. Indent Strategy** (whitespace continuation)
+```bash
+kelora app.log --multiline indent
+```
+Lines starting with whitespace are continuations of previous event.
+
+**3. Regex Strategy** (custom patterns)
+```bash
+kelora app.log \
+    --multiline regex \
+    --multiline-start '^\[' \
+    --multiline-end '^\['
+```
+Define custom start/end patterns for event boundaries.
+
+**4. All Strategy** (entire input as one event)
+```bash
+kelora config.json --multiline all
+```
+Buffers entire input as single event (use for structured files).
+
+**Multiline Timeout:**
+- Sequential mode: Flush incomplete events after timeout (default: 200ms)
+- Parallel mode: Flush at batch boundaries (no timeout)
+
+**Critical:** Multiline creates event boundaries before parsing. Each complete event string is then parsed into structured data.
+
+---
+
+## Layer 3: Event-Level Processing
+
+Operations on parsed events (maps/objects).
+
+### Parsing
+
+Convert complete event strings into structured maps:
+
+```
+Event string → Parser → Event map (e.field accessible)
+```
+
+Parsers: `json`, `logfmt`, `syslog`, `combined`, `csv`, `tsv`, `cols`, etc.
+
+### Script Stages (Pipeline Core)
+
+**User script stages execute in exact CLI order:**
+
+- `--filter <EXPR>` - Boolean filter (true = keep, false = skip)
+- `--exec <SCRIPT>` - Transform/process event
+- `--exec-file <PATH>` - Execute script from file (alias: `-E`)
+
+**Multiple instances allowed, intermixed in any order.**
 
 **Example:**
 ```bash
 kelora -j app.log \
+    --filter 'e.status >= 400' \    # Stage 1: Filter
+    --exec 'e.alert = true' \        # Stage 2: Exec (only 4xx/5xx)
+    --filter 'e.status < 500' \      # Stage 3: Filter (only 4xx)
+    --exec 'track_count(e.path)'     # Stage 4: Exec (track 4xx paths)
+```
+
+Each stage processes the output of the previous stage sequentially.
+
+### Complete Stage Ordering
+
+After user script stages, built-in filters execute:
+
+1. **User script stages** (--filter, --exec in CLI order)
+2. **Timestamp filtering** (--since, --until)
+3. **Level filtering** (--levels, --exclude-levels)
+4. **Key filtering** (--keys, --exclude-keys)
+
+**Note:** User filters execute **before** built-in filtering like `--levels`.
+
+### Span Processing
+
+Groups events into spans for aggregation:
+
+**Count-based Spans:**
+```bash
+kelora -j app.log --span 100 \
+    --span-close 'print("Span complete: " + meta.span_id)'
+```
+Closes span every N events that pass filters.
+
+**Time-based Spans:**
+```bash
+kelora -j app.log --span 5m \
+    --span-close 'track_sum("requests", meta.span_event_count)'
+```
+Closes span on aligned time windows (5m, 1h, 30s, etc.).
+
+**Span Processing Flow:**
+1. Event passes through filters/execs
+2. Span processor assigns `span_id` and `SpanStatus`
+3. Event processed with span context
+4. When span closes → `--span-close` hook executes
+5. Hook has access to `meta.span_id`, `meta.span_start`, `meta.span_end`, `metrics`
+
+**Constraints:**
+- Spans force sequential mode (incompatible with `--parallel`)
+- Span state maintained across events
+
+### Begin and End Stages
+
+**`--begin`:** Execute once before processing any events
+**`--end`:** Execute once after all events processed
+
+```bash
+kelora -j app.log \
     --begin 'print("Starting analysis")' \
-    --exec 'e.duration_s = e.duration_ms / 1000' \
     --exec 'track_count(e.service)' \
-    --end 'print("Complete")' \
+    --end 'print("Services seen: " + metrics.count.len())' \
     --metrics
 ```
 
-**Behavior:**
+In parallel mode:
+- `--begin` runs sequentially before worker pool starts
+- `--end` runs sequentially after workers complete (with merged metrics)
 
-- Transformations modify events in place
-- In resilient mode: errors return original event unchanged
-- In strict mode: transformation errors abort processing
-- Empty events (`e = ()`) are filtered out before output
+### Context Lines
 
-### 5. Output Stage
+Show surrounding lines around matches:
 
-**Purpose:** Format and emit events.
+- `--before-context N` / `-B N` - Show N lines before match
+- `--after-context N` / `-A N` - Show N lines after match
+- `--context N` / `-C N` - Show N lines before and after
 
-**Operations:**
-
-- Apply `--keys` field selection
-- Convert timestamps (`--convert-ts`, `--show-ts-local`, `--show-ts-utc`)
-- Format events (default, JSON, CSV, etc.)
-- Apply `--take` limit
-- Write to stdout or files
-
-**Key Flags:**
-
-- `--keys` - Select top-level fields to output
-- `-F, --output-format` - Output format (default, json, csv, etc.)
-- `--convert-ts` - Convert timestamp fields to RFC3339
-- `--show-ts-local` / `--show-ts-utc` - Display timestamp format
-- `--take` - Limit output to N events
-
-**Example:**
-```bash
-kelora -j app.log --keys timestamp,service,message
-kelora -j app.log -F json
-kelora -j app.log --take 100
-```
-
-## Pipeline Characteristics
-
-### Streaming
-
-Kelora processes events one at a time (or in batches with `--parallel`):
-
-- **Low memory usage** - Events are processed and discarded
-- **Real-time processing** - Works with `tail -f` and live streams
-- **No lookahead** - Can't access future events (except with `--window`)
-
-### Sequential vs Parallel
-
-**Sequential (default):**
-
-- Events processed in order
-- Lower memory usage
-- Predictable output order
-- Simpler debugging
-
-**Parallel (`--parallel`):**
-
-- Events processed in batches across cores
-- Higher throughput
-- Keeps output order by default; add `--unordered` to trade ordering for throughput
-- Higher memory usage
-
-### Event Lifecycle
-
-```
-1. Line read from input
-2. Line parsed into event map
-3. Event passes through filters
-4. Event transformed by --exec scripts
-5. Event formatted and output
-6. Event discarded (unless windowed)
-```
-
-## Common Pipeline Patterns
-
-### Simple Filter-and-Select
+Requires active filtering (--filter, --levels, --since, etc.).
 
 ```bash
 kelora -j app.log \
     --filter 'e.level == "ERROR"' \
-    --keys timestamp,service,message
+    --before-context 2 \
+    --after-context 2
 ```
 
-Pipeline: Input → Parse → Filter → Output (with field selection)
+### Output Stage
 
-### Filter-Transform-Output
+Format and emit events:
+
+- Apply `--keys` field selection
+- Convert timestamps (--convert-ts, --show-ts-local, --show-ts-utc)
+- Format output (--output-format: default, json, csv, etc.)
+- Apply `--take` limit
+- Write to stdout or files
 
 ```bash
 kelora -j app.log \
-    --filter 'e.service == "api"' \
-    --exec 'e.duration_s = e.duration_ms / 1000' \
-    --keys timestamp,duration_s,path
+    --keys timestamp,service,message \
+    -F json \
+    --take 100
 ```
 
-Pipeline: Input → Parse → Filter → Transform → Output
+---
 
-### Aggregate and Report
+## Parallel Processing Model
+
+Kelora's `--parallel` mode is **batch-parallel**, not stage-parallel.
+
+### Architecture
+
+```
+Sequential:  Line → Line filters → Multiline → Parse → Script stages → Output
+             (one at a time)
+
+Parallel:    Batch of lines → Worker pool
+             Each worker: Line filters → Multiline → Parse → Script stages
+             Results → Ordering buffer → Output
+```
+
+Where:
+- **Line filters** = `--skip-lines`, `--ignore-lines`, `--section-start`, etc.
+- **Multiline** = Event boundary detection (aggregates multiple lines into events)
+- **Script stages** = `--filter` and `--exec` in CLI order
+
+### How It Works
+
+1. **Reader thread** batches lines (default: 1000 lines, 200ms timeout)
+2. **Worker pool** processes batches independently (default: CPU count workers)
+3. Each worker has its own Pipeline instance
+4. **Results merged** with ordering preservation (default) or unordered (`--unordered`)
+5. **Stats/metrics merged** from all workers
+
+**Configuration:**
+```bash
+kelora -j large.log \
+    --parallel \
+    --threads 8 \
+    --batch-size 2000 \
+    --batch-timeout 500
+```
+
+### Constraints and Tradeoffs
+
+**Incompatible Features:**
+- **Spans** - Cannot maintain span state across batches (forces sequential)
+- **Cross-event context** - Each batch processed independently
+
+**Multiline Behavior:**
+- Multiline chunking happens **per-batch**
+- Event boundaries may not span batch boundaries
+- Consider larger batch sizes for multiline workloads
+
+**Ordering:**
+- Default: Preserve input order (adds overhead)
+- `--unordered`: Trade ordering for maximum throughput
+
+**Best For:**
+- Large files with independent events
+- CPU-bound transformations (regex, hashing, calculations)
+- High-throughput batch processing
+
+**Not Ideal For:**
+- Real-time streaming (use sequential)
+- Cross-event analysis (use spans in sequential mode)
+- Small files (overhead exceeds benefit)
+
+---
+
+## Metrics and Statistics
+
+Kelora maintains two tracking systems:
+
+### User Metrics (`--metrics`)
+
+Populated by Rhai functions in --exec scripts:
 
 ```bash
 kelora -j app.log \
     --exec 'track_count(e.service)' \
+    --exec 'track_sum("total_bytes", e.bytes)' \
     --exec 'track_avg("response_time", e.duration_ms)' \
-    --metrics \
-    -F none
+    --exec 'track_unique("users", e.user_id)' \
+    --metrics
 ```
 
-Pipeline: Input → Parse → Transform (tracking) → Output (metrics only)
+**Available Functions:**
+- `track_count(key)` - Increment counter
+- `track_inc(key, value)` - Add to counter
+- `track_sum(key, value)` - Sum values
+- `track_avg(key, value)` - Calculate average
+- `track_unique(key, value)` - Collect unique values
 
-### Multi-Stage Filtering
-
+**Access in --end stage:**
 ```bash
 kelora -j app.log \
-    --levels error,warn \
-    --since "1 hour ago" \
-    --filter 'e.service != "health-check"' \
-    --keys timestamp,level,service,message
+    --exec 'track_count(e.service)' \
+    --end 'print("Total services: " + metrics.count.len())' \
+    --metrics
 ```
 
-Pipeline: Input → Parse → Filter (levels) → Filter (time) → Filter (custom) → Output
+**Output:**
+- Printed to stderr with `--metrics`
+- Written to JSON file with `--metrics-file metrics.json`
 
-### Fan-Out Processing
+### Internal Statistics (`--stats`)
+
+Auto-collected counters:
+
+- `events_created` - Parsed events
+- `events_output` - Output events
+- `events_filtered` - Filtered events
+- `discovered_levels` - Log levels seen
+- `discovered_keys` - Field names seen
+- Parse errors, filter errors, etc.
 
 ```bash
-kelora -j batch.log \
-    --exec 'emit_each(e.items, #{batch_id: e.batch_id})' \
-    --filter 'e.status == "active"' \
-    --keys batch_id,item_id,status
+kelora -j app.log --stats
 ```
 
-Pipeline: Input → Parse → Transform (fan-out) → Filter → Output
+### Parallel Metrics Merging
 
-## Error Handling in Pipeline
+In parallel mode:
+- Each worker maintains local tracking state
+- GlobalTracker merges worker states after processing:
+  - Counters: summed
+  - Unique sets: unioned
+  - Averages: recomputed from sums and counts
+- Merged metrics available in `--end` stage
+
+---
+
+## Error Handling
 
 ### Resilient Mode (Default)
 
 - **Parse errors:** Skip line, continue processing
 - **Filter errors:** Treat as `false`, skip event
-- **Transform errors:** Return original event, continue
+- **Transform errors:** Return original event unchanged
 - **Summary:** Show error count at end
+
+```bash
+kelora -j app.log --verbose  # Show errors as they occur
+```
 
 ### Strict Mode (`--strict`)
 
-- **Parse errors:** Show error, abort immediately
-- **Filter errors:** Show error, abort immediately
-- **Transform errors:** Show error, abort immediately
-- **Summary:** No summary (aborted)
+- **Any error:** Abort immediately with exit code 1
+- **No summary:** Program exits on first error
 
-### Verbose Mode (`--verbose`)
-
-- Shows each error immediately as it occurs
-- Works in both resilient and strict modes
-- Useful for debugging pipeline issues
-
-## Pipeline State
-
-### Stateless Processing
-
-Most operations are stateless:
-
-- Each event processed independently
-- No memory of previous events
-- Can process infinite streams
-
-### Stateful Features
-
-Some features maintain state:
-
-**Metrics Tracking:**
 ```bash
-kelora -j app.log \
-    --exec 'track_count(e.service)' \
-    --metrics
+kelora -j app.log --strict
 ```
 
-Maintains counters in memory.
+### Verbosity Levels
 
-**Window Functions:**
-```bash
-kelora -j app.log \
-    --window 5 \
-    --exec 'e.recent = window_values("status")'
+- `-v` / `--verbose` - Show detailed errors (level 1)
+- `-vv` - More verbose (level 2)
+- `-vvv` - Maximum verbosity (level 3)
+
+### Quiet Modes
+
+- `-q` - Suppress diagnostics
+- `-qq` - Suppress diagnostics and events
+- `-qqq` - Suppress diagnostics, events, and script output
+
+---
+
+## Complete Data Flow
+
+```
+┌─────────────────────────────────────────┐
+│  Layer 1: Input                         │
+├─────────────────────────────────────────┤
+│  • Stdin or Files (--file-order)        │
+│  • Automatic decompression (gzip/zstd)  │
+│  • Reader thread spawning               │
+└──────────────┬──────────────────────────┘
+               │ Raw lines
+┌──────────────▼──────────────────────────┐
+│  Layer 2: Line-Level Processing         │
+├─────────────────────────────────────────┤
+│  • --skip-lines (skip first N)          │
+│  • --section-start/through (sections)   │
+│  • --ignore-lines/--keep-lines (regex)  │
+│  • Multiline chunker (event boundaries) │
+└──────────────┬──────────────────────────┘
+               │ Complete event strings
+┌──────────────▼──────────────────────────┐
+│  Layer 3: Event-Level Processing        │
+├─────────────────────────────────────────┤
+│  • Parser → Event map                   │
+│  • Span preparation (assign span_id)    │
+│  • Script stages (--filter/--exec)      │
+│    - User stages in CLI order           │
+│    - Timestamp filtering (--since)      │
+│    - Level filtering (--levels)         │
+│    - Key filtering (--keys)             │
+│  • Span close hooks (--span-close)      │
+│  • Output formatting                    │
+└──────────────┬──────────────────────────┘
+               │ Formatted output
+               ▼
+           stdout/files
 ```
 
-Maintains sliding window of recent events.
-
-**Context Lines:**
-```bash
-kelora -j app.log \
-    --filter 'e.level == "ERROR"' \
-    --before-context 2
+**Parallel Mode Differences:**
+```
+Line batching (1000 lines) → Worker pool
+Each worker independently:
+  - Line-level processing
+  - Event-level processing
+Results → Ordering buffer → Merged output
+Metrics → GlobalTracker → Merged stats
 ```
 
-Buffers events to provide context.
+---
 
-## Pipeline Optimization
+## Performance Characteristics
 
-### Early Filtering
+### Streaming
 
-Place cheap filters early to reduce work:
+- **Low memory usage** - Events processed and discarded
+- **Real-time capable** - Works with `tail -f` and live streams
+- **No lookahead** - Cannot access future events (except with `--window`)
 
+### Sequential vs Parallel
+
+**Sequential (default):**
+- Events processed in order
+- Lower memory usage
+- Predictable output order
+- Supports spans and cross-event state
+- Best for streaming and interactive use
+
+**Parallel (`--parallel`):**
+- Events processed in batches across cores
+- Higher throughput for CPU-bound work
+- Higher memory usage (batching + worker pools)
+- Limited cross-event features
+- Best for batch processing large files
+
+### Optimization Tips
+
+**Early filtering:**
 ```bash
-# Good: Level filter before expensive regex
+# Good: Cheap filters first
 kelora -j app.log \
     --levels error \
-    --filter 'e.message.has_matches(r"complex.*pattern")'
+    --filter 'e.message.has_matches(r"expensive.*regex")'
 
 # Less efficient: Expensive filter on all events
 kelora -j app.log \
-    --filter 'e.message.has_matches(r"complex.*pattern")' \
-    --filter 'e.level == "ERROR"'
+    --filter 'e.message.has_matches(r"expensive.*regex")' \
+    --levels error
 ```
 
-### Selective Field Access
-
-Use `--keys` to reduce output processing:
-
+**Use --keys to reduce output processing:**
 ```bash
-kelora -j app.log \
-    --keys timestamp,message \
-    -F json
+kelora -j app.log --keys timestamp,message -F json
 ```
 
-### Parallel Processing
-
-Use `--parallel` for CPU-bound transformations:
-
+**Parallel for CPU-bound transformations:**
 ```bash
 kelora -j large.log \
     --parallel \
@@ -371,17 +569,15 @@ kelora -j large.log \
     --batch-size 1000
 ```
 
-### Limiting Output
-
-Use `--take` for quick exploration:
-
+**Use --take for quick exploration:**
 ```bash
 kelora -j large.log --take 100
 ```
 
+---
+
 ## See Also
 
 - [Events and Fields](events-and-fields.md) - How events are structured
-- [Scripting Stages](scripting-stages.md) - Deep dive into --begin/--exec/--end
+- [Scripting Stages](scripting-stages.md) - Writing --filter and --exec scripts
 - [Error Handling](error-handling.md) - Resilient vs strict modes
-- [Performance Model](performance-model.md) - Sequential vs parallel processing
