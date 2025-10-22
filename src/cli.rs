@@ -476,14 +476,15 @@ pub struct Cli {
     )]
     pub stats_only: bool,
 
-    /// Show tracked metrics (default: off). Pair with --metrics-file for JSON output.
+    /// Show tracked metrics (default: off). Use -mm for full output without truncation.
     #[arg(
         short = 'm',
         long = "metrics",
+        action = clap::ArgAction::Count,
         help_heading = "Metrics and Stats",
-        help = "Expose metrics recorded via track_*() in Rhai (see --help-rhai)."
+        help = "Expose metrics recorded via track_*() in Rhai (see --help-rhai).\n\n  -m   Abbreviated table (large arrays show first 5 items)\n  -mm  Full table (all items, no truncation)"
     )]
-    pub metrics: bool,
+    pub metrics: u8,
 
     /// Disable tracked metrics explicitly (default: off).
     #[arg(
@@ -493,7 +494,16 @@ pub struct Cli {
     )]
     pub no_metrics: bool,
 
-    /// Write metrics to file (JSON format). Requires --metrics.
+    /// Output metrics as JSON to stderr (conflicts with -m).
+    #[arg(
+        long = "metrics-json",
+        help_heading = "Metrics and Stats",
+        conflicts_with = "metrics",
+        help = "Print metrics as JSON to stderr. Use --metrics-file to write to a file instead."
+    )]
+    pub metrics_json: bool,
+
+    /// Write metrics to file (JSON format). Can combine with -m for both table and file.
     #[arg(
         long = "metrics-file",
         help_heading = "Metrics and Stats",
@@ -561,7 +571,7 @@ impl Cli {
 
         // Handle metrics/no-metrics
         if self.no_metrics {
-            self.metrics = false;
+            self.metrics = 0;
         }
 
         // Handle strict/no-strict

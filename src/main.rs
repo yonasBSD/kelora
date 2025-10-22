@@ -1279,13 +1279,25 @@ fn main() -> Result<()> {
     let (final_stats, tracking_data) = match result {
         Ok(pipeline_result) => {
             // Print metrics if enabled (only if not terminated)
-            if config.output.metrics && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+            if config.output.metrics > 0 && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
                 let metrics_output = crate::rhai_functions::tracking::format_metrics_output(
                     &pipeline_result.tracking_data.user,
+                    config.output.metrics,
                 );
                 if !metrics_output.is_empty() && metrics_output != "No metrics tracked" {
                     stderr
                         .writeln(&config.format_metrics_message(&metrics_output))
+                        .unwrap_or(());
+                }
+            }
+
+            // Print metrics as JSON to stderr if --metrics-json enabled
+            if config.output.metrics_json && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+                if let Ok(json_output) = crate::rhai_functions::tracking::format_metrics_json(
+                    &pipeline_result.tracking_data.user,
+                ) {
+                    stderr
+                        .writeln(&config.format_metrics_message(&json_output))
                         .unwrap_or(());
                 }
             }

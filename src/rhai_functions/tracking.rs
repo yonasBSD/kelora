@@ -999,7 +999,7 @@ fn get_metrics_map() -> Dynamic {
 
 /// Format metrics for CLI output according to specification
 #[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
-pub fn format_metrics_output(metrics: &HashMap<String, Dynamic>) -> String {
+pub fn format_metrics_output(metrics: &HashMap<String, Dynamic>, metrics_level: u8) -> String {
     let mut output = String::new();
 
     // Filter out internal keys (operation metadata and stats)
@@ -1020,17 +1020,23 @@ pub fn format_metrics_output(metrics: &HashMap<String, Dynamic>) -> String {
         if value.is::<rhai::Array>() {
             if let Ok(arr) = value.clone().into_array() {
                 let len = arr.len();
-                if len <= 10 {
+                // Full output mode (-mm or higher): show everything
+                if metrics_level >= 2 {
+                    output.push_str(&format!("{:<12} ({} unique):\n", key, len));
+                    for item in arr.iter() {
+                        output.push_str(&format!("  {}\n", item));
+                    }
+                } else if len <= 10 {
                     // Small arrays: show inline
                     output.push_str(&format!("{:<12} = {}\n", key, value));
                 } else {
-                    // Large arrays: show count + preview + hint
+                    // Large arrays in abbreviated mode: show count + preview + hint
                     output.push_str(&format!("{:<12} ({} unique):\n", key, len));
                     for item in arr.iter().take(5) {
                         output.push_str(&format!("  {}\n", item));
                     }
                     output.push_str(&format!(
-                        "  [+{} more. Use --metrics-file or --end script for full list]\n",
+                        "  [+{} more. Use -mm, --metrics-json, or --metrics-file for full list]\n",
                         len - 5
                     ));
                 }

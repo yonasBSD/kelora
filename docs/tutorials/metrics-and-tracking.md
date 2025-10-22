@@ -138,6 +138,34 @@ cardinality analysis.
 
 Use `metrics["services"].len()` later to compute the number of distinct members.
 
+### Viewing Full Metrics
+
+When `track_unique()` collects many items, `-m` shows only the first 5 with a
+hint. Use `-mm` for the complete list or `--metrics-json` for JSON format:
+
+=== "Full table with -mm"
+
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'track_unique("services", e.service)' \
+      -mm
+    ```
+
+=== "JSON format with --metrics-json"
+
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'track_unique("services", e.service)' \
+      --metrics-json
+    ```
+
+The `-mm` flag shows all items in table format, while `--metrics-json` outputs
+structured JSON to stderr. Both are mutually exclusive—pick the format that
+matches your workflow. You can also combine `-m` with `--metrics-file` to get
+both table output and a JSON file.
+
 ## Step 4 – Sliding Windows and Percentiles
 
 Enable the window buffer to examine recent events. The example below tracks a
@@ -341,8 +369,11 @@ human-readable histogram once processing finishes.
 
 ## Troubleshooting
 
-- **No metrics printed**: Ensure you pass `--metrics` or consume `metrics` within
-  an `--end` script. Tracking functions alone do not emit output.
+- **No metrics printed**: Ensure you pass `-m` (or `--metrics`) or consume `metrics`
+  within an `--end` script. Tracking functions alone do not emit output.
+- **Truncated arrays**: If `-m` shows only the first 5 items with a hint, use `-mm`
+  for full table output, `--metrics-json` for JSON format, or `--metrics-file` to
+  write JSON to disk.
 - **Huge maps**: Reset counters between runs by clearing your terminal or using
   `rm metrics.json` when exporting to disk. Large cardinality sets from
   `track_unique()` are the usual culprit.
