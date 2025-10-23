@@ -187,7 +187,7 @@ pub enum InputFormat {
 }
 
 /// Output format enumeration
-#[derive(ValueEnum, Clone, Debug, Default)]
+#[derive(ValueEnum, Clone, Debug, Default, PartialEq)]
 pub enum OutputFormat {
     Json,
     #[default]

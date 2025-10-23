@@ -2579,10 +2579,15 @@ impl ParallelProcessor {
         Self::write_csv_header_if_needed(output, config)?;
 
         let gap_marker_use_colors = crate::tty::should_use_colors_with_mode(&config.output.color);
-        let mut gap_tracker = config
-            .output
-            .mark_gaps
-            .map(|threshold| GapTracker::new(threshold, gap_marker_use_colors));
+        let mut gap_tracker = if config.output.format == crate::config::OutputFormat::None {
+            // Suppress gap markers when output is suppressed (stats-only, high quiet levels)
+            None
+        } else {
+            config
+                .output
+                .mark_gaps
+                .map(|threshold| GapTracker::new(threshold, gap_marker_use_colors))
+        };
 
         if preserve_order {
             Self::pipeline_ordered_result_sink(
