@@ -17,3 +17,4 @@ Step-by-step walkthroughs for building Kelora pipelines from scratch. Start here
 ## Advanced
 
 - [Parsing Custom Formats](parsing-custom-formats.md) - Handle non-standard log formats
+- [Configuration and Reusability](configuration-and-reusability.md) - Aliases, includes, and shared workflows
