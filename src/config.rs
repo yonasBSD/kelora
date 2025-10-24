@@ -62,6 +62,10 @@ pub struct OutputConfig {
 pub enum ScriptStageType {
     Filter(String),
     Exec(String),
+    LevelFilter {
+        include: Vec<String>,
+        exclude: Vec<String>,
+    },
 }
 
 /// Error reporting configuration
@@ -595,6 +599,17 @@ impl KeloraConfig {
         };
 
         let default_timezone = determine_default_timezone(cli);
+        let flatten_levels = |values: &[String]| -> Vec<String> {
+            values
+                .iter()
+                .flat_map(|value| value.split(','))
+                .map(|part| part.trim())
+                .filter(|part| !part.is_empty())
+                .map(|part| part.to_string())
+                .collect()
+        };
+        let include_levels = flatten_levels(&cli.levels);
+        let exclude_levels = flatten_levels(&cli.exclude_levels);
 
         Ok(Self {
             input: InputConfig {
@@ -648,8 +663,8 @@ impl KeloraConfig {
                 stages: Vec::new(), // Will be set by main() after CLI parsing
                 end: cli.end.clone(),
                 error_report: parse_error_report_config(cli),
-                levels: cli.levels.clone(),
-                exclude_levels: cli.exclude_levels.clone(),
+                levels: include_levels,
+                exclude_levels,
                 span: parse_span_config(cli)?,
                 window_size: cli.window_size.unwrap_or(0),
                 timestamp_filter: None, // Will be set in main() after parsing since/until

@@ -4317,6 +4317,76 @@ fn test_take_limit_parallel_unordered() {
 // metrics were broken due to incorrect thread-local vs global state handling.
 
 #[test]
+fn test_levels_before_exec_limits_exec_work() {
+    let input = r#"{"level":"ERROR","message":"fail"}
+{"level":"INFO","message":"ok"}
+{"level":"WARN","message":"heads-up"}"#;
+
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--levels",
+            "error",
+            "--exec",
+            "track_count(\"exec_runs\")",
+            "--metrics",
+        ],
+        input,
+    );
+
+    assert_eq!(
+        exit_code, 0,
+        "Filtering by --levels before --exec should succeed"
+    );
+
+    let exec_metric_line = stderr
+        .lines()
+        .find(|line| line.trim_start().starts_with("exec_runs"))
+        .expect("Metrics output should list exec_runs");
+    assert!(
+        exec_metric_line.contains("= 1"),
+        "Exec stage should run once when --levels precedes it (saw `{}`)",
+        exec_metric_line.trim()
+    );
+}
+
+#[test]
+fn test_exec_before_levels_observes_all_events() {
+    let input = r#"{"level":"ERROR","message":"fail"}
+{"level":"INFO","message":"ok"}
+{"level":"WARN","message":"heads-up"}"#;
+
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "track_count(\"exec_runs\")",
+            "--levels",
+            "error",
+            "--metrics",
+        ],
+        input,
+    );
+
+    assert_eq!(
+        exit_code, 0,
+        "Filtering by --levels after --exec should succeed"
+    );
+
+    let exec_metric_line = stderr
+        .lines()
+        .find(|line| line.trim_start().starts_with("exec_runs"))
+        .expect("Metrics output should list exec_runs");
+    assert!(
+        exec_metric_line.contains("= 3"),
+        "Exec stage should run on all three events when it precedes --levels (saw `{}`)",
+        exec_metric_line.trim()
+    );
+}
+
+#[test]
 fn test_metrics_sequential_mode_basic() {
     let input = r#"{"level":"info","message":"test1"}
 {"level":"error","message":"test2"}

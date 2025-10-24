@@ -251,7 +251,6 @@ pub struct Cli {
     #[arg(
         short = 'l',
         long = "levels",
-        value_delimiter = ',',
         help_heading = "Filtering Options",
         help = "Include only events with these log levels (comma-separated, case-insensitive)."
     )]
@@ -261,7 +260,6 @@ pub struct Cli {
     #[arg(
         short = 'L',
         long = "exclude-levels",
-        value_delimiter = ',',
         help_heading = "Filtering Options",
         help = "Exclude events with these log levels (comma-separated, case-insensitive)."
     )]
@@ -656,6 +654,23 @@ impl Cli {
         let mut stages_with_indices = Vec::new();
         let mut include_map: HashMap<usize, Vec<String>> = HashMap::new();
 
+        let parse_level_list = |raw: &str| -> Result<Vec<String>> {
+            let levels: Vec<String> = raw
+                .split(',')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+                .collect();
+
+            if levels.is_empty() {
+                Err(anyhow::anyhow!(
+                    "Level filters require at least one level (e.g. --levels error,critical)"
+                ))
+            } else {
+                Ok(levels)
+            }
+        };
+
         // First, collect all include arguments and map them to the next script stage
         if let Some(include_indices) = matches.indices_of("includes") {
             let include_values: Vec<&String> =
@@ -709,6 +724,42 @@ impl Cli {
                     );
                 }
                 stages_with_indices.push((index, ScriptStageType::Filter(script)));
+            }
+        }
+
+        // Get level filter stages (includes)
+        if let Some(level_indices) = matches.indices_of("levels") {
+            let level_values: Vec<&String> =
+                matches.get_many::<String>("levels").unwrap().collect();
+            for (pos, index) in level_indices.enumerate() {
+                let raw = level_values[pos];
+                let include_levels = parse_level_list(raw)?;
+                stages_with_indices.push((
+                    index,
+                    ScriptStageType::LevelFilter {
+                        include: include_levels,
+                        exclude: Vec::new(),
+                    },
+                ));
+            }
+        }
+
+        // Get level filter stages (exclusions)
+        if let Some(exclude_indices) = matches.indices_of("exclude_levels") {
+            let exclude_values: Vec<&String> = matches
+                .get_many::<String>("exclude_levels")
+                .unwrap()
+                .collect();
+            for (pos, index) in exclude_indices.enumerate() {
+                let raw = exclude_values[pos];
+                let exclude_levels = parse_level_list(raw)?;
+                stages_with_indices.push((
+                    index,
+                    ScriptStageType::LevelFilter {
+                        include: Vec::new(),
+                        exclude: exclude_levels,
+                    },
+                ));
             }
         }
 
@@ -909,6 +960,40 @@ mod tests {
             .get_ordered_script_stages(&matches)
             .expect("empty stages should succeed");
         assert!(stages.is_empty());
+    }
+
+    #[test]
+    fn ordered_script_stages_capture_level_filters_in_order() {
+        let args = vec![
+            "kelora".to_string(),
+            "-l".to_string(),
+            "error,critical".to_string(),
+            "-e".to_string(),
+            "track_count(e.level)".to_string(),
+            "--exclude-levels".to_string(),
+            "debug".to_string(),
+        ];
+
+        let (cli, matches) = parse_cli(&args);
+        let stages = cli
+            .get_ordered_script_stages(&matches)
+            .expect("level stages should parse");
+
+        assert_eq!(stages.len(), 3);
+        assert!(matches!(
+            &stages[0],
+            ScriptStageType::LevelFilter { include, exclude }
+                if include == &vec!["error".to_string(), "critical".to_string()] && exclude.is_empty()
+        ));
+        assert!(matches!(
+            &stages[1],
+            ScriptStageType::Exec(script) if script == "track_count(e.level)"
+        ));
+        assert!(matches!(
+            &stages[2],
+            ScriptStageType::LevelFilter { include, exclude }
+                if include.is_empty() && exclude == &vec!["debug".to_string()]
+        ));
     }
 
     #[test]

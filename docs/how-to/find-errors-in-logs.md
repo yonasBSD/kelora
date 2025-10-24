@@ -22,7 +22,7 @@ kelora -j examples/simple_json.jsonl \
   --until 30m
 ```
 
-- `-l` (or `--levels`) is faster than `--filter` because it runs during parsing.
+- `-l` (or `--levels`) executes as soon as it appears, so place it before heavier stages to prune work early.
 - You can mix absolute ISO timestamps with relative offsets to anchor investigations (as shown above).
 - Prefer explicit formats (`-j`, `-f logfmt`, `-f combined`) over `-f auto` detection to avoid surprises.
 - For a directory of files, pass a glob (`logs/app/*.jsonl`) or feed a file list via `find … -print0 | xargs -0 kelora …`.

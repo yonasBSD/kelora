@@ -485,19 +485,22 @@ kelora -qqq app.log; echo "Exit: $?"                  # Exit code only
 
 #### `-l, --levels <LEVELS>`
 
-Include only events with specified log levels (comma-separated, case-insensitive).
+Include only events with specified log levels (case-insensitive). Every occurrence runs exactly where it appears in the CLI, so you can place `-l` before heavy `--exec` stages (to prune work early) or repeat it later after you derive a new level.
 
 ```bash
 kelora -j --levels error app.log
 kelora -j --levels error,warn,critical app.log
+kelora -j --exec 'e.fallback_level = "WARN"' --levels warn log.txt  # second levels runs after exec
 ```
 
 #### `-L, --exclude-levels <LEVELS>`
 
-Exclude events with specified log levels (comma-separated, case-insensitive).
+Exclude events with specified log levels (case-insensitive). Like `--levels`, you may repeat this flag to drop different levels at multiple points in the pipeline.
 
 ```bash
 kelora -j --exclude-levels debug,trace app.log
+kelora -j --levels error --exec 'if e.service == "chat" { e.level = "WARN" }' \
+    --exclude-levels warn app.log
 ```
 
 ### Field Selection

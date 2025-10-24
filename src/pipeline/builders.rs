@@ -64,6 +64,7 @@ pub struct PipelineBuilder {
     take_limit: Option<usize>,
     keys: Vec<String>,
     exclude_keys: Vec<String>,
+    // Fallback level filters when stages don't include explicit level entries
     levels: Vec<String>,
     exclude_levels: Vec<String>,
     multiline: Option<crate::config::MultilineConfig>,
@@ -396,10 +397,17 @@ impl PipelineBuilder {
         let mut script_stages: Vec<Box<dyn ScriptStage>> = Vec::new();
         let mut stage_number = 1;
 
-        // Check if any script filters exist
         let has_script_filters = stages
             .iter()
             .any(|stage| matches!(stage, crate::config::ScriptStageType::Filter(_)));
+        let has_inline_level_stage = stages
+            .iter()
+            .any(|stage| matches!(stage, crate::config::ScriptStageType::LevelFilter { .. }));
+        let mut level_context = if !has_script_filters && self.context_config.is_active() {
+            Some(self.context_config.clone())
+        } else {
+            None
+        };
 
         for stage in stages {
             match stage {
@@ -416,6 +424,27 @@ impl PipelineBuilder {
                     script_stages.push(Box::new(exec_stage));
                     stage_number += 1;
                 }
+                crate::config::ScriptStageType::LevelFilter { include, exclude } => {
+                    let mut level_stage = LevelFilterStage::new(include, exclude);
+                    if level_stage.is_active() {
+                        if let Some(context) = level_context.take() {
+                            level_stage = level_stage.with_context(context);
+                        }
+                        script_stages.push(Box::new(level_stage));
+                        stage_number += 1;
+                    }
+                }
+            }
+        }
+
+        if !has_inline_level_stage {
+            let mut level_stage =
+                LevelFilterStage::new(self.levels.clone(), self.exclude_levels.clone());
+            if level_stage.is_active() {
+                if let Some(context) = level_context.take() {
+                    level_stage = level_stage.with_context(context);
+                }
+                script_stages.push(Box::new(level_stage));
             }
         }
 
@@ -423,17 +452,6 @@ impl PipelineBuilder {
         if let Some(timestamp_filter_config) = self.timestamp_filter {
             let timestamp_filter_stage = TimestampFilterStage::new(timestamp_filter_config);
             script_stages.push(Box::new(timestamp_filter_stage));
-        }
-
-        // Add level filtering stage (runs after timestamp filtering, before key filtering)
-        let mut level_filter_stage =
-            LevelFilterStage::new(self.levels.clone(), self.exclude_levels.clone());
-        if level_filter_stage.is_active() {
-            // Only assign context to level filter if no script filters are active
-            if !has_script_filters {
-                level_filter_stage = level_filter_stage.with_context(self.context_config.clone());
-            }
-            script_stages.push(Box::new(level_filter_stage));
         }
 
         // Add key filtering stage (runs after level filtering, before context processing)
@@ -807,10 +825,17 @@ impl PipelineBuilder {
         let mut script_stages: Vec<Box<dyn ScriptStage>> = Vec::new();
         let mut stage_number = 1;
 
-        // Check if any script filters exist
         let has_script_filters = stages
             .iter()
             .any(|stage| matches!(stage, crate::config::ScriptStageType::Filter(_)));
+        let has_inline_level_stage = stages
+            .iter()
+            .any(|stage| matches!(stage, crate::config::ScriptStageType::LevelFilter { .. }));
+        let mut level_context = if !has_script_filters && self.context_config.is_active() {
+            Some(self.context_config.clone())
+        } else {
+            None
+        };
 
         for stage in stages {
             match stage {
@@ -827,6 +852,27 @@ impl PipelineBuilder {
                     script_stages.push(Box::new(exec_stage));
                     stage_number += 1;
                 }
+                crate::config::ScriptStageType::LevelFilter { include, exclude } => {
+                    let mut level_stage = LevelFilterStage::new(include, exclude);
+                    if level_stage.is_active() {
+                        if let Some(context) = level_context.take() {
+                            level_stage = level_stage.with_context(context);
+                        }
+                        script_stages.push(Box::new(level_stage));
+                        stage_number += 1;
+                    }
+                }
+            }
+        }
+
+        if !has_inline_level_stage {
+            let mut level_stage =
+                LevelFilterStage::new(self.levels.clone(), self.exclude_levels.clone());
+            if level_stage.is_active() {
+                if let Some(context) = level_context.take() {
+                    level_stage = level_stage.with_context(context);
+                }
+                script_stages.push(Box::new(level_stage));
             }
         }
 
@@ -834,17 +880,6 @@ impl PipelineBuilder {
         if let Some(timestamp_filter_config) = self.timestamp_filter {
             let timestamp_filter_stage = TimestampFilterStage::new(timestamp_filter_config);
             script_stages.push(Box::new(timestamp_filter_stage));
-        }
-
-        // Add level filtering stage (runs after timestamp filtering, before key filtering)
-        let mut level_filter_stage =
-            LevelFilterStage::new(self.levels.clone(), self.exclude_levels.clone());
-        if level_filter_stage.is_active() {
-            // Only assign context to level filter if no script filters are active
-            if !has_script_filters {
-                level_filter_stage = level_filter_stage.with_context(self.context_config.clone());
-            }
-            script_stages.push(Box::new(level_filter_stage));
         }
 
         // Add key filtering stage (runs after level filtering, before context processing)

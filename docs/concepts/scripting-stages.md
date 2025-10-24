@@ -245,6 +245,8 @@ kelora -j app.log --filter 'e.level in ["ERROR", "WARN"]'
 
 However, `--filter` provides more flexibility for complex conditions.
 
+Level flags behave like script stages: you can place `--levels` or `--exclude-levels` anywhere in the CLI sequence, and Kelora runs them immediately at that point. Repeat the flag when you want different level rules before and after a transformation (for example, derive a level in `--exec`, then add another `--levels` to act on the new field).
+
 ### Filter Output
 
 Filters don't modify events - they only decide pass/skip:

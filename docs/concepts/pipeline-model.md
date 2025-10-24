@@ -192,35 +192,34 @@ Parsers: `json`, `logfmt`, `syslog`, `combined`, `csv`, `tsv`, `cols`, etc.
 
 ### Script Stages (Pipeline Core)
 
-**User script stages execute in exact CLI order:**
+**User-controlled stages execute exactly where you place them on the CLI:**
 
-- `--filter <EXPR>` - Boolean filter (true = keep, false = skip)
-- `--exec <SCRIPT>` - Transform/process event
-- `--exec-file <PATH>` - Execute script from file (alias: `-E`)
+- `--filter <EXPR>` – Boolean filter (true = keep, false = skip)
+- `--levels/-L <LIST>` – Include or exclude log levels (case-insensitive, repeatable)
+- `--exec <SCRIPT>` – Transform/process event
+- `--exec-file <PATH>` – Execute script from file (alias: `-E`)
 
-**Multiple instances allowed, intermixed in any order.**
+You can mix and repeat these flags; each stage sees the output of the previous one.
 
 **Example:**
 ```bash
 kelora -j app.log \
-    --filter 'e.status >= 400' \    # Stage 1: Filter
-    --exec 'e.alert = true' \        # Stage 2: Exec (only 4xx/5xx)
-    --filter 'e.status < 500' \      # Stage 3: Filter (only 4xx)
-    --exec 'track_count(e.path)'     # Stage 4: Exec (track 4xx paths)
+    --levels error,critical \        # Stage 1: Level filter
+    --filter 'e.status >= 400' \     # Stage 2: Filter
+    --exec 'e.alert = true' \        # Stage 3: Exec (only 4xx/5xx errors)
+    --exclude-levels debug \         # Stage 4: Remove any downgraded events
+    --exec 'track_count(e.path)'     # Stage 5: Exec (track surviving paths)
 ```
 
 Each stage processes the output of the previous stage sequentially.
 
 ### Complete Stage Ordering
 
-After user script stages, built-in filters execute:
+1. **CLI-ordered stages** – `--filter`, `--levels`/`--exclude-levels`, `--exec`, `--exec-file`
+2. **Timestamp filtering** – `--since`, `--until`
+3. **Key filtering** – `--keys`, `--exclude-keys`
 
-1. **User script stages** (--filter, --exec in CLI order)
-2. **Timestamp filtering** (--since, --until)
-3. **Level filtering** (--levels, --exclude-levels)
-4. **Key filtering** (--keys, --exclude-keys)
-
-**Note:** User filters execute **before** built-in filtering like `--levels`.
+Place `--levels` before heavy transforms to prune work early, or add another `--levels` after a script if you synthesise a level field there.
 
 ### Span Processing
 
