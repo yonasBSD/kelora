@@ -834,50 +834,7 @@ impl RhaiEngine {
     }
 
     fn is_likely_type_mismatch(func_signature: &str, func_name: &str) -> bool {
-        // Check if the function name is one we know exists
-        let known_functions = vec![
-            "extract_re",
-            "extract_all_re",
-            "split_re",
-            "replace_re",
-            "count",
-            "strip",
-            "before",
-            "after",
-            "between",
-            "starting_with",
-            "ending_with",
-            "is_digit",
-            "join",
-            "extract_ip",
-            "extract_ips",
-            "mask_ip",
-            "is_private_ip",
-            "extract_url",
-            "extract_domain",
-            "parse_json",
-            "parse_kv",
-            "col",
-            "cols",
-            "status_class",
-            "track_count",
-            "track_sum",
-            "track_min",
-            "track_max",
-            "track_avg",
-            "track_unique",
-            "track_bucket",
-            // Common Rhai built-ins that work on strings
-            "len",
-            "contains",
-            "starts_with",
-            "ends_with",
-            "split",
-            "replace",
-            "trim",
-        ];
-
-        known_functions.contains(&func_name) && func_signature.contains('(')
+        !Self::get_expected_function_signature(func_name).is_empty() && func_signature.contains('(')
     }
 
     fn extract_called_types(func_signature: &str) -> String {
