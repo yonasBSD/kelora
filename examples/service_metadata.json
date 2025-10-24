@@ -1,0 +1,27 @@
+{
+  "api": {
+    "team": "backend",
+    "owner": "alice@example.com",
+    "criticality": "high"
+  },
+  "database": {
+    "team": "data",
+    "owner": "bob@example.com",
+    "criticality": "critical"
+  },
+  "auth": {
+    "team": "security",
+    "owner": "charlie@example.com",
+    "criticality": "critical"
+  },
+  "cache": {
+    "team": "infra",
+    "owner": "diana@example.com",
+    "criticality": "medium"
+  },
+  "scheduler": {
+    "team": "ops",
+    "owner": "evan@example.com",
+    "criticality": "low"
+  }
+}

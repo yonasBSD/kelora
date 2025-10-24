@@ -69,16 +69,7 @@ kelora -j \
     app.log
 ```
 
-#### `read_json(path)`
-
-Parse JSON file (convenience helper).
-
-```bash
-kelora -j \
-    --begin 'conf.users = read_json("users.json")' \
-    --exec 'e.user_name = conf.users.get(e.user_id, "unknown")' \
-    app.log
-```
+**Note:** To parse JSON files, use `read_file(path)` and then call `.parse_json()` on the result, or define data structures inline using Rhai's map syntax `#{ key: value }`.
 
 ### Examples
 
@@ -95,7 +86,11 @@ kelora -j \
 
 ```bash
 kelora -j \
-    --begin 'conf.ip_to_country = read_json("geoip.json")' \
+    --begin 'conf.ip_to_country = #{
+                "192.168.1.1": "US",
+                "10.0.0.1": "UK",
+                "172.16.0.1": "DE"
+            }' \
     --exec 'e.country = conf.ip_to_country.get(e.ip, "unknown")' \
     app.log
 ```

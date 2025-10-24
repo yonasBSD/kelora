@@ -171,7 +171,7 @@ cargo install kelora
 ## Learn More
 
 - **[Quickstart](quickstart.md)** - 5-minute tour
-- **[Tutorials](tutorials/parsing-custom-formats.md)** - Step-by-step guides
+- **[Tutorials](tutorials/)** - Step-by-step guides starting with [the basics](tutorials/basics.md)
 - **[How-To](how-to/find-errors-in-logs.md)** - Solve specific problems
 - **[Concepts](concepts/pipeline-model.md)** - Understanding how Kelora works
 - **[Reference](reference/functions.md)** - Functions, formats, CLI options
