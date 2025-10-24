@@ -24,7 +24,7 @@ kelora -j examples/simple_json.jsonl \
 
 - `-l` (or `--levels`) is faster than `--filter` because it runs during parsing.
 - You can mix absolute ISO timestamps with relative offsets to anchor investigations (as shown above).
-- Prefer explicit formats (`-j`, `-f logfmt`, `-f combined`) over auto detection to avoid surprises.
+- Prefer explicit formats (`-j`, `-f logfmt`, `-f combined`) over `-f auto` detection to avoid surprises.
 - For a directory of files, pass a glob (`logs/app/*.jsonl`) or feed a file list via `find … -print0 | xargs -0 kelora …`.
 
 ## Step 2: Narrow to Relevant Signals
@@ -48,11 +48,11 @@ Show surrounding events to understand what happened before and after each error.
 ```bash
 kelora -j examples/simple_json.jsonl \
   -l error,critical \
-  --before-context 2 \
-  --after-context 1
+  -B 2 \
+  -A 1
 ```
 
-- `--before-context` and `--after-context` mimic `grep`’s `-B/-A`. Use them sparingly to avoid flooding output.
+- `-B`/`-A` (short for `--before-context`/`--after-context`) mimic `grep`’s context flags. Use them sparingly to avoid flooding output.
 - If the log contains multi-line traces, run the relevant strategy from [Choose a Multiline Strategy](handle-multiline-stacktraces.md) first, then apply level/context filtering.
 
 ## Step 4: Summarise Severity and Ownership
