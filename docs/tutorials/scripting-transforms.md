@@ -26,8 +26,8 @@ Start with `examples/errors_exec_transform.jsonl`, which includes messy values.
 
     ```bash
     kelora -j examples/errors_exec_transform.jsonl \
-      -e 'e.status_code = to_int_or(e.status, -1)' \
-      -e 'e.bytes_int = to_int_or(e.bytes, 0)' \
+      -e 'e.status_code = e.status.to_int_or(-1)' \
+      -e 'e.bytes_int = e.bytes.to_int_or(0)' \
       -J -n 3
     ```
 
@@ -35,13 +35,13 @@ Start with `examples/errors_exec_transform.jsonl`, which includes messy values.
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/errors_exec_transform.jsonl \
-      -e 'e.status_code = to_int_or(e.status, -1)' \
-      -e 'e.bytes_int = to_int_or(e.bytes, 0)' \
+      -e 'e.status_code = e.status.to_int_or(-1)' \
+      -e 'e.bytes_int = e.bytes.to_int_or(0)' \
       -J -n 3
     ```
 
-`to_int_or(value, fallback)` converts strings to integers and substitutes the
-fallback when conversion fails. Stacking `--exec` scripts lets you layer
+Using method-style `.to_int_or(fallback)` converts strings to integers and
+substitutes the fallback when conversion fails. Stacking `--exec` scripts lets you layer
 transformations without writing monolithic expressions.
 
 ## Step 2 – Derive New Fields and Filter by Them
@@ -53,7 +53,7 @@ events.
 
     ```bash
     kelora -j examples/errors_exec_transform.jsonl \
-      -e 'e.status_code = to_int_or(e.status, -1)' \
+      -e 'e.status_code = e.status.to_int_or(-1)' \
       -e 'e.severity = if e.status_code >= 500 { "critical" } else if e.status_code >= 400 { "error" } else { "ok" }' \
       --filter 'e.severity != "ok"' \
       -k timestamp,status_code,severity \
@@ -64,7 +64,7 @@ events.
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/errors_exec_transform.jsonl \
-      -e 'e.status_code = to_int_or(e.status, -1)' \
+      -e 'e.status_code = e.status.to_int_or(-1)' \
       -e 'e.severity = if e.status_code >= 500 { "critical" } else if e.status_code >= 400 { "error" } else { "ok" }' \
       --filter 'e.severity != "ok"' \
       -k timestamp,status_code,severity \
@@ -80,14 +80,14 @@ available to later filters or transformations.
 
     ```bash
     kelora -f combined examples/web_access_large.log.gz \
-      -e 'let status = to_int_or(e.status, 0); if status >= 500 { e.family = "server_error"; } else if status >= 400 { e.family = "client_error"; } else { e.family = "ok"; }'
+      -e 'let status = e.status.to_int_or(0); if status >= 500 { e.family = "server_error"; } else if status >= 400 { e.family = "client_error"; } else { e.family = "ok"; }'
     ```
 
 === "Output"
 
     ```bash exec="on" source="above" result="ansi"
     kelora -f combined examples/web_access_large.log.gz \
-      -e 'let status = to_int_or(e.status, 0); if status >= 500 { e.family = "server_error"; } else if status >= 400 { e.family = "client_error"; } else { e.family = "ok"; }'
+      -e 'let status = e.status.to_int_or(0); if status >= 500 { e.family = "server_error"; } else if status >= 400 { e.family = "client_error"; } else { e.family = "ok"; }'
     ```
 
 ### Pseudonymise Sensitive Attributes
@@ -222,7 +222,7 @@ reuses it across multiple commands.
     ```bash
     cat <<'RHAI' > classifiers.rhai
     fn classify_status(status) {
-        let code = to_int_or(status, -1);
+        let code = status.to_int_or(-1);
         if code >= 500 {
             "critical"
         } else if code >= 400 {
@@ -248,7 +248,7 @@ reuses it across multiple commands.
     ```bash exec="on" source="above" result="ansi"
     cat <<'RHAI' > classifiers.rhai
     fn classify_status(status) {
-        let code = to_int_or(status, -1);
+        let code = status.to_int_or(-1);
         if code >= 500 {
             "critical"
         } else if code >= 400 {

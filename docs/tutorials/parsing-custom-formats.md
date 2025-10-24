@@ -459,7 +459,7 @@ kelora -f 'cols:timestamp level *message' app.log \
 
 **Solution:** Use `get_path` with defaults in resilient mode:
 ```bash
-kelora -f 'cols:status bytes' -e 'e.status_int = to_int_or(e.status, 0)'
+kelora -f 'cols:status bytes' -e 'e.status_int = e.status.to_int_or(0)'
 ```
 
 ### Greedy Field Capturing Too Much

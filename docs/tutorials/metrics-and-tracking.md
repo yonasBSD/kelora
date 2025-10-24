@@ -13,8 +13,9 @@ feed into dashboards.
 
 ## Prerequisites
 
-- Completed the [Quickstart](../quickstart.md)
-- Familiarity with basic Rhai scripting (`--filter`, `--exec`)
+- [Getting Started: Input, Display & Filtering](basics.md) - Basic CLI usage
+- [Introduction to Rhai Scripting](intro-to-rhai.md) - Rhai fundamentals
+- **Time:** ~25 minutes
 
 ## Sample Data
 
@@ -78,7 +79,7 @@ Pair `--metrics` with `--stats` when you need throughput details as well:
 `--stats` adds processing totals, time span, and field inventory without touching
 your metrics map.
 
-## Step 2 – Summaries with Sums, Buckets, and Averages
+## Step 2 – Summaries with Sums and Averages
 
 Kelora ships several helpers for numeric metrics. The following example treats
 response sizes and latency as rolling aggregates.
@@ -88,9 +89,12 @@ response sizes and latency as rolling aggregates.
     ```bash
     kelora -j examples/simple_json.jsonl \
       -F none \
-      -e 'track_sum("response_bytes", to_int_or(e.get_path("bytes"), 0))' \
-      -e 'track_avg("response_time_ms", to_int_or(e.get_path("duration_ms"), 0))' \
-      -e 'if e.has_path("duration_ms") { track_bucket("slow_requests", clamp(to_int_or(e.duration_ms, 0) / 250 * 250, 0, 2000)) }' \
+      -e 'if e.has_field("duration_ms") {
+              track_sum("total_duration", e.duration_ms);
+              track_count("duration_count");
+              track_min("min_duration", e.duration_ms);
+              track_max("max_duration", e.duration_ms)
+          }' \
       --metrics
     ```
 
@@ -99,17 +103,66 @@ response sizes and latency as rolling aggregates.
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
       -F none \
-      -e 'track_sum("response_bytes", to_int_or(e.get_path("bytes"), 0))' \
-      -e 'track_avg("response_time_ms", to_int_or(e.get_path("duration_ms"), 0))' \
-      -e 'if e.has_path("duration_ms") { track_bucket("slow_requests", clamp(to_int_or(e.duration_ms, 0) / 250 * 250, 0, 2000)) }' \
+      -e 'if e.has_field("duration_ms") { track_sum("total_duration", e.duration_ms); track_count("duration_count"); track_min("min_duration", e.duration_ms); track_max("max_duration", e.duration_ms) }' \
       --metrics
     ```
 
-- `track_sum` accumulates totals (suitable for throughput or volume).
-- `track_avg` automatically maintains a running average per key.
-- `track_bucket` groups values into ranges so you can build histograms.
+**Available aggregation functions:**
 
-Buckets show up as nested maps where each bucket value keeps its own count.
+- `track_sum(key, value)` - Accumulates totals (throughput, volume)
+- `track_min(key, value)` - Tracks minimum value seen
+- `track_max(key, value)` - Tracks maximum value seen
+- `track_count(key)` - Counts occurrences of key
+- `track_inc(key, amount)` - Increment counter by amount (not shown above)
+
+**Note:** There's no `track_avg()` function. Calculate averages in `--end` stage:
+```rhai
+--end 'let avg = metrics.total_duration / metrics.duration_count; print("Average: " + avg)'
+```
+
+## Step 2.5 – Histograms with track_bucket()
+
+Build histograms by grouping values into buckets—perfect for latency distributions.
+
+=== "Command"
+
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'if e.has_field("duration_ms") {
+              let bucket = (e.duration_ms / 1000) * 1000;
+              track_bucket("latency_histogram", bucket)
+          }' \
+      --metrics
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'if e.has_field("duration_ms") { let bucket = (e.duration_ms / 1000) * 1000; track_bucket("latency_histogram", bucket) }' \
+      --metrics
+    ```
+
+`track_bucket(key, bucket_value)` creates nested counters where each unique bucket
+value maintains its own count. Perfect for building histograms.
+
+**Common bucketing patterns:**
+
+```rhai
+// Round to nearest 100ms
+track_bucket("latency", (duration_ms / 100) * 100)
+
+// HTTP status code families
+track_bucket("status_family", (status / 100) * 100)
+
+// File size buckets (KB)
+track_bucket("file_sizes", (bytes / 1024))
+
+// Hour of day
+track_bucket("hour_of_day", timestamp.hour())
+```
 
 ## Step 3 – Unique Values and Cardinality
 
@@ -384,11 +437,43 @@ human-readable histogram once processing finishes.
   only works after you enable `--window` and the requested field exists in the
   buffered events.
 
+## Quick Reference: All Tracking Functions
+
+| Function | Purpose | Example |
+|----------|---------|---------|
+| `track_count(key)` | Count events by key | `track_count(e.service)` |
+| `track_inc(key, amount)` | Increment by amount | `track_inc("total_bytes", e.size)` |
+| `track_sum(key, value)` | Sum numeric values | `track_sum("bandwidth", e.bytes)` |
+| `track_min(key, value)` | Minimum value | `track_min("fastest", e.duration)` |
+| `track_max(key, value)` | Maximum value | `track_max("slowest", e.duration)` |
+| `track_bucket(key, bucket)` | Histogram buckets | `track_bucket("status", (e.status/100)*100)` |
+| `track_unique(key, value)` | Unique values | `track_unique("users", e.user_id)` |
+
+**Note:** Calculate averages using `sum / count` in the `--end` stage.
+
+## Summary
+
+You've learned:
+
+- ✅ Track counts with `track_count()` and increment with `track_inc()`
+- ✅ Aggregate numbers with `track_sum()`, `track_min()`, `track_max()`
+- ✅ Calculate averages in `--end` stage from sum and count
+- ✅ Build histograms with `track_bucket()`
+- ✅ Count unique values with `track_unique()`
+- ✅ View metrics with `-m`, `-mm`, and `--metrics-json`
+- ✅ Persist metrics with `--metrics-file`
+- ✅ Generate custom reports in `--end` stage
+- ✅ Use sliding windows for percentile analysis
+
 ## Next Steps
 
-- Dive into the [Scripting Transforms tutorial](scripting-transforms.md) for more
-  transformation patterns.
-- Read the [Concepts: Scripting Stages](../concepts/scripting-stages.md) page to
-  understand how `--begin`, `--exec`, and `--end` interact.
-- Explore the [Function Reference](../reference/functions.md#tracking-functions)
-  for the complete list of tracking helpers and their signatures.
+Now that you can track and aggregate data, continue to:
+
+- **[Pipeline Stages](pipeline-stages.md)** - Use `--begin` and `--end` for advanced workflows
+- **[Scripting Transforms](scripting-transforms.md)** - Advanced transformation patterns
+- **[Configuration and Reusability](configuration-and-reusability.md)** - Save common patterns as aliases
+
+**Related guides:**
+- [Concepts: Scripting Stages](../concepts/scripting-stages.md) - Deep dive into stage execution
+- [Function Reference](../reference/functions.md#tracking-functions) - Complete function signatures
+- [How-To: Monitor Application Health](../how-to/monitor-application-health.md) - Real-world examples
