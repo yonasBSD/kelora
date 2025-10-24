@@ -57,11 +57,20 @@ Validate assumptions and produce quick metrics prior to export.
 kelora -f 'csv status:int duration_ms:int' examples/simple_csv.csv \
   -e 'track_count("total")' \
   -e 'if e.status >= 500 { track_count("errors") }' \
-  -e 'track_avg("avg_latency_ms", e.duration_ms)' \
+  -e 'track_sum("latency_total_ms", e.duration_ms)' \
+  -e 'track_count("latency_samples")' \
+  -m \
+  --end '
+    if metrics.contains("latency_total_ms") && metrics["latency_samples"] != 0 {
+      let avg = metrics["latency_total_ms"] / metrics["latency_samples"];
+      print("avg_latency_ms=" + avg.to_string());
+    }
+  ' \
   --metrics
 ```
 
 - Compare counts with what you expect from upstream systems.
+- Divide `latency_total_ms` by `latency_samples` for averages, or compute per-service stats with additional prefixes.
 - Use `track_bucket()` to build histograms or `track_unique()` to measure cardinality.
 
 ## Step 5: Export the Prepared Dataset

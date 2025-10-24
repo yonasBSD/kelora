@@ -26,11 +26,11 @@ kelora -j examples/simple_json.jsonl \
   --span-close '
     let metrics = span.metrics;
     print(span.id + ",events=" + span.size.to_string() +
-          ",errors=" + metrics.get_path("errors", 0).to_string());
+          ",errors=" + metrics.get_path("level|ERROR", 0).to_string());
   ' \
   --exec '
     track_count("total");
-    if e.level == "ERROR" { track_count("errors"); }
+    track_count("level|" + e.level);
   '
 ```
 
@@ -46,11 +46,11 @@ kelora -j examples/simple_json.jsonl \
   --span 5m \
   --exec '
     track_count("total");
-    if e.level == "ERROR" { track_count("errors"); }
+    track_count("level|" + e.level);
   ' \
   --span-close '
     let total = span.metrics.get_path("total", 0);
-    let errors = span.metrics.get_path("errors", 0);
+    let errors = span.metrics.get_path("level|ERROR", 0);
     if total > 0 {
       let rate = (errors.to_float() / total.to_float()) * 100.0;
       print(span.start.to_string() + "," +

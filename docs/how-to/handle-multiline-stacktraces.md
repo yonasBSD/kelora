@@ -84,7 +84,7 @@ kelora config.json --multiline all -J
   ```bash
   kelora --multiline timestamp \
     -f logfmt app.log \
-    --filter 'e.level == "ERROR"'
+    -l error
   ```
 - **Extract stack trace metadata**  
   ```bash

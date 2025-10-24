@@ -31,7 +31,7 @@ Combine level filters with Rhai expressions to describe the alert.
 tail -f /var/log/app.log | kelora -j \
   -l error,critical \
   --filter 'e.service == "payments" || e.message.contains("timeout")' \
-  -e 'if e.level == "CRITICAL" { eprint("CRITICAL: " + e.service + " " + e.message) }'
+  -e 'eprint(e.level + ": " + e.service + " " + e.message)'
 ```
 
 - Use `-l warn,error,critical` when log levels are reliable and you want broad coverage.
@@ -44,11 +44,11 @@ Quiet modes and counters help you avoid pager fatigue.
 ```bash
 tail -f /var/log/app.log | kelora -j -qq \
   -e 'track_count("total")' \
-  -e 'if e.level == "ERROR" { track_count("errors") }' \
+  -e 'track_count("level|" + e.level)' \
   -m \
   --end '
     let total = metrics.get_path("total", 0);
-    let errors = metrics.get_path("errors", 0);
+    let errors = metrics.get_path("level|ERROR", 0);
     if total > 0 && errors * 100 / total > 5 {
       eprint("ALERT: error rate " + errors.to_string() + "/" + total.to_string());
       exit(1);
@@ -65,7 +65,7 @@ Direct alerts to stderr for on-call use, files for dashboards, or downstream com
 
 ```bash
 tail -f /var/log/app.log | kelora -j --allow-fs-writes -qq \
-  --filter 'e.level == "CRITICAL"' \
+  -l critical \
   -e 'append_file("/tmp/critical.log", e.timestamp.to_string() + " " + e.service + " " + e.message + "\n")'
 ```
 
@@ -80,7 +80,7 @@ Embed the pipeline in a script so that your automation platform can restart it o
 #!/usr/bin/env bash
 set -euo pipefail
 
-if ! tail -f /var/log/app.log | kelora -j -qqq --filter 'e.level == "CRITICAL"'; then
+if ! tail -f /var/log/app.log | kelora -j -qqq -l critical; then
   printf 'Critical log seen at %s\n' "$(date -Is)" | mail -s "PROD critical" ops@example.com
 fi
 ```
@@ -93,12 +93,14 @@ fi
   ```bash
   tail -f /var/log/app.log | kelora -j -qq \
     --filter 'e.service == "search"' \
-    -e 'if e.level == "ERROR" { eprint("search error: " + e.message) }'
+    -l error \
+    -e 'eprint("search error: " + e.message)'
   ```
 - **Spike detection**  
   ```bash
   tail -f /var/log/app.log | kelora -j --window 50 -qq \
-    -e 'let recent = window_values("level").filter(|lvl| lvl == "ERROR");' \
+    -l error \
+    -e 'let recent = window_events();' \
     -e 'if recent.len() >= 10 { eprint("ALERT: error spike (" + recent.len().to_string() + " / 50)") }'
   ```
 - **Access log latency guard**  

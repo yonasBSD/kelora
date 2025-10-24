@@ -17,7 +17,7 @@ Start simple to confirm filters, transformations, and outputs are correct.
 
 ```bash
 time kelora -j logs/2024-04-01.jsonl.gz \
-  --filter 'e.level == "ERROR"' \
+  -l error \
   -k timestamp,service,message \
   -J > errors-sample.json
 ```
@@ -31,7 +31,7 @@ Use `--parallel` to leverage multiple cores. Let Kelora auto-detect thread count
 ```bash
 time kelora -j logs/2024-04-*.jsonl.gz \
   --parallel \
-  --filter 'e.level == "ERROR"' \
+  -l error \
   -e 'track_count(e.service)' \
   --metrics
 ```
@@ -45,7 +45,7 @@ Batch size controls how many events each worker processes before flushing.
 ```bash
 kelora -j logs/2024-04-*.jsonl.gz \
   --parallel --batch-size 5000 \
-  --filter 'e.level == "ERROR"' \
+  -l error \
   --stats
 ```
 
@@ -84,7 +84,7 @@ OUTPUT="reports/errors-$(date +%Y-%m-%d).json"
 
 kelora -j $ARCHIVE_GLOB \
   --parallel --unordered --batch-size 5000 \
-  --filter 'e.level == "ERROR"' \
+  -l error \
   -k timestamp,service,message \
   -J > "$OUTPUT"
 
@@ -99,7 +99,7 @@ kelora -j "$OUTPUT" --stats
   ```bash
   kelora -j logs/2024-04-*.jsonl logs/2024-04-*.jsonl.gz \
     --parallel --threads 8 \
-    --filter 'e.level == "CRITICAL"' \
+    -l critical \
     --stats
   ```
 - **Recursive discovery**  
