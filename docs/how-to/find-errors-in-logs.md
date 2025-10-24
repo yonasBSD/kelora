@@ -18,11 +18,12 @@ Decide which files and time ranges matter for the investigation. Use level filte
 ```bash
 kelora -j examples/simple_json.jsonl \
   -l error,critical \
-  --since 1h \
+  --since "2024-01-15T10:00:00Z" \
   --until 30m
 ```
 
 - `-l` (or `--levels`) is faster than `--filter` because it runs during parsing.
+- You can mix absolute ISO timestamps with relative offsets to anchor investigations (as shown above).
 - Prefer explicit formats (`-j`, `-f logfmt`, `-f combined`) over auto detection to avoid surprises.
 - For a directory of files, pass a glob (`logs/app/*.jsonl`) or feed a file list via `find … -print0 | xargs -0 kelora …`.
 
