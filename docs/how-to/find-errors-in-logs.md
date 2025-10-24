@@ -77,7 +77,8 @@ kelora -j examples/simple_json.jsonl \
   -l error,critical \
   -e 'e.error_code = e.get_path("error.code", "unknown")' \
   -k timestamp,service,error_code,message \
-  -F csv > errors.csv
+  -F csv \
+  -o errors.csv
 ```
 
 Alternatives:
