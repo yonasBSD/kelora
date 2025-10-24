@@ -32,10 +32,10 @@ Track latency and resource metrics with averages and extremes per service.
 ```bash
 kelora -j examples/simple_json.jsonl \
   -e 'let latency = e.get_path("duration_ms");
+      track_sum("latency_total_ms|" + e.service, latency);
+      track_max("latency_p99|" + e.service, latency);
       if latency != () {
-        track_sum("latency_total_ms|" + e.service, latency);
         track_count("latency_samples|" + e.service);
-        track_max("latency_p99|" + e.service, latency);
       }' \
   -e 'track_max("memory_peak|" + e.service, e.get_path("memory_percent"))' \
   --metrics
@@ -69,10 +69,10 @@ Create a compact report for status updates or documentation.
 kelora -j examples/simple_json.jsonl \
   -e 'track_count(e.service)' \
   -e 'let latency = e.get_path("duration_ms");
+      track_sum("latency_total_ms|" + e.service, latency);
+      track_max("latency_p99|" + e.service, latency);
       if latency != () {
-        track_sum("latency_total_ms|" + e.service, latency);
         track_count("latency_samples|" + e.service);
-        track_max("latency_p99|" + e.service, latency);
       }' \
   -e 'track_max("memory_peak|" + e.service, e.get_path("memory_percent"))' \
   -m \
@@ -148,8 +148,8 @@ kelora -j examples/simple_json.jsonl \
     --filter 'e.service == "payments"' \
     -e 'track_count(e.level)' \
     -e 'let latency = e.get_path("duration_ms");
+        track_sum("latency_total_ms|" + e.service, latency);
         if latency != () {
-          track_sum("latency_total_ms|" + e.service, latency);
           track_count("latency_samples|" + e.service);
         }' \
     --metrics
