@@ -1,410 +1,133 @@
-# Monitor Application Health
+# Build a Service Health Snapshot
 
-Extract health metrics and track service behavior from JSON application logs.
+Create a concise operational report from JSON service logs, tracking errors, latency, and resource pressure without leaving the terminal.
 
-## Problem
+## When to Reach for This
+- You need a quick health summary after a deployment or incident.
+- Product teams request a daily/weekly status report built from application logs.
+- You are validating that a suspected fix reduced error rates or latency.
 
-You have JSON logs from microservices and need to monitor health, track errors, measure performance, and understand service behavior.
+## Before You Start
+- Example commands use `examples/simple_json.jsonl`. Replace it with your application logs.
+- Ensure key fields exist in the payload (e.g., `service`, `level`, `duration_ms`, `memory_percent`, `status`).
+- Rhai metric helpers (`track_count`, `track_avg`, `track_sum`, etc.) power the summary; see [Tutorial: Metrics and Tracking](../tutorials/metrics-and-tracking.md) if you need a refresher.
 
-## Solutions
-
-### Basic Health Check
-
-Monitor overall service health:
-
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl \
-        -e 'track_count(e.level)' \
-        -e 'track_count(e.service)' \
-        --metrics
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl \
-        -e 'track_count(e.level)' \
-        -e 'track_count(e.service)' \
-        --metrics
-    ```
-
-### Error Rate Monitoring
-
-Track error rates over time:
+## Step 1: Build a Baseline Scoreboard
+Count events by service and severity to frame the rest of the investigation.
 
 ```bash
-kelora -j app.log \
-    -e 'if e.level == "ERROR" || e.level == "CRITICAL" { track_count("errors") }' \
-    -e 'track_count("total")' \
-    --metrics
+kelora -j examples/simple_json.jsonl \
+  -e 'track_count(e.service)' \
+  -e 'track_count("level_" + e.level)' \
+  --metrics \
+  --stats
 ```
 
-Calculate error percentage from metrics output.
+- `--metrics` prints the tracked values once input completes.
+- `--stats` reports parse errors and throughput, giving you confidence in the numbers.
 
-### Service-Specific Health
-
-Monitor individual service health:
+## Step 2: Add Performance Signals
+Track latency and resource metrics with averages and extremes per service.
 
 ```bash
-kelora -j app.log \
-    --filter 'e.service == "database"' \
+kelora -j examples/simple_json.jsonl \
+  -e 'if e.has_path("duration_ms") {
+        track_avg(e.service + "_latency_ms", e.duration_ms);
+        track_max(e.service + "_latency_p99", e.duration_ms);
+      }' \
+  -e 'if e.has_path("memory_percent") {
+        track_max(e.service + "_memory_peak", e.memory_percent);
+      }' \
+  --metrics
+```
+
+Guidance:
+- Use safe guards (`e.has_path`) to avoid failing when fields are missing.
+- Track additional business KPIs (orders, sign-ups) with `track_sum()` or `track_count()` as needed.
+
+## Step 3: Flag Error Hotspots
+Separate healthy traffic from incidents and identify recurring failure modes.
+
+```bash
+kelora -j examples/simple_json.jsonl \
+  -l error,critical \
+  -e 'let code = e.get_path("error.code", "unknown");' \
+  -e 'track_count("errors|" + e.service)' \
+  -e 'track_count("error_code|" + code)' \
+  -k timestamp,service,message \
+  --metrics
+```
+
+- Running the same pipeline without `-k` is useful when you only need counts.
+- Combine multiple passes (baseline + errors) to build an overall picture or wrap the logic in a tiny shell script.
+
+## Step 4: Generate a Shareable Summary
+Create a compact report for status updates or documentation.
+
+```bash
+kelora -j examples/simple_json.jsonl \
+  -e 'track_count(e.service)' \
+  -e 'if e.level == "ERROR" { track_count("errors_" + e.service) }' \
+  -e 'if e.has_path("duration_ms") {
+        track_avg("latency_" + e.service, e.duration_ms);
+      }' \
+  -m \
+  --end '
+    print("=== Service Snapshot ===");
+    for (key, value) in metrics {
+      print(key + ": " + value.to_string());
+    }
+  '
+```
+
+- `-m` (or `--metrics`) keeps the metrics map available in the `--end` block.
+- Redirect the output to a file (`> reports/service-health.txt`) or pipe it into notification tooling.
+
+## Step 5: Export Structured Data
+Share filtered events with teams that need to deep dive.
+
+```bash
+kelora -j examples/simple_json.jsonl \
+  --filter 'e.level == "ERROR"' \
+  -e 'e.error_code = e.get_path("error.code", "unknown")' \
+  -k timestamp,service,error_code,message \
+  -F csv > service-errors.csv
+```
+
+- Use `-J` or `-F json` for downstream analytics pipelines.
+- When privacy matters, combine with [Sanitize Logs Before Sharing](extract-and-mask-sensitive-data.md).
+
+## Variations
+- **Per-service drilldown**  
+  ```bash
+  kelora -j app.log \
+    --filter 'e.service == "payments"' \
     -e 'track_count(e.level)' \
-    -e 'track_avg("duration", e.get_path("duration_ms", 0))' \
+    -e 'track_avg("payments_latency", e.get_path("duration_ms", 0))' \
     --metrics
-```
-
-### Response Time Monitoring
-
-Track performance metrics:
-
-```bash
-kelora -j app.log \
-    --filter 'e.has_path("duration_ms")' \
-    -e 'track_avg("response_time", e.duration_ms)' \
-    -e 'track_min("fastest", e.duration_ms)' \
-    -e 'track_max("slowest", e.duration_ms)' \
+  ```
+- **Time-boxed reports**  
+  ```bash
+  kelora -j app.log \
+    --since "2 hours ago" \
+    -e 'e.window = e.timestamp.format("%Y-%m-%d %H:00")' \
+    -e 'track_count(e.window)' \
     --metrics
-```
-
-### Memory Usage Tracking
-
-Monitor memory consumption:
-
-```bash
-kelora -j app.log \
-    --filter 'e.has_path("memory_percent")' \
-    -e 'track_avg("memory", e.memory_percent)' \
-    -e 'track_max("peak_memory", e.memory_percent)' \
-    --metrics
-```
-
-### Endpoint Performance
-
-Analyze API endpoint health:
-
-```bash
-kelora -j app.log \
-    --filter 'e.has_path("path")' \
-    -e 'track_count(e.path)' \
-    -e 'track_avg(e.path, e.get_path("duration_ms", 0))' \
-    --metrics
-```
-
-## Real-World Examples
-
-### Service Status Dashboard
-
-Generate a comprehensive health report:
-
-```bash
-kelora -j app.log \
+  ```
+- **Live monitoring**  
+  ```bash
+  tail -f /var/log/app.log | kelora -j -q \
     -e 'track_count(e.service)' \
-    -e 'track_count(e.level)' \
-    -e 'if e.level == "ERROR" { track_count(e.service + "_errors") }' \
-    -e 'if e.has_path("duration_ms") { track_avg("avg_duration", e.duration_ms) }' \
-    --metrics
-```
+    -e 'if e.level == "ERROR" { eprint("ALERT: error in " + e.service) }'
+  ```
+  Add `--no-emoji` when piping into systems that cannot render emoji.
 
-### Failed Operations
-
-Track operations that fail:
-
-```bash
-kelora -j app.log \
-    --filter 'e.get_path("status", "success") != "success"' \
-    -e 'e.operation = e.get_path("operation", "unknown")' \
-    -e 'track_count(e.operation)' \
-    -k timestamp,service,operation,message \
-    --metrics
-```
-
-### Database Query Health
-
-Monitor database performance:
-
-```bash
-kelora -j app.log \
-    --filter 'e.service == "database"' \
-    -e 'if e.get_path("duration_ms", 0) > 1000 { e.slow = true }' \
-    -e 'track_count("queries")' \
-    -e 'if e.slow { track_count("slow_queries") }' \
-    -e 'track_avg("query_time", e.get_path("duration_ms", 0))' \
-    --metrics
-```
-
-### Authentication Failures
-
-Track login and auth issues:
-
-```bash
-kelora -j app.log \
-    --filter 'e.service == "auth"' \
-    --filter 'e.message.contains("failed") || e.message.contains("locked")' \
-    -e 'track_count(e.username)' \
-    -e 'track_count(e.get_path("ip", "unknown"))' \
-    -k timestamp,username,ip,message \
-    --metrics
-```
-
-### Cache Performance
-
-Monitor cache hit rates:
-
-```bash
-kelora -j app.log \
-    --filter 'e.service == "cache"' \
-    -e 'if e.message.contains("hit") { track_count("cache_hits") }' \
-    -e 'if e.message.contains("miss") { track_count("cache_misses") }' \
-    -e 'track_count("cache_total")' \
-    --metrics
-```
-
-### Service Dependencies
-
-Track which services are interacting:
-
-```bash
-kelora -j app.log \
-    --filter 'e.has_path("downstream_service")' \
-    -e 'e.call = e.service + " -> " + e.downstream_service' \
-    -e 'track_count(e.call)' \
-    --metrics
-```
-
-### Hourly Health Report
-
-Break down health by time:
-
-```bash
-kelora -j app.log \
-    -e 'e.hour = e.timestamp.format("%Y-%m-%d %H:00")' \
-    -e 'track_count(e.hour)' \
-    -e 'if e.level == "ERROR" { track_count(e.hour + "_errors") }' \
-    --metrics
-```
-
-### Resource Exhaustion Detection
-
-Find resource pressure points:
-
-```bash
-kelora -j app.log \
-    --filter 'e.level == "WARN" || e.level == "ERROR"' \
-    --filter 'e.message.contains("memory") || e.message.contains("disk") || e.message.contains("connection")' \
-    -e 'track_count(e.service)' \
-    -k timestamp,service,level,message
-```
-
-### User Activity Tracking
-
-Monitor user-facing operations:
-
-```bash
-kelora -j app.log \
-    --filter 'e.has_path("user_id")' \
-    -e 'track_unique("active_users", e.user_id)' \
-    -e 'track_count(e.get_path("operation", "unknown"))' \
-    --metrics
-```
-
-## Time-Based Monitoring
-
-### Last Hour's Health
-
-```bash
-kelora -j app.log \
-    --since "1 hour ago" \
-    -e 'track_count(e.level)' \
-    -e 'track_count(e.service)' \
-    --metrics
-```
-
-### Compare Time Periods
-
-```bash
-# Morning traffic
-kelora -j app.log \
-    --since "2024-01-15 06:00:00" \
-    --until "2024-01-15 12:00:00" \
-    -e 'track_count(e.level)' \
-    --metrics
-
-# Afternoon traffic
-kelora -j app.log \
-    --since "2024-01-15 12:00:00" \
-    --until "2024-01-15 18:00:00" \
-    -e 'track_count(e.level)' \
-    --metrics
-```
-
-### Real-Time Monitoring
-
-=== "Linux/macOS"
-
-    ```bash
-    tail -f /var/log/app.log | kelora -j \
-        -e 'track_count(e.level)' \
-        -e 'if e.level == "ERROR" { eprint("⚠️  ERROR in " + e.service) }' \
-        --metrics
-    ```
-
-=== "Windows"
-
-    ```powershell
-    Get-Content -Wait app.log | kelora -j \
-        -e 'track_count(e.level)' \
-        -e 'if e.level == "ERROR" { eprint("⚠️  ERROR in " + e.service) }' \
-        --metrics
-    ```
-
-## Alerting Patterns
-
-### Critical Error Detection
-
-```bash
-kelora -j app.log \
-    --filter 'e.level == "CRITICAL"' \
-    -e 'eprint("🚨 CRITICAL: " + e.service + " - " + e.message)' \
-    -qq
-```
-
-The `-qq` flag suppresses event output, showing only alerts.
-
-### Threshold Alerts
-
-```bash
-kelora -j app.log \
-    -e 'if e.get_path("memory_percent", 0) > 90 { eprint("⚠️  High memory: " + e.service + " at " + e.memory_percent + "%") }' \
-    -e 'if e.get_path("duration_ms", 0) > 5000 { eprint("⚠️  Slow request: " + e.get_path("path", "unknown") + " took " + e.duration_ms + "ms") }' \
-    -qq
-```
-
-### Service Down Detection
-
-```bash
-kelora -j app.log \
-    --filter 'e.message.contains("unavailable") || e.message.contains("timeout") || e.message.contains("unreachable")' \
-    -e 'eprint("🔴 Service issue: " + e.service + " - " + e.message)' \
-    -k timestamp,service,message
-```
-
-## Export for Monitoring Tools
-
-### Prometheus-Style Metrics
-
-```bash
-kelora -j app.log \
-    -e 'track_count("http_requests_total")' \
-    -e 'if e.status >= 500 { track_count("http_requests_errors") }' \
-    -e 'track_avg("http_request_duration_ms", e.get_path("duration_ms", 0))' \
-    --metrics
-```
-
-### JSON Export for Dashboards
-
-```bash
-kelora -j app.log \
-    --filter 'e.level == "ERROR"' \
-    -e 'e.error_type = e.get_path("error.type", "unknown")' \
-    -k timestamp,service,error_type,message \
-    -J > errors.json
-```
-
-### CSV for Spreadsheets
-
-```bash
-kelora -j app.log \
-    -e 'e.hour = e.timestamp.format("%Y-%m-%d %H:00")' \
-    -k hour,service,level,message \
-    -F csv > health_report.csv
-```
-
-## Performance Tips
-
-**Large Log Files:**
-```bash
-kelora -j large-app.log.gz \
-    --parallel \
-    -e 'track_count(e.service)' \
-    --metrics
-```
-
-**Sampling for Quick Analysis:**
-```bash
-kelora -j app.log \
-    -e 'if e.user_id.bucket() % 10 == 0 { track_count("sampled") }' \
-    --metrics
-```
-
-**Focus on Recent Events:**
-```bash
-kelora -j app.log \
-    --since "30 minutes ago" \
-    -e 'track_count(e.level)' \
-    --metrics
-```
-
-## Common Patterns
-
-**Service health summary:**
-```bash
-kelora -j app.log \
-    -e 'track_count(e.service + "_" + e.level)' \
-    --metrics
-```
-
-**Error rate calculation:**
-```bash
-kelora -j app.log \
-    -e 'track_count("total")' \
-    -e 'if e.level == "ERROR" { track_count("errors") }' \
-    --metrics
-# Calculate: errors / total * 100
-```
-
-**Unique users:**
-```bash
-kelora -j app.log \
-    -e 'track_unique("users", e.user_id)' \
-    --metrics
-```
-
-**Service call patterns:**
-```bash
-kelora -j app.log \
-    --filter 'e.has_path("operation")' \
-    -e 'track_count(e.service + "::" + e.operation)' \
-    --metrics
-```
-
-## Troubleshooting
-
-**Missing fields:**
-```bash
-# Use safe access with defaults
-e.get_path("nested.field", "default_value")
-```
-
-**Inconsistent log formats:**
-```bash
-# Check if field exists before using
-if e.has_path("duration_ms") {
-    track_avg("duration", e.duration_ms)
-}
-```
-
-**Large numbers:**
-```bash
-# Convert to human-readable
-e.duration_s = e.duration_ms / 1000
-e.memory_mb = e.memory_bytes / 1024 / 1024
-```
+## Validate and Iterate
+- Compare counts against existing dashboards to ensure your pipeline includes every service instance.
+- Make `--stats` part of the report so readers see parse failures or skipped events.
+- If metrics explode after a deploy, combine this guide with [Triage Production Errors](find-errors-in-logs.md) to capture concrete samples.
 
 ## See Also
-
-- [Find Errors in Logs](find-errors-in-logs.md) - Error detection techniques
-- [Analyze Web Traffic](analyze-web-traffic.md) - Web server monitoring
-- [Function Reference](../reference/functions.md) - All available functions
-- [Metrics and Tracking Tutorial](../tutorials/metrics-and-tracking.md) - Deep dive into metrics
+- [Tutorial: Metrics and Tracking](../tutorials/metrics-and-tracking.md) for a deeper tour of Rhai telemetry helpers.
+- [Design Streaming Alerts](build-streaming-alerts.md) to turn the snapshot into a continuous monitor.
+- [Process Archives at Scale](batch-process-archives.md) when historical context is required.

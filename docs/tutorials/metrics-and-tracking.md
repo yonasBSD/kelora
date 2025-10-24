@@ -476,4 +476,4 @@ Now that you can track and aggregate data, continue to:
 **Related guides:**
 - [Concepts: Scripting Stages](../concepts/scripting-stages.md) - Deep dive into stage execution
 - [Function Reference](../reference/functions.md#tracking-functions) - Complete function signatures
-- [How-To: Monitor Application Health](../how-to/monitor-application-health.md) - Real-world examples
+- [How-To: Build a Service Health Snapshot](../how-to/monitor-application-health.md) - Real-world examples

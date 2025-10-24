@@ -1,146 +1,127 @@
-# Span Aggregation Cookbook
+# Roll Up Logs with Span Windows
 
-Use `--span` and `--span-close` to batch events for summaries, dashboards, and incident analyses.
+Batch events into fixed-size or time-based windows using `--span` so you can compute summaries without losing streaming behavior.
 
-## Problem
+## When to Use Spans
+- Produce per-minute or per-N-event digests during incident reviews.
+- Generate lightweight dashboards straight from log streams.
+- Detect bursts or trends without shipping data into another analytics system.
 
-You need periodic rollups (per N events or per time window) without losing the per-event pipeline logic. You also want late or malformed timestamps handled gracefully.
+## Before You Start
+- Examples use `examples/simple_json.jsonl` and assume a parsed timestamp (`timestamp` field). Adapt field names as needed.
+- `--span` disables parallel mode; span processing requires ordered input.
+- Late or timestamp-free events require special handling (see Step 4).
 
-## Solutions
+## Step 1: Select a Window Strategy
+- **Count-based**: `--span 500` closes the window every 500 events that pass all filters.
+- **Time-based**: `--span 5m` groups events by wall-clock duration (supports `s`, `m`, `h`).
+- Optional `--span-close '...Rhai script...'` runs when the window closes. Use it for custom summaries or output.
 
-### Count-Based Batches
-
-Split the stream every _N_ events that survive filters and emit a summary per batch.
-
-```bash
-kelora -f json access.log \
-  --filter 'e.status >= 400' \
-  --span 500 \
-  --span-close '
-    let errors = span.size;
-    print(span.id + ",errors=" + errors.to_string());
-  '
-```
-
-- Works in arrival order; no late-event concept.
-- `span.size` reflects post-filter events, so remove empty spans if needed:
-
-```rhai
-if span.size > 0 {
-    print(span.id + ":" + span.size);
-}
-```
-
-### Time-Based Windows
-
-Emit metrics aligned to fixed wall-clock windows by duration.
+## Step 2: Count-Based Example
+Summarise every 200 events for quick batch metrics.
 
 ```bash
-kelora -f json --span 5m app.log \
+kelora -j examples/simple_json.jsonl \
+  --span 200 \
   --span-close '
     let metrics = span.metrics;
-    let hits = metrics.get_path("hits", 0);
-    let slow = metrics.get_path("slow", 0);
-    let rate = if hits > 0 { slow * 100 / hits } else { 0 };
-    print(span.id + "," +
-          "hits=" + hits.to_string() + "," +
-          "slow_pct=" + rate.to_string());
+    print(span.id + ",events=" + span.size.to_string() +
+          ",errors=" + metrics.get_path("errors", 0).to_string());
   ' \
   --exec '
-    track_count("hits");
-    if e.duration_ms > 2000 { track_count("slow"); }
+    track_count("total");
+    if e.level == "ERROR" { track_count("errors"); }
   '
 ```
 
-Best practices:
+- `span.id` is an incrementing identifier (`span-000001`, ...).
+- `span.metrics` exposes only the deltas collected within that window.
+- Because the original events are still streamed, you can attach more `--exec` or `--filter` stages before or after the span logic.
 
-- Sort or pre-group logs by timestamp for accurate window assignment.
-- Events lacking `ts` appear with `meta.span_status == "unassigned"` and do not enter `span.events`.
-- Late arrivals keep `meta.span_status == "late"` and include the window they missed.
-
-### Inspect Span Events
-
-`span.events` gives the surviving events so you can generate rollups or trace context.
+## Step 3: Time-Based Example
+Roll up five-minute error summaries aligned to timestamps.
 
 ```bash
-kelora -f json --span 100 requests.jsonl \
-  --span-close '
-    let events = span.events;
-    let ids = events.map(|evt| evt.request_id).join(",");
-    print(span.id + ": " + ids);
-  '
-```
-
-The maps inside `span.events` include all original fields plus span metadata (`span_status`, `span_start`, `span_end`).
-
-### Track Metrics Automatically
-
-`span.metrics` isolates the deltas for `track_*` calls inside the span.
-
-```bash
-kelora -f json --span 1m api.log \
+kelora -j examples/simple_json.jsonl \
+  --span 5m \
   --exec '
     track_count("total");
     if e.level == "ERROR" { track_count("errors"); }
   ' \
   --span-close '
-    let metrics = span.metrics;
-    let total = metrics.get_path("total", 0);
-    let errors = metrics.get_path("errors", 0);
+    let total = span.metrics.get_path("total", 0);
+    let errors = span.metrics.get_path("errors", 0);
     if total > 0 {
-      let err_rate = errors * 100 / total;
-      print(span.id + ",error_rate=" + err_rate.to_string());
+      let rate = (errors.to_float() / total.to_float()) * 100.0;
+      print(span.start.to_string() + "," +
+            "total=" + total.to_string() + "," +
+            "errors=" + errors.to_string() + "," +
+            "error_rate=" + rate.to_string());
     }
   '
 ```
 
-No manual resets required—Kelora snapshots and clears span metrics after each close.
+- `span.start` and `span.end` use `DateTime` values from event timestamps.
+- Windows are tumbling; events fall into the window that matches their timestamp.
+- Ensure input is chronologically sorted to avoid unnecessary late events.
 
-### Handle Late or Missing Timestamps
+## Step 4: Handle Late or Missing Timestamps
+Inspect span metadata to see how events were classified.
 
 ```bash
-kelora -f json --span 10m logs.jsonl \
+kelora -j examples/simple_json.jsonl \
+  --span 1m \
   --exec '
     if meta.span_status == "late" {
-      eprint("Late: " + meta.span_id + " ← " + e.ts);
+      eprint("Late event: " + e.timestamp.to_string());
     } else if meta.span_status == "unassigned" {
-      eprint("Missing ts: line " + meta.line_num.to_string());
+      eprint("Missing timestamp on line " + meta.line_num.to_string());
     }
   ' \
-  --span-close 'print(span.id + ":" + span.size)'
+  --span-close 'print(span.id + ": " + span.size.to_string())'
 ```
 
-- `meta.span_status` is visible in `--exec` stages, so you can branch on late/unassigned events.
-- Late events still pass through filters/exec but do not reopen closed spans.
-- For strict timestamp enforcement, add `--strict` (events without valid `ts` become hard errors).
+- `meta.span_status` is one of `active`, `late`, or `unassigned`.
+- Use `--strict` if missing timestamps should abort the run instead of being skipped.
 
-### Use Span Metadata Without a Close Hook
-
-Skip `--span-close` when you only need Kelora to tag events; the span processor stays lightweight but emits per-event metadata you can forward downstream.
+## Step 5: Export or Chain Spans
+Write per-span summaries to files or feed them into downstream commands.
 
 ```bash
-kelora -f json access.log --span 5m \
-  --exec 'e.window = #{id: meta.span_id, start: meta.span_start, end: meta.span_end};'
+kelora -j examples/simple_json.jsonl \
+  --span 10m \
+  --exec 'track_count(e.service)' \
+  --span-close '
+    let path = "/tmp/span-" + span.id + ".csv";
+    for (service, count) in span.metrics {
+      append_file(path, span.start.to_string() + "," + service + "," + count.to_string() + "\n");
+    }
+  ' \
+  --allow-fs-writes
 ```
 
-Every event now carries its tumbling window so tools like `jq`, DuckDB, or spreadsheets can group by `e.window.id`.
+- Remember to enable `--allow-fs-writes` when using `append_file()`.
+- Alternatively, pipe Kelora output into `jq`, DuckDB, or spreadsheets for visualisation.
 
-```bash
-kelora -f json errors.log --span 2m --output jsonl |
-  jq -sc 'group_by(.meta.span_id)
-          | map({span: .[0].meta.span_id, errors: length})'
-```
+## Variations
+- **Per-service spans**  
+  ```bash
+  kelora -j app.log \
+    --filter 'e.service == "payments"' \
+    --span 100 \
+    --span-close 'print(span.id + ",payments=" + span.size.to_string())'
+  ```
+- **Sliding error thresholds**  
+  Combine `--span` with [Design Streaming Alerts](build-streaming-alerts.md) to trigger notifications when span metrics cross a threshold.
+- **Hybrid reporting**  
+  Run two spans simultaneously by invoking Kelora twice: one count-based for rapid feedback, another time-based for dashboards.
 
-Or filter in-line by span status while still emitting the rest:
+## Best Practices
+- Sort archives by timestamp before running time-based spans to minimise late events.
+- Keep span window sizes reasonable; extremely large spans consume more memory.
+- Capture `--stats` output alongside span summaries for auditing.
 
-```bash
-kelora -f json access.log --span 5m \
-  --filter 'meta.span_status != "late"' \
-  --exec 'if meta.span_status == "late" { eprint("Late: " + e.ts + " → " + meta.span_id); }'
-```
-
-### Tips
-
-- Time spans align to the first valid timestamp in the stream; ensure ordering or use upstream sort.
-- Count spans retain all events in memory until `span.size` is reached. Watch for large values.
-- `--span` disables parallel mode automatically—sequential processing is required for deterministic batching.
+## See Also
+- [Process Archives at Scale](batch-process-archives.md) to prepare large datasets before spanning.
+- [Build a Service Health Snapshot](monitor-application-health.md) for metric examples you can embed in span logic.
+- `kelora --help-time` and `kelora --help-functions` for timestamp parsing and metric helper references.

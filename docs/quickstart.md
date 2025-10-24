@@ -157,7 +157,7 @@ kelora --help-time         # Timestamp format reference
 
 ## Next Steps
 
-- **Start with events** — Practice accessing and mutating `e.field` values on JSON or logfmt samples. Then branch into [How-To: Find Errors in Logs](how-to/find-errors-in-logs.md).
+- **Start with events** — Practice accessing and mutating `e.field` values on JSON or logfmt samples. Then branch into [How-To: Triage Production Errors](how-to/find-errors-in-logs.md).
 - **Explore parsers** — Try `-f json`, `-f combined`, and `-f 'cols:...'`, then dig into the [Input Formats reference](reference/formats.md).
 - **Layer scripts** — Combine `--filter`, `--exec`, and `--keys` for enrichment. Deepen your skills with the [Scripting Transforms tutorial](tutorials/scripting-transforms.md).
 - **Add metrics** — Introduce `track_count`, `track_sum`, and `--metrics`, then read the [Metrics & Tracking tutorial](tutorials/metrics-and-tracking.md).

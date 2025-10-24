@@ -1,248 +1,112 @@
-# Process CSV Data
+# Prepare CSV Exports for Analytics
 
-Parse and analyze CSV/TSV files with type annotations, header handling, and field transformations.
+Clean up CSV or TSV logs, enforce types, and produce analysis-ready datasets for spreadsheets, SQL engines, or BI tools.
 
-## Problem
+## Use This Guide When
+- Your application or appliance emits CSV/TSV logs that need quick filtering or enrichment.
+- You need to normalise raw exports before loading them into DuckDB, Pandas, or spreadsheets.
+- You want to ship lightweight metrics without building a full ETL job.
 
-You have CSV or TSV files and need to parse them with proper type handling, filter rows, aggregate values, or transform the data for further analysis.
+## Before You Start
+- Examples use `examples/simple_csv.csv`. Replace paths with your real data.
+- Confirm whether the file has a header row. Use `-f csvnh`/`tsvnh` for header-less data.
+- Decide which columns require numeric or boolean types; type annotations enable filters and arithmetic.
 
-## Solutions
-
-### Basic CSV Parsing
-
-Parse CSV files with automatic header detection:
+## Step 1: Inspect the Source File
+Glance at a handful of rows to understand column names and potential anomalies.
 
 ```bash
-# Parse CSV with headers
-kelora -f csv data.csv -n 5
-
-# Parse TSV (tab-separated)
-kelora -f tsv data.tsv -n 5
+kelora -f csv examples/simple_csv.csv -n 5
 ```
 
-### CSV with Type Annotations
+- Look for blank fields, mixed types, or embedded quotes.
+- Use `--stats` during early runs to catch parsing errors.
 
-Specify field types for proper numeric handling:
-
-=== "Command"
-
-    ```bash
-    # Type annotations can be in the CSV header itself
-    kelora -f csv examples/csv_typed.csv -n 3
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    # Type annotations can be in the CSV header itself
-    kelora -f csv examples/csv_typed.csv -n 3
-    ```
-
-Type annotations enable:
-
-- Numeric comparisons and arithmetic
-- Sorting by numeric values
-- Proper aggregations (sum, average, etc.)
-
-### CSV without Headers
-
-Process CSV files without header rows:
+## Step 2: Enforce Column Types
+Typed columns allow numerical comparisons and aggregations.
 
 ```bash
-# No headers - use csvnh (CSV No Header)
-kelora -f csvnh data.csv
-
-# Access by index: _1, _2, _3, etc.
-kelora -f csvnh data.csv -e 'e.timestamp = e._1; e.status = e._2.to_int()'
-
-# TSV without headers
-kelora -f tsvnh data.tsv
+kelora -f 'csv status:int bytes:int duration_ms:int' examples/simple_csv.csv \
+  --take 3
 ```
 
-### Filter CSV Rows
+Alternatives:
+- Embed annotations in the header row (e.g., `status:int,duration_ms:int`).
+- For TSV, replace `csv` with `tsv` in the format string.
 
-Filter based on field values:
-
-=== "Command"
-
-    ```bash
-    # Filter by status code using CLI type annotations
-    kelora -f 'csv status:int' examples/simple_csv.csv \
-      --filter 'e.status >= 400'
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    # Filter by status code using CLI type annotations
-    kelora -f 'csv status:int' examples/simple_csv.csv \
-      --filter 'e.status >= 400'
-    ```
-
-### Aggregate CSV Data
-
-Calculate statistics across rows:
+## Step 3: Clean and Transform Rows
+Normalise values, derive new columns, or drop unnecessary data.
 
 ```bash
-# Count by status code
-kelora -f 'csv status:int' data.csv \
-  -e 'track_count(e.status)' \
-  --metrics
-
-# Sum bytes transferred
-kelora -f 'csv bytes:int' data.csv \
-  -e 'track_sum("total_bytes", e.bytes)' \
-  --metrics
-
-# Track unique values
-kelora -f csv data.csv \
-  -e 'track_unique("methods", e.method)' \
-  --metrics
-```
-
-### Transform CSV Fields
-
-Create new fields or modify existing ones:
-
-```bash
-# Calculate derived fields
-kelora -f 'csv bytes:int duration:int' data.csv \
-  -e 'e.throughput = e.bytes / e.duration'
-
-# Normalize timestamps
-kelora -f csv data.csv \
-  -e 'e.hour = to_datetime(e.timestamp).hour()'
-
-# Extract path components
-kelora -f csv data.csv \
+kelora -f 'csv status:int bytes:int duration_ms:int' examples/simple_csv.csv \
   -e 'e.endpoint = e.path.split("/")[1]' \
-  -e 'track_count(e.endpoint)' \
+  -e 'e.duration_s = e.duration_ms / 1000.0' \
+  -e 'e.success = e.status < 400' \
+  -k timestamp,method,endpoint,status,duration_s,success
+```
+
+Tips:
+- Use `to_int_or()` / `to_float_or()` for defensive conversions.
+- Remove sensitive data with assignments like `e.user_email = ()` before export.
+- Apply `strip()` when whitespace is inconsistent.
+
+## Step 4: Summarise for Sanity Checks
+Validate assumptions and produce quick metrics prior to export.
+
+```bash
+kelora -f 'csv status:int duration_ms:int' examples/simple_csv.csv \
+  -e 'track_count("total")' \
+  -e 'if e.status >= 500 { track_count("errors") }' \
+  -e 'track_avg("avg_latency_ms", e.duration_ms)' \
   --metrics
 ```
 
-### Convert CSV to Other Formats
+- Compare counts with what you expect from upstream systems.
+- Use `track_bucket()` to build histograms or `track_unique()` to measure cardinality.
+
+## Step 5: Export the Prepared Dataset
+Write the cleaned result to CSV, JSON, or logfmt depending on downstream needs.
 
 ```bash
-# CSV to JSON
-kelora -f csv data.csv -J > output.json
-
-# CSV to logfmt
-kelora -f csv data.csv -F logfmt > output.log
-
-# CSV to JSON with selected fields
-kelora -f csv data.csv -k timestamp,status,bytes -F json
-```
-
-### Handle Ragged/Malformed CSV
-
-Process CSV files with missing or extra fields:
-
-```bash
-# Resilient mode (default) - skip bad rows
-kelora -f csv data.csv --stats
-
-# See parsing errors
-kelora -f csv data.csv --verbose
-
-# Strict mode - abort on first error
-kelora -f csv data.csv --strict
-```
-
-### Select Specific Columns
-
-Output only desired fields:
-
-```bash
-# Select specific fields
-kelora -f csv data.csv -k timestamp,method,status
-
-# Exclude sensitive fields
-kelora -f csv data.csv --exclude-keys email,ip_address
-
-# Reorder fields in output
-kelora -f csv data.csv -k status,method,path -F csv
-```
-
-## Real-World Examples
-
-### Find Slow API Calls
-
-```bash
-kelora -f 'csv path method status:int duration:int' api_log.csv \
-  --filter 'e.duration > 1000' \
-  -e 'track_count(e.path)' \
-  -k path,method,duration --metrics
-```
-
-### Calculate Response Time Percentiles
-
-```bash
-kelora -f 'csv duration:int' data.csv \
-  --window 10000 --end '
-    let times = window_numbers("duration");
-    print("p50: " + times.percentile(50));
-    print("p95: " + times.percentile(95));
-    print("p99: " + times.percentile(99))
-  '
-```
-
-### Export Error Rows
-
-```bash
-kelora -f 'csv status:int' data.csv \
-  --filter 'e.status >= 500' \
-  -J > errors.json
-```
-
-### Group by Time Windows
-
-```bash
-kelora -f csv data.csv \
-  -e 'e.hour = to_datetime(e.timestamp).format("%Y-%m-%d %H:00")' \
-  -e 'track_count(e.hour)' \
-  --metrics
-```
-
-### Clean and Normalize Data
-
-```bash
-kelora -f csv raw_data.csv \
-  -e 'e.email = e.email.to_lower().strip()' \
-  -e 'e.status = to_int_or(e.status, 0)' \
-  -e 'e.timestamp = to_datetime(e.timestamp).to_iso()' \
+kelora -f 'csv status:int duration_ms:int bytes:int' examples/simple_csv.csv \
+  --filter 'e.status < 500' \
+  -k timestamp,method,path,status,duration_ms,bytes \
   -F csv > cleaned.csv
 ```
 
-## Tips
+Other formats:
+- `-J` or `-F json` for ingestion into document stores.
+- `-F logfmt` when shipping data to systems that expect key=value lines.
 
-**Type Handling:**
+## Variations
+- **Files without headers**  
+  ```bash
+  kelora -f csvnh data.csv \
+    -e 'e.timestamp = e._1; e.status = e._2.to_int(); e.bytes = e._3.to_int()' \
+    -k timestamp,status,bytes
+  ```
+- **Large archives**  
+  ```bash
+  kelora -f 'csv status:int bytes:int' logs/2024-*.csv.gz \
+    --parallel \
+    -e 'track_sum("bytes_total", e.bytes)' \
+    --metrics
+  ```
+- **Ragged data validation**  
+  ```bash
+  kelora -f csv raw.csv \
+    --stats \
+    --verbose \
+    --filter 'meta.parse_errors > 0'
+  ```
+  Switch to `--strict` to abort on the first malformed row once cleanup is complete.
 
-- Use `:int` for status codes, counts, IDs
-- Use `:float` for durations, measurements, rates
-- Use `:bool` for flags (accepts: true/false, 1/0, yes/no)
-- Untyped fields remain as strings
-
-**Performance:**
-
-- Add `--parallel` for large CSV files
-- Use `--batch-size` to control memory usage
-- Filter early to reduce processing overhead
-
-**Error Handling:**
-
-- Use `--verbose` to see parsing errors
-- Use `--stats` to see skip/error counts
-- Ragged CSV (missing fields) creates partial events
-
-**Field Access:**
-
-- Headers become field names (spaces → underscores)
-- Without headers, use `_1`, `_2`, `_3` etc.
-- Use `to_int_or()` / `to_float_or()` for safe type conversion
+## Quality Checklist
+- Compare row counts between raw and cleaned files; mismatches often indicate parse errors or filters that were too aggressive.
+- If you drop columns, annotate the export with a README describing what was removed.
+- Capture `--stats` output in automation logs so data consumers see parsing success rates.
 
 ## See Also
-
-- [Fan Out Nested Structures](fan-out-nested-structures.md) - Process nested CSV data
-- [Analyze Web Traffic](analyze-web-traffic.md) - Similar patterns for log files
-- [Function Reference](../reference/functions.md) - Type conversion functions
-- [CLI Reference](../reference/cli-reference.md) - Format specifications
+- [Sanitize Logs Before Sharing](extract-and-mask-sensitive-data.md) for masking sensitive fields prior to export.
+- [Flatten Nested JSON for Analysis](fan-out-nested-structures.md) when CSV columns contain arrays or embedded JSON.
+- [Process Archives at Scale](batch-process-archives.md) for high-volume CSV crunching.

@@ -680,4 +680,4 @@ Now that you understand basic Rhai scripting, continue to:
 **Related guides:**
 - [Function Reference](../reference/functions.md) - Complete function catalog
 - [Rhai Cheatsheet](../reference/rhai-cheatsheet.md) - Quick syntax reference
-- [How-To: Find Errors in Logs](../how-to/find-errors-in-logs.md) - Practical examples
+- [How-To: Triage Production Errors](../how-to/find-errors-in-logs.md) - Practical examples

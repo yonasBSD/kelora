@@ -645,10 +645,10 @@ If you press Ctrl+C during span processing, Kelora waits for the current `--span
 Now that you understand span aggregation, continue your journey:
 
 - **[Configuration and Reusability](configuration-and-reusability.md)** - Save span pipelines as reusable aliases
-- **[How-To: Span Aggregation Cookbook](../how-to/span-aggregation-cookbook.md)** - More advanced span patterns
+- **[How-To: Roll Up Logs with Span Windows](../how-to/span-aggregation-cookbook.md)** - More advanced span patterns
 - **[Concepts: Pipeline Model](../concepts/pipeline-model.md)** - Deep dive into span processing architecture
 
 **Related guides:**
 - [Metrics and Tracking](metrics-and-tracking.md) - Understanding `track_*()` functions
 - [Working with Time](working-with-time.md) - Timestamp parsing and filtering
-- [How-To: Monitor Application Health](../how-to/monitor-application-health.md) - Real-world monitoring patterns
+- [How-To: Build a Service Health Snapshot](../how-to/monitor-application-health.md) - Real-world monitoring patterns

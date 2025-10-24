@@ -1,285 +1,113 @@
-# Fan Out Nested Structures
+# Flatten Nested JSON for Analysis
 
-Convert nested arrays and objects into individual events using `emit_each()` for processing hierarchical data.
+Turn events that contain arrays or nested objects into a table of individual records, keeping the context needed for aggregation and reporting.
 
-## Problem
+## When to Use This
+- Logs contain batches (orders with items, users with activities) that must become one row per item.
+- Analytics tools downstream expect flat records in CSV or JSON lines format.
+- You need to enrich child objects with parent metadata before summarising.
 
-You have JSON logs with nested arrays (users, items, transactions) and need to process each element as a separate event for filtering, aggregation, or reporting.
+## Before You Start
+- Examples reference `examples/fan_out_batches.jsonl` and `examples/json_arrays.jsonl`.
+- `emit_each()` creates new events and suppresses the original. Emit context manually if you still need the parent (see Step 3).
+- Large arrays increase memory usage. Filter or sample before fan-out when possible.
 
-## Solutions
-
-### Basic Array Fan-Out
-
-Convert array elements to individual events:
+## Step 1: Inspect the Source Shape
+Look at a minimal sample to identify the array or object path you want to explode.
 
 ```bash
-# Fan out users array
-kelora -j data.jsonl -e 'emit_each(e.users)'
-
-# Example with actual data
-kelora -j examples/json_arrays.jsonl -e 'emit_each(e.users)' -n 5
+kelora -j examples/fan_out_batches.jsonl -n 2
 ```
 
-The original event is suppressed; each array element becomes a new event.
+Note field names such as `orders`, `items`, or nested maps you might need later.
 
-### Fan-Out with Base Fields
-
-Preserve context from parent event:
-
-```bash
-# Add batch_id to each user event
-kelora -j data.jsonl \
-  -e 'let base = #{batch_id: e.batch_id, timestamp: e.timestamp};
-          emit_each(e.users, base)'
-
-# Result: Each user event includes batch_id and timestamp fields
-```
-
-### Multi-Level Fan-Out
-
-Fan out nested structures in stages:
+## Step 2: Fan Out a Single Array
+Use `emit_each()` to turn array elements into individual events.
 
 ```bash
-# Orders → Items (two-level fan-out)
-kelora -j examples/fan_out_batches.jsonl \
-  -e 'let ctx = #{batch_id: e.batch_id}; emit_each(e.orders, ctx)' \
-  -e 'let order_ctx = #{batch_id: e.batch_id, order_id: e.order_id}; emit_each(e.items, order_ctx)'
-
-# Now each item is a separate event with batch_id and order_id
-```
-
-### Filter After Fan-Out
-
-Process specific elements only:
-
-```bash
-# Fan out users, then filter by score
-kelora -j data.jsonl \
+kelora -j examples/json_arrays.jsonl \
   -e 'emit_each(e.users)' \
-  --filter 'e.score > 90'
-
-# Fan out and filter in one pipeline
-kelora -j data.jsonl \
-  -e 'emit_each(e.users)' \
-  --filter 'e.score > 90' \
   -k id,name,score
 ```
 
-### Count Emitted Events
+Key points:
+- After `emit_each()`, `e` refers to the array element.
+- The original event is not emitted unless you capture it beforehand.
 
-Track how many events were created:
-
-```bash
-# emit_each returns count of emitted events
-kelora -j data.jsonl \
-  -e 'e.user_count = emit_each(e.users)' \
-  -e 'track_sum("total_users", e.user_count)' \
-  --metrics
-```
-
-### Conditional Fan-Out
-
-Fan out only when conditions are met:
+## Step 3: Preserve Parent Context
+Merge parent metadata into each emitted child event using the `base` parameter.
 
 ```bash
-# Only fan out batches with more than 2 items
-kelora -j data.jsonl \
-  --filter 'e.users.len() > 2' \
-  -e 'emit_each(e.users)'
-
-# Fan out high-priority items only
-kelora -j data.jsonl \
-  -e 'let high_priority = e.items.filter(|item| item.priority == "high");
-          emit_each(high_priority)'
-```
-
-## Real-World Examples
-
-### Process E-Commerce Orders
-
-```bash
-# Batch → Orders → Items (3-level fan-out)
-kelora -j orders.jsonl \
-  -e 'let batch = #{batch_id: e.batch_id, created: e.created};
-          emit_each(e.orders, batch)' \
-  -e 'let order = #{batch_id: e.batch_id, order_id: e.order_id};
-          emit_each(e.items, order)' \
-  -e 'e.total = e.qty * e.price' \
-  --filter 'e.total > 100' \
-  -k batch_id,order_id,sku,qty,price,total
-```
-
-### Analyze User Activity
-
-```bash
-# Fan out user events and track activity types
-kelora -j activity.jsonl \
-  -e 'emit_each(e.events)' \
-  -e 'track_count(e.event_type)' \
-  --metrics
-```
-
-### Extract Email Domains
-
-```bash
-# Fan out email list and extract domains
-kelora -j data.jsonl \
-  -e 'emit_each(e.emails)' \
-  -e 'e.email = e.line' \
-  -e 'e.domain = e.email.extract_domain()' \
-  -e 'track_unique("domains", e.domain)' \
-  --metrics
-```
-
-### Process Log Batches
-
-```bash
-# Fan out log arrays with severity filtering
-kelora -j logs.jsonl \
-  -e 'let ctx = #{source: e.source, timestamp: e.timestamp};
-          emit_each(e.logs, ctx)' \
-  --filter 'e.level == "error" || e.level == "warn"' \
-  -k timestamp,source,level,msg
-```
-
-### Transaction Analysis
-
-```bash
-# Fan out purchases and calculate totals
-kelora -j transactions.jsonl \
-  -e 'let tx = #{transaction_id: e.id, user: e.user};
-          emit_each(e.purchases, tx)' \
-  -e 'e.line_total = e.price * e.qty' \
-  -e 'track_sum("revenue", e.line_total)' \
-  -e 'track_count(e.item)' \
-  --metrics
-```
-
-### Filter Active Items from Nested Batches
-
-```bash
-# Multi-level with filtering at each stage
 kelora -j examples/fan_out_batches.jsonl \
-  -e 'emit_each(e.batches)' \
-  -e 'let batch_ctx = #{batch_name: e.name}; emit_each(e.items, batch_ctx)' \
-  --filter 'e.status == "active"' \
-  --filter 'e.priority == "high"' \
-  -k batch_name,id,status,priority
+  -e 'let ctx = #{batch_id: e.batch_id, created_at: e.created_at};
+        emit_each(e.orders, ctx)' \
+  -k batch_id,order_id,customer,total
 ```
 
-### Aggregate Nested Statistics
+- `ctx` values merge with each emitted event.
+- Use descriptive keys (e.g., `batch_id`, `parent_service`) so downstream tools can trace lineage.
+
+## Step 4: Handle Multiple Levels
+Chain `emit_each()` calls when arrays are nested.
 
 ```bash
-# Fan out and calculate per-item statistics
-kelora -j data.jsonl \
-  -e 'emit_each(e.items)' \
-  -e 'track_sum("total_quantity", e.qty)' \
-  -e 'track_sum("total_revenue", e.price * e.qty)' \
-  -e 'track_unique("skus", e.sku)' \
-  --metrics
+kelora -j examples/fan_out_batches.jsonl \
+  -e 'let batch_ctx = #{batch_id: e.batch_id};
+        emit_each(e.orders, batch_ctx)' \
+  -e 'let order_ctx = #{batch_id: e.batch_id, order_id: e.order_id};
+        emit_each(e.items, order_ctx)' \
+  -k batch_id,order_id,sku,qty,price
 ```
 
-### Export Flattened Data
+Tips:
+- Apply filters between stages to cut unnecessary data early.
+- Rename conflicting keys (e.g., parent `id` vs child `id`) to avoid overwriting.
+
+## Step 5: Aggregate or Export
+Once events are flat, use metrics or writers to produce the final dataset.
 
 ```bash
-# Fan out nested data and export as CSV
-kelora -j nested.jsonl \
-  -e 'let parent = #{parent_id: e.id, created: e.timestamp};
-          emit_each(e.children, parent)' \
-  -k parent_id,created,child_id,name,value \
-  -F csv > flattened.csv
+kelora -j examples/fan_out_batches.jsonl \
+  -e 'let ctx = #{batch_id: e.batch_id};
+        emit_each(e.orders, ctx)' \
+  -e 'let order_ctx = #{batch_id: e.batch_id, order_id: e.order_id};
+        emit_each(e.items, order_ctx)' \
+  -e 'e.line_total = e.qty * e.price' \
+  -e 'track_sum("revenue", e.line_total)' \
+  -k batch_id,order_id,sku,qty,price,line_total \
+  -F csv > flattened_orders.csv
 ```
 
-## Fan-Out Behavior
+- `track_sum`, `track_count`, and `track_unique` work as usual on flattened events.
+- Use `-F csv` or `-J` to ship results to downstream systems.
 
-### Original Event Handling
+## Variations
+- **Conditional fan-out**  
+  ```bash
+  kelora -j data.jsonl \
+    --filter 'e.items.len() > 0' \
+    -e 'let ctx = #{order_id: e.id}; emit_each(e.items, ctx)' \
+    --filter 'e.priority == "high"'
+  ```
+- **Count emitted records**  
+  ```bash
+  kelora -j data.jsonl \
+    -e 'e.emitted = emit_each(e.rows)' \
+    -e 'track_sum("row_count", e.emitted)' \
+    --metrics
+  ```
+- **Guard against missing arrays**  
+  ```bash
+  kelora -j data.jsonl \
+    -e 'if e.has_path("logs") { emit_each(e.logs) } else { () }'
+  ```
 
-```bash
-# Original event is suppressed after emit_each
-kelora -j data.jsonl -e 'emit_each(e.users)'
-# Output: Only user events, not the original batch event
-
-# To keep original + fanned out events, emit before fan-out
-# (Not currently supported - fan-out suppresses original)
-```
-
-### Empty Arrays
-
-```bash
-# Empty arrays emit 0 events
-kelora -j data.jsonl \
-  -e 'e.count = emit_each(e.items)' \
-  -e 'track_count(if e.count == 0 { "empty" } else { "has_items" })'
-```
-
-### Error Handling
-
-**Resilient mode (default):**
-
-- Invalid arrays are skipped
-- Original event is suppressed
-- Processing continues
-
-**Strict mode:**
-
-- Errors abort processing
-- Use `--strict` for fail-fast behavior
-
-```bash
-# See errors if fan-out fails
-kelora -j data.jsonl -e 'emit_each(e.users)' --verbose
-```
-
-## Tips
-
-**Performance:**
-
-- Fan-out increases event count significantly
-- Use `--parallel` for large datasets
-- Filter before fan-out when possible to reduce processing
-
-**Memory:**
-
-- Each fanned-out event is a separate allocation
-- Large arrays can increase memory usage
-- Consider batch processing with `--take` for testing
-
-**Field Access:**
-
-- After fan-out, access element fields directly: `e.name` not `e.users[0].name`
-- Base fields are merged: `e.batch_id` available after fan-out with base map
-
-**Metrics:**
-
-- Track fan-out count: `e.count = emit_each(...)`
-- Aggregate after fan-out: `track_sum()`, `track_count()`, etc.
-- Use `--metrics` to see tracked values
-
-**Common Patterns:**
-```bash
-# Preserve parent ID
-let ctx = #{parent_id: e.id}; emit_each(e.children, ctx)
-
-# Multi-level with context
-emit_each(e.level1) then emit_each(e.level2, #{level1_id: e.id})
-
-# Filter then fan-out
-filter 'e.items.len() > 0' then emit_each(e.items)
-
-# Fan-out then aggregate
-emit_each(e.data) then track_count(e.category)
-```
-
-**Pipeline Order:**
-1. Filter parent events (reduce fan-out volume)
-2. Fan-out arrays
-3. Filter child events (specific criteria)
-4. Transform/enrich child events
-5. Aggregate or export
+## Good Practices
+- Filter parent events before fan-out to avoid unnecessary work (`--filter 'e.type == "invoice"'`).
+- Rename or rename conflicting keys immediately after fan-out to keep schemas tidy.
+- Document the resulting schema (field names, types) alongside the export so analysts know what to expect.
 
 ## See Also
-
-- [Process CSV Data](process-csv-data.md) - Similar patterns for tabular data
-- [Monitor Application Health](monitor-application-health.md) - Nested JSON processing
-- [Function Reference](../reference/functions.md) - Array functions and emit_each
-- [Scripting Transforms Tutorial](../tutorials/scripting-transforms.md) - Advanced Rhai patterns
+- [Prepare CSV Exports for Analytics](process-csv-data.md) for post-flattening clean-up.
+- [Sanitize Logs Before Sharing](extract-and-mask-sensitive-data.md) if nested objects contain sensitive data.
+- [Tutorial: Scripting Transforms](../tutorials/scripting-transforms.md) for more complex Rhai patterns.

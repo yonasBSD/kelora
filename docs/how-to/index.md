@@ -1,15 +1,23 @@
 # How-To Guides
 
-Solutions for common Kelora tasks. Each guide walks through a typical workflow with ready-to-run commands and scripts.
+Pick the scenario that matches your job-to-be-done and follow the playbook. Each guide links to deeper concepts and tutorials when you want more background.
 
-- [Find Errors in Logs](find-errors-in-logs.md)
+## Operational Response
+- [Triage Production Errors](find-errors-in-logs.md)
+- [Build a Service Health Snapshot](monitor-application-health.md)
+- [Design Streaming Alerts](build-streaming-alerts.md)
+
+## Traffic & Ingress
 - [Analyze Web Traffic](analyze-web-traffic.md)
-- [Monitor Application Health](monitor-application-health.md)
-- [Parse Syslog Files](parse-syslog-files.md)
-- [Handle Multiline Stacktraces](handle-multiline-stacktraces.md)
-- [Extract and Mask Sensitive Data](extract-and-mask-sensitive-data.md)
-- [Process CSV Data](process-csv-data.md)
-- [Fan Out Nested Structures](fan-out-nested-structures.md)
-- [Build Streaming Alerts](build-streaming-alerts.md)
-- [Batch Process Archives](batch-process-archives.md)
-- [Span Aggregation Cookbook](span-aggregation-cookbook.md)
+- [Investigate Syslog Sources](parse-syslog-files.md)
+- [Choose a Multiline Strategy](handle-multiline-stacktraces.md)
+
+## Data Preparation & Hygiene
+- [Sanitize Logs Before Sharing](extract-and-mask-sensitive-data.md)
+- [Pseudonymize Identifiers for Analytics](pseudonymize-identifiers-for-analytics.md)
+- [Prepare CSV Exports for Analytics](process-csv-data.md)
+- [Flatten Nested JSON for Analysis](fan-out-nested-structures.md)
+
+## Performance & Aggregation
+- [Process Archives at Scale](batch-process-archives.md)
+- [Roll Up Logs with Span Windows](span-aggregation-cookbook.md)

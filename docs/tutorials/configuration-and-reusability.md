@@ -685,5 +685,5 @@ Now that you can create reusable workflows, continue to:
 
 **Related guides:**
 - [Concepts: Configuration System](../concepts/configuration-system.md) - Deep dive into config precedence
-- [How-To: Monitor Application Health](../how-to/monitor-application-health.md) - Real-world alias examples
+- [How-To: Build a Service Health Snapshot](../how-to/monitor-application-health.md) - Real-world alias examples
 - [CLI Reference: Configuration Options](../reference/cli-reference.md#configuration-options) - All config flags

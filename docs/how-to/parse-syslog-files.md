@@ -1,300 +1,117 @@
-# Parse Syslog Files
+# Investigate Syslog Sources
 
-Parse and analyze syslog format files from system logs, application logs, and network devices.
+Parse syslog-formatted logs (RFC 3164 / RFC 5424) to surface security events, infrastructure issues, and service-level anomalies.
 
-## Problem
+## When to Use This Guide
+- Auditing authentication activity (`sshd`, `sudo`, VPN) on Linux systems.
+- Monitoring routers, firewalls, or load balancers that emit syslog.
+- Building quick, scriptable reports without standing up a SIEM.
 
-You need to parse syslog-formatted logs (RFC 3164/RFC 5424) to extract facility, severity, hostname, process information, and messages for monitoring, troubleshooting, or security analysis.
+## Before You Start
+- Examples use `examples/simple_syslog.log`. Replace it with `/var/log/syslog`, `/var/log/auth.log`, or device exports.
+- Syslog encodes both severity (0–7) and facility (0–23). Keep a cheat sheet nearby for your environment.
+- If timestamps appear with unusual formats, consult `kelora --help-time` and be ready to specify `--ts-format`.
 
-## Solutions
-
-### Basic Syslog Parsing
-
-Parse standard syslog format:
+## Step 1: Inspect the Stream
+Confirm parsing works and note which fields are available.
 
 ```bash
-# Auto-detect and parse syslog
-kelora -f syslog /var/log/syslog -n 5
-
-# Explicit syslog format
-kelora -f syslog examples/simple_syslog.log
+kelora -f syslog examples/simple_syslog.log -n 5
 ```
 
-Syslog format includes:
+Common fields:
+- `timestamp`, `hostname`, `process`, `pid`, `message`
+- `facility` (integer code) and `severity` (0 = emergency, 7 = debug)
+- Some devices include structured data in `message`; plan to parse it with Rhai helpers.
 
-- `priority` - Combined facility/severity number
-- `facility` - Facility code (0-23)
-- `severity` - Severity level (0-7)
-- `timestamp` - Event timestamp
-- `hostname` - Source hostname
-- `process` - Process name
-- `pid` - Process ID
-- `message` - Log message
-
-### Filter by Severity
-
-Filter logs by severity level (0=emerg, 7=debug):
+## Step 2: Filter by Severity or Facility
+Focus on critical events first, then expand scope.
 
 ```bash
-# Critical and below (0-2: emerg, alert, crit)
-kelora -f syslog /var/log/syslog --filter 'e.severity <= 2'
-
-# Errors only (severity 3)
-kelora -f syslog /var/log/syslog --filter 'e.severity == 3'
-
-# Warning and above (0-4)
-kelora -f syslog /var/log/syslog --filter 'e.severity <= 4'
-```
-
-Severity levels:
-
-- 0: Emergency (system unusable)
-- 1: Alert (immediate action required)
-- 2: Critical
-- 3: Error
-- 4: Warning
-- 5: Notice
-- 6: Informational
-- 7: Debug
-
-### Filter by Facility
-
-Filter by facility type:
-
-```bash
-# Kernel messages (facility 0)
-kelora -f syslog /var/log/syslog --filter 'e.facility == 0'
-
-# Auth/security messages (facility 4 or 10)
-kelora -f syslog /var/log/auth.log --filter 'e.facility == 4 || e.facility == 10'
-
-# System daemons (facility 3)
-kelora -f syslog /var/log/syslog --filter 'e.facility == 3'
-```
-
-Common facilities:
-
-- 0: Kernel
-- 1: User-level
-- 2: Mail
-- 3: System daemons
-- 4: Security/auth
-- 10: Security/auth (private)
-
-### Filter by Process
-
-Track specific services or processes:
-
-```bash
-# Specific process name
-kelora -f syslog /var/log/syslog --filter 'e.process == "sshd"'
-
-# Multiple processes
-kelora -f syslog /var/log/syslog \
-  --filter 'e.process == "sshd" || e.process == "sudo"'
-
-# Process name pattern
-kelora -f syslog /var/log/syslog \
-  --filter 'e.process.contains("systemd")'
-```
-
-### Monitor Authentication
-
-Track authentication events:
-
-```bash
-# Failed SSH logins
-kelora -f syslog /var/log/auth.log \
-  --filter 'e.process == "sshd" && e.message.contains("Failed password")'
-
-# Sudo usage
-kelora -f syslog /var/log/auth.log \
-  --filter 'e.process == "sudo"' \
-  -k timestamp,hostname,message
-
-# Track unique users attempting auth
-kelora -f syslog /var/log/auth.log \
-  --filter 'e.message.contains("Failed")' \
-  -e 'e.user = e.message.extract_re(r"for ([^ ]+)", 1)' \
-  -e 'track_unique("failed_users", e.user)' \
-  --metrics
-```
-
-### Extract Message Details
-
-Parse structured information from messages:
-
-```bash
-# Extract IP addresses from messages
-kelora -f syslog /var/log/syslog \
-  -e 'e.ip = e.message.extract_ip()' \
-  --filter 'e.ip != ""'
-
-# Extract error codes
-kelora -f syslog /var/log/syslog \
-  -e 'e.error_code = e.message.extract_re(r"error[: ](\d+)", 1)' \
-  --filter 'e.error_code != ""'
-
-# Parse key-value pairs in message
-kelora -f syslog /var/log/syslog \
-  -e 'e.details = e.message.parse_kv(" ", "=")' \
-  -e 'e.status = e.get_path("details.status", "")'
-```
-
-### Aggregate by Hostname
-
-Track activity across multiple hosts:
-
-```bash
-# Count messages per host
-kelora -f syslog /var/log/syslog \
-  -e 'track_count(e.hostname)' \
-  --metrics
-
-# Track errors per host
 kelora -f syslog /var/log/syslog \
   --filter 'e.severity <= 3' \
-  -e 'track_count(e.hostname)' \
-  --metrics
-
-# Find most active hosts
-kelora -f syslog /var/log/syslog \
-  -e 'track_count(e.hostname)' \
-  -e 'track_unique("processes", e.hostname + ":" + e.process)' \
-  --metrics
+  -k timestamp,hostname,process,message
 ```
 
-### Time-Based Analysis
+Helpful ranges:
+- `<= 2` for emergencies/alerts/critical.
+- `== 4` for warnings.
+- Facility codes: `0` Kernel, `3` System daemons, `4` Auth/Security, `10` Auth (private), `16+` Local use.
 
-Filter and analyze by time:
+## Step 3: Target Specific Services
+Investigate authentication flows or infrastructure components.
 
 ```bash
-# Last hour's errors
-kelora -f syslog /var/log/syslog \
-  --since "1 hour ago" \
-  --filter 'e.severity <= 3'
+kelora -f syslog /var/log/auth.log \
+  --filter 'e.process == "sshd" && e.message.contains("Failed password")' \
+  -e 'e.username = e.message.extract_re(r"for ([^ ]+)", 1)' \
+  -k timestamp,hostname,username,message
+```
 
-# Events in specific time range
-kelora -f syslog /var/log/syslog \
-  --since "2024-01-15 09:00" \
-  --until "2024-01-15 17:00"
+- Combine multiple processes: `--filter 'e.process == "sudo" || e.process == "su"'`.
+- Use `extract_re()` or `parse_kv()` to decode structured messages (firewalls, network gear).
 
-# Group errors by hour
+## Step 4: Add Enrichment and Metrics
+Capture per-host or per-IP trends while reviewing raw events.
+
+```bash
 kelora -f syslog /var/log/syslog \
   --filter 'e.severity <= 3' \
-  -e 'e.hour = to_datetime(e.timestamp).format("%Y-%m-%d %H:00")' \
-  -e 'track_count(e.hour)' \
+  -e 'let ip = e.message.extract_ip(); if ip != "" { track_count(ip) }' \
   --metrics
 ```
 
-### Convert to JSON
+- `track_count(e.hostname)` surfaces noisy machines.
+- Record severity names for reporting:
+  ```bash
+  -e 'e.severity_name = ["EMERG","ALERT","CRIT","ERROR","WARN","NOTICE","INFO","DEBUG"][e.severity]'
+  ```
 
-Export syslog to JSON for further processing:
+## Step 5: Export for Stakeholders
+Hand off filtered events to incident responders or auditors.
 
 ```bash
-# Convert to JSON
-kelora -f syslog /var/log/syslog -J > syslog.json
-
-# Convert with selected fields
 kelora -f syslog /var/log/syslog \
+  --since "today 00:00" \
+  --filter 'e.severity <= 3' \
   -k timestamp,hostname,process,severity,message \
-  -J > syslog.json
-
-# Add enrichment before export
-kelora -f syslog /var/log/syslog \
-  -e 'e.severity_name = switch e.severity {
-    0 => "EMERG", 1 => "ALERT", 2 => "CRIT",
-    3 => "ERROR", 4 => "WARN", 5 => "NOTICE",
-    6 => "INFO", _ => "DEBUG"
-  }' \
-  -F json
+  -F csv > syslog-critical.csv
 ```
 
-## Real-World Examples
+Alternatives:
+- `-J` for JSON exports consumed by log analytics tools.
+- Use `-q` when running inside scripts that only care about exit codes or metrics.
 
-### Security Monitoring
+## Variations
+- **RFC 5424 structured data**  
+  ```bash
+  kelora -f syslog app-5424.log \
+    -e 'let kv = e.message.parse_kv(" ", "="); e += kv' \
+    -k timestamp,hostname,app_id,msgid,message
+  ```
+- **Network device monitoring**  
+  ```bash
+  kelora -f syslog firewall.log \
+    --filter 'e.facility == 4' \
+    -e 'e.src_ip = e.message.extract_re(r"SRC=([^ ]+)", 1)' \
+    -e 'track_count(e.src_ip)' \
+    --metrics
+  ```
+- **Time-boxed reporting**  
+  ```bash
+  kelora -f syslog /var/log/syslog \
+    --since "1 hour ago" \
+    -e 'e.hour = to_datetime(e.timestamp).format("%Y-%m-%d %H:00")' \
+    -e 'track_count(e.hour)' \
+    --metrics
+  ```
 
-```bash
-# Monitor failed SSH attempts from external IPs
-kelora -f syslog /var/log/auth.log \
-  --filter 'e.process == "sshd" && e.message.contains("Failed")' \
-  -e 'e.ip = e.message.extract_ip()' \
-  -e 'e.external = !e.ip.is_private_ip()' \
-  --filter 'e.external' \
-  -e 'track_count(e.ip)' \
-  -k timestamp,ip,message --metrics
-```
-
-### Service Health Check
-
-```bash
-# Track service starts/stops
-kelora -f syslog /var/log/syslog \
-  --filter 'e.message.contains("Started") || e.message.contains("Stopped")' \
-  -e 'e.action = if e.message.contains("Started") { "start" } else { "stop" }' \
-  -e 'track_count(e.process + ":" + e.action)' \
-  --metrics
-```
-
-### Disk Space Warnings
-
-```bash
-# Track disk space warnings
-kelora -f syslog /var/log/syslog \
-  --filter 'e.message.contains("disk") && e.message.contains("full")' \
-  -e 'e.disk = e.message.extract_re(r"(/[^ ]+)", 1)' \
-  -k timestamp,hostname,disk,message
-```
-
-### Network Device Logs
-
-```bash
-# Parse router/switch logs
-kelora -f syslog network.log \
-  --filter 'e.facility == 16' \
-  -e 'e.interface = e.message.extract_re(r"interface ([^ ]+)", 1)' \
-  -e 'track_count(e.interface)' \
-  --metrics
-```
-
-## Tips
-
-**Severity Filtering:**
-
-- Use numeric comparison for severity ranges
-- Lower numbers = higher severity (0 is most critical)
-- Filter `<= 3` for error-level and above
-- Filter `>= 6` for debug/info only
-
-**Facility Codes:**
-
-- Different systems use different facilities
-- Check your syslog.conf for facility mappings
-- Security logs often use facility 4 or 10
-- Custom applications typically use 16-23
-
-**Performance:**
-
-- Add `--parallel` for large syslog files
-- Use `--since`/`--until` to reduce processing
-- Filter by severity early in pipeline
-
-**Message Parsing:**
-
-- Message format varies by application
-- Use `extract_re()` for pattern extraction
-- Use `parse_kv()` for structured messages
-- Consider `--filter` before expensive parsing
-
-**Hostname Handling:**
-
-- Hostname may be IP or FQDN
-- Normalize with `.to_lower()` for consistency
-- Use `extract_domain()` for FQDN analysis
+## Troubleshooting
+- **Timestamps not recognised**: specify `--ts-format` matching the source (e.g., `%b %e %H:%M:%S` for classic syslog).
+- **Facility/severity seems wrong**: some appliances offset the code; inspect `e.priority` and decode manually with `e.priority / 8` (facility) and `e.priority % 8` (severity).
+- **Parsing stops**: enable `--verbose` to view problematic lines; consider `--strict` once the pipeline is stable.
 
 ## See Also
-
-- [Find Errors in Logs](find-errors-in-logs.md) - General error filtering patterns
-- [Build Streaming Alerts](build-streaming-alerts.md) - Real-time syslog monitoring
-- [Monitor Application Health](monitor-application-health.md) - Service monitoring patterns
-- [Function Reference](../reference/functions.md) - String extraction functions
+- [Analyze Web Traffic](analyze-web-traffic.md) for HTTP access logs that complement syslog-level insights.
+- [Triage Production Errors](find-errors-in-logs.md) when application logs, not syslog, contain the signal.
+- [Concept: Performance Model](../concepts/performance-model.md) if you need to process multi-GB syslog archives quickly.

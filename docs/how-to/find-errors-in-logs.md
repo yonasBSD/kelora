@@ -1,213 +1,124 @@
-# Find Errors in Logs
+# Triage Production Errors
 
-Quickly find and analyze error-level events across different log formats.
+Quickly focus on error-level events, capture the surrounding context, and hand off a concise summary for incident response.
 
-## Problem
+## Who This Is For
+- On-call engineers triaging incidents across multiple services.
+- SREs verifying that a fix reduced error volume.
+- Developers preparing error samples for debugging.
 
-You need to find error-level events in your logs, possibly across multiple files or formats, and understand what's happening around them.
+## Before You Start
+- Kelora installed (or run `cargo run --release -- ...` from the repo root).
+- Access to the relevant log files or streams. Examples below use `examples/simple_json.jsonl`; swap in your own paths.
+- Familiarity with the log format you are reading (`-j` for JSON, `-f logfmt` for logfmt, `-f combined` for web access logs, etc.).
 
-## Solutions
-
-### Basic Error Filtering
-
-Filter by log level using `--levels`:
-
-=== "Command"
-
-    ```bash
-    # JSON logs - filter for errors and critical
-    kelora -j examples/simple_json.jsonl -l error,critical
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    # JSON logs - filter for errors and critical
-    kelora -j examples/simple_json.jsonl -l error,critical
-    ```
-
-Other level filtering examples:
+## Step 1: Scope the Log Set
+Decide which files and time ranges matter for the investigation. Use level filtering for the fastest coarse grained scan.
 
 ```bash
-# Logfmt logs
-kelora -f logfmt service.log -l error,critical
-
-# Multiple levels (error, warn, critical)
-kelora -j app.log -l warn,error
+kelora -j examples/simple_json.jsonl \
+  -l error,critical \
+  --since "2024-04-01 09:00:00" \
+  --until "2024-04-01 12:00:00"
 ```
 
-### Errors from Specific Time Range
+- `-l` (or `--levels`) is faster than `--filter` because it runs during parsing.
+- Prefer explicit formats (`-j`, `-f logfmt`, `-f combined`) over auto detection to avoid surprises.
+- For a directory of files, pass a glob (`logs/app/*.jsonl`) or feed a file list via `find … -print0 | xargs -0 kelora …`.
 
-Combine level filtering with time bounds:
-
-```bash
-# Errors from the last hour
-kelora -j app.log -l error --since "1 hour ago"
-
-# Errors in specific date range
-kelora -j app.log -l error \
-  --since "2024-01-15 09:00:00" \
-  --until "2024-01-15 17:00:00"
-
-# Today's errors only
-kelora -j app.log -l error --since "today"
-```
-
-### Errors from Specific Services
-
-Use `--filter` for fine-grained control:
+## Step 2: Narrow to Relevant Signals
+Add scripted filters to isolate services, customers, or error types. Combine filter expressions with level-based filters for precision.
 
 ```bash
-# Errors from database service only
-kelora -j app.log -l error \
-  --filter 'e.service == "database"'
-
-# Errors matching specific pattern
-kelora -j app.log -l error \
-  --filter 'e.message.contains("timeout")'
-
-# Errors with high severity
-kelora -j app.log -l error \
-  --filter 'e.get_path("severity", 0) >= 8'
-```
-
-### Context Lines
-
-Show surrounding events for context (like `grep -A/-B/-C`):
-
-```bash
-# Show 2 lines after each error
-kelora -j app.log -l error --after-context 2
-
-# Show 1 line before each error
-kelora -j app.log -l error --before-context 1
-
-# Show 2 lines before and after each error
-kelora -j app.log -l error \
-  --before-context 2 --after-context 2
-```
-
-### Extract Key Fields
-
-Focus on relevant information:
-
-```bash
-# Show only timestamp, service, and message
-kelora -j app.log -l error \
+kelora -j examples/simple_json.jsonl \
+  -l error,critical \
+  --filter 'e.service == "orders" || e.message.contains("timeout")' \
   -k timestamp,service,message
+```
 
-# Include error code if present
-kelora -j app.log -l error \
+Guidance:
+- Prefer `--filter` (Rhai expression) for field checks, pattern scans, or numerical comparisons.
+- Chain multiple `--filter` flags if it reads better than a long expression.
+- Use safe accessors (`e.get_path("error.code", "unknown")`) when fields may be missing.
+
+## Step 3: Pull Contextual Events
+Show surrounding events to understand what happened before and after each error. Combine context flags with multiline handling when stack traces are present.
+
+```bash
+kelora -j examples/simple_json.jsonl \
+  -l error,critical \
+  --before-context 2 \
+  --after-context 1
+```
+
+- `--before-context` and `--after-context` mimic `grep`’s `-B/-A`. Use them sparingly to avoid flooding output.
+- If the log contains multi-line traces, run the relevant strategy from [Choose a Multiline Strategy](handle-multiline-stacktraces.md) first, then apply level/context filtering.
+
+## Step 4: Summarise Severity and Ownership
+Track counts while you inspect events so you can state who is affected and how often it happens.
+
+```bash
+kelora -j examples/simple_json.jsonl \
+  -l error,critical \
+  -e 'track_count(e.service)' \
+  -e 'track_count(e.get_path("error.code", "unknown"))' \
+  --metrics \
+  --stats
+```
+
+- `track_count()` tallies per-key counts; combine with `--metrics` to view the table at the end.
+- `--stats` reports records processed, parse failures, and throughput so you can mention data quality in the incident summary.
+
+## Step 5: Export Evidence
+Produce a shareable artifact once you know which events matter.
+
+```bash
+kelora -j examples/simple_json.jsonl \
+  -l error,critical \
   -e 'e.error_code = e.get_path("error.code", "unknown")' \
-  -k timestamp,service,error_code,message
+  -k timestamp,service,error_code,message \
+  -F csv > errors.csv
 ```
 
-### Multiple Files
+Alternatives:
+- `-J` (or `-F json`) for structured archives.
+- `-q` or `-qq` when piping into shell scripts that only care about exit codes.
 
-Search across many log files:
+## Variations
+- **Web server failures**  
+  ```bash
+  kelora -f combined examples/simple_combined.log \
+    --filter 'e.status >= 500' \
+    -k timestamp,status,request
+  ```
+- **Search compressed archives in parallel**  
+  ```bash
+  kelora -j logs/2024-04-*.jsonl.gz \
+    --parallel \
+    -l error,critical \
+    --filter 'e.message.contains("timeout")'
+  ```
+- **Pivot by customer or shard**  
+  ```bash
+  kelora -j examples/simple_json.jsonl \
+    -l error,critical \
+    -e 'track_count(e.account_id)' \
+    --metrics
+  ```
+- **Fail fast in CI**  
+  ```bash
+  kelora -qq -j build/kelora.log -l error \
+    && echo "no errors" \
+    || (echo "errors detected" >&2; exit 1)
+  ```
 
-```bash
-# All logs in directory
-kelora -j logs/*.jsonl -l error
-
-# Recursive search with find
-find /var/log -name "*.log" -exec kelora -f auto {} -l error \;
-
-# Gzipped archives
-kelora -j logs/2024-01-*.log.gz -l error
-```
-
-### Extract Error Patterns
-
-Identify error codes and patterns:
-
-```bash
-# Extract error codes using regex
-kelora -j app.log -l error \
-  -e 'e.error_code = e.message.extract_re(r"ERR-(\d+)", 1)' \
-  -k timestamp,error_code,message
-
-# Count error types
-kelora -j app.log -l error \
-  -e 'track_count(e.get_path("error.type", "unknown"))' \
-  --metrics
-```
-
-### Output to Different Format
-
-Export errors for further analysis:
-
-```bash
-# JSON output
-kelora -f logfmt app.log -l error -J > errors.json
-
-# CSV for spreadsheets
-kelora -j app.log -l error \
-  -k timestamp,service,message -F csv > errors.csv
-```
-
-## Real-World Examples
-
-### Find Database Errors
-
-```bash
-kelora -j db.log -l error \
-  --filter 'e.message.contains("deadlock") || e.message.contains("constraint")' \
-  -k timestamp,query,error_message
-```
-
-### API Errors with Status Codes
-
-```bash
-kelora -f combined /var/log/nginx/access.log \
-  --filter 'e.status >= 500' \
-  -k ip,timestamp,status,request,user_agent
-```
-
-### Application Crashes
-
-```bash
-kelora -j app.log -l error,critical \
-  --filter 'e.message.contains("panic") || e.message.contains("fatal")' \
-  --before-context 5 --after-context 2
-```
-
-### Errors by Hour
-
-```bash
-kelora -j app.log -l error \
-  -e 'e.hour = e.timestamp.format("%Y-%m-%d %H:00")' \
-  -e 'track_count(e.hour)' \
-  --metrics
-```
-
-## Tips
-
-**Performance:**
-
-- Use `--levels` instead of `--filter` when possible (faster)
-- Add `--parallel` for large files
-- Use `--take 100` to limit output when exploring
-
-**Debugging:**
-
-- Use `--verbose` to see parsing errors
-- Use `--stats` to see processing summary
-- Use `-F json | jq` for complex JSON analysis
-
-**Automation:**
-```bash
-# Alert on errors (exit code 0 = no errors, 1 = has errors)
-if kelora -q -f json app.log -l error --since "5 minutes ago"; then
-    echo "No errors found"
-else
-    echo "Errors detected!" | mail -s "Alert" admin@example.com
-fi
-```
+## Validate and Hand Off
+- Inspect `--stats` output to ensure parse error counts are zero (exit code 1 indicates parse/runtime failures).
+- Sample a few events with `--take 20` before exporting to confirm filters captured the right incidents.
+- Note any masking or redaction you applied so downstream teams know whether to consult raw logs.
 
 ## See Also
-
-- [Monitor Application Health](monitor-application-health.md) - Extract health metrics
-- [Analyze Web Traffic](analyze-web-traffic.md) - Web server error analysis
-- [Function Reference](../reference/functions.md) - All available functions
-- [CLI Reference](../reference/cli-reference.md) - Complete flag documentation
+- [Concept: Error Handling](../concepts/error-handling.md) for pipeline failure semantics.
+- [Build a Service Health Snapshot](monitor-application-health.md) for ongoing health metrics.
+- [Design Streaming Alerts](build-streaming-alerts.md) to turn this triage flow into a live alert.
+- [CLI Reference: Filtering](../reference/cli-reference.md#filtering) for complete flag and expression details.

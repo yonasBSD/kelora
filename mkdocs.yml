@@ -86,6 +86,7 @@ nav:
       - how-to/parse-syslog-files.md
       - how-to/handle-multiline-stacktraces.md
       - how-to/extract-and-mask-sensitive-data.md
+      - how-to/pseudonymize-identifiers-for-analytics.md
       - how-to/process-csv-data.md
       - how-to/fan-out-nested-structures.md
       - how-to/build-streaming-alerts.md

@@ -563,6 +563,6 @@ Now that you understand the complete pipeline lifecycle, continue to:
 - **[Working with Time](working-with-time.md)** - Time-based filtering and operations
 
 **Related guides:**
-- [How-To: Monitor Application Health](../how-to/monitor-application-health.md)
-- [How-To: Build Streaming Alerts](../how-to/build-streaming-alerts.md)
+- [How-To: Build a Service Health Snapshot](../how-to/monitor-application-health.md)
+- [How-To: Design Streaming Alerts](../how-to/build-streaming-alerts.md)
 - [Concepts: Scripting Stages](../concepts/scripting-stages.md) - Deep technical details

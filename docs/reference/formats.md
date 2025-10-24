@@ -305,4 +305,4 @@ kelora -j app.log -F none --stats                       # Only stats
 - [CLI Reference](cli-reference.md) - Complete flag documentation including timestamp parsing, multiline strategies, and prefix extraction
 - [Quickstart](../quickstart.md) - Format examples with annotated output
 - [Parsing Custom Formats Tutorial](../tutorials/parsing-custom-formats.md) - Step-by-step guide
-- [Process CSV Data How-To](../how-to/process-csv-data.md) - CSV-specific tips
+- [Prepare CSV Exports for Analytics](../how-to/process-csv-data.md) - CSV-specific tips

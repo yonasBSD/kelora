@@ -1280,7 +1280,7 @@ if e.has_path("error.details.code") {
 - [CLI Reference](cli-reference.md) - Command-line flags and options
 - [Rhai Cheatsheet](rhai-cheatsheet.md) - Rhai language syntax
 - [Scripting Transforms Tutorial](../tutorials/scripting-transforms.md) - Learn advanced scripting
-- [How-To: Extract and Mask Sensitive Data](../how-to/extract-and-mask-sensitive-data.md) - Practical examples
+- [How-To: Sanitize Logs Before Sharing](../how-to/extract-and-mask-sensitive-data.md) - Practical examples
 
 For more details, run:
 ```bash
