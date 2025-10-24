@@ -94,22 +94,23 @@ Current tutorials cover basics, formats, time, metrics, and transforms well. How
 
 ### 🟡 Priority 2: Important Features
 
-#### 3. Time-Based Aggregation with Spans
+#### 3. ✅ Time-Based Aggregation with Spans (COMPLETED)
 **Position:** After pipeline-stages.md
 **Time:** ~20 minutes
 **Fills gap:** Span aggregation needs proper tutorial
+**File:** `docs/tutorials/span-aggregation.md`
 
 **Topics:**
-- What are spans? (non-overlapping time windows or event counts)
-- Count-based spans (`--span 100`)
-- Time-based spans (`--span 5m`, `--span 1h`)
-- The `--span-close` hook and when it runs
-- Accessing `span.events`, `span.metrics`, `span.id`, `span.start`, `span.end`
-- Per-span vs global metrics
-- Practical example: 5-minute rollups of error rates
-- Practical example: Sliding statistics per 1000 events
-- Late events and `meta.span_status`
-- Why spans require sequential mode
+- ✅ What are spans? (non-overlapping time windows or event counts)
+- ✅ Count-based spans (`--span 100`)
+- ✅ Time-based spans (`--span 5m`, `--span 1h`)
+- ✅ The `--span-close` hook and when it runs
+- ✅ Accessing `span.events`, `span.metrics`, `span.id`, `span.start`, `span.end`
+- ✅ Per-span vs global metrics
+- ✅ Practical example: 5-minute rollups of error rates
+- ✅ Practical example: Sliding statistics per 1000 events
+- ✅ Late events and `meta.span_status`
+- ✅ Why spans require sequential mode
 
 **Learning outcome:** Build time-windowed aggregations and rollups
 
@@ -216,9 +217,9 @@ Phase 2: Intermediate
 └─ 6. scripting-transforms.md           ← Complex transforms
 
 Phase 3: Advanced
-├─ 7. parsing-custom-formats.md         ← Custom formats
-├─ 8. span-aggregation.md (NEW)         ← Time windows
-└─ 9. configuration.md (NEW)            ← Aliases, reusability
+├─ 7. parsing-custom-formats.md         ← Custom formats ✅
+├─ 8. span-aggregation.md (NEW)         ← Time windows ✅
+└─ 9. configuration-and-reusability.md (NEW) ← Aliases, reusability ✅
 
 Phase 4: Specialized
 └─ How-To Guides for specific problems
@@ -347,22 +348,24 @@ How do we know documentation is better?
 
 ---
 
-## Most Important Recommendation
+## ✅ Implementation Status: COMPLETE
 
-**Create the "Introduction to Rhai Scripting" tutorial first.**
+**All priority tutorials have been implemented!**
 
-This is the biggest gap in the learning journey. Users currently jump from:
-- basics.md: `kelora -j -l error -k timestamp,message`
-- scripting-transforms.md: Complex multi-stage pipelines with fan-out
+The complete learning path is now in place:
 
-There's no gentle introduction showing:
-- How `e` works
-- Basic filter syntax
-- Simple transformations
-- Why order matters
-- How to debug
+1. ✅ **intro-to-rhai.md** - Introduction to Rhai Scripting (Priority 1)
+2. ✅ **pipeline-stages.md** - Pipeline lifecycle with --begin/--end (Priority 1)
+3. ✅ **span-aggregation.md** - Time-Based Aggregation with Spans (Priority 2)
+4. ✅ **configuration-and-reusability.md** - Configuration and Reusable Scripts (Priority 2)
 
-A 15-20 minute tutorial bridging this gap would dramatically improve the learning experience.
+The learning journey now has a complete, gentle progression from basics through advanced patterns:
+- ✅ basics.md → intro-to-rhai.md bridges the CLI-to-scripting gap
+- ✅ pipeline-stages.md covers --begin, --end, and conf map
+- ✅ span-aggregation.md teaches time windows and rollups
+- ✅ configuration-and-reusability.md enables reusable workflows
+
+**Total learning time:** ~3-4 hours for complete journey (as planned)
 
 ---
 

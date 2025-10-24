@@ -17,4 +17,5 @@ Step-by-step walkthroughs for building Kelora pipelines from scratch. Start here
 ## Advanced
 
 - [Parsing Custom Formats](parsing-custom-formats.md) - Handle non-standard log formats
+- [Span Aggregation: Time-Based and Count-Based Windows](span-aggregation.md) - Windowed rollups and time-series
 - [Configuration and Reusability](configuration-and-reusability.md) - Aliases, includes, and shared workflows
