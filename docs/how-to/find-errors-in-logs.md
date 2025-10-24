@@ -18,8 +18,8 @@ Decide which files and time ranges matter for the investigation. Use level filte
 ```bash
 kelora -j examples/simple_json.jsonl \
   -l error,critical \
-  --since "2024-04-01 09:00:00" \
-  --until "2024-04-01 12:00:00"
+  --since 1h \
+  --until 30m
 ```
 
 - `-l` (or `--levels`) is faster than `--filter` because it runs during parsing.
