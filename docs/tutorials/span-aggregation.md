@@ -198,8 +198,8 @@ Use durations (`5m`, `1h`, `30s`) to create fixed wall-clock windows:
       --span 2m \
       --span-close '
         print("Window: " + span.id);
-        print("  Start: " + span.start.to_rfc3339());
-        print("  End: " + span.end.to_rfc3339());
+        print("  Start: " + span.start.to_iso());
+        print("  End: " + span.end.to_iso());
         print("  Events: " + span.size.to_string());
       '
     ```
@@ -212,8 +212,8 @@ Use durations (`5m`, `1h`, `30s`) to create fixed wall-clock windows:
       --span 2m \
       --span-close '
         print("Window: " + span.id);
-        print("  Start: " + span.start.to_rfc3339());
-        print("  End: " + span.end.to_rfc3339());
+        print("  Start: " + span.start.to_iso());
+        print("  End: " + span.end.to_iso());
         print("  Events: " + span.size.to_string());
       '
     ```
@@ -299,7 +299,7 @@ Calculate error rates per 1-minute window:
         let requests = m.get_path("requests", 0);
         let errors = m.get_path("errors", 0);
         let rate = if requests > 0 { (errors * 100) / requests } else { 0 };
-        print(span.start.to_rfc3339() + ": " + errors.to_string() + "/" +
+        print(span.start.to_iso() + ": " + errors.to_string() + "/" +
               requests.to_string() + " errors (" + rate.to_string() + "%)");
       '
     ```
@@ -319,7 +319,7 @@ Calculate error rates per 1-minute window:
         let requests = m.get_path("requests", 0);
         let errors = m.get_path("errors", 0);
         let rate = if requests > 0 { (errors * 100) / requests } else { 0 };
-        print(span.start.to_rfc3339() + ": " + errors.to_string() + "/" +
+        print(span.start.to_iso() + ": " + errors.to_string() + "/" +
               requests.to_string() + " errors (" + rate.to_string() + "%)");
       '
     ```

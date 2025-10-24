@@ -69,10 +69,15 @@ nav:
   - Quickstart: quickstart.md
   - Tutorials:
       - Overview: tutorials/index.md
-      - tutorials/parsing-custom-formats.md
-      - tutorials/working-with-time.md
-      - tutorials/metrics-and-tracking.md
-      - tutorials/scripting-transforms.md
+      - Getting Started: tutorials/basics.md
+      - Introduction to Rhai: tutorials/intro-to-rhai.md
+      - Working with Time: tutorials/working-with-time.md
+      - Metrics and Tracking: tutorials/metrics-and-tracking.md
+      - Pipeline Stages: tutorials/pipeline-stages.md
+      - Scripting Transforms: tutorials/scripting-transforms.md
+      - Parsing Custom Formats: tutorials/parsing-custom-formats.md
+      - Span Aggregation: tutorials/span-aggregation.md
+      - Configuration and Reusability: tutorials/configuration-and-reusability.md
   - How-To Guides:
       - Overview: how-to/index.md
       - how-to/find-errors-in-logs.md
