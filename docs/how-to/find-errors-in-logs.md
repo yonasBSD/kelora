@@ -123,4 +123,4 @@ Alternatives:
 - [Concept: Error Handling](../concepts/error-handling.md) for pipeline failure semantics.
 - [Build a Service Health Snapshot](monitor-application-health.md) for ongoing health metrics.
 - [Design Streaming Alerts](build-streaming-alerts.md) to turn this triage flow into a live alert.
-- [CLI Reference: Filtering](../reference/cli-reference.md#filtering) for complete flag and expression details.
+- [CLI Reference: Filtering](../reference/cli-reference.md#filtering-options) for complete flag and expression details.
