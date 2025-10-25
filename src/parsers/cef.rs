@@ -198,7 +198,7 @@ impl EventParser for CefParser {
 
         // Set syslog fields
         if let Some(ts) = timestamp {
-            event.set_field("timestamp".to_string(), Dynamic::from(ts.to_string()));
+            event.set_field("ts".to_string(), Dynamic::from(ts.to_string()));
         }
         if let Some(host) = hostname {
             event.set_field("host".to_string(), Dynamic::from(host.to_string()));
@@ -309,7 +309,7 @@ mod tests {
         assert_eq!(
             result
                 .fields
-                .get("timestamp")
+                .get("ts")
                 .unwrap()
                 .clone()
                 .into_string()

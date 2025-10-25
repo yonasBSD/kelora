@@ -107,7 +107,7 @@ impl CombinedParser {
             // Timestamp
             if let Some(timestamp) = captures.get(4) {
                 event.set_field(
-                    "timestamp".to_string(),
+                    "ts".to_string(),
                     Dynamic::from(timestamp.as_str().to_string()),
                 );
             }
@@ -186,7 +186,7 @@ impl CombinedParser {
             // Timestamp
             if let Some(timestamp) = captures.get(4) {
                 event.set_field(
-                    "timestamp".to_string(),
+                    "ts".to_string(),
                     Dynamic::from(timestamp.as_str().to_string()),
                 );
             }
@@ -255,7 +255,7 @@ impl CombinedParser {
             // Timestamp
             if let Some(timestamp) = captures.get(4) {
                 event.set_field(
-                    "timestamp".to_string(),
+                    "ts".to_string(),
                     Dynamic::from(timestamp.as_str().to_string()),
                 );
             }

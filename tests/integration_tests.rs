@@ -1850,7 +1850,7 @@ Oct 11 22:14:16 server01 kernel: CPU0: Core temperature above threshold"#;
     // Check first line (with PID)
     let first_line: serde_json::Value =
         serde_json::from_str(lines[0]).expect("First line should be valid JSON");
-    assert_eq!(first_line["timestamp"].as_str().unwrap(), "Oct 11 22:14:15");
+    assert_eq!(first_line["ts"].as_str().unwrap(), "Oct 11 22:14:15");
     assert_eq!(first_line["host"].as_str().unwrap(), "server01");
     assert_eq!(first_line["prog"].as_str().unwrap(), "sshd");
     assert_eq!(first_line["pid"].as_i64().unwrap(), 1234);
@@ -1862,10 +1862,7 @@ Oct 11 22:14:16 server01 kernel: CPU0: Core temperature above threshold"#;
     // Check second line (no PID)
     let second_line: serde_json::Value =
         serde_json::from_str(lines[1]).expect("Second line should be valid JSON");
-    assert_eq!(
-        second_line["timestamp"].as_str().unwrap(),
-        "Oct 11 22:14:16"
-    );
+    assert_eq!(second_line["ts"].as_str().unwrap(), "Oct 11 22:14:16");
     assert_eq!(second_line["host"].as_str().unwrap(), "server01");
     assert_eq!(second_line["prog"].as_str().unwrap(), "kernel");
     assert_eq!(second_line["pid"], serde_json::Value::Null); // No PID for kernel messages
@@ -2126,16 +2123,13 @@ fn test_brief_output_mode_short_form() {
 
 #[test]
 fn test_core_field_filtering() {
-    let input = r#"{"timestamp": "2024-01-01T12:00:00Z", "level": "ERROR", "message": "Test message", "user": "alice", "status": 500}"#;
+    let input = r#"{"ts": "2024-01-01T12:00:00Z", "level": "ERROR", "message": "Test message", "user": "alice", "status": 500}"#;
 
     let (stdout, _, exit_code) = run_kelora_with_input(&["-f", "json", "--core"], input);
     assert_eq!(exit_code, 0, "kelora should exit successfully with --core");
 
     // Should only contain core fields
-    assert!(
-        stdout.contains("timestamp="),
-        "Should contain timestamp field"
-    );
+    assert!(stdout.contains("ts="), "Should contain ts field");
     assert!(stdout.contains("level="), "Should contain level field");
     assert!(stdout.contains("message="), "Should contain message field");
     assert!(
@@ -2150,7 +2144,7 @@ fn test_core_field_filtering() {
 
 #[test]
 fn test_core_field_filtering_short_flag() {
-    let input = r#"{"timestamp": "2024-01-01T12:00:00Z", "level": "ERROR", "message": "Test message", "user": "alice"}"#;
+    let input = r#"{"ts": "2024-01-01T12:00:00Z", "level": "ERROR", "message": "Test message", "user": "alice"}"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json", "-c"], input);
     assert_eq!(
@@ -2159,10 +2153,7 @@ fn test_core_field_filtering_short_flag() {
     );
 
     // Should only contain core fields
-    assert!(
-        stdout.contains("timestamp="),
-        "Should contain timestamp field"
-    );
+    assert!(stdout.contains("ts="), "Should contain ts field");
     assert!(stdout.contains("level="), "Should contain level field");
     assert!(stdout.contains("message="), "Should contain message field");
     assert!(
@@ -2193,7 +2184,7 @@ fn test_core_field_with_alternative_names() {
 
 #[test]
 fn test_core_field_plus_additional_keys() {
-    let input = r#"{"timestamp": "2024-01-01T12:00:00Z", "level": "ERROR", "message": "Test message", "user": "alice", "status": 500}"#;
+    let input = r#"{"ts": "2024-01-01T12:00:00Z", "level": "ERROR", "message": "Test message", "user": "alice", "status": 500}"#;
 
     let (stdout, _stderr, exit_code) =
         run_kelora_with_input(&["-f", "json", "--core", "--keys", "user,status"], input);
@@ -2203,10 +2194,7 @@ fn test_core_field_plus_additional_keys() {
     );
 
     // Should contain both core fields and specified keys
-    assert!(
-        stdout.contains("timestamp="),
-        "Should contain timestamp field"
-    );
+    assert!(stdout.contains("ts="), "Should contain ts field");
     assert!(stdout.contains("level="), "Should contain level field");
     assert!(stdout.contains("message="), "Should contain message field");
     assert!(
@@ -2234,10 +2222,7 @@ fn test_core_field_with_syslog() {
         stdout.contains("severity="),
         "Should contain severity field"
     );
-    assert!(
-        stdout.contains("timestamp="),
-        "Should contain timestamp field"
-    );
+    assert!(stdout.contains("ts="), "Should contain ts field");
     assert!(stdout.contains("msg="), "Should contain msg field");
     // Should not contain non-core syslog fields
     assert!(
@@ -2336,10 +2321,7 @@ fn test_core_field_multiple_timestamp_variants() {
 
     // Should include all timestamp field variants (current behavior: include all matching names)
     assert!(stdout.contains("ts="), "Should contain ts field");
-    assert!(
-        stdout.contains("timestamp="),
-        "Should contain timestamp field"
-    );
+    assert!(stdout.contains("ts="), "Should contain ts field");
     assert!(stdout.contains("time="), "Should contain time field");
     assert!(stdout.contains("level="), "Should contain level field");
     assert!(stdout.contains("message="), "Should contain message field");

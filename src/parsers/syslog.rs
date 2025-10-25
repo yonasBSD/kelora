@@ -76,7 +76,7 @@ impl SyslogParser {
             if let Some(ts) = captures.get(3) {
                 let ts_str = ts.as_str();
                 if ts_str != "-" {
-                    event.set_field("timestamp".to_string(), Dynamic::from(ts_str.to_string()));
+                    event.set_field("ts".to_string(), Dynamic::from(ts_str.to_string()));
                 }
             }
 
@@ -163,7 +163,7 @@ impl SyslogParser {
             // Set timestamp (group 2 now since priority is group 1)
             if let Some(ts) = captures.get(2) {
                 event.set_field(
-                    "timestamp".to_string(),
+                    "ts".to_string(),
                     Dynamic::from(ts.as_str().to_string()),
                 );
             }
@@ -238,7 +238,7 @@ mod tests {
         assert_eq!(
             result
                 .fields
-                .get("timestamp")
+                .get("ts")
                 .unwrap()
                 .clone()
                 .into_string()
@@ -299,7 +299,7 @@ mod tests {
         assert_eq!(
             result
                 .fields
-                .get("timestamp")
+                .get("ts")
                 .unwrap()
                 .clone()
                 .into_string()
@@ -351,7 +351,7 @@ mod tests {
         assert_eq!(
             result
                 .fields
-                .get("timestamp")
+                .get("ts")
                 .unwrap()
                 .clone()
                 .into_string()
@@ -406,7 +406,7 @@ mod tests {
         assert_eq!(
             result
                 .fields
-                .get("timestamp")
+                .get("ts")
                 .unwrap()
                 .clone()
                 .into_string()
@@ -505,7 +505,7 @@ mod tests {
         assert_eq!(
             result
                 .fields
-                .get("timestamp")
+                .get("ts")
                 .unwrap()
                 .clone()
                 .into_string()
