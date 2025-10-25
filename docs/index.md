@@ -8,7 +8,7 @@ Parse messy logs into structured events, then filter, transform, and analyze the
     Kelora is a [vibe-coded](https://en.wikipedia.org/wiki/Vibe_coding) experimental tool under active development. APIs and behaviour may change without notice.
 
 ![Kelora hero demo](screenshots/hero.gif)
-*Three examples: Filtering noisy logs, parsing custom formats, and visualizing log levels*
+*Filtering noisy logs, parsing custom formats, and visualizing log levels*
 
 ## Examples
 
