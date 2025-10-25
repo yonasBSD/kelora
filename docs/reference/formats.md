@@ -293,6 +293,12 @@ Specify output format with `-F, --output-format <format>`.
 | `tsvnh` | TSV without header |
 | `none` | No output (useful with `--stats` or `--metrics`) |
 
+**Levelmap Visual Example:**
+
+![Levelmap output format showing compact log visualization](../screenshots/levelmap.gif)
+
+The `levelmap` format provides a compact visual representation of logs, showing timestamps and level indicators in a condensed format ideal for quick scanning.
+
 **Examples:**
 ```bash
 kelora -j app.log -F json                               # Output as JSON

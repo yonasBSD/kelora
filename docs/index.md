@@ -7,6 +7,9 @@ Parse messy logs into structured events, then filter, transform, and analyze the
 !!! warning "Experimental Tool"
     Kelora is a [vibe-coded](https://en.wikipedia.org/wiki/Vibe_coding) experimental tool under active development. APIs and behaviour may change without notice.
 
+![Error detection with context highlighting](screenshots/context-highlighting.gif)
+*Parsing syslog with multiline stacktraces, filtering for errors, and showing context with `-C 1`*
+
 ## Examples
 
 **Parse embedded formats inside syslog**

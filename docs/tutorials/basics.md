@@ -112,12 +112,15 @@ Let's examine what Kelora shows by default:
 - ✅ **Colors** (when terminal supports it)
 - ✅ **Smart ordering** - timestamp, level, message first, then others alphabetically
 
+![Colored key-value output in the default formatter](../screenshots/colored-output.gif)
+
 **Key observations:**
 
 1. Strings are quoted (`'Application started'`)
 2. Numbers are not quoted (`max_connections=50`)
 3. Fields wrap to next line when too long
 4. Each event is separated by a blank line
+5. Field names are highlighted in color for better readability
 
 ---
 

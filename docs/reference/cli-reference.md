@@ -590,6 +590,12 @@ Show N lines before and after each match (requires filtering).
 kelora -j --levels error --context 2 app.log
 ```
 
+**Visual Example:**
+
+![Context highlighting in action](../screenshots/error-triage.gif)
+
+Context lines are highlighted with colored symbols: `/` for before-context, `*` for matching lines, `\` for after-context, and `|` for separator lines.
+
 ## Output Options
 
 ### Output Format
@@ -734,6 +740,12 @@ Insert centered marker when time delta between events exceeds duration.
 kelora -j --mark-gaps 30s app.log    # Mark 30+ second gaps
 kelora -j --mark-gaps 5m app.log     # Mark 5+ minute gaps
 ```
+
+**Visual Example:**
+
+![Gap markers showing time discontinuities](../screenshots/mark-gaps.gif)
+
+Gap markers help identify time discontinuities in your logs, making it easier to spot service restarts, network issues, or other temporal anomalies.
 
 ### Emoji
 

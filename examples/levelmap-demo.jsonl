@@ -1,0 +1,184 @@
+{"timestamp":"2024-10-25T08:00:00Z","level":"INFO","service":"api","message":"Application started","version":"2.1.0"}
+{"timestamp":"2024-10-25T08:00:01Z","level":"INFO","service":"database","message":"Connection pool initialized","max_connections":50}
+{"timestamp":"2024-10-25T08:00:02Z","level":"DEBUG","service":"cache","message":"Redis connection established","host":"redis-01"}
+{"timestamp":"2024-10-25T08:00:03Z","level":"INFO","service":"api","message":"HTTP server listening","port":8080}
+{"timestamp":"2024-10-25T08:00:05Z","level":"DEBUG","service":"auth","message":"JWT keys loaded","algorithm":"RS256"}
+{"timestamp":"2024-10-25T08:00:10Z","level":"INFO","service":"worker","message":"Background job processor started","workers":4}
+{"timestamp":"2024-10-25T08:00:15Z","level":"DEBUG","service":"metrics","message":"Prometheus exporter initialized","port":9090}
+{"timestamp":"2024-10-25T08:00:20Z","level":"INFO","service":"api","message":"Request received","method":"GET","path":"/health"}
+{"timestamp":"2024-10-25T08:00:21Z","level":"DEBUG","service":"api","message":"Health check passed","duration_ms":2}
+{"timestamp":"2024-10-25T08:00:25Z","level":"INFO","service":"api","message":"Request received","method":"POST","path":"/api/users"}
+{"timestamp":"2024-10-25T08:00:26Z","level":"DEBUG","service":"database","message":"Query executed","query":"INSERT INTO users","duration_ms":15}
+{"timestamp":"2024-10-25T08:00:27Z","level":"INFO","service":"api","message":"User created","user_id":1001}
+{"timestamp":"2024-10-25T08:00:30Z","level":"WARN","service":"cache","message":"Cache miss","key":"user:1001"}
+{"timestamp":"2024-10-25T08:00:35Z","level":"INFO","service":"api","message":"Request received","method":"GET","path":"/api/users/1001"}
+{"timestamp":"2024-10-25T08:00:36Z","level":"DEBUG","service":"database","message":"Query executed","query":"SELECT * FROM users","duration_ms":8}
+{"timestamp":"2024-10-25T08:00:40Z","level":"INFO","service":"worker","message":"Job enqueued","job_id":"job-1234","type":"email"}
+{"timestamp":"2024-10-25T08:00:45Z","level":"DEBUG","service":"worker","message":"Processing job","job_id":"job-1234"}
+{"timestamp":"2024-10-25T08:00:50Z","level":"INFO","service":"email","message":"Email sent","recipient":"user@example.com"}
+{"timestamp":"2024-10-25T08:00:55Z","level":"INFO","service":"worker","message":"Job completed","job_id":"job-1234","duration_ms":10000}
+{"timestamp":"2024-10-25T08:01:00Z","level":"WARN","service":"api","message":"Slow request detected","path":"/api/search","duration_ms":2500}
+{"timestamp":"2024-10-25T08:01:05Z","level":"DEBUG","service":"cache","message":"Cache set","key":"search:results","ttl":300}
+{"timestamp":"2024-10-25T08:01:10Z","level":"INFO","service":"api","message":"Request received","method":"POST","path":"/api/orders"}
+{"timestamp":"2024-10-25T08:01:11Z","level":"DEBUG","service":"database","message":"Transaction started"}
+{"timestamp":"2024-10-25T08:01:12Z","level":"ERROR","service":"database","message":"Constraint violation","error":"duplicate key","table":"orders"}
+{"timestamp":"2024-10-25T08:01:13Z","level":"WARN","service":"api","message":"Request failed","status":409,"error":"Order already exists"}
+{"timestamp":"2024-10-25T08:01:15Z","level":"INFO","service":"api","message":"Request received","method":"GET","path":"/api/orders"}
+{"timestamp":"2024-10-25T08:01:16Z","level":"DEBUG","service":"cache","message":"Cache hit","key":"orders:list"}
+{"timestamp":"2024-10-25T08:01:20Z","level":"INFO","service":"metrics","message":"Metrics scraped","endpoint":"/metrics"}
+{"timestamp":"2024-10-25T08:01:25Z","level":"WARN","service":"database","message":"Connection pool exhausted","active":50,"max":50}
+{"timestamp":"2024-10-25T08:01:30Z","level":"ERROR","service":"api","message":"Database connection timeout","duration_ms":5000}
+{"timestamp":"2024-10-25T08:01:31Z","level":"WARN","service":"api","message":"Request retry","attempt":1}
+{"timestamp":"2024-10-25T08:01:35Z","level":"INFO","service":"api","message":"Request completed","status":200}
+{"timestamp":"2024-10-25T08:01:40Z","level":"DEBUG","service":"auth","message":"Token validated","user_id":1001}
+{"timestamp":"2024-10-25T08:01:45Z","level":"INFO","service":"api","message":"Request received","method":"PUT","path":"/api/users/1001"}
+{"timestamp":"2024-10-25T08:01:46Z","level":"DEBUG","service":"database","message":"Query executed","query":"UPDATE users","duration_ms":12}
+{"timestamp":"2024-10-25T08:01:50Z","level":"WARN","service":"cache","message":"Cache invalidated","key":"user:1001"}
+{"timestamp":"2024-10-25T08:01:55Z","level":"INFO","service":"api","message":"User updated","user_id":1001}
+{"timestamp":"2024-10-25T08:02:00Z","level":"DEBUG","service":"worker","message":"Queue check","pending_jobs":5}
+{"timestamp":"2024-10-25T08:02:05Z","level":"INFO","service":"worker","message":"Job enqueued","job_id":"job-1235","type":"notification"}
+{"timestamp":"2024-10-25T08:02:10Z","level":"ERROR","service":"worker","message":"Job failed","job_id":"job-1235","error":"Network timeout"}
+{"timestamp":"2024-10-25T08:02:11Z","level":"WARN","service":"worker","message":"Job scheduled for retry","job_id":"job-1235","retry_count":1}
+{"timestamp":"2024-10-25T08:02:15Z","level":"INFO","service":"api","message":"Request received","method":"DELETE","path":"/api/sessions/xyz"}
+{"timestamp":"2024-10-25T08:02:16Z","level":"DEBUG","service":"cache","message":"Cache delete","key":"session:xyz"}
+{"timestamp":"2024-10-25T08:02:20Z","level":"INFO","service":"api","message":"Session terminated","session_id":"xyz"}
+{"timestamp":"2024-10-25T08:02:25Z","level":"WARN","service":"auth","message":"Failed login attempt","username":"admin","ip":"192.168.1.100"}
+{"timestamp":"2024-10-25T08:02:30Z","level":"WARN","service":"auth","message":"Failed login attempt","username":"admin","ip":"192.168.1.100"}
+{"timestamp":"2024-10-25T08:02:35Z","level":"ERROR","service":"auth","message":"Account locked","username":"admin","attempts":5}
+{"timestamp":"2024-10-25T08:02:40Z","level":"INFO","service":"api","message":"Request received","method":"GET","path":"/api/stats"}
+{"timestamp":"2024-10-25T08:02:41Z","level":"DEBUG","service":"database","message":"Query executed","query":"SELECT COUNT(*) FROM users","duration_ms":150}
+{"timestamp":"2024-10-25T08:02:45Z","level":"WARN","service":"database","message":"Slow query detected","duration_ms":150,"threshold":100}
+{"timestamp":"2024-10-25T08:02:50Z","level":"INFO","service":"api","message":"Statistics retrieved","total_users":10500}
+{"timestamp":"2024-10-25T08:02:55Z","level":"DEBUG","service":"metrics","message":"Counter incremented","metric":"http_requests_total"}
+{"timestamp":"2024-10-25T08:03:00Z","level":"INFO","service":"scheduler","message":"Cron job started","job":"backup","schedule":"0 3 * * *"}
+{"timestamp":"2024-10-25T08:03:05Z","level":"DEBUG","service":"backup","message":"Backup initiated","type":"full"}
+{"timestamp":"2024-10-25T08:03:10Z","level":"INFO","service":"backup","message":"Backing up database","database":"production"}
+{"timestamp":"2024-10-25T08:03:15Z","level":"DEBUG","service":"backup","message":"Table backed up","table":"users","rows":10500}
+{"timestamp":"2024-10-25T08:03:20Z","level":"DEBUG","service":"backup","message":"Table backed up","table":"orders","rows":45000}
+{"timestamp":"2024-10-25T08:03:25Z","level":"WARN","service":"backup","message":"Large table detected","table":"logs","rows":2000000}
+{"timestamp":"2024-10-25T08:03:30Z","level":"INFO","service":"backup","message":"Backup progress","tables_completed":5,"total_tables":20}
+{"timestamp":"2024-10-25T08:03:35Z","level":"DEBUG","service":"backup","message":"Compression started","algorithm":"gzip"}
+{"timestamp":"2024-10-25T08:03:40Z","level":"INFO","service":"backup","message":"Backup completed","size_mb":1024,"duration_ms":35000}
+{"timestamp":"2024-10-25T08:03:45Z","level":"DEBUG","service":"storage","message":"Uploading to S3","bucket":"backups"}
+{"timestamp":"2024-10-25T08:03:50Z","level":"INFO","service":"storage","message":"Upload completed","key":"backup-2024-10-25.gz"}
+{"timestamp":"2024-10-25T08:03:55Z","level":"INFO","service":"scheduler","message":"Cron job completed","job":"backup"}
+{"timestamp":"2024-10-25T08:04:00Z","level":"DEBUG","service":"api","message":"Rate limit check","client_id":"client-001"}
+{"timestamp":"2024-10-25T08:04:05Z","level":"WARN","service":"api","message":"Rate limit approaching","client_id":"client-001","used":95,"limit":100}
+{"timestamp":"2024-10-25T08:04:10Z","level":"ERROR","service":"api","message":"Rate limit exceeded","client_id":"client-001"}
+{"timestamp":"2024-10-25T08:04:11Z","level":"INFO","service":"api","message":"Request rejected","status":429,"reason":"Rate limit"}
+{"timestamp":"2024-10-25T08:04:15Z","level":"DEBUG","service":"cache","message":"Cache eviction","evicted_keys":50}
+{"timestamp":"2024-10-25T08:04:20Z","level":"WARN","service":"cache","message":"Memory usage high","used_mb":1500,"max_mb":2048}
+{"timestamp":"2024-10-25T08:04:25Z","level":"INFO","service":"api","message":"Request received","method":"GET","path":"/api/products"}
+{"timestamp":"2024-10-25T08:04:26Z","level":"DEBUG","service":"database","message":"Query executed","query":"SELECT * FROM products","duration_ms":25}
+{"timestamp":"2024-10-25T08:04:30Z","level":"INFO","service":"api","message":"Products retrieved","count":250}
+{"timestamp":"2024-10-25T08:04:35Z","level":"DEBUG","service":"cache","message":"Cache populated","key":"products:list"}
+{"timestamp":"2024-10-25T08:04:40Z","level":"INFO","service":"worker","message":"Job enqueued","job_id":"job-1236","type":"index"}
+{"timestamp":"2024-10-25T08:04:45Z","level":"DEBUG","service":"worker","message":"Processing job","job_id":"job-1236"}
+{"timestamp":"2024-10-25T08:04:50Z","level":"INFO","service":"search","message":"Index rebuild started","index":"products"}
+{"timestamp":"2024-10-25T08:04:55Z","level":"DEBUG","service":"search","message":"Indexing documents","count":250}
+{"timestamp":"2024-10-25T08:05:00Z","level":"INFO","service":"search","message":"Index rebuild completed","duration_ms":10000}
+{"timestamp":"2024-10-25T08:05:05Z","level":"INFO","service":"worker","message":"Job completed","job_id":"job-1236"}
+{"timestamp":"2024-10-25T08:05:10Z","level":"WARN","service":"api","message":"Deprecated endpoint used","path":"/api/v1/legacy"}
+{"timestamp":"2024-10-25T08:05:15Z","level":"DEBUG","service":"api","message":"Forwarding to new endpoint","path":"/api/v2/users"}
+{"timestamp":"2024-10-25T08:05:20Z","level":"INFO","service":"api","message":"Request completed","status":200}
+{"timestamp":"2024-10-25T08:05:25Z","level":"ERROR","service":"external","message":"Third-party API error","provider":"payment-gateway","error":"Connection refused"}
+{"timestamp":"2024-10-25T08:05:26Z","level":"WARN","service":"api","message":"Payment processing failed","order_id":5001}
+{"timestamp":"2024-10-25T08:05:30Z","level":"INFO","service":"api","message":"Fallback payment method used","method":"offline"}
+{"timestamp":"2024-10-25T08:05:35Z","level":"DEBUG","service":"database","message":"Query executed","query":"UPDATE orders","duration_ms":18}
+{"timestamp":"2024-10-25T08:05:40Z","level":"INFO","service":"notifications","message":"Alert sent","type":"payment_failure","recipient":"admin"}
+{"timestamp":"2024-10-25T08:05:45Z","level":"DEBUG","service":"metrics","message":"Histogram observed","metric":"request_duration","value":125}
+{"timestamp":"2024-10-25T08:05:50Z","level":"INFO","service":"api","message":"Request received","method":"POST","path":"/api/webhook"}
+{"timestamp":"2024-10-25T08:05:51Z","level":"DEBUG","service":"webhook","message":"Signature verified","source":"github"}
+{"timestamp":"2024-10-25T08:05:55Z","level":"INFO","service":"webhook","message":"Webhook processed","event":"push"}
+{"timestamp":"2024-10-25T08:06:00Z","level":"DEBUG","service":"ci","message":"Build triggered","branch":"main"}
+{"timestamp":"2024-10-25T08:06:05Z","level":"INFO","service":"ci","message":"Build started","build_id":"build-789"}
+{"timestamp":"2024-10-25T08:06:10Z","level":"DEBUG","service":"ci","message":"Running tests","suite":"unit"}
+{"timestamp":"2024-10-25T08:06:15Z","level":"INFO","service":"ci","message":"Tests passed","passed":150,"failed":0}
+{"timestamp":"2024-10-25T08:06:20Z","level":"DEBUG","service":"ci","message":"Building artifacts"}
+{"timestamp":"2024-10-25T08:06:25Z","level":"INFO","service":"ci","message":"Build completed","duration_ms":25000}
+{"timestamp":"2024-10-25T08:06:30Z","level":"WARN","service":"monitoring","message":"CPU usage high","usage_percent":85}
+{"timestamp":"2024-10-25T08:06:35Z","level":"DEBUG","service":"monitoring","message":"Process list sampled","top_process":"database"}
+{"timestamp":"2024-10-25T08:06:40Z","level":"WARN","service":"monitoring","message":"Disk usage high","partition":"/var","usage_percent":82}
+{"timestamp":"2024-10-25T08:06:45Z","level":"INFO","service":"cleanup","message":"Old logs cleanup started"}
+{"timestamp":"2024-10-25T08:06:50Z","level":"DEBUG","service":"cleanup","message":"Scanning log directory","path":"/var/log"}
+{"timestamp":"2024-10-25T08:06:55Z","level":"INFO","service":"cleanup","message":"Deleted old files","count":150,"freed_mb":500}
+{"timestamp":"2024-10-25T08:07:00Z","level":"DEBUG","service":"api","message":"CORS preflight request","origin":"https://app.example.com"}
+{"timestamp":"2024-10-25T08:07:05Z","level":"INFO","service":"api","message":"Request received","method":"POST","path":"/api/files"}
+{"timestamp":"2024-10-25T08:07:06Z","level":"DEBUG","service":"storage","message":"File upload started","filename":"document.pdf"}
+{"timestamp":"2024-10-25T08:07:10Z","level":"WARN","service":"storage","message":"Large file upload","size_mb":50}
+{"timestamp":"2024-10-25T08:07:15Z","level":"DEBUG","service":"storage","message":"Chunk uploaded","chunk":1,"total_chunks":10}
+{"timestamp":"2024-10-25T08:07:20Z","level":"DEBUG","service":"storage","message":"Chunk uploaded","chunk":2,"total_chunks":10}
+{"timestamp":"2024-10-25T08:07:25Z","level":"DEBUG","service":"storage","message":"Chunk uploaded","chunk":3,"total_chunks":10}
+{"timestamp":"2024-10-25T08:07:30Z","level":"DEBUG","service":"storage","message":"Chunk uploaded","chunk":4,"total_chunks":10}
+{"timestamp":"2024-10-25T08:07:35Z","level":"DEBUG","service":"storage","message":"Chunk uploaded","chunk":5,"total_chunks":10}
+{"timestamp":"2024-10-25T08:07:40Z","level":"ERROR","service":"storage","message":"Upload failed","chunk":6,"error":"Network error"}
+{"timestamp":"2024-10-25T08:07:41Z","level":"WARN","service":"storage","message":"Retrying chunk upload","chunk":6}
+{"timestamp":"2024-10-25T08:07:45Z","level":"DEBUG","service":"storage","message":"Chunk uploaded","chunk":6,"total_chunks":10}
+{"timestamp":"2024-10-25T08:07:50Z","level":"DEBUG","service":"storage","message":"Chunk uploaded","chunk":7,"total_chunks":10}
+{"timestamp":"2024-10-25T08:07:55Z","level":"DEBUG","service":"storage","message":"Chunk uploaded","chunk":8,"total_chunks":10}
+{"timestamp":"2024-10-25T08:08:00Z","level":"DEBUG","service":"storage","message":"Chunk uploaded","chunk":9,"total_chunks":10}
+{"timestamp":"2024-10-25T08:08:05Z","level":"DEBUG","service":"storage","message":"Chunk uploaded","chunk":10,"total_chunks":10}
+{"timestamp":"2024-10-25T08:08:10Z","level":"INFO","service":"storage","message":"File upload completed","filename":"document.pdf"}
+{"timestamp":"2024-10-25T08:08:15Z","level":"DEBUG","service":"virus-scan","message":"Scanning file","filename":"document.pdf"}
+{"timestamp":"2024-10-25T08:08:20Z","level":"INFO","service":"virus-scan","message":"File clean","filename":"document.pdf"}
+{"timestamp":"2024-10-25T08:08:25Z","level":"INFO","service":"api","message":"Request completed","status":201}
+{"timestamp":"2024-10-25T08:08:30Z","level":"DEBUG","service":"database","message":"Connection returned to pool","active":35}
+{"timestamp":"2024-10-25T08:08:35Z","level":"INFO","service":"api","message":"Request received","method":"GET","path":"/api/notifications"}
+{"timestamp":"2024-10-25T08:08:36Z","level":"DEBUG","service":"database","message":"Query executed","query":"SELECT * FROM notifications","duration_ms":22}
+{"timestamp":"2024-10-25T08:08:40Z","level":"INFO","service":"api","message":"Notifications retrieved","count":15,"unread":3}
+{"timestamp":"2024-10-25T08:08:45Z","level":"DEBUG","service":"websocket","message":"Client connected","client_id":"ws-001"}
+{"timestamp":"2024-10-25T08:08:50Z","level":"INFO","service":"websocket","message":"Subscription added","topic":"notifications"}
+{"timestamp":"2024-10-25T08:08:55Z","level":"DEBUG","service":"websocket","message":"Heartbeat sent","client_id":"ws-001"}
+{"timestamp":"2024-10-25T08:09:00Z","level":"INFO","service":"worker","message":"Job enqueued","job_id":"job-1237","type":"report"}
+{"timestamp":"2024-10-25T08:09:05Z","level":"DEBUG","service":"worker","message":"Processing job","job_id":"job-1237"}
+{"timestamp":"2024-10-25T08:09:10Z","level":"INFO","service":"reports","message":"Report generation started","type":"monthly"}
+{"timestamp":"2024-10-25T08:09:15Z","level":"DEBUG","service":"database","message":"Query executed","query":"SELECT * FROM analytics","duration_ms":500}
+{"timestamp":"2024-10-25T08:09:20Z","level":"WARN","service":"reports","message":"Large dataset","rows":500000}
+{"timestamp":"2024-10-25T08:09:25Z","level":"DEBUG","service":"reports","message":"Aggregating data"}
+{"timestamp":"2024-10-25T08:09:30Z","level":"INFO","service":"reports","message":"Charts generated","count":12}
+{"timestamp":"2024-10-25T08:09:35Z","level":"DEBUG","service":"reports","message":"Rendering PDF"}
+{"timestamp":"2024-10-25T08:09:40Z","level":"INFO","service":"reports","message":"Report completed","size_mb":5}
+{"timestamp":"2024-10-25T08:09:45Z","level":"INFO","service":"worker","message":"Job completed","job_id":"job-1237","duration_ms":40000}
+{"timestamp":"2024-10-25T08:09:50Z","level":"DEBUG","service":"email","message":"Sending report","recipient":"manager@example.com"}
+{"timestamp":"2024-10-25T08:09:55Z","level":"INFO","service":"email","message":"Email sent","recipient":"manager@example.com"}
+{"timestamp":"2024-10-25T08:10:00Z","level":"CRITICAL","service":"monitoring","message":"Service health check failed","service":"payment-gateway"}
+{"timestamp":"2024-10-25T08:10:01Z","level":"ERROR","service":"monitoring","message":"Attempting automatic restart"}
+{"timestamp":"2024-10-25T08:10:05Z","level":"WARN","service":"payment-gateway","message":"Service restarting"}
+{"timestamp":"2024-10-25T08:10:10Z","level":"INFO","service":"payment-gateway","message":"Service started"}
+{"timestamp":"2024-10-25T08:10:15Z","level":"DEBUG","service":"payment-gateway","message":"Configuration loaded"}
+{"timestamp":"2024-10-25T08:10:20Z","level":"INFO","service":"payment-gateway","message":"Ready to accept requests"}
+{"timestamp":"2024-10-25T08:10:25Z","level":"INFO","service":"monitoring","message":"Service recovered","service":"payment-gateway"}
+{"timestamp":"2024-10-25T08:10:30Z","level":"DEBUG","service":"api","message":"Middleware executed","middleware":"auth"}
+{"timestamp":"2024-10-25T08:10:35Z","level":"INFO","service":"api","message":"Request received","method":"GET","path":"/api/dashboard"}
+{"timestamp":"2024-10-25T08:10:36Z","level":"DEBUG","service":"cache","message":"Cache hit","key":"dashboard:summary"}
+{"timestamp":"2024-10-25T08:10:40Z","level":"INFO","service":"api","message":"Dashboard data retrieved"}
+{"timestamp":"2024-10-25T08:10:45Z","level":"DEBUG","service":"metrics","message":"Response time recorded","duration_ms":50}
+{"timestamp":"2024-10-25T08:10:50Z","level":"WARN","service":"security","message":"Unusual activity detected","ip":"203.0.113.42"}
+{"timestamp":"2024-10-25T08:10:55Z","level":"INFO","service":"security","message":"IP added to watch list","ip":"203.0.113.42"}
+{"timestamp":"2024-10-25T08:11:00Z","level":"DEBUG","service":"api","message":"Request validation passed"}
+{"timestamp":"2024-10-25T08:11:05Z","level":"INFO","service":"api","message":"Request received","method":"PUT","path":"/api/settings"}
+{"timestamp":"2024-10-25T08:11:06Z","level":"DEBUG","service":"database","message":"Query executed","query":"UPDATE settings","duration_ms":10}
+{"timestamp":"2024-10-25T08:11:10Z","level":"INFO","service":"config","message":"Configuration updated","key":"notification_enabled"}
+{"timestamp":"2024-10-25T08:11:15Z","level":"WARN","service":"config","message":"Configuration reload required"}
+{"timestamp":"2024-10-25T08:11:20Z","level":"INFO","service":"config","message":"Configuration reloaded"}
+{"timestamp":"2024-10-25T08:11:25Z","level":"DEBUG","service":"cache","message":"Cache cleared","pattern":"config:*"}
+{"timestamp":"2024-10-25T08:11:30Z","level":"INFO","service":"api","message":"Request received","method":"POST","path":"/api/logout"}
+{"timestamp":"2024-10-25T08:11:31Z","level":"DEBUG","service":"auth","message":"Token revoked","token_id":"tok-xyz"}
+{"timestamp":"2024-10-25T08:11:35Z","level":"INFO","service":"api","message":"User logged out","user_id":1001}
+{"timestamp":"2024-10-25T08:11:40Z","level":"DEBUG","service":"session","message":"Session destroyed","session_id":"sess-123"}
+{"timestamp":"2024-10-25T08:11:45Z","level":"INFO","service":"audit","message":"Audit log entry created","action":"logout"}
+{"timestamp":"2024-10-25T08:11:50Z","level":"DEBUG","service":"metrics","message":"Active sessions count","count":245}
+{"timestamp":"2024-10-25T08:11:55Z","level":"INFO","service":"scheduler","message":"Scheduled task running","task":"session_cleanup"}
+{"timestamp":"2024-10-25T08:12:00Z","level":"DEBUG","service":"session","message":"Scanning for expired sessions"}
+{"timestamp":"2024-10-25T08:12:05Z","level":"INFO","service":"session","message":"Expired sessions removed","count":12}
+{"timestamp":"2024-10-25T08:12:10Z","level":"DEBUG","service":"database","message":"Query executed","query":"DELETE FROM sessions","duration_ms":45}
+{"timestamp":"2024-10-25T08:12:15Z","level":"INFO","service":"scheduler","message":"Task completed","task":"session_cleanup"}
+{"timestamp":"2024-10-25T08:12:20Z","level":"WARN","service":"performance","message":"Memory leak suspected","process":"worker"}
+{"timestamp":"2024-10-25T08:12:25Z","level":"ERROR","service":"performance","message":"Memory usage increasing","current_mb":1800,"max_mb":2048}
+{"timestamp":"2024-10-25T08:12:30Z","level":"CRITICAL","service":"performance","message":"Out of memory risk","available_mb":100}
+{"timestamp":"2024-10-25T08:12:35Z","level":"ERROR","service":"worker","message":"Worker process restarting"}
+{"timestamp":"2024-10-25T08:12:40Z","level":"WARN","service":"worker","message":"In-flight jobs rescheduled","count":3}
+{"timestamp":"2024-10-25T08:12:45Z","level":"INFO","service":"worker","message":"Worker process started","pid":12345}
+{"timestamp":"2024-10-25T08:12:50Z","level":"DEBUG","service":"worker","message":"Job queue reconnected"}
+{"timestamp":"2024-10-25T08:12:55Z","level":"INFO","service":"worker","message":"Worker ready","workers":4}
+{"timestamp":"2024-10-25T08:13:00Z","level":"INFO","service":"monitoring","message":"System metrics collected","cpu":45,"memory":65,"disk":82}

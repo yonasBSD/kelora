@@ -1,0 +1,38 @@
+Oct 25 08:15:23 webserver01 nginx[1234]: 192.168.1.100 - - [25/Oct/2024:08:15:23 +0000] "GET /api/users HTTP/1.1" 200 1432
+Oct 25 08:15:24 webserver01 nginx[1234]: 192.168.1.101 - - [25/Oct/2024:08:15:24 +0000] "POST /api/orders HTTP/1.1" 201 856
+Oct 25 08:15:25 appserver01 backend[5678]: INFO: Processing order #12345 for user john@example.com
+Oct 25 08:15:26 appserver01 backend[5678]: DEBUG: Validating payment method credit_card
+Oct 25 08:15:27 database01 postgres[9012]: [25-1] LOG: duration: 12.345 ms statement: SELECT * FROM users WHERE email = 'john@example.com'
+Oct 25 08:15:28 appserver01 backend[5678]: ERROR: Payment gateway timeout
+  Traceback (most recent call last):
+    File "/app/payment.py", line 45, in process_payment
+      response = gateway.charge(amount, card)
+    File "/lib/gateway/client.py", line 123, in charge
+      return self.post('/charge', data)
+  requests.exceptions.Timeout: Gateway did not respond within 5 seconds
+Oct 25 08:15:29 appserver01 backend[5678]: WARN: Retrying payment with backup gateway
+Oct 25 08:15:30 appserver01 backend[5678]: INFO: Payment processed successfully via backup gateway
+Oct 25 08:15:31 database01 postgres[9012]: [25-2] LOG: duration: 8.123 ms statement: UPDATE orders SET status = 'paid' WHERE id = 12345
+Oct 25 08:15:32 webserver01 nginx[1234]: 192.168.1.102 - - [25/Oct/2024:08:15:32 +0000] "GET /api/health HTTP/1.1" 200 23
+Oct 25 08:15:35 loadbalancer haproxy[3456]: Server backend01/appserver01 is UP
+Oct 25 08:15:40 appserver02 backend[5679]: INFO: Background job started: send_order_confirmation
+Oct 25 08:15:41 appserver02 backend[5679]: DEBUG: Rendering email template order_confirmation.html
+Oct 25 08:15:42 mailserver postfix[7890]: NOQUEUE: reject: RCPT from unknown[203.0.113.45]: 554 5.7.1 Relay access denied
+Oct 25 08:15:45 appserver02 backend[5679]: ERROR: Email delivery failed
+  SMTPServerDisconnected: Connection unexpectedly closed
+    at /usr/lib/python3.9/smtplib.py", line 466, in getreply
+      raise SMTPServerDisconnected("Connection unexpectedly closed")
+Oct 25 08:15:46 appserver02 backend[5679]: WARN: Queueing email for retry
+Oct 25 08:15:50 webserver01 nginx[1234]: 192.168.1.103 - - [25/Oct/2024:08:15:50 +0000] "POST /api/webhook HTTP/1.1" 200 145
+Oct 25 08:15:55 monitoring prometheus[2345]: level=info msg="Scraping target" target="appserver01:9090"
+Oct 25 08:16:00 database01 postgres[9012]: [25-3] ERROR: deadlock detected
+  DETAIL: Process 9012 waits for ShareLock on transaction 12345; blocked by process 9013.
+  Process 9013 waits for ShareLock on transaction 12346; blocked by process 9012.
+  HINT: See server log for query details.
+Oct 25 08:16:01 database01 postgres[9012]: [25-4] STATEMENT: UPDATE inventory SET quantity = quantity - 1 WHERE product_id = 789
+Oct 25 08:16:02 appserver01 backend[5678]: ERROR: Database operation failed
+Oct 25 08:16:03 appserver01 backend[5678]: WARN: Rolling back transaction
+Oct 25 08:16:05 webserver01 nginx[1234]: 192.168.1.104 - - [25/Oct/2024:08:16:05 +0000] "GET /api/products HTTP/1.1" 500 78
+Oct 25 08:16:10 cache redis[4567]: 1:M 25 Oct 2024 08:16:10.123 * 100 changes in 300 seconds. Saving...
+Oct 25 08:16:12 cache redis[4567]: 1:M 25 Oct 2024 08:16:12.456 * Background saving started by pid 4568
+Oct 25 08:16:15 cache redis[4567]: 1:M 25 Oct 2024 08:16:15.789 * DB saved on disk

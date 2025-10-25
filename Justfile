@@ -79,6 +79,22 @@ docs-build:
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
     uvx --with mkdocs-material --with mike --with markdown-exec[ansi] mkdocs build
 
+# Generate documentation screenshots using VHS
+screenshots:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v vhs >/dev/null 2>&1; then
+        echo "error: vhs is not installed. Install it from https://github.com/charmbracelet/vhs" >&2
+        exit 1
+    fi
+    cargo build --release
+    echo "Generating screenshots with VHS..."
+    for tape in vhs/*.tape; do
+        echo "  Processing $(basename "$tape")..."
+        vhs "$tape"
+    done
+    echo "Screenshots generated in docs/screenshots/"
+
 # Prepare a release: verify version, run checks, and create the tag (no pushes)
 release-prepare:
     #!/usr/bin/env bash
