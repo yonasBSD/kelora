@@ -12,7 +12,7 @@ Set Theme "Catppuccin Mocha"
 
 # Execute command without showing typing
 Hide
-Type "./target/release/kelora -j examples/simple_json.jsonl --mark-gaps 30s -n 15"
+Type "kelora -j examples/simple_json.jsonl --mark-gaps 30s -n 15"
 Enter
 Show
 

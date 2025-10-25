@@ -33,7 +33,7 @@ This command:
 ### Generate Individual Screenshots
 
 ```bash
-vhs vhs/context-highlighting.tape
+vhs vhs/hero.tape
 vhs vhs/mark-gaps.tape
 vhs vhs/levelmap.tape
 vhs vhs/error-triage.tape
@@ -44,7 +44,7 @@ vhs vhs/colored-output.tape
 
 | Tape File | Output | Used In | Shows |
 |-----------|--------|---------|-------|
-| `context-highlighting.tape` | `context-highlighting.gif` | Homepage (hero) | Multiline stacktraces with `--before-context`/`--after-context` colored highlighting |
+| `hero.tape` | `hero.gif` | Homepage (hero) | Multiline stacktraces with `--before-context`/`--after-context` colored highlighting |
 | `mark-gaps.tape` | `mark-gaps.gif` | CLI Reference | Time gap markers with `--mark-gaps` |
 | `levelmap.tape` | `levelmap.gif` | Formats Reference | Compact levelmap output format |
 | `error-triage.tape` | `error-triage.gif` | CLI Reference | Error filtering with context highlighting |

@@ -12,7 +12,7 @@ Set Theme "Catppuccin Mocha"
 
 # Execute command without showing typing
 Hide
-Type "./target/release/kelora -j examples/levelmap-demo.jsonl -F levelmap"
+Type "kelora -j examples/levelmap-demo.jsonl -F levelmap"
 Enter
 Show
 

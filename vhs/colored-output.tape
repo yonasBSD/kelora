@@ -12,7 +12,7 @@ Set Theme "Catppuccin Mocha"
 
 # Execute command without showing typing
 Hide
-Type "./target/release/kelora -f combined examples/simple_combined.log -k timestamp,ip,status,method,path -n 6"
+Type "kelora -f combined examples/simple_combined.log -k timestamp,ip,status,method,path -n 6"
 Enter
 Show
 

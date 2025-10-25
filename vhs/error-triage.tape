@@ -12,7 +12,7 @@ Set Theme "Catppuccin Mocha"
 
 # Execute command without showing typing - filter for only ERROR level
 Hide
-Type "./target/release/kelora -j examples/simple_json.jsonl --filter 'e.level == "
+Type "kelora -j examples/simple_json.jsonl --filter 'e.level == "
 Type '"'
 Type "ERROR"
 Type '"'
