@@ -79,7 +79,10 @@ impl SyslogParser {
             event.set_field("pri".to_string(), Dynamic::from(priority as i64));
             event.set_field("facility".to_string(), Dynamic::from(facility as i64));
             event.set_field("severity".to_string(), Dynamic::from(severity as i64));
-            event.set_field("level".to_string(), Dynamic::from(Self::severity_to_level(severity)));
+            event.set_field(
+                "level".to_string(),
+                Dynamic::from(Self::severity_to_level(severity)),
+            );
 
             // Set version
             if let Some(version) = captures.get(2) {
@@ -174,15 +177,15 @@ impl SyslogParser {
                 event.set_field("pri".to_string(), Dynamic::from(priority as i64));
                 event.set_field("facility".to_string(), Dynamic::from(facility as i64));
                 event.set_field("severity".to_string(), Dynamic::from(severity as i64));
-                event.set_field("level".to_string(), Dynamic::from(Self::severity_to_level(severity)));
+                event.set_field(
+                    "level".to_string(),
+                    Dynamic::from(Self::severity_to_level(severity)),
+                );
             }
 
             // Set timestamp (group 2 now since priority is group 1)
             if let Some(ts) = captures.get(2) {
-                event.set_field(
-                    "ts".to_string(),
-                    Dynamic::from(ts.as_str().to_string()),
-                );
+                event.set_field("ts".to_string(), Dynamic::from(ts.as_str().to_string()));
             }
 
             // Set hostname (group 3)
