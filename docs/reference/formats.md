@@ -125,15 +125,19 @@ RFC3164:
 
 | Field | Type | RFC5424 | RFC3164 | Description |
 |-------|------|---------|---------|-------------|
-| `facility` | Integer | ✓ | ✓ | Syslog facility code |
-| `severity` | Integer | ✓ | ✓ | Severity level (0-7) |
-| `timestamp` | String | ✓ | ✓ | Parsed timestamp |
-| `hostname` | String | ✓ | ✓ | Source hostname |
-| `appname` | String | ✓ | - | Application name |
-| `procid` | String | ✓ | - | Process ID |
+| `pri` | Integer | ✓ | ✓* | Priority value (facility * 8 + severity) |
+| `facility` | Integer | ✓ | ✓* | Syslog facility code |
+| `severity` | Integer | ✓ | ✓* | Severity level (0-7) |
+| `level` | String | ✓ | ✓* | Log level (EMERG, ALERT, CRIT, ERROR, WARN, NOTICE, INFO, DEBUG) |
+| `ts` | String | ✓ | ✓ | Parsed timestamp |
+| `host` | String | ✓ | ✓ | Source hostname |
+| `prog` | String | ✓ | ✓ | Application/program name |
+| `pid` | Integer/String | ✓ | ✓ | Process ID (parsed as integer if numeric) |
 | `msgid` | String | ✓ | - | Message ID |
-| `tag` | String | - | ✓ | Syslog tag (appname[pid]) |
-| `message` | String | ✓ | ✓ | Log message |
+| `version` | Integer | ✓ | - | Syslog protocol version |
+| `msg` | String | ✓ | ✓ | Log message |
+
+*RFC3164: Only present if priority prefix `<NNN>` is included
 
 **Notes:**
 
@@ -173,7 +177,7 @@ Nginx with request_time:
 | `ip` | String | ✓ | ✓ | ✓ | Client IP address |
 | `identity` | String | ✓ | ✓ | ✓ | RFC 1413 identity (omit if `-`) |
 | `user` | String | ✓ | ✓ | ✓ | HTTP auth username (omit if `-`) |
-| `timestamp` | String | ✓ | ✓ | ✓ | Request timestamp |
+| `ts` | String | ✓ | ✓ | ✓ | Request timestamp |
 | `request` | String | ✓ | ✓ | ✓ | Full HTTP request line |
 | `method` | String | ✓ | ✓ | ✓ | HTTP method (auto-extracted) |
 | `path` | String | ✓ | ✓ | ✓ | Request path (auto-extracted) |
@@ -202,16 +206,26 @@ CEF:0|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 d
 
 **Output Fields:**
 
+**Syslog prefix (optional):**
+
 | Field | Type | Description |
 |-------|------|-------------|
-| `cef_version` | String | CEF format version |
-| `device_vendor` | String | Device vendor name |
-| `device_product` | String | Device product name |
-| `device_version` | String | Device version |
-| `signature_id` | String | Event signature ID |
-| `name` | String | Event name |
-| `severity` | Integer | Event severity |
-| *(extensions)* | Various | All extension fields as top-level fields |
+| `ts` | String | Timestamp from syslog prefix |
+| `host` | String | Hostname from syslog prefix |
+
+**CEF header:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `cefver` | String | CEF format version |
+| `vendor` | String | Device vendor name |
+| `product` | String | Device product name |
+| `version` | String | Device version |
+| `eventid` | String | Event signature ID |
+| `event` | String | Event name/classification |
+| `severity` | String | Event severity (0-10) |
+
+**Extensions:** All extension key=value pairs become top-level fields with automatic type conversion (integers, floats, booleans)
 
 ### Column Format
 
@@ -234,13 +248,13 @@ CEF:0|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 d
 Simple fields:
 ```bash
 # Input: ERROR api "Connection failed"
-kelora -f 'cols:level service *message' app.log
+kelora -f 'cols:level service *msg' app.log
 ```
 
 Multi-token timestamp:
 ```bash
 # Input: 2024-01-15 10:30:00 INFO Connection failed
-kelora -f 'cols:timestamp(2) level *message' app.log --ts-field timestamp
+kelora -f 'cols:ts(2) level *msg' app.log --ts-field ts
 ```
 
 Custom separator:
@@ -301,9 +315,9 @@ The `levelmap` format provides a compact visual representation of logs, showing 
 
 **Examples:**
 ```bash
-kelora -j app.log -F json                               # Output as JSON
-kelora -j app.log -F csv --keys timestamp,level,message # Output as CSV
-kelora -j app.log -F none --stats                       # Only stats
+kelora -j app.log -F json                      # Output as JSON
+kelora -j app.log -F csv --keys ts,level,msg   # Output as CSV
+kelora -j app.log -F none --stats              # Only stats
 ```
 
 ## See Also

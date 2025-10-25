@@ -301,6 +301,7 @@ pub const MESSAGE_FIELD_NAMES: &[&str] = &[
     "_message",
     "@message",
     "@m",
+    "event", // CEF event name field (lowest priority)
 ];
 
 /// Create an ordered iterator over event fields, prioritizing timestamps, log levels, and messages
