@@ -44,6 +44,21 @@ impl SyslogParser {
         (facility, severity)
     }
 
+    /// Map syslog severity (0-7) to log level string
+    fn severity_to_level(severity: u32) -> &'static str {
+        match severity {
+            0 => "EMERG",
+            1 => "ALERT",
+            2 => "CRIT",
+            3 => "ERROR",
+            4 => "WARN",
+            5 => "NOTICE",
+            6 => "INFO",
+            7 => "DEBUG",
+            _ => "UNKNOWN",
+        }
+    }
+
     /// Try to parse as RFC5424 format first
     fn try_parse_rfc5424(&self, line: &str) -> Option<Event> {
         if let Some(captures) = self.rfc5424_regex.captures(line) {
@@ -58,12 +73,13 @@ impl SyslogParser {
             let (facility, severity) = Self::parse_priority(priority);
 
             // Pre-allocate with expected field count
-            let mut event = Event::with_capacity(line.to_string(), 10);
+            let mut event = Event::with_capacity(line.to_string(), 11);
 
             // Set priority fields
             event.set_field("pri".to_string(), Dynamic::from(priority as i64));
             event.set_field("facility".to_string(), Dynamic::from(facility as i64));
             event.set_field("severity".to_string(), Dynamic::from(severity as i64));
+            event.set_field("level".to_string(), Dynamic::from(Self::severity_to_level(severity)));
 
             // Set version
             if let Some(version) = captures.get(2) {
@@ -158,6 +174,7 @@ impl SyslogParser {
                 event.set_field("pri".to_string(), Dynamic::from(priority as i64));
                 event.set_field("facility".to_string(), Dynamic::from(facility as i64));
                 event.set_field("severity".to_string(), Dynamic::from(severity as i64));
+                event.set_field("level".to_string(), Dynamic::from(Self::severity_to_level(severity)));
             }
 
             // Set timestamp (group 2 now since priority is group 1)
