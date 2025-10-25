@@ -1,0 +1,5 @@
+{"timestamp":"2024-07-17T12:20:00Z","service":"api","level":"ERROR","message":"timeout","latency_ms":2100}
+{"timestamp":"2024-07-17T12:20:01Z","service":"api","level":"INFO","message":"ok","latency_ms":600}
+{"timestamp":"2024-07-17T12:20:02Z","service":"api","level":"ERROR","message":"timeout","latency_ms":2150}
+{"timestamp":"2024-07-17T12:20:03Z","service":"api","level":"ERROR","message":"timeout","latency_ms":2200}
+{"timestamp":"2024-07-17T12:20:05Z","service":"api","level":"WARN","message":"retrying","latency_ms":1400}

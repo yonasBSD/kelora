@@ -1,0 +1,6 @@
+ts=2024-07-17T11:59:40Z level=INFO method=GET path=/docs status=200 latency_ms=280
+ts=2024-07-17T11:59:55Z level=INFO method=POST path=/checkout status=200 latency_ms=950
+ts=2024-07-17T12:00:01Z level=INFO method=GET path=/docs status=200 latency_ms=320
+ts=2024-07-17T12:00:04Z level=INFO method=POST path=/checkout status=200 latency_ms=1450
+ts=2024-07-17T12:00:05Z level=ERROR method=POST path=/checkout status=502 latency_ms=2100
+ts=2024-07-17T12:00:07Z level=WARN method=GET path=/billing status=200 latency_ms=900

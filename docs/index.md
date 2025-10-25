@@ -12,122 +12,136 @@ Parse messy logs into structured events, then filter, transform, and analyze the
 
 ## Examples
 
-**Parse embedded formats inside syslog**
+**Spot slow or failing requests**
 
 === "Command"
 
     ```bash
-    kelora -f syslog examples/simple_syslog.log \
-      --exec 'if e.msg.contains("=") { e += e.msg.parse_logfmt() }' \
-      --filter 'e.has_field("user")' \
-      --keys timestamp,host,user,action,detail,message \
+    kelora -f logfmt examples/traffic_logfmt.log \
+      --since "2024-07-17T12:00:00Z" \
+      --filter 'e.status.to_int() >= 500 || e.latency_ms.to_int() > 1200'
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f logfmt examples/traffic_logfmt.log \
+      --since "2024-07-17T12:00:00Z" \
+      --filter 'e.status.to_int() >= 500 || e.latency_ms.to_int() > 1200'
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    cat examples/traffic_logfmt.log
+    ```
+
+**Parse custom rollout logs instantly**
+
+=== "Command"
+
+    ```bash
+    kelora -f 'cols:ts level service request_id *message' examples/release_pipe.log \
+      --cols-sep '|' \
+      --levels warn,error \
       -F json
     ```
 
 === "Output"
 
     ```bash exec="on" source="above" result="ansi"
-    kelora -f syslog examples/simple_syslog.log \
-      --exec 'if e.msg.contains("=") { e += e.msg.parse_logfmt() }' \
-      --filter 'e.has_field("user")' \
-      --keys timestamp,host,user,action,detail,message \
+    kelora -f 'cols:ts level service request_id *message' examples/release_pipe.log \
+      --cols-sep '|' \
+      --levels warn,error \
       -F json
     ```
 
 === "Log Data"
 
     ```bash exec="on" result="ansi"
-    cat examples/simple_syslog.log
+    cat examples/release_pipe.log
     ```
 
-**Keep stacktraces together**
+**Enrich JSON logs and mask secrets**
 
 === "Command"
 
     ```bash
-    kelora examples/multiline_stacktrace.log \
-      --multiline timestamp \
-      --filter 'e.line.lower().contains("valueerror")' \
-      --before-context 1 --after-context 1
+    kelora -j examples/tenant_api.jsonl \
+      --exec 'e.tenant = e.path.between("/tenants/", "/"); e.ip = e.ip.mask_ip(2)' \
+      --keys timestamp,tenant,ip,event \
+      --brief
     ```
 
 === "Output"
 
     ```bash exec="on" source="above" result="ansi"
-    kelora examples/multiline_stacktrace.log \
-      --multiline timestamp \
-      --filter 'e.line.lower().contains("valueerror")' \
-      --before-context 1 --after-context 1
+    kelora -j examples/tenant_api.jsonl \
+      --exec 'e.tenant = e.path.between("/tenants/", "/"); e.ip = e.ip.mask_ip(2)' \
+      --keys timestamp,tenant,ip,event \
+      --brief
     ```
 
 === "Log Data"
 
     ```bash exec="on" result="ansi"
-    cat examples/multiline_stacktrace.log
+    cat examples/tenant_api.jsonl
     ```
 
-**Track container activity with metrics**
+**Count services in a stream**
 
 === "Command"
 
     ```bash
-    kelora examples/prefix_docker.log --extract-prefix container \
-      --exec 'e.level = e.line.between("[", "]")' \
-      --metrics \
-      --exec 'track_count(e.container); track_count(e.level)' \
-      --keys container,level,line \
-      -F csv
+    kelora -j examples/services.jsonl \
+      --exec 'track_count(e.service)' \
+      --metrics
     ```
 
 === "Output"
 
     ```bash exec="on" source="above" result="ansi"
-    kelora examples/prefix_docker.log --extract-prefix container \
-      --exec 'e.level = e.line.between("[", "]")' \
-      --metrics \
-      --exec 'track_count(e.container); track_count(e.level)' \
-      --keys container,level,line \
-      -F csv
+    kelora -j examples/services.jsonl \
+      --exec 'track_count(e.service)' \
+      --metrics
     ```
 
 === "Log Data"
 
     ```bash exec="on" result="ansi"
-    cat examples/prefix_docker.log 
+    cat examples/services.jsonl
     ```
 
-**Mask sensitive fields in JSON logs**
+**Detect error bursts with a sliding window**
 
 === "Command"
 
     ```bash
-    kelora -j examples/security_audit.jsonl \
-      --exec 'if e.has_field("token") {
-                let jwt = e.token.parse_jwt();
-                e.role = jwt.get_path("claims.role", "guest")
+    kelora -j examples/deploy_tail.jsonl \
+      --window 15 \
+      --exec 'let recent = window_values(window, "level");
+              if recent.filter(|lvl| lvl == "ERROR").len() >= 3 {
+                eprint("burst detected at " + e.timestamp);
               }' \
-      --exec 'e.ip = e.ip.mask_ip(2)' \
-      --keys timestamp,event,role,ip \
-      -F json
+      -F none
     ```
 
 === "Output"
 
     ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/security_audit.jsonl \
-      --exec 'if e.has_field("token") {
-                let jwt = e.token.parse_jwt();
-                e.role = jwt.get_path("claims.role", "guest")
+    kelora -j examples/deploy_tail.jsonl \
+      --window 15 \
+      --exec 'let recent = window_values(window, "level");
+              if recent.filter(|lvl| lvl == "ERROR").len() >= 3 {
+                eprint("burst detected at " + e.timestamp);
               }' \
-      --exec 'e.ip = e.ip.mask_ip(2)' \
-      --keys timestamp,event,role,ip \
-      -F json
+      -F none
     ```
 
-=== "Logs Data"
+=== "Log Data"
 
     ```bash exec="on" result="ansi"
-    cat examples/security_audit.jsonl
+    cat examples/deploy_tail.jsonl
     ```
 
 See the [Quickstart](quickstart.md) for a step-by-step tour with full output.

@@ -1,0 +1,3 @@
+{"timestamp":"2024-07-17T12:15:01Z","path":"/tenants/alpha/sessions/42","event":"login","ip":"203.0.113.10"}
+{"timestamp":"2024-07-17T12:15:05Z","path":"/tenants/alpha/sessions/42","event":"heartbeat","ip":"203.0.113.10"}
+{"timestamp":"2024-07-17T12:15:10Z","path":"/tenants/bravo/payments","event":"charge_failed","ip":"198.51.100.24"}

@@ -1,0 +1,3 @@
+2024-07-17 12:10:02|WARN|checkout|req-92|retrying payment status=SOFT_FAIL duration=890ms
+2024-07-17 12:10:06|ERROR|checkout|req-93|final failure status=HARD_FAIL duration=1480ms cause=db_deadlock
+2024-07-17 12:10:09|INFO|checkout|req-94|completed status=OK duration=640ms

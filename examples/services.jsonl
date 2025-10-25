@@ -1,0 +1,4 @@
+{"timestamp":"2024-07-17T12:00:00Z","service":"checkout","level":"INFO"}
+{"timestamp":"2024-07-17T12:00:01Z","service":"checkout","level":"ERROR"}
+{"timestamp":"2024-07-17T12:00:01Z","service":"billing","level":"INFO"}
+{"timestamp":"2024-07-17T12:00:02Z","service":"search","level":"WARN"}
