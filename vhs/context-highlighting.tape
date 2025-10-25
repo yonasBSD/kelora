@@ -12,7 +12,7 @@ Set Theme "Catppuccin Mocha"
 
 # Execute command without showing typing
 Hide
-Type "./target/release/kelora -f syslog examples/syslog_multiline.log --multiline ts --filter 'e.msg.contains("
+Type "./target/release/kelora -f syslog examples/syslog_multiline.log --multiline timestamp --filter 'e.msg.contains("
 Type '"'
 Type "ERROR"
 Type '"'
