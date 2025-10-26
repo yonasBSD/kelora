@@ -104,7 +104,7 @@ kelora -f 'cols:timestamp host component level *message' \
   -k timestamp,level,component
 ```
 
-`awk` (and angle-grinder’s lightweight `parse`) stay **≈12× faster** because they only slice bytes; Kelora parses into typed columns, validates timestamps, and keeps metadata for later stages. klp’s Python regex pipeline is even slower than Kelora here, so reach for it only when you need its advanced templating. Stick with `awk`/`agrind` for quick-and-dirty splits, but prefer Kelora when you immediately need type conversion, schema-aware errors, or downstream scripting. You can trim Kelora’s cost by projecting only the fields you need with `-k` and disabling expensive formatters (`-F none`).
+Kelora trails `awk` and angle-grinder by **≈12×** because it parses into typed columns, validates timestamps, and keeps metadata for later stages; klp’s Python regex pipeline is even slower than Kelora here, so reach for it only when you need its advanced templating. Stick with those lighter tools for quick-and-dirty splits, but prefer Kelora when you immediately need type conversion, schema-aware errors, or downstream scripting. You can trim Kelora’s cost by projecting only the fields you need with `-k` and disabling expensive formatters (`-F none`).
 
 ---
 
@@ -135,7 +135,7 @@ agrind '* | json | where level == "ERROR"' -f benchmarks/bench_100k.jsonl
 klp --input-format jsonl -l error benchmarks/bench_100k.jsonl
 ```
 
-`jq` leads Kelora by **~6×**, while angle-grinder’s tight Rust pipeline is another ~3× faster than jq for this workload. Kelora and klp both incur scripting overhead (Rhai vs. Python) to keep high-level constructs available. Reach for Kelora when you need that scripting environment (multiple `--filter` stages, stateful metrics) or want to mix formats. For pure filtering, enable `--no-emoji` and emit `-F json` to hold the gap to ~4× on this machine, or run the query in `agrind`/`jq` and feed the structured output back into Kelora.
+Kelora runs **~6× slower than jq** (and ~17× slower than angle-grinder) because it pulls every event into a Rhai context with metrics/windowing hooks; klp pays a similar tax for its Python runtime. Reach for Kelora when you need that scripting environment (multiple `--filter` stages, stateful metrics) or want to mix formats. For pure filtering, enable `--no-emoji` and emit `-F json` to hold the gap to ~4× on this machine, or run the query in `agrind`/`jq` and feed the structured output back into Kelora.
 
 ---
 
@@ -164,7 +164,7 @@ kelora -j benchmarks/bench_100k.jsonl \
   -k timestamp,method,status,is_error -q
 ```
 
-`jq` wins decisively (≈11× faster than Kelora) for short declarative transforms, and angle-grinder’s expression engine is another ≈3× faster than jq here. Kelora’s advantage shows up when the logic no longer fits into a single expression—multiple `--filter` passes, reusable `--exec` snippets, or when you need to call into Rhai helpers (`parse_jwt`, `track_percentile`, etc.). klp keeps the Python flexibility but pays even more overhead. If you stay in Kelora, move heavy setup into `--begin` blocks and project only the final keys to keep execution closer to 6 – 7 s.
+Kelora is **≈11× slower than jq** (and ~40× slower than angle-grinder) on short declarative transforms, because it executes multiple Rhai stages instead of a single compiled expression; klp keeps similar flexibility but pays even more overhead. Kelora’s advantage shows up when the logic no longer fits into one expression—multiple `--filter` passes, reusable `--exec` snippets, or calls into Rhai helpers (`parse_jwt`, `track_percentile`, etc.). If you stay in Kelora, move heavy setup into `--begin` blocks and project only the final keys to keep execution closer to 6 – 7 s.
 
 ---
 
@@ -233,7 +233,7 @@ kelora -j benchmarks/bench_500k.jsonl \
   --filter "e.component == 'api'" --parallel -F json -q
 ```
 
-Angle-grinder’s Rust pipeline makes quick work of the dataset (<1 s), while Kelora and klp both rely on higher-level scripting engines. Kelora’s interpreter overhead is obvious in the sequential run (≈9× slower than jq), but turning on `--parallel` claws back the advantage—processing drops from 44 s to 8.8 s on this 6‑core machine, only ~2× slower than jq while delivering richer scripting. klp sees a similar 2.2× boost with `--parallel 0`. Use Kelora’s parallel mode for archival replays: set `--parallel`, keep `--batch-size` near cache-friendly values (1 000–4 000), and pin `--threads` to your physical cores if the workload competes with other services.
+Kelora is far slower than angle-grinder’s Rust pipeline and about **9× slower than jq** when it runs sequentially, because it executes every event inside the Rhai interpreter. Turning on `--parallel` claws back the deficit—processing drops from 44 s to 8.8 s on this 6‑core machine, leaving Kelora only ~2× slower than jq while still delivering the richer scripting model. klp sees a similar 2.2× boost with `--parallel 0`. Use Kelora’s parallel mode for archival replays: set `--parallel`, keep `--batch-size` near cache-friendly values (1 000–4 000), and pin `--threads` to your physical cores if the workload competes with other services.
 
 ---
 
