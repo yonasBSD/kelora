@@ -154,7 +154,7 @@ Track performance improvements across Kelora versions:
 
 | Version | Test | M1 Result | Intel Mac Result | Notes |
 |---------|------|-----------|------------------|-------|
-| 0.x.x | JSON Filter | 6.157s | 6.425s | Initial benchmark |
+| 0.x.x | JSON Filter | 6.157s | 6.434s | Initial benchmark |
 | (future) | | | | |
 
 ---
@@ -175,6 +175,8 @@ Track performance improvements across Kelora versions:
 - jq: 1.6
 - mlr: 6.15.0
 - qsv: 8.1.1
+- angle-grinder: 0.19.5
+- klp: 0.77.0
 
 ---
 
@@ -186,9 +188,11 @@ Track performance improvements across Kelora versions:
 |------|------|------------|-------|
 | grep | 0.049s | ~2.04 M/s | Baseline - fastest text search |
 | ripgrep (rg) | 0.021s | ~4.76 M/s | Modern grep alternative |
-| kelora (line) | 0.411s | ~0.24 M/s | Full log parsing + structured output |
+| angle-grinder | 0.327s | ~0.31 M/s | `parse "* * *[*]: *"` + `where level == "ERROR"` |
+| kelora (line) | 0.405s | ~0.25 M/s | Full log parsing + structured output |
+| klp | 1.952s | ~0.05 M/s | `klp --input-format line -l error` |
 
-**Interpretation:** ripgrep is ~20× faster (≈2.3× faster than BSD `grep`, which Kelora trails by ~8×); the extra time goes into emitting structured events that make follow-up scripting trivial.
+**Interpretation:** ripgrep stays ~19× faster than Kelora (≈2.3× faster than BSD `grep`), while angle-grinder sits between the raw text scanners and structured tools. klp’s Python runtime lags far behind for this workload. Use Kelora when you need structured events for follow-up scripting, not raw throughput.
 
 ---
 
@@ -199,9 +203,11 @@ Track performance improvements across Kelora versions:
 | Tool | Time | Throughput | Notes |
 |------|------|------------|-------|
 | awk | 0.389s | ~0.26 M/s | Field splitting by whitespace |
-| kelora (cols) | 4.672s | ~0.02 M/s | Structured parsing + type awareness |
+| angle-grinder | 0.368s | ~0.27 M/s | `parse` + `fields` |
+| kelora (cols) | 4.744s | ~0.02 M/s | Structured parsing + type awareness |
+| klp | 6.898s | ~0.01 M/s | regex via `--input-exec`, output via `--keys` |
 
-**Interpretation:** awk is ≈12× faster for pure column splits. Use Kelora when you need schema validation or type conversions downstream.
+**Interpretation:** awk/agrind remain ≈12× faster because they only slice bytes. Kelora (and klp’s Python pipeline) pay for schema validation and typed output—worth it when you need dependable structure or follow-up scripting.
 
 ---
 
@@ -211,10 +217,12 @@ Track performance improvements across Kelora versions:
 
 | Tool | Time | Throughput | Notes |
 |------|------|------------|-------|
-| jq | 1.101s | ~0.09 M/s | Standard JSON processor |
-| kelora | 6.425s | ~0.02 M/s | JSON parsing with Rhai filter |
+| jq | 1.104s | ~0.09 M/s | Standard JSON processor |
+| angle-grinder | 0.367s | ~0.27 M/s | `json` + `where level == "ERROR"` |
+| kelora | 6.434s | ~0.02 M/s | JSON parsing with Rhai filter |
+| klp | 4.695s | ~0.02 M/s | `klp --input-format jsonl -l error` |
 
-**Interpretation:** jq keeps a ~5.8× edge for simple filters. Kelora catches up when you chain multiple filters, metrics, or Rhai helpers.
+**Interpretation:** angle-grinder leads with a streamlined Rust pipeline; jq is ~6× faster than Kelora, and both Kelora/klp trade speed for higher-level scripting (Rhai vs. Python). Use Kelora when you need its multi-stage filters or metrics hooks.
 
 ---
 
@@ -224,10 +232,12 @@ Track performance improvements across Kelora versions:
 
 | Tool | Time | Throughput | Notes |
 |------|------|------------|-------|
-| jq | 0.792s | ~0.13 M/s | Complex jq query |
-| kelora | 9.203s | ~0.01 M/s | Multi-stage pipeline |
+| jq | 0.822s | ~0.12 M/s | Complex jq query |
+| angle-grinder | 0.232s | ~0.43 M/s | `json` + computed `is_error` |
+| kelora | 9.383s | ~0.01 M/s | Multi-stage pipeline |
+| klp | 11.082s | ~0.01 M/s | jsonl + `-l error` + computed key |
 
-**Interpretation:** jq is ≈11.6× faster for single-expression transforms. Kelora shines when that logic spans multiple stages or needs custom functions.
+**Interpretation:** angle-grinder/JQ excel at single-expression transforms (0.23–0.82 s). Kelora and klp are slower but make multi-stage, scriptable pipelines much easier.
 
 ---
 
@@ -237,10 +247,12 @@ Track performance improvements across Kelora versions:
 
 | Tool | Time | Throughput | Command Complexity |
 |------|------|------------|-------------------|
-| bash + jq + sort + uniq | 0.724s | ~0.14 M/s | `jq ... \| sort \| uniq -c \| sort -rn` |
-| kelora | 6.957s | ~0.01 M/s | `kelora -l error --exec 'track_count(...)' --metrics` |
+| bash + jq + sort + uniq | 0.753s | ~0.13 M/s | `jq ... \| sort \| uniq -c \| sort -rn` |
+| angle-grinder | 0.220s | ~0.45 M/s | `agrind '* | json | where level == "ERROR" | count by component'` |
+| kelora | 7.086s | ~0.01 M/s | `kelora -l error --exec 'track_count(...)' --metrics` |
+| klp + sort + uniq | 3.851s | ~0.03 M/s | `klp -l error --output-template '{component}' \| sort \| uniq -c \| sort -rn` |
 
-**Interpretation:** The Unix pipeline is ~10× faster but spans multiple processes. Kelora trades those seconds for a single, maintainable command.
+**Interpretation:** angle-grinder dominates throughput with native aggregates; bash+jq remains fast but multi-process. Kelora/klp lag but consolidate the pipeline into one script, which is easier to evolve.
 
 ---
 
@@ -250,11 +262,14 @@ Track performance improvements across Kelora versions:
 
 | Tool | Time | Throughput | Notes |
 |------|------|------------|-------|
-| jq (sequential) | 4.570s | ~0.11 M/s | Single-threaded processing |
-| kelora (sequential) | 43.587s | ~0.01 M/s | Single-threaded baseline |
-| kelora (--parallel) | 8.966s | ~0.06 M/s | Multi-core processing |
+| jq (sequential) | 4.665s | ~0.11 M/s | Single-threaded processing |
+| angle-grinder | 0.979s | ~0.51 M/s | `json` + `where component == "api"` |
+| kelora (sequential) | 44.266s | ~0.01 M/s | Single-threaded baseline |
+| kelora (--parallel) | 8.832s | ~0.06 M/s | Multi-core processing |
+| klp (sequential) | 27.122s | ~0.02 M/s | `klp --input-format jsonl --where 'component == \"api\"'` |
+| klp (--parallel 0) | 12.108s | ~0.04 M/s | Multiprocess (--parallel 0) |
 
-**Interpretation:** Kelora sequential is ~9.5× slower than jq, but `--parallel` recovers most of that gap (4.9× faster than sequential, only 2× slower than jq).
+**Interpretation:** angle-grinder provides the fastest streaming baseline. Kelora and klp both gain 4–5× speedups by going parallel, narrowing the gap with jq while keeping their higher-level scripting models.
 
 ---
 
@@ -264,9 +279,9 @@ Track performance improvements across Kelora versions:
 
 | Tool | Time | Throughput | Notes |
 |------|------|------------|-------|
-| miller | 0.233s | ~0.43 M/s | CSV swiss army knife |
-| qsv | 0.072s | ~1.39 M/s | High-performance CSV tool |
-| kelora | 6.815s | ~0.01 M/s | CSV + Rhai scripting |
+| miller | 0.228s | ~0.44 M/s | CSV swiss army knife |
+| qsv | 0.073s | ~1.37 M/s | High-performance CSV tool |
+| kelora | 6.808s | ~0.01 M/s | CSV + Rhai scripting |
 
 **Interpretation:** CSV-specialized tools dominate (Kelora is 95× slower than qsv). Use Kelora when you need to mix CSV with other formats or invoke Rhai logic inline.
 
