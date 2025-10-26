@@ -1,18 +1,33 @@
 # Kelora Performance Benchmark Suite
 
-A lightweight benchmarking system to prevent performance regressions and track improvements over time.
+A comprehensive benchmarking system for both internal performance testing and external tool comparisons.
 
 ## Quick Start
 
-```bash
-# Run quick benchmarks (10k dataset)
-make bench-quick
+### Internal Benchmarks (Regression Testing)
 
-# Run full benchmark suite (10k + 50k datasets)
-make bench
+```bash
+# Run quick benchmarks (50k dataset)
+just bench-quick
+
+# Run full benchmark suite (100k + 500k datasets)
+just bench
 
 # Update performance baseline
-make bench-update
+just bench-update
+```
+
+### External Tool Comparisons
+
+```bash
+# Generate comparison datasets (CSV, syslog formats)
+just bench-datasets
+
+# Run comparisons against grep, jq, awk, miller, etc.
+just bench-compare
+
+# Run all benchmarks (internal + external)
+just bench-all
 ```
 
 ## Benchmark Tests
@@ -128,3 +143,55 @@ Based on current optimizations (MacBook with SSD):
 **Note**: Times include "cold start" overhead (~0.3s first run). Subsequent runs are much faster (~0.01s).
 
 These are rough guidelines - actual performance depends on hardware and system load.
+
+---
+
+## External Tool Comparisons
+
+The `compare_tools.sh` script benchmarks Kelora against common command-line tools:
+
+### Comparison Matrix
+
+| Category | Tools Compared | Purpose |
+|----------|---------------|---------|
+| **Text Filtering** | grep, ripgrep, kelora | Simple pattern matching baseline |
+| **Field Extraction** | awk, kelora | Column splitting and extraction |
+| **JSON Processing** | jq, kelora | JSON filtering and transformation |
+| **Complex Pipelines** | bash+jq+sort, kelora | Multi-stage processing |
+| **Parallel Processing** | jq, kelora (sequential vs parallel) | Multi-core scaling |
+| **CSV Analytics** | miller, qsv, kelora | Structured data operations |
+
+### Running Comparisons
+
+```bash
+# Install comparison tools (macOS)
+brew install grep ripgrep jq miller qsv
+
+# Install comparison tools (Ubuntu/Debian)
+apt install grep ripgrep jq miller qsv
+
+# Generate test datasets
+just bench-datasets
+
+# Run all comparisons
+just bench-compare
+```
+
+Results are saved to `benchmarks/comparison_results/` as individual markdown files.
+
+### Comparison Datasets
+
+The comparison benchmarks use additional test datasets:
+
+- **bench_100k.csv** - CSV format for miller/qsv comparison
+- **bench_100k.log** - Syslog-style text for grep/awk comparison
+- **bench_100k.jsonl** - JSON lines (already exists)
+- **bench_500k.jsonl** - Larger dataset for parallel testing
+
+These are generated automatically from the JSON test data.
+
+### Documentation
+
+Comparison results and analysis are documented in:
+- **[docs/concepts/performance-comparisons.md](../docs/concepts/performance-comparisons.md)** - Comprehensive guide with decision matrix
+- Results include honest assessment of when to use each tool

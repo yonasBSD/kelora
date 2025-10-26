@@ -112,6 +112,8 @@ Kelora focuses on normalising noisy logs into structured data. Pipe or export Ke
 - **[SQLite](https://www.sqlite.org/)/[DuckDB](https://duckdb.org/)** — load Kelora's CSV/JSON output into a database for SQL queries and reporting
 - **[miller](https://github.com/johnkerl/miller)** — transform Kelora's CSV output for reshaping, aggregating, and format conversion
 
+For performance comparisons and guidance on choosing between these tools for different tasks, see the [Performance Comparisons guide](https://kelora.dev/latest/concepts/performance-comparisons/).
+
 ## License
 
 Kelora is open source software licensed under the [MIT License](https://github.com/dloss/kelora/blob/main/LICENSE).

@@ -61,6 +61,17 @@ bench-quick:
 bench-update:
     ./benchmarks/run_benchmarks.sh --update-baseline
 
+# Generate comparison datasets for external tool benchmarks
+bench-datasets:
+    ./benchmarks/generate_comparison_data.sh
+
+# Run external tool comparison benchmarks (requires grep, jq, etc.)
+bench-compare:
+    ./benchmarks/compare_tools.sh
+
+# Run all benchmarks (internal + external comparisons)
+bench-all: bench bench-compare
+
 # Serve documentation locally with auto-reload
 docs-serve:
     mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools

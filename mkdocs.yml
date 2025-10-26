@@ -100,6 +100,8 @@ nav:
       - concepts/error-handling.md
       - concepts/multiline-strategies.md
       - concepts/performance-model.md
+      - concepts/performance-comparisons.md
+      - concepts/benchmark-results.md
       - concepts/configuration-system.md
   - Reference:
       - Overview: reference/index.md
