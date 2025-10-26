@@ -55,8 +55,8 @@ Understanding how Kelora compares to other command-line tools helps you choose t
 
 | Tool | Time | Throughput | Notes |
 |------|------|------------|-------|
-| grep | 0.049 s | ~2.04 M/s | Baseline - fastest text search |
 | ripgrep (rg) | 0.021 s | ~4.76 M/s | Modern grep alternative |
+| grep | 0.049 s | ~2.04 M/s | Baseline - fastest text search |
 | angle-grinder | 0.327 s | ~0.31 M/s | `parse` + `where level == "ERROR"` |
 | kelora (line) | 0.405 s | ~0.25 M/s | Full log parsing + structured output |
 | klp | 1.952 s | ~0.05 M/s | `-l error` scan with line parser |
@@ -88,8 +88,8 @@ Kelora is roughly **19× slower than ripgrep** (which itself is ≈2.3× faster 
 
 | Tool | Time | Throughput | Notes |
 |------|------|------------|-------|
-| awk | 0.389 s | ~0.26 M/s | Field splitting by whitespace |
 | angle-grinder | 0.368 s | ~0.27 M/s | `parse` + `fields` |
+| awk | 0.389 s | ~0.26 M/s | Field splitting by whitespace |
 | kelora (cols) | 4.744 s | ~0.02 M/s | Structured parsing + type awareness |
 | klp | 6.898 s | ~0.01 M/s | line input + regex via `--input-exec` |
 
@@ -114,10 +114,10 @@ Kelora trails `awk` and angle-grinder by **≈12×** because it parses into type
 
 | Tool | Time | Throughput | Notes |
 |------|------|------------|-------|
-| jq | 1.104 s | ~0.09 M/s | Standard JSON processor |
 | angle-grinder | 0.367 s | ~0.27 M/s | `json` + `where level == "ERROR"` |
-| kelora | 6.434 s | ~0.02 M/s | JSON parsing with Rhai filter |
+| jq | 1.104 s | ~0.09 M/s | Standard JSON processor |
 | klp | 4.695 s | ~0.02 M/s | jsonl input + `-l error` |
+| kelora | 6.434 s | ~0.02 M/s | JSON parsing with Rhai filter |
 
 **Example Commands:**
 ```bash
@@ -145,8 +145,8 @@ Kelora runs **~6× slower than jq** (and ~17× slower than angle-grinder) becaus
 
 | Tool | Time | Throughput | Notes |
 |------|------|------------|-------|
-| jq | 0.822 s | ~0.12 M/s | Complex jq query |
 | angle-grinder | 0.232 s | ~0.43 M/s | `json` + computed `is_error` + `fields` |
+| jq | 0.822 s | ~0.12 M/s | Complex jq query |
 | kelora | 9.383 s | ~0.01 M/s | Multi-stage pipeline |
 | klp | 11.082 s | ~0.01 M/s | jsonl + `-l error` + computed key |
 
@@ -174,10 +174,10 @@ Kelora is **≈11× slower than jq** (and ~40× slower than angle-grinder) on sh
 
 | Tool | Time | Throughput | Command Complexity |
 |------|------|------------|-------------------|
-| bash + jq + sort + uniq | 0.753 s | ~0.13 M/s | `jq ... \| sort \| uniq -c \| sort -rn` |
 | angle-grinder | 0.220 s | ~0.45 M/s | `agrind '* | json | where level == "ERROR" | count by component'` |
-| kelora | 7.086 s | ~0.01 M/s | `kelora --filter ... --exec 'track_count(...)' --metrics` |
+| bash + jq + sort + uniq | 0.753 s | ~0.13 M/s | `jq ... \| sort \| uniq -c \| sort -rn` |
 | klp + sort + uniq | 3.851 s | ~0.03 M/s | `klp -l error --output-template '{component}' \| sort \| uniq -c \| sort -rn` |
+| kelora | 7.086 s | ~0.01 M/s | `kelora --filter ... --exec 'track_count(...)' --metrics` |
 
 **Example Commands:**
 ```bash
@@ -211,12 +211,12 @@ This scenario highlights ergonomics over raw speed: the Unix pipelines or angle-
 
 | Tool | Time | Throughput | Notes |
 |------|------|------------|-------|
-| jq (sequential) | 4.665 s | ~0.11 M/s | Single-threaded processing |
 | angle-grinder | 0.979 s | ~0.51 M/s | `json` + `where component == "api"` |
-| kelora (sequential) | 44.266 s | ~0.01 M/s | Single-threaded baseline |
+| jq (sequential) | 4.665 s | ~0.11 M/s | Single-threaded processing |
 | kelora (--parallel) | 8.832 s | ~0.06 M/s | Multi-core processing |
-| klp (sequential) | 27.122 s | ~0.02 M/s | jsonl input + `--where` |
 | klp (--parallel 0) | 12.108 s | ~0.04 M/s | Multiprocess (--parallel 0) |
+| klp (sequential) | 27.122 s | ~0.02 M/s | jsonl input + `--where` |
+| kelora (sequential) | 44.266 s | ~0.01 M/s | Single-threaded baseline |
 
 **Example Commands:**
 ```bash
@@ -243,8 +243,8 @@ Kelora is far slower than angle-grinder’s Rust pipeline and about **9× slower
 
 | Tool | Time | Throughput | Notes |
 |------|------|------------|-------|
-| miller | 0.228 s | ~0.44 M/s | CSV swiss army knife |
 | qsv | 0.073 s | ~1.37 M/s | High-performance CSV tool |
+| miller | 0.228 s | ~0.44 M/s | CSV swiss army knife |
 | kelora | 6.808 s | ~0.01 M/s | CSV + Rhai scripting |
 
 **Example Commands:**
