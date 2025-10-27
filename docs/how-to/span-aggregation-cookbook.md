@@ -25,8 +25,7 @@ kelora -j examples/simple_json.jsonl \
   --span 200 \
   --span-close '
     let metrics = span.metrics;
-    print(span.id + ",events=" + span.size.to_string() +
-          ",errors=" + metrics.get_path("level|ERROR", 0).to_string());
+    print(`${span.id},events=${span.size},errors=${metrics.get_path("level|ERROR", 0)}`);
   ' \
   --exec '
     track_count("total");
@@ -53,10 +52,7 @@ kelora -j examples/simple_json.jsonl \
     let errors = span.metrics.get_path("level|ERROR", 0);
     if total > 0 {
       let rate = (errors.to_float() / total.to_float()) * 100.0;
-      print(span.start.to_string() + "," +
-            "total=" + total.to_string() + "," +
-            "errors=" + errors.to_string() + "," +
-            "error_rate=" + rate.to_string());
+      print(`${span.start},total=${total},errors=${errors},error_rate=${rate}`);
     }
   '
 ```
@@ -73,9 +69,9 @@ kelora -j examples/simple_json.jsonl \
   --span 1m \
   --exec '
     if meta.span_status == "late" {
-      eprint("Late event: " + e.timestamp.to_string());
+      eprint(`Late event: ${e.timestamp}`);
     } else if meta.span_status == "unassigned" {
-      eprint("Missing timestamp on line " + meta.line_num.to_string());
+      eprint(`Missing timestamp on line ${meta.line_num}`);
     }
   ' \
   --span-close 'print(span.id + ": " + span.size.to_string())'
@@ -94,7 +90,7 @@ kelora -j examples/simple_json.jsonl \
   --span-close '
     let path = "/tmp/span-" + span.id + ".csv";
     for (service, count) in span.metrics {
-      append_file(path, span.start.to_string() + "," + service + "," + count.to_string() + "\n");
+      append_file(path, `${span.start},${service},${count}\n`);
     }
   ' \
   --allow-fs-writes

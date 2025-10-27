@@ -1205,7 +1205,7 @@ let id = span.id;  // "#0" or "2024-05-19T12:05:00Z/5m"
 
 ```rhai
 if span.start != () {
-    print("Window: " + span.start.to_string() + " → " + span.end.to_string());
+    print(`Window: ${span.start} → ${span.end}`);
 }
 ```
 

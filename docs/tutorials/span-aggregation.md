@@ -250,8 +250,7 @@ Combine `track_*()` functions in `--exec` with `span.metrics` in `--span-close` 
         let total = m.get_path("total", 0);
         let errors = m.get_path("errors", 0);
         let warnings = m.get_path("warnings", 0);
-        print("Span " + span.id + ": " + total.to_string() + " total, " +
-              errors.to_string() + " errors, " + warnings.to_string() + " warnings");
+        print(`Span ${span.id}: ${total} total, ${errors} errors, ${warnings} warnings`);
       '
     ```
 
@@ -271,8 +270,7 @@ Combine `track_*()` functions in `--exec` with `span.metrics` in `--span-close` 
         let total = m.get_path("total", 0);
         let errors = m.get_path("errors", 0);
         let warnings = m.get_path("warnings", 0);
-        print("Span " + span.id + ": " + total.to_string() + " total, " +
-              errors.to_string() + " errors, " + warnings.to_string() + " warnings");
+        print(`Span ${span.id}: ${total} total, ${errors} errors, ${warnings} warnings`);
       '
     ```
 
@@ -305,8 +303,7 @@ Calculate error rates per 1-minute window:
         let requests = m.get_path("requests", 0);
         let errors = m.get_path("errors", 0);
         let rate = if requests > 0 { (errors * 100) / requests } else { 0 };
-        print(span.start.to_iso() + ": " + errors.to_string() + "/" +
-              requests.to_string() + " errors (" + rate.to_string() + "%)");
+        print(`${span.start.to_iso()}: ${errors}/${requests} errors (${rate}%)`);
       '
     ```
 
@@ -325,8 +322,7 @@ Calculate error rates per 1-minute window:
         let requests = m.get_path("requests", 0);
         let errors = m.get_path("errors", 0);
         let rate = if requests > 0 { (errors * 100) / requests } else { 0 };
-        print(span.start.to_iso() + ": " + errors.to_string() + "/" +
-              requests.to_string() + " errors (" + rate.to_string() + "%)");
+        print(`${span.start.to_iso()}: ${errors}/${requests} errors (${rate}%)`);
       '
     ```
 
@@ -351,8 +347,7 @@ This lets you compare per-window activity against overall trends:
       --span-close '
         let span_err = span.metrics.get_path("errors", 0);
         let total_err = metrics.get_path("errors", 0);
-        eprint("Span " + span.id + ": +" + span_err.to_string() +
-               " errors (total: " + total_err.to_string() + ")");
+        eprint(`Span ${span.id}: +${span_err} errors (total: ${total_err})`);
       '
     ```
 
@@ -366,8 +361,7 @@ This lets you compare per-window activity against overall trends:
       --span-close '
         let span_err = span.metrics.get_path("errors", 0);
         let total_err = metrics.get_path("errors", 0);
-        eprint("Span " + span.id + ": +" + span_err.to_string() +
-               " errors (total: " + total_err.to_string() + ")");
+        eprint(`Span ${span.id}: +${span_err} errors (total: ${total_err})`);
       '
     ```
 
@@ -395,8 +389,7 @@ Detect anomalies by comparing span activity to overall rates:
         let total_rate = metrics.get_path("errors", 0) * 100 /
                          metrics.get_path("requests", 1);
         if span_rate > total_rate * 2 {
-          eprint("🚨 Spike in " + span.id + ": " + span_rate.to_string() +
-                 "% (avg: " + total_rate.to_string() + "%)");
+          eprint(`🚨 Spike in ${span.id}: ${span_rate}% (avg: ${total_rate}%)`);
         }
       '
     ```
@@ -413,8 +406,7 @@ Detect anomalies by comparing span activity to overall rates:
         let total_rate = metrics.get_path("errors", 0) * 100 /
                          metrics.get_path("requests", 1);
         if span_rate > total_rate * 2 {
-          eprint("🚨 Spike in " + span.id + ": " + span_rate.to_string() +
-                 "% (avg: " + total_rate.to_string() + "%)");
+          eprint(`🚨 Spike in ${span.id}: ${span_rate}% (avg: ${total_rate}%)`);
         }
       '
     ```
@@ -442,7 +434,7 @@ Events arriving earlier than the current span window are marked as "late":
       --span 1m \
       --exec '
         if meta.span_status == "late" {
-          eprint("⚠️  Late event: " + e.msg + " at " + e.ts);
+          eprint(`⚠️  Late event: ${e.msg} at ${e.ts}`);
         }
       ' \
       --span-close 'print("Window " + span.id + ": " + span.size.to_string() + " events")'
@@ -459,7 +451,7 @@ Events arriving earlier than the current span window are marked as "late":
       --span 1m \
       --exec '
         if meta.span_status == "late" {
-          eprint("⚠️  Late event: " + e.msg + " at " + e.ts);
+          eprint(`⚠️  Late event: ${e.msg} at ${e.ts}`);
         }
       ' \
       --span-close 'print("Window " + span.id + ": " + span.size.to_string() + " events")'
@@ -743,7 +735,7 @@ Combine `span.metrics` and `metrics` for context-aware reporting:
 // Pattern 1: Running commentary with context
 let span_errors = span.metrics.get_path("errors", 0);
 let total_errors = metrics.get_path("errors", 0);
-eprint("+" + span_errors.to_string() + " errors (total: " + total_errors.to_string() + ")");
+eprint(`+${span_errors} errors (total: ${total_errors})`);
 ```
 
 ```rhai

@@ -31,7 +31,7 @@ Combine level filters with Rhai expressions to describe the alert.
 tail -f /var/log/app.log | kelora -j \
   -l error,critical \
   --filter 'e.service == "payments" || e.message.contains("timeout")' \
-  -e 'eprint(e.level + ": " + e.service + " " + e.message)'
+  -e 'eprint(`${e.level}: ${e.service} ${e.message}`)'
 ```
 
 - Use `-l warn,error,critical` when log levels are reliable and you want broad coverage.
@@ -50,7 +50,7 @@ tail -f /var/log/app.log | kelora -j -qq \
     let total = metrics.get_path("total", 0);
     let errors = metrics.get_path("level|ERROR", 0);
     if total > 0 && errors * 100 / total > 5 {
-      eprint("ALERT: error rate " + errors.to_string() + "/" + total.to_string());
+      eprint(`ALERT: error rate ${errors}/${total}`);
       exit(1);
     }
   '
@@ -66,7 +66,7 @@ Direct alerts to stderr for on-call use, files for dashboards, or downstream com
 ```bash
 tail -f /var/log/app.log | kelora -j --allow-fs-writes -qq \
   -l critical \
-  -e 'append_file("/tmp/critical.log", e.timestamp.to_string() + " " + e.service + " " + e.message + "\n")'
+  -e 'append_file("/tmp/critical.log", `${e.timestamp} ${e.service} ${e.message}\n`)'
 ```
 
 - Use `append_file()` sparingly; it requires `--allow-fs-writes` and should point to writable locations.
@@ -107,7 +107,7 @@ fi
   ```bash
   tail -f /var/log/nginx/access.log | kelora -f combined -qq \
     --filter 'e.get_path("request_time", "0").to_float() > 1.5' \
-    -e 'eprint("SLOW: " + e.method + " " + e.path + " " + e.request_time + "s")'
+    -e 'eprint(`SLOW: ${e.method} ${e.path} ${e.request_time}s`)'
   ```
 
 ## Validate Before Paging People
