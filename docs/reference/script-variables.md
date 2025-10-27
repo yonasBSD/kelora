@@ -19,6 +19,7 @@ Kelora exposes several built-in variables to Rhai scripts. Their availability de
 ### `line`
 - Type: `String`
 - Snapshot of the text the parser captured for the current record. Structured formats strip trailing newlines before storing it, `-f raw` preserves every byte (including terminators), and `--multiline` reflects the chunk assembled by the multiline stage. Present in every stage and read-only.
+- You’ll also see the same text at `meta.line`; that copy travels with saved metadata (window snapshots, span hooks, cloned `meta` values) so the original record is still available later on.
 
 ### `e`
 - Type: `Map`
