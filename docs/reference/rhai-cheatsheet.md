@@ -51,6 +51,42 @@ a &= b   a |= b   a ^= b   a <<= b  a >>= b
 "key" in map                         // Check if key exists
 ```
 
+## String Interpolation
+
+Rhai supports string interpolation using `${...}` syntax within backtick strings:
+
+```rhai
+let name = "Alice";
+let age = 30;
+let message = `Hello, ${name}! You are ${age} years old.`;
+// Result: "Hello, Alice! You are 30 years old."
+
+// Complex expressions in interpolation
+let x = 10;
+let y = 20;
+let result = `Sum: ${x + y}, Product: ${x * y}`;
+// Result: "Sum: 30, Product: 200"
+
+// Nested interpolations
+let status = "active";
+let msg = `User ${name} is ${`currently ${status}`}`;
+// Result: "User Alice is currently active"
+
+// Multi-line interpolated strings
+let report = `
+  User: ${e.user.name}
+  Status: ${e.status}
+  Count: ${e.items.len()}
+`;
+```
+
+**Key Points:**
+
+- Interpolation only works with backtick strings (`` `text` ``), not double-quote strings (`"text"`)
+- Use `${expression}` to embed any Rhai expression
+- The expression can be a variable, function call, or complex statement block
+- Cannot escape `${` in interpolated strings; build such strings in pieces instead
+
 ## Control Flow
 
 ### If-Else

@@ -1890,6 +1890,23 @@ OPERATORS:
   Range:       1..5  1..=5            (exclusive/inclusive, for loops only)
   Membership:  "key" in map            (check map key existence)
 
+STRING INTERPOLATION:
+  Rhai supports string interpolation using ${...} syntax within backtick strings:
+
+  let name = "Alice";
+  let age = 30;
+  let msg = `Hello, ${name}! You are ${age} years old.`;
+
+  Complex expressions:
+  let x = 10, y = 20;
+  let result = `Sum: ${x + y}, Product: ${x * y}`;
+
+  Nested interpolations allowed:
+  let status = "active";
+  let msg = `User ${name} is ${`currently ${status}`}`;
+
+  Note: Interpolation only works with backtick strings (`text`), not double quotes ("text")
+
 CONTROL FLOW:
   if x > 10 {                          If-else (braces required)
       print("big");
