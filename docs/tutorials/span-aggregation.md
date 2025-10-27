@@ -332,7 +332,98 @@ Calculate error rates per 1-minute window:
 
 ---
 
-## Step 5: Late Events and Missing Timestamps
+## Step 5: Global Metrics – Compare Spans to Cumulative Totals
+
+Inside `--span-close` you have access to **two** metrics maps:
+
+- **`span.metrics`** – Delta for this span only (resets after each span)
+- **`metrics`** – Cumulative totals across the entire run
+
+This lets you compare per-window activity against overall trends:
+
+=== "Command"
+
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      --exec 'track_count("total"); if e.level == "ERROR" { track_count("errors"); }' \
+      --span 5 \
+      --span-close '
+        let span_err = span.metrics.get_path("errors", 0);
+        let total_err = metrics.get_path("errors", 0);
+        eprint("Span " + span.id + ": +" + span_err.to_string() +
+               " errors (total: " + total_err.to_string() + ")");
+      '
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      --exec 'track_count("total"); if e.level == "ERROR" { track_count("errors"); }' \
+      --span 5 \
+      --span-close '
+        let span_err = span.metrics.get_path("errors", 0);
+        let total_err = metrics.get_path("errors", 0);
+        eprint("Span " + span.id + ": +" + span_err.to_string() +
+               " errors (total: " + total_err.to_string() + ")");
+      '
+    ```
+
+**Key differences:**
+
+| Feature | `span.metrics` | `metrics` |
+|---------|----------------|-----------|
+| Scope | Current span only | Entire run |
+| Values | Deltas (what changed) | Cumulative totals |
+| Reset | After each span | Never |
+
+### Spike Detection – Compare to Average
+
+Detect anomalies by comparing span activity to overall rates:
+
+=== "Command"
+
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      --exec 'track_count("requests"); if e.level == "ERROR" { track_count("errors"); }' \
+      --span 3 \
+      --span-close '
+        let span_rate = span.metrics.get_path("errors", 0) * 100 / span.size;
+        let total_rate = metrics.get_path("errors", 0) * 100 /
+                         metrics.get_path("requests", 1);
+        if span_rate > total_rate * 2 {
+          eprint("🚨 Spike in " + span.id + ": " + span_rate.to_string() +
+                 "% (avg: " + total_rate.to_string() + "%)");
+        }
+      '
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      --exec 'track_count("requests"); if e.level == "ERROR" { track_count("errors"); }' \
+      --span 3 \
+      --span-close '
+        let span_rate = span.metrics.get_path("errors", 0) * 100 / span.size;
+        let total_rate = metrics.get_path("errors", 0) * 100 /
+                         metrics.get_path("requests", 1);
+        if span_rate > total_rate * 2 {
+          eprint("🚨 Spike in " + span.id + ": " + span_rate.to_string() +
+                 "% (avg: " + total_rate.to_string() + "%)");
+        }
+      '
+    ```
+
+**Use case:** Detect sudden increases in error rates, latency spikes, or unusual traffic patterns relative to baseline.
+
+---
+
+## Step 6: Late Events and Missing Timestamps
 
 Time-based spans track event status for better handling of out-of-order or missing data.
 
@@ -435,7 +526,7 @@ kelora -j --span 5m --strict app.log
 
 ---
 
-## Step 6: Tagging Events Without --span-close
+## Step 7: Tagging Events Without --span-close
 
 You can use `--span` to tag events with window metadata without writing a close hook:
 
@@ -470,7 +561,7 @@ This is **lightweight** – Kelora doesn't buffer events or compute metrics, jus
 
 ---
 
-## Step 7: Combining Filters, Execs, and Spans
+## Step 8: Combining Filters, Execs, and Spans
 
 Spans work seamlessly with multi-stage pipelines:
 
@@ -532,6 +623,7 @@ You've learned to use span aggregation for time-windowed and count-based rollups
 - ✅ **span.size** counts events that survived
 - ✅ **span.events** provides full event arrays for detailed analysis
 - ✅ **span.metrics** gives automatic per-span metric deltas
+- ✅ **metrics** provides cumulative totals across all spans
 - ✅ **meta.span_status** detects late/unassigned/filtered events
 - ✅ Spans work seamlessly with filters, execs, and tracking functions
 
@@ -545,6 +637,7 @@ You've learned to use span aggregation for time-windowed and count-based rollups
 | span.size | Event count | Event count |
 | span.events | Full event array | Full event array |
 | span.metrics | Per-span deltas | Per-span deltas |
+| metrics | Global cumulative totals | Global cumulative totals |
 
 ## Common Mistakes
 
@@ -641,6 +734,30 @@ cat *.log | sort | kelora -j --span 5m --span-close '...'
 # Or use GNU sort with large files
 sort -S 2G --parallel=4 huge.log | kelora -j --span 1h --span-close '...'
 ```
+
+### Using Both Metrics Maps Effectively
+
+Combine `span.metrics` and `metrics` for context-aware reporting:
+
+```rhai
+// Pattern 1: Running commentary with context
+let span_errors = span.metrics.get_path("errors", 0);
+let total_errors = metrics.get_path("errors", 0);
+eprint("+" + span_errors.to_string() + " errors (total: " + total_errors.to_string() + ")");
+```
+
+```rhai
+// Pattern 2: Threshold alerts after warmup
+let total_processed = metrics.get_path("total", 0);
+if total_processed > 1000 {  // Only alert after warmup
+  let span_rate = span.metrics.get_path("errors", 0) / span.size;
+  if span_rate > 0.10 { eprint("⚠️  Error rate exceeds 10%"); }
+}
+```
+
+**When to use each:**
+- `span.metrics`: "What changed in this window?"
+- `metrics`: "What's the big picture?"
 
 ### Signal Handling
 
