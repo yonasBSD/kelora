@@ -354,12 +354,14 @@ fn get_initial_timestamp_formats() -> Vec<String> {
         // Application-specific formats
         "%Y-%m-%d %H:%M:%S,%f".to_string(), // Python logging format
         "%Y/%m/%d %H:%M:%S".to_string(),    // Nginx error log format
+        "%m/%d/%Y %H:%M:%S".to_string(),    // US slash format with time
         "%d.%m.%Y %H:%M:%S".to_string(),    // German format
         "%y%m%d %H:%M:%S".to_string(),      // MySQL legacy format
         // Less common but valid formats
-        "%a %b %d %H:%M:%S %Y".to_string(), // Classic Unix timestamp
+        "%d %b %Y, %H:%M".to_string(),         // "12 Feb 2006, 19:17"
+        "%a %b %d %H:%M:%S %Y".to_string(),    // Classic Unix timestamp
         "%d-%b-%y %I:%M:%S.%f %p".to_string(), // Oracle format
-        "%b %d, %Y %I:%M:%S %p".to_string(), // Java SimpleDateFormat
+        "%b %d, %Y %I:%M:%S %p".to_string(),   // Java SimpleDateFormat
     ]
 }
 
@@ -522,6 +524,13 @@ fn parse_date_only(arg: &str) -> Option<DateTime<Utc>> {
         }
     }
 
+    // Try YYYY/MM/DD format
+    if let Ok(date) = chrono::NaiveDate::parse_from_str(arg, "%Y/%m/%d") {
+        if let Some(naive_dt) = date.and_hms_opt(0, 0, 0) {
+            return Some(naive_dt.and_utc());
+        }
+    }
+
     // Try MM/DD/YYYY format
     if let Ok(date) = chrono::NaiveDate::parse_from_str(arg, "%m/%d/%Y") {
         if let Some(naive_dt) = date.and_hms_opt(0, 0, 0) {
@@ -531,6 +540,20 @@ fn parse_date_only(arg: &str) -> Option<DateTime<Utc>> {
 
     // Try DD.MM.YYYY format
     if let Ok(date) = chrono::NaiveDate::parse_from_str(arg, "%d.%m.%Y") {
+        if let Some(naive_dt) = date.and_hms_opt(0, 0, 0) {
+            return Some(naive_dt.and_utc());
+        }
+    }
+
+    // Try Month Day, Year format with long month name
+    if let Ok(date) = chrono::NaiveDate::parse_from_str(arg, "%B %d, %Y") {
+        if let Some(naive_dt) = date.and_hms_opt(0, 0, 0) {
+            return Some(naive_dt.and_utc());
+        }
+    }
+
+    // Try Day Month Year format with long month name
+    if let Ok(date) = chrono::NaiveDate::parse_from_str(arg, "%d %B %Y") {
         if let Some(naive_dt) = date.and_hms_opt(0, 0, 0) {
             return Some(naive_dt.and_utc());
         }
