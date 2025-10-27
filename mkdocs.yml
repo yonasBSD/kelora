@@ -110,3 +110,4 @@ nav:
       - reference/formats.md
       - reference/exit-codes.md
       - reference/rhai-cheatsheet.md
+      - reference/script-variables.md
