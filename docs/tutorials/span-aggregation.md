@@ -125,6 +125,12 @@ The `span.events` array contains all events that were included in the span:
 - Includes original fields plus `line`, `line_num`, `filename` (if applicable)
 - Includes span metadata: `span_status`, `span_id`, `span_start`, `span_end`
 
+### Span Script Variable Reference
+
+Inside `--span-close` the important bindings are `span.id`, `span.start`, `span.end`, `span.size`, `span.events`, `span.metrics`, and the global `metrics` map. Use `span.metrics` for per-span deltas and `metrics` for cumulative totals. See the [Script Variables reference](../reference/script-variables.md) for the full scope matrix, including helpers such as `meta.span_status`, `meta.span_id`, and when `window` is available.
+
+> `--span-close` executes outside the per-event pipeline, so treat it as a summary hook: rely on `span.*` and `metrics` for aggregates, and loop over `span.events` when you need per-event details.
+
 **Use case:** Collect request IDs for correlation, extract specific fields for detailed reports, or forward events to external systems.
 
 ### Extract Specific Fields from Events

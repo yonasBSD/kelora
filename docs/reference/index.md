@@ -7,3 +7,4 @@ Authoritative details for Kelora's command line, scripting API, formats, and int
 - [Input Formats](formats.md)
 - [Exit Codes](exit-codes.md)
 - [Rhai Cheatsheet](rhai-cheatsheet.md)
+- [Script Variables](script-variables.md)
