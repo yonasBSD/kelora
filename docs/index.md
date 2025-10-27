@@ -146,9 +146,6 @@ Parse messy logs into structured events, then filter, transform, and analyze the
 
 See the [Quickstart](quickstart.md) for a step-by-step tour with full output.
 
-!!! info "Performance Philosophy"
-    Kelora trades raw speed for simplicity—specialized tools like grep, jq, and qsv are often 5-100x faster for single tasks. **Kelora shines** for multi-format pipelines, complex transforms with 100+ built-in functions, and windowed analysis. See [Performance Comparisons](concepts/performance-comparisons.md) for honest benchmarks.
-
 ## What It Does
 
 - **Parse** JSON, logfmt, syslog, CSV/TSV, Apache/Nginx logs, or custom formats
@@ -156,6 +153,9 @@ See the [Quickstart](quickstart.md) for a step-by-step tour with full output.
 - **Transform** with 100+ built-in functions - enrich, redact, extract, restructure
 - **Analyze** with built-in metrics - track counts, sums, averages, distributions
 - **Output** as logfmt, JSON, or CSV
+
+!!! info "Performance Philosophy"
+    Kelora is quite slow. It's designed for development logs, debugging sessions, and incident investigations—not production archives. Specialized tools are often 5-100× faster. Kelora trades speed for convenience: one readable command instead of complex pipelines or custom scripts. See [Performance Comparisons](concepts/performance-comparisons.md) for benchmarks.
 
 ## How It Works
 
