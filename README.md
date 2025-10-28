@@ -8,8 +8,8 @@
 
 Scriptable log processor for the command line. Treats logs as structured events and lets you filter, transform, and analyze them using embedded [Rhai](https://rhai.rs) scripts with 40+ built-in functions.
 
-> [!WARNING]
-> Experimental tool. [Vibe-coded](https://en.wikipedia.org/wiki/Vibe_coding). APIs and behaviour may change without notice.
+> [!NOTE]
+> Pre-1.0 software developed with AI assistance. Breaking changes may occur without migration paths. Backed by 770+ tests plus cargo-audit/deny; see [SECURITY.md](SECURITY.md) for details.
 
 ## Overview
 

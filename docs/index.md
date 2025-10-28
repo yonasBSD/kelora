@@ -4,8 +4,8 @@
 
 Parse messy logs into structured events, then filter, transform, and analyze them with embedded [Rhai](https://rhai.rs) scripting.
 
-!!! warning "Experimental Tool"
-    Kelora is a [vibe-coded](https://en.wikipedia.org/wiki/Vibe_coding) experimental tool under active development. APIs and behaviour may change without notice.
+!!! note "Development Status"
+    Pre-1.0 software developed with AI assistance. Breaking changes may occur without migration paths. Backed by 770+ tests plus cargo-audit/deny; see the [Security Policy](https://github.com/dloss/kelora/blob/main/SECURITY.md) for details.
 
 ![Kelora hero demo](screenshots/hero.gif)
 *Filtering noisy logs, parsing custom formats, and visualizing log levels*
