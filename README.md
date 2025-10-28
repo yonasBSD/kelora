@@ -9,7 +9,7 @@
 Scriptable log processor for the command line. Treats logs as structured events and lets you filter, transform, and analyze them using embedded [Rhai](https://rhai.rs) scripts with 40+ built-in functions.
 
 > [!NOTE]
-> Pre-1.0 software using AI-generated code validated through automated testing, not manual review. Breaking changes may occur without migration paths. Backed by 770+ tests plus cargo-audit/deny; see [SECURITY.md](SECURITY.md) for details.
+> Pre-1.0 software using AI-generated code. Validated through automated testing, not manual review. Breaking changes may occur without migration paths. Backed by 770+ tests plus cargo-audit/deny; see [SECURITY.md](SECURITY.md) for details.
 
 ## Overview
 
