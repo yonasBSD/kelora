@@ -5,7 +5,7 @@
 Parse messy logs into structured events, then filter, transform, and analyze them with embedded [Rhai](https://rhai.rs) scripting.
 
 !!! note "Development Status"
-    Pre-1.0 software developed with AI assistance. Breaking changes may occur without migration paths. Backed by 770+ tests plus cargo-audit/deny; see the [Security Policy](https://github.com/dloss/kelora/blob/main/SECURITY.md) for details.
+    Pre-1.0 software using AI-generated code validated through automated testing, not manual review. Breaking changes may occur without migration paths. Backed by 770+ tests plus cargo-audit/deny; see the [Security Policy](https://github.com/dloss/kelora/blob/main/SECURITY.md) for details.
 
 ![Kelora hero demo](screenshots/hero.gif)
 *Filtering noisy logs, parsing custom formats, and visualizing log levels*

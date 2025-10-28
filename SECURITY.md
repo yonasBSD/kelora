@@ -56,7 +56,7 @@ Kelora implements multiple layers of security controls to ensure safe operation:
 
 ### Development Process
 
-Kelora is developed using AI-assisted coding (Claude, GPT-5). Quality assurance includes:
+Kelora is developed using AI-generated code (Claude, GPT-5) validated through automated testing, not manual review. Quality assurance includes:
 - Comprehensive automated tests for all features
 - Functional validation through testing and usage
 - Continuous integration checks on every change
