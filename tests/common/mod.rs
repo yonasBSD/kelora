@@ -108,6 +108,44 @@ pub fn extract_events_created_from_stats(stderr: &str) -> i32 {
     0
 }
 
+/// Extract the lines from the stats block in stderr (emoji and plain prefixes supported)
+pub fn extract_stats_lines(stderr: &str) -> Vec<String> {
+    let mut in_stats = false;
+    let mut stats_lines = Vec::new();
+
+    for raw_line in stderr.lines() {
+        let trimmed = raw_line.trim();
+
+        if !in_stats {
+            if trimmed == "📈 Stats:" || trimmed == "kelora: Stats:" || trimmed == "Stats:" {
+                in_stats = true;
+            }
+            continue;
+        }
+
+        if trimmed.is_empty() {
+            break;
+        }
+
+        stats_lines.push(trimmed.to_string());
+    }
+
+    stats_lines
+}
+
+/// Find a specific stats line by prefix within the extracted stats block
+pub fn stats_line<'a>(stats: &'a [String], prefix: &str) -> &'a str {
+    stats
+        .iter()
+        .find(|line| line.starts_with(prefix))
+        .unwrap_or_else(|| {
+            panic!(
+                "Expected stats line starting with '{}', but stats were {:?}",
+                prefix, stats
+            )
+        })
+}
+
 /// Helper to extract filtered count from stats stderr output
 pub fn extract_events_filtered_from_stats(stderr: &str) -> i32 {
     for line in stderr.lines() {

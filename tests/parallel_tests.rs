@@ -733,3 +733,231 @@ fn test_stdin_with_parallel_processing() {
     assert!(stdout.contains("test2"));
     assert!(stdout.contains("test3"));
 }
+
+#[test]
+fn test_parallel_stats_counting_basic() {
+    let input: String = (1..=100).map(|i| i.to_string()).collect::<Vec<_>>().join("\n");
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "--stats",
+            "--filter",
+            "line.to_int() % 10 == 0",
+            "--parallel",
+        ],
+        &input,
+    );
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let output_lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(output_lines.len(), 10, "Should emit 10 multiples of 10");
+
+    let stats = extract_stats_lines(&stderr);
+    let lines_processed = stats
+        .iter()
+        .find(|line| line.starts_with("Lines processed:"))
+        .expect("Stats should include line totals");
+    assert_eq!(
+        lines_processed,
+        "Lines processed: 100 total, 0 filtered (0.0%), 0 errors (0.0%)"
+    );
+
+    let events_created = stats
+        .iter()
+        .find(|line| line.starts_with("Events created:"))
+        .expect("Stats should include event totals");
+    assert_eq!(
+        events_created,
+        "Events created: 100 total, 10 output, 90 filtered (90.0%)"
+    );
+}
+
+#[test]
+fn test_parallel_stats_counting_large_dataset() {
+    let input: String = (1..=10_000)
+        .map(|i| i.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "--stats",
+            "--filter",
+            "line.to_int() % 10 == 0",
+            "--parallel",
+            "--batch-size",
+            "100",
+        ],
+        &input,
+    );
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let stats = extract_stats_lines(&stderr);
+    let lines_processed = stats
+        .iter()
+        .find(|line| line.starts_with("Lines processed:"))
+        .expect("Stats should include line totals");
+    assert_eq!(
+        lines_processed,
+        "Lines processed: 10000 total, 0 filtered (0.0%), 0 errors (0.0%)"
+    );
+
+    let events_created = stats
+        .iter()
+        .find(|line| line.starts_with("Events created:"))
+        .expect("Stats should include event totals");
+    assert_eq!(
+        events_created,
+        "Events created: 10000 total, 1000 output, 9000 filtered (90.0%)"
+    );
+}
+
+#[test]
+fn test_parallel_vs_sequential_stats_consistency() {
+    let input: String = (1..=1000)
+        .map(|i| i.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let (stdout_seq, stderr_seq, exit_code_seq) =
+        run_kelora_with_input(&["--stats", "--filter", "line.to_int() % 100 == 0"], &input);
+    let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(
+        &[
+            "--stats",
+            "--filter",
+            "line.to_int() % 100 == 0",
+            "--parallel",
+            "--batch-size",
+            "50",
+        ],
+        &input,
+    );
+
+    assert_eq!(exit_code_seq, 0, "Sequential execution should succeed");
+    assert_eq!(exit_code_par, 0, "Parallel execution should succeed");
+    assert_eq!(
+        stdout_seq, stdout_par,
+        "Sequential and parallel output should match exactly"
+    );
+
+    let stats_seq = extract_stats_lines(&stderr_seq);
+    let stats_par = extract_stats_lines(&stderr_par);
+    let seq_lines_processed = stats_line(&stats_seq, "Lines processed:");
+    let par_lines_processed = stats_line(&stats_par, "Lines processed:");
+    assert_eq!(
+        seq_lines_processed, par_lines_processed,
+        "Sequential and parallel runs should report the same line totals"
+    );
+    assert_eq!(
+        seq_lines_processed,
+        "Lines processed: 1000 total, 0 filtered (0.0%), 0 errors (0.0%)"
+    );
+
+    let seq_events_created = stats_line(&stats_seq, "Events created:");
+    let par_events_created = stats_line(&stats_par, "Events created:");
+    assert_eq!(
+        seq_events_created, par_events_created,
+        "Sequential and parallel runs should report the same event totals"
+    );
+    assert_eq!(
+        seq_events_created,
+        "Events created: 1000 total, 10 output, 990 filtered (99.0%)"
+    );
+}
+
+#[test]
+fn test_parallel_stats_with_errors() {
+    let input = "1\n2\ninvalid\n4\n5\n";
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "--stats",
+            "--filter",
+            "line.to_int() > 3",
+            "--parallel",
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let output_lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(output_lines.len(), 2, "Should emit two values greater than 3");
+
+    let stats = extract_stats_lines(&stderr);
+    let lines_processed = stats
+        .iter()
+        .find(|line| line.starts_with("Lines processed:"))
+        .expect("Stats should include line totals");
+    assert_eq!(
+        lines_processed,
+        "Lines processed: 5 total, 0 filtered (0.0%), 0 errors (0.0%)"
+    );
+
+    let events_created = stats
+        .iter()
+        .find(|line| line.starts_with("Events created:"))
+        .expect("Stats should include event totals");
+    assert_eq!(
+        events_created,
+        "Events created: 5 total, 2 output, 3 filtered (60.0%)"
+    );
+}
+
+#[test]
+fn test_parallel_stats_with_different_batch_sizes() {
+    let input: String = (1..=500).map(|i| i.to_string()).collect::<Vec<_>>().join("\n");
+    let batch_sizes = [1, 10, 50, 100, 500];
+    let mut results = Vec::new();
+
+    for batch_size in batch_sizes {
+        let (stdout, stderr, exit_code) = run_kelora_with_input(
+            &[
+                "--stats",
+                "--filter",
+                "line.to_int() % 50 == 0",
+                "--parallel",
+                "--batch-size",
+                &batch_size.to_string(),
+            ],
+            &input,
+        );
+
+        assert_eq!(
+            exit_code, 0,
+            "kelora should succeed with batch size {}",
+            batch_size
+        );
+        results.push((stdout, stderr));
+    }
+
+    let (first_stdout, _) = &results[0];
+    for (idx, (stdout, stderr)) in results.iter().enumerate() {
+        assert_eq!(
+            stdout, first_stdout,
+            "Batch size {} should match output from batch size {}",
+            batch_sizes[idx], batch_sizes[0]
+        );
+
+        let stats = extract_stats_lines(stderr);
+        let lines_processed = stats
+            .iter()
+            .find(|line| line.starts_with("Lines processed:"))
+            .expect("Stats should include line totals");
+        assert_eq!(
+            lines_processed,
+            "Lines processed: 500 total, 0 filtered (0.0%), 0 errors (0.0%)"
+        );
+
+        let events_created = stats
+            .iter()
+            .find(|line| line.starts_with("Events created:"))
+            .expect("Stats should include event totals");
+        assert_eq!(
+            events_created,
+            "Events created: 500 total, 10 output, 490 filtered (98.0%)"
+        );
+    }
+}

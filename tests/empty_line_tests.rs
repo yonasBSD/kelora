@@ -192,3 +192,47 @@ fn test_empty_line_handling_parallel_mode_line_format() {
         "Should process non-empty lines in parallel mode"
     );
 }
+
+#[test]
+fn test_empty_line_handling_line_format_with_stats() {
+    let input = "alpha\n\nbeta\n";
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(&["--stats"], input);
+    assert_eq!(exit_code, 0, "Line format should exit successfully with stats");
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 3, "Should emit all lines including the blank one");
+
+    let stats = extract_stats_lines(&stderr);
+    assert_eq!(
+        stats_line(&stats, "Lines processed:"),
+        "Lines processed: 3 total, 0 filtered (0.0%), 0 errors (0.0%)"
+    );
+    assert_eq!(
+        stats_line(&stats, "Events created:"),
+        "Events created: 3 total, 3 output, 0 filtered (0.0%)"
+    );
+}
+
+#[test]
+fn test_empty_line_handling_structured_format_with_stats() {
+    let input = r#"{"value": 1}
+
+{"value": 2}"#;
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--stats"], input);
+    assert_eq!(exit_code, 0, "Structured format should exit successfully");
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 2, "Should emit only the two JSON objects");
+
+    let stats = extract_stats_lines(&stderr);
+    assert_eq!(
+        stats_line(&stats, "Lines processed:"),
+        "Lines processed: 3 total, 0 filtered (0.0%), 0 errors (0.0%)"
+    );
+    assert_eq!(
+        stats_line(&stats, "Events created:"),
+        "Events created: 2 total, 2 output, 0 filtered (0.0%)"
+    );
+}

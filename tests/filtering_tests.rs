@@ -320,6 +320,54 @@ fn test_combined_keep_lines_and_ignore_lines() {
 }
 
 #[test]
+fn test_ignore_lines_with_stats() {
+    let input = r#"{"level": "INFO", "message": "Valid message 1"}
+# Comment to ignore
+{"level": "ERROR", "message": "Valid message 2"}
+# Another comment
+{"level": "WARN", "message": "Valid message 3"}"#;
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "-F",
+            "json",
+            "--ignore-lines",
+            "^#",
+            "--stats",
+        ],
+        input,
+    );
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully with ignore-lines and stats enabled"
+    );
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 3, "Should output 3 non-comment lines");
+
+    let stats = extract_stats_lines(&stderr);
+    let lines_processed = stats
+        .iter()
+        .find(|line| line.starts_with("Lines processed:"))
+        .expect("Stats should report line counts");
+    assert_eq!(
+        lines_processed,
+        "Lines processed: 5 total, 2 filtered (40.0%), 0 errors (0.0%)"
+    );
+
+    let events_created = stats
+        .iter()
+        .find(|line| line.starts_with("Events created:"))
+        .expect("Stats should report event counts");
+    assert_eq!(
+        events_created,
+        "Events created: 3 total, 3 output, 0 filtered (0.0%)"
+    );
+}
+
+#[test]
 fn test_multiple_filters() {
     let input = r#"{"level": "INFO", "status": 200, "response_time": 50}
 {"level": "ERROR", "status": 500, "response_time": 100}
