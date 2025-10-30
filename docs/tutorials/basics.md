@@ -10,6 +10,10 @@ Master the essential commands for reading logs, controlling display output, and 
 - Export data in different formats with `-F` and `-J`
 - Combine options for common workflows
 
+## About This Tutorial
+
+In the [Quickstart](../quickstart.md), you ran three commands to see Kelora in action. Now we'll teach you what each flag means, how they combine, and when to use them. By the end, you'll understand the building blocks for any Kelora workflow.
+
 ## Prerequisites
 
 - Kelora installed and in your PATH
@@ -28,6 +32,8 @@ If you cloned the project, run commands from the repository root.
 ## Part 1: Input Formats (`-f`, `-j`)
 
 ### Explicit Format Selection Required
+
+You've seen `-j` in the [Quickstart](../quickstart.md) to read JSON logs. Let's understand what this flag really means and what other formats Kelora supports.
 
 **Important:** Kelora does **NOT** auto-detect format based on filename. The default is `-f line` (plain text). You must specify the format explicitly.
 
@@ -383,6 +389,31 @@ Brief output excluding debug noise:
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl -L debug -b --take 5
     ```
+
+### Real-World Patterns
+
+Here are some patterns you'll use frequently in practice:
+
+```bash
+# Stream processing (tail -f, kubectl logs, etc.)
+kubectl logs -f deployment/api | kelora -f json -l error
+
+# Multiple files - track which files have errors
+kelora -f json logs/*.log --metrics \
+  --exec 'if e.level == "ERROR" { track_count(meta.filename) }'
+
+# Time-based filtering
+kelora -f combined access.log --since "1 hour ago" --until "10 minutes ago"
+
+# Extract prefixes (Docker Compose, systemd, etc.)
+docker compose logs | kelora --extract-prefix container -f json
+
+# Auto-detect format and output brief values only
+kelora -f auto mixed.log -k timestamp,level,message -b
+
+# Custom timestamp formats
+kelora -f line app.log --ts-format "%d/%b/%Y:%H:%M:%S" --ts-field timestamp
+```
 
 ---
 
