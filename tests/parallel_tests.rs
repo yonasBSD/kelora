@@ -736,7 +736,10 @@ fn test_stdin_with_parallel_processing() {
 
 #[test]
 fn test_parallel_stats_counting_basic() {
-    let input: String = (1..=100).map(|i| i.to_string()).collect::<Vec<_>>().join("\n");
+    let input: String = (1..=100)
+        .map(|i| i.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
         &[
@@ -872,19 +875,18 @@ fn test_parallel_stats_with_errors() {
     let input = "1\n2\ninvalid\n4\n5\n";
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
-        &[
-            "--stats",
-            "--filter",
-            "line.to_int() > 3",
-            "--parallel",
-        ],
+        &["--stats", "--filter", "line.to_int() > 3", "--parallel"],
         input,
     );
 
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
     let output_lines: Vec<&str> = stdout.trim().lines().collect();
-    assert_eq!(output_lines.len(), 2, "Should emit two values greater than 3");
+    assert_eq!(
+        output_lines.len(),
+        2,
+        "Should emit two values greater than 3"
+    );
 
     let stats = extract_stats_lines(&stderr);
     let lines_processed = stats
@@ -908,7 +910,10 @@ fn test_parallel_stats_with_errors() {
 
 #[test]
 fn test_parallel_stats_with_different_batch_sizes() {
-    let input: String = (1..=500).map(|i| i.to_string()).collect::<Vec<_>>().join("\n");
+    let input: String = (1..=500)
+        .map(|i| i.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
     let batch_sizes = [1, 10, 50, 100, 500];
     let mut results = Vec::new();
 

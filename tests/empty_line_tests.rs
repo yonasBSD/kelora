@@ -198,10 +198,17 @@ fn test_empty_line_handling_line_format_with_stats() {
     let input = "alpha\n\nbeta\n";
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(&["--stats"], input);
-    assert_eq!(exit_code, 0, "Line format should exit successfully with stats");
+    assert_eq!(
+        exit_code, 0,
+        "Line format should exit successfully with stats"
+    );
 
     let lines: Vec<&str> = stdout.trim().lines().collect();
-    assert_eq!(lines.len(), 3, "Should emit all lines including the blank one");
+    assert_eq!(
+        lines.len(),
+        3,
+        "Should emit all lines including the blank one"
+    );
 
     let stats = extract_stats_lines(&stderr);
     assert_eq!(
