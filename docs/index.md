@@ -52,6 +52,10 @@ Parse any log format, filter with expressions, transform with 100+ functions, tr
     cat examples/deploy_tail.jsonl
     ```
 
+## Works Well With
+
+Kelora thrives in Unix pipelines. Stream logs from kubectl, tail, or journalctl into Kelora, then pipe output to jq, SQLite, qsv, or visualization tools. See [Integrate Kelora with External Tools](how-to/integrate-external-tools.md) for 18 tools and usage patterns.
+
 ## Get Started
 
 **[→ Quickstart (5 minutes)](quickstart.md)** - Install and run your first commands
