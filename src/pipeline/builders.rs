@@ -1090,7 +1090,10 @@ fn read_all_files_to_memory(
 pub fn create_input_reader(
     config: &crate::config::KeloraConfig,
 ) -> Result<Box<dyn BufRead + Send>> {
-    if config.input.files.is_empty() {
+    if config.input.no_input {
+        // Create empty input for --no-input mode
+        Ok(Box::new(BufReader::new(std::io::Cursor::new(Vec::new()))))
+    } else if config.input.files.is_empty() {
         // Use stdin reader with gzip/zstd detection for Send compatibility
         let stdin_reader = crate::readers::ChannelStdinReader::new()?;
         let processed_stdin = crate::decompression::maybe_decompress(stdin_reader)?;

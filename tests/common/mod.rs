@@ -93,6 +93,26 @@ pub fn run_kelora_with_files(args: &[&str], files: &[&str]) -> (String, String, 
     )
 }
 
+/// Helper function to run kelora without any input (for --no-input flag)
+pub fn run_kelora(args: &[&str]) -> (String, String, i32) {
+    let binary_path = if cfg!(debug_assertions) {
+        "./target/debug/kelora"
+    } else {
+        "./target/release/kelora"
+    };
+
+    let output = Command::new(binary_path)
+        .args(args)
+        .output()
+        .expect("Failed to execute kelora");
+
+    (
+        String::from_utf8_lossy(&output.stdout).to_string(),
+        String::from_utf8_lossy(&output.stderr).to_string(),
+        output.status.code().unwrap_or(-1),
+    )
+}
+
 /// Helper to extract event count from stats stderr output
 pub fn extract_events_created_from_stats(stderr: &str) -> i32 {
     for line in stderr.lines() {

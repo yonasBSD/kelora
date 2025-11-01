@@ -1444,6 +1444,11 @@ impl RhaiEngine {
         }
         scope.set_value("metrics", tracked_map);
 
+        // Set the frozen conf map (read-only)
+        if let Some(ref conf_map) = self.conf_map {
+            scope.set_value("conf", conf_map.clone());
+        }
+
         let _ = self
             .engine
             .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
@@ -1472,6 +1477,11 @@ impl RhaiEngine {
         }
         scope.set_value("metrics", metrics_map);
         scope.push_constant("span", Dynamic::from(span));
+
+        // Set the frozen conf map (read-only)
+        if let Some(ref conf_map) = self.conf_map {
+            scope.set_value("conf", conf_map.clone());
+        }
 
         crate::rhai_functions::file_ops::clear_pending_ops();
 
@@ -1537,6 +1547,11 @@ impl RhaiEngine {
                 tracked_map.insert(k.clone().into(), v.clone());
             }
             scope.set_value("metrics", tracked_map);
+
+            // Set the frozen conf map (read-only)
+            if let Some(ref conf_map) = self.conf_map {
+                scope.set_value("conf", conf_map.clone());
+            }
 
             let _ = self
                 .engine

@@ -270,3 +270,99 @@ fn test_filename_tracking_with_file_order() {
         stdout
     );
 }
+
+#[test]
+fn test_no_input_with_begin_only() {
+    // Test --no-input with only --begin stage
+    let (stdout, _stderr, exit_code) =
+        run_kelora(&["--no-input", "--begin", "print(\"Hello, World!\")"]);
+
+    assert_eq!(exit_code, 0, "Should exit successfully");
+    assert!(
+        stdout.contains("Hello, World!"),
+        "Should execute begin stage: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_no_input_with_begin_and_end() {
+    // Test --no-input with both --begin and --end stages
+    let (stdout, _stderr, exit_code) = run_kelora(&[
+        "--no-input",
+        "--begin",
+        "conf.counter = 0; for i in 0..5 { conf.counter += i; }",
+        "--end",
+        "print(`Sum: ${conf.counter}`)",
+    ]);
+
+    assert_eq!(exit_code, 0, "Should exit successfully");
+    assert!(
+        stdout.contains("Sum: 10"),
+        "Should execute begin and end stages: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_no_input_conflicts_with_files() {
+    // Test that --no-input conflicts with file arguments
+    let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
+    temp_file
+        .write_all(b"test\n")
+        .expect("Failed to write to temp file");
+
+    let (stdout, stderr, exit_code) =
+        run_kelora_with_files(&["--no-input"], &[temp_file.path().to_str().unwrap()]);
+
+    assert_ne!(exit_code, 0, "Should fail with error");
+    assert!(
+        stderr.contains("--no-input cannot be used with input files"),
+        "Should show conflict error: {}",
+        stderr
+    );
+    assert!(stdout.is_empty());
+}
+
+#[test]
+fn test_no_input_with_metrics() {
+    // Test --no-input with metrics tracking in begin/end stages
+    let (stdout, _stderr, exit_code) = run_kelora(&[
+        "--no-input",
+        "--begin",
+        "for i in 0..10 { track_count(\"iterations\"); }",
+        "--end",
+        "print(`Total iterations: ${metrics[\"iterations\"]}`)",
+    ]);
+
+    assert_eq!(exit_code, 0, "Should exit successfully");
+    assert!(
+        stdout.contains("Total iterations: 10"),
+        "Should track metrics across stages: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_no_input_sequential_mode() {
+    // Test --no-input in sequential mode (default)
+    let (stdout, _stderr, exit_code) =
+        run_kelora(&["--no-input", "--begin", "print(\"Sequential mode\")"]);
+
+    assert_eq!(exit_code, 0, "Should work in sequential mode");
+    assert!(stdout.contains("Sequential mode"));
+}
+
+#[test]
+fn test_no_input_parallel_mode() {
+    // Test --no-input with --parallel
+    let (stdout, _stderr, exit_code) = run_kelora(&[
+        "--no-input",
+        "--parallel",
+        "--begin",
+        "print(\"Parallel mode\")",
+    ]);
+
+    assert_eq!(exit_code, 0, "Should work in parallel mode");
+    assert!(stdout.contains("Parallel mode"));
+}

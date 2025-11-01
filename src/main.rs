@@ -58,8 +58,16 @@ fn detect_format_from_peekable_reader<R: std::io::BufRead>(
 
 /// Detect format for parallel mode processing
 /// Returns the detected format
-fn detect_format_for_parallel_mode(files: &[String]) -> Result<config::InputFormat> {
+fn detect_format_for_parallel_mode(
+    files: &[String],
+    no_input: bool,
+) -> Result<config::InputFormat> {
     use std::io;
+
+    if no_input {
+        // For --no-input mode, default to Line format
+        return Ok(config::InputFormat::Line);
+    }
 
     if files.is_empty() {
         // For stdin with potential gzip/zstd, handle decompression first
@@ -160,7 +168,8 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     // Handle auto-detection for parallel mode
     let final_config = if matches!(config.input.format, config::InputFormat::Auto) {
         // For parallel mode, we need to detect format first
-        let detected_format = detect_format_for_parallel_mode(&config.input.files)?;
+        let detected_format =
+            detect_format_for_parallel_mode(&config.input.files, config.input.no_input)?;
 
         // Report detected format
         if config.processing.quiet_level == 0 {
@@ -270,7 +279,10 @@ fn run_pipeline_sequential<W: Write>(
         return run_pipeline_sequential_with_auto_detection(config, output, ctrl_rx);
     }
 
-    let input = if config.input.files.is_empty() {
+    let input = if config.input.no_input {
+        // Create empty input for --no-input mode
+        SequentialInput::Stdin(Box::new(io::BufReader::new(io::Cursor::new(Vec::new()))))
+    } else if config.input.files.is_empty() {
         let stdin_reader = readers::ChannelStdinReader::new()?;
         let processed_stdin = decompression::maybe_decompress(stdin_reader)?;
         SequentialInput::Stdin(Box::new(io::BufReader::new(processed_stdin)))
@@ -289,6 +301,15 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
     output: &mut W,
     ctrl_rx: Receiver<Ctrl>,
 ) -> Result<()> {
+    if config.input.no_input {
+        // For --no-input mode, skip auto-detection and use empty input with Line format
+        let mut final_config = config.clone();
+        final_config.input.format = config::InputFormat::Line;
+        let input =
+            SequentialInput::Stdin(Box::new(io::BufReader::new(io::Cursor::new(Vec::new()))));
+        return run_pipeline_sequential_internal(&final_config, output, ctrl_rx, input);
+    }
+
     if config.input.files.is_empty() {
         let stdin_reader = readers::ChannelStdinReader::new()?;
         let processed_stdin = decompression::maybe_decompress(stdin_reader)?;
@@ -1422,6 +1443,13 @@ fn main() -> Result<()> {
 
 /// Validate CLI arguments for early error detection
 fn validate_cli_args(cli: &Cli) -> Result<()> {
+    // Validate --no-input conflicts
+    if cli.no_input && !cli.files.is_empty() {
+        return Err(anyhow::anyhow!(
+            "--no-input cannot be used with input files"
+        ));
+    }
+
     // Check if input files exist (if specified), skip "-" which represents stdin
     let mut stdin_count = 0;
     for file_path in &cli.files {
@@ -1730,8 +1758,8 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
 
     // Config file defaults and aliases are already applied in process_args above
 
-    // Show usage if on TTY and no input files provided (but not if "-" is explicitly specified)
-    if crate::tty::is_stdin_tty() && cli.files.is_empty() {
+    // Show usage if on TTY and no input files provided (unless --no-input is specified)
+    if crate::tty::is_stdin_tty() && cli.files.is_empty() && !cli.no_input {
         // Print brief usage with description and help hint
         println!("{}", Cli::command().render_usage());
         println!("A command-line log analysis tool with embedded Rhai scripting");

@@ -59,6 +59,10 @@ pub struct Cli {
     /// Input files (stdin if not specified, or use "-" to explicitly specify stdin)
     pub files: Vec<String>,
 
+    /// Run without reading input (useful for scripts that only use --begin/--end stages)
+    #[arg(long = "no-input", help_heading = "Input Options")]
+    pub no_input: bool,
+
     /// Input format. Supports standard formats (json, line, csv, etc.), cols:<spec> for column parsing, and csv/tsv with type annotations.
     /// Examples: -f json, -f 'cols:ts level *msg', -f 'csv status:int bytes:int'
     #[arg(

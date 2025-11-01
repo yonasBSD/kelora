@@ -14,6 +14,7 @@ pub struct KeloraConfig {
 #[derive(Debug, Clone)]
 pub struct InputConfig {
     pub files: Vec<String>,
+    pub no_input: bool,
     pub format: InputFormat,
     pub file_order: FileOrder,
     pub skip_lines: usize,
@@ -614,6 +615,7 @@ impl KeloraConfig {
         Ok(Self {
             input: InputConfig {
                 files: cli.files.clone(),
+                no_input: cli.no_input,
                 format: if cli.json_input {
                     InputFormat::Json
                 } else {
@@ -715,6 +717,7 @@ impl Default for KeloraConfig {
         Self {
             input: InputConfig {
                 files: Vec::new(),
+                no_input: false,
                 format: InputFormat::Json,
                 file_order: FileOrder::Cli,
                 skip_lines: 0,
