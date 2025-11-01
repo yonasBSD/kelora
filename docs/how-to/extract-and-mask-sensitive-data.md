@@ -71,7 +71,7 @@ Run automated checks to ensure sensitive patterns no longer appear.
 ```bash
 kelora -j sanitized.json \
   -qq \
-  --filter 'e.message.has_matches("\\b\\d{3}-\\d{2}-\\d{4}\\b") || e.message.has_matches("@")' \
+  --filter 'e.message.matches("\\b\\d{3}-\\d{2}-\\d{4}\\b") || e.message.matches("@")' \
   && echo "WARNING: potential PII found" \
   || echo "Sanitisation checks passed"
 ```

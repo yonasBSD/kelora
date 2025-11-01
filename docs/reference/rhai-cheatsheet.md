@@ -197,6 +197,7 @@ e.headers["user-agent"]               // Bracket notation for special chars
 
 // Field existence checking
 "field" in e                          // Check top-level field exists
+e.has("field")                        // True only if value not ()
 e.has_path("user.role")               // Check nested path exists
 
 // Safe field access with defaults

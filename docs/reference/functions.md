@@ -460,14 +460,52 @@ if e.message.contains("timeout") {
 }
 ```
 
+#### `text.like(pattern)`
+Glob match (anchored) with `*` and `?`.
+
+```rhai
+if e.message.like("ERROR * timeout") {
+    e.timeout_error = true
+}
+```
+
+#### `text.ilike(pattern)`
+Case-insensitive glob match with Unicode folding.
+
+```rhai
+if e.message.ilike("*straße*") {
+    e.locale = "de"
+}
+```
+
+#### `text.matches(pattern)`
+Regex search with cached compilation. Invalid patterns raise errors.
+
+```rhai
+if e.path.matches(r"^/api/[^/]+/details$") {
+    e.route = "details"
+}
+```
+
 #### `text.has_matches(pattern)`
-Check if text matches regex pattern.
+Legacy regex helper (invalid patterns return `false`).
 
 ```rhai
 if e.code.has_matches(r"^ERR-\d+$") {
     e.valid_error_code = true
 }
 ```
+
+#### `text.matches` vs `text.has_matches`
+
+| Function | Anchored | Errors on invalid pattern | Case handling | Use case |
+|----------|----------|---------------------------|---------------|----------|
+| `like()` | Yes      | N/A (glob syntax)         | Exact         | Simple wildcard matching |
+| `ilike()`| Yes      | N/A                       | Unicode fold  | Case-insensitive glob |
+| `matches()` | No   | Yes                       | Regex-driven  | Full regex search with caching |
+| `has_matches()` | No | No (returns `false`)    | Regex-driven  | Backwards-compatible regex check |
+
+> ⚠️ Regex performance tips: avoid nested quantifiers like `(.*)*`, prefer anchored patterns when possible, and reuse patterns to benefit from the per-thread cache.
 
 #### `text.is_digit()`
 Check if text contains only digits.
@@ -680,6 +718,15 @@ Check if map contains key with non-unit value.
 ```rhai
 if e.has_field("error_code") {
     // Field exists and has a value
+}
+```
+
+#### `map.has("key")`
+Check if map contains key whose value is not `()`.
+
+```rhai
+if e.has("user") {
+    // `user` present and not explicitly cleared to ()
 }
 ```
 
