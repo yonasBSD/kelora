@@ -25,6 +25,8 @@ Tools that feed data **into** Kelora:
 |------|----------|---------|
 | **grep/ripgrep** | Pre-filter | Fast text filtering before parsing |
 | **tail/journalctl** | Streaming | Live log monitoring |
+| **kubectl** | Container logs | Stream Kubernetes pod logs |
+| **docker/docker compose** | Container logs | Stream Docker container logs |
 | **find + xargs** | Discovery | Locate log archives for batch processing |
 | **jc** | Converter | Convert command output to JSON for Kelora |
 
@@ -99,6 +101,53 @@ journalctl -u myapp.service -f --output=json | \
 ```
 
 See [Design Streaming Alerts](build-streaming-alerts.md) for complete alert workflows.
+
+---
+
+### kubectl — Kubernetes Pod Logs
+
+Stream logs from Kubernetes pods into Kelora for real-time monitoring and analysis. Essential for debugging containerized applications and tracking issues across pod restarts. Use `-f` for live streaming, `--tail` to limit history, and `--all-containers` for multi-container pods.
+
+```bash
+# Stream logs from a specific pod
+kubectl logs -f pod-name | kelora -j -l error,warn
+
+# Follow logs from a deployment with label selector
+kubectl logs -f -l app=myapp --all-containers=true | \
+  kelora -j --filter 'e.level == "ERROR"' -F json
+
+# Stream logs from previous container instance (after crash)
+kubectl logs -f pod-name --previous | \
+  kelora -j --window 50 -e 'track_count("error_type|" + e.error)'
+
+# Multi-pod log aggregation
+kubectl logs -f -l app=myapp --prefix=true | \
+  kelora -f auto -e 'e.pod = e.message.split(" ")[0]' -J
+```
+
+See [Design Streaming Alerts](build-streaming-alerts.md) for alerting patterns that work well with kubectl streaming.
+
+---
+
+### docker / docker compose — Container Logs
+
+Stream Docker container logs into Kelora for local development and single-host deployments. Use `docker logs -f` or `docker compose logs -f` for live streaming. Combine `--tail` to limit history and `--timestamps` for temporal analysis.
+
+```bash
+# Stream logs from a single container
+docker logs -f container-name | kelora -j -l error,critical
+
+# Follow logs from all compose services
+docker compose logs -f | kelora -f logfmt --filter 'e.service == "api"'
+
+# Stream with timestamps for correlation
+docker logs -f --timestamps myapp | \
+  kelora -f auto -e 'track_count(e.level)' --metrics
+
+# Multiple containers with filtering
+docker compose logs -f api worker | \
+  kelora -j --filter 'e.response_time > 1000' -k timestamp,service,response_time
+```
 
 ---
 
