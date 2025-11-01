@@ -1,226 +1,87 @@
-Heck yes—methods it is. Here’s a tight draft you can drop into Kelora without waking the feature-creep goblin.
+# Micro Search Methods – Feature Specification
 
-# Micro-Search Methods (Rhai)
+## Goals
+- Provide first-class Rhai helpers for common string filtering and event-key checks inside `--filter`.
+- Keep the API small, predictable, and Unicode-safe so beginners can reach for it without learning new DSLs.
+- Avoid adding new CLI flags or secondary parsing modes.
+
+## Non-Goals
+- No new wildcards beyond `*` (zero or more scalars) and `?` (exactly one scalar).
+- No path-style globbing (`[]`, `{}`, `**`) or regex substitutions.
+- No deep field traversal; nested key discovery remains the job of `has_path`.
+- No change to existing `contains`, `matches`, or core Rhai semantics.
 
 ## Surface API (Rhai)
+- `str.like(pattern: string) -> bool`
+- `str.ilike(pattern: string) -> bool`
+- `str.match(pattern: string) -> bool`
+- `str.imatch(pattern: string) -> bool`
+- `e.has(key: string) -> bool`
 
-On **String** values:
-
-* `str.like(pattern: string) -> bool`
-  Glob matching: `*` = any sequence, `?` = any single char. Case-sensitive.
-* `str.ilike(pattern: string) -> bool`
-  Same as `like` but case-insensitive (Unicode simple fold).
-* `str.match(pattern: string) -> bool`
-  Regex “find” (not anchored). Case-sensitive.
-* `str.imatch(pattern: string) -> bool`
-  Regex “find”, case-insensitive.
-
-On **maps/events**:
-
-* `e.has(key: string) -> bool`
-  Top-level existence check (sugar for `"key" in e`). Keeps beginners out of `"field" in e` syntax.
-
-### Examples
-
+### Quick examples
 ```bash
-# substring/glob
 kelora -f json --filter 'e.msg.ilike("*timeout*")'
-
-# regex, case-insensitive
 kelora -f json --filter 'e.msg.imatch("user\\s+not\\s+found")'
-
-# field presence + simple glob
 kelora -f logfmt --filter 'e.has("user") && e.user.like("alice*")'
 ```
 
----
+## Detailed Behavior
 
-## Semantics (precise but boring)
+### `like` / `ilike`
+- Match the **entire** string (implicit anchors).
+- Wildcards: `*` matches zero or more Unicode scalar values; `?` matches exactly one scalar.
+- `like` compares scalars exactly as stored.
+- `ilike` applies Unicode simple case folding to both haystack and pattern:
+  - Normalize with NFKC, then apply default case fold (requires `unicode-normalization` or equivalent).
+  - Guarantees `"Straße".ilike("strasse") == true`, `"CAFÉ".ilike("café") == true`.
+- Implementation iterates over `Vec<char>` (scalar values). No byte slicing.
 
-### `like` / `ilike` (glob)
+### `match` / `imatch`
+- Use the `regex` crate (search semantics, not anchored).
+- `imatch` compiles with case-insensitive flag.
+- Inputs are treated as UTF-8; regex crate already processes Unicode scalars appropriately.
+- Invalid regex patterns yield `false` in default mode; they must raise an error when Kelora is running with `--strict`.
+- Compiled regexes should be cached (e.g., `once_cell` + `Mutex<HashMap<(pattern, ci), Regex>>`) to amortize compilation cost.
 
-* Supported wildcards: `*` (0+ chars), `?` (exactly 1 char).
-* **No** `[]` character classes (keep it KISS and fast).
-* `like`: byte-wise compare; `ilike`: Unicode case-folded (Rust `to_lowercase()` on both haystack + pattern once).
-* Pattern is matched against the **entire** string (implicit `^...$` semantics).
+### `has`
+- Checks only top-level keys present on the event/map.
+- Returns `false` if the key is missing **or** the stored value is Rhai unit `()`, honoring the project-wide sentinel meaning of “intentionally empty”.
+- Returns `true` for any other value, including empty strings, zero, empty arrays/maps, etc.
+- For nested paths, users continue to use `e.has_path("foo.bar")`.
 
-### `match` / `imatch` (regex)
+## Implementation Notes
+- Introduce `src/rhai_functions/micro_search.rs` with:
+  - UTF-8-aware `glob_like`.
+  - Regex helper with cache.
+  - Public `register(engine: &mut Engine)` that wires all five methods.
+- Add `unicode-normalization` dependency (or `unicode_casefold`) to support case folding.
+- Update `src/rhai_functions/mod.rs` and any engine bootstrapping code to register the new module.
+- Leave room for future perf tuning by isolating hot loops.
 
-* Engine: `regex` crate.
-* Uses **search** (find) semantics, not anchored. Users can write `^…$` if they want anchoring.
-* `imatch` compiles with case-insensitive flag (equivalent to `(?i)`).
+## Documentation Requirements
+- Update `src/rhai_functions/docs.rs` entries for `like`, `ilike`, `match`, `imatch`, `has`.
+- Clarify `has` vs raw `"key" in e`, especially the `()` sentinel behavior.
+- Mention Unicode guarantees and pattern limitations.
+- Add CLI help snippets (`--help-functions`, `--help-examples`) mirroring the examples above.
 
-### `e.has(key)`
+## Testing Requirements
+- Unit tests covering:
+  - ASCII success/failure cases.
+  - Unicode scalars (`"🚀"`, `"café"`, `"Straße"`).
+  - `ilike` folding (`"straße".ilike("STRASSE")`).
+  - `has` returning `false` for `()`, `true` for other values.
+  - Invalid regex returning `false`, `imatch` case-insensitive search.
+- Integration smoke tests in `tests/integration_tests.rs` that run the CLI against small JSON/logfmt fixtures to exercise each helper end-to-end.
 
-* Checks only **top-level** keys on the event/map.
-* Equivalent to `"key" in e`, but clearer to read.
-* For nested: users should continue to use `e.has_path("a.b[0].c")` (already documented).
+## Performance & Safety
+- Glob matcher operates on scalars without heap reallocations beyond initial `Vec<char>` conversion.
+- Regex cache prevents repeated compilation; consider LRU if memory pressure is observed, but plain `HashMap` is acceptable to start.
+- No additional allocations or syscalls in hot path beyond what Rhai already performs.
 
----
-
-## Rust API (binding to Rhai)
-
-```rust
-use once_cell::sync::Lazy;
-use regex::{Regex, RegexBuilder};
-use std::collections::HashMap;
-use std::sync::Mutex;
-use rhai::{Engine, Map, Dynamic};
-
-// ---------- Regex cache ----------
-static RE_CACHE: Lazy<Mutex<HashMap<(String, bool), Regex>>> =
-    Lazy::new(|| Mutex::new(HashMap::with_capacity(128)));
-
-fn re_find(s: &str, pat: &str, case_insensitive: bool) -> bool {
-    let key = (pat.to_string(), case_insensitive);
-    let re = {
-        let mut cache = RE_CACHE.lock().unwrap();
-        if let Some(r) = cache.get(&key) { r.clone() } else {
-            let r = RegexBuilder::new(&pat)
-                .case_insensitive(case_insensitive)
-                .build()
-                .unwrap_or_else(|_| Regex::new("$^").unwrap()); // never matches on invalid regex
-            cache.insert(key.clone(), r.clone());
-            r
-        }
-    };
-    re.find(s).is_some()
-}
-
-// ---------- Glob (*, ?) ----------
-fn glob_like(s: &str, pat: &str, case_insensitive: bool) -> bool {
-    fn norm(x: &str, ci: bool) -> std::borrow::Cow<'_, str> {
-        if ci { x.to_lowercase().into() } else { x.into() }
-    }
-    let s = norm(s, case_insensitive);
-    let p = norm(pat, case_insensitive);
-
-    // Simple iterative matcher, supports * and ?
-    let (mut si, mut pi, mut star_pi, mut star_si) = (0usize, 0usize, None, 0usize);
-    let sb = s.as_bytes();
-    let pb = p.as_bytes();
-
-    while si < sb.len() {
-        if pi < pb.len() && (pb[pi] == b'?' || pb[pi] == sb[si]) {
-            si += 1; pi += 1;
-        } else if pi < pb.len() && pb[pi] == b'*' {
-            star_pi = Some(pi);
-            star_si = si;
-            pi += 1;
-        } else if let Some(sp) = star_pi {
-            pi = sp + 1;
-            star_si += 1;
-            si = star_si;
-        } else {
-            return false;
-        }
-    }
-    while pi < pb.len() && pb[pi] == b'*' { pi += 1; }
-    pi == pb.len()
-}
-
-// ---------- Rhai-callable wrappers ----------
-fn str_like(s: &str, pat: &str) -> bool { glob_like(s, pat, false) }
-fn str_ilike(s: &str, pat: &str) -> bool { glob_like(s, pat, true) }
-fn str_match(s: &str, re: &str) -> bool { re_find(s, re, false) }
-fn str_imatch(s: &str, re: &str) -> bool { re_find(s, re, true) }
-fn map_has(m: &Map, key: &str) -> bool { m.contains_key(key) }
-
-// ---------- Registration ----------
-pub fn register_search_methods(engine: &mut Engine) {
-    engine.register_fn("like", str_like);
-    engine.register_fn("ilike", str_ilike);
-    engine.register_fn("match", str_match);
-    engine.register_fn("imatch", str_imatch);
-    engine.register_fn("has", map_has);
-}
-// Rhai treats functions as methods when the first argument’s type matches the receiver,
-// so `"abc".like("*")` and `e.has("field")` work.
-```
-
-**Notes**
-
-* `Regex` is `Clone`, cloning is cheap; cache keeps compiled forms. Start with a plain `HashMap`; if you want, swap to a tiny LRU later.
-* Invalid regexes return `false` without aborting (consistent with resilient mode); in `--strict` you might prefer surfacing the error—your call.
-
----
-
-## Tests (unit + integration)
-
-### Unit (Rhai engine)
-
-```rust
-#[test]
-fn test_like_basic() {
-    let mut eng = Engine::new();
-    register_search_methods(&mut eng);
-    assert!(eng.eval::<bool>(r#""hello".like("he*o")"#).unwrap());
-    assert!(!eng.eval::<bool>(r#""hello".like("he?lo!")"#).unwrap());
-}
-
-#[test]
-fn test_ilike_unicode() {
-    let mut eng = Engine::new();
-    register_search_methods(&mut eng);
-    assert!(eng.eval::<bool>(r#""Straße".ilike("strasse")"#).unwrap()); // simple fold pass
-}
-
-#[test]
-fn test_match_find() {
-    let mut eng = Engine::new();
-    register_search_methods(&mut eng);
-    assert!(eng.eval::<bool>(r#""user not found".match("not\\s+f")"#).unwrap());
-    assert!(!eng.eval::<bool>(r#""abc".match("^z")"#).unwrap());
-}
-
-#[test]
-fn test_imatch_flag() {
-    let mut eng = Engine::new();
-    register_search_methods(&mut eng);
-    assert!(eng.eval::<bool>(r#""Timeout".imatch("timeout")"#).unwrap());
-}
-
-#[test]
-fn test_map_has() {
-    let mut eng = Engine::new();
-    register_search_methods(&mut eng);
-    let ok = eng.eval::<bool>(r#"let e = #{user: "alice"}; e.has("user")"#).unwrap();
-    assert!(ok);
-}
-```
-
-### CLI smoke (integration)
-
-```
-# glob
-echo '{"msg":"read timeout"}' \
- | kelora -f json --filter 'e.msg.ilike("*timeout*")' -J
-
-# regex
-echo '{"msg":"user not found"}' \
- | kelora -f json --filter 'e.msg.imatch("user\\s+not\\s+found")' -J
-
-# field presence
-echo 'level=info msg="started" user=alice' \
- | kelora -f logfmt --filter 'e.has("user") && e.user.like("ali*")'
-```
-
----
-
-## Docs (one tiny box)
-
-**Quick Searching**
-
-* Substring/glob: `e.msg.like("error*")`, case-insensitive: `ilike`
-* Regex search: `e.msg.match("timeout|failed")`, case-insensitive: `imatch`
-* Field presence: `e.has("user")` (top-level). For nested use `e.has_path("user.name")`.
-
----
-
-## Why this stays KISS
-
-* No new flag, no new DSL. Power lives in `--filter`.
-* Clear names, method style, zero gotchas.
-* Fast paths: `like/ilike` avoid regex cost; regex is cached.
-
-If you nod, I can convert this into a PR-ready patch layout (module file, registration call in your `engine.rs`, tests under `tests/`).
+## Rollout Checklist
+1. Implement module and register functions.
+2. Add dependency for Unicode folding.
+3. Write unit + integration tests.
+4. Update documentation and CLI help.
+5. Run `just fmt`, `just lint`, `just test`.
+6. Verify new helpers appear in `--help-functions` output.
