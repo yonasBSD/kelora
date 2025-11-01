@@ -14,14 +14,12 @@
 ## Surface API (Rhai)
 - `str.like(pattern: string) -> bool`
 - `str.ilike(pattern: string) -> bool`
-- `str.match(pattern: string) -> bool`
-- `str.imatch(pattern: string) -> bool`
 - `e.has(key: string) -> bool`
 
 ### Quick examples
 ```bash
 kelora -f json --filter 'e.msg.ilike("*timeout*")'
-kelora -f json --filter 'e.msg.imatch("user\\s+not\\s+found")'
+kelora -f json --filter 'e.msg.matches("user\\s+not\\s+found")'
 kelora -f logfmt --filter 'e.has("user") && e.user.like("alice*")'
 ```
 
@@ -36,12 +34,11 @@ kelora -f logfmt --filter 'e.has("user") && e.user.like("alice*")'
   - Guarantees `"Straße".ilike("strasse") == true`, `"CAFÉ".ilike("café") == true`.
 - Implementation iterates over `Vec<char>` (scalar values). No byte slicing.
 
-### `match` / `imatch`
-- Use the `regex` crate (search semantics, not anchored).
-- `imatch` compiles with case-insensitive flag.
+### `matches`
+- Reuse the existing Rhai `matches` helper for regex search; no new variant is added.
 - Inputs are treated as UTF-8; regex crate already processes Unicode scalars appropriately.
-- Invalid regex patterns yield `false` in default mode; they must raise an error when Kelora is running with `--strict`.
-- Compiled regexes should be cached (e.g., `once_cell` + `Mutex<HashMap<(pattern, ci), Regex>>`) to amortize compilation cost.
+- Invalid regex patterns should raise errors (respecting `--strict` and quiet modes) instead of silently returning `false`.
+- Compiled regexes should be cached using a concurrent, bounded structure (e.g., LRU inside `DashMap` or thread-local caches) so `--parallel` runs stay scalable.
 
 ### `has`
 - Checks only top-level keys present on the event/map.
@@ -52,14 +49,14 @@ kelora -f logfmt --filter 'e.has("user") && e.user.like("alice*")'
 ## Implementation Notes
 - Introduce `src/rhai_functions/micro_search.rs` with:
   - UTF-8-aware `glob_like`.
-  - Regex helper with cache.
-  - Public `register(engine: &mut Engine)` that wires all five methods.
+- Public `register(engine: &mut Engine)` that wires all three methods.
+- Add shared regex caching utilities (concurrent + LRU) that the existing `matches` helper can call.
 - Add `unicode-normalization` dependency (or `unicode_casefold`) to support case folding.
 - Update `src/rhai_functions/mod.rs` and any engine bootstrapping code to register the new module.
 - Leave room for future perf tuning by isolating hot loops.
 
 ## Documentation Requirements
-- Update `src/rhai_functions/docs.rs` entries for `like`, `ilike`, `match`, `imatch`, `has`.
+- Update `src/rhai_functions/docs.rs` entries for `like`, `ilike`, `has`, and document the regex caching/error behavior for `matches`.
 - Clarify `has` vs raw `"key" in e`, especially the `()` sentinel behavior.
 - Mention Unicode guarantees and pattern limitations.
 - Add CLI help snippets (`--help-functions`, `--help-examples`) mirroring the examples above.
@@ -70,12 +67,12 @@ kelora -f logfmt --filter 'e.has("user") && e.user.like("alice*")'
   - Unicode scalars (`"🚀"`, `"café"`, `"Straße"`).
   - `ilike` folding (`"straße".ilike("STRASSE")`).
   - `has` returning `false` for `()`, `true` for other values.
-  - Invalid regex returning `false`, `imatch` case-insensitive search.
+  - Invalid regex error propagation.
 - Integration smoke tests in `tests/integration_tests.rs` that run the CLI against small JSON/logfmt fixtures to exercise each helper end-to-end.
 
 ## Performance & Safety
 - Glob matcher operates on scalars without heap reallocations beyond initial `Vec<char>` conversion.
-- Regex cache prevents repeated compilation; consider LRU if memory pressure is observed, but plain `HashMap` is acceptable to start.
+- Regex cache prevents repeated compilation; ship with a bounded LRU backed by a concurrent map so `--parallel` workers avoid contending on a single mutex.
 - No additional allocations or syscalls in hot path beyond what Rhai already performs.
 
 ## Rollout Checklist
