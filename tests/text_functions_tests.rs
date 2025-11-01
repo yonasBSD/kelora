@@ -201,7 +201,7 @@ fn test_status_class_function() {
 }
 
 #[test]
-fn test_or_unit_with_empty_strings() {
+fn test_or_empty_with_empty_strings() {
     let input = r#"{"message": "prefix:found"}
 {"message": "no prefix here"}
 {"message": "prefix:also_found"}"#;
@@ -211,7 +211,7 @@ fn test_or_unit_with_empty_strings() {
             "-f",
             "json",
             "--exec",
-            "e.extracted = e.message.after(\"prefix:\").or_unit();",
+            "e.extracted = e.message.after(\"prefix:\").or_empty();",
             "-F",
             "json",
         ],
@@ -243,7 +243,7 @@ fn test_or_unit_with_empty_strings() {
 }
 
 #[test]
-fn test_or_unit_prevents_empty_field_assignment() {
+fn test_or_empty_prevents_empty_field_assignment() {
     let input = r#"{"message": "prefix:value1"}
 {"message": "no prefix"}
 {"message": "prefix:value2"}"#;
@@ -253,7 +253,7 @@ fn test_or_unit_prevents_empty_field_assignment() {
             "-f",
             "json",
             "--exec",
-            "e.extracted = e.message.after(\"prefix:\").or_unit(); track_unique(\"values\", e.extracted);",
+            "e.extracted = e.message.after(\"prefix:\").or_empty(); track_unique(\"values\", e.extracted);",
             "--end",
             "print(`Unique: ${metrics[\"values\"].len()}`);",
         ],
@@ -269,7 +269,7 @@ fn test_or_unit_prevents_empty_field_assignment() {
 }
 
 #[test]
-fn test_or_unit_with_empty_arrays() {
+fn test_or_empty_with_empty_arrays() {
     let input = r#"{"id": 1, "tags": ["a", "b"]}
 {"id": 2, "tags": []}
 {"id": 3, "tags": ["c"]}"#;
@@ -279,7 +279,7 @@ fn test_or_unit_with_empty_arrays() {
             "-f",
             "json",
             "--exec",
-            "e.tags = e.tags.or_unit();",
+            "e.tags = e.tags.or_empty();",
             "-F",
             "json",
         ],
@@ -314,7 +314,7 @@ fn test_or_unit_with_empty_arrays() {
 }
 
 #[test]
-fn test_or_unit_with_empty_maps() {
+fn test_or_empty_with_empty_maps() {
     let input = r#"{"id": 1, "metadata": {"key": "value"}}
 {"id": 2, "metadata": {}}
 {"id": 3, "metadata": {"foo": "bar"}}"#;
@@ -324,7 +324,7 @@ fn test_or_unit_with_empty_maps() {
             "-f",
             "json",
             "--exec",
-            "e.metadata = e.metadata.or_unit();",
+            "e.metadata = e.metadata.or_empty();",
             "-F",
             "json",
         ],

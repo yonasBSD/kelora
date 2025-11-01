@@ -952,11 +952,11 @@ e.status = to_int_or(e.status_string, 0)
 e.score = to_float_or(e.score_string, 0.0)
 ```
 
-#### `value.or_unit()`
+#### `value.or_empty()`
 Convert empty values to Unit `()` for removal/filtering.
 
 Converts conceptually "empty" values to Unit, which:
-- Removes the field when assigned (e.g., `e.field = value.or_unit()`)
+- Removes the field when assigned (e.g., `e.field = value.or_empty()`)
 - Gets skipped by `track_*()` functions
 - Works with missing fields (passes Unit through unchanged)
 
@@ -969,40 +969,40 @@ Converts conceptually "empty" values to Unit, which:
 **String extraction:**
 ```rhai
 // Extract only when prefix exists, otherwise remove field
-e.name = e.message.after("prefix:").or_unit()
+e.name = e.message.after("prefix:").or_empty()
 
 // Track only non-empty values
-track_unique("names", e.extracted.or_unit())
+track_unique("names", e.extracted.or_empty())
 ```
 
 **Array filtering:**
 ```rhai
 // Only assign tags if array is non-empty
-e.tags = e.tags.or_unit()  // [] becomes (), field removed
+e.tags = e.tags.or_empty()  // [] becomes (), field removed
 
 // Track only events with items
 track_bucket("item_count", e.items.len())
 if e.items.len() == 0 {
-    e.items = e.items.or_unit()  // Remove empty array
+    e.items = e.items.or_empty()  // Remove empty array
 }
 ```
 
 **Map filtering:**
 ```rhai
 // Only keep non-empty metadata
-e.metadata = e.parse_json().or_unit()  // {} becomes (), field removed
+e.metadata = e.parse_json().or_empty()  // {} becomes (), field removed
 
 // Safe chaining with missing fields
-e.optional = e.maybe_field.or_unit()  // Works even if maybe_field is ()
+e.optional = e.maybe_field.or_empty()  // Works even if maybe_field is ()
 ```
 
 **Common pattern - conditional extraction and tracking:**
 ```rhai
-e.extracted = e.message.after("User:").or_unit()
+e.extracted = e.message.after("User:").or_empty()
 track_unique("users", e.extracted)  // Only tracks when extraction succeeds
 
 // Filter events with no data
-e.results = e.search_results.or_unit()
+e.results = e.search_results.or_empty()
 track_unique("result_sets", e.results)  // Skips empty arrays and ()
 ```
 
@@ -1113,8 +1113,8 @@ Track unique values for key. Skips Unit `()` values.
 track_unique("users", e.user_id)
 track_unique("ips", e.client_ip)
 
-// Combined with .or_unit() for conditional tracking
-track_unique("names", e.message.after("User:").or_unit())
+// Combined with .or_empty() for conditional tracking
+track_unique("names", e.message.after("User:").or_empty())
 ```
 
 #### `track_bucket(key, bucket)`
@@ -1125,7 +1125,7 @@ let bucket = floor(e.response_time / 100) * 100
 track_bucket("latency", bucket)
 
 // Safe with optional fields
-track_bucket("user_types", e.user_type.or_unit())  // Skips empty/missing
+track_bucket("user_types", e.user_type.or_empty())  // Skips empty/missing
 ```
 
 ---

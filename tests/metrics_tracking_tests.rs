@@ -228,7 +228,7 @@ fn test_track_unique_with_unit_values() {
             "-f",
             "json",
             "--exec",
-            "track_unique(\"users\", e.user); track_unique(\"optionals\", e.optional.or_unit());",
+            "track_unique(\"users\", e.user); track_unique(\"optionals\", e.optional.or_empty());",
             "--end",
             "print(`Users: ${metrics[\"users\"].len()}, Optionals: ${metrics[\"optionals\"].len()}`);"
         ],
@@ -256,7 +256,7 @@ fn test_track_unique_with_empty_arrays() {
             "-f",
             "json",
             "--exec",
-            "let tag_str = e.tags.join(\",\"); track_unique(\"tag_sets\", tag_str.or_unit());",
+            "let tag_str = e.tags.join(\",\"); track_unique(\"tag_sets\", tag_str.or_empty());",
             "--end",
             "print(`Unique: ${metrics[\"tag_sets\"].len()}`);",
             "--metrics",
@@ -321,7 +321,7 @@ fn test_track_bucket_with_unit() {
             "-f",
             "json",
             "--exec",
-            "track_bucket(\"status_dist\", e.status); track_bucket(\"user_dist\", e.user.or_unit());",
+            "track_bucket(\"status_dist\", e.status); track_bucket(\"user_dist\", e.user.or_empty());",
             "--end",
             "print(`Status_200: ${metrics[\"status_dist\"].get(\"200\") ?? 0}, Users: ${metrics[\"user_dist\"].len()}`);"
         ],

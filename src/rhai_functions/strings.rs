@@ -1188,7 +1188,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     // Convert empty string to Unit for removal/filtering
-    engine.register_fn("or_unit", |text: &str| -> rhai::Dynamic {
+    engine.register_fn("or_empty", |text: &str| -> rhai::Dynamic {
         if text.is_empty() {
             Dynamic::UNIT
         } else {
@@ -1197,10 +1197,10 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     // Unit overload - if already Unit, just pass through
-    engine.register_fn("or_unit", |_unit: ()| -> rhai::Dynamic { Dynamic::UNIT });
+    engine.register_fn("or_empty", |_unit: ()| -> rhai::Dynamic { Dynamic::UNIT });
 
     // Array overload - convert empty array to Unit
-    engine.register_fn("or_unit", |arr: rhai::Array| -> rhai::Dynamic {
+    engine.register_fn("or_empty", |arr: rhai::Array| -> rhai::Dynamic {
         if arr.is_empty() {
             Dynamic::UNIT
         } else {
@@ -1209,7 +1209,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     // Map overload - convert empty map to Unit
-    engine.register_fn("or_unit", |map: rhai::Map| -> rhai::Dynamic {
+    engine.register_fn("or_empty", |map: rhai::Map| -> rhai::Dynamic {
         if map.is_empty() {
             Dynamic::UNIT
         } else {

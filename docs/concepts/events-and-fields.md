@@ -63,7 +63,7 @@ In Rhai, `null` from JSON becomes the unit type `()`, representing "no value" or
 - Assigning `()` to a field removes it from the event
 - Missing fields return `()` when accessed
 - `track_*()` functions silently skip `()` values
-- Use `.or_unit()` to convert empty values (strings, arrays, maps) to `()` for conditional field assignment
+- Use `.or_empty()` to convert empty values (strings, arrays, maps) to `()` for conditional field assignment
 
 ## Field Access Patterns
 
@@ -240,59 +240,59 @@ Removed fields won't appear in output.
 
 ### Conditional Field Assignment
 
-Use `.or_unit()` to conditionally assign fields based on empty values. It works with strings, arrays, and maps:
+Use `.or_empty()` to conditionally assign fields based on empty values. It works with strings, arrays, and maps:
 
 **String extraction:**
 ```rhai
 // Only assign field if extraction succeeds
-e.user = e.message.after("User:").or_unit()
+e.user = e.message.after("User:").or_empty()
 // If "User:" not found → empty string → Unit → field removed
 
-e.code = e.error.extract_re(r"ERR-(\d+)", 1).or_unit()
+e.code = e.error.extract_re(r"ERR-(\d+)", 1).or_empty()
 // If regex doesn't match → empty string → Unit → field removed
 ```
 
 **Array filtering:**
 ```rhai
 // Remove field if array is empty
-e.tags = e.tags.or_unit()
+e.tags = e.tags.or_empty()
 // If tags is [] → Unit → field removed
 
 // Only track events with items
-track_unique("has_items", e.items.or_unit())
+track_unique("has_items", e.items.or_empty())
 // Skips events where items is [] or ()
 ```
 
 **Map/object filtering:**
 ```rhai
 // Remove field if map is empty
-e.metadata = e.parse_json().or_unit()
+e.metadata = e.parse_json().or_empty()
 // If parsed JSON is {} → Unit → field removed
 
 // Only assign config if it has values
-e.config = e.settings.or_unit()
+e.config = e.settings.or_empty()
 // If settings is #{} → Unit → field removed
 ```
 
 **Combined with tracking:**
 ```rhai
-e.extracted = e.text.after("prefix:").or_unit()
+e.extracted = e.text.after("prefix:").or_empty()
 track_unique("values", e.extracted)  // Only tracks non-empty values
 ```
 
-The `.or_unit()` method converts empty values (`""`, `[]`, `#{}`) to `()`, enabling clean conditional field creation without explicit `if` statements.
+The `.or_empty()` method converts empty values (`""`, `[]`, `#{}`) to `()`, enabling clean conditional field creation without explicit `if` statements.
 
 **Pattern comparison:**
 
 ```rhai
-// Without .or_unit() - verbose
+// Without .or_empty() - verbose
 let extracted = e.message.after("User:")
 if extracted != "" {
     e.user = extracted
 }
 
-// With .or_unit() - concise
-e.user = e.message.after("User:").or_unit()
+// With .or_empty() - concise
+e.user = e.message.after("User:").or_empty()
 ```
 
 ### Remove Entire Event
@@ -507,8 +507,8 @@ kelora -f json app.log \
 ```bash
 # Extract and track only when pattern exists
 kelora -f json app.log \
-    --exec 'e.user = e.message.after("User:").or_unit()' \
-    --exec 'e.code = e.message.extract_re(r"ERR-(\d+)", 1).or_unit()' \
+    --exec 'e.user = e.message.after("User:").or_empty()' \
+    --exec 'e.code = e.message.extract_re(r"ERR-(\d+)", 1).or_empty()' \
     --exec 'track_unique("users", e.user)' \
     --exec 'track_unique("error_codes", e.code)' \
     --metrics

@@ -72,7 +72,7 @@ text.strip([chars])                  Remove whitespace or specified characters
 text.sub_string(start [,length])     Extract substring from position (builtin)
 text.to_float()                      Convert text to float (returns () on error)
 text.to_int()                        Convert text to integer (returns () on error)
-text.or_unit()                       Convert empty string/array/map to () for removal/filtering
+text.or_empty()                      Convert empty string/array/map to () for removal/filtering
 text.to_lower()                      Convert to lowercase (builtin)
 text.to_upper()                      Convert to uppercase (builtin)
 text.trim()                          Remove whitespace from start and end (builtin)
