@@ -8,6 +8,7 @@
 ## Non-Goals
 - No new wildcards beyond `*` (zero or more scalars) and `?` (exactly one scalar).
 - No path-style globbing (`[]`, `{}`, `**`) or regex substitutions.
+- No escape sequences for literal `*` or `?` characters (use `contains()` or `matches()` instead).
 - No deep field traversal; nested key discovery remains the job of `has_path`.
 - No change to existing `contains`, `matches`, or core Rhai semantics.
 
@@ -50,6 +51,28 @@ kelora -f logfmt --filter 'e.has("user") && e.user.like("alice*")'
 - Returns `false` if the key is missing **or** the stored value is Rhai unit `()`, honoring the project-wide sentinel meaning of "intentionally empty".
 - Returns `true` for any other value, including empty strings, zero, empty arrays/maps, etc.
 - For nested paths, users continue to use `e.has_path("foo.bar")`.
+
+## Edge Cases
+
+### Empty String Behavior
+Following standard glob semantics:
+
+| Expression | Result | Reason |
+|------------|--------|--------|
+| `"".like("")` | `true` | Empty matches empty exactly |
+| `"".like("*")` | `true` | `*` matches zero or more (including zero) |
+| `"".like("**")` | `true` | Multiple `*` still match zero |
+| `"".like("?")` | `false` | `?` requires exactly one scalar |
+| `"foo".like("")` | `false` | Non-empty doesn't match empty pattern |
+| `"".ilike("*")` | `true` | Same rules apply for `ilike` |
+
+### Literal Wildcards
+To match literal `*` or `?` characters, use `contains()` or escape in `matches()`:
+```rhai
+"file*.txt".contains("*")           // → true (finds literal asterisk)
+"file*.txt".matches(r"file\*\.txt") // → true (regex escape)
+"file*.txt".like("file*.txt")       // → false (asterisk is wildcard)
+```
 
 ## Function Comparison Table
 
@@ -98,7 +121,31 @@ kelora -f logfmt --filter 'e.has("user") && e.user.like("alice*")'
   - `ilike` folding (`"straße".ilike("STRASSE")`).
   - `has` returning `false` for `()`, `true` for other values.
   - Invalid regex error propagation.
+  - Empty string edge cases from the table above.
 - Integration smoke tests in `tests/integration_tests.rs` that run the CLI against small JSON/logfmt fixtures to exercise each helper end-to-end.
+
+## Benchmark Requirements
+Create `benchmarks/bench_micro_search.rs` to measure and validate performance claims:
+
+**ASCII Fast-Path Validation:**
+- `bench_like_ascii_prefix` - `"access.log".like("access*")`
+- `bench_like_ascii_suffix` - `"access.log".like("*.log")`
+- `bench_like_ascii_middle` - `"user-123-admin".like("user-*-admin")`
+
+**Unicode Overhead Measurement:**
+- `bench_like_unicode` - `"café🚀user".like("café*")`
+- `bench_ilike_unicode_fold` - `"STRAẞE".ilike("strasse*")`
+
+**Comparison Against Alternatives:**
+- `bench_like_vs_contains` - Show when to use which
+- `bench_like_vs_regex_simple` - Compare `"foo*"` vs `matches("^foo.*")`
+
+**Regex Cache Effectiveness:**
+- `bench_matches_cached` - Same pattern repeated (should be fast)
+- `bench_matches_dynamic` - Different patterns each time (measures cache miss overhead)
+- `bench_matches_parallel` - Verify no lock contention with thread-local storage
+
+**Goal:** ASCII fast-path should be 10-100x faster than Unicode scalar iteration. Cache hits should be <100ns overhead.
 
 ## Performance & Safety
 - Glob matcher operates on scalars without heap reallocations beyond initial `Vec<char>` conversion.
@@ -110,7 +157,8 @@ kelora -f logfmt --filter 'e.has("user") && e.user.like("alice*")'
 1. Implement module and register functions.
 2. Add dependency for Unicode folding and LRU cache.
 3. Write unit + integration tests.
-4. Update documentation and CLI help.
-5. Run `just fmt`, `just lint`, `just test`.
-6. **Run `just bench` to verify no performance regressions** (especially for `like`/`ilike` hot paths).
-7. Verify new helpers appear in `--help-functions` output with comparison table and ReDoS guidance.
+4. Write benchmarks per "Benchmark Requirements" section above.
+5. Update documentation and CLI help.
+6. Run `just fmt`, `just lint`, `just test`.
+7. **Run `just bench` to verify no performance regressions and validate ASCII fast-path claims** (10-100x speedup).
+8. Verify new helpers appear in `--help-functions` output with comparison table and ReDoS guidance.
