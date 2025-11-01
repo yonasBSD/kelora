@@ -21,3 +21,6 @@ Pick the scenario that matches your job-to-be-done and follow the playbook. Each
 ## Performance & Aggregation
 - [Process Archives at Scale](batch-process-archives.md)
 - [Roll Up Logs with Span Windows](span-aggregation-cookbook.md)
+
+## Integration & Workflow
+- [Integrate Kelora with External Tools](integrate-external-tools.md)
