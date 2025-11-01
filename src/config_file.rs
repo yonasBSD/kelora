@@ -704,15 +704,28 @@ mod tests {
     }
 
     // RAII guard to restore working directory on drop
+    use once_cell::sync::Lazy;
+    use std::sync::{Mutex, MutexGuard};
+
+    static CWD_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+
     struct WorkingDirGuard {
         original_dir: PathBuf,
+        _lock: MutexGuard<'static, ()>,
     }
 
     impl WorkingDirGuard {
         fn new(new_dir: &Path) -> std::io::Result<Self> {
+            let lock = CWD_MUTEX.lock().unwrap();
             let original_dir = std::env::current_dir()?;
-            std::env::set_current_dir(new_dir)?;
-            Ok(Self { original_dir })
+            if let Err(err) = std::env::set_current_dir(new_dir) {
+                drop(lock);
+                return Err(err);
+            }
+            Ok(Self {
+                original_dir,
+                _lock: lock,
+            })
         }
     }
 

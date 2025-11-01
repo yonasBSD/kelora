@@ -14,6 +14,8 @@ text.bucket()                        Fast hash for sampling/grouping (returns IN
 text.clip()                          Remove leading/trailing non-alphanumeric characters
 text.col(spec [,separator])          Extract columns by index/range/list (e.g., '1', '1,3,5', '1:4')
 text.contains(pattern)               Check if text contains pattern (builtin)
+text.like(pattern)                   Glob match (*, ?) against entire string
+text.ilike(pattern)                  Glob match with Unicode case folding (*, ?)
 text.count(pattern)                  Count occurrences of pattern in text
 text.decode_b64()                    Decode base64 string to text
 text.decode_hex()                    Decode hexadecimal string to text
@@ -32,7 +34,8 @@ text.extract_ips()                   Extract all IP addresses as array
 text.extract_re_maps(pattern, field) Extract regex matches as array of maps for fan-out
 text.extract_re(pattern [,group])    Extract regex match or capture group
 text.extract_url([nth])              Extract URL from text (nth: 1=first, -1=last)
-text.has_matches(pattern)            Check if text matches regex pattern
+text.has_matches(pattern)            Regex search (legacy helper; invalid pattern returns false)
+text.matches(pattern)                Regex search (cached; invalid pattern raises error)
 text.hash([algo])                    Hash with algorithm (default: sha256, also: sha1, md5, xxh3, blake3)
 text.index_of(pattern)               Find position of substring (-1 if not found) (builtin)
 text.is_digit()                      Check if text contains only digits
@@ -78,6 +81,19 @@ text.to_upper()                      Convert to uppercase (builtin)
 text.trim()                          Remove whitespace from start and end (builtin)
 text.unescape_html()                 Unescape HTML entities to text
 text.unescape_json()                 Unescape JSON escape sequences
+
+MICRO SEARCH QUICK GUIDE:
+Function            Use Case                      Pattern Type    Anchored  Case-Sensitive  Example
+contains()          Substring search              Literal         No        Yes             "foobar".contains("oba") → true
+like()              Anchored glob match           * and ?         Yes       Yes             "foobar".like("foo*") → true
+ilike()             Anchored glob match (Unicode) * and ?         Yes       No              "FooBar".ilike("foo*") → true
+matches()           Regex search                  Regex           No        Yes             "foobar".matches("ba.") → true
+
+⚠️  REGEX PATTERN TIPS
+- Avoid nested quantifiers: (.*)*  (worst-case performance)
+- Prefer: .*error  over  (.*)*error
+- Compiled patterns are cached per thread (1000 entries)
+- Invalid regex patterns raise errors (respect quiet/strict modes)
 text.upper()                         Convert text to uppercase
   
 ARRAY FUNCTIONS:
@@ -209,10 +225,13 @@ EVENT MANIPULATION:
 emit_each(array [,base_map])         Fan out array elements as separate events (returns emitted count)
 e = ()                               Clear entire event (remove all fields)
 e.field = ()                         Remove individual field from event
+e.has("key")                         Check if key exists and value is not ()
 e.rename_field("old", "new")         Rename field, returns true if successful
 
 Rhai lets you call functions as either `value.method(args)` or `function(value, args)`.
 Use 'e' to access the current event. See --help-examples for common usage patterns.
+"field" in e                         Builtin check for raw key presence (ignores value contents)
+Note: Prefer e.has("field") when you want () to count as "missing".
 "#
 }
 
@@ -220,6 +239,16 @@ Use 'e' to access the current event. See --help-examples for common usage patter
 pub fn generate_examples_text() -> &'static str {
     r#"
 Common Log Analysis Patterns:
+
+MICRO SEARCH HELPERS:
+# Case-insensitive wildcard search
+kelora -f json --filter 'e.message.ilike("*timeout*")'
+
+# Regex search with cached compilation
+kelora -f json --filter 'e.message.matches(r"user\s+not\s+found")'
+
+# Field existence that ignores () sentinel
+kelora -f logfmt --filter 'e.has("user") && e.user.like("alice*")'
 
 WEB LOG ANALYSIS:
 # Extract HTTP details from combined log

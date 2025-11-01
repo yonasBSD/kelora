@@ -12,6 +12,7 @@ pub mod file_ops;
 pub mod hashing;
 pub mod maps;
 pub mod math;
+pub mod micro_search;
 pub mod network;
 pub mod normalize;
 pub mod process;
@@ -25,6 +26,7 @@ pub mod window;
 pub fn register_all_functions(engine: &mut Engine) {
     arrays::register_functions(engine);
     strings::register_functions(engine);
+    micro_search::register_functions(engine);
     tracking::register_functions(engine);
     columns::register_functions(engine);
     maps::register_functions(engine);
