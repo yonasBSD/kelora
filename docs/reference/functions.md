@@ -761,7 +761,7 @@ e.local_time = now_local()
 ```
 
 #### `to_datetime(text [, fmt [, tz]])`
-Convert string into DateTimeWrapper with optional hints.
+Convert string into datetime value with optional hints.
 
 ```rhai
 e.parsed = to_datetime("2024-01-15 10:30:00", "%Y-%m-%d %H:%M:%S", "UTC")
@@ -769,7 +769,7 @@ e.auto = to_datetime("2024-01-15T10:30:00Z")          // Auto-detect format
 ```
 
 #### `to_duration("1h30m")`
-Convert duration string into DurationWrapper.
+Convert duration string into duration value.
 
 ```rhai
 let timeout = to_duration("5m")
@@ -1167,6 +1167,10 @@ Fan out array elements as separate events (returns emitted count).
 ```rhai
 emit_each(e.users)                                    // Each user becomes an event
 emit_each(e.items, #{batch_id: e.batch_id})           // Add batch_id to each
+
+// Use return value to track emission count
+let count = emit_each(e.batch_items, #{batch_id: e.id})
+track_sum("items_emitted", count)
 ```
 
 #### `e = ()`

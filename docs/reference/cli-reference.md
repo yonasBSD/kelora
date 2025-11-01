@@ -107,7 +107,7 @@ kelora -f 'cols:ts(2) level *msg' custom.log  # `ts` is auto-detected as a times
 
 #### `-j`
 
-Shortcut for `-f json`.
+Shortcut for `-f json`. Only affects input parsing. For JSON output, use `-J` or `-F json`.
 
 ```bash
 kelora -j app.jsonl
@@ -276,8 +276,9 @@ kelora --input-tz Europe/Berlin app.log
 Multi-line event detection strategy. See `--help-multiline` for details.
 
 ```bash
-kelora -M json app.log              # JSON events across lines
-kelora -M '^\\d{4}-' app.log        # Events start with date
+kelora -M all app.log                           # Entire file as one event
+kelora -M timestamp app.log                     # Auto-detect timestamp headers
+kelora -M regex --multiline-start '^\\d{4}-' app.log  # Events start with date
 ```
 
 ### Prefix Extraction
@@ -490,7 +491,7 @@ Include only events with specified log levels (case-insensitive). Every occurren
 ```bash
 kelora -j --levels error app.log
 kelora -j --levels error,warn,critical app.log
-kelora -j --exec 'e.fallback_level = "WARN"' --levels warn log.txt  # second levels runs after exec
+kelora -j --exec 'if !e.has_field("level") { e.level = "WARN" }' --levels warn log.txt  # Add level, then filter
 ```
 
 #### `-L, --exclude-levels <LEVELS>`

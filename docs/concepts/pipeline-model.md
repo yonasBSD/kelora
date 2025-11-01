@@ -116,10 +116,10 @@ kelora app.log --keep-lines '^\d{4}-\d{2}-\d{2}'
 Extract specific sections from logs based on start/end markers:
 
 **Flags:**
-- `--section-start <REGEX>` - Begin section (default: exclude marker)
-- `--section-from <REGEX>` - Begin section (include marker)
-- `--section-through <REGEX>` - End section (include marker)
-- `--section-before <REGEX>` - End section (exclude marker)
+- `--section-after <REGEX>` - Begin section (exclude marker line)
+- `--section-from <REGEX>` - Begin section (include marker line)
+- `--section-through <REGEX>` - End section (include marker line)
+- `--section-before <REGEX>` - End section (exclude marker line)
 - `--max-sections <N>` - Limit number of sections
 
 **State Machine:**
@@ -195,7 +195,8 @@ Parsers: `json`, `logfmt`, `syslog`, `combined`, `csv`, `tsv`, `cols`, etc.
 **User-controlled stages execute exactly where you place them on the CLI:**
 
 - `--filter <EXPR>` – Boolean filter (true = keep, false = skip)
-- `--levels/-L <LIST>` – Include or exclude log levels (case-insensitive, repeatable)
+- `--levels/-l <LIST>` – Include log levels (case-insensitive, repeatable)
+- `--exclude-levels/-L <LIST>` – Exclude log levels (case-insensitive, repeatable)
 - `--exec <SCRIPT>` – Transform/process event
 - `--exec-file <PATH>` – Execute script from file (alias: `-E`)
 
@@ -215,7 +216,10 @@ Each stage processes the output of the previous stage sequentially.
 
 ### Complete Stage Ordering
 
-1. **CLI-ordered stages** – `--filter`, `--levels`/`--exclude-levels`, `--exec`, `--exec-file`
+**User-controlled stages** (run in the order you specify them on the CLI):
+1. `--filter`, `--levels`, `--exclude-levels`, `--exec`, `--exec-file`
+
+**Fixed-position filters** (always run after user-controlled stages, regardless of CLI order):
 2. **Timestamp filtering** – `--since`, `--until`
 3. **Key filtering** – `--keys`, `--exclude-keys`
 
@@ -235,7 +239,7 @@ Closes span every N events that pass filters.
 **Time-based Spans:**
 ```bash
 kelora -j app.log --span 5m \
-    --span-close 'track_sum("requests", meta.span_event_count)'
+    --span-close 'track_sum("requests", span.size)'
 ```
 Closes span on aligned time windows (5m, 1h, 30s, etc.).
 
@@ -259,7 +263,7 @@ Closes span on aligned time windows (5m, 1h, 30s, etc.).
 kelora -j app.log \
     --begin 'print("Starting analysis")' \
     --exec 'track_count(e.service)' \
-    --end 'print("Services seen: " + metrics.count.len())' \
+    --end 'print("Services seen: " + metrics.len())' \
     --metrics
 ```
 
@@ -379,23 +383,23 @@ Populated by Rhai functions in --exec scripts:
 kelora -j app.log \
     --exec 'track_count(e.service)' \
     --exec 'track_sum("total_bytes", e.bytes)' \
-    --exec 'track_avg("response_time", e.duration_ms)' \
     --exec 'track_unique("users", e.user_id)' \
     --metrics
 ```
 
 **Available Functions:**
 - `track_count(key)` - Increment counter
-- `track_inc(key, value)` - Add to counter
 - `track_sum(key, value)` - Sum values
-- `track_avg(key, value)` - Calculate average
+- `track_min(key, value)` - Track minimum value
+- `track_max(key, value)` - Track maximum value
 - `track_unique(key, value)` - Collect unique values
+- `track_bucket(key, bucket)` - Track values in buckets
 
 **Access in --end stage:**
 ```bash
 kelora -j app.log \
     --exec 'track_count(e.service)' \
-    --end 'print("Total services: " + metrics.count.len())' \
+    --end 'print("Total services: " + metrics.len())' \
     --metrics
 ```
 
