@@ -63,9 +63,22 @@ grep -i "ERROR" /var/log/app.log | kelora -f logfmt
 
 # Faster with ripgrep, case-insensitive, show context
 rg -i "timeout" /var/log/app.log -A 2 | kelora -j
+
+# Alternative: Use Kelora's built-in line filtering (faster parsing)
+kelora -f logfmt --keep-lines 'ERROR|WARN' /var/log/app.log
+
+# Combine with time-based filtering
+grep "ERROR" /var/log/app.log | kelora -j --since '1 hour ago'
+
+# Extract multi-line stack traces after grep
+grep -A 20 "Exception" /var/log/app.log | kelora -f line -M 'regex:match=^[A-Z]'
 ```
 
-Kelora's `--filter` is more powerful for structured field checks, but `grep` excels at raw text scanning across massive files.
+**When to use grep vs Kelora:**
+- Use `grep` for raw text scanning across massive unstructured files
+- Use `--keep-lines`/`--ignore-lines` when you want Kelora to track parse errors
+- Use `--filter` for structured field checks after parsing (e.g., `e.status >= 500`)
+- Use `--since`/`--until` for time-based filtering (no grep needed)
 
 ---
 
@@ -74,13 +87,22 @@ Kelora's `--filter` is more powerful for structured field checks, but `grep` exc
 Locate log files across directories and process them in parallel. Use when you have scattered archives that need systematic batch processing. The `find` command provides powerful file selection (by date, size, name), and `-print0 | xargs -0` handles paths with spaces safely.
 
 ```bash
-# Find all compressed JSON logs from April 2024
+# Find all compressed JSON logs from April 2024 - maximum throughput
 find /archives -name "app-2024-04-*.jsonl.gz" -print0 | \
-  xargs -0 kelora -j --parallel -l error --stats
+  xargs -0 kelora -j --parallel --unordered -l error --stats
 
 # Recursive search for all .log files modified in last 7 days
 find /var/log -name "*.log" -mtime -7 -print0 | \
-  xargs -0 kelora -f auto --filter 'e.level == "ERROR"' -F json
+  xargs -0 kelora -f auto --filter 'e.level == "ERROR"' -J
+
+# Alternative: Use --since instead of find -mtime for time filtering
+find /var/log -name "*.log" -print0 | \
+  xargs -0 kelora -f auto --since '7 days ago' -l error -J
+
+# Parallel file processing with xargs AND parallel Kelora processing
+find /archives -name "*.jsonl.gz" -print0 | \
+  xargs -0 -P 4 -n 1 kelora -j --parallel --unordered \
+    -e 'track_count(e.service)' -m
 ```
 
 See [Process Archives at Scale](batch-process-archives.md) for parallel processing strategies.
@@ -109,20 +131,25 @@ See [Design Streaming Alerts](build-streaming-alerts.md) for complete alert work
 Stream logs from Kubernetes pods into Kelora for real-time monitoring and analysis. Essential for debugging containerized applications and tracking issues across pod restarts. Use `-f` for live streaming, `--tail` to limit history, and `--all-containers` for multi-container pods.
 
 ```bash
-# Stream logs from a specific pod
-kubectl logs -f pod-name | kelora -j -l error,warn
+# Stream logs from a specific pod with context around errors
+kubectl logs -f pod-name | kelora -j -l error,warn -C 2
 
-# Follow logs from a deployment with label selector
-kubectl logs -f -l app=myapp --all-containers=true | \
-  kelora -j --filter 'e.level == "ERROR"' -F json
+# Follow logs from last hour only
+kubectl logs -f pod-name --since=1h | kelora -j --filter 'e.level == "ERROR"' -J
 
-# Stream logs from previous container instance (after crash)
+# Stream logs from previous container with spike detection
 kubectl logs -f pod-name --previous | \
-  kelora -j --window 50 -e 'track_count("error_type|" + e.error)'
+  kelora -j --window 10 \
+    -e 'e.recent_errors = window_values("level").filter(|x| x == "ERROR").len()' \
+    --filter 'e.recent_errors > 5'  # Alert on error spikes
 
-# Multi-pod log aggregation
+# Multi-pod log aggregation with pod name extraction
 kubectl logs -f -l app=myapp --prefix=true | \
-  kelora -f auto -e 'e.pod = e.message.split(" ")[0]' -J
+  kelora -f auto --extract-prefix pod --prefix-sep ' ' -J
+
+# Separate logs by container using section selection
+kubectl logs -f pod-name --all-containers=true | \
+  kelora --section-from '^\[container-name\]' --section-before '^\[' -j
 ```
 
 See [Design Streaming Alerts](build-streaming-alerts.md) for alerting patterns that work well with kubectl streaming.
@@ -134,34 +161,60 @@ See [Design Streaming Alerts](build-streaming-alerts.md) for alerting patterns t
 Stream Docker container logs into Kelora for local development and single-host deployments. Use `docker logs -f` or `docker compose logs -f` for live streaming. Combine `--tail` to limit history and `--timestamps` for temporal analysis.
 
 ```bash
-# Stream logs from a single container
-docker logs -f container-name | kelora -j -l error,critical
+# Stream logs from a single container with error context
+docker logs -f container-name | kelora -j -l error,critical -A 3
 
-# Follow logs from all compose services
-docker compose logs -f | kelora -f logfmt --filter 'e.service == "api"'
+# Extract specific service logs from compose output
+docker compose logs -f | \
+  kelora --section-from '^web_1' --section-before '^(db_1|api_1)' -f auto
 
-# Stream with timestamps for correlation
-docker logs -f --timestamps myapp | \
-  kelora -f auto -e 'track_count(e.level)' --metrics
+# Stream with timestamps and time-based filtering
+docker logs -f --timestamps myapp --since 10m | \
+  kelora -f auto --since '5 minutes ago' -e 'track_count(e.level)' -m
 
-# Multiple containers with filtering
+# Multiple containers with slow request detection
 docker compose logs -f api worker | \
-  kelora -j --filter 'e.response_time > 1000' -k timestamp,service,response_time
+  kelora -j --filter 'e.response_time.to_float() > 1.0' \
+    -k timestamp,service,response_time,path
+
+# Aggregate metrics per 1-minute windows
+docker logs -f --timestamps myapp | \
+  kelora -j --span 1m --span-close 'track_count("span_events")' \
+    -e 'track_count(e.level)' -m
 ```
 
 ---
 
 ### jc — Command Output Converter
 
-Converts output from 100+ CLI tools (ls, ps, netstat, etc.) into JSON for Kelora to parse. Turns unstructured command output into queryable structured data.
+Converts output from 100+ CLI tools (ls, ps, netstat, etc.) into JSON for Kelora to parse. Turns unstructured command output into queryable structured data. Pairs well with Kelora's parsing functions for deeper analysis.
 
 ```bash
 # Parse directory listings as structured data
 jc ls -la | kelora -j --filter 'e.size > 1000000' -k filename,size
 
-# Analyze running processes
-jc ps aux | kelora -j --filter 'e.pcpu > 50.0' -k user,pid,command
+# Analyze running processes with aggregation
+jc ps aux | kelora -j --filter 'e.pcpu.to_float() > 50.0' \
+  -e 'track_sum(e.user, e.pcpu.to_float())' -m
+
+# Extract and parse URLs from command output
+jc curl -I https://example.com | kelora -j \
+  -e 'e.url_parts = e.location.parse_url()' \
+  -e 'e.domain = e.location.extract_domain()' -J
+
+# Parse user-agent strings from web server logs
+kelora -f combined access.log \
+  -e 'e.ua = e.user_agent.parse_user_agent()' \
+  -e 'track_count("browser|" + e.ua.browser)' -m
 ```
+
+**Kelora parsing functions that work well with jc output:**
+- `parse_url()` - Extract URL components
+- `parse_user_agent()` - Parse browser/OS from user-agent strings
+- `parse_email()` - Extract email parts
+- `parse_path()` - Parse filesystem paths
+- `extract_domain()` - Extract domains from URLs
+- `extract_ip()` / `extract_ips()` - Extract IP addresses
 
 [jc documentation](https://kellyjonbrazil.github.io/jc/)
 
@@ -171,16 +224,34 @@ jc ps aux | kelora -j --filter 'e.pcpu > 50.0' -k user,pid,command
 
 ### jq — Advanced JSON Manipulation
 
-Powerful JSON querying, reshaping, and computation beyond Kelora's built-in capabilities. Use for complex JSON restructuring, recursive descent, or computations that are awkward in Rhai. Kelora focuses on log-specific operations; jq excels at generic JSON transformation. Use Kelora for filtering, extraction, and log-specific functions. Use jq for complex JSON reshaping and output formatting.
+Powerful JSON querying, reshaping, and computation beyond Kelora's built-in capabilities. Use for complex JSON restructuring, recursive descent, or computations that are awkward in Rhai. Kelora focuses on log-specific operations; jq excels at generic JSON transformation.
+
+**When to use Kelora vs jq:**
+- Use Kelora for filtering, aggregation, and log-specific operations
+- Use jq for complex JSON reshaping, recursive queries, and output formatting
+- Many common jq tasks can be done natively in Kelora (see examples below)
 
 ```bash
-# Kelora extracts errors, jq reshapes into nested structure
-kelora -j examples/simple_json.jsonl -l error -J | \
+# This jq pattern...
+kelora -j app.jsonl -l error -J | \
   jq 'group_by(.service) | map({service: .[0].service, count: length})'
 
-# Combine Kelora filtering with jq's advanced path queries
+# ...can often be done with Kelora's tracking functions:
+kelora -j app.jsonl -l error -e 'track_count(e.service)' -m
+
+# When jq is better: Complex nested field extraction
 kelora -j logs/app.jsonl --filter 'e.status >= 500' -J | \
   jq -r '.request.headers | to_entries[] | "\(.key): \(.value)"'
+
+# Kelora alternative: Use get_path() and flatten()
+kelora -j logs/app.jsonl --filter 'e.status >= 500' \
+  -e 'e.headers_flat = e.get_path("request.headers", #{}).flatten(".", "dot")' -J
+
+# Best of both: Kelora parses/filters/extracts, jq reshapes complex output
+kelora -j logs/app.jsonl \
+  -e 'e.url_parts = e.request_url.parse_url()' \
+  --filter 'e.url_parts.path.starts_with("/api")' -J | \
+  jq 'group_by(.url_parts.host) | map({host: .[0].url_parts.host, requests: length})'
 ```
 
 [jq manual](https://jqlang.github.io/jq/)
@@ -192,18 +263,26 @@ kelora -j logs/app.jsonl --filter 'e.status >= 500' -J | \
 High-performance CSV toolkit with statistics, joins, validation, SQL queries, and more. Adds SQL-like operations, statistical analysis, and data validation to CSV workflows. Use when Kelora's CSV output needs further analysis, validation, or joining with other datasets.
 
 ```bash
-# Kelora extracts to CSV, qsv generates statistics
+# Kelora pre-processes, qsv generates detailed statistics
 kelora -j logs/app.jsonl -k timestamp,response_time,status -F csv | \
   qsv stats --select response_time
 
-# Frequency analysis of error codes
+# Frequency analysis - compare with Kelora's track_count()
 kelora -j logs/app.jsonl -l error -k error_code,service -F csv | \
   qsv frequency --select error_code | \
   qsv sort --select count --reverse
 
-# Join Kelora output with reference data
+# Alternative: Use Kelora's tracking for simple counts
+kelora -j logs/app.jsonl -l error -e 'track_count(e.error_code)' -m
+
+# Join Kelora output with reference data (qsv excels here)
 kelora -j logs/orders.jsonl -k order_id,user_id,amount -F csv > orders.csv
 qsv join user_id orders.csv user_id users.csv | qsv select 'user_id,name,order_id,amount'
+
+# Kelora can pre-aggregate before export for faster qsv processing
+kelora -j logs/app.jsonl --span 5m --span-close \
+  'print(span.id + "," + span.size.to_string())' -qq > summary.csv
+qsv stats summary.csv
 ```
 
 [qsv documentation](https://github.com/jqnatividad/qsv)
@@ -234,20 +313,33 @@ kelora -j logs/app.jsonl -J | \
 
 ### sort — Column-Based Sorting
 
-Sorts Kelora's TSV/CSV output by columns. Kelora doesn't have built-in sorting, so use `sort` when output order matters for chronological analysis, top-N queries, and ordered exports. Use `-t$'\t'` for tab delimiter. Column numbers are 1-indexed.
+Sorts Kelora's TSV/CSV output by columns. Use `sort` when output order matters for chronological analysis, top-N queries, and ordered exports. Use `-t$'\t'` for tab delimiter. Column numbers are 1-indexed.
+
+**Kelora alternatives to consider first:**
+- Use `--since`/`--until` for time-based filtering (often eliminates need for sorting)
+- Use `sorted()` or `sorted_by()` Rhai functions for array sorting within events
+- Use `--take N` to limit output (though not sorted)
 
 ```bash
 # Sort errors by timestamp
 kelora -j logs/app.jsonl -l error -k timestamp,service,message -F tsv | \
   sort -t$'\t' -k1,1
 
-# Sort by response time (numeric, descending)
+# Sort by response time (numeric, descending) - top 20 slowest
 kelora -j logs/app.jsonl -k timestamp,response_time,path -F tsv | \
   sort -t$'\t' -k2,2nr | head -20
+
+# Alternative: Track top values with Kelora
+kelora -j logs/app.jsonl -e 'track_max("slowest|" + e.path, e.response_time)' -m
 
 # Multi-column sort: service (ascending), then timestamp (descending)
 kelora -j logs/app.jsonl -F tsv | \
   sort -t$'\t' -k2,2 -k1,1r
+
+# Sort array values within Rhai
+kelora -j logs/app.jsonl \
+  -e 'e.sorted_tags = e.tags.sorted()' \
+  -e 'e.users_by_age = e.users.sorted_by("age")' -J
 ```
 
 ---
@@ -305,14 +397,31 @@ kelora -j logs/app.jsonl -F csv | \
 Log aggregation and filtering with a query language different from Kelora's Rhai scripting. Offers an alternative when Rhai scripting isn't a good fit, or when you want a more declarative syntax. angle-grinder and Kelora overlap significantly—choose based on syntax preference and feature fit.
 
 ```bash
-# Parse and aggregate with angle-grinder instead of Kelora
+# This angle-grinder pattern...
 kelora -j logs/app.jsonl -J | \
   agrind '* | json | count by service'
 
-# Combine: Kelora normalizes format, angle-grinder aggregates
+# ...can be done natively with Kelora:
+kelora -j logs/app.jsonl -e 'track_count(e.service)' -m
+
+# angle-grinder's parse pattern
 kelora -f logfmt logs/mixed.log -J | \
   agrind '* | json | parse "user_id=*" as user | count by user'
+
+# Kelora equivalent using extract_re() or parse_kv()
+kelora -f logfmt logs/mixed.log \
+  -e 'e.user = e.message.extract_re(r"user_id=(\S+)", 1)' \
+  -e 'track_count(e.user)' -m
+
+# For complex key-value extraction, use parse_kv()
+kelora -f line logs/mixed.log \
+  -e 'let fields = e.message.parse_kv(" ", "=")' \
+  -e 'e.user = fields["user_id"]' \
+  -e 'track_count(e.user)' -m
 ```
+
+**When to use angle-grinder:** You prefer its query syntax, or need features Kelora doesn't have.
+**When to use Kelora:** You want Rhai's full programming power, need advanced parsing functions, or want better integration with other tools.
 
 [angle-grinder](https://github.com/rcoh/angle-grinder)
 
@@ -388,16 +497,29 @@ kelora -j logs/app.jsonl -l error,warn | ov
 
 Creates console histograms, bar graphs, tables, and heatmaps from streaming data. Quick visual insights without leaving the terminal.
 
+**Note:** Kelora's `track_bucket()` function can create histograms natively with `-m`. Use rare for visual charts.
+
 ```bash
 # Bar chart of log levels
 kelora -j logs/app.jsonl -k level -F tsv | rare histo --field level
+
+# Alternative: Kelora's native histogram tracking
+kelora -j logs/app.jsonl -e 'track_bucket("level", e.level)' -m
 
 # Time-series histogram of events per minute
 kelora -j logs/app.jsonl -k timestamp -F tsv | \
   rare histo --field timestamp --time
 
-# Table summary of services and error counts
+# Response time histogram with bucketing in Kelora
+kelora -j logs/app.jsonl \
+  -e 'let bucket = floor(e.response_time / 100) * 100; track_bucket("latency_ms", bucket)' \
+  -m
+
+# Table summary of services and error counts - rare for visual output
 kelora -j logs/app.jsonl -l error -k service -F tsv | rare table
+
+# Or use Kelora tracking for text output
+kelora -j logs/app.jsonl -l error -e 'track_count(e.service)' -m
 ```
 
 [rare](https://github.com/zix99/rare)
@@ -444,12 +566,18 @@ kelora -j logs/app.jsonl -J | \
   done
 ```
 
-**Or batch upload:**
+**Or batch upload with span aggregation:**
 
 ```bash
 # Process logs and upload to object storage for ingestion
-kelora -j logs/*.jsonl.gz --parallel -J -o processed.json
+kelora -j logs/*.jsonl.gz --parallel --unordered -J -o processed.json
 rclone copy processed.json remote:logs/$(date +%Y-%m-%d)/
+
+# Pre-aggregate with spans before uploading
+kelora -j logs/*.jsonl.gz --span 5m \
+  --span-close 'print(span.metrics.to_json())' \
+  -e 'track_count("events"); track_sum("bytes", e.size)' -qq > metrics.jsonl
+curl -X POST http://victorialogs:9428/insert/jsonl -d @metrics.jsonl
 ```
 
 ---
@@ -458,51 +586,110 @@ rclone copy processed.json remote:logs/$(date +%Y-%m-%d)/
 
 ### Parallel Discovery and Processing
 
-Combine `find`, `xargs`, and Kelora's `--parallel` for maximum throughput:
+Combine `find`, `xargs`, and Kelora's `--parallel --unordered` for maximum throughput:
 
 ```bash
+# Maximum performance: parallel find + parallel kelora + unordered output
 find /archives -name "*.jsonl.gz" -print0 | \
-  xargs -0 -P 4 kelora -j --parallel \
+  xargs -0 -P 4 kelora -j --parallel --unordered \
     -l error \
     -e 'track_count(e.service)' \
-    --metrics
+    -m
+
+# With time-based filtering instead of file modification time
+find /archives -name "*.jsonl.gz" -print0 | \
+  xargs -0 kelora -j --parallel --since '24 hours ago' \
+    --filter 'e.status >= 500' \
+    -e 'track_count(e.path); track_max("slowest", e.response_time)' -m
 ```
 
 ---
 
 ### Multi-Stage Pipelines
 
-Chain tools for complex transformations:
+Chain tools for complex transformations. Consider whether Kelora can do it natively before adding external tools.
 
 ```bash
-# Stage 1: Grep pre-filter
-# Stage 2: Kelora parse and extract
-# Stage 3: qsv aggregate
-# Stage 4: rare visualize
-
+# Multi-stage: grep pre-filter → Kelora parse/extract → qsv stats → rare visualize
 grep -i "checkout" /var/log/app.log | \
   kelora -f logfmt -k timestamp,duration,user_id -F csv | \
   qsv stats --select duration | \
   rare table
+
+# Often better: Do it all in Kelora
+kelora -f logfmt /var/log/app.log \
+  --keep-lines checkout \
+  -e 'track_bucket("duration_ms", floor(e.duration / 100) * 100)' \
+  -e 'track_unique("users", e.user_id)' -m
+
+# Complex extraction pipeline with parsing functions
+kelora -f line /var/log/app.log \
+  -e 'e.url_parts = e.message.extract_url().parse_url()' \
+  -e 'e.params = e.url_parts.query.parse_query_params()' \
+  -e 'e.checkout_id = e.params["id"]' \
+  --filter 'e.has_field("checkout_id")' \
+  -e 'track_count(e.url_parts.path)' -m
 ```
 
 ---
 
 ### Live Monitoring with Alerts
 
-Stream logs, filter with Kelora, visualize with rare, alert on anomalies:
+Stream logs, filter with Kelora, visualize with rare, alert on anomalies. Use span aggregation for rate-based alerting.
 
 ```bash
+# Real-time visualization with rare
 tail -F /var/log/app.log | \
   kelora -j -l error,critical -J | \
   rare histo --field service &
 
-# In another terminal: alert on thresholds
+# Simple alert on specific conditions
 tail -F /var/log/app.log | \
   kelora -j -l error -qq \
     --filter 'e.service == "payments"' \
     -e 'eprint("PAYMENT ERROR: " + e.message)'
+
+# Rate-based alerting with span aggregation
+tail -F /var/log/app.log | \
+  kelora -j --span 1m \
+    -e 'if e.level == "ERROR" { track_count("errors") }' \
+    --span-close 'if span.metrics["errors"].or_empty() > 10 { eprint("⚠️  High error rate: " + span.metrics["errors"].to_string() + " errors/min") }' \
+    -qq
+
+# Spike detection with window functions
+tail -F /var/log/app.log | \
+  kelora -j --window 20 \
+    -e 'e.recent_500s = window_values("status").filter(|x| x >= 500).len()' \
+    --filter 'e.recent_500s > 5' \
+    -e 'eprint("🚨 Error spike detected: " + e.recent_500s.to_string() + " 5xx in last 20 requests")' \
+    -qq
 ```
+
+---
+
+## When to Use Kelora vs External Tools
+
+Before reaching for external tools, check if Kelora can handle it natively:
+
+**Kelora excels at:**
+- Time-based filtering (`--since`, `--until`) - no grep needed
+- Structured field filtering (`--filter 'e.status >= 500'`)
+- Pattern extraction (`extract_re()`, `extract_re_maps()`)
+- Parsing structured formats (`parse_url()`, `parse_kv()`, `parse_json()`, etc.)
+- Aggregation and counting (`track_count()`, `track_sum()`, `track_bucket()`)
+- Array operations (`sorted()`, `filter()`, `map()`, `percentile()`)
+- Window-based analysis (`--window` with `window_values()`)
+- Time-windowed aggregation (`--span` with `--span-close`)
+- Multi-line event detection (`-M timestamp`, `-M regex:...`)
+- Section extraction (`--section-from`, `--section-before`)
+
+**Use external tools when:**
+- jq: Complex JSON reshaping, recursive descent
+- qsv: Statistical analysis, CSV joins, data validation
+- sort: Output ordering (Kelora doesn't sort output)
+- grep: Raw text scanning across massive unstructured files
+- SQL databases: Long-term storage, complex JOINs, persistent queries
+- Visualization tools: Interactive exploration (lnav, visidata), charts (rare)
 
 ---
 
@@ -545,11 +732,11 @@ See [Concept: Performance Comparisons](../concepts/performance-comparisons.md) f
 **Shell quoting:** Remember to quote arguments with special characters:
 
 ```bash
-# Wrong: shell expands * and $
-kelora -f 'cols:ts *message' --exec 'e.new_field = $other'
+# Wrong: shell may interpret special characters
+kelora -f 'cols:ts *message' -e 'e.new_field = $other'
 
-# Right: quote to protect from shell
-kelora -f 'cols:ts *message' --exec 'e.new_field = e.other'
+# Right: quote properly and use correct Rhai syntax
+kelora -f 'cols:ts *message' -e 'e.new_field = e.other'
 ```
 
 **Pipe buffering:** Some tools buffer output. Use `stdbuf` or tool-specific flags for live streaming:
