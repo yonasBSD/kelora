@@ -672,6 +672,9 @@ pub struct RhaiEngine {
 impl Clone for RhaiEngine {
     fn clone(&self) -> Self {
         let mut engine = Engine::new();
+        // Use Simple optimization, not Full. Full optimization breaks side-effect functions
+        // like track_count("key"), print("msg"), emit(), etc. by trying to evaluate them at
+        // compile time when their arguments are constants. These functions MUST run at runtime.
         engine.set_optimization_level(rhai::OptimizationLevel::Simple);
 
         // Apply the same on_print override as in new(), respecting suppress_side_effects
@@ -992,6 +995,9 @@ impl RhaiEngine {
     pub fn new() -> Self {
         let mut engine = Engine::new();
 
+        // Use Simple optimization, not Full. Full optimization breaks side-effect functions
+        // like track_count("key"), print("msg"), emit(), etc. by trying to evaluate them at
+        // compile time when their arguments are constants. These functions MUST run at runtime.
         engine.set_optimization_level(rhai::OptimizationLevel::Simple);
 
         // Override the built-in print function to support capture in parallel mode
