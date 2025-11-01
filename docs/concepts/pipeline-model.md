@@ -143,30 +143,31 @@ Detects event boundaries to combine multiple lines into single events **before p
 
 **1. Timestamp Strategy** (auto-detect timestamp headers)
 ```bash
-kelora app.log --multiline timestamp
+kelora app.log -M timestamp
+kelora app.log -M 'timestamp:format=%Y-%m-%d %H-%M-%S'
 ```
 Detects lines starting with timestamps as new events. Continuation lines (stack traces, wrapped messages) are appended to current event.
 
 **2. Indent Strategy** (whitespace continuation)
 ```bash
-kelora app.log --multiline indent
+kelora app.log -M indent
 ```
 Lines starting with whitespace are continuations of previous event.
 
 **3. Regex Strategy** (custom patterns)
 ```bash
-kelora app.log \
-    --multiline regex \
-    --multiline-start '^\[' \
-    --multiline-end '^\['
+kelora app.log -M 'regex:match=^\['
+kelora app.log -M 'regex:match=^\[:end=^\['
 ```
-Define custom start/end patterns for event boundaries.
+Define custom start/end patterns for event boundaries using `match=` (required) and `end=` (optional) segments within the `-M` argument.
 
 **4. All Strategy** (entire input as one event)
 ```bash
-kelora config.json --multiline all
+kelora config.json -M all
 ```
 Buffers entire input as single event (use for structured files).
+
+*Note:* The current CLI treats `:` as an option separator inside the `-M` value. For regex patterns, encode literal colons (for example `\x3A`). Timestamp hints that require `:` currently need pre-normalised input or a regex-based strategy.
 
 **Multiline Timeout:**
 - Sequential mode: Flush incomplete events after timeout (default: 200ms)

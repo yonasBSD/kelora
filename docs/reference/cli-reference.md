@@ -273,12 +273,20 @@ kelora --input-tz Europe/Berlin app.log
 
 #### `-M, --multiline <STRATEGY>`
 
-Multi-line event detection strategy. See `--help-multiline` for details.
+Multi-line event detection strategy. Value format: `<strategy>[:key=value[:key=value...]]`. Supported strategies:
+
+- `timestamp` — optional `format=` hint (e.g., `timestamp:format=%Y-%m-%d %H-%M-%S`)  
+  *(Literal `:` characters in the format string are not supported yet.)*
+- `indent`
+- `regex` — requires `match=REGEX`, optional `end=REGEX`
+- `all`
 
 ```bash
-kelora -M all app.log                           # Entire file as one event
-kelora -M timestamp app.log                     # Auto-detect timestamp headers
-kelora -M regex --multiline-start '^\\d{4}-' app.log  # Events start with date
+kelora -M all config.json                        # Entire input as one event
+kelora -M timestamp app.log                      # Auto-detect timestamp headers
+kelora -M 'timestamp:format=%Y-%m-%d %H-%M-%S' app.log
+kelora -M 'regex:match=^\\d{4}-' app.log         # Start pattern only
+kelora -M 'regex:match=^START:end=^END$' app.log # Start + end patterns
 ```
 
 ### Prefix Extraction

@@ -149,7 +149,9 @@ pub struct Cli {
     #[arg(long = "input-tz", help_heading = "Input Options")]
     pub input_tz: Option<String>,
 
-    /// Multi-line event detection strategy
+    /// Multi-line event detection strategy. Supply values like `timestamp`,
+    /// `timestamp:format=%Y-%m-%d %H-%M-%S`, `regex:match=^START`, or
+    /// `regex:match=^START:end=^END$`. See `kelora --help-multiline` for details.
     #[arg(short = 'M', long = "multiline", help_heading = "Input Options")]
     pub multiline: Option<String>,
 
