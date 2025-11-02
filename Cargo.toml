@@ -38,7 +38,7 @@ urlencoding = "2.1"
 html-escape = "0.2"
 terminal_size = "0.4.3"
 url = "2.5"
-lru = "0.12"
+lru = "0.16"
 unicode-normalization = "0.1"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 blake3 = "1.5"
@@ -51,7 +51,7 @@ hmac = "0.12"
 ipnet = "2.9"
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.7", features = ["html_reports"] }
 tempfile = "3.8"
 
 [[bench]]
