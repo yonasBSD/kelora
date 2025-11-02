@@ -71,4 +71,4 @@ Kelora is open source software licensed under the [MIT License](https://github.c
 
 ## Development Approach
 
-Kelora is an experiment in agentic AI development. Claude Code (Sonnet 4/4.5) and Codex CLI (`gpt-5-codex`) generate all implementation and tests; I steer requirements but do not write or review code. Validation relies on the automated test suite plus `cargo audit` and `cargo deny`, so please inspect the code yourself before relying on it in production and expect the API to evolve until 1.0. This is a spare-time, single-developer project, so support and updates are best-effort.
+Kelora is an experiment in agentic AI development. Claude Code (Sonnet 4.5) and Codex CLI (gpt-5-codex) generate all implementation and tests; I steer requirements but do not write or review code. Validation relies on the automated test suite plus `cargo audit` and `cargo deny`, so please inspect the code yourself before relying on it in production and expect the API to evolve until 1.0. This is a spare-time, single-developer project, so support and updates are best-effort.
