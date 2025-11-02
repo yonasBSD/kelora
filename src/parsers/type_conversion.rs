@@ -123,6 +123,7 @@ pub fn convert_value_to_type(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     #[test]
     fn test_field_type_from_str() {
@@ -241,5 +242,29 @@ mod tests {
 
         let result = convert_value_to_type("anything", &FieldType::String, false).unwrap();
         assert_eq!(result.clone().into_string().unwrap(), "anything");
+    }
+
+    proptest! {
+        #[test]
+        fn prop_convert_int_roundtrip(value in any::<i64>()) {
+            let input = value.to_string();
+            let converted = convert_value_to_type(&input, &FieldType::Int, true).unwrap();
+            prop_assert_eq!(converted.as_int().unwrap(), value);
+        }
+
+        #[test]
+        fn prop_convert_float_roundtrip(value in prop::num::f64::NORMAL) {
+            let input = value.to_string();
+            let converted = convert_value_to_type(&input, &FieldType::Float, true).unwrap();
+            let parsed = converted.as_float().unwrap();
+            prop_assert_eq!(parsed.to_bits(), value.to_bits());
+        }
+
+        #[test]
+        fn prop_convert_int_non_strict_preserves_input(input in "[A-Za-z!@#$%^&* ]+") {
+            prop_assume!(input.parse::<i64>().is_err());
+            let converted = convert_value_to_type(&input, &FieldType::Int, false).unwrap();
+            prop_assert_eq!(converted.into_string().unwrap(), input);
+        }
     }
 }
