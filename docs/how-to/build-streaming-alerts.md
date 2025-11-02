@@ -57,7 +57,7 @@ tail -f /var/log/app.log | kelora -j -qq \
 ```
 
 - `-q` hides diagnostics; `-qq` also suppresses event output so only alerts are printed.
-- Combine `--window N` with `window_values()` to examine rolling slices when bursts matter more than totals.
+- Combine `--window N` with `window.pluck()` to examine rolling slices when bursts matter more than totals.
 - Call `exit(1)` to propagate failure into CI or cron jobs; Kelora exits with 0 otherwise.
 
 ## Step 4: Decide How to Emit Alerts

@@ -142,7 +142,7 @@ kubectl logs -f pod-name --since=1h | kelora -j --filter 'e.level == "ERROR"' -J
 # Stream logs from previous container with spike detection
 kubectl logs -f pod-name --previous | \
   kelora -j --window 10 \
-    -e 'e.recent_errors = window_values("level").filter(|x| x == "ERROR").len()' \
+    -e 'e.recent_errors = window.pluck("level").filter(|x| x == "ERROR").len()' \
     --filter 'e.recent_errors > 5'  # Alert on error spikes
 
 # Multi-pod log aggregation with pod name extraction
@@ -716,7 +716,7 @@ tail -F /var/log/app.log | \
 # Spike detection with window functions
 tail -F /var/log/app.log | \
   kelora -j --window 20 \
-    -e 'e.recent_500s = window_values("status").filter(|x| x >= 500).len()' \
+    -e 'e.recent_500s = window.pluck("status").filter(|x| x >= 500).len()' \
     --filter 'e.recent_500s > 5' \
     -e 'eprint("🚨 Error spike detected: " + e.recent_500s.to_string() + " 5xx in last 20 requests")' \
     -qq
@@ -735,7 +735,7 @@ Before reaching for external tools, check if Kelora can handle it natively:
 - Parsing structured formats (`parse_url()`, `parse_kv()`, `parse_json()`, etc.)
 - Aggregation and counting (`track_count()`, `track_sum()`, `track_bucket()`)
 - Array operations (`sorted()`, `filter()`, `map()`, `percentile()`)
-- Window-based analysis (`--window` with `window_values()`)
+- Window-based analysis (`--window` with `window.pluck()`)
 - Time-windowed aggregation (`--span` with `--span-close`)
 - Multi-line event detection (`-M timestamp`, `-M regex:...`)
 - Section extraction (`--section-from`, `--section-before`)

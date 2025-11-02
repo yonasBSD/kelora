@@ -184,7 +184,7 @@ Enable the sliding window to compare the current event to recent history.
     kelora -j examples/window_metrics.jsonl \
       --filter 'e.metric == "cpu"' \
       --window 3 \
-      -e $'let values = window_numbers(window, "value");
+      -e $'let values = window.pluck_as_nums("value");
     if values.len() >= 2 {
         let diff = values[0] - values[1];
         e.delta_vs_prev = round(diff * 100.0) / 100.0;
@@ -199,7 +199,7 @@ Enable the sliding window to compare the current event to recent history.
     kelora -j examples/window_metrics.jsonl \
       --filter 'e.metric == "cpu"' \
       --window 3 \
-      -e $'let values = window_numbers(window, "value");
+      -e $'let values = window.pluck_as_nums("value");
     if values.len() >= 2 {
         let diff = values[0] - values[1];
         e.delta_vs_prev = round(diff * 100.0) / 100.0;
@@ -209,7 +209,7 @@ Enable the sliding window to compare the current event to recent history.
     ```
 
 `window` holds the current event plus the previous `N` events (here `N = 3`).
-Using `window_numbers(window, FIELD)` avoids manual parsing and gracefully
+Using `window.pluck_as_nums("FIELD")` avoids manual parsing and gracefully
 skips missing values.
 
 ## Step 6 – Reuse Logic with `--include` and `--exec-file`

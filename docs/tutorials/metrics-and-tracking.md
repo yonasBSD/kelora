@@ -230,7 +230,7 @@ five-event moving average and P95 latency for CPU metrics.
     kelora -j examples/window_metrics.jsonl \
       --filter 'e.metric == "cpu"' \
       --window 5 \
-      -e $'let values = window_numbers(window, "value");
+      -e $'let values = window.pluck_as_nums("value");
     if values.len() > 0 {
         let sum = values.reduce(|s, x| s + x, 0.0);
         let avg = sum / values.len();
@@ -248,7 +248,7 @@ five-event moving average and P95 latency for CPU metrics.
     kelora -j examples/window_metrics.jsonl \
       --filter 'e.metric == "cpu"' \
       --window 5 \
-      -e $'let values = window_numbers(window, "value");
+      -e $'let values = window.pluck_as_nums("value");
     if values.len() > 0 {
         let sum = values.reduce(|s, x| s + x, 0.0);
         let avg = sum / values.len();
@@ -261,8 +261,8 @@ five-event moving average and P95 latency for CPU metrics.
     ```
 
 The special `window` variable becomes available once you pass `--window`. Use
-`window_numbers(window, FIELD)` for numeric arrays and `window_values(window, FIELD)`
-for raw strings.
+`window.pluck_as_nums("FIELD")` for numeric arrays and `window.pluck("FIELD")`
+for raw values.
 
 ## Step 5 – Custom Reports with `--end`
 
@@ -433,7 +433,7 @@ human-readable histogram once processing finishes.
 - **Operation metadata**: Kelora keeps operator hints (the `__op_*` keys)
   in the internal tracker now, so user metric maps print cleanly. If you need
   those hints for custom aggregation, read them from the internal metrics map.
-- **Sliding window functions return empty arrays**: `window_numbers(window, ...)`
+- **Sliding window functions return empty arrays**: `window.pluck_as_nums("field")`
   only works after you enable `--window` and the requested field exists in the
   buffered events.
 

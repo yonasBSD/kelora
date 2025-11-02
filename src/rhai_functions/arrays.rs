@@ -25,6 +25,10 @@ pub fn register_functions(engine: &mut Engine) {
     // Register starts_with_any function - check if array starts with any of the specified values
     engine.register_fn("starts_with_any", starts_with_any_array);
 
+    // Register field extraction helpers for arrays of maps
+    engine.register_fn("pluck", pluck);
+    engine.register_fn("pluck_as_nums", pluck_as_nums);
+
     // Register min/max functions - find minimum/maximum values in arrays
     engine.register_fn("min", min_array);
     engine.register_fn("max", max_array);
@@ -67,6 +71,60 @@ pub fn register_functions(engine: &mut Engine) {
             convert_indexmap_to_rhai_map(flattened)
         },
     );
+}
+
+/// Extract a field from an array of maps, preserving original value types
+fn pluck(array: Array, field_name: String) -> Array {
+    let mut results = Array::new();
+
+    for item in array {
+        if let Some(map) = item.try_cast::<Map>() {
+            if let Some(value) = map.get(field_name.as_str()) {
+                if value.is_unit() {
+                    continue;
+                }
+                results.push(value.clone());
+            }
+        }
+    }
+
+    results
+}
+
+/// Extract a field from an array of maps and convert results to f64
+fn pluck_as_nums(array: Array, field_name: String) -> Array {
+    let mut results = Array::new();
+
+    for item in array {
+        if let Some(map) = item.try_cast::<Map>() {
+            if let Some(value) = map.get(field_name.as_str()) {
+                if value.is_unit() {
+                    continue;
+                }
+
+                if let Some(number) = dynamic_to_f64(value) {
+                    results.push(Dynamic::from(number));
+                }
+            }
+        }
+    }
+
+    results
+}
+
+/// Convert a Dynamic value to f64 if possible
+fn dynamic_to_f64(value: &Dynamic) -> Option<f64> {
+    if value.is_int() {
+        value.as_int().ok().map(|v| v as f64)
+    } else if value.is_float() {
+        value.as_float().ok()
+    } else if value.is_bool() {
+        value.as_bool().ok().map(|v| if v { 1.0 } else { 0.0 })
+    } else if value.is_string() {
+        value.clone().into_string().ok()?.parse::<f64>().ok()
+    } else {
+        value.to_string().parse::<f64>().ok()
+    }
 }
 
 /// Sort an array and return a new sorted array (like Python's sorted())
@@ -748,7 +806,85 @@ fn convert_indexmap_to_rhai_map(indexmap: IndexMap<String, Dynamic>) -> Map {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rhai::{Array, Dynamic};
+    use rhai::{Array, Dynamic, Map};
+
+    fn make_row(fields: Vec<(&str, Dynamic)>) -> Dynamic {
+        let mut map = Map::new();
+        for (key, value) in fields {
+            map.insert(key.into(), value);
+        }
+        Dynamic::from(map)
+    }
+
+    #[test]
+    fn test_pluck_preserves_types() {
+        let rows = vec![
+            make_row(vec![
+                ("status", Dynamic::from(200i64)),
+                ("message", Dynamic::from("ok")),
+            ]),
+            make_row(vec![
+                ("status", Dynamic::from(404i64)),
+                ("message", Dynamic::from("missing")),
+            ]),
+            make_row(vec![("status", Dynamic::from(true))]),
+        ];
+
+        let result = pluck(rows, "status".to_string());
+
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].as_int().unwrap(), 200);
+        assert_eq!(result[1].as_int().unwrap(), 404);
+        assert!(result[2].as_bool().unwrap());
+    }
+
+    #[test]
+    fn test_pluck_skips_missing_and_unit() {
+        let rows = vec![
+            make_row(vec![("status", Dynamic::from(200i64))]),
+            make_row(vec![("status", Dynamic::from(()))]),
+            make_row(vec![("other", Dynamic::from("skip"))]),
+            Dynamic::from("not a map"),
+        ];
+
+        let result = pluck(rows, "status".to_string());
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].as_int().unwrap(), 200);
+    }
+
+    #[test]
+    fn test_pluck_as_nums_converts_mixed_types() {
+        let rows = vec![
+            make_row(vec![("value", Dynamic::from(42i64))]),
+            make_row(vec![("value", Dynamic::from(2.5))]),
+            make_row(vec![("value", Dynamic::from("3.5"))]),
+            make_row(vec![("value", Dynamic::from(true))]),
+        ];
+
+        let result = pluck_as_nums(rows, "value".to_string());
+
+        assert_eq!(result.len(), 4);
+        assert_eq!(result[0].as_float().unwrap(), 42.0);
+        assert!((result[1].as_float().unwrap() - 2.5).abs() < f64::EPSILON);
+        assert!((result[2].as_float().unwrap() - 3.5).abs() < f64::EPSILON);
+        assert_eq!(result[3].as_float().unwrap(), 1.0);
+    }
+
+    #[test]
+    fn test_pluck_as_nums_skips_invalid_values() {
+        let rows = vec![
+            make_row(vec![("value", Dynamic::from("100"))]),
+            make_row(vec![("value", Dynamic::from("invalid"))]),
+            make_row(vec![("value", Dynamic::from(()))]),
+            Dynamic::from("not a map"),
+        ];
+
+        let result = pluck_as_nums(rows, "value".to_string());
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].as_float().unwrap(), 100.0);
+    }
 
     #[test]
     fn test_sorted_numbers() {

@@ -1114,12 +1114,12 @@ Get type name as string.
 e.value_type = type_of(e.value)                       // "string", "int", "array", etc.
 ```
 
-#### `window_values(field)` / `window_numbers(field)`
-Get field values from current window (requires `--window`).
+#### `window.pluck(field)` / `window.pluck_as_nums(field)`
+Extract field values from the current window array (requires `--window`).
 
 ```rhai
-let recent_statuses = window_values("status")
-let recent_times = window_numbers("response_time")
+let recent_statuses = window.pluck("status")
+let recent_times = window.pluck_as_nums("response_time")
 e.avg_time = recent_times.reduce(|s, x| s + x, 0) / recent_times.len()
 ```
 

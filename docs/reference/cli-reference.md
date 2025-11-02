@@ -429,10 +429,10 @@ kelora -j --allow-fs-writes --exec 'append_file("errors.txt", e.message)' app.lo
 
 #### `--window <SIZE>`
 
-Enable sliding window of N+1 recent events. Required for `window_*()` functions.
+Enable sliding window of N+1 recent events. The window is exposed as the `window` array, so you can call helpers like `window.pluck()`.
 
 ```bash
-kelora -j --window 5 --exec 'e.recent_statuses = window_values("status")' app.log
+kelora -j --window 5 --exec 'e.recent_statuses = window.pluck("status")' app.log
 ```
 
 ### Timestamp Conversion

@@ -105,6 +105,8 @@ array.flattened([style [,max_depth]]) Return new flattened map from nested array
 array.join(separator)                Join array elements with separator
 array.len                            Get array length (builtin)
 array.map(|item| expression)         Transform each element (builtin)
+array.pluck(field)                   Extract field from array of maps (skips missing/() values)
+array.pluck_as_nums(field)           Extract field as f64 from array of maps (skips invalid)
 array.max()                          Find maximum value in array (no auto string-to-number coercion)
 array.min()                          Find minimum value in array (no auto string-to-number coercion)
 array.parse_cols(spec [,sep])        Apply column spec to pre-split values
@@ -198,8 +200,8 @@ pseudonym(value, domain)             Generate domain-separated pseudonym (requir
 read_file(path)                      Read file contents as string
 read_lines(path)                     Read file as array of lines
 type_of(value)                       Get type name as string (builtin)
-window_numbers(field)                Get numeric field values from current window (requires --window)
-window_values(field)                 Get field values from current window (requires --window)
+window.pluck(field)                  Extract field values from current window/window array
+window.pluck_as_nums(field)          Extract numeric field values from current window/window array
 
 TRACKING/METRICS FUNCTIONS (requires --metrics):
 track_bucket(key, bucket)            Track values in buckets for histograms (skips () values)
@@ -291,7 +293,7 @@ kelora -f json --exec 'e = e.normalized(["ipv4", "email", "uuid"])'
 
 # Time-based error clustering (5min windows)
 kelora -f json -l error --window 100 --exec '
-  let recent = window_values("timestamp").map(|ts| to_datetime(ts));
+  let recent = window.pluck("timestamp").map(|ts| to_datetime(ts));
   let time_span = (recent[-1] - recent[0]).as_minutes();
   e.error_burst = time_span < 5 && recent.len() > 10
 ' --filter 'e.error_burst'
@@ -329,7 +331,7 @@ kelora -f line --exec 'let email = e.from.parse_email(); e.domain = email.domain
 METRICS & AGGREGATION:
 # Response time percentiles (requires --window)
 kelora -f json --window 1000 --metrics --end '
-  let times = window_numbers("response_time");
+  let times = window.pluck_as_nums("response_time");
   print("p50: " + times.percentile(50));
   print("p95: " + times.percentile(95));
   print("p99: " + times.percentile(99))

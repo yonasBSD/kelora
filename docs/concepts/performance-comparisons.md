@@ -299,7 +299,7 @@ awk '...[50 lines of window logic]...'
 
 # With Kelora - built-in windows
 kelora -j app.jsonl --window 60 \
-  --exec 'let errors = window_values(window, "level")
+  --exec 'let errors = window.pluck("level")
             .filter(|x| x == "ERROR");
           if errors.len() >= 3 {
             eprint("Burst at " + e.timestamp)

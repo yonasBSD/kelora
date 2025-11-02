@@ -127,7 +127,7 @@ Watch a live deploy (`tail -f`), maintain a sliding window, and append alerts to
 ```bash
 tail -f examples/deploy_tail.jsonl | kelora -j --window 25 --metrics --allow-fs-writes -qq \
   --exec '
-    let recent = window_values("level");
+    let recent = window.pluck("level");
     let err = recent.filter(|lvl| lvl == "ERROR").len();
     if err >= 3 {
       append_file("/tmp/deploy-alerts.log",
@@ -142,7 +142,7 @@ tail -f examples/deploy_tail.jsonl | kelora -j --window 25 --metrics --allow-fs-
 ```
 
 ### Why it matters
-Combines sliding windows (`--window` + `window_values()`), quiet mode, metrics, and file output (`append_file`) to build a lightweight deploy guard without external alerting systems.
+Combines sliding windows (`--window` + `window.pluck()`), quiet mode, metrics, and file output (`append_file`) to build a lightweight deploy guard without external alerting systems.
 
 ---
 
@@ -254,7 +254,7 @@ Maintain a rolling view of auth responses and raise structured alerts when failu
 kelora -j examples/auth_burst.jsonl \
   --window 20 \
   --exec '
-    let recent = window_values("status");
+    let recent = window.pluck("status");
     let failures = recent.reduce(|acc, code| acc + if code >= 500 { 1 } else { 0 }, 0);
     if failures >= 5 {
       e.alert = failures.to_string() + " failures in last " + recent.len().to_string() + " events";
@@ -267,7 +267,7 @@ kelora -j examples/auth_burst.jsonl \
 ```
 
 ### Why it matters
-Highlights `--window` + `window_values()` for contextual analytics where simple counts miss short, sharp spikes.
+Highlights `--window` + `window.pluck()` for contextual analytics where simple counts miss short, sharp spikes.
 
 ---
 
