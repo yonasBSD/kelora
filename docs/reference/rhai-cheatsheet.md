@@ -87,6 +87,16 @@ let report = `
 - The expression can be a variable, function call, or complex statement block
 - Cannot escape `${` in interpolated strings; build such strings in pieces instead
 
+## Raw Strings
+
+Disable escape sequences with `#"..."#` (ideal for regexes and file paths):
+
+```rhai
+let regex = #"\d{3}-\d{2}-\d{4}"#;        // vs "\\d{3}-\\d{2}-\\d{4}"
+let path = #"C:\Users\data"#;             // Windows paths
+let s = ##"Has "quotes" inside"##;        // Multiple # to include "
+```
+
 ## Control Flow
 
 ### If-Else

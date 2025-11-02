@@ -1935,6 +1935,13 @@ STRING INTERPOLATION:
 
   Note: Interpolation only works with backtick strings (`text`), not double quotes ("text")
 
+RAW STRINGS:
+  Wrap strings with #"..."# to disable escape sequences (perfect for regexes):
+
+  let regex = #"\d{3}-\d{2}-\d{4}"#;       No escaping needed (vs "\\d{3}-\\d{2}-\\d{4}")
+  let path = #"C:\Users\data"#;            Windows paths work naturally
+  let s = ##"Contains "quotes""##;         Use multiple # to include " inside
+
 CONTROL FLOW:
   if x > 10 {                          If-else (braces required)
       print("big");
