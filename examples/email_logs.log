@@ -1,0 +1,10 @@
+2025-01-15T10:23:45Z INFO Email sent from alice@example.com to bob@company.org subject="Welcome"
+2025-01-15T10:24:12Z INFO Email received from support@acme.com to help@example.com subject="Support Request"
+2025-01-15T10:24:33Z WARN Bounced email to invalid@nodomain.xyz reason="Domain not found"
+2025-01-15T10:25:01Z INFO Email sent from noreply@service.io to user123@gmail.com subject="Password Reset"
+2025-01-15T10:25:18Z INFO Email sent from alerts@monitoring.net to admin@example.com subject="Server Alert"
+2025-01-15T10:25:45Z ERROR Failed to send email to broken@email reason="Invalid address format"
+2025-01-15T10:26:02Z INFO Email sent from newsletter@marketing.com to subscriber@yahoo.com subject="Monthly Newsletter"
+2025-01-15T10:26:23Z INFO Email received from customer@bigcorp.com to sales@example.com subject="Quote Request"
+2025-01-15T10:26:44Z INFO Email sent from notifications@app.example.com to user@hotmail.com subject="New Message"
+2025-01-15T10:27:05Z WARN Spam detected from spammer@badactor.net to inbox@example.com

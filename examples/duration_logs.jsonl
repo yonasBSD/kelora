@@ -1,0 +1,5 @@
+{"timestamp":"2025-01-15T10:23:45Z","request_id":"req-001","start_time":"2025-01-15T10:23:45.000Z","end_time":"2025-01-15T10:23:45.234Z","operation":"user_lookup"}
+{"timestamp":"2025-01-15T10:24:12Z","request_id":"req-002","start_time":"2025-01-15T10:24:12.000Z","end_time":"2025-01-15T10:24:17.123Z","operation":"database_query"}
+{"timestamp":"2025-01-15T10:24:33Z","request_id":"req-003","start_time":"2025-01-15T10:24:33.000Z","end_time":"2025-01-15T10:24:33.456Z","operation":"cache_lookup"}
+{"timestamp":"2025-01-15T10:25:01Z","request_id":"req-004","start_time":"2025-01-15T10:25:01.000Z","end_time":"2025-01-15T10:25:07.789Z","operation":"api_call"}
+{"timestamp":"2025-01-15T10:25:18Z","request_id":"req-005","start_time":"2025-01-15T10:25:18.000Z","end_time":"2025-01-15T10:25:18.123Z","operation":"validation"}

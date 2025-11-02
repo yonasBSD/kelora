@@ -237,7 +237,7 @@ Note: Prefer e.has("field") when you want () to count as "missing".
 
 /// Generate practical examples for common log analysis patterns
 pub fn generate_examples_text() -> &'static str {
-    r#"
+    r###"
 Common Log Analysis Patterns:
 
 MICRO SEARCH HELPERS:
@@ -245,14 +245,14 @@ MICRO SEARCH HELPERS:
 kelora -f json --filter 'e.message.ilike("*timeout*")'
 
 # Regex search with cached compilation
-kelora -f json --filter 'e.message.matches(r"user\s+not\s+found")'
+kelora -f json --filter 'e.message.matches(#"[Uu]ser\s+not\s+found"#)'
 
 # Field existence that ignores () sentinel
 kelora -f logfmt --filter 'e.has("user") && e.user.like("alice*")'
 
 WEB LOG ANALYSIS:
 # Extract HTTP details from combined log
-kelora -f combined --exec 'e.slow = e.request_time > 1.0' --filter 'e.slow'
+kelora -f combined --exec 'e.large_response = e.bytes > 50000' --filter 'e.large_response'
 
 # Parse request path parameters
 kelora -f combined --exec '
@@ -272,7 +272,7 @@ ERROR TRACKING:
 # Extract stack traces and error types
 kelora -f json --filter 'e.level == "ERROR"' --exec '
   e.error_type = e.error.before(":");
-  e.line_number = e.error.extract_re(r"line (\d+)", 1).to_int()
+  e.line_number = e.stack_trace.extract_re(#":(\d+)"#, 1).to_int()
 '
 
 # Group errors by hash for deduplication
@@ -297,13 +297,13 @@ kelora -f json -l error --window 100 --exec '
 
 SECURITY & AUDIT:
 # Check for private IPs in external traffic
-kelora -f json --filter 'e.source_ip.is_ipv4() && !e.source_ip.is_private_ip()'
+kelora -f json --exec 'e.is_public = e.source_ip.is_private_ip() == false' --filter 'e.is_public'
 
 # JWT token analysis without verification
-kelora -f json --exec 'let jwt = e.token.parse_jwt(); e.user_id = jwt.sub; e.role = jwt.role'
+kelora -f json --exec 'let jwt = e.token.parse_jwt(); e.jwt_user = jwt.claims.sub; e.jwt_role = jwt.claims.role'
 
 # Detect CIDR-based access patterns
-kelora -f json --exec 'e.internal = e.ip.is_in_cidr("10.0.0.0/8")' --filter '!e.internal'
+kelora -f json --exec 'e.internal = e.client_ip.is_in_cidr("10.0.0.0/8")' --filter 'e.internal == false'
 
 # Hash sensitive fields with domain separation
 export KELORA_SECRET="your-secret-key"
@@ -340,7 +340,7 @@ kelora -f combined --metrics --exec 'track_bucket("status", e.status / 100 * 100
 
 # Unique users per endpoint
 kelora -f json --metrics --exec 'track_unique(e.path, e.user_id)' \
-  --end 'for (path, users) in metrics { print(path + ": " + users.len() + " users") }'
+  --end 'for path in metrics.keys() { let users = metrics[path]; print(path + ": " + users.len() + " users") }'
 
 ARRAY & FAN-OUT PROCESSING:
 # Process nested arrays - fan out items
@@ -352,8 +352,7 @@ kelora -f json --exec 'emit_each(e.batches)' \
   --filter 'e.priority == "high"'
 
 # Array transformations and sorting
-kelora -f json --exec 'e.top_scores = sorted(e.scores)[-3:]' \
-  --exec 'e.winners = sorted_by(e.players, "score")[-5:].map(|p| p.name)'
+kelora -f json --exec 'let s = sorted(e.scores); let len = s.len(); e.top_3 = [s[len-3], s[len-2], s[len-1]]'
 
 # Remove duplicate elements
 kelora -f json --exec 'e.unique_tags = unique(e.tags)'
@@ -458,5 +457,5 @@ COMMON IDIOMS:
 # Pattern normalization        → e.message.normalized("ipv4,email,uuid")
 
 See --help-functions for complete function reference. Visit https://rhai.rs for Rhai language details.
-"#
+"###
 }
