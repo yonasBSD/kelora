@@ -568,6 +568,15 @@ Return new array in reverse order.
 e.reversed = reversed(e.items)
 ```
 
+#### `array.slice(spec)`
+Slice array using Python notation (e.g., `"1:5"`, `":3"`, `"-2:"`).
+
+```rhai
+e.top_three = e.values.slice(":3")                   // [9, 8, 7, 6] → [9, 8, 7]
+e.tail = e.values.slice("-2:")                       // [9, 8, 7, 6] → [7, 6]
+e.every_other = e.values.slice("0::2")               // [9, 8, 7, 6] → [9, 7]
+```
+
 #### `array.unique()`
 Remove all duplicate elements (preserves first occurrence).
 

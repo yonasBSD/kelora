@@ -10,6 +10,9 @@ pub fn register_functions(engine: &mut Engine) {
     // Register reversed function - like Python's reversed(), reverses array order
     engine.register_fn("reversed", reversed_array);
 
+    // Register slice function - Python-style slicing for arrays
+    engine.register_fn("slice", slice_array);
+
     // Register unique function - remove all duplicates from array
     engine.register_fn("unique", unique_array);
 
@@ -177,6 +180,81 @@ fn get_number_value(value: &Dynamic) -> Result<f64, ()> {
 fn reversed_array(mut arr: Array) -> Array {
     arr.reverse();
     arr
+}
+
+/// Python-style slicing for arrays using "start:end:step" notation.
+fn slice_array(arr: Array, spec: &str) -> Array {
+    let len = arr.len() as i32;
+    if len == 0 {
+        return Array::new();
+    }
+
+    let parts: Vec<&str> = spec.split(':').collect();
+
+    let step = if parts.len() > 2 && !parts[2].trim().is_empty() {
+        parts[2].trim().parse::<i32>().unwrap_or(1)
+    } else {
+        1
+    };
+
+    if step == 0 {
+        return Array::new();
+    }
+
+    let (default_start, default_end) = if step > 0 { (0, len) } else { (len - 1, -1) };
+
+    let start = if !parts.is_empty() && !parts[0].trim().is_empty() {
+        let mut value = parts[0].trim().parse::<i32>().unwrap_or(default_start);
+        if value < 0 {
+            value += len;
+        }
+        if step > 0 {
+            value.clamp(0, len)
+        } else {
+            value.clamp(0, len - 1)
+        }
+    } else {
+        default_start
+    };
+
+    let end = if parts.len() > 1 && !parts[1].trim().is_empty() {
+        let mut value = parts[1].trim().parse::<i32>().unwrap_or(default_end);
+        if value < 0 {
+            value += len;
+        }
+        if step > 0 {
+            value.clamp(0, len)
+        } else {
+            value.clamp(-1, len - 1)
+        }
+    } else {
+        default_end
+    };
+
+    let mut result = Array::new();
+    let mut i = start;
+
+    if step > 0 {
+        while i < end {
+            if i >= 0 && i < len {
+                if let Some(value) = arr.get(i as usize) {
+                    result.push(value.clone());
+                }
+            }
+            i += step;
+        }
+    } else {
+        while i > end {
+            if i >= 0 && i < len {
+                if let Some(value) = arr.get(i as usize) {
+                    result.push(value.clone());
+                }
+            }
+            i += step;
+        }
+    }
+
+    result
 }
 
 /// Remove all duplicate elements from an array, preserving first occurrence order
@@ -1505,5 +1583,55 @@ mod tests {
         // Should return () for mixed types
         assert!(min_result.is_unit());
         assert!(max_result.is_unit());
+    }
+
+    fn array_to_ints(arr: Array) -> Vec<i64> {
+        arr.into_iter().map(|d| d.as_int().unwrap()).collect()
+    }
+
+    #[test]
+    fn test_slice_array_basic_range() {
+        let arr = vec![
+            Dynamic::from(0i64),
+            Dynamic::from(1i64),
+            Dynamic::from(2i64),
+            Dynamic::from(3i64),
+            Dynamic::from(4i64),
+        ];
+
+        let result = slice_array(arr, "1:4");
+        assert_eq!(array_to_ints(result), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_slice_array_negative_indices_and_step() {
+        let arr = vec![
+            Dynamic::from(0i64),
+            Dynamic::from(1i64),
+            Dynamic::from(2i64),
+            Dynamic::from(3i64),
+            Dynamic::from(4i64),
+        ];
+
+        let result = slice_array(arr.clone(), "-4:-1");
+        assert_eq!(array_to_ints(result), vec![1, 2, 3]);
+
+        let reversed = slice_array(arr, "3:0:-1");
+        assert_eq!(array_to_ints(reversed), vec![3, 2, 1]);
+    }
+
+    #[test]
+    fn test_slice_array_defaults_and_zero_step() {
+        let arr = vec![
+            Dynamic::from(10i64),
+            Dynamic::from(20i64),
+            Dynamic::from(30i64),
+        ];
+
+        let no_spec = slice_array(arr.clone(), "");
+        assert_eq!(array_to_ints(no_spec), vec![10, 20, 30]);
+
+        let zero_step = slice_array(arr, "0:2:0");
+        assert!(zero_step.is_empty());
     }
 }

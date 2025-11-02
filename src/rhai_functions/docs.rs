@@ -113,6 +113,7 @@ array.pop()                          Remove and return last item (builtin)
 array.push(item)                     Add item to end of array (builtin)
 array.reduce(|acc, item| expr, init) Aggregate array into single value (builtin)
 array.reversed()                     Return new array in reverse order
+array.slice(spec)                    Slice array using Python notation (e.g., "1:5", ":3", "-2:")
 array.some(|item| condition)         Check if any element matches condition (builtin)
 array.sort()                         Sort array in place (builtin)
 array.sorted_by(field)               Sort array of objects by field name
