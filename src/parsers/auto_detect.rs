@@ -291,6 +291,8 @@ fn detect_csv_variants(line: &str) -> Option<ConfigInputFormat> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+    use proptest::strategy::{BoxedStrategy, Strategy};
 
     #[test]
     fn test_detect_json() {
@@ -393,5 +395,243 @@ mod tests {
             detect_format("a single word").unwrap(),
             ConfigInputFormat::Line
         );
+    }
+
+    fn lower_ascii(len: std::ops::RangeInclusive<usize>) -> BoxedStrategy<String> {
+        prop::collection::vec(proptest::char::range('a', 'z'), len)
+            .prop_map(|chars| chars.into_iter().collect())
+            .boxed()
+    }
+
+    fn identifier() -> BoxedStrategy<String> {
+        lower_ascii(1..=8)
+    }
+
+    fn short_ascii_text() -> BoxedStrategy<String> {
+        lower_ascii(3..=12)
+    }
+
+    fn json_value() -> BoxedStrategy<serde_json::Value> {
+        let string_val = lower_ascii(0..=8)
+            .prop_map(serde_json::Value::String)
+            .boxed();
+
+        let number_val = any::<i64>()
+            .prop_map(|v| serde_json::Value::Number(serde_json::Number::from(v)))
+            .boxed();
+
+        let bool_val = any::<bool>()
+            .prop_map(serde_json::Value::Bool)
+            .boxed();
+
+        prop_oneof![string_val, number_val, bool_val].boxed()
+    }
+
+    fn json_line() -> BoxedStrategy<String> {
+        prop::collection::vec((identifier(), json_value()), 1..=4)
+            .prop_map(|entries| {
+                let mut map = serde_json::Map::new();
+                for (k, v) in entries {
+                    map.insert(k, v);
+                }
+                serde_json::Value::Object(map).to_string()
+            })
+            .boxed()
+    }
+
+    fn cef_line() -> BoxedStrategy<String> {
+        (
+            identifier(),
+            identifier(),
+            identifier(),
+            identifier(),
+            identifier(),
+            0u8..=10,
+            identifier(),
+            identifier(),
+        )
+            .prop_map(|(vendor, product, version, signature, name, severity, ext_key, ext_value)| {
+                format!(
+                    "CEF:0|{vendor}|{product}|{version}|{signature}|{name}|{severity}|{ext_key}={ext_value}"
+                )
+            })
+            .boxed()
+    }
+
+    fn month_abbrev() -> BoxedStrategy<&'static str> {
+        proptest::sample::select(&[
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        ])
+        .boxed()
+    }
+
+    fn syslog_rfc5424_line() -> BoxedStrategy<String> {
+        (
+            0u32..=191,
+            identifier(),
+            identifier(),
+            0u32..=65535,
+            identifier(),
+            short_ascii_text(),
+        )
+            .prop_map(|(priority, host, app, pid, msgid, msg)| {
+                format!(
+                    "<{priority}>1 2024-01-02T03:04:05.006Z {host} {app} {pid} {msgid} - {msg}"
+                )
+            })
+            .boxed()
+    }
+
+    fn syslog_rfc3164_line() -> BoxedStrategy<String> {
+        (
+            month_abbrev(),
+            1u8..=28,
+            0u8..=23,
+            0u8..=59,
+            0u8..=59,
+            identifier(),
+            identifier(),
+            0u16..=9999,
+            short_ascii_text(),
+        )
+            .prop_map(|(month, day, hour, minute, second, host, program, pid, message)| {
+                let day_formatted = format!("{:>2}", day);
+                format!(
+                    "{month} {day_formatted} {hour:02}:{minute:02}:{second:02} {host} {program}[{pid}]: {message}"
+                )
+            })
+            .boxed()
+    }
+
+    fn syslog_line() -> BoxedStrategy<String> {
+        prop_oneof![syslog_rfc5424_line(), syslog_rfc3164_line()].boxed()
+    }
+
+    fn ip_octet() -> BoxedStrategy<u8> {
+        (1u8..=255).boxed()
+    }
+
+    fn combined_line() -> BoxedStrategy<String> {
+        (
+            (ip_octet(), ip_octet(), ip_octet(), ip_octet()),
+            1u8..=28,
+            month_abbrev(),
+            0u8..=23,
+            0u8..=59,
+            0u8..=59,
+            proptest::sample::select(&["GET", "POST", "PUT", "DELETE"]),
+            identifier(),
+            100u16..=599,
+            0u32..=10_000,
+        )
+            .prop_map(|((a, b, c, d), day, month, hour, minute, second, method, path, status, size)| {
+                let ip = format!("{a}.{b}.{c}.{d}");
+                let timestamp = format!("{day:02}/{month}/2024:{hour:02}:{minute:02}:{second:02} +0000");
+                format!(
+                    "{ip} - - [{timestamp}] \"{method} /{path} HTTP/1.1\" {status} {size} \"-\" \"Mozilla/5.0\""
+                )
+            })
+            .boxed()
+    }
+
+    fn logfmt_value() -> BoxedStrategy<String> {
+        prop_oneof![
+            identifier(),
+            any::<i64>().prop_map(|v| v.to_string()).boxed(),
+            short_ascii_text(),
+        ]
+        .boxed()
+    }
+
+    fn logfmt_line() -> BoxedStrategy<String> {
+        prop::collection::vec((identifier(), logfmt_value()), 2..=4)
+            .prop_map(|pairs| {
+                pairs
+                    .into_iter()
+                    .map(|(k, v)| format!("{k}={v}"))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            })
+            .boxed()
+    }
+
+    fn csv_with_headers() -> BoxedStrategy<String> {
+        prop::collection::vec(identifier(), 3..=5)
+            .prop_map(|fields| fields.join(","))
+            .boxed()
+    }
+
+    fn csv_without_headers() -> BoxedStrategy<String> {
+        prop::collection::vec(0u16..=999, 3..=5)
+            .prop_map(|nums| nums.into_iter().map(|n| n.to_string()).collect::<Vec<_>>().join(","))
+            .boxed()
+    }
+
+    fn tsv_with_headers() -> BoxedStrategy<String> {
+        prop::collection::vec(identifier(), 3..=5)
+            .prop_map(|fields| fields.join("\t"))
+            .boxed()
+    }
+
+    fn tsv_without_headers() -> BoxedStrategy<String> {
+        prop::collection::vec(0u16..=999, 3..=5)
+            .prop_map(|nums| nums.into_iter().map(|n| n.to_string()).collect::<Vec<_>>().join("\t"))
+            .boxed()
+    }
+
+    fn plain_line() -> BoxedStrategy<String> {
+        lower_ascii(5..=30)
+    }
+
+    proptest! {
+        #[test]
+        fn prop_detects_json(line in json_line()) {
+            prop_assert_eq!(detect_format(&line).unwrap(), ConfigInputFormat::Json);
+        }
+
+        #[test]
+        fn prop_detects_cef(line in cef_line()) {
+            prop_assert_eq!(detect_format(&line).unwrap(), ConfigInputFormat::Cef);
+        }
+
+        #[test]
+        fn prop_detects_syslog(line in syslog_line()) {
+            prop_assert_eq!(detect_format(&line).unwrap(), ConfigInputFormat::Syslog);
+        }
+
+        #[test]
+        fn prop_detects_combined(line in combined_line()) {
+            prop_assert_eq!(detect_format(&line).unwrap(), ConfigInputFormat::Combined);
+        }
+
+        #[test]
+        fn prop_detects_logfmt(line in logfmt_line()) {
+            prop_assert_eq!(detect_format(&line).unwrap(), ConfigInputFormat::Logfmt);
+        }
+
+        #[test]
+        fn prop_detects_csv_headers(line in csv_with_headers()) {
+            prop_assert_eq!(detect_format(&line).unwrap(), ConfigInputFormat::Csv(None));
+        }
+
+        #[test]
+        fn prop_detects_csv_no_headers(line in csv_without_headers()) {
+            prop_assert_eq!(detect_format(&line).unwrap(), ConfigInputFormat::Csvnh);
+        }
+
+        #[test]
+        fn prop_detects_tsv_headers(line in tsv_with_headers()) {
+            prop_assert_eq!(detect_format(&line).unwrap(), ConfigInputFormat::Tsv(None));
+        }
+
+        #[test]
+        fn prop_detects_tsv_no_headers(line in tsv_without_headers()) {
+            prop_assert_eq!(detect_format(&line).unwrap(), ConfigInputFormat::Tsvnh);
+        }
+
+        #[test]
+        fn prop_detects_line_fallback(line in plain_line()) {
+            prop_assert_eq!(detect_format(&line).unwrap(), ConfigInputFormat::Line);
+        }
     }
 }
