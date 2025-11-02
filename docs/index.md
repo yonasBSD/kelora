@@ -39,9 +39,8 @@ Parse any log format, filter with expressions, transform with 100+ functions, tr
     ```bash exec="on" source="above" result="ansi"
     kelora -f json examples/deploy_tail.jsonl \
       --window 15 \
-      --exec 'let recent = window_values(window, "level");
-              if recent.filter(|lvl| lvl == "ERROR").len() >= 3 {
-                eprint("burst detected at " + e.timestamp);
+      --exec 'if window.filter(|ev| ev.level == "ERROR").len() >= 3 {
+                eprint("Error burst detected at " + e.timestamp);
               }' \
       -F none
     ```
