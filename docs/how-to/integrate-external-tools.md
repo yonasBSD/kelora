@@ -40,6 +40,7 @@ Tools that process data **from** Kelora:
 | **SQLite/DuckDB** | Database | SQL queries, aggregations, storage | `-F csv`, `-J` |
 | **sort** | Sorting | Order by timestamp, level, or other fields | `-F tsv`, `-F csv` |
 | **column** | Formatter | Pretty-print TSV as aligned tables | `-F tsv` |
+| **jtbl** | Formatter | Pretty-print JSON as aligned tables | `-J` |
 | **miller** | Data processing | Multi-format analytics and reshaping | `-F csv`, `-J` |
 | **qsv** | CSV analytics | Statistical analysis, joins, validation | `-F csv` |
 | **lnav** | Interactive viewer | Explore and search logs interactively | `-J` |
@@ -541,6 +542,35 @@ kelora -j logs/app.jsonl -k timestamp,level,service,message -F tsv | \
 kelora -j logs/app.jsonl -F tsv | \
   column -ts $'\t' -N timestamp,level,service,message -J > output.json
 ```
+
+---
+
+### jtbl — JSON to Table Converter
+
+Converts JSON/JSON Lines to formatted tables for terminal display. Simpler than spreadsheet tools for quick viewing, automatically detects columns and formats data. Created by Kelly Brazil (author of `jc`).
+
+```bash
+# Pretty-print JSON output as a table
+kelora -j logs/app.jsonl -k timestamp,level,service,message -J | jtbl
+
+# Works with full JSON output too
+kelora -j logs/app.jsonl --filter 'e.status >= 500' -J | jtbl
+
+# Combine with jq for column selection
+kelora -j logs/app.jsonl -J | \
+  jq '{timestamp, level, service, message}' | jtbl
+
+# Compare with column (TSV-based approach)
+kelora -j logs/app.jsonl -k timestamp,level,service,message -F tsv | \
+  column -ts $'\t'
+```
+
+**When to use jtbl vs column:**
+- Use `jtbl` when working with JSON output (no need to convert to TSV first)
+- Use `column` for TSV output or when you need more control over formatting
+- `jtbl` auto-detects columns; `column` requires explicit configuration
+
+[jtbl documentation](https://github.com/kellyjonbrazil/jtbl)
 
 ---
 
