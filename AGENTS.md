@@ -76,7 +76,7 @@ src/
 ├── processing/          # Pipeline stages
 ├── rhai_functions/      # Rhai functions (update docs.rs!)
 └── output/              # Output formatters
-tests/integration_tests.rs
+tests/
 examples/                # Usage examples
 benchmarks/              # Performance tests
 Justfile                 # Build automation
