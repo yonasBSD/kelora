@@ -257,13 +257,13 @@ kelora -f combined --exec 'e.large_response = e.bytes > 50000' --filter 'e.large
 # Parse request path parameters
 kelora -f combined --exec '
   let params = e.path.after("?").parse_query_params();
-  e.utm_source = params.get_path("utm_source", "");
-  e.user_id = params.get_path("user_id", "").to_int()
+  e.utm_source = params.utm_source ?? "";
+  e.user_id = (params.user_id ?? "").to_int()
 '
 
 # Mask IPs and extract domains from referers
 kelora -f json --exec 'e.ip = e.client_ip.mask_ip(2)' \
-  --exec 'e.referer_domain = e.get_path("referer", "").extract_domain()'
+  --exec 'e.referer_domain = (e.referer ?? "").extract_domain()'
 
 # Detect suspicious user agents
 kelora -f combined --filter 'e.user_agent.has_matches("(?i)(bot|crawler|scanner)")'
@@ -443,9 +443,12 @@ kelora -f json --allow-fs-writes --exec '
 
 COMMON IDIOMS:
 # Method chaining              → e.domain = e.url.extract_domain().to_lower().strip()
-# Safe nested access           → e.get_path("user.role", "guest")
+# Top-level default value      → e.referer ?? "unknown"
+# Nested field with default    → e.get_path("user.role", "guest")
 # Safe type conversion         → to_int_or(e.port, 8080)
-# Check field exists           → e.has_path("user.id")
+# Check top-level field        → e.has("user")
+# Check nested field exists    → e.has_path("user.id")
+# Only process if field exists → --filter 'e.has("referer")' --exec '...'
 # Remove sensitive fields      → e.password = (); e.ssn = ()
 # Hash for grouping/sampling   → e.session_id.bucket() % 100
 # Parse then extract           → e.url.parse_url().path
