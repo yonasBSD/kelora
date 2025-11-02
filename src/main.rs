@@ -1890,7 +1890,7 @@ Multiline strategies?          kelora --help-multiline
 
 /// Print Rhai scripting guide
 fn print_rhai_help() {
-    let help_text = r#"
+    let help_text = r###"
 Rhai Language Guide for Kelora:
 
 This guide covers Rhai language fundamentals for programmers familiar with Python, JavaScript, or Bash.
@@ -2082,7 +2082,7 @@ See also:
   kelora --help-functions  Complete function catalogue
   kelora --help-time       Timestamp format reference
   https://rhai.rs          Full Rhai language documentation
-"#;
+"###;
     println!("{}", help_text);
 }
 

@@ -11,7 +11,7 @@ Kelora thrives in Unix pipelines—combine it with specialized tools to filter, 
 
 ## Before You Start
 
-- Kelora installed (see [Install](../index.md#install)).
+- Kelora installed (see [Installation](../quickstart.md#installation)).
 - Basic familiarity with Kelora's input formats (`-j`, `-f logfmt`, `-f csv`, etc.) and output formats (`-F json`, `-F csv`, `-F tsv`).
 - Access to the external tools you want to use (installation instructions vary by tool).
 
