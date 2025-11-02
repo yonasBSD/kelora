@@ -38,6 +38,7 @@ Tools that process data **from** Kelora:
 |------|----------|---------|---------------|
 | **jq** | JSON query | Advanced JSON transformations | `-J` |
 | **SQLite/DuckDB** | Database | SQL queries, aggregations, storage | `-F csv`, `-J` |
+| **pirkle** | PRQL query | SQL-style queries with pipeline syntax | `-F csv`, `-F jsonl`, `-f logfmt` |
 | **sort** | Sorting | Order by timestamp, level, or other fields | `-F tsv`, `-F csv` |
 | **column** | Formatter | Pretty-print TSV as aligned tables | `-F tsv` |
 | **jtbl** | Formatter | Pretty-print JSON as aligned tables | `-J` |
@@ -390,6 +391,37 @@ kelora -j logs/app.jsonl -F csv | \
 ```
 
 [SQLite](https://sqlite.org/), [DuckDB](https://duckdb.org/)
+
+---
+
+### pirkle — PRQL Query Tool
+
+Query CSV files and SQLite databases using PRQL (Pipelined Relational Query Language). Rust-based with excellent stdin support for Unix pipelines. Outputs JSON Lines, logfmt, CSV, or tables for bidirectional integration with Kelora.
+
+```bash
+# Kelora preprocesses, pirkle performs SQL analytics
+kelora -j logs/app.jsonl -k timestamp,level,service,message -F jsonl | \
+  pirkle stdin --query "
+    from stdin
+    | group service (aggregate {error_count = count this})
+    | sort -error_count"
+
+# Join Kelora output with reference data
+kelora -j logs/orders.jsonl -k order_id,user_id,amount -F csv | \
+  pirkle stdin users.csv --query "
+    from stdin
+    | join users (==user_id)
+    | select {order_id, users.name, amount, users.region}"
+
+# Round-trip: pirkle queries, Kelora aggregates
+pirkle transactions.csv --format jsonl --query "
+  from transactions | filter amount > 1000" | \
+  kelora -j --span 1h -e 'track_sum("total", e.amount)' -m
+```
+
+**When to use pirkle:** SQL-style JOINs, complex GROUP BY, window functions, or when PRQL syntax is clearer than Rhai.
+
+[pirkle documentation](https://github.com/dloss/pirkle)
 
 ---
 
