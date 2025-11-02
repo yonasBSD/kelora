@@ -90,6 +90,16 @@ docs-build:
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
     uvx --with mkdocs-material --with mike --with markdown-exec[ansi] mkdocs build
 
+# Run JSON parser fuzzing locally (requires cargo-fuzz + nightly toolchain)
+fuzz-json *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! cargo fuzz --help >/dev/null 2>&1; then
+        echo "error: cargo-fuzz is not installed. Install with 'cargo install cargo-fuzz'." >&2
+        exit 1
+    fi
+    cargo +nightly fuzz run json_parser "$@"
+
 # Generate documentation screenshots using VHS
 screenshots:
     #!/usr/bin/env bash

@@ -154,26 +154,36 @@ fn try_parse_with_format(
 
     // Handle comma-separated fractional seconds (Python logging format)
     let (processed_ts_str, processed_format) = if format.contains(",%f") {
-        // Convert comma to dot for chrono compatibility and handle milliseconds properly
+        // Convert comma to dot for chrono compatibility and handle milliseconds properly.
+        // Only normalize when the fractional part is all digits; otherwise, leave untouched
+        // so parsing simply fails instead of panicking on unexpected characters.
         if let Some(comma_pos) = ts_str.rfind(',') {
             let base_part = &ts_str[..comma_pos];
             let frac_part = &ts_str[comma_pos + 1..];
 
-            // Pad or truncate fractional part to 9 digits (nanoseconds)
-            let frac_nanos = if frac_part.len() <= 3 {
-                // Treat as milliseconds, pad to nanoseconds
-                format!("{:0<9}", format!("{:0<3}", frac_part))
-            } else if frac_part.len() <= 6 {
-                // Treat as microseconds, pad to nanoseconds
-                format!("{:0<9}", format!("{:0<6}", frac_part))
-            } else {
-                // Truncate to nanoseconds
-                frac_part[..9].to_string()
-            };
+            if !frac_part.is_empty() && frac_part.chars().all(|c| c.is_ascii_digit()) {
+                // Pad or truncate fractional part to 9 digits (nanoseconds)
+                let frac_nanos = if frac_part.len() <= 3 {
+                    // Treat as milliseconds, pad to nanoseconds
+                    format!("{:0<9}", format!("{:0<3}", frac_part))
+                } else if frac_part.len() <= 6 {
+                    // Treat as microseconds, pad to nanoseconds
+                    format!("{:0<9}", format!("{:0<6}", frac_part))
+                } else {
+                    // Limit to nanosecond precision while keeping at least 9 digits
+                    let mut truncated: String = frac_part.chars().take(9).collect();
+                    if truncated.len() < 9 {
+                        truncated = format!("{:0<9}", truncated);
+                    }
+                    truncated
+                };
 
-            let new_ts_str = format!("{}.{}", base_part, frac_nanos);
-            let new_format = format.replace(",%f", ".%f");
-            (new_ts_str, new_format)
+                let new_ts_str = format!("{}.{}", base_part, frac_nanos);
+                let new_format = format.replace(",%f", ".%f");
+                (new_ts_str, new_format)
+            } else {
+                (ts_str.to_string(), format.to_string())
+            }
         } else {
             (ts_str.to_string(), format.to_string())
         }
@@ -755,6 +765,13 @@ mod tests {
         assert!(result.is_none());
 
         let result = parser.parse_ts("2023-13-45T25:70:70Z");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_fractional_part_with_non_digits_does_not_panic() {
+        let mut parser = AdaptiveTsParser::new();
+        let result = parser.parse_ts("4050-01-01T0,:00:00Z");
         assert!(result.is_none());
     }
 

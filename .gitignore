@@ -12,3 +12,8 @@ benchmarks/bench_*.jsonl
 benchmarks/bench_*.csv
 benchmarks/bench_*.log
 benchmarks/comparison_results/
+
+# Fuzzing outputs
+fuzz/artifacts/
+fuzz/corpus/
+fuzz/target/

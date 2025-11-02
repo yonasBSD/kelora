@@ -49,6 +49,11 @@ just docs-build         # Build locally
 
 **Architecture:** Streaming pipeline: Input → Parsing → Processing (Rhai) → Output
 
+**Fuzzing (manual only):**
+- Harnesses live in `fuzz/`. Install [`cargo-fuzz`](https://github.com/rust-fuzz/cargo-fuzz) and run `just fuzz-json` (wraps `cargo +nightly fuzz run json_parser`) to stress the JSON pipeline.
+- Seeds in `fuzz/corpus/json_parser/` keep coverage grounded; extend them when triaging crashes.
+- Leave fuzzing out of CI—run it ad-hoc during development.
+
 **Adding Rhai Functions:**
 - Implement in `src/rhai_functions/`
 - **ALWAYS update `src/rhai_functions/docs.rs`** for `--help-functions`
