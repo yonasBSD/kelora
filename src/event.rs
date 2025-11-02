@@ -534,6 +534,43 @@ impl std::fmt::Display for FieldValue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+    use proptest::strategy::{BoxedStrategy, Strategy};
+
+    fn arb_dynamic(depth: u32) -> BoxedStrategy<Dynamic> {
+        use proptest::collection::vec;
+
+        let leaf = prop_oneof![
+            any::<i64>().prop_map(Dynamic::from),
+            prop::num::f64::NORMAL.prop_map(Dynamic::from),
+            any::<bool>().prop_map(Dynamic::from),
+            "[ -~]{0,16}".prop_map(Dynamic::from),
+            Just(Dynamic::UNIT),
+        ]
+        .boxed();
+
+        leaf.prop_recursive(depth, 64, 8, |inner| {
+            let map = vec(("[a-z]{1,8}".prop_map(|s: String| s), inner.clone()), 0..4)
+                .prop_map(|entries| {
+                    let mut map = rhai::Map::new();
+                    for (k, v) in entries {
+                        map.insert(k.into(), v);
+                    }
+                    Dynamic::from(map)
+                });
+
+            let array = vec(inner, 0..4).prop_map(|items| {
+                let mut arr = rhai::Array::new();
+                for item in items {
+                    arr.push(item);
+                }
+                Dynamic::from(arr)
+            });
+
+            prop_oneof![map, array]
+        })
+        .boxed()
+    }
     use chrono::{TimeZone, Utc};
     use rhai::{Array, Map};
 
@@ -806,5 +843,29 @@ mod tests {
         // Should stop at level 3 and contain the remaining structure as a string
         assert!(limited.contains_key("level1.level2.level3"));
         assert!(!limited.contains_key("level1.level2.level3.level4.level5.level6.level7.level8"));
+    }
+    proptest! {
+        #[test]
+        fn prop_flatten_preserves_scalars(value in arb_dynamic(3), style in prop_oneof![Just(FlattenStyle::Bracket), Just(FlattenStyle::Dot), Just(FlattenStyle::Underscore)]) {
+            let flattened = flatten_dynamic(&value, style, 0);
+            prop_assert!(!flattened.is_empty());
+
+            if value.clone().try_cast::<rhai::Map>().is_none() && value.clone().try_cast::<rhai::Array>().is_none() {
+                prop_assert_eq!(flattened.len(), 1);
+                let (_, v) = flattened.iter().next().unwrap();
+                prop_assert_eq!(v.clone().type_name(), value.type_name());
+            }
+        }
+
+        #[test]
+        fn prop_flatten_depth_limit_dot(depth in 1usize..5, value in arb_dynamic(3)) {
+            let flattened = flatten_dynamic(&value, FlattenStyle::Dot, depth);
+            for key in flattened.keys() {
+                if key != "value" {
+                    let segments = key.split('.').count();
+                    prop_assert!(segments <= depth);
+                }
+            }
+        }
     }
 }

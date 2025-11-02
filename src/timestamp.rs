@@ -585,6 +585,16 @@ fn parse_time_only(arg: &str) -> Option<DateTime<Utc>> {
 mod tests {
     use super::*;
     use chrono::{Datelike, Timelike};
+    use proptest::prelude::*;
+
+    fn arb_utc_datetime() -> impl Strategy<Value = DateTime<Utc>> {
+        (-2208988800i64..=253402300799i64, 0u32..1_000_000_000).prop_map(|(secs, nanos)| {
+            chrono::Utc
+                .timestamp_opt(secs, nanos)
+                .single()
+                .expect("valid timestamp")
+        })
+    }
 
     #[test]
     fn test_adaptive_parser_basic() {
@@ -975,5 +985,29 @@ mod tests {
 
         // Edge case: malformed brackets are outside our scope -
         // our improvement handles the common case of properly bracketed timestamps
+    }
+
+    proptest! {
+        #[test]
+        fn prop_parse_rfc3339_roundtrip(dt in arb_utc_datetime()) {
+            let mut parser = AdaptiveTsParser::new();
+            let input = dt.to_rfc3339();
+            let parsed = parser
+                .parse_ts_with_config(&input, None, None)
+                .expect("parser should accept RFC3339 timestamp");
+
+            prop_assert_eq!(parsed, dt);
+        }
+
+        #[test]
+        fn prop_parse_ignores_surrounding_whitespace(dt in arb_utc_datetime(), prefix in "[ \t]{0,3}", suffix in "[ \t]{0,3}") {
+            let mut parser = AdaptiveTsParser::new();
+            let raw = format!("{}{}{}", prefix, dt.to_rfc3339(), suffix);
+            let parsed = parser
+                .parse_ts_with_config(&raw, None, None)
+                .expect("parser should ignore surrounding whitespace");
+
+            prop_assert_eq!(parsed, dt);
+        }
     }
 }
