@@ -525,7 +525,8 @@ fn parse_relative_time(arg: &str) -> Result<DateTime<Utc>, String> {
     let total_seconds = signed_num
         .checked_mul(seconds_factor)
         .ok_or_else(|| "Relative time is out of supported range".to_string())?;
-    let duration = chrono::Duration::seconds(total_seconds);
+    let duration = chrono::Duration::try_seconds(total_seconds)
+        .ok_or_else(|| "Relative time is out of supported range".to_string())?;
 
     Utc::now()
         .checked_add_signed(duration)
