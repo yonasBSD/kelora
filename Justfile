@@ -152,3 +152,6 @@ release-prepare:
     echo "Release tag created locally. Push when ready:"
     echo "  git push ${REMOTE} ${TARGET_BRANCH}"
     echo "  git push ${REMOTE} ${TAG}"
+
+install:
+    cargo install --path .
