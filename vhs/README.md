@@ -64,7 +64,7 @@ Set FontSize 14
 Set Width 1200
 Set Height 600
 Set Padding 20
-Set Theme "Catppuccin Mocha"
+Set Theme "Dracula"
 
 # Type your command
 Type "./target/release/kelora [your command here]"
@@ -86,7 +86,7 @@ Sleep 2s
 - **Escaping quotes**: Break complex commands into multiple `Type` commands to avoid escaping issues
 - **Timing**: Adjust `Sleep` durations to ensure commands complete and viewers can read output
 - **Terminal size**: Keep width around 1200px for readability in docs
-- **Theme**: We use "Catppuccin Mocha" for consistency
+- **Theme**: We use "Dracula" for intense, vibrant colors
 - **File size**: GIFs can be large. Keep recordings under 10 seconds when possible
 
 ## Troubleshooting

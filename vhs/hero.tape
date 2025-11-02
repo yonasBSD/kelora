@@ -8,7 +8,7 @@ Set FontSize 24
 Set Width 1400
 Set Height 800
 Set Padding 20
-Set Theme "Catppuccin Mocha"
+Set Theme "Dracula"
 
 # First example: slow/failing requests in logfmt
 Hide

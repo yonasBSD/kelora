@@ -8,7 +8,7 @@ Set FontSize 24
 Set Width 1400
 Set Height 700
 Set Padding 20
-Set Theme "Catppuccin Mocha"
+Set Theme "Dracula"
 
 # Execute command without showing typing
 Hide
