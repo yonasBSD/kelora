@@ -513,16 +513,23 @@ fn parse_relative_time(arg: &str) -> Result<DateTime<Utc>, String> {
         .map_err(|_| "Invalid number in relative time")?;
     let signed_num = sign * num;
 
-    let duration = match unit {
-        "s" | "sec" | "secs" | "second" | "seconds" => chrono::Duration::seconds(signed_num),
-        "m" | "min" | "mins" | "minute" | "minutes" => chrono::Duration::minutes(signed_num),
-        "h" | "hour" | "hours" => chrono::Duration::hours(signed_num),
-        "d" | "day" | "days" => chrono::Duration::days(signed_num),
-        "w" | "week" | "weeks" => chrono::Duration::weeks(signed_num),
+    let seconds_factor: i64 = match unit {
+        "s" | "sec" | "secs" | "second" | "seconds" => 1,
+        "m" | "min" | "mins" | "minute" | "minutes" => 60,
+        "h" | "hour" | "hours" => 3_600,
+        "d" | "day" | "days" => 86_400,
+        "w" | "week" | "weeks" => 604_800,
         _ => return Err(format!("Unknown time unit: {}", unit)),
     };
 
-    Ok(Utc::now() + duration)
+    let total_seconds = signed_num
+        .checked_mul(seconds_factor)
+        .ok_or_else(|| "Relative time is out of supported range".to_string())?;
+    let duration = chrono::Duration::seconds(total_seconds);
+
+    Utc::now()
+        .checked_add_signed(duration)
+        .ok_or_else(|| "Relative time is out of supported range".to_string())
 }
 
 /// Parse date-only strings and assume 00:00:00
@@ -870,6 +877,11 @@ mod tests {
 
         let result = parse_timestamp_arg_with_timezone("1h", None); // Unsigned defaults to past
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_relative_time_out_of_range_returns_error() {
+        assert!(parse_relative_time("111111111111h").is_err());
     }
 
     #[test]
