@@ -33,7 +33,7 @@ Kelora implements multiple layers of security controls to ensure safe operation:
 
 ### Automated Testing
 
-- **770+ test functions** covering core functionality, parsers, and edge cases
+- **Hundreds of test functions** covering core functionality, parsers, and edge cases
 - **Integration tests** validating end-to-end behavior
 - **CI enforcement** on every commit (formatting, linting, tests)
 
