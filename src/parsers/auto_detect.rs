@@ -420,9 +420,7 @@ mod tests {
             .prop_map(|v| serde_json::Value::Number(serde_json::Number::from(v)))
             .boxed();
 
-        let bool_val = any::<bool>()
-            .prop_map(serde_json::Value::Bool)
-            .boxed();
+        let bool_val = any::<bool>().prop_map(serde_json::Value::Bool).boxed();
 
         prop_oneof![string_val, number_val, bool_val].boxed()
     }
@@ -475,9 +473,7 @@ mod tests {
             short_ascii_text(),
         )
             .prop_map(|(priority, host, app, pid, msgid, msg)| {
-                format!(
-                    "<{priority}>1 2024-01-02T03:04:05.006Z {host} {app} {pid} {msgid} - {msg}"
-                )
+                format!("<{priority}>1 2024-01-02T03:04:05.006Z {host} {app} {pid} {msgid} - {msg}")
             })
             .boxed()
     }
@@ -563,7 +559,12 @@ mod tests {
 
     fn csv_without_headers() -> BoxedStrategy<String> {
         prop::collection::vec(0u16..=999, 3..=5)
-            .prop_map(|nums| nums.into_iter().map(|n| n.to_string()).collect::<Vec<_>>().join(","))
+            .prop_map(|nums| {
+                nums.into_iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            })
             .boxed()
     }
 
@@ -575,7 +576,12 @@ mod tests {
 
     fn tsv_without_headers() -> BoxedStrategy<String> {
         prop::collection::vec(0u16..=999, 3..=5)
-            .prop_map(|nums| nums.into_iter().map(|n| n.to_string()).collect::<Vec<_>>().join("\t"))
+            .prop_map(|nums| {
+                nums.into_iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join("\t")
+            })
             .boxed()
     }
 

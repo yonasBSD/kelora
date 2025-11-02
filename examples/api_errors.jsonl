@@ -1,0 +1,6 @@
+{"timestamp":"2024-07-17T12:00:00Z","level":"INFO","endpoint":"/health","status":200}
+{"timestamp":"2024-07-17T12:00:05Z","level":"ERROR","endpoint":"/api/data","status":500,"error":"database timeout"}
+{"timestamp":"2024-07-17T12:00:10Z","level":"INFO","endpoint":"/api/users","status":200}
+{"timestamp":"2024-07-17T12:00:15Z","level":"INFO","endpoint":"/api/posts","status":200}
+{"timestamp":"2024-07-17T12:00:20Z","level":"ERROR","endpoint":"/api/export","status":503,"error":"service unavailable"}
+{"timestamp":"2024-07-17T12:00:25Z","level":"INFO","endpoint":"/health","status":200}

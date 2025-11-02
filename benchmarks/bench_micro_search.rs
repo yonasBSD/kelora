@@ -1,7 +1,8 @@
 use std::cell::Cell;
+use std::hint::black_box;
 use std::thread;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
 
 use kelora::rhai_functions::micro_search::{ilike_impl, like_impl, matches_impl};

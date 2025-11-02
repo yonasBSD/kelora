@@ -32,23 +32,23 @@ Parse any log format, filter with expressions, transform with 100+ functions, tr
     cat examples/release_pipe.log
     ```
 
-**Detect error bursts with sliding windows** - Analyze events in context:
+**Enrich events with recent context** - Add error context from sliding window:
 
 === "Command/Output"
 
     ```bash exec="on" source="above" result="ansi"
-    kelora -f json examples/deploy_tail.jsonl \
-      --window 15 \
-      --exec 'if window.filter(|ev| ev.level == "ERROR").len() >= 3 {
-                eprint("Error burst detected at " + e.timestamp);
-              }' \
-      -F none
+    kelora -j examples/api_errors.jsonl \
+      --window 5 \
+      --exec 'let err = window.filter(|x| x.level == "ERROR");
+              if err.len() > 0 { e.ctx = err[0].error; }' \
+      --keys timestamp,endpoint,ctx \
+      -F logfmt
     ```
 
 === "Log Data"
 
     ```bash exec="on" result="ansi"
-    cat examples/deploy_tail.jsonl
+    cat examples/api_errors.jsonl
     ```
 
 ## Works Well With

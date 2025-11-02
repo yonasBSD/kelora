@@ -550,14 +550,15 @@ mod tests {
         .boxed();
 
         leaf.prop_recursive(depth, 64, 8, |inner| {
-            let map = vec(("[a-z]{1,8}".prop_map(|s: String| s), inner.clone()), 0..4)
-                .prop_map(|entries| {
+            let map = vec(("[a-z]{1,8}".prop_map(|s: String| s), inner.clone()), 0..4).prop_map(
+                |entries| {
                     let mut map = rhai::Map::new();
                     for (k, v) in entries {
                         map.insert(k.into(), v);
                     }
                     Dynamic::from(map)
-                });
+                },
+            );
 
             let array = vec(inner, 0..4).prop_map(|items| {
                 let mut arr = rhai::Array::new();
