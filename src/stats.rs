@@ -482,7 +482,7 @@ impl ProcessingStats {
                     || self.last_timestamp != self.last_result_timestamp);
 
             let label = if is_different {
-                "Input time span (all events)"
+                "Input time span (before filtering)"
             } else {
                 "Time span"
             };
