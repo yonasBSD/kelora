@@ -287,6 +287,7 @@ pub struct Pipeline {
     pub output: Box<dyn OutputWriter>,
     pub window_manager: Box<dyn WindowManager>,
     pub span_processor: Option<SpanProcessor>,
+    pub ts_config: crate::timestamp::TsConfig,
 }
 
 impl Pipeline {
@@ -510,7 +511,7 @@ impl Pipeline {
                         // Track result timestamp for time span statistics
                         let mut result_event = event.clone();
                         result_event.parsed_ts = None; // Clear to force re-extraction
-                        result_event.extract_timestamp();
+                        result_event.extract_timestamp_with_config(None, &self.ts_config);
                         if let Some(result_ts) = result_event.parsed_ts {
                             crate::stats::stats_update_result_timestamp(result_ts);
                         }
@@ -599,7 +600,7 @@ impl Pipeline {
                             // Track result timestamp for time span statistics
                             let mut result_event = event.clone();
                             result_event.parsed_ts = None; // Clear to force re-extraction
-                            result_event.extract_timestamp();
+                            result_event.extract_timestamp_with_config(None, &self.ts_config);
                             if let Some(result_ts) = result_event.parsed_ts {
                                 crate::stats::stats_update_result_timestamp(result_ts);
                             }

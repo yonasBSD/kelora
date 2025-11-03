@@ -468,7 +468,7 @@ fn test_stats_report_custom_ts_field_failures() {
     );
     assert!(
         stderr.contains(
-            "Timestamp: user-specified service — parsed 0 of 1 detected events (0.0%). Hint: Adjust --ts-format."
+            "Timestamp: service (--ts-field) - 0/1 parsed (0.0%). Hint: Adjust --ts-format."
         ),
         "Stats should report the failure for the user-specified timestamp field.\nSTDERR:\n{}",
         stderr
@@ -494,7 +494,7 @@ fn test_stats_report_custom_ts_format_failures() {
     );
     assert!(
         stderr.contains(
-            "Timestamp: auto-detected timestamp — parsed 0 of 1 detected events (0.0%). Hint: Try --ts-field or --ts-format."
+            "Timestamp: timestamp (auto-detected) - 0/1 parsed (0.0%). Hint: Try --ts-field or --ts-format."
         ),
         "Overall timestamp parsing should reflect the failure.\nSTDERR:\n{}",
         stderr

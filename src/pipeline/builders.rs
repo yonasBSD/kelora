@@ -524,6 +524,14 @@ impl PipelineBuilder {
             Box::new(SimpleWindowManager::new())
         };
 
+        // Create timestamp config for consistent timestamp parsing
+        let ts_config = crate::timestamp::TsConfig {
+            custom_field: self.ts_field.clone(),
+            custom_format: self.ts_format.clone(),
+            default_timezone: self.default_timezone.clone(),
+            auto_parse: true,
+        };
+
         // Create pipeline
         let pipeline = Pipeline {
             line_filter: None, // No line filter implementation yet
@@ -535,6 +543,7 @@ impl PipelineBuilder {
             output: Box::new(StdoutWriter),
             window_manager,
             span_processor,
+            ts_config,
         };
 
         Ok((pipeline, begin_stage, end_stage, ctx))
@@ -930,6 +939,14 @@ impl PipelineBuilder {
             Box::new(SimpleWindowManager::new())
         };
 
+        // Create timestamp config for consistent timestamp parsing
+        let ts_config = crate::timestamp::TsConfig {
+            custom_field: self.ts_field.clone(),
+            custom_format: self.ts_format.clone(),
+            default_timezone: self.default_timezone.clone(),
+            auto_parse: true,
+        };
+
         // Create worker pipeline (no output writer - results are collected by the processor)
         let pipeline = Pipeline {
             line_filter: None,
@@ -941,6 +958,7 @@ impl PipelineBuilder {
             output: Box::new(StdoutWriter), // This won't actually be used in parallel mode
             window_manager,
             span_processor: None,
+            ts_config,
         };
 
         Ok((pipeline, ctx))

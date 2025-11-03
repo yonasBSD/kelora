@@ -264,7 +264,7 @@ impl ProcessingStats {
             && self.timestamp_absent_events == 0
         {
             if let Some(field) = &self.timestamp_override_field {
-                return format!("Timestamp: user-specified {} — no events processed.", field);
+                return format!("Timestamp: {} (--ts-field) - no events processed.", field);
             }
             return "Timestamp: no events processed.".to_string();
         }
@@ -279,9 +279,9 @@ impl ProcessingStats {
 
         let (descriptor, mut hint) = if let Some(field) = &self.timestamp_override_field {
             let descriptor = if detected == 0 {
-                format!("user-specified {} (field not found)", field)
+                format!("{} (--ts-field) - not found", field)
             } else {
-                format!("user-specified {}", field)
+                format!("{} (--ts-field)", field)
             };
 
             let hint = if detected == 0 {
@@ -302,15 +302,15 @@ impl ProcessingStats {
                         self.events_created
                     };
                     let descriptor = if events > 0 {
-                        format!("auto-detect found no timestamp field ({} events)", events)
+                        format!("(none found, {} events)", events)
                     } else {
-                        "auto-detect found no timestamp field".to_string()
+                        "(none found)".to_string()
                     };
                     (descriptor, Some("Try --ts-field or --ts-format."))
                 }
                 1 => {
                     let field = self.timestamp_fields.keys().next().unwrap();
-                    let descriptor = format!("auto-detected {}", field);
+                    let descriptor = format!("{} (auto-detected)", field);
                     let hint = if parsed < detected {
                         Some("Try --ts-field or --ts-format.")
                     } else {
@@ -325,7 +325,7 @@ impl ProcessingStats {
                         .cloned()
                         .collect::<Vec<_>>()
                         .join(", ");
-                    let descriptor = format!("auto-detected fields {}", names);
+                    let descriptor = format!("{} (auto-detected)", names);
                     let hint = if parsed < detected {
                         Some("Try --ts-field or --ts-format.")
                     } else {
@@ -341,20 +341,12 @@ impl ProcessingStats {
         }
 
         let mut summary = format!(
-            "Timestamp: {} — parsed {} of {} detected events ({:.1}%)",
+            "Timestamp: {} - {}/{} parsed ({:.1}%)",
             descriptor, parsed, detected, pct
         );
 
         if self.timestamp_absent_events > 0 {
-            let missing = if self.timestamp_absent_events == 1 {
-                "1 event missing a timestamp field".to_string()
-            } else {
-                format!(
-                    "{} events missing a timestamp field",
-                    self.timestamp_absent_events
-                )
-            };
-            summary.push_str(&format!("; {}", missing));
+            summary.push_str(&format!("; {} missing", self.timestamp_absent_events));
         }
 
         summary.push('.');
