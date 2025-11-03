@@ -482,7 +482,7 @@ impl ProcessingStats {
                     || self.last_timestamp != self.last_result_timestamp);
 
             let label = if is_different {
-                "Input time span"
+                "Input time span (all events)"
             } else {
                 "Time span"
             };
@@ -512,14 +512,14 @@ impl ProcessingStats {
 
                 if result_first == result_last {
                     output.push_str(&format!(
-                        "Result time span: {} (single timestamp)\n",
+                        "Output time span (after filtering): {} (single timestamp)\n",
                         result_first.to_rfc3339()
                     ));
                 } else {
                     let duration = result_last - result_first;
                     let duration_wrapper = DurationWrapper::new(duration);
                     output.push_str(&format!(
-                        "Result time span: {} to {} ({})\n",
+                        "Output time span (after filtering): {} to {} ({})\n",
                         result_first.to_rfc3339(),
                         result_last.to_rfc3339(),
                         duration_wrapper
