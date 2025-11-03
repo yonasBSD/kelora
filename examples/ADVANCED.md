@@ -16,7 +16,7 @@ Turn ad-hoc delimited text into structured events, extract latency numbers, and 
 ### Command
 ```bash
 kelora -f 'cols:ts level service request_id *message' examples/release_pipe.log \
-  --convert-ts ts \
+  --convert-ts \
   --exec 'e.latency_ms = e.message.extract_re(r"(\\d+)ms", 1).to_int()' \
   --filter 'e.level == "ERROR" || e.latency_ms > 800' \
   --keys ts,service,request_id,latency_ms,message \

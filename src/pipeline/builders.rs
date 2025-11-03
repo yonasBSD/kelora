@@ -43,7 +43,7 @@ use super::{
     create_multiline_chunker, BeginStage, EndStage, EventLimiter, EventParser, ExecStage,
     FilterStage, Formatter, KeyFilterStage, LevelFilterStage, MetaData, Pipeline, PipelineConfig,
     PipelineContext, ScriptStage, SimpleChunker, SimpleWindowManager, SlidingWindowManager,
-    StdoutWriter, TakeNLimiter, TimestampFilterStage,
+    StdoutWriter, TakeNLimiter, TimestampConversionStage, TimestampFilterStage,
 };
 use crate::decompression::DecompressionReader;
 use crate::engine::{DebugConfig, RhaiEngine};
@@ -71,6 +71,7 @@ pub struct PipelineBuilder {
     window_size: usize,
     csv_headers: Option<Vec<String>>, // Pre-processed CSV headers for parallel mode
     timestamp_filter: Option<crate::config::TimestampFilterConfig>,
+    convert_timestamps: bool,
     ts_field: Option<String>,
     ts_format: Option<String>,
     default_timezone: Option<String>,
@@ -115,6 +116,7 @@ impl PipelineBuilder {
             window_size: 0,
             csv_headers: None,
             timestamp_filter: None,
+            convert_timestamps: false,
             ts_field: None,
             ts_format: None,
             default_timezone: None,
@@ -452,6 +454,15 @@ impl PipelineBuilder {
         if let Some(timestamp_filter_config) = self.timestamp_filter {
             let timestamp_filter_stage = TimestampFilterStage::new(timestamp_filter_config);
             script_stages.push(Box::new(timestamp_filter_stage));
+        }
+
+        if self.convert_timestamps {
+            let conversion_stage = TimestampConversionStage::new(
+                self.ts_field.clone(),
+                self.ts_format.clone(),
+                self.default_timezone.clone(),
+            );
+            script_stages.push(Box::new(conversion_stage));
         }
 
         // Add key filtering stage (runs after level filtering, before context processing)
@@ -1051,6 +1062,7 @@ pub fn create_pipeline_builder_from_config(
     builder.multiline = config.input.multiline.clone();
     builder.window_size = config.processing.window_size;
     builder.timestamp_filter = config.processing.timestamp_filter.clone();
+    builder.convert_timestamps = config.processing.convert_timestamps;
     builder.ts_field = config.input.ts_field.clone();
     builder.ts_format = config.input.ts_format.clone();
     builder.default_timezone = config.input.default_timezone.clone();

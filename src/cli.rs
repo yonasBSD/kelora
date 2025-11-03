@@ -377,11 +377,10 @@ pub struct Cli {
     )]
     pub no_wrap: bool,
 
-    /// Convert timestamp fields to RFC3339 format (ISO 8601 compatible).
-    /// Example: 2024-01-15T10:30:00+01:00
+    /// Normalize the primary timestamp field to RFC3339 (ISO 8601 compatible).
     /// Modifies event data - affects all output formats.
     #[arg(long = "convert-ts", help_heading = "Processing Options")]
-    pub convert_ts: Option<String>,
+    pub convert_ts: bool,
 
     /// Display timestamps as local RFC3339 (ISO 8601 compatible).
     /// Display-only - only affects default formatter output.

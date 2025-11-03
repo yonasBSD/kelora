@@ -133,6 +133,8 @@ pub struct ProcessingConfig {
     pub window_size: usize,
     /// Timestamp filtering configuration
     pub timestamp_filter: Option<TimestampFilterConfig>,
+    /// Convert the primary timestamp field to RFC3339 output
+    pub convert_timestamps: bool,
     /// Limit output to the first N events (None = no limit)
     pub take_limit: Option<usize>,
     /// Exit on first error (fail-fast behavior) - new resiliency model
@@ -670,6 +672,7 @@ impl KeloraConfig {
                 span: parse_span_config(cli)?,
                 window_size: cli.window_size.unwrap_or(0),
                 timestamp_filter: None, // Will be set in main() after parsing since/until
+                convert_timestamps: cli.convert_ts,
                 take_limit: cli.take,
                 strict: cli.strict,
                 verbose: if cli.quiet > 0 { 0 } else { cli.verbose },
@@ -761,6 +764,7 @@ impl Default for KeloraConfig {
                 exclude_levels: Vec::new(),
                 window_size: 0,
                 timestamp_filter: None,
+                convert_timestamps: false,
                 take_limit: None,
                 strict: false,
                 verbose: 0,
@@ -838,14 +842,13 @@ fn create_timestamp_format_config(
     cli: &crate::Cli,
     default_timezone: Option<String>,
 ) -> TimestampFormatConfig {
-    let format_fields = if let Some(ref convert_ts) = cli.convert_ts {
-        convert_ts
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .collect()
-    } else {
-        Vec::new()
-    };
+    let mut format_fields = Vec::new();
+    if let Some(ref ts_field) = cli.ts_field {
+        let trimmed = ts_field.trim();
+        if !trimmed.is_empty() {
+            format_fields.push(trimmed.to_string());
+        }
+    }
 
     let auto_format_all = cli.format_timestamps_local || cli.format_timestamps_utc;
     let format_as_utc = cli.format_timestamps_utc;

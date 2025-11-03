@@ -815,6 +815,58 @@ impl ScriptStage for TimestampFilterStage {
     }
 }
 
+/// Normalize the primary timestamp field to RFC3339 once scripts have run
+pub struct TimestampConversionStage {
+    ts_config: crate::timestamp::TsConfig,
+}
+
+impl TimestampConversionStage {
+    pub fn new(
+        ts_field: Option<String>,
+        ts_format: Option<String>,
+        default_timezone: Option<String>,
+    ) -> Self {
+        Self {
+            ts_config: crate::timestamp::TsConfig {
+                custom_field: ts_field,
+                custom_format: ts_format,
+                default_timezone,
+                auto_parse: true,
+            },
+        }
+    }
+
+    fn target_field(&self, event: &Event) -> Option<String> {
+        if let Some(ref custom_field) = self.ts_config.custom_field {
+            if event.fields.contains_key(custom_field) {
+                return Some(custom_field.clone());
+            }
+        }
+
+        crate::timestamp::identify_timestamp_field(&event.fields, &self.ts_config)
+            .map(|(field, _)| field)
+    }
+}
+
+impl ScriptStage for TimestampConversionStage {
+    fn apply(&mut self, mut event: Event, _ctx: &mut PipelineContext) -> ScriptResult {
+        event.extract_timestamp_with_config(None, &self.ts_config);
+
+        let parsed_ts = match event.parsed_ts {
+            Some(ts) => ts,
+            None => return ScriptResult::Emit(event),
+        };
+
+        if let Some(field_name) = self.target_field(&event) {
+            if let Some(value) = event.fields.get_mut(&field_name) {
+                *value = rhai::Dynamic::from(parsed_ts.to_rfc3339());
+            }
+        }
+
+        ScriptResult::Emit(event)
+    }
+}
+
 // ContextStage removed - context processing is now integrated into FilterStage and LevelFilterStage
 
 #[cfg(test)]

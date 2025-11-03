@@ -437,12 +437,12 @@ kelora -j --window 5 --exec 'e.recent_statuses = window.pluck("status")' app.log
 
 ### Timestamp Conversion
 
-#### `--convert-ts <FIELDS>`
+#### `--convert-ts`
 
-Convert timestamp fields to RFC3339 format (ISO 8601 compatible). Modifies event data - affects all output formats.
+Normalize the primary timestamp field (the one Kelora uses for filtering and stats) to RFC3339 (ISO 8601). Runs after Rhai scripts and affects every output formatter.
 
 ```bash
-kelora -j --convert-ts timestamp,created_at app.log
+kelora -j --convert-ts app.log
 ```
 
 ## Error Handling Options
