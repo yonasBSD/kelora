@@ -1,0 +1,8 @@
+[2025-01-15 10:00:00] INFO Application started on :8080
+[2025-01-15 10:00:05] INFO Connected to database db-primary
+[2025-01-15 10:00:12] WARN Slow query detected: 450ms (threshold: 200ms)
+[2025-01-15 10:00:15] ERROR Payment timeout order=1234 gateway=stripe duration=5s
+[2025-01-15 10:00:18] INFO Payment retry successful order=1234
+[2025-01-15 10:00:22] ERROR Gateway unreachable host=stripe.com
+[2025-01-15 10:00:30] WARN Pool exhausted: 20/20 used, 15 waiting
+[2025-01-15 10:00:35] INFO Shutting down connections=3
