@@ -467,6 +467,13 @@ impl ProcessingStats {
             }
         }
 
+        // Timestamp parsing summary
+        output.push_str(&format!("{}\n", self.format_timestamp_summary()));
+
+        if let Some(message) = &self.timestamp_override_warning {
+            output.push_str(&format!("Warning: {}\n", message));
+        }
+
         // Time span: show generic label when identical, specific labels when different
         let has_original = self.first_timestamp.is_some() && self.last_timestamp.is_some();
         let has_result =
@@ -526,12 +533,6 @@ impl ProcessingStats {
                     ));
                 }
             }
-        }
-
-        output.push_str(&format!("{}\n", self.format_timestamp_summary()));
-
-        if let Some(message) = &self.timestamp_override_warning {
-            output.push_str(&format!("Warning: {}\n", message));
         }
 
         // Levels seen: (only if we have discovered levels)
