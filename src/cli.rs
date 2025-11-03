@@ -379,8 +379,8 @@ pub struct Cli {
 
     /// Normalize the primary timestamp field to RFC3339 (ISO 8601 compatible).
     /// Modifies event data - affects all output formats.
-    #[arg(long = "convert-ts", help_heading = "Processing Options")]
-    pub convert_ts: bool,
+    #[arg(long = "normalize-ts", help_heading = "Processing Options")]
+    pub normalize_ts: bool,
 
     /// Display timestamps as local RFC3339 (ISO 8601 compatible).
     /// Display-only - only affects default formatter output.

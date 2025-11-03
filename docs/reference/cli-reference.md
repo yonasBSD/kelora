@@ -437,12 +437,12 @@ kelora -j --window 5 --exec 'e.recent_statuses = window.pluck("status")' app.log
 
 ### Timestamp Conversion
 
-#### `--convert-ts`
+#### `--normalize-ts`
 
 Normalize the primary timestamp field (the one Kelora uses for filtering and stats) to RFC3339 (ISO 8601). Runs after Rhai scripts and affects every output formatter.
 
 ```bash
-kelora -j --convert-ts app.log
+kelora -j --normalize-ts app.log
 ```
 
 ## Error Handling Options

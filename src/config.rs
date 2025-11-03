@@ -133,8 +133,8 @@ pub struct ProcessingConfig {
     pub window_size: usize,
     /// Timestamp filtering configuration
     pub timestamp_filter: Option<TimestampFilterConfig>,
-    /// Convert the primary timestamp field to RFC3339 output
-    pub convert_timestamps: bool,
+    /// Normalize the primary timestamp field to RFC3339 output
+    pub normalize_timestamps: bool,
     /// Limit output to the first N events (None = no limit)
     pub take_limit: Option<usize>,
     /// Exit on first error (fail-fast behavior) - new resiliency model
@@ -672,7 +672,7 @@ impl KeloraConfig {
                 span: parse_span_config(cli)?,
                 window_size: cli.window_size.unwrap_or(0),
                 timestamp_filter: None, // Will be set in main() after parsing since/until
-                convert_timestamps: cli.convert_ts,
+                normalize_timestamps: cli.normalize_ts,
                 take_limit: cli.take,
                 strict: cli.strict,
                 verbose: if cli.quiet > 0 { 0 } else { cli.verbose },
@@ -764,7 +764,7 @@ impl Default for KeloraConfig {
                 exclude_levels: Vec::new(),
                 window_size: 0,
                 timestamp_filter: None,
-                convert_timestamps: false,
+                normalize_timestamps: false,
                 take_limit: None,
                 strict: false,
                 verbose: 0,

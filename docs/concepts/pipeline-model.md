@@ -294,7 +294,7 @@ kelora -j app.log \
 Format and emit events:
 
 - Apply `--keys` field selection
-- Convert timestamps (--convert-ts, --show-ts-local, --show-ts-utc)
+- Convert timestamps (--normalize-ts, --show-ts-local, --show-ts-utc)
 - Format output (--output-format: default, json, csv, etc.)
 - Apply `--take` limit
 - Write to stdout or files

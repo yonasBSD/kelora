@@ -385,15 +385,17 @@ fn test_quiet_level_3_suppress_all() {
 }
 
 #[test]
-fn test_convert_ts_normalizes_primary_timestamp_default_output() {
+fn test_normalize_ts_normalizes_primary_timestamp_default_output() {
     let input = r#"{"ts": "2025-01-15 10:00:00", "level": "INFO", "message": "Test"}"#;
 
-    let (stdout, _stderr, exit_code) =
-        run_kelora_with_input(&["-f", "json", "--input-tz", "UTC", "--convert-ts"], input);
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &["-f", "json", "--input-tz", "UTC", "--normalize-ts"],
+        input,
+    );
 
     assert_eq!(
         exit_code, 0,
-        "kelora should exit successfully with --convert-ts"
+        "kelora should exit successfully with --normalize-ts"
     );
     assert!(
         stdout.contains("ts='2025-01-15T10:00:00+00:00'"),
@@ -408,7 +410,7 @@ fn test_convert_ts_normalizes_primary_timestamp_default_output() {
 }
 
 #[test]
-fn test_convert_ts_normalizes_primary_timestamp_json_output() {
+fn test_normalize_ts_normalizes_primary_timestamp_json_output() {
     let input = r#"{"ts": "2025-01-15 10:00:00", "level": "INFO"}"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
@@ -417,7 +419,7 @@ fn test_convert_ts_normalizes_primary_timestamp_json_output() {
             "json",
             "--input-tz",
             "UTC",
-            "--convert-ts",
+            "--normalize-ts",
             "-F",
             "json",
         ],
@@ -426,7 +428,7 @@ fn test_convert_ts_normalizes_primary_timestamp_json_output() {
 
     assert_eq!(
         exit_code, 0,
-        "kelora should exit successfully with --convert-ts"
+        "kelora should exit successfully with --normalize-ts"
     );
     assert!(
         stdout.contains("\"ts\":\"2025-01-15T10:00:00+00:00\""),

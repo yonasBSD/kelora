@@ -71,7 +71,7 @@ pub struct PipelineBuilder {
     window_size: usize,
     csv_headers: Option<Vec<String>>, // Pre-processed CSV headers for parallel mode
     timestamp_filter: Option<crate::config::TimestampFilterConfig>,
-    convert_timestamps: bool,
+    normalize_timestamps: bool,
     ts_field: Option<String>,
     ts_format: Option<String>,
     default_timezone: Option<String>,
@@ -116,7 +116,7 @@ impl PipelineBuilder {
             window_size: 0,
             csv_headers: None,
             timestamp_filter: None,
-            convert_timestamps: false,
+            normalize_timestamps: false,
             ts_field: None,
             ts_format: None,
             default_timezone: None,
@@ -456,7 +456,7 @@ impl PipelineBuilder {
             script_stages.push(Box::new(timestamp_filter_stage));
         }
 
-        if self.convert_timestamps {
+        if self.normalize_timestamps {
             let conversion_stage = TimestampConversionStage::new(
                 self.ts_field.clone(),
                 self.ts_format.clone(),
@@ -1062,7 +1062,7 @@ pub fn create_pipeline_builder_from_config(
     builder.multiline = config.input.multiline.clone();
     builder.window_size = config.processing.window_size;
     builder.timestamp_filter = config.processing.timestamp_filter.clone();
-    builder.convert_timestamps = config.processing.convert_timestamps;
+    builder.normalize_timestamps = config.processing.normalize_timestamps;
     builder.ts_field = config.input.ts_field.clone();
     builder.ts_format = config.input.ts_format.clone();
     builder.default_timezone = config.input.default_timezone.clone();

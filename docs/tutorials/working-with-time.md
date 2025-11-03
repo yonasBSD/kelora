@@ -163,16 +163,16 @@ kelora -j --input-tz America/New_York app.log
 
 ## Step 5: Converting Timestamps in Events
 
-Use `--convert-ts` to normalize the primary timestamp (the same field Kelora uses for filtering and stats) to RFC3339:
+Use `--normalize-ts` to normalize the primary timestamp (the same field Kelora uses for filtering and stats) to RFC3339:
 
 ```bash
 # Convert the detected timestamp field to RFC3339
 echo '{"ts": "2024-01-15 10:30:00", "user": "alice"}' | \
-    kelora -j --input-tz UTC --convert-ts
+    kelora -j --input-tz UTC --normalize-ts
 
 # Respect a custom timestamp field provided via --ts-field
 echo '{"created_at": "2024-01-15 10:45:00", "user": "bob"}' | \
-    kelora -j --ts-field created_at --input-tz UTC --convert-ts
+    kelora -j --ts-field created_at --input-tz UTC --normalize-ts
 ```
 
 **Output example:**
@@ -188,9 +188,9 @@ This modifies the event data itself, affecting all output formats.
 Understand the difference between data conversion and display formatting:
 
 ```bash
-# --convert-ts: Modifies event data (affects all formats)
+# --normalize-ts: Modifies event data (affects all formats)
 echo '{"ts": "2024-01-15 10:30:00"}' | \
-    kelora -j --convert-ts -F json
+    kelora -j --normalize-ts -F json
 
 # -z: Display formatting only (default format only)
 echo '{"ts": "2024-01-15T10:30:00Z"}' | \
@@ -203,7 +203,7 @@ echo '{"ts": "2024-01-15T10:30:00Z"}' | \
 
 **Key differences:**
 
-- `--convert-ts` - Changes the event data
+- `--normalize-ts` - Changes the event data
 - `-z / -Z` - Only affects default formatter display
 - JSON/CSV output ignores `-z/-Z` flags
 
@@ -549,7 +549,7 @@ kelora -f 'cols:my_time level *message' app.log --since 1h --ts-field my_time
 kelora -j --input-tz UTC app.log -n 1 -z
 
 # Verify timestamp includes timezone info
-kelora -j --convert-ts app.log -n 1 -F json
+kelora -j --normalize-ts app.log -n 1 -F json
 ```
 
 ### Custom Format Not Parsing

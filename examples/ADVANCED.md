@@ -16,7 +16,7 @@ Turn ad-hoc delimited text into structured events, extract latency numbers, and 
 ### Command
 ```bash
 kelora -f 'cols:ts level service request_id *message' examples/release_pipe.log \
-  --convert-ts \
+  --normalize-ts \
   --exec 'e.latency_ms = e.message.extract_re(r"(\\d+)ms", 1).to_int()' \
   --filter 'e.level == "ERROR" || e.latency_ms > 800' \
   --keys ts,service,request_id,latency_ms,message \
@@ -24,7 +24,7 @@ kelora -f 'cols:ts level service request_id *message' examples/release_pipe.log 
 ```
 
 ### Why it matters
-Combines the column parser (`-f 'cols:…'`) with regex extraction (`text.extract_re`) and timestamp normalization (`--convert-ts`) to tidy bespoke deployment logs in one pass.
+Combines the column parser (`-f 'cols:…'`) with regex extraction (`text.extract_re`) and timestamp normalization (`--normalize-ts`) to tidy bespoke deployment logs in one pass.
 
 ---
 
