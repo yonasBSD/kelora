@@ -90,6 +90,29 @@ docs-build:
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
     uvx --with mkdocs-material --with mike --with markdown-exec[ansi] mkdocs build
 
+# List published documentation versions (from gh-pages via mike)
+docs-list-versions:
+    mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools
+    UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
+    UV_DATA_DIR={{justfile_directory()}}/.uv/data \
+    UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
+    uvx --with mkdocs-material --with mike --with markdown-exec[ansi] mike list
+
+# Delete one or more published documentation versions
+docs-delete-version *versions:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    versions=( {{versions}} )
+    if [[ "${#versions[@]}" -eq 0 ]]; then
+        echo "error: provide at least one version to delete (e.g. 'just docs-delete-version 0.7.2')" >&2
+        exit 1
+    fi
+    mkdir -p "{{justfile_directory()}}/.uv/cache" "{{justfile_directory()}}/.uv/data" "{{justfile_directory()}}/.uv/tools"
+    UV_CACHE_DIR="{{justfile_directory()}}/.uv/cache" \
+    UV_DATA_DIR="{{justfile_directory()}}/.uv/data" \
+    UV_TOOL_DIR="{{justfile_directory()}}/.uv/tools" \
+    uvx --with mkdocs-material --with mike --with markdown-exec[ansi] mike delete --push "${versions[@]}"
+
 # Run JSON parser fuzzing locally (requires cargo-fuzz + nightly toolchain)
 fuzz-json *args:
     #!/usr/bin/env bash
