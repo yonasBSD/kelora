@@ -1135,10 +1135,7 @@ fn parse_kv_impl(text: &str, sep: Option<&str>, kv_sep: &str) -> rhai::Map {
                 map.insert(key.into(), rhai::Dynamic::from(value.to_string()));
             }
         }
-        // If no separator found, treat as key with empty value
-        else if !pair.is_empty() {
-            map.insert(pair.into(), rhai::Dynamic::from(String::new()));
-        }
+        // Skip tokens without separator
     }
 
     map
@@ -3614,7 +3611,7 @@ mod tests {
             "simple"
         );
 
-        // Test with key without value
+        // Test that tokens without separator are skipped
         scope.push("text5", "key1=value1 standalone key2=value2");
         let result: rhai::Map = engine
             .eval_with_scope(&mut scope, r#"parse_kv(text5)"#)
@@ -3623,15 +3620,8 @@ mod tests {
             result.get("key1").unwrap().clone().into_string().unwrap(),
             "value1"
         );
-        assert_eq!(
-            result
-                .get("standalone")
-                .unwrap()
-                .clone()
-                .into_string()
-                .unwrap(),
-            ""
-        );
+        // "standalone" should not be in the result since it has no separator
+        assert!(!result.contains_key("standalone"));
         assert_eq!(
             result.get("key2").unwrap().clone().into_string().unwrap(),
             "value2"

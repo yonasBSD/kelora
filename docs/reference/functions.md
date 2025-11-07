@@ -184,10 +184,11 @@ e.severity = cef["severity"]
 ```
 
 #### `text.parse_kv([sep [, kv_sep]])`
-Parse key-value pairs from text.
+Parse key-value pairs from text. Only extracts tokens containing the key-value separator; tokens without the separator are skipped (e.g., prose words or unpaired values).
 
 ```rhai
 e.params = e.query.parse_kv("&", "=")                 // "a=1&b=2" → {a: "1", b: "2"}
+e.fields = e.msg.parse_kv()                           // "Payment timeout order=1234" → {order: "1234"}
 ```
 
 #### `text.parse_url()`

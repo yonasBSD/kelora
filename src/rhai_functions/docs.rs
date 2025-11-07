@@ -53,7 +53,7 @@ text.parse_content_disposition()     Parse Content-Disposition header parameters
 text.parse_email()                   Parse email address into parts
 text.parse_json()                    Parse JSON string into map/array
 text.parse_jwt()                     Parse JWT header/payload without verification
-text.parse_kv([sep [,kv_sep]])       Parse key-value pairs from text
+text.parse_kv([sep [,kv_sep]])       Parse key-value pairs from text (skips tokens without separator)
 text.parse_logfmt()                  Parse logfmt line into structured fields
 text.parse_media_type()              Parse media type tokens and parameters
 text.parse_path()                    Parse filesystem path into components
@@ -303,7 +303,7 @@ kelora -f line --exec 'e.cols = e.line.col("1,3,5", " ")' \
 
 # Parse key-value logs (multiple formats)
 kelora -f line --exec 'e = e.line.parse_logfmt()'  # logfmt: key=value
-kelora -f line --exec 'e = e.line.parse_kv(" ", "=")'  # custom separators
+kelora -f line --exec 'e = e.line.parse_kv(" ", "=")'  # custom separators, extracts only key=value pairs
 
 # Email header parsing
 kelora -f line --exec 'let email = e.from.parse_email(); e.domain = email.domain; e.user = email.local'
