@@ -3,9 +3,6 @@ pub fn generate_help_text() -> &'static str {
     r#"
 Available Rhai Functions for Kelora:
 
-Sections: strings | arrays | maps | datetime | math | conversion | utility | tracking | file-output | events | examples
-See the Rhai language guide at https://rhai.rs for syntax details.
-
 STRING FUNCTIONS:
 text.after(delimiter [,nth])         Text after occurrence of delimiter (nth: 1=first, -1=last)
 text.before(delimiter [,nth])        Text before occurrence of delimiter (nth: 1=first, -1=last)
@@ -82,20 +79,6 @@ text.trim()                          Remove whitespace from start and end (built
 text.unescape_html()                 Unescape HTML entities to text
 text.unescape_json()                 Unescape JSON escape sequences
 
-MICRO SEARCH QUICK GUIDE:
-Function            Use Case                      Pattern Type    Anchored  Case-Sensitive  Example
-contains()          Substring search              Literal         No        Yes             "foobar".contains("oba") → true
-like()              Anchored glob match           * and ?         Yes       Yes             "foobar".like("foo*") → true
-ilike()             Anchored glob match (Unicode) * and ?         Yes       No              "FooBar".ilike("foo*") → true
-matches()           Regex search                  Regex           No        Yes             "foobar".matches("ba.") → true
-
-⚠️  REGEX PATTERN TIPS
-- Avoid nested quantifiers: (.*)*  (worst-case performance)
-- Prefer: .*error  over  (.*)*error
-- Compiled patterns are cached per thread (1000 entries)
-- Invalid regex patterns raise errors (respect quiet/strict modes)
-text.upper()                         Convert text to uppercase
-  
 ARRAY FUNCTIONS:
 array.all(|item| condition)          Check if all elements match condition (builtin)
 array.contains_any(search_array)     Check if array contains any search values
@@ -232,9 +215,6 @@ e.has("key")                         Check if key exists and value is not ()
 e.rename_field("old", "new")         Rename field, returns true if successful
 
 Rhai lets you call functions as either `value.method(args)` or `function(value, args)`.
-Use 'e' to access the current event. See --help-examples for common usage patterns.
-"field" in e                         Builtin check for raw key presence (ignores value contents)
-Note: Prefer e.has("field") when you want () to count as "missing".
 "#
 }
 
