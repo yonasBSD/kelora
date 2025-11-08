@@ -66,10 +66,12 @@ Both options default to `false` to preserve the long-standing behavior:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status` | string | `"applied"`, `"missing_field"`, `"not_string"`, or `"no_pairs"` |
-| `pairs` | map | All parsed key-value pairs (only populated when `status == "applied"`) |
+| `status` | string | `"applied"`, `"missing_field"`, `"not_string"`, or `"empty"` |
+| `data` | map | All parsed key-value pairs (only populated when `status == "applied"`) |
 | `remainder` | string or `()` | The leftover text that was not parsed; `()` when no remainder |
 | `removed_source` | bool | `true` when the field was deleted after parsing every token |
+
+**Note:** `AbsorbResult` is shared across all `absorb_*()` functions (JSON, logfmt, URL params, etc.). For all-or-nothing formats like JSON, `remainder` is always `()`.
 
 Method-style calls are still supported:
 
@@ -99,7 +101,7 @@ The function performs these steps:
 ```rhai
 "Payment timeout order=1234 gateway=stripe duration=5s"
 // Tokens: ["Payment", "timeout", "order=1234", "gateway=stripe", "duration=5s"]
-// Parsed: {order: "1234", gateway: "stripe", duration: "5s"}
+// Parsed data: {order: "1234", gateway: "stripe", duration: "5s"}
 // Unparsed: ["Payment", "timeout"]
 ```
 
@@ -133,7 +135,7 @@ When `keep_source` is `true`, the source field is never modified; use `res.remai
 
 #### 5. Return Result
 
-- Returns `AbsorbResult` so scripts can inspect `status`, `pairs`, and `remainder`
+- Returns `AbsorbResult` so scripts can inspect `status`, `data`, and `remainder`
 - `status == "applied"` when at least one pair was merged
 - Non-`"applied"` statuses indicate why nothing changed
 
@@ -151,7 +153,7 @@ let res = e.absorb_kv("msg")
 // e.gateway = "stripe"
 // e.duration = "5s"
 // res.status == "applied"
-// res.pairs == #{ order: "1234", gateway: "stripe", duration: "5s" }
+// res.data == #{ order: "1234", gateway: "stripe", duration: "5s" }
 // res.remainder == "Payment timeout"
 ```
 
@@ -182,8 +184,8 @@ let res = e.absorb_kv("msg")
 
 // After:
 // e.msg = "This is just plain text without any pairs" (unchanged)
-// res.status == "no_pairs"
-// res.pairs == #{}
+// res.status == "empty"
+// res.data == #{}
 ```
 
 #### Custom Separators
@@ -243,7 +245,7 @@ let res = e.absorb_kv("msg", #{ on_conflict_keep: true })
 // After:
 // e.order is still "legacy"
 // e.duration == "5s"
-// res.pairs == #{ order: "1234", duration: "5s" }
+// res.data == #{ order: "1234", duration: "5s" }
 ```
 
 #### Conditional Logic
@@ -289,16 +291,16 @@ assert(res.status == "not_string")
 
 #### Empty or Whitespace-Only String
 
-`status = "no_pairs"` and the field is deleted (unless `keep_source` is set):
+`status = "empty"` and the field is deleted (unless `keep_source` is set):
 
 ```rhai
 e.msg = ""
 let res = e.absorb_kv("msg")
-assert(res.status == "no_pairs")
+assert(res.status == "empty")
 
 e.msg = "   "
 let res2 = e.absorb_kv("msg")
-assert(res2.status == "no_pairs")
+assert(res2.status == "empty")
 ```
 
 #### Key with Empty Value
@@ -313,7 +315,7 @@ let res = e.absorb_kv("msg")
 // e.msg deleted
 // e.error = ""  (empty string)
 // e.code = "500"
-// res.pairs.error == ""
+// res.data.error == ""
 ```
 
 #### Key with No Value Separator
@@ -341,7 +343,7 @@ let overwrite = e.absorb_kv("msg")
 assert(e.status == "active")        // overwritten
 
 let keep = e.absorb_kv("msg", #{ on_conflict_keep: true })
-assert(keep.pairs.status == "active")
+assert(keep.data.status == "active")
 assert(e.status == "active")        // unchanged because merge skipped
 ```
 
@@ -358,7 +360,7 @@ let res = e.absorb_kv("msg")
 // e.user = "alice™"
 // e.emoji = "🎉"
 // e.price = "$99.99"
-// res.pairs.price == "$99.99"
+// res.data.price == "$99.99"
 ```
 
 ### Comparison with Manual Approach
@@ -420,7 +422,7 @@ Follows Kelora's resilient error handling philosophy:
 - **Never throws exceptions** in resilient mode
 - Invalid field types → `status = "not_string"`, no error
 - Missing fields → `status = "missing_field"`, no error
-- Empty results → `status = "no_pairs"`, not an error
+- Empty results → `status = "empty"`, not an error
 
 This ensures `absorb_kv()` can be used safely in pipelines without breaking on unexpected data.
 
@@ -444,19 +446,22 @@ Parse JSON from field, merge into event, delete field:
 
 ```rhai
 e.payload = '{"user":"alice","action":"login","timestamp":1234567890}'
-e.absorb_json("payload")
+let res = e.absorb_json("payload")
 
 // After:
 // e.payload deleted
 // e.user = "alice"
 // e.action = "login"
 // e.timestamp = 1234567890
+// res.status == "applied"
+// res.data == #{ user: "alice", action: "login", timestamp: 1234567890 }
+// res.remainder == ()  (always () for JSON)
 ```
 
 **Behavior differences from absorb_kv():**
 - JSON parsing is all-or-nothing (no "unparsed text")
 - Field always deleted on successful parse
-- Parse failure → field unchanged, result status indicates the error
+- Parse failure → `status = "parse_error"`, field unchanged
 
 ### absorb_logfmt()
 
@@ -464,12 +469,15 @@ Parse logfmt from field, merge into event, clean field:
 
 ```rhai
 e.msg = 'prefix user="alice" status=active suffix'
-e.absorb_logfmt("msg")
+let res = e.absorb_logfmt("msg")
 
 // After:
 // e.msg = "prefix suffix"
 // e.user = "alice"
 // e.status = "active"
+// res.status == "applied"
+// res.data == #{ user: "alice", status: "active" }
+// res.remainder == "prefix suffix"
 ```
 
 **Similar to absorb_kv()** but uses logfmt parser which handles quoted values.
@@ -480,13 +488,16 @@ Parse URL query parameters from field, merge into event, delete field:
 
 ```rhai
 e.query = "foo=bar&baz=qux&limit=10"
-e.absorb_url_params("query")
+let res = e.absorb_url_params("query")
 
 // After:
 // e.query deleted
 // e.foo = "bar"
 // e.baz = "qux"
 // e.limit = "10"
+// res.status == "applied"
+// res.data == #{ foo: "bar", baz: "qux", limit: "10" }
+// res.remainder == ()  (always () for URL params)
 ```
 
 **All-or-nothing parsing** like JSON - entire string is the query string.
