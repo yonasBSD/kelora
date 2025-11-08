@@ -27,6 +27,8 @@ e.absorb_kv("msg")
 // Result: e.msg = "Payment timeout", e.order = "1234", e.gateway = "stripe", e.duration = "5s"
 ```
 
+**Important:** Absorb functions don't guess or infer structure—they extract key-value pairs that are already present in the text using explicit separators you control.
+
 ## absorb_kv()
 
 Parse key-value pairs from an event field, merge them into the event, and update the field with unparsed text. Returns a status record so scripts can react without guessing.
