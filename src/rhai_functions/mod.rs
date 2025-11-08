@@ -1,5 +1,6 @@
 use rhai::Engine;
 
+pub mod absorb;
 pub mod arrays;
 pub mod columns;
 pub mod conf;
@@ -24,6 +25,7 @@ pub mod tracking;
 pub mod window;
 
 pub fn register_all_functions(engine: &mut Engine) {
+    absorb::register_functions(engine);
     arrays::register_functions(engine);
     strings::register_functions(engine);
     micro_search::register_functions(engine);

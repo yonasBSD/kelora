@@ -436,15 +436,15 @@ kelora -j logs/app.jsonl -e 'track_count(e.service)' -m
 kelora -f logfmt logs/mixed.log -J | \
   agrind '* | json | parse "user_id=*" as user | count by user'
 
-# Kelora equivalent using extract_re() or parse_kv()
+# Kelora equivalent using extract_re() or absorb_kv()
 kelora -f logfmt logs/mixed.log \
   -e 'e.user = e.message.extract_re(r"user_id=(\S+)", 1)' \
   -e 'track_count(e.user)' -m
 
-# For complex key-value extraction, use parse_kv()
+# For mixed prose + key=value tails, absorb them in-place
 kelora -f line logs/mixed.log \
-  -e 'let fields = e.message.parse_kv(" ", "=")' \
-  -e 'e.user = fields["user_id"]' \
+  -e 'let res = e.absorb_kv("message")' \
+  -e 'e.user = res.data["user_id"] ?? ""' \
   -e 'track_count(e.user)' -m
 ```
 

@@ -1247,6 +1247,26 @@ e.password = ()                                       // Remove sensitive field
 e.temp_data = ()                                      // Clean up temporary field
 ```
 
+#### `e.absorb_kv(field [, options])`
+Parse inline `key=value` tokens from a string field, merge the pairs into the event, and get a status report back. Returns a map with `status`, `data`, `written`, `remainder`, `removed_source`, and `error` so scripts can branch without guessing.
+
+```rhai
+let res = e.absorb_kv("msg", #{ sep: ",", kv_sep: "=", keep_source: true });
+if res.status == "applied" {
+    e.cleaned_msg = res.remainder ?? "";
+    // Parsed keys now live on the event; res.data mirrors the inserted pairs
+}
+```
+
+Options:
+
+- `sep`: string or `()` (default whitespace) – token separator; `()` normalizes whitespace.
+- `kv_sep`: string (default `"="`) – separator between key and value.
+- `keep_source`: bool (default `false`) – leave the original field untouched; use `remainder` for cleaned text.
+- `overwrite`: bool (default `true`) – allow parsed keys to overwrite existing event fields; set `false` to skip conflicts.
+
+Unknown option keys set `status = "invalid_option"`; in `--strict` mode this aborts the pipeline.
+
 
 ## Span Context – `--span-close` Only
 

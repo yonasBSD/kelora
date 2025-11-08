@@ -209,6 +209,7 @@ span.metrics                         Per-span metric deltas from track_* calls (
 
 EVENT MANIPULATION:
 emit_each(array [,base_map])         Fan out array elements as separate events (returns emitted count)
+e.absorb_kv(field [,options])        Parse key=value tokens from field, merge pairs, return status map
 e = ()                               Clear entire event (remove all fields)
 e.field = ()                         Remove individual field from event
 e.has("key")                         Check if key exists and value is not ()
@@ -304,6 +305,14 @@ kelora -f line --exec 'e.cols = e.line.col("1,3,5", " ")' \
 # Parse key-value logs (multiple formats)
 kelora -f line --exec 'e = e.line.parse_logfmt()'  # logfmt: key=value
 kelora -f line --exec 'e = e.line.parse_kv(" ", "=")'  # custom separators, extracts only key=value pairs
+
+# Absorb inline key=value tails without losing the original message
+kelora -f line --exec '
+  let res = e.absorb_kv("msg", #{ keep_source: true });
+  if res.status == "applied" {
+    e.cleaned_msg = res.remainder ?? ""
+  }
+'
 
 # Email header parsing
 kelora -f line --exec 'let email = e.from.parse_email(); e.domain = email.domain; e.user = email.local'

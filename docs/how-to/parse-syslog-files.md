@@ -84,11 +84,11 @@ Alternatives:
 
 ## Variations
 - **RFC 5424 structured data**  
-  ```bash
-  kelora -f syslog app-5424.log \
-    -e 'let kv = e.message.parse_kv(" ", "="); e += kv' \
-    -k timestamp,hostname,app_id,msgid,message
-  ```
+```bash
+kelora -f syslog app-5424.log \
+  -e 'e.absorb_kv("message")' \
+  -k timestamp,hostname,app_id,msgid,message
+```
 - **Network device monitoring**  
   ```bash
   kelora -f syslog firewall.log \

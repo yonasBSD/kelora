@@ -22,7 +22,7 @@ Parse any log format, filter with expressions, transform with 100+ functions, tr
     kelora -f 'cols:ts level service request_id *message' examples/release_pipe.log \
       --cols-sep '|' \
       --levels warn,error \
-      --exec 'e.merge(e.message.parse_kv())' \
+      --exec 'e.absorb_kv("message")' \
       -F json
     ```
 

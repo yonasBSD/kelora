@@ -2,8 +2,8 @@ use super::{PipelineContext, ScriptResult, ScriptStage};
 use crate::config::TimestampFilterConfig;
 use crate::engine::RhaiEngine;
 use crate::event::Event;
-use crate::rhai_functions::columns;
 use crate::rhai_functions::file_ops;
+use crate::rhai_functions::{absorb, columns};
 use anyhow::Result;
 
 /// Cached event along with whether it satisfied the stage filter.
@@ -57,6 +57,7 @@ impl FilterStage {
 
     fn evaluate_filter(&mut self, event: &Event, ctx: &mut PipelineContext) -> Result<bool> {
         columns::set_parse_cols_strict(ctx.config.strict);
+        absorb::set_absorb_strict(ctx.config.strict);
 
         file_ops::clear_pending_ops();
 
@@ -311,6 +312,7 @@ impl ScriptStage for ExecStage {
         let mut event_copy = event.clone();
 
         columns::set_parse_cols_strict(ctx.config.strict);
+        absorb::set_absorb_strict(ctx.config.strict);
 
         file_ops::clear_pending_ops();
 
@@ -434,6 +436,7 @@ impl BeginStage {
     pub fn execute(&self, ctx: &mut PipelineContext) -> Result<()> {
         if let Some(ref compiled) = self.compiled_begin {
             columns::set_parse_cols_strict(ctx.config.strict);
+            absorb::set_absorb_strict(ctx.config.strict);
             file_ops::clear_pending_ops();
             let _init_map = ctx.rhai.execute_compiled_begin(
                 compiled,
@@ -470,6 +473,7 @@ impl EndStage {
     pub fn execute(&self, ctx: &PipelineContext) -> Result<()> {
         if let Some(ref compiled) = self.compiled_end {
             columns::set_parse_cols_strict(ctx.config.strict);
+            absorb::set_absorb_strict(ctx.config.strict);
             file_ops::clear_pending_ops();
             ctx.rhai.execute_compiled_end(compiled, &ctx.tracker)?;
             let ops = file_ops::take_pending_ops();
