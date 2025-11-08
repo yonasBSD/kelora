@@ -499,7 +499,7 @@ Include only events with specified log levels (case-insensitive). Every occurren
 ```bash
 kelora -j --levels error app.log
 kelora -j --levels error,warn,critical app.log
-kelora -j --exec 'if !e.has_field("level") { e.level = "WARN" }' --levels warn log.txt  # Add level, then filter
+kelora -j --exec 'if !e.has("level") { e.level = "WARN" }' --levels warn log.txt  # Add level, then filter
 ```
 
 #### `-L, --exclude-levels <LEVELS>`

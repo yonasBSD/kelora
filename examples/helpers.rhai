@@ -3,7 +3,7 @@
 // Check if event is a problem (error or slow)
 fn is_problem(event) {
     let is_error = event.level == "ERROR" || event.level == "CRITICAL";
-    let is_slow = event.has_field("duration_ms") && event.duration_ms > 1000;
+    let is_slow = event.has("duration_ms") && event.duration_ms > 1000;
     is_error || is_slow
 }
 

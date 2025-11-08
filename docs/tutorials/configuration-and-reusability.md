@@ -386,7 +386,7 @@ kelora -j app.log \
 e.level = e.level.to_upper();
 e.service = e.service.to_lower();
 
-if e.has_field("duration_ms") {
+if e.has("duration_ms") {
     e.duration_s = e.duration_ms / 1000;
 }
 
@@ -434,13 +434,13 @@ fn add_alert_tag(e) {
 Create `scripts/enrich.rhai`:
 ```rhai
 // Add computed fields
-if e.has_field("duration_ms") {
+if e.has("duration_ms") {
     e.duration_s = e.duration_ms / 1000;
     e.slow = e.duration_ms > 1000;
 }
 
 // Classify severity
-if e.has_field("level") {
+if e.has("level") {
     e.severity = if e.level == "CRITICAL" || e.level == "ERROR" {
         "high"
     } else if e.level == "WARN" {
@@ -649,7 +649,7 @@ fn is_error_status(status) {
 // Use it
 kelora -j app.log \
     -I myhelpers.rhai \
-    --filter 'e.has_field("status") && is_error_status(e.status)'
+    --filter 'e.has("status") && is_error_status(e.status)'
 ```
 </details>
 

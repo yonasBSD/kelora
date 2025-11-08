@@ -364,7 +364,7 @@ kelora -j examples/simple_json.jsonl \
 
 ## Step 8: Checking if Fields Exist
 
-Not all events have the same fields. Use `has_field()` to check before accessing.
+Not all events have the same fields. Use `has()` to check before accessing.
 
 ### Safe Field Access
 
@@ -372,8 +372,8 @@ Not all events have the same fields. Use `has_field()` to check before accessing
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-        --exec 'e.has_duration = e.has_field("duration_ms")' \
-        --exec 'if e.has_field("duration_ms") {
+        --exec 'e.has_duration = e.has("duration_ms")' \
+        --exec 'if e.has("duration_ms") {
                     e.slow = e.duration_ms > 1000
                 } else {
                     e.slow = false
@@ -386,15 +386,15 @@ Not all events have the same fields. Use `has_field()` to check before accessing
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-        --exec 'e.has_duration = e.has_field("duration_ms")' \
-        --exec 'if e.has_field("duration_ms") { e.slow = e.duration_ms > 1000 } else { e.slow = false }' \
+        --exec 'e.has_duration = e.has("duration_ms")' \
+        --exec 'if e.has("duration_ms") { e.slow = e.duration_ms > 1000 } else { e.slow = false }' \
         -k service,has_duration,slow,message \
         --take 5
     ```
 
 **Pattern:**
 ```rhai
-if e.has_field("field_name") {
+if e.has("field_name") {
     // Safe to access e.field_name
 } else {
     // Provide default behavior
@@ -468,7 +468,7 @@ Chain multiple `--exec` and `--filter` stages for complex logic.
     ```bash
     kelora -j examples/simple_json.jsonl \
         --exec 'e.is_error = e.level == "ERROR" || e.level == "CRITICAL"' \
-        --exec 'e.is_slow = e.has_field("duration_ms") && e.duration_ms > 1000' \
+        --exec 'e.is_slow = e.has("duration_ms") && e.duration_ms > 1000' \
         --exec 'e.needs_attention = e.is_error || e.is_slow' \
         --filter 'e.needs_attention' \
         -k service,level,is_error,is_slow,message
@@ -479,7 +479,7 @@ Chain multiple `--exec` and `--filter` stages for complex logic.
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
         --exec 'e.is_error = e.level == "ERROR" || e.level == "CRITICAL"' \
-        --exec 'e.is_slow = e.has_field("duration_ms") && e.duration_ms > 1000' \
+        --exec 'e.is_slow = e.has("duration_ms") && e.duration_ms > 1000' \
         --exec 'e.needs_attention = e.is_error || e.is_slow' \
         --filter 'e.needs_attention' \
         -k service,level,is_error,is_slow,message
@@ -500,7 +500,7 @@ kelora -j app.log --filter 'e.status >= 400'  # Fails if status doesn't exist
 
 **Solution:**
 ```bash
-kelora -j app.log --filter 'e.has_field("status") && e.status >= 400'
+kelora -j app.log --filter 'e.has("status") && e.status >= 400'
 ```
 
 ---
@@ -559,7 +559,7 @@ kelora -j app.log --filter 'e.level == "ERROR" && e.service == "api"'
 ```rhai
 e.field_name              # Direct access
 e["field_name"]           # Bracket notation
-e.has_field("name")       # Check existence
+e.has("name")       # Check existence
 e.get("name", default)    # Get with fallback
 ```
 
@@ -613,7 +613,7 @@ Filter for WARN events where `memory_percent` > 80:
 
 ```bash
 kelora -j examples/simple_json.jsonl \
-    --filter 'e.level == "WARN" && e.has_field("memory_percent") && e.memory_percent > 80'
+    --filter 'e.level == "WARN" && e.has("memory_percent") && e.memory_percent > 80'
 ```
 </details>
 
@@ -625,7 +625,7 @@ Add a `speed` field: "fast" if duration < 100ms, "normal" if < 1000ms, else "slo
 
 ```bash
 kelora -j examples/simple_json.jsonl \
-    --exec 'if e.has_field("duration_ms") {
+    --exec 'if e.has("duration_ms") {
                 e.speed = if e.duration_ms < 100 { "fast" }
                          else if e.duration_ms < 1000 { "normal" }
                          else { "slow" }
@@ -644,10 +644,10 @@ For events with a `method` field, add `is_safe_method` (true for GET/HEAD):
 
 ```bash
 kelora -j examples/simple_json.jsonl \
-    --exec 'if e.has_field("method") {
+    --exec 'if e.has("method") {
                 e.is_safe_method = e.method == "GET" || e.method == "HEAD"
             }' \
-    --filter 'e.has_field("is_safe_method")' \
+    --filter 'e.has("is_safe_method")' \
     -k method,is_safe_method,path
 ```
 </details>
@@ -664,7 +664,7 @@ You've learned:
 - ✅ Use string methods like `.contains()`, `.split()`, `.to_upper()`
 - ✅ Convert types safely with `to_int_or()`, `to_float_or()`
 - ✅ Write conditionals with `if/else`
-- ✅ Check field existence with `has_field()`
+- ✅ Check field existence with `has()`
 - ✅ Debug with `-F inspect` and `--verbose`
 - ✅ Understand pipeline order (exec before filter)
 - ✅ Build multi-stage pipelines

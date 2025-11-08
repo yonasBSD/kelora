@@ -722,11 +722,11 @@ if path_equals(e, "user.role", "admin") {
 }
 ```
 
-#### `map.has_field("key")`
+#### `map.has("key")`
 Check if map contains key with non-unit value.
 
 ```rhai
-if e.has_field("error_code") {
+if e.has("error_code") {
     // Field exists and has a value
 }
 ```

@@ -285,7 +285,7 @@ kelora -f syslog syslog.log \
   --exec 'if e.msg.contains("=") {
             e += e.msg.parse_logfmt()
           }' \
-  --filter 'e.has_field("user")' \
+  --filter 'e.has("user")' \
   -k timestamp,host,user,action
 ```
 
@@ -314,7 +314,7 @@ kelora -j app.jsonl --window 60 \
 # Kelora's built-in functions make this trivial
 kelora -j security.jsonl \
   --exec 'e.ip = e.ip.mask_ip(2);
-          if e.has_field("token") {
+          if e.has("token") {
             let jwt = e.token.parse_jwt();
             e.role = jwt.get_path("claims.role", "guest")
           }'

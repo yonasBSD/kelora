@@ -110,7 +110,7 @@ MAP/OBJECT FUNCTIONS:
 map.contains("key")                  Check if map contains key (ignores value) (builtin)
 map.flattened([style [,max_depth]])  Return new flattened map from nested object
 map.get_path("field.path" [,default]) Safe nested field access with fallback
-map.has_field("key")                 Check if map contains key with non-unit value
+map.has("key")                 Check if map contains key with non-unit value
 map.has_path("field.path")           Check if nested field path exists
 map.merge(other_map)                 Merge another map into this one
 map.normalized([patterns])           Return new map with all string fields normalized

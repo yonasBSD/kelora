@@ -83,13 +83,10 @@ pub fn register_functions(engine: &mut Engine) {
         result
     });
 
-    // map.has_field(key) - check if map contains key AND value is not unit ()
-    engine.register_fn(
-        "has_field",
-        |map: Map, key: rhai::ImmutableString| -> bool {
-            map.get(key.as_str()).is_some_and(|value| !value.is_unit())
-        },
-    );
+    // map.has(key) - check if map contains key AND value is not unit ()
+    engine.register_fn("has", |map: Map, key: rhai::ImmutableString| -> bool {
+        map.get(key.as_str()).is_some_and(|value| !value.is_unit())
+    });
 
     // map.rename_field(old_name, new_name) - rename a field, returns true if successful
     engine.register_fn("rename_field", rename_field);

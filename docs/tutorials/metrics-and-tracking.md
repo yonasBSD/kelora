@@ -89,7 +89,7 @@ response sizes and latency as rolling aggregates.
     ```bash
     kelora -j examples/simple_json.jsonl \
       -F none \
-      -e 'if e.has_field("duration_ms") {
+      -e 'if e.has("duration_ms") {
               track_sum("total_duration", e.duration_ms);
               track_count("duration_count");
               track_min("min_duration", e.duration_ms);
@@ -103,7 +103,7 @@ response sizes and latency as rolling aggregates.
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
       -F none \
-      -e 'if e.has_field("duration_ms") { track_sum("total_duration", e.duration_ms); track_count("duration_count"); track_min("min_duration", e.duration_ms); track_max("max_duration", e.duration_ms) }' \
+      -e 'if e.has("duration_ms") { track_sum("total_duration", e.duration_ms); track_count("duration_count"); track_min("min_duration", e.duration_ms); track_max("max_duration", e.duration_ms) }' \
       --metrics
     ```
 
@@ -129,7 +129,7 @@ Build histograms by grouping values into buckets—perfect for latency distribut
     ```bash
     kelora -j examples/simple_json.jsonl \
       -F none \
-      -e 'if e.has_field("duration_ms") {
+      -e 'if e.has("duration_ms") {
               let bucket = (e.duration_ms / 1000) * 1000;
               track_bucket("latency_histogram", bucket)
           }' \
@@ -141,7 +141,7 @@ Build histograms by grouping values into buckets—perfect for latency distribut
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
       -F none \
-      -e 'if e.has_field("duration_ms") { let bucket = (e.duration_ms / 1000) * 1000; track_bucket("latency_histogram", bucket) }' \
+      -e 'if e.has("duration_ms") { let bucket = (e.duration_ms / 1000) * 1000; track_bucket("latency_histogram", bucket) }' \
       --metrics
     ```
 

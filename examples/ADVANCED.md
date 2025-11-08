@@ -42,12 +42,12 @@ Investigate slow or failing auth requests by decoding JWT payloads, inferring ro
 ```bash
 kelora -j examples/k8s_security.jsonl \
   --filter 'e.level == "WARN" || e.level == "ERROR" || e.latency_ms > 1500' \
-  --exec 'if e.has_field("token") {
+  --exec 'if e.has("token") {
             let jwt = e.token.parse_jwt();
             e.role = jwt.get_path("claims.role", "guest");
             e.token = e.token.slice(":8") + "…";
           }' \
-  --exec 'if e.has_field("ip") { e.ip = e.ip.mask_ip(2) }' \
+  --exec 'if e.has("ip") { e.ip = e.ip.mask_ip(2) }' \
   --keys timestamp,pod,role,latency_ms,event,ip \
   -F json
 ```
@@ -69,7 +69,7 @@ Explode nested arrays into individual events with `emit_each`, then track totals
 ### Command
 ```bash
 kelora -j examples/batch_settlements.jsonl --metrics \
-  --exec 'if e.has_field("attempts") {
+  --exec 'if e.has("attempts") {
             emit_each(e.attempts, #{batch_id: e.batch_id, user: e.user});
             e = ();
           }' \
@@ -231,7 +231,7 @@ Turn arrays of security findings into flat events, filter by severity, and keep 
 kelora -j examples/audit_findings.jsonl \
   --exec '
     let rows = [];
-    if e.has_field("findings") {
+    if e.has("findings") {
       for finding in e.findings {
         rows.push(#{timestamp: e.timestamp, user: e.user, kind: finding.kind, severity: finding.severity});
       }

@@ -684,7 +684,7 @@ kelora -f line /var/log/app.log \
   -e 'e.url_parts = e.message.extract_url().parse_url()' \
   -e 'e.params = e.url_parts.query.parse_query_params()' \
   -e 'e.checkout_id = e.params["id"]' \
-  --filter 'e.has_field("checkout_id")' \
+  --filter 'e.has("checkout_id")' \
   -e 'track_count(e.url_parts.path)' -m
 ```
 
