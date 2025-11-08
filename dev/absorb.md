@@ -53,12 +53,10 @@ absorb_kv(field: string, (), kv_sep: string, options: map) -> AbsorbResult
 
 ### Options
 
-Both options default to `false` to preserve the long-standing behavior:
-
-| Option | Type | Effect |
-|--------|------|--------|
-| `keep_source` | bool | Leave the source field untouched; remainder is only available via the return value |
-| `on_conflict_keep` | bool | Keep existing event fields when conflicts happen (skip merging that key) |
+| Option | Type | Default | Effect |
+|--------|------|---------|--------|
+| `keep_source` | bool | `false` | Leave the source field untouched; remainder is only available via the return value |
+| `overwrite` | bool | `true` | When `true` (default), parsed values overwrite existing event fields. When `false`, existing fields are preserved and conflicting keys are skipped during merge |
 
 ### Return Value
 
@@ -108,7 +106,8 @@ The function performs these steps:
 #### 3. Merge Parsed Pairs into Event
 
 - Each parsed key-value pair is inserted into the event
-- **Overwrites existing fields** with same key (like `merge()`), unless `on_conflict_keep` is enabled
+- **Overwrites existing fields** with same key (like `merge()`) by default
+- Set `overwrite: false` to preserve existing fields when conflicts occur
 
 #### 4. Update Source Field
 
@@ -197,11 +196,26 @@ e.tags = "env:prod,region:us-west,tier:web"
 let res = e.absorb_kv("tags", ",", ":")
 
 // After:
-// e.tags deleted
+// e.tags deleted (all tokens were KV pairs)
 // e.env = "prod"
 // e.region = "us-west"
 // e.tier = "web"
 // res.status == "applied"
+```
+
+#### Custom Separator with Mixed Content
+
+When mixing plain tokens and KV pairs, format is preserved:
+
+```rhai
+e.categories = "news,sports,user:alice,region:us-west"
+let res = e.absorb_kv("categories", ",", ":")
+
+// After:
+// e.categories = "news,sports" (comma-separated, format preserved!)
+// e.user = "alice"
+// e.region = "us-west"
+// res.remainder == "news,sports"
 ```
 
 #### Whitespace Separator with Custom KV Separator
@@ -235,17 +249,17 @@ let res = e.absorb_kv("msg", #{ keep_source: true })
 
 #### Avoiding Overwrites
 
-Skip merging keys that already exist:
+Preserve existing fields by disabling overwrite:
 
 ```rhai
 e.order = "legacy"
 e.msg = "order=1234 duration=5s"
-let res = e.absorb_kv("msg", #{ on_conflict_keep: true })
+let res = e.absorb_kv("msg", #{ overwrite: false })
 
 // After:
-// e.order is still "legacy"
-// e.duration == "5s"
-// res.data == #{ order: "1234", duration: "5s" }
+// e.order is still "legacy" (not overwritten)
+// e.duration == "5s" (new field added)
+// res.data == #{ order: "1234", duration: "5s" } (shows all parsed data)
 ```
 
 #### Conditional Logic
@@ -334,17 +348,24 @@ let res = e.absorb_kv("msg")
 
 #### Conflicting Keys (Overwrites)
 
-By default absorb **overwrites existing fields** (same behavior as `merge()`), but `on_conflict_keep` switches to "keep existing" semantics:
+By default absorb **overwrites existing fields** (same behavior as `merge()`), but `overwrite: false` preserves existing values:
 
 ```rhai
 e.status = "pending"
 e.msg = "Processing status=active"
-let overwrite = e.absorb_kv("msg")
+
+// Default: overwrites existing
+e.absorb_kv("msg")
 assert(e.status == "active")        // overwritten
 
-let keep = e.absorb_kv("msg", #{ on_conflict_keep: true })
-assert(keep.data.status == "active")
-assert(e.status == "active")        // unchanged because merge skipped
+// Reset for second example
+e.status = "pending"
+e.msg = "Processing status=active"
+
+// With overwrite: false, keeps existing
+let res = e.absorb_kv("msg", #{ overwrite: false })
+assert(res.data.status == "active") // parsed data available
+assert(e.status == "pending")       // unchanged - existing preserved
 ```
 
 #### Special Characters and Unicode
@@ -398,21 +419,72 @@ e.absorb_kv("msg")
 
 #### Join Separator for Unparsed Tokens
 
-Unparsed tokens are **always joined with a single space**, regardless of the separator used for parsing.
+Unparsed tokens are **joined using the same separator that was used for splitting**.
 
 **Rationale:**
-- Simplest and most predictable behavior
-- Works well for the common case (whitespace-separated logs)
-- Avoids complexity of preserving original spacing
+- Preserves format fidelity (comma-separated stays comma-separated)
+- Enables round-tripping and further processing
+- Whitespace mode still normalizes to single space (expected behavior)
 
-**Example:**
+**Rules:**
+- **Whitespace mode** (`sep = ()`): Join with single space
+- **Custom separator** (`sep = ","`, `":"`, etc.): Join with same separator
+- **Token processing**: Tokens are trimmed before classification; empty tokens are filtered out
+
+**Example with custom separator:**
 ```rhai
 e.tags = "important,urgent,user=alice,priority=high"
 e.absorb_kv("tags", ",", "=")
 
 // Unparsed: ["important", "urgent"]
-// Joined with space (not comma):
-// e.tags = "important urgent"
+// Joined with comma (same as split separator):
+// e.tags = "important,urgent"
+```
+
+**Example with whitespace:**
+```rhai
+e.msg = "Error   occurred    code=500"
+e.absorb_kv("msg")
+
+// Unparsed: ["Error", "occurred"]
+// Joined with single space (normalized):
+// e.msg = "Error occurred"
+```
+
+#### Token Processing and Normalization
+
+Before classifying tokens as KV pairs or remainder, each token undergoes processing:
+
+**Steps:**
+1. **Split** by separator (whitespace or custom string)
+2. **Trim** each token (remove leading/trailing whitespace)
+3. **Filter** empty tokens (from consecutive separators like `"tag1,,tag3"`)
+4. **Classify** as KV pair (contains `kv_sep`) or remainder
+5. **Join** remainder using same separator
+
+**Edge cases handled:**
+
+```rhai
+// Leading/trailing separators
+e.data = ",tag1,tag2,owner=alice,"
+e.absorb_kv("data", ",", "=")
+// Split: ["", "tag1", "tag2", "owner=alice", ""]
+// After trim+filter: ["tag1", "tag2", "owner=alice"]
+// Result: e.data = "tag1,tag2"
+
+// Inconsistent spacing with custom separator
+e.tags = "error, warning, code=500"
+e.absorb_kv("tags", ",", "=")
+// Split: ["error", " warning", " code=500"]
+// After trim: ["error", "warning", "code=500"]
+// Classified: KV={code:"500"}, remainder=["error","warning"]
+// Result: e.tags = "error,warning"
+
+// Whitespace mode normalizes all whitespace
+e.msg = "Error\n\toccurred\t\tuser=alice"
+e.absorb_kv("msg")
+// Split by any whitespace: ["Error", "occurred", "user=alice"]
+// Remainder joined with single space: "Error occurred"
 ```
 
 #### Error Handling
