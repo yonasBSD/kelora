@@ -57,6 +57,9 @@ markdown_extensions:
   - toc:
       permalink: true
 
+extra_css:
+  - stylesheets/ansi-colors.css
+
 extra:
   version:
     provider: mike

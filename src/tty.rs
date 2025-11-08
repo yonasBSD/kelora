@@ -26,6 +26,11 @@ pub fn should_use_colors_with_mode(color_mode: &ColorMode) -> bool {
 
 /// Auto color detection logic
 fn should_use_colors_auto() -> bool {
+    // Check FORCE_COLOR first for CI environments that support colors
+    if std::env::var("FORCE_COLOR").is_ok() {
+        return true;
+    }
+
     // Don't use colors if not on TTY
     if !is_stdout_tty() {
         return false;
@@ -34,11 +39,6 @@ fn should_use_colors_auto() -> bool {
     // Respect NO_COLOR environment variable (https://no-color.org/)
     if std::env::var("NO_COLOR").is_ok() {
         return false;
-    }
-
-    // Check FORCE_COLOR for CI environments that support colors
-    if std::env::var("FORCE_COLOR").is_ok() {
-        return true;
     }
 
     // Default: use colors for TTY
