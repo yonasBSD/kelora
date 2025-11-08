@@ -20,21 +20,11 @@ Learn how to write simple Rhai scripts to filter and transform log events. This 
 
 ## Sample Data
 
-This tutorial uses `examples/simple_json.jsonl` - application logs with various services and events.
+This tutorial uses `examples/basics.jsonl` - the same small JSON log file from the basics tutorial:
 
-Preview the data:
-
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl --take 5
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl --take 5
-    ```
+```bash exec="on" result="ansi"
+cat examples/basics.jsonl
+```
 
 ---
 
@@ -52,17 +42,9 @@ e.status         # Access any field in the event
 
 Let's see the structure with `-F inspect`:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl -F inspect --take 1
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl -F inspect --take 1
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl -F inspect --take 1
+```
 
 **Key insight:** Field names become properties you can access in scripts.
 
@@ -76,17 +58,9 @@ Use `--filter` to keep only events where the expression returns `true`.
 
 Keep only ERROR level events:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl --filter 'e.level == "ERROR"'
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl --filter 'e.level == "ERROR"'
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl --filter 'e.level == "ERROR"'
+```
 
 **What happened:** Only events where `e.level` equals `"ERROR"` are kept.
 
@@ -94,17 +68,9 @@ Keep only ERROR level events:
 
 Keep only slow queries (duration > 1000ms):
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl --filter 'e.duration_ms > 1000'
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl --filter 'e.duration_ms > 1000'
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl --filter 'e.duration_ms > 1000'
+```
 
 **Important:** This only keeps events that **have** a `duration_ms` field. Events without it are skipped.
 
@@ -112,19 +78,10 @@ Keep only slow queries (duration > 1000ms):
 
 Find ERROR or WARN events from the database service:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl \
-        --filter '(e.level == "ERROR" || e.level == "WARN") && e.service == "database"'
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl \
-        --filter '(e.level == "ERROR" || e.level == "WARN") && e.service == "database"'
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl \
+    --filter '(e.level == "ERROR" || e.level == "WARN") && e.service == "database"'
+```
 
 **Operators:**
 - `==` - Equals
@@ -144,23 +101,12 @@ Use `--exec` to modify events or add new fields.
 
 Convert milliseconds to seconds:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl \
-        --exec 'e.duration_s = e.duration_ms / 1000' \
-        --filter 'e.duration_s > 1.0' \
-        -k timestamp,service,duration_ms,duration_s
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl \
-        --exec 'e.duration_s = e.duration_ms / 1000' \
-        --filter 'e.duration_s > 1.0' \
-        -k timestamp,service,duration_ms,duration_s
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl \
+    --exec 'e.duration_s = e.duration_ms / 1000' \
+    --filter 'e.duration_s > 1.0' \
+    -k timestamp,service,duration_ms,duration_s
+```
 
 **Key insight:** `--exec` runs **before** `--filter`, so the new field is available for filtering.
 
@@ -168,21 +114,10 @@ Convert milliseconds to seconds:
 
 Normalize level to uppercase:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl \
-        --exec 'e.level = e.level.to_upper()' \
-        --take 3
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl \
-        --exec 'e.level = e.level.to_upper()' \
-        --take 3
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl \
+    --exec 'e.level = e.level.to_upper()'
+```
 
 ---
 
@@ -194,41 +129,21 @@ Rhai provides powerful string methods for text processing.
 
 Find events with "timeout" in the message:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl \
-        --filter 'e.message.contains("timeout")'
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl \
-        --filter 'e.message.contains("timeout")'
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl \
+    --filter 'e.message.contains("timeout")'
+```
 
 ### Extract Parts of Strings
 
 Extract just the error type from messages:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl \
-        --filter 'e.level == "ERROR"' \
-        --exec 'e.error_type = e.message.split(" ")[0]' \
-        -k timestamp,service,error_type,message
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl \
-        --filter 'e.level == "ERROR"' \
-        --exec 'e.error_type = e.message.split(" ")[0]' \
-        -k timestamp,service,error_type,message
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl \
+    --filter 'e.level == "ERROR"' \
+    --exec 'e.error_type = e.message.split(" ")[0]' \
+    -k timestamp,service,error_type,message
+```
 
 **Common string methods:**
 - `contains(substr)` - Check if string contains text
@@ -247,29 +162,11 @@ Use `if/else` to make decisions in your transforms.
 
 ### Add Severity Classification
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl \
-        --exec 'e.severity = if e.level == "ERROR" || e.level == "CRITICAL" {
-                    "high"
-                } else if e.level == "WARN" {
-                    "medium"
-                } else {
-                    "low"
-                }' \
-        -k level,severity,service,message \
-        --take 5
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl \
-        --exec 'e.severity = if e.level == "ERROR" || e.level == "CRITICAL" { "high" } else if e.level == "WARN" { "medium" } else { "low" }' \
-        -k level,severity,service,message \
-        --take 5
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl \
+    --exec 'e.severity = if e.level == "ERROR" || e.level == "CRITICAL" { "high" } else if e.level == "WARN" { "medium" } else { "low" }' \
+    -k level,severity,service,message
+```
 
 **Syntax:**
 ```rhai
@@ -292,29 +189,15 @@ Fields may be strings when you need numbers (or vice versa). Convert types safel
 
 Use `to_int_or()` to handle conversion failures:
 
-=== "Command"
-
-    ```bash
-    echo '{"id":"123","status":"200","invalid":"abc"}
-    {"id":"456","status":"404","invalid":"xyz"}' | \
-        kelora -j \
-        --exec 'e.id_num = e.id.to_int_or(-1)' \
-        --exec 'e.status_num = e.status.to_int_or(0)' \
-        --exec 'e.invalid_num = e.invalid.to_int_or(999)' \
-        -k id,id_num,status,status_num,invalid,invalid_num
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    echo '{"id":"123","status":"200","invalid":"abc"}
-    {"id":"456","status":"404","invalid":"xyz"}' | \
-        kelora -j \
-        --exec 'e.id_num = e.id.to_int_or(-1)' \
-        --exec 'e.status_num = e.status.to_int_or(0)' \
-        --exec 'e.invalid_num = e.invalid.to_int_or(999)' \
-        -k id,id_num,status,status_num,invalid,invalid_num
-    ```
+```bash exec="on" source="above" result="ansi"
+echo '{"id":"123","status":"200","invalid":"abc"}
+{"id":"456","status":"404","invalid":"xyz"}' | \
+    kelora -j \
+    --exec 'e.id_num = e.id.to_int_or(-1)' \
+    --exec 'e.status_num = e.status.to_int_or(0)' \
+    --exec 'e.invalid_num = e.invalid.to_int_or(999)' \
+    -k id,id_num,status,status_num,invalid,invalid_num
+```
 
 **Safe conversion functions:**
 - `to_int_or(fallback)` - Convert to integer or use fallback
@@ -327,36 +210,25 @@ Use `to_int_or()` to handle conversion failures:
 
 The order of `--filter` and `--exec` flags determines execution order.
 
-### ❌ Wrong Order: Filter Before Creating Field
+### Wrong Order: Filter Before Creating Field
 
 This **won't work** because `duration_s` doesn't exist yet:
 
 ```bash
 # WRONG - will fail
-kelora -j examples/simple_json.jsonl \
+kelora -j examples/basics.jsonl \
     --filter 'e.duration_s > 1.0' \
     --exec 'e.duration_s = e.duration_ms / 1000'
 ```
 
-### ✅ Correct Order: Create Field Before Filtering
+### Correct Order: Create Field Before Filtering
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl \
-        --exec 'e.duration_s = e.duration_ms / 1000' \
-        --filter 'e.duration_s > 1.0' \
-        -k service,duration_s,message
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl \
-        --exec 'e.duration_s = e.duration_ms / 1000' \
-        --filter 'e.duration_s > 1.0' \
-        -k service,duration_s,message
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl \
+    --exec 'e.duration_s = e.duration_ms / 1000' \
+    --filter 'e.duration_s > 1.0' \
+    -k service,duration_s,message
+```
 
 **Rule:** Fields must exist before you filter on them. Scripts run in CLI order.
 
@@ -368,29 +240,12 @@ Not all events have the same fields. Use `has()` to check before accessing.
 
 ### Safe Field Access
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl \
-        --exec 'e.has_duration = e.has("duration_ms")' \
-        --exec 'if e.has("duration_ms") {
-                    e.slow = e.duration_ms > 1000
-                } else {
-                    e.slow = false
-                }' \
-        -k service,has_duration,slow,message \
-        --take 5
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl \
-        --exec 'e.has_duration = e.has("duration_ms")' \
-        --exec 'if e.has("duration_ms") { e.slow = e.duration_ms > 1000 } else { e.slow = false }' \
-        -k service,has_duration,slow,message \
-        --take 5
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl \
+    --exec 'e.has_duration = e.has("duration_ms")' \
+    --exec 'if e.has("duration_ms") { e.slow = e.duration_ms > 1000 } else { e.slow = false }' \
+    -k service,has_duration,slow,message
+```
 
 **Pattern:**
 ```rhai
@@ -409,45 +264,23 @@ When scripts don't work as expected, use these techniques.
 
 ### Use -F inspect to See Types
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl \
-        --exec 'e.status = 200' \
-        --exec 'e.computed = e.status * 2' \
-        -F inspect --take 1
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl \
-        --exec 'e.status = 200' \
-        --exec 'e.computed = e.status * 2' \
-        -F inspect --take 1
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl \
+    --exec 'e.status = 200' \
+    --exec 'e.computed = e.status * 2' \
+    -F inspect --take 1
+```
 
 ### Use --verbose to See Errors
 
 When scripts fail in resilient mode, use `--verbose` to see what went wrong:
 
-=== "Command"
-
-    ```bash
-    echo '{"value":"not_a_number"}' | \
-        kelora -j \
-        --exec 'e.num = e.value.to_int()' \
-        --verbose
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    echo '{"value":"not_a_number"}' | \
-        kelora -j \
-        --exec 'e.num = e.value.to_int()' \
-        --verbose
-    ```
+```bash exec="on" source="above" result="ansi"
+echo '{"value":"not_a_number"}' | \
+    kelora -j \
+    --exec 'e.num = e.value.to_int()' \
+    --verbose
+```
 
 **Debug workflow:**
 1. Use `-F inspect` to check field types
@@ -463,27 +296,14 @@ Chain multiple `--exec` and `--filter` stages for complex logic.
 
 ### Progressive Refinement
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl \
-        --exec 'e.is_error = e.level == "ERROR" || e.level == "CRITICAL"' \
-        --exec 'e.is_slow = e.has("duration_ms") && e.duration_ms > 1000' \
-        --exec 'e.needs_attention = e.is_error || e.is_slow' \
-        --filter 'e.needs_attention' \
-        -k service,level,is_error,is_slow,message
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl \
-        --exec 'e.is_error = e.level == "ERROR" || e.level == "CRITICAL"' \
-        --exec 'e.is_slow = e.has("duration_ms") && e.duration_ms > 1000' \
-        --exec 'e.needs_attention = e.is_error || e.is_slow' \
-        --filter 'e.needs_attention' \
-        -k service,level,is_error,is_slow,message
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl \
+    --exec 'e.is_error = e.level == "ERROR" || e.level == "CRITICAL"' \
+    --exec 'e.is_slow = e.has("duration_ms") && e.duration_ms > 1000' \
+    --exec 'e.needs_attention = e.is_error || e.is_slow' \
+    --filter 'e.needs_attention' \
+    -k service,level,is_error,is_slow,message
+```
 
 **Pattern:** Build up computed fields step-by-step, then filter on the final result.
 
@@ -491,7 +311,7 @@ Chain multiple `--exec` and `--filter` stages for complex logic.
 
 ## Common Mistakes and Solutions
 
-### ❌ Mistake 1: Accessing Missing Fields
+### Mistake 1: Accessing Missing Fields
 
 **Problem:**
 ```bash
@@ -505,7 +325,7 @@ kelora -j app.log --filter 'e.has("status") && e.status >= 400'
 
 ---
 
-### ❌ Mistake 2: String vs Number Comparison
+### Mistake 2: String vs Number Comparison
 
 **Problem:**
 ```bash
@@ -521,7 +341,7 @@ kelora -j app.log --filter 'e.status.to_int_or(0) == 200'
 
 ---
 
-### ❌ Mistake 3: Wrong Pipeline Order
+### Mistake 3: Wrong Pipeline Order
 
 **Problem:**
 ```bash
@@ -537,7 +357,7 @@ kelora -j app.log --exec 'e.is_slow = e.duration > 1000' --filter 'e.is_slow'
 
 ---
 
-### ❌ Mistake 4: Forgetting Quotes
+### Mistake 4: Forgetting Quotes
 
 **Problem:**
 ```bash
@@ -612,7 +432,7 @@ Filter for WARN events where `memory_percent` > 80:
 <summary>Solution</summary>
 
 ```bash
-kelora -j examples/simple_json.jsonl \
+kelora -j examples/basics.jsonl \
     --filter 'e.level == "WARN" && e.has("memory_percent") && e.memory_percent > 80'
 ```
 </details>
@@ -624,7 +444,7 @@ Add a `speed` field: "fast" if duration < 100ms, "normal" if < 1000ms, else "slo
 <summary>Solution</summary>
 
 ```bash
-kelora -j examples/simple_json.jsonl \
+kelora -j examples/basics.jsonl \
     --exec 'if e.has("duration_ms") {
                 e.speed = if e.duration_ms < 100 { "fast" }
                          else if e.duration_ms < 1000 { "normal" }
@@ -643,7 +463,7 @@ For events with a `method` field, add `is_safe_method` (true for GET/HEAD):
 <summary>Solution</summary>
 
 ```bash
-kelora -j examples/simple_json.jsonl \
+kelora -j examples/basics.jsonl \
     --exec 'if e.has("method") {
                 e.is_safe_method = e.method == "GET" || e.method == "HEAD"
             }' \
@@ -658,16 +478,16 @@ kelora -j examples/simple_json.jsonl \
 
 You've learned:
 
-- ✅ Access event fields with `e.field_name`
-- ✅ Filter events with `--filter` boolean expressions
-- ✅ Transform events with `--exec` scripts
-- ✅ Use string methods like `.contains()`, `.split()`, `.to_upper()`
-- ✅ Convert types safely with `to_int_or()`, `to_float_or()`
-- ✅ Write conditionals with `if/else`
-- ✅ Check field existence with `has()`
-- ✅ Debug with `-F inspect` and `--verbose`
-- ✅ Understand pipeline order (exec before filter)
-- ✅ Build multi-stage pipelines
+- Access event fields with `e.field_name`
+- Filter events with `--filter` boolean expressions
+- Transform events with `--exec` scripts
+- Use string methods like `.contains()`, `.split()`, `.to_upper()`
+- Convert types safely with `to_int_or()`, `to_float_or()`
+- Write conditionals with `if/else`
+- Check field existence with `has()`
+- Debug with `-F inspect` and `--verbose`
+- Understand pipeline order (exec before filter)
+- Build multi-stage pipelines
 
 ## Next Steps
 
