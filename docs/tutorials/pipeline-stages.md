@@ -408,6 +408,74 @@ kelora -j app.log \
 - The `metrics` map is **only available** in `--end`
 - Metrics accumulate across all events
 
+### 4. Variable Scope Between Stages
+
+**Each `--exec` stage runs in isolation.** Local variables declared with `let` do NOT persist across stages:
+
+```bash
+# ❌ WRONG - ctx is lost in the second stage
+kelora -j app.log \
+    -e 'let ctx = e.user_id; emit(e)' \
+    -e 'e.context = ctx'  # ERROR: ctx doesn't exist here!
+
+# ✅ CORRECT - Use semicolons within one stage
+kelora -j app.log \
+    -e 'let ctx = e.user_id; e.context = ctx; emit(e)'
+```
+
+**What DOES persist between stages:**
+- ✅ **Event fields** - Modifications to `e.field` carry forward
+- ✅ **`conf` map** - Initialized in `--begin`, read-only afterward
+- ✅ **`metrics` map** - Populated by `track_*()`, accessed in `--end`
+- ✅ **`window` array** - When `--window` is enabled
+
+**What DOES NOT persist:**
+- ❌ **Local variables** (`let x = ...`) - Scoped to the stage only
+- ❌ **Function definitions** - Unless loaded via `--include`
+
+**When to use multiple stages vs semicolons:**
+
+Use **semicolons within one `-e`** when you need shared local variables:
+```bash
+kelora -j app.log \
+    -e 'let total = e.count + e.bonus; e.result = total * 2; emit(e)'
+```
+
+Use **multiple `-e` stages** for stage snapshotting (see below).
+
+### 5. Resilient Mode and Stage Snapshotting
+
+In resilient mode (`--resilient`), Kelora creates a **snapshot after each successful stage**. If a later stage fails, the event **rolls back to the last successful snapshot**:
+
+```bash
+# With --resilient, events that fail in later stages
+# are restored to their last successful state
+kelora -j app.log --resilient \
+    -e 'e.step1 = "done"' \           # Snapshot 1
+    -e 'e.step2 = risky_operation(e)' \ # Might fail
+    -e 'e.step3 = "done"'             # If step2 fails, event has step1 but not step2
+```
+
+**Why use multiple stages:**
+- ✅ **Error isolation** - Failures don't corrupt earlier transformations
+- ✅ **Progressive validation** - Each stage is a checkpoint
+- ✅ **Debugging** - Easier to identify which stage failed
+
+**Example - Risky enrichment with fallback:**
+```bash
+kelora -j app.log --resilient \
+    -e 'e.safe_field = "processed"' \      # Always succeeds
+    -e 'e.risky = parse_json(e.raw_data)' \ # Might fail for some events
+    -e 'track_count(e.risky.status)' \     # Only runs if risky succeeded
+    -k safe_field,risky
+```
+
+Events that fail the risky parse still have `safe_field` and are included in output (unless filtered out).
+
+**Trade-off:**
+- **Multiple stages**: Better error handling, snapshotting, but variables don't persist
+- **Single stage with semicolons**: Shared variables, but all-or-nothing execution
+
 ---
 
 ## Common Patterns

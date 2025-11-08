@@ -301,6 +301,50 @@ kelora -j \
 2. Track average duration
 3. Add `alert` field for slow requests
 
+### Variable Scope Between Exec Stages
+
+**Important:** Each `--exec` stage has its own isolated scope. Local variables declared with `let` do **NOT** persist between stages:
+
+```bash
+# ❌ WRONG - ctx doesn't exist in the second stage
+kelora -j \
+    --exec 'let ctx = e.user_id' \
+    --exec 'e.context = ctx' \  # ERROR: ctx undefined!
+    app.log
+```
+
+**What persists between stages:**
+- ✅ **Event fields** (`e.field = value`) - Modifications carry forward
+- ✅ **`conf` map** - Initialized in `--begin`, read-only in exec stages
+- ✅ **`metrics` map** - Populated by `track_*()` functions
+- ✅ **`window` array** - When using `--window`
+
+**What does NOT persist:**
+- ❌ **Local variables** (`let x = ...`) - Scoped to the stage only
+- ❌ **Function definitions** - Unless loaded via `--include`
+
+**Solution - Use semicolons for shared variables:**
+
+When you need local variables to persist across operations, use semicolons within a single `--exec`:
+
+```bash
+# ✅ CORRECT - Both operations in one stage
+kelora -j \
+    --exec 'let ctx = e.user_id; e.context = ctx; emit(e)' \
+    app.log
+```
+
+**When to use multiple stages vs semicolons:**
+
+Use **multiple `-e` stages** when you want:
+- Stage-level error isolation (see resilient mode below)
+- Logical separation of transformation steps
+- Progressive validation checkpoints
+
+Use **semicolons within one `-e`** when you need:
+- Shared local variables across operations
+- All-or-nothing execution (no partial results)
+
 ### Intermixing --filter and --exec
 
 `--filter` and `--exec` are both script stages and execute in **exact CLI order**:
@@ -343,6 +387,59 @@ If `e.value` is not a valid integer:
 - No partial modifications
 
 In strict mode (`--strict`), errors abort immediately.
+
+### Resilient Mode and Stage Snapshotting
+
+Resilient mode creates **snapshots after each successful stage**. If a later stage fails, the event **reverts to the last successful snapshot**:
+
+```bash
+kelora -j --resilient \
+    --exec 'e.step1 = "processed"' \        # Snapshot 1
+    --exec 'e.step2 = risky_parse(e.raw)' \ # Might fail
+    --exec 'e.step3 = "complete"' \         # Snapshot 3 (if step2 succeeds)
+    app.log
+```
+
+**Behavior on error:**
+- If `step2` fails for an event, it **keeps `step1` but not `step2`**
+- The event continues through the pipeline with fields from the last successful stage
+- Later stages see the rolled-back event
+
+**Why use multiple stages for error handling:**
+
+```bash
+# Multiple stages - Graceful degradation
+kelora -j --resilient \
+    --exec 'e.safe = "always_set"' \        # Always succeeds
+    --exec 'e.parsed = parse_json(e.raw)' \ # Might fail for some events
+    --exec 'track_count(e.parsed.type)' \   # Only runs if parsing succeeded
+    -k safe,parsed
+# Events that fail parsing still have 'safe' field and appear in output
+
+# Single stage - All-or-nothing
+kelora -j --resilient \
+    --exec 'e.safe = "always_set"; e.parsed = parse_json(e.raw); track_count(e.parsed.type)' \
+    -k safe,parsed
+# If parsing fails, the ENTIRE exec fails - no 'safe' field, event unchanged
+```
+
+**Design pattern - Progressive risk:**
+
+Place risky operations in later stages so earlier transformations survive:
+
+```bash
+kelora -j --resilient \
+    --exec 'e.normalized = e.status.to_string()' \  # Safe normalization
+    --exec 'e.enriched = lookup_external(e.id)' \   # Risky external call
+    --exec 'e.computed = e.enriched.calculate()' \  # Depends on risky data
+    app.log
+```
+
+Events that fail external lookup still get `normalized` field.
+
+**Trade-off:**
+- **Multiple stages**: Better error isolation, partial success, but local variables don't persist
+- **Single stage with semicolons**: Shared variables, but all-or-nothing execution
 
 ### Common Patterns
 

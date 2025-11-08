@@ -114,10 +114,18 @@ kelora -j json_arrays.jsonl -e 'emit_each(e.get_path("users", []))' -k id,name,s
 **Multi-level fan-out:**
 ```bash
 kelora -j fan_out_batches.jsonl \
-  -e 'let ctx = #{batch_id: e.batch_id}; emit_each(e.orders, ctx)' \
-  -e 'let ctx2 = #{batch_id: e.batch_id, order_id: e.order_id}; emit_each(e.items, ctx2)' \
+  -e 'for order in e.orders {
+        let base = #{batch_id: e.batch_id, order_id: order.order_id};
+        for item in order.items {
+          let event = base.clone();
+          event += item;
+          emit(event)
+        }
+      }; e = ()' \
   -k batch_id,order_id,sku,qty,price
 ```
+
+Note: Multi-level fan-out requires nested loops in a single stage to share local variables. The `e = ()` at the end removes the original event since we've emitted all the expanded items.
 
 **Metrics and aggregation:**
 ```bash

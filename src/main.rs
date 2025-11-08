@@ -2003,6 +2003,28 @@ KELORA PIPELINE STAGES:
 
 Prerequisites: --allow-fs-writes (file I/O), --window N (windowing), --metrics (tracking)
 
+VARIABLE SCOPE BETWEEN STAGES:
+  ⚠️  Each --exec stage runs in ISOLATION. Local variables (let) do NOT persist:
+
+  WRONG:  kelora -e 'let ctx = e.id' -e 'e.context = ctx'     # ERROR: ctx undefined!
+  RIGHT:  kelora -e 'let ctx = e.id; e.context = ctx'         # Use semicolons for shared vars
+
+  What persists:   e.field modifications, conf, metrics, window
+  What doesn't:    let variables, function definitions (unless from --include)
+
+RESILIENT MODE SNAPSHOTTING:
+  Each successful stage creates a snapshot. On error, event reverts to last good state:
+
+  kelora --resilient -e 'e.safe = "ok"' -e 'e.risky = parse(e.raw)' -e 'e.done = true'
+  → If parse fails, event keeps 'safe' but not 'risky', continues with 'safe' field
+
+  Why use multiple stages:
+    ✓ Error isolation (failures don't corrupt earlier work)
+    ✓ Progressive checkpoints (partial success possible)
+  Why use semicolons in one stage:
+    ✓ Share local variables
+    ✓ All-or-nothing execution (no partial results)
+
 KELORA EVENT ACCESS:
   e                                    Current event (global variable in --filter/--exec)
   e.field                              Direct field access
