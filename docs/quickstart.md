@@ -38,7 +38,8 @@ Filter to show only ERROR level events and display statistics. The stats show pr
 ### 3. Extract hidden data
 
 ```bash exec="on" source="above" result="ansi"
-kelora examples/quickstart.log -f 'cols:ts(3) level *msg' -l error -e 'e.absorb_kv("msg")' --normalize-ts -J
+kelora examples/quickstart.log -f 'cols:ts(3) level *msg' -l error \
+  -e 'e.absorb_kv("msg")' --normalize-ts -J
 ```
 
 Extract key-value pairs from error messages into structured JSON fields. Notice how `order=1234`, `gateway=stripe`, `user=admin`, and other embedded data are now proper JSON fields. The `--normalize-ts` flag also converts the syslog timestamp (`Jan 15 10:00:00`) into full ISO 8601 format, ready for analysis or ingestion into other tools.

@@ -78,7 +78,7 @@ docs-serve:
     mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools
     PATH="{{justfile_directory()}}/target/release:${PATH}" \
     FORCE_COLOR=1 \
-    COLUMNS=60 \
+    COLUMNS=80 \
     UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
     UV_DATA_DIR={{justfile_directory()}}/.uv/data \
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
@@ -90,7 +90,7 @@ docs-build:
     mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools
     PATH="{{justfile_directory()}}/target/release:${PATH}" \
     FORCE_COLOR=1 \
-    COLUMNS=60 \
+    COLUMNS=80 \
     UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
     UV_DATA_DIR={{justfile_directory()}}/.uv/data \
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
