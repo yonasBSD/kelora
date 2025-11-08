@@ -1,0 +1,6 @@
+{"timestamp":"2024-01-15T10:00:00Z","level":"INFO","service":"api","message":"Application started","version":"1.2.3"}
+{"timestamp":"2024-01-15T10:00:10Z","level":"DEBUG","service":"database","message":"Connection pool initialized","max_connections":50}
+{"timestamp":"2024-01-15T10:01:00Z","level":"WARN","service":"api","message":"High memory usage detected","memory_percent":85}
+{"timestamp":"2024-01-15T10:01:30Z","level":"ERROR","service":"database","message":"Query timeout","query":"SELECT * FROM users","duration_ms":5000}
+{"timestamp":"2024-01-15T10:02:00Z","level":"INFO","service":"api","message":"Request received","method":"GET","path":"/api/users"}
+{"timestamp":"2024-01-15T10:03:00Z","level":"ERROR","service":"auth","message":"Account locked","username":"admin","attempts":5}

@@ -21,9 +21,11 @@ In the [Quickstart](../quickstart.md), you ran three commands to see Kelora in a
 
 ## Sample Data
 
-Commands below use example files from the repository:
+Commands below use `examples/basics.jsonl` — a small JSON-formatted log file with 6 events designed for this tutorial:
 
-- `examples/simple_json.jsonl` — JSON-formatted application logs with multiple services
+```bash exec="on" result="ansi"
+cat examples/basics.jsonl
+```
 
 If you cloned the project, run commands from the repository root.
 
@@ -39,46 +41,30 @@ You've seen `-j` in the [Quickstart](../quickstart.md) to read JSON logs. Let's 
 
 Let's see what happens without specifying the format:
 
-=== "Command"
-
-    ```bash
-    kelora examples/simple_json.jsonl --take 2
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora examples/simple_json.jsonl --take 2
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora examples/basics.jsonl
+```
 
 Notice it treats the entire JSON line as plain text (`line='...'`). Now with `-j`:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl --take 2
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl --take 2
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl
+```
 
 **Three ways to read JSON logs:**
 
 ```bash
-kelora -f json examples/simple_json.jsonl    # Explicit format
-kelora -j examples/simple_json.jsonl         # -j is shortcut for -f json
-kelora -f auto examples/simple_json.jsonl    # Auto-detect by examining content
+kelora -f json examples/basics.jsonl    # Explicit format
+kelora -j examples/basics.jsonl         # -j is shortcut for -f json
+kelora -f auto examples/basics.jsonl    # Auto-detect by examining content
 ```
 
 **Key Points:**
 
-- ✅ `-f auto` detects format by **examining the content** (not filename)
-- ❌ Kelora does **NOT** look at file extensions (`.jsonl`, `.log`, `.csv`)
-- ✅ Default is always `-f line` unless you specify otherwise
-- ✅ Best practice: Be explicit with `-j` for JSON
+- `-f auto` detects format by **examining the content** (not filename)
+- Kelora does **NOT** look at file extensions (`.jsonl`, `.log`, `.csv`)
+- Default is always `-f line` unless you specify otherwise
+- Best practice: Be explicit with `-j` for JSON
 
 ### Common Input Formats
 
@@ -99,32 +85,22 @@ kelora -f auto examples/simple_json.jsonl    # Auto-detect by examining content
 
 Let's examine what Kelora shows by default:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl --take 3
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl --take 3
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl
+```
 
 **The default output format shows:**
 
-- ✅ **Field names and values** in `key='value'` format
-- ✅ **Automatic wrapping** - long events wrap with indentation
-- ✅ **Colors** (when terminal supports it)
-- ✅ **Smart ordering** - timestamp, level, message first, then others alphabetically
-
-![Colored key-value output in the default formatter](../screenshots/colored-output.gif)
+- **Field names and values** in `key='value'` format
+- **Automatic wrapping** - long events wrap with indentation
+- **Colors** (when terminal supports it)
+- **Smart ordering** - timestamp, level, message first, then others alphabetically
 
 **Key observations:**
 
 1. Strings are quoted (`'Application started'`)
 2. Numbers are not quoted (`max_connections=50`)
-3. Fields wrap to next line when too long
+3. **Intelligent wrapping** - When output is too wide for your terminal, Kelora wraps **between fields** (never in the middle of a field) and indents continuation lines for readability
 4. Each event is separated by a blank line
 5. Field names are highlighted in color for better readability
 
@@ -136,17 +112,9 @@ Let's examine what Kelora shows by default:
 
 Omit field names, show only values for compact output:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl -b --take 3
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl -b --take 3
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl -b
+```
 
 **Use `-b` when:** You want compact, grep-friendly output.
 
@@ -154,17 +122,9 @@ Omit field names, show only values for compact output:
 
 Show only timestamp, level, and message:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl -c --take 3
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl -c --take 3
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl -c
+```
 
 **Use `-c` when:** You want to focus on the essentials, hiding extra metadata.
 
@@ -172,17 +132,9 @@ Show only timestamp, level, and message:
 
 Choose exactly which fields to show (and in what order):
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl -k level,service,message --take 3
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl -k level,service,message --take 3
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl -k level,service,message
+```
 
 **Pro tip:** Fields appear in the order you specify!
 
@@ -190,17 +142,9 @@ Choose exactly which fields to show (and in what order):
 
 Remove specific fields (like passwords, tokens, or verbose metadata):
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl -K service,version --take 3
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl -K service,version --take 3
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl -K service,version
+```
 
 **Use `-K` when:** Hiding sensitive data (passwords, API keys) or reducing noise.
 
@@ -212,17 +156,9 @@ Remove specific fields (like passwords, tokens, or verbose metadata):
 
 Filter to show only errors and warnings:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl -l error,warn
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl -l error,warn
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl -l error,warn
+```
 
 **Common patterns:**
 
@@ -236,17 +172,9 @@ kelora -j app.log -l info                     # Application flow (skip debug noi
 
 Remove verbose log levels:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl -L debug,info --take 5
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl -L debug,info --take 5
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl -L debug,info
+```
 
 **Use `-L` when:** You want to exclude chatty debug/trace output.
 
@@ -258,17 +186,9 @@ The default `key='value'` format is great for reading, but sometimes you need ma
 
 ### JSON Output (`-F json` or `-J`)
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl -J --take 2
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl -J --take 2
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl -J
+```
 
 **Use JSON when:** Piping to `jq`, saving to file, or integrating with other tools.
 
@@ -276,65 +196,33 @@ The default `key='value'` format is great for reading, but sometimes you need ma
 
 Perfect for spreadsheet export:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl -F csv -k timestamp,level,service,message --take 4
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl -F csv -k timestamp,level,service,message --take 4
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl -F csv -k timestamp,level,service,message
+```
 
 **Use CSV when:** Exporting to Excel, Google Sheets, or data analysis tools.
 
 ### Logfmt Output (`-F logfmt`)
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl -F logfmt --take 2
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl -F logfmt --take 2
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl -F logfmt
+```
 
 **Use logfmt when:** You want parseable output that's also human-readable.
 
 ### Inspect Output (`-F inspect`) - Debug with Types
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl -F inspect --take 1
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl -F inspect --take 1
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl -F inspect --take 1
+```
 
 **Use inspect when:** Debugging type mismatches or understanding field types.
 
 ### No Output (`-F none`) - Stats Only
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl -F none --stats
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl -F none --stats
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl -F none --stats
+```
 
 **Use `-F none --stats` when:** You want to analyze log structure without seeing the events.
 
@@ -346,49 +234,25 @@ Perfect for spreadsheet export:
 
 Show only errors with just timestamp, service, and message:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl -l error -k timestamp,service,message
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl -l error -k timestamp,service,message
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl -l error -k timestamp,service,message
+```
 
 ### Exercise 2: Export Problems to CSV
 
 Export warnings and errors to CSV for Excel analysis:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl -l error,warn -k timestamp,level,service,message -F csv
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl -l error,warn -k timestamp,level,service,message -F csv
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl -l error,warn -k timestamp,level,service,message -F csv
+```
 
 ### Exercise 3: Compact View Without Debug
 
 Brief output excluding debug noise:
 
-=== "Command"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl -L debug -b --take 5
-    ```
-
-=== "Output"
-
-    ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/simple_json.jsonl -L debug -b --take 5
-    ```
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl -L debug -b
+```
 
 ### Real-World Patterns
 
