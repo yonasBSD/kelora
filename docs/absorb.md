@@ -1,6 +1,6 @@
 # Absorb Functions
 
-Absorb functions provide a streamlined way to extract structured data from event fields, merge it into the event, and clean up the source field - all in a single operation.
+Absorb functions provide a streamlined way to extract structured data from event fields, merge it into the event, and (optionally) clean up the source field - all in a single operation.
 
 ## Overview
 
@@ -29,14 +29,17 @@ e.absorb_kv("msg")
 
 ## absorb_kv()
 
-Parse key-value pairs from an event field, merge them into the event, and update the field with unparsed text.
+Parse key-value pairs from an event field, merge them into the event, and update the field with unparsed text. Returns a status record so scripts can react without guessing.
 
 ### Signatures
 
 ```rhai
-absorb_kv(field: string) -> bool
-absorb_kv(field: string, sep: string, kv_sep: string) -> bool
-absorb_kv(field: string, (), kv_sep: string) -> bool
+absorb_kv(field: string) -> AbsorbResult
+absorb_kv(field: string, sep: string, kv_sep: string) -> AbsorbResult
+absorb_kv(field: string, (), kv_sep: string) -> AbsorbResult
+absorb_kv(field: string, options: map) -> AbsorbResult
+absorb_kv(field: string, sep: string, kv_sep: string, options: map) -> AbsorbResult
+absorb_kv(field: string, (), kv_sep: string, options: map) -> AbsorbResult
 ```
 
 **Parameters:**
@@ -46,10 +49,29 @@ absorb_kv(field: string, (), kv_sep: string) -> bool
 | `field` | string | Field name to parse (e.g., `"msg"`) | Required |
 | `sep` | string or `()` | Token separator; use `()` for whitespace | Whitespace |
 | `kv_sep` | string | Key-value separator | `"="` |
+| `options` | map | Optional behavior tweaks (see below) | `{}` |
 
-**Returns:** `bool`
-- `true` if any key-value pairs were found and merged
-- `false` if no pairs found
+### Options
+
+Both options default to `false` to preserve the long-standing behavior:
+
+| Option | Type | Effect |
+|--------|------|--------|
+| `keep_source` | bool | Leave the source field untouched; remainder is only available via the return value |
+| `on_conflict_keep` | bool | Keep existing event fields when conflicts happen (skip merging that key) |
+
+### Return Value
+
+`AbsorbResult` is a record with the following fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | `"applied"`, `"missing_field"`, `"not_string"`, or `"no_pairs"` |
+| `pairs` | map | All parsed key-value pairs (only populated when `status == "applied"`) |
+| `remainder` | string or `()` | The leftover text that was not parsed; `()` when no remainder |
+| `removed_source` | bool | `true` when the field was deleted after parsing every token |
+
+Method-style calls are still supported:
 
 **Method-style calls supported:**
 ```rhai
@@ -64,8 +86,8 @@ The function performs these steps:
 #### 1. Extract and Validate Field
 
 - Get value of the specified field
-- If field doesn't exist → return `false` (no-op, no error)
-- If field is not a string → return `false` (no-op, no error)
+- If field doesn't exist → return result with `status = "missing_field"`
+- If field is not a string → return result with `status = "not_string"`
 
 #### 2. Parse with Remainder Tracking
 
@@ -84,11 +106,11 @@ The function performs these steps:
 #### 3. Merge Parsed Pairs into Event
 
 - Each parsed key-value pair is inserted into the event
-- **Overwrites existing fields** with same key (like `merge()`)
+- **Overwrites existing fields** with same key (like `merge()`), unless `on_conflict_keep` is enabled
 
 #### 4. Update Source Field
 
-Two cases:
+Unless `keep_source` is enabled, the source field is updated according to:
 
 **Unparsed tokens remain:**
 - Join unparsed tokens with single space
@@ -107,10 +129,13 @@ e.absorb_kv("data")
 // → e.data deleted (field removed from event)
 ```
 
+When `keep_source` is `true`, the source field is never modified; use `res.remainder` if you need the cleaned text.
+
 #### 5. Return Result
 
-- Returns `true` if any pairs were parsed and merged
-- Returns `false` if no pairs found
+- Returns `AbsorbResult` so scripts can inspect `status`, `pairs`, and `remainder`
+- `status == "applied"` when at least one pair was merged
+- Non-`"applied"` statuses indicate why nothing changed
 
 ### Examples
 
@@ -118,14 +143,16 @@ e.absorb_kv("data")
 
 ```rhai
 e.msg = "Payment timeout order=1234 gateway=stripe duration=5s"
-e.absorb_kv("msg")
+let res = e.absorb_kv("msg")
 
 // After:
 // e.msg = "Payment timeout"
 // e.order = "1234"
 // e.gateway = "stripe"
 // e.duration = "5s"
-// Returns: true
+// res.status == "applied"
+// res.pairs == #{ order: "1234", gateway: "stripe", duration: "5s" }
+// res.remainder == "Payment timeout"
 ```
 
 #### All Tokens Are Pairs
@@ -134,14 +161,15 @@ When every token is a key-value pair, the field is deleted:
 
 ```rhai
 e.data = "user=alice status=active count=42"
-e.absorb_kv("data")
+let res = e.absorb_kv("data")
 
 // After:
 // e.data deleted (no longer exists)
 // e.user = "alice"
 // e.status = "active"
 // e.count = "42"
-// Returns: true
+// res.removed_source == true
+// res.remainder == ()
 ```
 
 #### No Pairs Found
@@ -150,11 +178,12 @@ If no key-value pairs are found, the field remains unchanged:
 
 ```rhai
 e.msg = "This is just plain text without any pairs"
-e.absorb_kv("msg")
+let res = e.absorb_kv("msg")
 
 // After:
 // e.msg = "This is just plain text without any pairs" (unchanged)
-// Returns: false
+// res.status == "no_pairs"
+// res.pairs == #{}
 ```
 
 #### Custom Separators
@@ -163,14 +192,14 @@ Parse with custom token and KV separators:
 
 ```rhai
 e.tags = "env:prod,region:us-west,tier:web"
-e.absorb_kv("tags", ",", ":")
+let res = e.absorb_kv("tags", ",", ":")
 
 // After:
 // e.tags deleted
 // e.env = "prod"
 // e.region = "us-west"
 // e.tier = "web"
-// Returns: true
+// res.status == "applied"
 ```
 
 #### Whitespace Separator with Custom KV Separator
@@ -179,7 +208,7 @@ Use `()` to specify whitespace separator with custom KV separator:
 
 ```rhai
 e.labels = "env:prod region:us tier:web"
-e.absorb_kv("labels", (), ":")
+let res = e.absorb_kv("labels", (), ":")
 
 // After:
 // e.labels deleted
@@ -188,20 +217,51 @@ e.absorb_kv("labels", (), ":")
 // e.tier = "web"
 ```
 
+#### Keeping the Source Field
+
+Prevent destructive updates by enabling `keep_source`:
+
+```rhai
+e.msg = "Payment timeout order=1234"
+let res = e.absorb_kv("msg", #{ keep_source: true })
+
+// After:
+// e.msg stays "Payment timeout order=1234"
+// e.order == "1234"
+// res.remainder == "Payment timeout"
+```
+
+#### Avoiding Overwrites
+
+Skip merging keys that already exist:
+
+```rhai
+e.order = "legacy"
+e.msg = "order=1234 duration=5s"
+let res = e.absorb_kv("msg", #{ on_conflict_keep: true })
+
+// After:
+// e.order is still "legacy"
+// e.duration == "5s"
+// res.pairs == #{ order: "1234", duration: "5s" }
+```
+
 #### Conditional Logic
 
 Use the return value for conditional processing:
 
 ```rhai
 // Try KV first, fall back to JSON if no pairs
-if !e.absorb_kv("payload") {
+let res = e.absorb_kv("payload")
+if res.status != "applied" {
     e.merge(e.payload.parse_json())
 }
 ```
 
 ```rhai
 // Only process events with KV data
-if e.absorb_kv("msg") {
+let res = e.absorb_kv("msg")
+if res.status == "applied" {
     print("Found structured data")
 }
 ```
@@ -210,31 +270,35 @@ if e.absorb_kv("msg") {
 
 #### Field Doesn't Exist
 
-No error, returns `false`:
+No error; result reports `status = "missing_field"`:
 
 ```rhai
-e.absorb_kv("missing_field")  // Returns false, no error
+let res = e.absorb_kv("missing_field")
+assert(res.status == "missing_field")
 ```
 
 #### Field Is Not a String
 
-No error, returns `false`:
+No error; result reports `status = "not_string"`:
 
 ```rhai
 e.count = 42
-e.absorb_kv("count")  // Returns false, no error
+let res = e.absorb_kv("count")
+assert(res.status == "not_string")
 ```
 
 #### Empty or Whitespace-Only String
 
-Field is deleted, returns `false`:
+`status = "no_pairs"` and the field is deleted (unless `keep_source` is set):
 
 ```rhai
 e.msg = ""
-e.absorb_kv("msg")  // Returns false, msg deleted
+let res = e.absorb_kv("msg")
+assert(res.status == "no_pairs")
 
 e.msg = "   "
-e.absorb_kv("msg")  // Returns false, msg deleted
+let res2 = e.absorb_kv("msg")
+assert(res2.status == "no_pairs")
 ```
 
 #### Key with Empty Value
@@ -243,12 +307,13 @@ Empty values are preserved:
 
 ```rhai
 e.msg = "error= code=500"
-e.absorb_kv("msg")
+let res = e.absorb_kv("msg")
 
 // After:
 // e.msg deleted
 // e.error = ""  (empty string)
 // e.code = "500"
+// res.pairs.error == ""
 ```
 
 #### Key with No Value Separator
@@ -257,25 +322,27 @@ Tokens without the KV separator are kept as unparsed text:
 
 ```rhai
 e.msg = "prefix key=value suffix"
-e.absorb_kv("msg")
+let res = e.absorb_kv("msg")
 
 // After:
 // e.msg = "prefix suffix"
 // e.key = "value"
+// res.remainder == "prefix suffix"
 ```
 
 #### Conflicting Keys (Overwrites)
 
-Absorb **overwrites existing fields** (same behavior as `merge()`):
+By default absorb **overwrites existing fields** (same behavior as `merge()`), but `on_conflict_keep` switches to "keep existing" semantics:
 
 ```rhai
 e.status = "pending"
 e.msg = "Processing status=active"
-e.absorb_kv("msg")
+let overwrite = e.absorb_kv("msg")
+assert(e.status == "active")        // overwritten
 
-// After:
-// e.msg = "Processing"
-// e.status = "active"  (overwritten!)
+let keep = e.absorb_kv("msg", #{ on_conflict_keep: true })
+assert(keep.pairs.status == "active")
+assert(e.status == "active")        // unchanged because merge skipped
 ```
 
 #### Special Characters and Unicode
@@ -284,13 +351,14 @@ Handles Unicode and special characters in both keys and values:
 
 ```rhai
 e.msg = "user=alice™ emoji=🎉 price=$99.99"
-e.absorb_kv("msg")
+let res = e.absorb_kv("msg")
 
 // After:
 // e.msg deleted
 // e.user = "alice™"
 // e.emoji = "🎉"
 // e.price = "$99.99"
+// res.pairs.price == "$99.99"
 ```
 
 ### Comparison with Manual Approach
@@ -350,9 +418,9 @@ e.absorb_kv("tags", ",", "=")
 Follows Kelora's resilient error handling philosophy:
 
 - **Never throws exceptions** in resilient mode
-- Invalid field types → return `false`, no error
-- Missing fields → return `false`, no error
-- Empty results → return `false`, not an error
+- Invalid field types → `status = "not_string"`, no error
+- Missing fields → `status = "missing_field"`, no error
+- Empty results → `status = "no_pairs"`, not an error
 
 This ensures `absorb_kv()` can be used safely in pipelines without breaking on unexpected data.
 
@@ -388,7 +456,7 @@ e.absorb_json("payload")
 **Behavior differences from absorb_kv():**
 - JSON parsing is all-or-nothing (no "unparsed text")
 - Field always deleted on successful parse
-- Parse failure → field unchanged, returns `false`
+- Parse failure → field unchanged, result status indicates the error
 
 ### absorb_logfmt()
 
