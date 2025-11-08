@@ -133,7 +133,7 @@ The function performs these steps:
 Unless `keep_source` is enabled, the source field is updated according to:
 
 **Unparsed tokens remain:**
-- Join unparsed tokens with single space
+- Join unparsed tokens using the same separator that was used for splitting (`sep: ()` still normalizes whitespace to a single space)
 - Update field with this remainder
 ```rhai
 e.msg = "Payment timeout order=1234"
