@@ -59,7 +59,7 @@ kelora --help-time         # Timestamp format reference
 You've seen Kelora in action. Now **learn how it actually works**:
 
 - **[Tutorial: Basics](tutorials/basics.md)** - Comprehensive 30-minute guide explaining input formats (`-f`, `-j`), display options (`-k`, `-b`, `-c`), level filtering (`-l`, `-L`), output formats (`-F`, `-J`), and common workflows
-- **[Tutorial: Scripting Transforms](tutorials/scripting-transforms.md)** - Write custom filters and transformations with Rhai
+- **[Tutorial: Advanced Scripting](tutorials/advanced-scripting.md)** - Write custom filters and transformations with Rhai
 - **[How-To Guides](how-to/find-errors-in-logs.md)** - Solve specific problems like finding errors, parsing custom formats, and tracking metrics
 
 For format conversion, time filtering, metrics tracking, and more advanced features, start with the [Tutorial: Basics](tutorials/basics.md).

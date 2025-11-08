@@ -110,4 +110,4 @@ kelora -j examples/fan_out_batches.jsonl \
 ## See Also
 - [Prepare CSV Exports for Analytics](process-csv-data.md) for post-flattening clean-up.
 - [Sanitize Logs Before Sharing](extract-and-mask-sensitive-data.md) if nested objects contain sensitive data.
-- [Tutorial: Scripting Transforms](../tutorials/scripting-transforms.md) for more complex Rhai patterns.
+- [Tutorial: Advanced Scripting](../tutorials/advanced-scripting.md) for more complex Rhai patterns.
