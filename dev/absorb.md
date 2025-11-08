@@ -39,6 +39,8 @@ Kelora standardizes on a single, options-driven call:
 absorb_kv(field: string, options: map = #{}) -> AbsorbResult
 ```
 
+All optional behavior is expressed through the `options` map—there is no positional `sep`/`kv_sep` overload.
+
 **Parameters:**
 
 | Parameter | Type | Description |
@@ -67,15 +69,16 @@ Absorb functions share a common options map so scripts can set behavior once and
 | `data` | map | All parsed key-value pairs (only populated when `status == "applied"`) |
 | `remainder` | string or `()` | The leftover text that was not parsed; `()` when no remainder |
 | `removed_source` | bool | `true` when the field was deleted after parsing every token |
+| `error` | string or `()` | Human-readable parse failure when `status == "parse_error"`; `()` otherwise |
 
 **Status guide:**
 - `applied`: At least one key-value pair was merged into the event.
 - `missing_field`: The target field is absent.
 - `not_string`: The field exists but is not a string.
 - `empty`: The field is a string but produced no pairs after trimming (covers whitespace-only and “no pairs” scenarios).
-- `parse_error`: Parser rejected the payload (all-or-nothing formats) and the field was left untouched.
+- `parse_error`: Parser rejected the payload (all-or-nothing formats) and the field was left untouched; `error` contains the message.
 
-**Note:** `AbsorbResult` is shared across all `absorb_*()` functions (JSON, logfmt, URL params, etc.). For all-or-nothing formats like JSON or URL parameters, `remainder` is always `()`, and `parse_error` is the error status they emit.
+**Note:** `AbsorbResult` is shared across all `absorb_*()` functions (JSON, logfmt, URL params, etc.). For all-or-nothing formats like JSON or URL parameters, `remainder` is always `()`, and `parse_error` includes a descriptive `error` string.
 
 Method-style calls are still supported:
 
@@ -199,7 +202,7 @@ Parse with custom token and KV separators:
 
 ```rhai
 e.tags = "env:prod,region:us-west,tier:web"
-let res = e.absorb_kv("tags", ",", ":")
+let res = e.absorb_kv("tags", #{ sep: ",", kv_sep: ":" })
 
 // After:
 // e.tags deleted (all tokens were KV pairs)
@@ -215,7 +218,7 @@ When mixing plain tokens and KV pairs, format is preserved:
 
 ```rhai
 e.categories = "news,sports,user:alice,region:us-west"
-let res = e.absorb_kv("categories", ",", ":")
+let res = e.absorb_kv("categories", #{ sep: ",", kv_sep: ":" })
 
 // After:
 // e.categories = "news,sports" (comma-separated, format preserved!)
@@ -226,11 +229,11 @@ let res = e.absorb_kv("categories", ",", ":")
 
 #### Whitespace Separator with Custom KV Separator
 
-Use `()` to specify whitespace separator with custom KV separator:
+Use `sep: ()` in the options map to specify whitespace separator with custom KV separator:
 
 ```rhai
 e.labels = "env:prod region:us tier:web"
-let res = e.absorb_kv("labels", (), ":")
+let res = e.absorb_kv("labels", #{ sep: (), kv_sep: ":" })
 
 // After:
 // e.labels deleted
@@ -267,6 +270,8 @@ let res = e.absorb_kv("msg", #{ overwrite: false })
 // e.duration == "5s" (new field added)
 // res.data == #{ order: "1234", duration: "5s" } (shows all parsed data)
 ```
+
+`res.data` always reports what was parsed, even if `overwrite: false` prevents conflicting keys from being written, so inspect the event map when you need to know which fields actually changed.
 
 #### Conditional Logic
 
@@ -440,7 +445,7 @@ Unparsed tokens are **joined using the same separator that was used for splittin
 **Example with custom separator:**
 ```rhai
 e.tags = "important,urgent,user=alice,priority=high"
-e.absorb_kv("tags", ",", "=")
+e.absorb_kv("tags", #{ sep: ",", kv_sep: "=" })
 
 // Unparsed: ["important", "urgent"]
 // Joined with comma (same as split separator):
@@ -473,14 +478,14 @@ Before classifying tokens as KV pairs or remainder, each token undergoes process
 ```rhai
 // Leading/trailing separators
 e.data = ",tag1,tag2,owner=alice,"
-e.absorb_kv("data", ",", "=")
+e.absorb_kv("data", #{ sep: ",", kv_sep: "=" })
 // Split: ["", "tag1", "tag2", "owner=alice", ""]
 // After trim+filter: ["tag1", "tag2", "owner=alice"]
 // Result: e.data = "tag1,tag2"
 
 // Inconsistent spacing with custom separator
 e.tags = "error, warning, code=500"
-e.absorb_kv("tags", ",", "=")
+e.absorb_kv("tags", #{ sep: ",", kv_sep: "=" })
 // Split: ["error", " warning", " code=500"]
 // After trim: ["error", "warning", "code=500"]
 // Classified: KV={code:"500"}, remainder=["error","warning"]
@@ -501,6 +506,7 @@ Follows Kelora's resilient error handling philosophy:
 - Invalid field types → `status = "not_string"`, no error
 - Missing fields → `status = "missing_field"`, no error
 - Empty results → `status = "empty"`, not an error
+- Parsers that fail (e.g., logfmt quotes, JSON syntax) return `status = "parse_error"` and populate `error` with the failure message
 
 This ensures `absorb_kv()` can be used safely in pipelines without breaking on unexpected data.
 
@@ -541,7 +547,7 @@ let res = e.absorb_json("payload")
 **Behavior differences from absorb_kv():**
 - JSON parsing is all-or-nothing (no "unparsed text")
 - Field always deleted on successful parse
-- Parse failure → `status = "parse_error"`, field unchanged
+- Parse failure → `status = "parse_error"`, field unchanged, and `res.error` carries the parser message
 
 ### absorb_logfmt()
 
@@ -585,6 +591,7 @@ let res = e.absorb_url_params("query")
 **Options:** Shares the same options map. `keep_source` preserves the original query string, `overwrite` guards existing fields, and tokenization options are ignored.
 
 **All-or-nothing parsing** like JSON - entire string is the query string.
+- Parse failure → `status = "parse_error"`, field unchanged, and `res.error` carries the parser message.
 
 ### Format-Specific Behavior Summary
 
