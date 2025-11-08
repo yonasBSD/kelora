@@ -33,30 +33,29 @@ Parse key-value pairs from an event field, merge them into the event, and update
 
 ### Signatures
 
+Kelora standardizes on a single, options-driven call:
+
 ```rhai
-absorb_kv(field: string) -> AbsorbResult
-absorb_kv(field: string, sep: string, kv_sep: string) -> AbsorbResult
-absorb_kv(field: string, (), kv_sep: string) -> AbsorbResult
-absorb_kv(field: string, options: map) -> AbsorbResult
-absorb_kv(field: string, sep: string, kv_sep: string, options: map) -> AbsorbResult
-absorb_kv(field: string, (), kv_sep: string, options: map) -> AbsorbResult
+absorb_kv(field: string, options: map = #{}) -> AbsorbResult
 ```
 
 **Parameters:**
 
-| Parameter | Type | Description | Default |
-|-----------|------|-------------|---------|
-| `field` | string | Field name to parse (e.g., `"msg"`) | Required |
-| `sep` | string or `()` | Token separator; use `()` for whitespace | Whitespace |
-| `kv_sep` | string | Key-value separator | `"="` |
-| `options` | map | Optional behavior tweaks (see below) | `{}` |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `field` | string | Field name to parse (e.g., `"msg"`) |
+| `options` | map | Optional behavior tweaks (see below) |
 
 ### Options
 
-| Option | Type | Default | Effect |
-|--------|------|---------|--------|
-| `keep_source` | bool | `false` | Leave the source field untouched; remainder is only available via the return value |
-| `overwrite` | bool | `true` | When `true` (default), parsed values overwrite existing event fields. When `false`, existing fields are preserved and conflicting keys are skipped during merge |
+Absorb functions share a common options map so scripts can set behavior once and reuse it across formats. Options that do not apply to a format are simply ignored.
+
+| Option | Type | Default | Applies to | Effect |
+|--------|------|---------|-----------|--------|
+| `sep` | string or `()` | Whitespace | Tokenized formats (KV, logfmt) | Token separator; use `()` for whitespace |
+| `kv_sep` | string | `"="` | Tokenized formats (KV, logfmt) | Key-value separator |
+| `keep_source` | bool | `false` | All | Leave the source field untouched; use the return value's `remainder` when you need the cleaned text |
+| `overwrite` | bool | `true` | All | When `true`, parsed values overwrite existing event fields. When `false`, existing fields are preserved and conflicting keys are skipped during merge |
 
 ### Return Value
 
@@ -64,12 +63,19 @@ absorb_kv(field: string, (), kv_sep: string, options: map) -> AbsorbResult
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status` | string | `"applied"`, `"missing_field"`, `"not_string"`, or `"empty"` |
+| `status` | string | One of `"applied"`, `"missing_field"`, `"not_string"`, `"empty"`, or `"parse_error"` |
 | `data` | map | All parsed key-value pairs (only populated when `status == "applied"`) |
 | `remainder` | string or `()` | The leftover text that was not parsed; `()` when no remainder |
 | `removed_source` | bool | `true` when the field was deleted after parsing every token |
 
-**Note:** `AbsorbResult` is shared across all `absorb_*()` functions (JSON, logfmt, URL params, etc.). For all-or-nothing formats like JSON, `remainder` is always `()`.
+**Status guide:**
+- `applied`: At least one key-value pair was merged into the event.
+- `missing_field`: The target field is absent.
+- `not_string`: The field exists but is not a string.
+- `empty`: The field is a string but produced no pairs after trimming (covers whitespace-only and “no pairs” scenarios).
+- `parse_error`: Parser rejected the payload (all-or-nothing formats) and the field was left untouched.
+
+**Note:** `AbsorbResult` is shared across all `absorb_*()` functions (JSON, logfmt, URL params, etc.). For all-or-nothing formats like JSON or URL parameters, `remainder` is always `()`, and `parse_error` is the error status they emit.
 
 Method-style calls are still supported:
 
@@ -530,6 +536,8 @@ let res = e.absorb_json("payload")
 // res.remainder == ()  (always () for JSON)
 ```
 
+**Options:** Supports the shared options map. `keep_source` lets you retain the original JSON string, and `overwrite` controls merge conflicts. `sep` / `kv_sep` are ignored.
+
 **Behavior differences from absorb_kv():**
 - JSON parsing is all-or-nothing (no "unparsed text")
 - Field always deleted on successful parse
@@ -552,6 +560,8 @@ let res = e.absorb_logfmt("msg")
 // res.remainder == "prefix suffix"
 ```
 
+**Options:** Honors the same options map. `sep`/`kv_sep` customize token parsing, while `keep_source` and `overwrite` behave identically to `absorb_kv()`.
+
 **Similar to absorb_kv()** but uses logfmt parser which handles quoted values.
 
 ### absorb_url_params()
@@ -571,6 +581,8 @@ let res = e.absorb_url_params("query")
 // res.data == #{ foo: "bar", baz: "qux", limit: "10" }
 // res.remainder == ()  (always () for URL params)
 ```
+
+**Options:** Shares the same options map. `keep_source` preserves the original query string, `overwrite` guards existing fields, and tokenization options are ignored.
 
 **All-or-nothing parsing** like JSON - entire string is the query string.
 
