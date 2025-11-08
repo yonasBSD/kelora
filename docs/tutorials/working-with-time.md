@@ -588,7 +588,7 @@ kelora -j app.log \
 
 Now that you understand time handling in Kelora, explore:
 
-- **[Scripting Transforms](scripting-transforms.md)** - Advanced Rhai scripting techniques
+- **[Advanced Scripting](advanced-scripting.md)** - Advanced Rhai scripting techniques
 - **[Metrics and Tracking](metrics-and-tracking.md)** - Time-based metric aggregation
 - **[Time Format Reference](../reference/cli-reference.md#timestamp-options)** - Complete format documentation
 

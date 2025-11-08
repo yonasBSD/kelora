@@ -477,4 +477,4 @@ Now that you understand custom format parsing, explore:
 
 - **[Working with Time](working-with-time.md)** - Advanced timestamp handling
 - **[Format Reference](../reference/formats.md)** - Complete format documentation
-- **[Scripting Transforms](scripting-transforms.md)** - Advanced event transformation
+- **[Advanced Scripting](advanced-scripting.md)** - Advanced event transformation

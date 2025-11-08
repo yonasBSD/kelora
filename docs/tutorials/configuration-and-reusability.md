@@ -679,7 +679,7 @@ traffic = --exec 'track_count(e.method); track_count(e.status.to_string())' --me
 
 Now that you can create reusable workflows, continue to:
 
-- **[Scripting Transforms](scripting-transforms.md)** - Advanced transformation patterns
+- **[Advanced Scripting](advanced-scripting.md)** - Advanced transformation patterns
 - **[Metrics and Tracking](metrics-and-tracking.md)** - Build analytics into your aliases
 - **[Working with Time](working-with-time.md)** - Time-based filtering in aliases
 

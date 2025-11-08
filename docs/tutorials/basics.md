@@ -387,6 +387,6 @@ kelora -j app.log -F none --stats
 Once you're comfortable with these basics, continue to:
 
 - **[Working with Time](working-with-time.md)** - Time filtering with `--since` and `--until`
-- **[Scripting Transforms](scripting-transforms.md)** - Custom filters and transformations with Rhai
+- **[Advanced Scripting](advanced-scripting.md)** - Custom filters and transformations with Rhai
 - **[Metrics and Tracking](metrics-and-tracking.md)** - Aggregate data with `track_*()` functions
 - **[Parsing Custom Formats](parsing-custom-formats.md)** - Handle non-standard log formats

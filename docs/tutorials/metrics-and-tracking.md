@@ -469,8 +469,8 @@ You've learned:
 
 Now that you can track and aggregate data, continue to:
 
-- **[Pipeline Stages](pipeline-stages.md)** - Use `--begin` and `--end` for advanced workflows
-- **[Scripting Transforms](scripting-transforms.md)** - Advanced transformation patterns
+- **[Begin and End Stages](begin-end-stages.md)** - Use `--begin` and `--end` for advanced workflows
+- **[Advanced Scripting](advanced-scripting.md)** - Advanced transformation patterns
 - **[Configuration and Reusability](configuration-and-reusability.md)** - Save common patterns as aliases
 
 **Related guides:**

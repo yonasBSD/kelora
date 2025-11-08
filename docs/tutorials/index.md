@@ -11,11 +11,11 @@ Step-by-step walkthroughs for building Kelora pipelines from scratch. Start here
 
 - [Working with Time](working-with-time.md) — Timestamp parsing, filtering, and timezone handling
 - [Metrics and Tracking](metrics-and-tracking.md) — Aggregate data with track_*() functions
-- [Pipeline Stages: Begin, Filter, Exec, and End](pipeline-stages.md) — Complete pipeline lifecycle
-- [Scripting Transforms](scripting-transforms.md) — Advanced transformation patterns
+- [Parsing Custom Formats](parsing-custom-formats.md) — Handle non-standard log formats
+- [Begin and End Stages](begin-end-stages.md) — Complete pipeline lifecycle with --begin and --end
+- [Advanced Scripting](advanced-scripting.md) — Advanced transformation patterns
 
 ## Advanced
 
-- [Parsing Custom Formats](parsing-custom-formats.md) — Handle non-standard log formats
 - [Span Aggregation: Time-Based and Count-Based Windows](span-aggregation.md) — Windowed rollups and time-series
 - [Configuration and Reusability](configuration-and-reusability.md) — Aliases, includes, and shared workflows

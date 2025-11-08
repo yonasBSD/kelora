@@ -15,7 +15,7 @@ Group events into non-overlapping spans for periodic rollups, time-series analys
 
 - [Basics: Input, Display & Filtering](basics.md) - Basic CLI usage
 - [Introduction to Rhai Scripting](intro-to-rhai.md) - Rhai fundamentals
-- [Pipeline Stages: Begin, Filter, Exec, and End](pipeline-stages.md) - Understanding --begin and --end
+- [Begin and End Stages](begin-end-stages.md) - Understanding --begin and --end
 - **Time:** ~20 minutes
 
 ## Sample Data

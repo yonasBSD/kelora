@@ -1,6 +1,6 @@
 # Rhai Cheatsheet
 
-Quick reference for Rhai scripting in Kelora. For detailed tutorials, see [Scripting Transforms](../tutorials/scripting-transforms.md). For practical examples: `kelora --help-examples`. For function reference: `kelora --help-functions`.
+Quick reference for Rhai scripting in Kelora. For detailed tutorials, see [Advanced Scripting](../tutorials/advanced-scripting.md). For practical examples: `kelora --help-examples`. For function reference: `kelora --help-functions`.
 
 ## Variables & Types
 
@@ -468,7 +468,7 @@ meta.line                             // Original raw line
 
 ## See Also
 
-- [Scripting Transforms Tutorial](../tutorials/scripting-transforms.md) - Detailed walkthrough with examples
+- [Advanced Scripting Tutorial](../tutorials/advanced-scripting.md) - Detailed walkthrough with examples
 - `kelora --help-functions` - Complete function catalogue
 - `kelora --help-examples` - Practical log analysis patterns
 - `kelora --help-rhai` - Language guide (this cheatsheet's source)

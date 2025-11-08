@@ -387,7 +387,7 @@ Now that you understand basic Rhai scripting, continue to:
 
 - **[Working with Time](working-with-time.md)** - Time filtering and timezone handling
 - **[Metrics and Tracking](metrics-and-tracking.md)** - Aggregate data with `track_*()` functions
-- **[Scripting Transforms](scripting-transforms.md)** - Advanced patterns and techniques
+- **[Advanced Scripting](advanced-scripting.md)** - Advanced patterns and techniques
 
 **Related guides:**
 
