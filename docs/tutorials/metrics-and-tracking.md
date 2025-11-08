@@ -13,7 +13,7 @@ feed into dashboards.
 
 ## Prerequisites
 
-- [Getting Started: Input, Display & Filtering](basics.md) - Basic CLI usage
+- [Basics: Input, Display & Filtering](basics.md) - Basic CLI usage
 - [Introduction to Rhai Scripting](intro-to-rhai.md) - Rhai fundamentals
 - **Time:** ~25 minutes
 

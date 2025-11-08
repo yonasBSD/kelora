@@ -1,4 +1,4 @@
-# Getting Started: Input, Display & Filtering
+# Basics: Input, Display & Filtering
 
 Master the essential commands for reading logs, controlling display output, and filtering by log level. This tutorial covers the foundation you'll use in every Kelora workflow.
 

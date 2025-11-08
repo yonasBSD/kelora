@@ -14,7 +14,7 @@ Learn how to use Kelora's four scripting stages to build complete data processin
 
 ## Prerequisites
 
-- [Getting Started: Input, Display & Filtering](basics.md) - Basic CLI usage
+- [Basics: Input, Display & Filtering](basics.md) - Basic CLI usage
 - [Introduction to Rhai Scripting](intro-to-rhai.md) - Basic scripting knowledge
 - **Time:** ~20 minutes
 

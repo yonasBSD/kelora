@@ -14,7 +14,7 @@ Learn how to write simple Rhai scripts to filter and transform log events. This 
 
 ## Prerequisites
 
-- [Getting Started: Input, Display & Filtering](basics.md) - Basic CLI usage
+- [Basics: Input, Display & Filtering](basics.md) - Basic CLI usage
 - **Time:** ~20 minutes
 
 ## Sample Data

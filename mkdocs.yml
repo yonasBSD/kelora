@@ -72,7 +72,7 @@ nav:
   - Quickstart: quickstart.md
   - Tutorials:
       - Overview: tutorials/index.md
-      - Getting Started: tutorials/basics.md
+      - Basics: tutorials/basics.md
       - Introduction to Rhai: tutorials/intro-to-rhai.md
       - Working with Time: tutorials/working-with-time.md
       - Metrics and Tracking: tutorials/metrics-and-tracking.md
