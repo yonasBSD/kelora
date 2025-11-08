@@ -213,7 +213,7 @@ kelora -j examples/basics.jsonl -F logfmt
 ### Inspect Output (`-F inspect`) - Debug with Types
 
 ```bash exec="on" source="above" result="ansi"
-kelora -j examples/basics.jsonl -F inspect --take 1
+kelora -j examples/basics.jsonl -F inspect
 ```
 
 **Use inspect when:** Debugging type mismatches or understanding field types.

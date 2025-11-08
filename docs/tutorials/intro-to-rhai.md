@@ -43,7 +43,7 @@ e.status         # Access any field in the event
 Let's see the structure with `-F inspect`:
 
 ```bash exec="on" source="above" result="ansi"
-kelora -j examples/basics.jsonl -F inspect --take 1
+kelora -j examples/basics.jsonl -F inspect
 ```
 
 **Key insight:** Field names become properties you can access in scripts.
@@ -268,7 +268,7 @@ When scripts don't work as expected, use these techniques.
 kelora -j examples/basics.jsonl \
     --exec 'e.status = 200' \
     --exec 'e.computed = e.status * 2' \
-    -F inspect --take 1
+    -F inspect
 ```
 
 ### Use --verbose to See Errors
