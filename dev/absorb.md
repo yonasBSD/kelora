@@ -50,7 +50,7 @@ All optional behavior is expressed through the `options` map—there is no posit
 
 ### Options
 
-Absorb functions share a common options map so scripts can set behavior once and reuse it across formats. Options that do not apply to a format are simply ignored.
+Absorb functions share a common options map so scripts can set behavior once and reuse it across formats. Unknown option keys are rejected up front; format-specific parsers silently ignore valid-but-irrelevant keys (e.g., `sep` for JSON).
 
 | Option | Type | Default | Applies to | Effect |
 |--------|------|---------|-----------|--------|
@@ -59,24 +59,32 @@ Absorb functions share a common options map so scripts can set behavior once and
 | `keep_source` | bool | `false` | All | Leave the source field untouched; use the return value's `remainder` when you need the cleaned text |
 | `overwrite` | bool | `true` | All | When `true`, parsed values overwrite existing event fields. When `false`, existing fields are preserved and conflicting keys are skipped during merge |
 
+**Validation rules**
+
+- The options map is validated against the table above. Unknown keys set `status = "invalid_option"` and populate `error` with `unknown absorb option: <key>`.
+- In resilient mode the function returns the `AbsorbResult` so scripts can handle or log the error.
+- `--strict` mode escalates immediately; the pipeline aborts on the first invalid option to keep failures loud.
+
 ### Return Value
 
 `AbsorbResult` is a record with the following fields:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status` | string | One of `"applied"`, `"missing_field"`, `"not_string"`, `"empty"`, or `"parse_error"` |
+| `status` | string | One of `"applied"`, `"missing_field"`, `"not_string"`, `"empty"`, `"parse_error"`, or `"invalid_option"` |
 | `data` | map | All parsed key-value pairs (only populated when `status == "applied"`) |
+| `written` | bool | `true` when at least one parsed key actually mutated the event (respects `overwrite`) |
 | `remainder` | string or `()` | The leftover text that was not parsed; `()` when no remainder |
 | `removed_source` | bool | `true` when the field was deleted after parsing every token |
-| `error` | string or `()` | Human-readable parse failure when `status == "parse_error"`; `()` otherwise |
+| `error` | string or `()` | Human-readable parse failure when `status == "parse_error"` or `"invalid_option"`; `()` otherwise |
 
 **Status guide:**
-- `applied`: At least one key-value pair was merged into the event.
+- `applied`: At least one key-value pair was parsed. Check `written` to see if anything actually changed.
 - `missing_field`: The target field is absent.
 - `not_string`: The field exists but is not a string.
 - `empty`: The field is a string but produced no pairs after trimming (covers whitespace-only and “no pairs” scenarios).
 - `parse_error`: Parser rejected the payload (all-or-nothing formats) and the field was left untouched; `error` contains the message.
+- `invalid_option`: The options map contained an unsupported key. Resilient mode returns the error; `--strict` aborts immediately.
 
 **Note:** `AbsorbResult` is shared across all `absorb_*()` functions (JSON, logfmt, URL params, etc.). For all-or-nothing formats like JSON or URL parameters, `remainder` is always `()`, and `parse_error` includes a descriptive `error` string.
 
@@ -143,8 +151,9 @@ When `keep_source` is `true`, the source field is never modified; use `res.remai
 
 #### 5. Return Result
 
-- Returns `AbsorbResult` so scripts can inspect `status`, `data`, and `remainder`
-- `status == "applied"` when at least one pair was merged
+- Returns `AbsorbResult` so scripts can inspect `status`, `data`, `written`, and `remainder`
+- `status == "applied"` when at least one pair was parsed
+- `written == true` when at least one parsed key was written (helpful when `overwrite: false`)
 - Non-`"applied"` statuses indicate why nothing changed
 
 ### Examples
@@ -163,6 +172,7 @@ let res = e.absorb_kv("msg")
 // res.status == "applied"
 // res.data == #{ order: "1234", gateway: "stripe", duration: "5s" }
 // res.remainder == "Payment timeout"
+// res.written == true
 ```
 
 #### All Tokens Are Pairs
@@ -194,6 +204,7 @@ let res = e.absorb_kv("msg")
 // e.msg = "This is just plain text without any pairs" (unchanged)
 // res.status == "empty"
 // res.data == #{}
+// res.written == false
 ```
 
 #### Custom Separators
@@ -269,9 +280,17 @@ let res = e.absorb_kv("msg", #{ overwrite: false })
 // e.order is still "legacy" (not overwritten)
 // e.duration == "5s" (new field added)
 // res.data == #{ order: "1234", duration: "5s" } (shows all parsed data)
+
+assert(res.written)  // true because at least one new field landed
+
+// All conflicts, nothing written:
+e.msg = "order=999"
+let res2 = e.absorb_kv("msg", #{ overwrite: false })
+assert(res2.status == "applied")
+assert(res2.written == false)
 ```
 
-`res.data` always reports what was parsed, even if `overwrite: false` prevents conflicting keys from being written, so inspect the event map when you need to know which fields actually changed.
+`res.data` always reports what was parsed, even if `overwrite: false` prevents conflicting keys from being written. Use `res.written` to quickly detect whether any mutation happened and only inspect the event map when you need per-field detail.
 
 #### Conditional Logic
 
@@ -327,6 +346,18 @@ e.msg = "   "
 let res2 = e.absorb_kv("msg")
 assert(res2.status == "empty")
 ```
+
+#### Unknown Option
+
+Typos are caught immediately:
+
+```rhai
+let res = e.absorb_kv("msg", #{ keep_sorce: true })
+assert(res.status == "invalid_option")
+assert(res.error == "unknown absorb option: keep_sorce")
+```
+
+In resilient mode you can branch on `res.status`; in `--strict` Kelora stops the pipeline on the same error.
 
 #### Key with Empty Value
 
@@ -518,7 +549,7 @@ The function performs a single pass through the text:
 3. Insertion into event map (O(1) per key)
 4. One join for unparsed tokens
 
-Overall: O(n) where n is the number of tokens.
+Overall: O(n) where n is the number of tokens. `written` is tracked inside the merge loop, so there is no extra pass or allocation.
 
 ## Future Extensions
 
