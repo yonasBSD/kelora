@@ -1,0 +1,11 @@
+Jan 15 10:00:00 INFO Application started on :8080
+Jan 15 10:00:05 INFO Connected to database db-primary
+Jan 15 10:00:12 WARN Slow query detected: 450ms (threshold: 200ms)
+Jan 15 10:00:15 ERROR Payment timeout order=1234 gateway=stripe duration=5s
+Jan 15 10:00:18 INFO Payment retry successful order=1234
+Jan 15 10:00:22 ERROR Gateway unreachable host=stripe.com
+Jan 15 10:00:25 ERROR Rate limit exceeded service=payment-api endpoint=/charge limit=100 window=60s
+Jan 15 10:00:27 WARN Cache miss key=user:5678 fetch_time=120ms
+Jan 15 10:00:28 ERROR Authentication failed user=admin ip=192.168.1.50 reason=invalid_token
+Jan 15 10:00:30 WARN Pool exhausted: 20/20 used, 15 waiting
+Jan 15 10:00:35 INFO Shutting down connections=3
