@@ -1,3 +1,4 @@
+use crate::event::json_to_dynamic;
 use rhai::{Dynamic, Engine, EvalAltResult, ImmutableString, Map};
 use std::cell::Cell;
 use std::collections::HashSet;
@@ -9,6 +10,8 @@ thread_local! {
 pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("absorb_kv", absorb_kv_default);
     engine.register_fn("absorb_kv", absorb_kv_with_options);
+    engine.register_fn("absorb_json", absorb_json_default);
+    engine.register_fn("absorb_json", absorb_json_with_options);
 }
 
 pub fn set_absorb_strict(strict: bool) {
@@ -41,6 +44,18 @@ fn finalize_result(result: AbsorbResult) -> Result<Map, Box<EvalAltResult>> {
     }
 
     Ok(result.into_map())
+}
+
+fn absorb_json_default(event: &mut Map, field: &str) -> Result<Map, Box<EvalAltResult>> {
+    finalize_result(absorb_json_impl(event, field, None))
+}
+
+fn absorb_json_with_options(
+    event: &mut Map,
+    field: &str,
+    options: Map,
+) -> Result<Map, Box<EvalAltResult>> {
+    finalize_result(absorb_json_impl(event, field, Some(&options)))
 }
 
 fn absorb_kv_impl(event: &mut Map, field: &str, options: Option<&Map>) -> AbsorbResult {
@@ -147,6 +162,107 @@ fn absorb_kv_impl(event: &mut Map, field: &str, options: Option<&Map>) -> Absorb
     result
 }
 
+fn absorb_json_impl(event: &mut Map, field: &str, options: Option<&Map>) -> AbsorbResult {
+    let opts = match AbsorbOptions::from_map(options) {
+        Ok(opts) => opts,
+        Err(err) => return AbsorbResult::invalid_option(err),
+    };
+
+    let field_value = match event.get(field) {
+        Some(value) => value.clone(),
+        None => return AbsorbResult::new(AbsorbStatus::MissingField),
+    };
+
+    let immutable = match field_value.try_cast::<ImmutableString>() {
+        Some(value) => value,
+        None => return AbsorbResult::new(AbsorbStatus::NotString),
+    };
+
+    let text = immutable.into_owned();
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        let mut result = AbsorbResult::new(AbsorbStatus::Empty);
+        if !opts.keep_source && event.remove(field).is_some() {
+            result.removed_source = true;
+        }
+        return result;
+    }
+
+    let parsed = match serde_json::from_str::<serde_json::Value>(trimmed) {
+        Ok(value) => value,
+        Err(err) => {
+            return AbsorbResult::parse_error(format!("invalid JSON: {}", err));
+        }
+    };
+
+    let object = match parsed {
+        serde_json::Value::Object(obj) => obj,
+        serde_json::Value::Array(_) => {
+            return AbsorbResult::parse_error(
+                "absorb_json expects a JSON object, got array".to_string(),
+            );
+        }
+        serde_json::Value::String(_) => {
+            return AbsorbResult::parse_error(
+                "absorb_json expects a JSON object, got string".to_string(),
+            );
+        }
+        serde_json::Value::Number(_) => {
+            return AbsorbResult::parse_error(
+                "absorb_json expects a JSON object, got number".to_string(),
+            );
+        }
+        serde_json::Value::Bool(_) => {
+            return AbsorbResult::parse_error(
+                "absorb_json expects a JSON object, got bool".to_string(),
+            );
+        }
+        serde_json::Value::Null => {
+            return AbsorbResult::parse_error(
+                "absorb_json expects a JSON object, got null".to_string(),
+            );
+        }
+    };
+
+    let mut data_map = Map::new();
+    for (key, value) in object {
+        data_map.insert(key.into(), json_to_dynamic(&value));
+    }
+
+    let mut result = AbsorbResult::new(AbsorbStatus::Applied);
+    result.data = data_map.clone();
+
+    let preexisting_keys = if opts.overwrite {
+        None
+    } else {
+        Some(
+            event
+                .keys()
+                .map(|key| key.to_string())
+                .collect::<HashSet<String>>(),
+        )
+    };
+
+    for (key, value) in data_map.iter() {
+        if !opts.overwrite {
+            if let Some(existing) = &preexisting_keys {
+                if existing.contains(key.as_str()) {
+                    continue;
+                }
+            }
+        }
+
+        event.insert(key.clone(), value.clone());
+        result.written = true;
+    }
+
+    if !opts.keep_source && event.remove(field).is_some() {
+        result.removed_source = true;
+    }
+
+    result
+}
+
 fn build_data_map(pairs: &[(String, String)]) -> Map {
     let mut data = Map::new();
     for (key, value) in pairs {
@@ -188,6 +304,17 @@ impl AbsorbResult {
         }
     }
 
+    fn parse_error(message: String) -> Self {
+        Self {
+            status: AbsorbStatus::ParseError,
+            data: Map::new(),
+            written: false,
+            remainder: None,
+            removed_source: false,
+            error: Some(message),
+        }
+    }
+
     fn into_map(self) -> Map {
         let mut map = Map::new();
         map.insert("status".into(), Dynamic::from(self.status.as_str()));
@@ -220,7 +347,6 @@ enum AbsorbStatus {
     MissingField,
     NotString,
     Empty,
-    #[allow(dead_code)]
     ParseError,
     InvalidOption,
 }
@@ -471,5 +597,105 @@ mod tests {
         assert!(result.remainder.is_none());
         assert!(!event.contains_key("msg"));
         assert!(result.removed_source);
+    }
+
+    #[test]
+    fn absorb_json_basic_merge() {
+        set_absorb_strict(false);
+        let mut event = Map::new();
+        event.insert(
+            "payload".into(),
+            map_string(r#"{ "user":"alice", "count": 42 }"#),
+        );
+
+        let result = absorb_json_impl(&mut event, "payload", None);
+        assert_eq!(result.status, AbsorbStatus::Applied);
+        assert!(result.remainder.is_none());
+        assert!(result.removed_source);
+        assert_eq!(event.get("user").unwrap().to_string(), "alice");
+        assert_eq!(event.get("count").unwrap().as_int().unwrap(), 42);
+        assert_eq!(result.data.get("user").unwrap().to_string(), "alice");
+    }
+
+    #[test]
+    fn absorb_json_keep_source_preserves_field() {
+        set_absorb_strict(false);
+        let mut event = Map::new();
+        event.insert(
+            "payload".into(),
+            map_string(r#"  { "status": "ok", "detail": { "code": 200 } }  "#),
+        );
+
+        let mut options = Map::new();
+        options.insert("keep_source".into(), Dynamic::from(true));
+
+        let result = absorb_json_impl(&mut event, "payload", Some(&options));
+        assert_eq!(result.status, AbsorbStatus::Applied);
+        assert_eq!(
+            event.get("payload").unwrap().to_string(),
+            r#"  { "status": "ok", "detail": { "code": 200 } }  "#
+        );
+        let detail = event.get("detail").unwrap().clone().cast::<Map>();
+        assert_eq!(detail.get("code").unwrap().clone().cast::<i64>(), 200);
+        assert!(!result.removed_source);
+    }
+
+    #[test]
+    fn absorb_json_overwrite_false_skips_existing() {
+        set_absorb_strict(false);
+        let mut event = Map::new();
+        event.insert("user".into(), map_string("existing"));
+        event.insert(
+            "payload".into(),
+            map_string(r#"{ "user": "alice", "role": "admin" }"#),
+        );
+
+        let mut options = Map::new();
+        options.insert("overwrite".into(), Dynamic::from(false));
+
+        let result = absorb_json_impl(&mut event, "payload", Some(&options));
+        assert_eq!(result.status, AbsorbStatus::Applied);
+        assert_eq!(event.get("user").unwrap().to_string(), "existing");
+        assert_eq!(event.get("role").unwrap().to_string(), "admin");
+        assert!(result.written); // role inserted
+    }
+
+    #[test]
+    fn absorb_json_invalid_json_sets_parse_error() {
+        set_absorb_strict(false);
+        let mut event = Map::new();
+        event.insert("payload".into(), map_string(r#"{ "user": "alice""#));
+
+        let result = absorb_json_impl(&mut event, "payload", None);
+        assert_eq!(result.status, AbsorbStatus::ParseError);
+        assert!(result.error.as_ref().unwrap().contains("invalid JSON"));
+        assert!(event.contains_key("payload"));
+    }
+
+    #[test]
+    fn absorb_json_non_object_returns_error() {
+        set_absorb_strict(false);
+        let mut event = Map::new();
+        event.insert("payload".into(), map_string(r#"[1, 2, 3]"#));
+
+        let result = absorb_json_impl(&mut event, "payload", None);
+        assert_eq!(result.status, AbsorbStatus::ParseError);
+        assert!(result
+            .error
+            .as_ref()
+            .unwrap()
+            .contains("expects a JSON object"));
+    }
+
+    #[test]
+    fn absorb_json_whitespace_only_removes_field() {
+        set_absorb_strict(false);
+        let mut event = Map::new();
+        event.insert("payload".into(), map_string("   "));
+
+        let result = absorb_json_impl(&mut event, "payload", None);
+        assert_eq!(result.status, AbsorbStatus::Empty);
+        assert!(result.removed_source);
+        assert!(!event.contains_key("payload"));
     }
 }

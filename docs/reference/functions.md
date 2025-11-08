@@ -1267,6 +1267,25 @@ Options:
 
 Unknown option keys set `status = "invalid_option"`; in `--strict` mode this aborts the pipeline.
 
+#### `e.absorb_json(field [, options])`
+Parse a JSON object from a string field, merge its keys into the event, and return the same status map as `absorb_kv()`. On success the source field is deleted unless `keep_source` is true, and `remainder` is always `()`.
+
+```rhai
+let res = e.absorb_json("payload");
+if res.status == "applied" {
+    e.actor = e.actor ?? e.user;      // merged from payload
+} else if res.status == "parse_error" {
+    warn(`bad payload: ${res.error}`);
+}
+```
+
+Options:
+
+- `keep_source`: bool (default `false`) – keep the original JSON string instead of deleting the field.
+- `overwrite`: bool (default `true`) – allow parsed keys to replace existing event fields (`false` skips conflicts).
+
+Other absorb options (like `sep`) are accepted for consistency but ignored. JSON parsing is all-or-nothing: invalid JSON or non-object payloads set `status = "parse_error"` and leave the event untouched.
+
 
 ## Span Context – `--span-close` Only
 
