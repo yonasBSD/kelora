@@ -109,9 +109,10 @@ nav:
       - concepts/configuration-system.md
   - Reference:
       - Overview: reference/index.md
-      - reference/functions.md
       - reference/cli-reference.md
       - reference/formats.md
-      - reference/exit-codes.md
-      - reference/rhai-cheatsheet.md
+      - reference/time-reference.md
+      - reference/functions.md
       - reference/script-variables.md
+      - reference/rhai-cheatsheet.md
+      - reference/exit-codes.md
