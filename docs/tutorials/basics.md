@@ -106,6 +106,51 @@ kelora -j examples/basics.jsonl
 
 ---
 
+## Part 2.5: Understanding Events
+
+Before we dive into display options, let's clarify what an **event** is and how you'll work with it in filters and scripts.
+
+### What is an Event?
+
+After Kelora parses a log line, it becomes an **event** — a structured object (like a map or dictionary) containing fields you can access and manipulate.
+
+Looking at the output above, each block like this is one event:
+
+```
+timestamp='2024-01-15T14:23:45Z' level='INFO' message='Application started'
+    service='api' version='1.2.3'
+```
+
+### The Event Object: `e`
+
+In filter expressions and scripts, you access the current event using the variable **`e`**. Each field becomes a property:
+
+```rhai
+e.timestamp   // Access the timestamp field
+e.level       // Access the level field
+e.service     // Access the service field
+e.message     // Access the message field
+```
+
+**Example:** To filter for ERROR events, you write `--filter 'e.level == "ERROR"'` which means "keep events where the level field equals ERROR."
+
+**Example:** To check if status code is 500 or higher, you write `--filter 'e.status >= 500'` which means "keep events where the status field is 500 or more."
+
+### Why This Matters
+
+Understanding events is crucial because:
+
+- **Filtering** uses event fields: `--filter 'e.service == "database"'`
+- **Scripts** read and modify event fields: `--exec 'e.user_type = "admin"'`
+- **Display options** control which event fields you see: `--keys timestamp,level,message`
+
+You'll encounter `e` throughout the documentation. Remember: `e` = the current event, and `e.field_name` = accessing a field in that event.
+
+!!! tip "Want to learn more?"
+    For complete details on event structure, nested fields, and type handling, see [Events and Fields](../concepts/events-and-fields.md).
+
+---
+
 ## Part 3: Display Modifiers (`-b`, `-c`, `-k`, `-K`)
 
 ### Brief Mode (`-b`) - Values Only
@@ -384,9 +429,21 @@ kelora -j app.log -F none --stats
 
 ## Next Steps
 
-Once you're comfortable with these basics, continue to:
+You've mastered the basics of input, display, and filtering. Now **learn to write scripts** for custom logic:
 
-- **[Working with Time](working-with-time.md)** - Time filtering with `--since` and `--until`
-- **[Advanced Scripting](advanced-scripting.md)** - Custom filters and transformations with Rhai
-- **[Metrics and Tracking](metrics-and-tracking.md)** - Aggregate data with `track_*()` functions
-- **[Parsing Custom Formats](parsing-custom-formats.md)** - Handle non-standard log formats
+### Recommended Next: Introduction to Rhai
+
+**[→ Introduction to Rhai Scripting](intro-to-rhai.md)** (20 min) - Learn to write filter expressions and transforms. You'll understand how to use the `e` object you just learned about, write conditionals, convert types, and build multi-stage pipelines. This is essential before tackling advanced features.
+
+### After That: Specialized Topics
+
+Pick based on your needs:
+
+- **[Working with Time](working-with-time.md)** (15 min) - Parse timestamps, filter by time ranges, handle timezones
+- **[Metrics and Tracking](metrics-and-tracking.md)** (20 min) - Aggregate data with `track_*()` functions
+- **[Parsing Custom Formats](parsing-custom-formats.md)** (15 min) - Handle non-standard log formats
+- **[Advanced Scripting](advanced-scripting.md)** (30 min) - Complex transformations and window operations
+
+### Or Jump to Solutions
+
+**[How-To Guides](../how-to/find-errors-in-logs.md)** - Solve specific problems with ready-made solutions
