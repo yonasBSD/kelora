@@ -7,11 +7,9 @@ Parse messy logs into structured events, then filter, transform, and analyze the
 !!! note "Development Status"
     Pre-1.0 tool generated entirely by AI agents. Validated by a large test suite and Rust security tools; see [Development Approach](#development-approach) and the [Security Policy](https://github.com/dloss/kelora/blob/main/SECURITY.md) before relying on it in production. APIs might change without notice before v1.0.
 
-## What It Does
+## Quick Examples
 
-See what you can do in a few commands:
-
-**Detect problems** - Find errors and performance issues by filtering on structured fields. After parsing, each log line becomes an event (a structured object) that you can filter using expressions like `e.status >= 500` (where `e` is the event). This example shows finding server errors and slow requests in web traffic logs:
+**Detect problems** - Filter server errors and slow requests. Each log line becomes an event (`e`) you can query with expressions like `e.status >= 500`:
 
 === "Command/Output"
 
@@ -26,7 +24,7 @@ See what you can do in a few commands:
     cat examples/traffic_logfmt.log
     ```
 
-**Parse custom formats and extract structured data** - Many logs use custom formats with delimited columns or key-value pairs buried in messages. Kelora's `cols` format lets you describe the structure (like `ts level service *message` for "timestamp, level, service, then the rest as message") instead of writing regex patterns. The `absorb_kv()` function then extracts hidden key-value pairs from the message field into proper structured fields:
+**Parse custom formats and extract structured data** - Describe column structure instead of writing regex, then extract nested key-value pairs:
 
 === "Command/Output"
 
@@ -44,7 +42,7 @@ See what you can do in a few commands:
     cat examples/release_pipe.log
     ```
 
-**Enrich events with recent context** - Sometimes you need to understand an event in relation to what happened recently. Kelora's sliding window feature (`--window 5`) keeps the last N events in memory, accessible in scripts via the `window` array. This example adds error context from recent events to each log line, helping you see patterns and correlations:
+**Enrich events with recent context** - Use sliding windows to add context from recent events:
 
 === "Command/Output"
 
@@ -63,9 +61,32 @@ See what you can do in a few commands:
     cat examples/api_errors.jsonl
     ```
 
-## Works Well With
+## Why Kelora
 
-Kelora thrives in command-line pipelines. Stream logs from kubectl, tail, or journalctl into Kelora, then pipe output to jq, SQLite, qsv, or visualization tools. See [Integrate Kelora with External Tools](how-to/integrate-external-tools.md) for 18 tools and usage patterns.
+Choose Kelora when you need **programmable log processing** in one streaming pipeline—filtering, transforming, and analyzing structured events with embedded scripts.
+
+**Reach for Kelora when:**
+
+- You need multi-stage transformations (parse → filter → enrich → filter)
+- Your logs mix formats or use custom delimiters
+- You want windowed analysis (error bursts, sliding metrics)
+- You're chaining grep + awk + jq + custom scripts
+
+**Use specialized tools for:**
+
+- Simple text search: `grep`/`rg` (50-100× faster)
+- Basic field extraction: `awk` (faster for simple splits)
+- Pure JSON queries: `jq` (ubiquitous, similar speed)
+- Interactive exploration: `lnav` (TUI with SQL)
+- CSV analytics: `qsv`/`miller` (faster for stats)
+
+Kelora trades raw speed for expressiveness. See [Performance Comparisons](concepts/performance-comparisons.md) for benchmarks and the full decision matrix.
+
+## Integrate With
+
+Pipe Kelora's output to: **jq** (JSON transforms) · **lnav** (interactive TUI) · **SQLite/DuckDB** (SQL queries) · **qsv/miller** (CSV analytics) · **rare** (visualizations)
+
+See [Integrate Kelora with External Tools](how-to/integrate-external-tools.md) for 18 tools and usage patterns.
 
 ## Get Started
 
