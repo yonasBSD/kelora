@@ -89,8 +89,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.8.0] - 2025-10-25
 
-_First release with git history available. See earlier versions on [crates.io](https://crates.io/crates/kelora/versions)._
-
 ## [0.7.2] - 2025-10-22
 
 ## [0.7.0] - 2025-10-19
