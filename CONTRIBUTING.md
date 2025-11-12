@@ -12,13 +12,14 @@ The best contribution you can make is sharing interesting log files and formats:
 - Multi-line logs (stack traces, JSON arrays, etc.)
 - Custom application log formats
 - Logs that other tools struggle with
-- Large-scale examples (GBs of compressed logs)
 
 **How to share**: Open an issue with:
 - Sample log lines (anonymized)
 - Brief description of the format
 - What you're trying to extract or analyze
 - Current pain points with existing tools
+
+By contributing log samples you agree they can be used under the MIT License like the rest of the project.
 
 ### 🔹 Use Cases and Scenarios
 
@@ -69,7 +70,7 @@ Helps build a performance picture across different systems.
 
 ### ❌ Code Pull Requests
 
-I'm keeping implementation work in-house as part of the development experiment. Code PRs won't be accepted, but feature requests and bug reports are welcome.
+I'm keeping implementation work in-house as part of the development experiment. Don't expect code PRs to be accepted, but feature requests and bug reports are welcome.
 
 ### ❌ Architectural Debates
 
@@ -83,7 +84,7 @@ The core design decisions (Rust, Rhai, streaming architecture) are settled. I'm 
 
 ## Response Time
 
-This is a spare-time project maintained by one person. Expect responses within a few days to a week. Critical security issues get priority.
+This is a spare-time project maintained by one person. Expect responses within one week to a month. Critical security issues get priority.
 
 ## Code of Conduct
 
