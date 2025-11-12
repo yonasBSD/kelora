@@ -24,7 +24,7 @@ Parse messy logs into structured events, then filter, transform, and analyze the
     cat examples/traffic_logfmt.log
     ```
 
-**Parse custom formats and extract structured data** - Describe column structure instead of writing regex, then extract nested key-value pairs:
+**Parse custom formats and extract structured data** - Name columns by position, with `*message` capturing everything remaining, then extract nested key-value pairs:
 
 === "Command/Output"
 
@@ -42,7 +42,7 @@ Parse messy logs into structured events, then filter, transform, and analyze the
     cat examples/release_pipe.log
     ```
 
-**Enrich events with recent context** - Use sliding windows to add context from recent events:
+**Enrich events with recent context** - Keep recent events in a sliding window to analyze patterns and add context:
 
 === "Command/Output"
 
