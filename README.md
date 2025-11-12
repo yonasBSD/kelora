@@ -27,7 +27,12 @@ Read the full documentation at **[kelora.dev](https://kelora.dev)**:
 
 ## Examples
 
-Browse runnable samples in [`examples/README.md`](examples/README.md#file-categories).
+The [`examples/`](https://github.com/dloss/kelora/tree/main/examples) directory contains 60+ sample log files covering JSON, logfmt, syslog, CSV, and more. Use them to test filters, transformations, and edge cases.
+
+For common patterns and usage recipes, run:
+```bash
+kelora --help-examples
+```
 
 ## Development Approach
 
