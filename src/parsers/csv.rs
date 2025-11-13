@@ -218,22 +218,12 @@ impl CsvParser {
                 if let Some(header) = self.headers.get(i) {
                     // Check if this field has a type annotation
                     let value = if let Some(field_type) = self.type_map.get(header) {
-                        // Apply type conversion
-                        match convert_value_to_type(field, field_type, self.strict) {
-                            Ok(converted) => converted,
-                            Err(e) => {
-                                if self.strict {
-                                    return Err(anyhow::anyhow!(
-                                        "Type conversion failed for field '{}': {}",
-                                        header,
-                                        e
-                                    ));
-                                } else {
-                                    // In resilient mode, fall back to string
-                                    Dynamic::from(field.to_string())
-                                }
-                            }
-                        }
+                        // convert_value_to_type handles strict mode internally:
+                        // - strict=true: returns Err on failure
+                        // - strict=false: returns Ok(string) on failure
+                        convert_value_to_type(field, field_type, self.strict).map_err(|e| {
+                            anyhow::anyhow!("Type conversion failed for field '{}': {}", header, e)
+                        })?
                     } else {
                         // No type annotation, store as string
                         Dynamic::from(field.to_string())

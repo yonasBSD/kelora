@@ -310,11 +310,11 @@ kelora -f 'regex:^(?P<ip>\S+) - - \[(?P<timestamp>[^\]]+)\] "(?P<method>\w+) (?P
 - **Full-line matching:** Pattern implicitly anchored with `^...$`
 - **Empty captures:** Skipped (not stored as fields)
 - **Non-matching lines:**
-    - Default (lenient): Creates event with empty fields
-    - With `--strict`: Error and exit
-- **Type conversion failures:**
-    - Default (lenient): Falls back to string
-    - With `--strict`: Error and exit
+    - Default (lenient): Returns error, line skipped, processing continues
+    - With `--strict`: Returns error, processing halts
+- **Type conversion failures** (e.g., `"abc"` for `:int`):
+    - Default (lenient): Automatically falls back to storing as string
+    - With `--strict`: Returns error, processing halts
 
 **Reserved Field Names:**
 

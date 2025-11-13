@@ -48,15 +48,16 @@ impl RegexParser {
         })
     }
 
-    /// Set strict mode for parsing
+    /// Set strict mode for type conversions
     ///
     /// In strict mode:
-    /// - Lines that don't match the pattern will cause an error
     /// - Type conversion failures will cause an error
     ///
     /// In lenient mode (default):
-    /// - Lines that don't match will create an empty event
     /// - Type conversion failures will fall back to string
+    ///
+    /// Note: Lines that don't match the pattern always return an error,
+    /// regardless of strict mode (handled at pipeline level).
     pub fn with_strict(mut self, strict: bool) -> Self {
         self.strict = strict;
         self
@@ -231,16 +232,11 @@ impl EventParser for RegexParser {
         let captures = match self.regex.captures(line) {
             Some(caps) => caps,
             None => {
-                if self.strict {
-                    return Err(anyhow::anyhow!(
-                        "Line does not match regex pattern '{}': {}",
-                        self.regex.as_str(),
-                        line
-                    ));
-                } else {
-                    // Lenient mode: return event with empty fields
-                    return Ok(Event::default_with_line(line.to_string()));
-                }
+                return Err(anyhow::anyhow!(
+                    "Line does not match regex pattern '{}': {}",
+                    self.regex.as_str(),
+                    line
+                ));
             }
         };
 
@@ -258,22 +254,17 @@ impl EventParser for RegexParser {
 
                 // Apply type conversion if specified
                 let converted_value = if let Some(field_type) = self.type_map.get(name) {
-                    match convert_value_to_type(value_str, field_type, self.strict) {
-                        Ok(val) => val,
-                        Err(err) => {
-                            if self.strict {
-                                return Err(anyhow::anyhow!(
-                                    "Type conversion error for field '{}' (value: '{}'): {}",
-                                    name,
-                                    value_str,
-                                    err
-                                ));
-                            } else {
-                                // Lenient mode already returns string on error
-                                Dynamic::from(value_str.to_string())
-                            }
-                        }
-                    }
+                    // convert_value_to_type handles strict mode internally:
+                    // - strict=true: returns Err on failure
+                    // - strict=false: returns Ok(string) on failure
+                    convert_value_to_type(value_str, field_type, self.strict).map_err(|e| {
+                        anyhow::anyhow!(
+                            "Type conversion error for field '{}' (value: '{}'): {}",
+                            name,
+                            value_str,
+                            e
+                        )
+                    })?
                 } else {
                     // No type annotation, store as string
                     Dynamic::from(value_str.to_string())
@@ -404,11 +395,11 @@ mod tests {
     #[test]
     fn test_non_matching_line_lenient() {
         let parser = RegexParser::new(r"(?P<code:int>\d+)").unwrap();
-        let event = parser.parse("no numbers here").unwrap();
+        let result = parser.parse("no numbers here");
 
-        // Lenient mode: empty fields
-        assert!(event.fields.is_empty());
-        assert_eq!(event.original_line, "no numbers here");
+        // Pattern mismatches always return errors, even in lenient mode
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("does not match"));
     }
 
     #[test]
