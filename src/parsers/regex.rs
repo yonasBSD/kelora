@@ -36,7 +36,9 @@ impl RegexParser {
     pub fn new(pattern: &str) -> Result<Self> {
         let (clean_pattern, type_map) = Self::extract_type_annotations(pattern)?;
 
-        let regex = Regex::new(&clean_pattern)
+        // Add anchors once at construction time to avoid recompilation on every line
+        let anchored_pattern = format!("^{}$", clean_pattern);
+        let regex = Regex::new(&anchored_pattern)
             .with_context(|| format!("Failed to compile regex pattern: {}", pattern))?;
 
         Ok(Self {
@@ -225,16 +227,14 @@ impl RegexParser {
 
 impl EventParser for RegexParser {
     fn parse(&self, line: &str) -> Result<Event> {
-        // Try to match the full line with anchors
-        let full_pattern = format!("^{}$", self.regex.as_str());
-        let full_regex = Regex::new(&full_pattern)?;
-
-        let captures = match full_regex.captures(line) {
+        // Regex is already anchored with ^...$ from constructor
+        let captures = match self.regex.captures(line) {
             Some(caps) => caps,
             None => {
                 if self.strict {
                     return Err(anyhow::anyhow!(
-                        "Line does not match regex pattern: {}",
+                        "Line does not match regex pattern '{}': {}",
+                        self.regex.as_str(),
                         line
                     ));
                 } else {
@@ -263,8 +263,9 @@ impl EventParser for RegexParser {
                         Err(err) => {
                             if self.strict {
                                 return Err(anyhow::anyhow!(
-                                    "Type conversion error for field '{}': {}",
+                                    "Type conversion error for field '{}' (value: '{}'): {}",
                                     name,
+                                    value_str,
                                     err
                                 ));
                             } else {
