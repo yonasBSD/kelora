@@ -99,8 +99,8 @@ kelora -j \
 
 ```bash
 kelora -j \
-    --begin 'conf.start_time = now_utc()' \
-    --end 'let duration = now_utc() - conf.start_time; print("Processed in " + duration + "s")' \
+    --begin 'conf.start_time = now()' \
+    --end 'let duration = now() - conf.start_time; print("Processed in " + duration + "s")' \
     app.log
 ```
 
@@ -636,10 +636,10 @@ kelora -j \
 
 ```bash
 kelora -j \
-    --begin 'conf.threshold = 1000; conf.start = now_utc()' \
+    --begin 'conf.threshold = 1000; conf.start = now()' \
     --exec 'if e.duration_ms > conf.threshold { track_count("slow") }' \
     --exec 'track_count("total")' \
-    --end 'let elapsed = now_utc() - conf.start; print("Processed " + metrics.total + " events in " + elapsed + "s"); print("Slow requests: " + metrics.get("slow", 0))' \
+    --end 'let elapsed = now() - conf.start; print("Processed " + metrics.total + " events in " + elapsed + "s"); print("Slow requests: " + metrics.get("slow", 0))' \
     app.log
 ```
 
@@ -832,9 +832,9 @@ When using `--parallel`, scripting stages behave differently:
 
 ```bash
 kelora -j --parallel \
-    --begin 'conf.start = now_utc()' \
+    --begin 'conf.start = now()' \
     --exec 'track_count(e.service)' \
-    --end 'print("Duration: " + (now_utc() - conf.start))' \
+    --end 'print("Duration: " + (now() - conf.start))' \
     app.log
 ```
 

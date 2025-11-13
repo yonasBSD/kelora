@@ -383,25 +383,25 @@ kelora -j app.log \
 - `>`, `<` - Greater/less than
 - `>=`, `<=` - Greater/less or equal
 
-## Step 13: Current Time Functions
+## Step 13: Current Time Function
 
-Use `now_utc()` and `now_local()` for relative time calculations:
+Use `now()` for relative time calculations:
 
 ```bash
 # Find events in last 5 minutes using script
 kelora -j app.log \
     -e 'let dt = to_datetime(e.timestamp)' \
-    -e 'let cutoff = now_utc() - to_duration("5m")' \
+    -e 'let cutoff = now() - to_duration("5m")' \
     --filter 'dt > cutoff'
 
 # Add processing timestamp
 kelora -j app.log \
-    -e 'e.processed_at = now_utc().to_iso()'
+    -e 'e.processed_at = now().to_iso()'
 
 # Calculate event age
 kelora -j app.log \
     -e 'let dt = to_datetime(e.timestamp)' \
-    -e 'let age = now_utc() - dt' \
+    -e 'let age = now() - dt' \
     -e 'e.age_minutes = age.as_minutes()'
 ```
 
@@ -495,7 +495,7 @@ kelora -f syslog app.log
 kelora -j --since 1h app.log
 
 # Less efficient - filter in script
-kelora -j app.log -e 'let dt = to_datetime(e.timestamp)' --filter 'now_utc() - dt < to_duration("1h")'
+kelora -j app.log -e 'let dt = to_datetime(e.timestamp)' --filter 'now() - dt < to_duration("1h")'
 ```
 
 ### Store Parsed DateTime in Variable

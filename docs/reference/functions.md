@@ -753,7 +753,7 @@ e.rename_field("old_name", "new_name")
 Merge another map into this one.
 
 ```rhai
-e.merge(#{status: "ok", timestamp: now_utc()})
+e.merge(#{status: "ok", timestamp: now()})
 ```
 
 #### `map.flatten([separator [, style]])`
@@ -809,12 +809,11 @@ e.access_log = e.request.to_combined()
 
 ### Creation
 
-#### `now_utc()` / `now_local()`
-Current timestamp.
+#### `now()`
+Current timestamp (UTC).
 
 ```rhai
-e.timestamp = now_utc()
-e.local_time = now_local()
+e.timestamp = now()
 ```
 
 #### `to_datetime(text [, fmt [, tz]])`
@@ -830,7 +829,7 @@ Convert duration string into duration value.
 
 ```rhai
 let timeout = to_duration("5m")
-e.deadline = now_utc() + timeout
+e.deadline = now() + timeout
 ```
 
 #### `duration_from_seconds(n)`, `duration_from_minutes(n)`, etc.
@@ -906,15 +905,15 @@ e.tz = e.timestamp.timezone_name()                    // "UTC"
 Add/subtract duration from datetime.
 
 ```rhai
-e.future = now_utc() + duration_from_hours(1)
-e.past = now_utc() - duration_from_days(7)
+e.future = now() + duration_from_hours(1)
+e.past = now() - duration_from_days(7)
 ```
 
 #### `dt1 - dt2`
 Get duration between datetimes.
 
 ```rhai
-let elapsed = now_utc() - e.start_time
+let elapsed = now() - e.start_time
 e.duration_ms = elapsed.as_milliseconds()
 ```
 

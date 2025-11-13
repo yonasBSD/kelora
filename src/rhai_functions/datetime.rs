@@ -1,4 +1,4 @@
-use chrono::{DateTime, Datelike, Duration, Local, NaiveDateTime, TimeZone, Timelike, Utc};
+use chrono::{DateTime, Datelike, Duration, NaiveDateTime, TimeZone, Timelike, Utc};
 use chrono_tz::Tz;
 use rhai::{Engine, EvalAltResult, Position};
 use std::cell::RefCell;
@@ -17,12 +17,6 @@ impl DateTimeWrapper {
     }
 
     pub fn from_utc(dt: DateTime<Utc>) -> Self {
-        Self {
-            inner: dt.with_timezone(&Tz::UTC),
-        }
-    }
-
-    pub fn from_local(dt: DateTime<Local>) -> Self {
         Self {
             inner: dt.with_timezone(&Tz::UTC),
         }
@@ -353,9 +347,8 @@ pub fn register_functions(engine: &mut Engine) {
 
     engine.register_fn("to_duration", to_duration);
 
-    // Current time helpers
-    engine.register_fn("now_utc", || DateTimeWrapper::from_utc(Utc::now()));
-    engine.register_fn("now_local", || DateTimeWrapper::from_local(Local::now()));
+    // Current time helper
+    engine.register_fn("now", || DateTimeWrapper::from_utc(Utc::now()));
 
     // Duration creation functions
     engine.register_fn("duration_from_seconds", DurationWrapper::from_seconds);

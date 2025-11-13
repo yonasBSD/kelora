@@ -231,8 +231,7 @@ Complete reference for working with dates and times in Rhai scripts.
 | `to_datetime(text)` | Parse ISO 8601 timestamp (auto-format) | `to_datetime("2024-01-15T10:30:00Z")` |
 | `to_datetime(text, fmt)` | Parse with custom format | `to_datetime("2024-01-15 10:30:00", "%Y-%m-%d %H:%M:%S")` |
 | `to_datetime(text, fmt, tz)` | Parse with format and timezone | `to_datetime("2024-01-15 10:30:00", "%Y-%m-%d %H:%M:%S", "America/New_York")` |
-| `now_utc()` | Current time in UTC | `now_utc()` |
-| `now_local()` | Current time in local timezone | `now_local()` |
+| `now()` | Current time (UTC) | `now()` |
 
 ### DateTime Components
 
@@ -411,7 +410,7 @@ if dt.hour() >= 9 && dt.hour() < 17 {
 ```rhai
 // Find events older than 1 hour
 let dt = to_datetime(e.timestamp);
-let age = now_utc() - dt;
+let age = now() - dt;
 if age > to_duration("1h") {
     e.is_old = true;
 }

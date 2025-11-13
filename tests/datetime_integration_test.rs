@@ -112,7 +112,7 @@ fn test_current_time_functions_integration() {
         .arg("json")
         .arg(temp_file.path())
         .arg("--exec")
-        .arg("let now = now_utc(); let year = now.year(); if year >= 2023 { print(\"NOW_MATCH\") }")
+        .arg("let now = now(); let year = now.year(); if year >= 2023 { print(\"NOW_MATCH\") }")
         .output()
         .expect("Failed to run kelora");
 

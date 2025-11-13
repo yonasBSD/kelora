@@ -125,8 +125,7 @@ map.to_syslog()                      Convert map to syslog format string
 map.unflatten([separator])           Reconstruct nested object from flat keys
   
 DATETIME FUNCTIONS:
-now_utc()                            Current UTC timestamp (DateTimeWrapper)
-now_local()                          Current local timestamp (DateTimeWrapper)
+now()                                Current UTC timestamp (DateTimeWrapper)
 to_datetime(text [,fmt [,tz]])       Convert string into DateTimeWrapper with optional hints
 to_duration("1h30m")                 Convert duration string into DurationWrapper
 duration_from_<unit>(n)              Create duration from seconds/minutes/hours/days/ms/ns
