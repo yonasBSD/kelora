@@ -17,7 +17,7 @@ The ability to automatically identify input format by examining file content rat
 A group of log lines processed together in parallel mode. Default batch size is 1000 lines. See `--batch-size` in [CLI Reference](reference/cli-reference.md).
 
 ### Brief Mode
-Display mode that shows only field values without field names. Activated with `-b`. See [Basics Tutorial](tutorials/basics.md#brief-mode-b---values-only).
+Display mode that shows only field values without field names. Activated with `-b`. See [Basics Tutorial](tutorials/basics.md#brief-mode-b-values-only).
 
 ---
 
@@ -27,7 +27,7 @@ Display mode that shows only field values without field names. Activated with `-
 Log lines shown before and/or after a matching event to provide surrounding context. Configured with `-A` (after), `-B` (before), or `-C` (both). Similar to grep's context flags. See [Processing Architecture](concepts/pipeline-model.md#context-lines).
 
 ### Core Fields
-The essential fields displayed with `-c`: timestamp, level, and message. See [Basics Tutorial](tutorials/basics.md#core-fields-c---essentials-only).
+The essential fields displayed with `-c`: timestamp, level, and message. See [Basics Tutorial](tutorials/basics.md#core-fields-c-essentials-only).
 
 ---
 
@@ -76,7 +76,7 @@ The structure and syntax of input log data. Common formats: JSON, logfmt, syslog
 ## L
 
 ### Level
-The severity or importance of a log event. Common levels: DEBUG, INFO, WARN, ERROR, CRITICAL. Can be filtered with `-l` (include) or `-L` (exclude). Case-insensitive. See [Basics Tutorial](tutorials/basics.md#part-4-level-filtering--l--l).
+The severity or importance of a log event. Common levels: DEBUG, INFO, WARN, ERROR, CRITICAL. Can be filtered with `-l` (include) or `-L` (exclude). Case-insensitive. See [Basics Tutorial](tutorials/basics.md#part-4-level-filtering-l-l).
 
 ### Line-Level Processing
 Operations performed on raw string lines before parsing into events. Includes line filtering (`--ignore-lines`, `--keep-lines`), line skipping (`--skip-lines`), and multiline aggregation. See [Processing Architecture](concepts/pipeline-model.md#layer-2-line-level-processing).
