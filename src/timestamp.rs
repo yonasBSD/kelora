@@ -441,6 +441,47 @@ pub fn parse_timestamp_arg_with_timezone(
         .ok_or_else(|| format!("Could not parse timestamp: {}", arg))
 }
 
+/// Parse anchored timestamp expressions like "start+30m", "end-1h"
+/// Requires the corresponding anchor timestamp to be provided
+pub fn parse_anchored_timestamp(
+    arg: &str,
+    start_anchor: Option<DateTime<Utc>>,
+    end_anchor: Option<DateTime<Utc>>,
+    default_timezone: Option<&str>,
+) -> Result<DateTime<Utc>, String> {
+    // Try to parse as anchor reference
+    if let Some(offset_part) = arg.strip_prefix("start+") {
+        let start = start_anchor
+            .ok_or_else(|| "'start' anchor requires --since to be specified".to_string())?;
+        let duration = parse_duration(&format!("+{}", offset_part))?;
+        start
+            .checked_add_signed(duration)
+            .ok_or_else(|| "Anchored timestamp is out of supported range".to_string())
+    } else if let Some(offset_part) = arg.strip_prefix("start-") {
+        let start = start_anchor
+            .ok_or_else(|| "'start' anchor requires --since to be specified".to_string())?;
+        let duration = parse_duration(&format!("-{}", offset_part))?;
+        start
+            .checked_add_signed(duration)
+            .ok_or_else(|| "Anchored timestamp is out of supported range".to_string())
+    } else if let Some(offset_part) = arg.strip_prefix("end+") {
+        let end = end_anchor
+            .ok_or_else(|| "'end' anchor requires --until to be specified".to_string())?;
+        let duration = parse_duration(&format!("+{}", offset_part))?;
+        end.checked_add_signed(duration)
+            .ok_or_else(|| "Anchored timestamp is out of supported range".to_string())
+    } else if let Some(offset_part) = arg.strip_prefix("end-") {
+        let end = end_anchor
+            .ok_or_else(|| "'end' anchor requires --until to be specified".to_string())?;
+        let duration = parse_duration(&format!("-{}", offset_part))?;
+        end.checked_add_signed(duration)
+            .ok_or_else(|| "Anchored timestamp is out of supported range".to_string())
+    } else {
+        // Not an anchored timestamp, parse normally
+        parse_timestamp_arg_with_timezone(arg, default_timezone)
+    }
+}
+
 /// Check if a string looks like a relative time expression (e.g., "1h", "30m", "2d", "1 hour")
 fn looks_like_relative_time(arg: &str) -> bool {
     // Must start with a digit
@@ -480,9 +521,9 @@ fn looks_like_relative_time(arg: &str) -> bool {
     )
 }
 
-/// Parse relative time expressions like "-1h", "+30m", "-2d", "1h", "30m"
-/// Unsigned times default to past (e.g., "1h" means "1 hour ago")
-fn parse_relative_time(arg: &str) -> Result<DateTime<Utc>, String> {
+/// Parse a duration string like "+30m", "-1h", "2d" into a chrono::Duration
+/// Positive values use +, negative values use -, unsigned defaults to negative (past)
+fn parse_duration(arg: &str) -> Result<chrono::Duration, String> {
     let (sign, rest) = if let Some(stripped) = arg.strip_prefix('-') {
         (-1, stripped)
     } else if let Some(stripped) = arg.strip_prefix('+') {
@@ -525,9 +566,14 @@ fn parse_relative_time(arg: &str) -> Result<DateTime<Utc>, String> {
     let total_seconds = signed_num
         .checked_mul(seconds_factor)
         .ok_or_else(|| "Relative time is out of supported range".to_string())?;
-    let duration = chrono::Duration::try_seconds(total_seconds)
-        .ok_or_else(|| "Relative time is out of supported range".to_string())?;
+    chrono::Duration::try_seconds(total_seconds)
+        .ok_or_else(|| "Relative time is out of supported range".to_string())
+}
 
+/// Parse relative time expressions like "-1h", "+30m", "-2d", "1h", "30m"
+/// Unsigned times default to past (e.g., "1h" means "1 hour ago")
+fn parse_relative_time(arg: &str) -> Result<DateTime<Utc>, String> {
+    let duration = parse_duration(arg)?;
     Utc::now()
         .checked_add_signed(duration)
         .ok_or_else(|| "Relative time is out of supported range".to_string())
@@ -883,6 +929,93 @@ mod tests {
     #[test]
     fn test_relative_time_out_of_range_returns_error() {
         assert!(parse_relative_time("111111111111h").is_err());
+    }
+
+    #[test]
+    fn test_parse_duration() {
+        // Test positive durations
+        let duration = parse_duration("+30m").unwrap();
+        assert_eq!(duration.num_minutes(), 30);
+
+        let duration = parse_duration("+1h").unwrap();
+        assert_eq!(duration.num_hours(), 1);
+
+        // Test negative durations
+        let duration = parse_duration("-30m").unwrap();
+        assert_eq!(duration.num_minutes(), -30);
+
+        // Test unsigned (defaults to negative)
+        let duration = parse_duration("1h").unwrap();
+        assert_eq!(duration.num_hours(), -1);
+    }
+
+    #[test]
+    fn test_parse_anchored_timestamp_start_plus() {
+        let base = chrono::Utc.with_ymd_and_hms(2024, 1, 15, 10, 0, 0).unwrap();
+        let result = parse_anchored_timestamp("start+30m", Some(base), None, None).unwrap();
+
+        let expected = chrono::Utc
+            .with_ymd_and_hms(2024, 1, 15, 10, 30, 0)
+            .unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_anchored_timestamp_start_minus() {
+        let base = chrono::Utc.with_ymd_and_hms(2024, 1, 15, 10, 0, 0).unwrap();
+        let result = parse_anchored_timestamp("start-1h", Some(base), None, None).unwrap();
+
+        let expected = chrono::Utc.with_ymd_and_hms(2024, 1, 15, 9, 0, 0).unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_anchored_timestamp_end_plus() {
+        let base = chrono::Utc.with_ymd_and_hms(2024, 1, 15, 11, 0, 0).unwrap();
+        let result = parse_anchored_timestamp("end+1h", None, Some(base), None).unwrap();
+
+        let expected = chrono::Utc.with_ymd_and_hms(2024, 1, 15, 12, 0, 0).unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_anchored_timestamp_end_minus() {
+        let base = chrono::Utc.with_ymd_and_hms(2024, 1, 15, 11, 0, 0).unwrap();
+        let result = parse_anchored_timestamp("end-30m", None, Some(base), None).unwrap();
+
+        let expected = chrono::Utc
+            .with_ymd_and_hms(2024, 1, 15, 10, 30, 0)
+            .unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_parse_anchored_timestamp_missing_anchor() {
+        // start anchor required but not provided
+        let result = parse_anchored_timestamp("start+30m", None, None, None);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .contains("'start' anchor requires --since"));
+
+        // end anchor required but not provided
+        let result = parse_anchored_timestamp("end+30m", None, None, None);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .contains("'end' anchor requires --until"));
+    }
+
+    #[test]
+    fn test_parse_anchored_timestamp_fallback_to_normal() {
+        // Non-anchored timestamps should fall back to normal parsing
+        let result = parse_anchored_timestamp("2024-01-15T10:00:00Z", None, None, None);
+        assert!(result.is_ok());
+
+        let dt = result.unwrap();
+        assert_eq!(dt.year(), 2024);
+        assert_eq!(dt.month(), 1);
+        assert_eq!(dt.day(), 15);
     }
 
     #[test]

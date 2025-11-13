@@ -84,6 +84,30 @@ kelora -j --since yesterday app.log
 - `--since +1h` - Events starting one hour from now
 - `--until +2d` - Events up to two days from now
 
+**Anchored timestamps** (duration windows):
+
+Anchor one boundary to the other to specify durations:
+
+```bash
+# 30 minutes starting at 10:00
+kelora -j --since "10:00" --until "start+30m" app.log
+
+# 1 hour ending at 11:00
+kelora -j --since "end-1h" --until "11:00" app.log
+
+# 2 hours starting from yesterday
+kelora -j --since "yesterday" --until "start+2h" app.log
+
+# 45 minutes starting from a specific timestamp
+kelora -j --since "2024-01-15T10:00:00Z" --until "start+45m" app.log
+```
+
+**Anchor syntax:**
+- `start+DURATION` or `start-DURATION` - relative to `--since` value
+- `end+DURATION` or `end-DURATION` - relative to `--until` value
+
+**Note:** Cannot use both anchors in the same command (e.g., `--since end-1h --until start+1h` will error).
+
 ## Step 3: Custom Timestamp Formats
 
 When your timestamps don't match standard formats, use `--ts-format`:

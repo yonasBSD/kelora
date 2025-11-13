@@ -162,14 +162,46 @@ kelora --ts-format '%Y-%m-%d %H:%M:%S' --input-tz America/New_York app.log
 - `30m` - 30 minutes ago
 - `2d` - 2 days ago
 - `1w` - 1 week ago
+- `+1h` - 1 hour in the future (prefix `+` for future times)
 - Combine: `1h30m` - 1 hour 30 minutes ago
 
 **Absolute Time Formats:**
 - ISO 8601: `2024-01-15T10:30:00Z`
 - RFC3339: `2024-01-15T10:30:00+00:00`
 - Unix timestamps: `1705318200`
+- Date only: `2024-01-15` (assumes 00:00:00)
+- Time only: `10:30:00` (assumes today)
+- Special values: `now`, `today`, `yesterday`, `tomorrow`
 
-**Examples:**
+**Anchored Timestamps:**
+
+Anchor one boundary to the other for duration-based windows:
+
+- `start+DURATION` - Duration after `--since` value
+- `start-DURATION` - Duration before `--since` value
+- `end+DURATION` - Duration after `--until` value
+- `end-DURATION` - Duration before `--until` value
+
+```bash
+# Show 30 minutes starting at 10:00
+kelora --since "10:00" --until "start+30m" app.log
+
+# Show 1 hour ending at 11:00
+kelora --since "end-1h" --until "11:00" app.log
+
+# Show 1 hour starting from 2 hours ago
+kelora --since "-2h" --until "start+1h" app.log
+
+# Show 45 minutes starting at a specific timestamp
+kelora --since "2024-01-15T10:00:00Z" --until "start+45m" app.log
+```
+
+**Important Notes:**
+- `start` anchors to the `--since` value, `end` anchors to the `--until` value
+- Cannot use both anchors in the same command (e.g., `--since end-1h --until start+1h` is an error)
+- The anchor target must be specified (e.g., `--until start+30m` requires `--since` to be set)
+
+**Basic Examples:**
 ```bash
 # Last hour
 kelora -j --since 1h app.log
@@ -182,6 +214,9 @@ kelora -j --since '2024-01-15T10:00:00Z' --until '2024-01-15T11:00:00Z' app.log
 
 # Since absolute time
 kelora -j --since '2024-01-15T10:00:00Z' app.log
+
+# Future events (1 hour from now)
+kelora -j --since +1h app.log
 ```
 
 ### Timestamp Display and Conversion

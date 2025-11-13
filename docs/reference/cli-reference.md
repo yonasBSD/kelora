@@ -538,14 +538,20 @@ Include events from this time onward. Accepts journalctl-style timestamps.
 
 **Formats:**
 
-- Absolute: `2024-01-15T12:00:00Z`, `2024-01-15 12:00`
-- Relative: `1h`, `-30m`, `yesterday`
+- Absolute: `2024-01-15T12:00:00Z`, `2024-01-15 12:00`, `10:30:00`
+- Relative: `1h`, `-30m`, `yesterday`, `now`, `today`
+- Anchored: `end+1h`, `end-30m` (relative to `--until` value)
 
 ```bash
 kelora -j --since '1 hour ago' app.log
 kelora -j --since yesterday app.log
 kelora -j --since 2024-01-15T10:00:00Z app.log
+
+# Duration before end time
+kelora -j --since "end-1h" --until "11:00" app.log
 ```
+
+**See Also:** [Time Reference](time-reference.md#time-range-filtering) for complete timestamp syntax.
 
 #### `--until <TIME>`
 
@@ -553,14 +559,37 @@ Include events until this time. Accepts journalctl-style timestamps.
 
 **Formats:**
 
-- Absolute: `2024-01-15T12:00:00Z`, `2024-01-15 12:00`
-- Relative: `1h`, `+30m`, `tomorrow`
+- Absolute: `2024-01-15T12:00:00Z`, `2024-01-15 12:00`, `18:00:00`
+- Relative: `1h`, `+30m`, `tomorrow`, `now`
+- Anchored: `start+30m`, `start-1h` (relative to `--since` value)
 
 ```bash
 kelora -j --until '30 minutes ago' app.log
 kelora -j --until tomorrow app.log
 kelora -j --until 2024-01-15T18:00:00Z app.log
+
+# Duration after start time
+kelora -j --since "10:00" --until "start+30m" app.log
 ```
+
+**Anchored Timestamp Examples:**
+
+Anchor one boundary to the other for duration-based windows:
+
+```bash
+# 30 minutes starting at 10:00
+kelora --since "10:00" --until "start+30m" app.log
+
+# 1 hour ending at 11:00
+kelora --since "end-1h" --until "11:00" app.log
+
+# 2 hours starting from yesterday
+kelora --since "yesterday" --until "start+2h" app.log
+```
+
+**Important:** Cannot use both anchors in the same command (e.g., `--since end-1h --until start+1h` is an error).
+
+**See Also:** [Time Reference](time-reference.md#time-range-filtering) for complete timestamp syntax.
 
 ### Output Limiting
 

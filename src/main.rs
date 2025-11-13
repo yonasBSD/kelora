@@ -1090,38 +1090,147 @@ fn main() -> Result<()> {
         // Use the same timezone logic as the main configuration
         let cli_timezone = config.input.default_timezone.as_deref();
 
-        let since = if let Some(ref since_str) = cli.since {
-            match crate::timestamp::parse_timestamp_arg_with_timezone(since_str, cli_timezone) {
-                Ok(dt) => Some(dt),
-                Err(e) => {
-                    stderr
-                        .writeln(&config.format_error_message(&format!(
-                            "Invalid --since timestamp '{}': {}",
-                            since_str, e
-                        )))
-                        .unwrap_or(());
-                    ExitCode::InvalidUsage.exit();
-                }
-            }
-        } else {
-            None
-        };
+        // Check for anchor dependencies
+        let since_uses_end_anchor = cli
+            .since
+            .as_ref()
+            .is_some_and(|s| s.starts_with("end+") || s.starts_with("end-"));
+        let until_uses_start_anchor = cli
+            .until
+            .as_ref()
+            .is_some_and(|u| u.starts_with("start+") || u.starts_with("start-"));
 
-        let until = if let Some(ref until_str) = cli.until {
-            match crate::timestamp::parse_timestamp_arg_with_timezone(until_str, cli_timezone) {
-                Ok(dt) => Some(dt),
-                Err(e) => {
-                    stderr
-                        .writeln(&config.format_error_message(&format!(
-                            "Invalid --until timestamp '{}': {}",
-                            until_str, e
-                        )))
-                        .unwrap_or(());
-                    ExitCode::InvalidUsage.exit();
+        // Detect circular dependency
+        if since_uses_end_anchor && until_uses_start_anchor {
+            stderr
+                .writeln(&config.format_error_message(
+                    "Cannot use both 'start' and 'end' anchors: --since uses 'end' anchor and --until uses 'start' anchor"
+                ))
+                .unwrap_or(());
+            ExitCode::InvalidUsage.exit();
+        }
+
+        let (since, until) = if until_uses_start_anchor {
+            // Parse --since first, then use it as anchor for --until
+            let since = if let Some(ref since_str) = cli.since {
+                match crate::timestamp::parse_timestamp_arg_with_timezone(since_str, cli_timezone) {
+                    Ok(dt) => Some(dt),
+                    Err(e) => {
+                        stderr
+                            .writeln(&config.format_error_message(&format!(
+                                "Invalid --since timestamp '{}': {}",
+                                since_str, e
+                            )))
+                            .unwrap_or(());
+                        ExitCode::InvalidUsage.exit();
+                    }
                 }
-            }
+            } else {
+                None
+            };
+
+            let until = if let Some(ref until_str) = cli.until {
+                match crate::timestamp::parse_anchored_timestamp(
+                    until_str,
+                    since,
+                    None,
+                    cli_timezone,
+                ) {
+                    Ok(dt) => Some(dt),
+                    Err(e) => {
+                        stderr
+                            .writeln(&config.format_error_message(&format!(
+                                "Invalid --until timestamp '{}': {}",
+                                until_str, e
+                            )))
+                            .unwrap_or(());
+                        ExitCode::InvalidUsage.exit();
+                    }
+                }
+            } else {
+                None
+            };
+
+            (since, until)
+        } else if since_uses_end_anchor {
+            // Parse --until first, then use it as anchor for --since
+            let until = if let Some(ref until_str) = cli.until {
+                match crate::timestamp::parse_timestamp_arg_with_timezone(until_str, cli_timezone) {
+                    Ok(dt) => Some(dt),
+                    Err(e) => {
+                        stderr
+                            .writeln(&config.format_error_message(&format!(
+                                "Invalid --until timestamp '{}': {}",
+                                until_str, e
+                            )))
+                            .unwrap_or(());
+                        ExitCode::InvalidUsage.exit();
+                    }
+                }
+            } else {
+                None
+            };
+
+            let since = if let Some(ref since_str) = cli.since {
+                match crate::timestamp::parse_anchored_timestamp(
+                    since_str,
+                    None,
+                    until,
+                    cli_timezone,
+                ) {
+                    Ok(dt) => Some(dt),
+                    Err(e) => {
+                        stderr
+                            .writeln(&config.format_error_message(&format!(
+                                "Invalid --since timestamp '{}': {}",
+                                since_str, e
+                            )))
+                            .unwrap_or(());
+                        ExitCode::InvalidUsage.exit();
+                    }
+                }
+            } else {
+                None
+            };
+
+            (since, until)
         } else {
-            None
+            // No anchors, parse independently (current behavior)
+            let since = if let Some(ref since_str) = cli.since {
+                match crate::timestamp::parse_timestamp_arg_with_timezone(since_str, cli_timezone) {
+                    Ok(dt) => Some(dt),
+                    Err(e) => {
+                        stderr
+                            .writeln(&config.format_error_message(&format!(
+                                "Invalid --since timestamp '{}': {}",
+                                since_str, e
+                            )))
+                            .unwrap_or(());
+                        ExitCode::InvalidUsage.exit();
+                    }
+                }
+            } else {
+                None
+            };
+
+            let until = if let Some(ref until_str) = cli.until {
+                match crate::timestamp::parse_timestamp_arg_with_timezone(until_str, cli_timezone) {
+                    Ok(dt) => Some(dt),
+                    Err(e) => {
+                        stderr
+                            .writeln(&config.format_error_message(&format!(
+                                "Invalid --until timestamp '{}': {}",
+                                until_str, e
+                            )))
+                            .unwrap_or(());
+                        ExitCode::InvalidUsage.exit();
+                    }
+                }
+            } else {
+                None
+            };
+
+            (since, until)
         };
 
         config.processing.timestamp_filter = Some(TimestampFilterConfig { since, until });
@@ -1835,6 +1944,14 @@ Timestamp filtering with --since and --until:
   kelora --until "yesterday" app.log              # Events before yesterday
   kelora --since 1h app.log                       # Last hour (1h, 30m, 2d, etc.)
   kelora --since +1h app.log                      # Future events (+ means ahead)
+
+  Anchored timestamps (relative to the other boundary):
+  kelora --since 10:00 --until start+30m app.log  # 30 minutes starting at 10:00
+  kelora --since end-1h --until 11:00 app.log     # 1 hour ending at 11:00
+  kelora --since -2h --until start+1h app.log     # 1 hour starting 2 hours ago
+
+  'start' anchors to --since, 'end' anchors to --until
+  Cannot use both anchors in the same command (e.g., --since end-1h --until start+1h)
 
   Common timestamp field names are auto-detected: ts, timestamp, time, @timestamp
   Events without valid timestamps are filtered out in resilient mode (default)

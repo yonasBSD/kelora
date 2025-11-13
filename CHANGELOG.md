@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Anchored timestamp syntax for `--since` and `--until`:**
+  - `start+DURATION` and `start-DURATION` - anchor to `--since` value
+  - `end+DURATION` and `end-DURATION` - anchor to `--until` value
+  - Examples: `--since "10:00" --until "start+30m"` (30 minutes starting at 10:00)
+  - Enables duration-based time windows without manual calculation
 - **New Rhai functions:**
   - `absorb_kv()` - Extract key-value pairs from unstructured text with format preservation
   - `absorb_json()` - Parse JSON embedded in text fields
@@ -16,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Rewritten quickstart showcasing custom format parsing
   - Improved tutorial structure and examples
   - Time reference documentation
+  - Anchored timestamp syntax examples and reference
 
 ### Changed
 
