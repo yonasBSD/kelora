@@ -2973,3 +2973,557 @@ impl ParallelProcessor {
         Ok((final_reader, pipeline_builder, preprocessing_count))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rhai::{Dynamic, Map};
+    use std::collections::HashMap;
+
+    // Helper function to create a tracker operation metadata entry
+    fn make_op(operation: &str) -> Dynamic {
+        Dynamic::from(operation.to_string())
+    }
+
+    // Helper function to create an integer Dynamic
+    fn make_int(value: i64) -> Dynamic {
+        Dynamic::from(value)
+    }
+
+    // Helper function to create a float Dynamic
+    fn make_float(value: f64) -> Dynamic {
+        Dynamic::from(value)
+    }
+
+    // Helper function to create an array Dynamic
+    fn make_array(values: Vec<Dynamic>) -> Dynamic {
+        Dynamic::from(values)
+    }
+
+    // Helper function to create a map Dynamic
+    fn make_map(entries: Vec<(&str, i64)>) -> Dynamic {
+        let mut map = Map::new();
+        for (key, value) in entries {
+            map.insert(key.into(), Dynamic::from(value));
+        }
+        Dynamic::from(map)
+    }
+
+    #[test]
+    fn test_global_tracker_new() {
+        let tracker = GlobalTracker::new();
+        // Should be able to create a new tracker without panicking
+        assert!(tracker.user_tracked.lock().unwrap().is_empty());
+        assert!(tracker.internal_tracked.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_merge_worker_state_empty() {
+        let tracker = GlobalTracker::new();
+        let user_state = HashMap::new();
+        let internal_state = HashMap::new();
+
+        let result = tracker.merge_worker_state(user_state, internal_state);
+        assert!(result.is_ok());
+
+        assert!(tracker.user_tracked.lock().unwrap().is_empty());
+        assert!(tracker.internal_tracked.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_merge_worker_state_count_operation() {
+        let tracker = GlobalTracker::new();
+
+        // First worker: count = 5
+        let mut worker1_user = HashMap::new();
+        worker1_user.insert("requests".to_string(), make_int(5));
+        worker1_user.insert("__op_requests".to_string(), make_op("count"));
+        tracker
+            .merge_worker_state(worker1_user, HashMap::new())
+            .unwrap();
+
+        // Verify first merge
+        {
+            let global = tracker.user_tracked.lock().unwrap();
+            assert_eq!(global.get("requests").unwrap().as_int().unwrap(), 5);
+        }
+
+        // Second worker: count = 3
+        let mut worker2_user = HashMap::new();
+        worker2_user.insert("requests".to_string(), make_int(3));
+        worker2_user.insert("__op_requests".to_string(), make_op("count"));
+        tracker
+            .merge_worker_state(worker2_user, HashMap::new())
+            .unwrap();
+
+        // Verify counts are added: 5 + 3 = 8
+        let global = tracker.user_tracked.lock().unwrap();
+        assert_eq!(global.get("requests").unwrap().as_int().unwrap(), 8);
+    }
+
+    #[test]
+    fn test_merge_worker_state_count_with_floats() {
+        let tracker = GlobalTracker::new();
+
+        // First worker: count = 5.5
+        let mut worker1_user = HashMap::new();
+        worker1_user.insert("metric".to_string(), make_float(5.5));
+        worker1_user.insert("__op_metric".to_string(), make_op("count"));
+        tracker
+            .merge_worker_state(worker1_user, HashMap::new())
+            .unwrap();
+
+        // Second worker: count = 3.2
+        let mut worker2_user = HashMap::new();
+        worker2_user.insert("metric".to_string(), make_float(3.2));
+        worker2_user.insert("__op_metric".to_string(), make_op("count"));
+        tracker
+            .merge_worker_state(worker2_user, HashMap::new())
+            .unwrap();
+
+        // Verify counts are added: 5.5 + 3.2 = 8.7
+        let global = tracker.user_tracked.lock().unwrap();
+        let result = global.get("metric").unwrap().as_float().unwrap();
+        assert!((result - 8.7).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_merge_worker_state_sum_operation() {
+        let tracker = GlobalTracker::new();
+
+        // First worker: sum = 100
+        let mut worker1_user = HashMap::new();
+        worker1_user.insert("total_bytes".to_string(), make_int(100));
+        worker1_user.insert("__op_total_bytes".to_string(), make_op("sum"));
+        tracker
+            .merge_worker_state(worker1_user, HashMap::new())
+            .unwrap();
+
+        // Second worker: sum = 250
+        let mut worker2_user = HashMap::new();
+        worker2_user.insert("total_bytes".to_string(), make_int(250));
+        worker2_user.insert("__op_total_bytes".to_string(), make_op("sum"));
+        tracker
+            .merge_worker_state(worker2_user, HashMap::new())
+            .unwrap();
+
+        // Verify sums are added: 100 + 250 = 350
+        let global = tracker.user_tracked.lock().unwrap();
+        assert_eq!(global.get("total_bytes").unwrap().as_int().unwrap(), 350);
+    }
+
+    #[test]
+    fn test_merge_worker_state_min_operation() {
+        let tracker = GlobalTracker::new();
+
+        // First worker: min = 50
+        let mut worker1_user = HashMap::new();
+        worker1_user.insert("min_latency".to_string(), make_int(50));
+        worker1_user.insert("__op_min_latency".to_string(), make_op("min"));
+        tracker
+            .merge_worker_state(worker1_user, HashMap::new())
+            .unwrap();
+
+        // Second worker: min = 30 (should win)
+        let mut worker2_user = HashMap::new();
+        worker2_user.insert("min_latency".to_string(), make_int(30));
+        worker2_user.insert("__op_min_latency".to_string(), make_op("min"));
+        tracker
+            .merge_worker_state(worker2_user, HashMap::new())
+            .unwrap();
+
+        // Third worker: min = 70 (should not win)
+        let mut worker3_user = HashMap::new();
+        worker3_user.insert("min_latency".to_string(), make_int(70));
+        worker3_user.insert("__op_min_latency".to_string(), make_op("min"));
+        tracker
+            .merge_worker_state(worker3_user, HashMap::new())
+            .unwrap();
+
+        // Verify minimum is 30
+        let global = tracker.user_tracked.lock().unwrap();
+        assert_eq!(global.get("min_latency").unwrap().as_int().unwrap(), 30);
+    }
+
+    #[test]
+    fn test_merge_worker_state_max_operation() {
+        let tracker = GlobalTracker::new();
+
+        // First worker: max = 50
+        let mut worker1_user = HashMap::new();
+        worker1_user.insert("max_latency".to_string(), make_int(50));
+        worker1_user.insert("__op_max_latency".to_string(), make_op("max"));
+        tracker
+            .merge_worker_state(worker1_user, HashMap::new())
+            .unwrap();
+
+        // Second worker: max = 30 (should not win)
+        let mut worker2_user = HashMap::new();
+        worker2_user.insert("max_latency".to_string(), make_int(30));
+        worker2_user.insert("__op_max_latency".to_string(), make_op("max"));
+        tracker
+            .merge_worker_state(worker2_user, HashMap::new())
+            .unwrap();
+
+        // Third worker: max = 90 (should win)
+        let mut worker3_user = HashMap::new();
+        worker3_user.insert("max_latency".to_string(), make_int(90));
+        worker3_user.insert("__op_max_latency".to_string(), make_op("max"));
+        tracker
+            .merge_worker_state(worker3_user, HashMap::new())
+            .unwrap();
+
+        // Verify maximum is 90
+        let global = tracker.user_tracked.lock().unwrap();
+        assert_eq!(global.get("max_latency").unwrap().as_int().unwrap(), 90);
+    }
+
+    #[test]
+    fn test_merge_worker_state_unique_operation() {
+        let tracker = GlobalTracker::new();
+
+        // First worker: unique = ["user1", "user2"]
+        let mut worker1_user = HashMap::new();
+        worker1_user.insert(
+            "unique_users".to_string(),
+            make_array(vec![
+                Dynamic::from("user1".to_string()),
+                Dynamic::from("user2".to_string()),
+            ]),
+        );
+        worker1_user.insert("__op_unique_users".to_string(), make_op("unique"));
+        tracker
+            .merge_worker_state(worker1_user, HashMap::new())
+            .unwrap();
+
+        // Second worker: unique = ["user2", "user3"] (user2 is duplicate)
+        let mut worker2_user = HashMap::new();
+        worker2_user.insert(
+            "unique_users".to_string(),
+            make_array(vec![
+                Dynamic::from("user2".to_string()),
+                Dynamic::from("user3".to_string()),
+            ]),
+        );
+        worker2_user.insert("__op_unique_users".to_string(), make_op("unique"));
+        tracker
+            .merge_worker_state(worker2_user, HashMap::new())
+            .unwrap();
+
+        // Verify unique values: ["user1", "user2", "user3"]
+        let global = tracker.user_tracked.lock().unwrap();
+        let result = global
+            .get("unique_users")
+            .unwrap()
+            .clone()
+            .into_array()
+            .unwrap();
+        assert_eq!(result.len(), 3);
+        let strings: Vec<String> = result.iter().map(|v| v.to_string()).collect();
+        assert!(strings.contains(&"user1".to_string()));
+        assert!(strings.contains(&"user2".to_string()));
+        assert!(strings.contains(&"user3".to_string()));
+    }
+
+    #[test]
+    fn test_merge_worker_state_bucket_operation() {
+        let tracker = GlobalTracker::new();
+
+        // First worker: bucket = {"200": 5, "404": 2}
+        let mut worker1_user = HashMap::new();
+        worker1_user.insert(
+            "status_codes".to_string(),
+            make_map(vec![("200", 5), ("404", 2)]),
+        );
+        worker1_user.insert("__op_status_codes".to_string(), make_op("bucket"));
+        tracker
+            .merge_worker_state(worker1_user, HashMap::new())
+            .unwrap();
+
+        // Second worker: bucket = {"200": 3, "500": 1} (200 is duplicate)
+        let mut worker2_user = HashMap::new();
+        worker2_user.insert(
+            "status_codes".to_string(),
+            make_map(vec![("200", 3), ("500", 1)]),
+        );
+        worker2_user.insert("__op_status_codes".to_string(), make_op("bucket"));
+        tracker
+            .merge_worker_state(worker2_user, HashMap::new())
+            .unwrap();
+
+        // Verify buckets are merged: {"200": 8, "404": 2, "500": 1}
+        let global = tracker.user_tracked.lock().unwrap();
+        let result = global
+            .get("status_codes")
+            .unwrap()
+            .clone()
+            .try_cast::<Map>()
+            .unwrap();
+        assert_eq!(result.get("200").unwrap().as_int().unwrap(), 8);
+        assert_eq!(result.get("404").unwrap().as_int().unwrap(), 2);
+        assert_eq!(result.get("500").unwrap().as_int().unwrap(), 1);
+    }
+
+    #[test]
+    fn test_merge_worker_state_error_examples_operation() {
+        let tracker = GlobalTracker::new();
+
+        // First worker: error_examples = ["error1", "error2"]
+        let mut worker1_internal = HashMap::new();
+        worker1_internal.insert(
+            "__errors".to_string(),
+            make_array(vec![
+                Dynamic::from("error1".to_string()),
+                Dynamic::from("error2".to_string()),
+            ]),
+        );
+        worker1_internal.insert("__op___errors".to_string(), make_op("error_examples"));
+        tracker
+            .merge_worker_state(HashMap::new(), worker1_internal)
+            .unwrap();
+
+        // Second worker: error_examples = ["error3", "error4"]
+        // Should merge but limit to 3 total
+        let mut worker2_internal = HashMap::new();
+        worker2_internal.insert(
+            "__errors".to_string(),
+            make_array(vec![
+                Dynamic::from("error3".to_string()),
+                Dynamic::from("error4".to_string()),
+            ]),
+        );
+        worker2_internal.insert("__op___errors".to_string(), make_op("error_examples"));
+        tracker
+            .merge_worker_state(HashMap::new(), worker2_internal)
+            .unwrap();
+
+        // Verify error examples are limited to 3
+        let global = tracker.internal_tracked.lock().unwrap();
+        let result = global
+            .get("__errors")
+            .unwrap()
+            .clone()
+            .into_array()
+            .unwrap();
+        assert!(result.len() <= 3);
+    }
+
+    #[test]
+    fn test_merge_worker_state_replace_operation() {
+        let tracker = GlobalTracker::new();
+
+        // First worker: value = "first"
+        let mut worker1_user = HashMap::new();
+        worker1_user.insert("last_seen".to_string(), Dynamic::from("first".to_string()));
+        worker1_user.insert("__op_last_seen".to_string(), make_op("replace"));
+        tracker
+            .merge_worker_state(worker1_user, HashMap::new())
+            .unwrap();
+
+        // Second worker: value = "second" (should replace)
+        let mut worker2_user = HashMap::new();
+        worker2_user.insert("last_seen".to_string(), Dynamic::from("second".to_string()));
+        worker2_user.insert("__op_last_seen".to_string(), make_op("replace"));
+        tracker
+            .merge_worker_state(worker2_user, HashMap::new())
+            .unwrap();
+
+        // Verify value is replaced
+        let global = tracker.user_tracked.lock().unwrap();
+        assert_eq!(
+            global.get("last_seen").unwrap().to_string(),
+            "second".to_string()
+        );
+    }
+
+    #[test]
+    fn test_merge_worker_state_no_operation_metadata() {
+        let tracker = GlobalTracker::new();
+
+        // Worker without operation metadata (should default to replace)
+        let mut worker1_user = HashMap::new();
+        worker1_user.insert("value".to_string(), make_int(42));
+        tracker
+            .merge_worker_state(worker1_user, HashMap::new())
+            .unwrap();
+
+        // Second worker
+        let mut worker2_user = HashMap::new();
+        worker2_user.insert("value".to_string(), make_int(99));
+        tracker
+            .merge_worker_state(worker2_user, HashMap::new())
+            .unwrap();
+
+        // Verify last value wins (replace behavior)
+        let global = tracker.user_tracked.lock().unwrap();
+        assert_eq!(global.get("value").unwrap().as_int().unwrap(), 99);
+    }
+
+    #[test]
+    fn test_merge_worker_stats_basic() {
+        let tracker = GlobalTracker::new();
+
+        let worker1_stats = ProcessingStats {
+            lines_errors: 5,
+            errors: 5,
+            files_processed: 2,
+            script_executions: 100,
+            ..Default::default()
+        };
+
+        tracker.merge_worker_stats(&worker1_stats).unwrap();
+
+        let global = tracker.processing_stats.lock().unwrap();
+        assert_eq!(global.lines_errors, 5);
+        assert_eq!(global.errors, 5);
+        assert_eq!(global.files_processed, 2);
+        assert_eq!(global.script_executions, 100);
+    }
+
+    #[test]
+    fn test_merge_worker_stats_multiple_workers() {
+        let tracker = GlobalTracker::new();
+
+        let worker1_stats = ProcessingStats {
+            lines_errors: 3,
+            files_processed: 1,
+            script_executions: 50,
+            ..Default::default()
+        };
+        tracker.merge_worker_stats(&worker1_stats).unwrap();
+
+        let worker2_stats = ProcessingStats {
+            lines_errors: 2,
+            files_processed: 1,
+            script_executions: 75,
+            ..Default::default()
+        };
+        tracker.merge_worker_stats(&worker2_stats).unwrap();
+
+        let global = tracker.processing_stats.lock().unwrap();
+        assert_eq!(global.lines_errors, 5); // 3 + 2
+        assert_eq!(global.files_processed, 2); // 1 + 1
+        assert_eq!(global.script_executions, 125); // 50 + 75
+    }
+
+    #[test]
+    fn test_merge_worker_stats_timestamp_fields() {
+        let tracker = GlobalTracker::new();
+
+        let worker1_stats = ProcessingStats {
+            timestamp_detected_events: 10,
+            timestamp_parsed_events: 8,
+            timestamp_absent_events: 2,
+            ..Default::default()
+        };
+        tracker.merge_worker_stats(&worker1_stats).unwrap();
+
+        let worker2_stats = ProcessingStats {
+            timestamp_detected_events: 15,
+            timestamp_parsed_events: 12,
+            timestamp_absent_events: 3,
+            ..Default::default()
+        };
+        tracker.merge_worker_stats(&worker2_stats).unwrap();
+
+        let global = tracker.processing_stats.lock().unwrap();
+        assert_eq!(global.timestamp_detected_events, 25); // 10 + 15
+        assert_eq!(global.timestamp_parsed_events, 20); // 8 + 12
+        assert_eq!(global.timestamp_absent_events, 5); // 2 + 3
+    }
+
+    #[test]
+    fn test_merge_worker_stats_lines_read_not_merged() {
+        let tracker = GlobalTracker::new();
+
+        let worker1_stats = ProcessingStats {
+            lines_read: 100, // This should NOT be merged
+            lines_errors: 5,
+            ..Default::default()
+        };
+        tracker.merge_worker_stats(&worker1_stats).unwrap();
+
+        let worker2_stats = ProcessingStats {
+            lines_read: 200, // This should NOT be merged
+            lines_errors: 3,
+            ..Default::default()
+        };
+        tracker.merge_worker_stats(&worker2_stats).unwrap();
+
+        let global = tracker.processing_stats.lock().unwrap();
+        // lines_read should not be merged (remains at default 0)
+        assert_eq!(global.lines_read, 0);
+        // But other stats should be merged
+        assert_eq!(global.lines_errors, 8); // 5 + 3
+    }
+
+    #[test]
+    fn test_parallel_config_default() {
+        let config = ParallelConfig::default();
+        assert!(config.num_workers > 0);
+        assert!(config.batch_size > 0);
+        assert!(config.batch_timeout_ms > 0);
+    }
+
+    #[test]
+    fn test_global_tracker_multiple_keys() {
+        let tracker = GlobalTracker::new();
+
+        // Worker with multiple tracked values
+        let mut worker1_user = HashMap::new();
+        worker1_user.insert("count1".to_string(), make_int(10));
+        worker1_user.insert("__op_count1".to_string(), make_op("count"));
+        worker1_user.insert("count2".to_string(), make_int(20));
+        worker1_user.insert("__op_count2".to_string(), make_op("count"));
+        worker1_user.insert("max_value".to_string(), make_int(100));
+        worker1_user.insert("__op_max_value".to_string(), make_op("max"));
+
+        tracker
+            .merge_worker_state(worker1_user, HashMap::new())
+            .unwrap();
+
+        // Verify all values are tracked
+        let global = tracker.user_tracked.lock().unwrap();
+        assert_eq!(global.get("count1").unwrap().as_int().unwrap(), 10);
+        assert_eq!(global.get("count2").unwrap().as_int().unwrap(), 20);
+        assert_eq!(global.get("max_value").unwrap().as_int().unwrap(), 100);
+    }
+
+    #[test]
+    fn test_merge_worker_state_internal_metadata_copied() {
+        let tracker = GlobalTracker::new();
+
+        // Internal state should copy metadata
+        let mut worker1_internal = HashMap::new();
+        worker1_internal.insert("__errors".to_string(), make_array(vec![]));
+        worker1_internal.insert("__op___errors".to_string(), make_op("error_examples"));
+
+        tracker
+            .merge_worker_state(HashMap::new(), worker1_internal)
+            .unwrap();
+
+        let global = tracker.internal_tracked.lock().unwrap();
+        // Metadata should be copied for internal state
+        assert!(global.contains_key("__op___errors"));
+    }
+
+    #[test]
+    fn test_merge_worker_state_user_metadata_not_copied() {
+        let tracker = GlobalTracker::new();
+
+        // User state should NOT copy metadata (it's looked up from worker state)
+        let mut worker1_user = HashMap::new();
+        worker1_user.insert("count".to_string(), make_int(5));
+        worker1_user.insert("__op_count".to_string(), make_op("count"));
+
+        tracker
+            .merge_worker_state(worker1_user, HashMap::new())
+            .unwrap();
+
+        let global = tracker.user_tracked.lock().unwrap();
+        // Metadata should NOT be in global user state
+        assert!(!global.contains_key("__op_count"));
+        // But the value should be there
+        assert!(global.contains_key("count"));
+    }
+}
