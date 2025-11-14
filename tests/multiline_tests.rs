@@ -163,3 +163,218 @@ Log 3"#;
     );
     assert!(stderr.contains("1 output"), "Should output exactly 1 event");
 }
+
+#[test]
+fn test_multiline_indent_with_filters_and_stats() {
+    let input = r#"ERROR connection failed
+    at module.rs:42
+    caused by network reset
+WARN degraded performance
+    while contacting replica
+INFO recovered cleanly
+"#;
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "line",
+            "-M",
+            "indent",
+            "-F",
+            "json",
+            "--stats",
+            "--filter",
+            "e.line.contains(\"ERROR\") || e.line.contains(\"WARN\")",
+        ],
+        input,
+    );
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully with -M indent"
+    );
+
+    let events: Vec<serde_json::Value> = stdout
+        .lines()
+        .filter(|line| line.trim_start().starts_with('{'))
+        .map(|line| serde_json::from_str(line).expect("Should parse JSON line"))
+        .collect();
+
+    assert_eq!(
+        events.len(),
+        2,
+        "Filter should keep only ERROR and WARN events"
+    );
+
+    let first = events
+        .first()
+        .and_then(|event| event["line"].as_str())
+        .expect("First event should contain a line field");
+    assert!(
+        first.contains("connection failed") && first.contains("module.rs:42"),
+        "First event should contain the stack trace content"
+    );
+
+    let second = events
+        .get(1)
+        .and_then(|event| event["line"].as_str())
+        .expect("Second event should contain a line field");
+    assert!(
+        second.contains("degraded performance") && second.contains("contacting replica"),
+        "Second event should retain continuation lines"
+    );
+
+    let stats = extract_stats_lines(&stderr);
+    assert!(
+        !stats.is_empty(),
+        "Stats output should be present when --stats is enabled"
+    );
+    assert_eq!(
+        extract_events_created_from_stats(&stderr),
+        3,
+        "Three multiline events should be created before filtering"
+    );
+    assert_eq!(
+        extract_events_filtered_from_stats(&stderr),
+        1,
+        "One event should be filtered out"
+    );
+}
+
+#[test]
+fn test_multiline_timestamp_with_format_hint_parallel_batches() {
+    let input = r#"2023|07|18_15*04*23 INFO primary event
+    stack line one
+2023|07|18_15*04*24 INFO secondary event
+    stack line two
+2023|07|18_15*04*25 WARN final event
+    last detail
+"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "line",
+            "-M",
+            "timestamp:format=%Y|%m|%d_%H*%M*%S",
+            "--parallel",
+            "--batch-size",
+            "1",
+            "--batch-timeout",
+            "1",
+            "-F",
+            "json",
+        ],
+        input,
+    );
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully with timestamp strategy"
+    );
+
+    let events: Vec<serde_json::Value> = stdout
+        .lines()
+        .filter(|line| line.trim_start().starts_with('{'))
+        .map(|line| serde_json::from_str(line).expect("Should parse JSON line"))
+        .collect();
+
+    assert_eq!(
+        events.len(),
+        3,
+        "Parallel batches should not split multiline events"
+    );
+
+    let first_line = events[0]["line"]
+        .as_str()
+        .expect("First event should contain aggregated text");
+    assert!(
+        first_line.contains("primary event") && first_line.contains("stack line one"),
+        "First event should include both header and continuation text"
+    );
+
+    let second_line = events[1]["line"]
+        .as_str()
+        .expect("Second event should contain aggregated text");
+    assert!(
+        second_line.contains("secondary event") && second_line.contains("stack line two"),
+        "Second event should keep its continuation line"
+    );
+
+    let third_line = events[2]["line"]
+        .as_str()
+        .expect("Third event should contain aggregated text");
+    assert!(
+        third_line.contains("final event") && third_line.contains("last detail"),
+        "Third event should retain trailing detail lines"
+    );
+}
+
+#[test]
+fn test_multiline_regex_with_start_and_end_patterns() {
+    let input = r#"START request 1
+payload line a
+payload line b
+END
+START request 2
+payload line c
+END
+"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "raw",
+            "-M",
+            "regex:match=^START:end=^END",
+            "-F",
+            "json",
+        ],
+        input,
+    );
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully with regex mode"
+    );
+
+    let events: Vec<serde_json::Value> = stdout
+        .lines()
+        .filter(|line| line.trim_start().starts_with('{'))
+        .map(|line| serde_json::from_str(line).expect("Should parse JSON line"))
+        .collect();
+
+    assert_eq!(events.len(), 2, "Expected two regex-delimited events");
+
+    let first = events[0]["raw"]
+        .as_str()
+        .expect("Regex event should retain raw text");
+    assert!(
+        first.contains("START request 1")
+            && first.contains("payload line b")
+            && first.contains("END"),
+        "Regex end pattern should keep the terminating line in the event"
+    );
+
+    let second = events[1]["raw"]
+        .as_str()
+        .expect("Regex event should retain raw text");
+    assert!(
+        second.contains("START request 2")
+            && second.contains("payload line c")
+            && second.ends_with("END"),
+        "Second regex section should flush cleanly at END"
+    );
+}
+
+#[test]
+fn test_multiline_regex_invalid_pattern_surfaces_error() {
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "raw", "-M", "regex:match=[", "-F", "json"], "");
+
+    assert_eq!(
+        exit_code, 1,
+        "Invalid regex configuration should propagate as an error"
+    );
+    assert!(
+        stderr.contains("Invalid regex start pattern"),
+        "Error output should mention the invalid regex start pattern"
+    );
+}
