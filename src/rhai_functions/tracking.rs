@@ -1186,3 +1186,578 @@ pub fn extract_error_summary(metrics: &HashMap<String, Dynamic>) -> Option<Strin
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rhai::Dynamic;
+
+    // Helper to clear thread-local state between tests
+    fn clear_tracking_state() {
+        THREAD_TRACKING_STATE.with(|state| {
+            let mut snapshot = state.borrow_mut();
+            snapshot.user.clear();
+            snapshot.internal.clear();
+        });
+    }
+
+    #[test]
+    fn test_merge_numeric_integers() {
+        let result = merge_numeric(Some(Dynamic::from(5i64)), Dynamic::from(3i64));
+        assert_eq!(result.as_int().unwrap(), 8);
+    }
+
+    #[test]
+    fn test_merge_numeric_floats() {
+        let result = merge_numeric(Some(Dynamic::from(5.5f64)), Dynamic::from(3.2f64));
+        let value = result.as_float().unwrap();
+        assert!((value - 8.7).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_merge_numeric_mixed_int_and_float() {
+        let result = merge_numeric(Some(Dynamic::from(5i64)), Dynamic::from(3.5f64));
+        let value = result.as_float().unwrap();
+        assert!((value - 8.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_merge_numeric_no_existing() {
+        let result = merge_numeric(None, Dynamic::from(42i64));
+        assert_eq!(result.as_int().unwrap(), 42);
+    }
+
+    #[test]
+    fn test_get_set_thread_tracking_state() {
+        clear_tracking_state();
+
+        let mut metrics = HashMap::new();
+        metrics.insert("test_key".to_string(), Dynamic::from(123i64));
+
+        set_thread_tracking_state(&metrics);
+
+        let retrieved = get_thread_tracking_state();
+        assert_eq!(retrieved.len(), 1);
+        assert_eq!(retrieved.get("test_key").unwrap().as_int().unwrap(), 123);
+
+        clear_tracking_state();
+    }
+
+    #[test]
+    fn test_get_set_thread_internal_state() {
+        clear_tracking_state();
+
+        let mut internal = HashMap::new();
+        internal.insert("internal_key".to_string(), Dynamic::from(456i64));
+
+        set_thread_internal_state(&internal);
+
+        let retrieved = get_thread_internal_state();
+        assert_eq!(retrieved.len(), 1);
+        assert_eq!(
+            retrieved.get("internal_key").unwrap().as_int().unwrap(),
+            456
+        );
+
+        clear_tracking_state();
+    }
+
+    #[test]
+    fn test_with_user_tracking() {
+        clear_tracking_state();
+
+        with_user_tracking(|state| {
+            state.insert("key1".to_string(), Dynamic::from(100i64));
+            state.insert("key2".to_string(), Dynamic::from(200i64));
+        });
+
+        let retrieved = get_thread_tracking_state();
+        assert_eq!(retrieved.len(), 2);
+        assert_eq!(retrieved.get("key1").unwrap().as_int().unwrap(), 100);
+        assert_eq!(retrieved.get("key2").unwrap().as_int().unwrap(), 200);
+
+        clear_tracking_state();
+    }
+
+    #[test]
+    fn test_with_internal_tracking() {
+        clear_tracking_state();
+
+        with_internal_tracking(|state| {
+            state.insert("__internal1".to_string(), Dynamic::from(999i64));
+        });
+
+        let retrieved = get_thread_internal_state();
+        assert_eq!(retrieved.len(), 1);
+        assert_eq!(retrieved.get("__internal1").unwrap().as_int().unwrap(), 999);
+
+        clear_tracking_state();
+    }
+
+    #[test]
+    fn test_record_operation_metadata() {
+        clear_tracking_state();
+
+        record_operation_metadata("test_key", "count");
+
+        let internal = get_thread_internal_state();
+        assert!(internal.contains_key("__op_test_key"));
+        assert_eq!(
+            internal
+                .get("__op_test_key")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "count"
+        );
+
+        clear_tracking_state();
+    }
+
+    #[test]
+    fn test_tracking_snapshot_from_parts() {
+        let mut user = HashMap::new();
+        user.insert("user_key".to_string(), Dynamic::from(1i64));
+
+        let mut internal = HashMap::new();
+        internal.insert("internal_key".to_string(), Dynamic::from(2i64));
+
+        let snapshot = TrackingSnapshot::from_parts(user.clone(), internal.clone());
+
+        assert_eq!(snapshot.user.len(), 1);
+        assert_eq!(snapshot.internal.len(), 1);
+        assert_eq!(snapshot.user.get("user_key").unwrap().as_int().unwrap(), 1);
+        assert_eq!(
+            snapshot
+                .internal
+                .get("internal_key")
+                .unwrap()
+                .as_int()
+                .unwrap(),
+            2
+        );
+    }
+
+    #[test]
+    fn test_get_thread_snapshot() {
+        clear_tracking_state();
+
+        with_user_tracking(|state| {
+            state.insert("user_data".to_string(), Dynamic::from(111i64));
+        });
+
+        with_internal_tracking(|state| {
+            state.insert("internal_data".to_string(), Dynamic::from(222i64));
+        });
+
+        let snapshot = get_thread_snapshot();
+        assert_eq!(snapshot.user.len(), 1);
+        assert_eq!(snapshot.internal.len(), 1);
+        assert_eq!(
+            snapshot.user.get("user_data").unwrap().as_int().unwrap(),
+            111
+        );
+        assert_eq!(
+            snapshot
+                .internal
+                .get("internal_data")
+                .unwrap()
+                .as_int()
+                .unwrap(),
+            222
+        );
+
+        clear_tracking_state();
+    }
+
+    #[test]
+    fn test_has_errors_in_tracking_no_errors() {
+        let snapshot = TrackingSnapshot::default();
+        assert!(!has_errors_in_tracking(&snapshot));
+    }
+
+    #[test]
+    fn test_has_errors_in_tracking_with_errors() {
+        let mut internal = HashMap::new();
+        internal.insert(
+            "__kelora_error_count_parse".to_string(),
+            Dynamic::from(5i64),
+        );
+
+        let snapshot = TrackingSnapshot::from_parts(HashMap::new(), internal);
+        assert!(has_errors_in_tracking(&snapshot));
+    }
+
+    #[test]
+    fn test_has_errors_in_tracking_zero_count() {
+        let mut internal = HashMap::new();
+        internal.insert(
+            "__kelora_error_count_parse".to_string(),
+            Dynamic::from(0i64),
+        );
+
+        let snapshot = TrackingSnapshot::from_parts(HashMap::new(), internal);
+        assert!(!has_errors_in_tracking(&snapshot));
+    }
+
+    #[test]
+    fn test_format_metrics_output_empty() {
+        let metrics = HashMap::new();
+        let output = format_metrics_output(&metrics, 1);
+        assert_eq!(output, "No metrics tracked");
+    }
+
+    #[test]
+    fn test_format_metrics_output_simple_values() {
+        let mut metrics = HashMap::new();
+        metrics.insert("count".to_string(), Dynamic::from(42i64));
+        metrics.insert("sum".to_string(), Dynamic::from(2.5f64));
+
+        let output = format_metrics_output(&metrics, 1);
+        assert!(output.contains("count"));
+        assert!(output.contains("42"));
+        assert!(output.contains("sum"));
+        assert!(output.contains("2.5"));
+    }
+
+    #[test]
+    fn test_format_metrics_output_filters_internal_keys() {
+        let mut metrics = HashMap::new();
+        metrics.insert("user_metric".to_string(), Dynamic::from(100i64));
+        metrics.insert("__op_user_metric".to_string(), Dynamic::from("count"));
+        metrics.insert("__kelora_stats_lines".to_string(), Dynamic::from(50i64));
+
+        let output = format_metrics_output(&metrics, 1);
+        assert!(output.contains("user_metric"));
+        assert!(!output.contains("__op_"));
+        assert!(!output.contains("__kelora_stats_"));
+    }
+
+    #[test]
+    fn test_format_metrics_output_small_array() {
+        let mut metrics = HashMap::new();
+        let arr = vec![
+            Dynamic::from("val1"),
+            Dynamic::from("val2"),
+            Dynamic::from("val3"),
+        ];
+        metrics.insert("unique_vals".to_string(), Dynamic::from(arr));
+
+        let output = format_metrics_output(&metrics, 1);
+        assert!(output.contains("unique_vals"));
+        assert!(output.contains("val1"));
+        assert!(output.contains("val2"));
+        assert!(output.contains("val3"));
+    }
+
+    #[test]
+    fn test_format_metrics_output_large_array_abbreviated() {
+        let mut metrics = HashMap::new();
+        let mut arr = Vec::new();
+        for i in 0..20 {
+            arr.push(Dynamic::from(format!("item{}", i)));
+        }
+        metrics.insert("large_array".to_string(), Dynamic::from(arr));
+
+        let output = format_metrics_output(&metrics, 1); // metrics_level = 1 (abbreviated)
+        assert!(output.contains("large_array"));
+        assert!(output.contains("20 unique"));
+        assert!(output.contains("item0"));
+        assert!(output.contains("item4"));
+        assert!(output.contains("[+15 more"));
+    }
+
+    #[test]
+    fn test_format_metrics_output_large_array_full() {
+        let mut metrics = HashMap::new();
+        let mut arr = Vec::new();
+        for i in 0..20 {
+            arr.push(Dynamic::from(format!("item{}", i)));
+        }
+        metrics.insert("large_array".to_string(), Dynamic::from(arr));
+
+        let output = format_metrics_output(&metrics, 2); // metrics_level = 2 (full)
+        assert!(output.contains("large_array"));
+        assert!(output.contains("20 unique"));
+        assert!(output.contains("item0"));
+        assert!(output.contains("item19"));
+        assert!(!output.contains("[+15 more")); // Should show all items
+    }
+
+    #[test]
+    fn test_format_metrics_json_simple() {
+        let mut metrics = HashMap::new();
+        metrics.insert("count".to_string(), Dynamic::from(42i64));
+
+        let json = format_metrics_json(&metrics).unwrap();
+        assert!(json.contains("\"count\""));
+        assert!(json.contains("42"));
+    }
+
+    #[test]
+    fn test_format_metrics_json_filters_internal() {
+        let mut metrics = HashMap::new();
+        metrics.insert("user_metric".to_string(), Dynamic::from(100i64));
+        metrics.insert("__op_user_metric".to_string(), Dynamic::from("count"));
+        metrics.insert("__kelora_stats_lines".to_string(), Dynamic::from(50i64));
+        metrics.insert(
+            "__kelora_error_count_parse".to_string(),
+            Dynamic::from(5i64),
+        );
+
+        let json = format_metrics_json(&metrics).unwrap();
+        assert!(json.contains("\"user_metric\""));
+        assert!(!json.contains("\"__op_"));
+        assert!(!json.contains("\"__kelora_stats_"));
+        assert!(!json.contains("\"__kelora_error_"));
+    }
+
+    #[test]
+    fn test_format_metrics_json_array() {
+        let mut metrics = HashMap::new();
+        let arr = vec![
+            Dynamic::from(1i64),
+            Dynamic::from(2i64),
+            Dynamic::from(3i64),
+        ];
+        metrics.insert("numbers".to_string(), Dynamic::from(arr));
+
+        let json = format_metrics_json(&metrics).unwrap();
+        assert!(json.contains("\"numbers\""));
+        assert!(json.contains("["));
+        assert!(json.contains("1"));
+        assert!(json.contains("2"));
+        assert!(json.contains("3"));
+    }
+
+    #[test]
+    fn test_format_metrics_json_map() {
+        let mut metrics = HashMap::new();
+        let mut map = rhai::Map::new();
+        map.insert("key1".into(), Dynamic::from(10i64));
+        map.insert("key2".into(), Dynamic::from(20i64));
+        metrics.insert("buckets".to_string(), Dynamic::from(map));
+
+        let json = format_metrics_json(&metrics).unwrap();
+        assert!(json.contains("\"buckets\""));
+        assert!(json.contains("\"key1\""));
+        assert!(json.contains("10"));
+        assert!(json.contains("\"key2\""));
+        assert!(json.contains("20"));
+    }
+
+    #[test]
+    fn test_dynamic_to_json_null() {
+        let json = dynamic_to_json(Dynamic::UNIT);
+        assert!(json.is_null());
+    }
+
+    #[test]
+    fn test_dynamic_to_json_integer() {
+        let json = dynamic_to_json(Dynamic::from(42i64));
+        assert_eq!(json.as_i64().unwrap(), 42);
+    }
+
+    #[test]
+    fn test_dynamic_to_json_float() {
+        let json = dynamic_to_json(Dynamic::from(2.5f64));
+        let val = json.as_f64().unwrap();
+        assert!((val - 2.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_dynamic_to_json_string() {
+        let json = dynamic_to_json(Dynamic::from("hello"));
+        assert_eq!(json.as_str().unwrap(), "hello");
+    }
+
+    #[test]
+    fn test_dynamic_to_json_bool() {
+        let json = dynamic_to_json(Dynamic::from(true));
+        assert!(json.as_bool().unwrap());
+    }
+
+    #[test]
+    fn test_dynamic_to_json_array() {
+        let arr = vec![
+            Dynamic::from(1i64),
+            Dynamic::from(2i64),
+            Dynamic::from(3i64),
+        ];
+        let json = dynamic_to_json(Dynamic::from(arr));
+        assert!(json.is_array());
+        let array = json.as_array().unwrap();
+        assert_eq!(array.len(), 3);
+        assert_eq!(array[0].as_i64().unwrap(), 1);
+        assert_eq!(array[1].as_i64().unwrap(), 2);
+        assert_eq!(array[2].as_i64().unwrap(), 3);
+    }
+
+    #[test]
+    fn test_dynamic_to_json_map() {
+        let mut map = rhai::Map::new();
+        map.insert("a".into(), Dynamic::from(100i64));
+        map.insert("b".into(), Dynamic::from(200i64));
+        let json = dynamic_to_json(Dynamic::from(map));
+        assert!(json.is_object());
+        let obj = json.as_object().unwrap();
+        assert_eq!(obj.get("a").unwrap().as_i64().unwrap(), 100);
+        assert_eq!(obj.get("b").unwrap().as_i64().unwrap(), 200);
+    }
+
+    #[test]
+    fn test_format_error_location_single_file() {
+        let input_files = vec!["test.log".to_string()];
+        let location = format_error_location(Some(42), Some("test.log"), &input_files);
+        assert_eq!(location, "line 42");
+    }
+
+    #[test]
+    fn test_format_error_location_stdin() {
+        let input_files: Vec<String> = vec![];
+        let location = format_error_location(Some(10), None, &input_files);
+        assert_eq!(location, "line 10");
+    }
+
+    #[test]
+    fn test_format_error_location_multiple_files_no_conflict() {
+        let input_files = vec!["file1.log".to_string(), "file2.log".to_string()];
+        let location = format_error_location(Some(100), Some("file1.log"), &input_files);
+        assert_eq!(location, "file1.log:100");
+    }
+
+    #[test]
+    fn test_format_error_location_multiple_files_with_conflict() {
+        let input_files = vec![
+            "/path/to/file.log".to_string(),
+            "/other/path/file.log".to_string(),
+        ];
+        let location = format_error_location(Some(50), Some("/path/to/file.log"), &input_files);
+        assert_eq!(location, "/path/to/file.log:50");
+    }
+
+    #[test]
+    fn test_format_error_location_no_line_number() {
+        let input_files = vec!["test.log".to_string()];
+        let location = format_error_location(None, Some("test.log"), &input_files);
+        assert_eq!(location, "unknown");
+    }
+
+    #[test]
+    fn test_extract_error_summary_no_errors() {
+        let metrics = HashMap::new();
+        let summary = extract_error_summary(&metrics);
+        assert!(summary.is_none());
+    }
+
+    #[test]
+    fn test_extract_error_summary_with_errors() {
+        let mut metrics = HashMap::new();
+        metrics.insert(
+            "__kelora_error_count_parse".to_string(),
+            Dynamic::from(5i64),
+        );
+
+        let arr = vec![Dynamic::from("example error 1")];
+        metrics.insert(
+            "__kelora_error_examples_parse".to_string(),
+            Dynamic::from(arr),
+        );
+
+        let summary = extract_error_summary(&metrics);
+        assert!(summary.is_some());
+        let text = summary.unwrap();
+        assert!(text.contains("parse"));
+        assert!(text.contains("\"count\": 5"));
+    }
+
+    #[test]
+    fn test_extract_error_summary_zero_errors() {
+        let mut metrics = HashMap::new();
+        metrics.insert(
+            "__kelora_error_count_parse".to_string(),
+            Dynamic::from(0i64),
+        );
+
+        let summary = extract_error_summary(&metrics);
+        assert!(summary.is_none());
+    }
+
+    #[test]
+    fn test_extract_error_summary_from_tracking_no_errors() {
+        let snapshot = TrackingSnapshot::default();
+        let summary = extract_error_summary_from_tracking(&snapshot, 0, None);
+        assert!(summary.is_none());
+    }
+
+    #[test]
+    fn test_extract_error_summary_from_tracking_with_errors() {
+        let mut internal = HashMap::new();
+        internal.insert(
+            "__kelora_error_count_parse".to_string(),
+            Dynamic::from(3i64),
+        );
+
+        // Create sample error objects
+        let mut sample_obj = rhai::Map::new();
+        sample_obj.insert("error_type".into(), Dynamic::from("parse"));
+        sample_obj.insert("line_num".into(), Dynamic::from(42i64));
+        sample_obj.insert("message".into(), Dynamic::from("Test error"));
+        sample_obj.insert("filename".into(), Dynamic::from("test.log"));
+
+        let samples = vec![Dynamic::from(sample_obj)];
+        internal.insert(
+            "__kelora_error_samples_parse".to_string(),
+            Dynamic::from(samples),
+        );
+
+        let snapshot = TrackingSnapshot::from_parts(HashMap::new(), internal);
+        let summary = extract_error_summary_from_tracking(&snapshot, 0, None);
+
+        assert!(summary.is_some());
+        let text = summary.unwrap();
+        assert!(text.contains("Parse errors: 3 total"));
+        assert!(text.contains("Test error"));
+    }
+
+    #[test]
+    fn test_merge_numeric_edge_case_zero_plus_zero() {
+        let result = merge_numeric(Some(Dynamic::from(0i64)), Dynamic::from(0i64));
+        assert_eq!(result.as_int().unwrap(), 0);
+    }
+
+    #[test]
+    fn test_merge_numeric_edge_case_negative_numbers() {
+        let result = merge_numeric(Some(Dynamic::from(-5i64)), Dynamic::from(-3i64));
+        assert_eq!(result.as_int().unwrap(), -8);
+    }
+
+    #[test]
+    fn test_merge_numeric_edge_case_large_integers() {
+        let result = merge_numeric(
+            Some(Dynamic::from(1_000_000_000i64)),
+            Dynamic::from(2_000_000_000i64),
+        );
+        assert_eq!(result.as_int().unwrap(), 3_000_000_000i64);
+    }
+
+    #[test]
+    fn test_thread_tracking_isolation() {
+        clear_tracking_state();
+
+        // Set initial state
+        with_user_tracking(|state| {
+            state.insert("test".to_string(), Dynamic::from(1i64));
+        });
+
+        // Verify state is set
+        let state1 = get_thread_tracking_state();
+        assert_eq!(state1.get("test").unwrap().as_int().unwrap(), 1);
+
+        // Clear and verify empty
+        clear_tracking_state();
+        let state2 = get_thread_tracking_state();
+        assert!(state2.is_empty());
+    }
+}
