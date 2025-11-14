@@ -98,11 +98,14 @@ e.extension = e.filename.after(".")                   // "file.txt" → "txt"
 e.domain = e.email.after("@")                         // "user@host.com" → "host.com"
 ```
 
-#### `text.between(start, end)`
-Text between start and end delimiters.
+#### `text.between(start, end [, nth])`
+Text between start and end delimiters (nth: 1=first, -1=last).
+
+**Note:** `text.between(left, right, nth)` is equivalent to `text.after(left, nth).before(right)`.
 
 ```rhai
 e.quoted = e.line.between('"', '"')                   // Extract quoted string
+"[a][b][c]".between("[", "]", 2)                      // "b" - same as .after("[", 2).before("]")
 ```
 
 #### `text.starting_with(prefix [, nth])`
