@@ -229,6 +229,16 @@ pub fn generate_examples_text() -> &'static str {
     r###"
 Common Log Analysis Patterns:
 
+DISCOVERING FIELDS:
+# See all fields, types, and structure
+kelora -f json app.log -F inspect | head -20
+
+# View discovered fields and parsing statistics
+kelora -f json app.log --stats
+
+# Inspect with full value detail (no truncation)
+kelora -f json app.log -F inspect -vv | head -50
+
 MICRO SEARCH HELPERS:
 # Case-insensitive wildcard search
 kelora -f json --filter 'e.message.ilike("*timeout*")'

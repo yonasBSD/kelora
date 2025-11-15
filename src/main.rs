@@ -2020,8 +2020,9 @@ High-frequency flags:
   --level <levels>              Comma-separated log levels to include
   -e, --exec <expr>             Transform events or emit metrics
   -k, --keys <fields>           Pick or reorder output fields
-  -F, --output-format <FORMAT>  Switch formatter (default, json, logfmt, levelmap, none)
-  --stats / --metrics           Show throughput stats or tracked counters
+  -F, --output-format <FORMAT>  Switch formatter (default, json, logfmt, inspect, none)
+  --stats                       Show stats with discovered fields and parsing metrics
+  --metrics                     Show tracked counters from track_*() functions
 
 Docs & references:
   kelora --help          Full CLI reference grouped by stage
