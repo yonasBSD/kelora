@@ -415,12 +415,12 @@ kelora -j app.log \
 ```bash
 # ❌ WRONG - ctx is lost in the second stage
 kelora -j app.log \
-    -e 'let ctx = e.user_id; emit(e)' \
+    -e 'let ctx = e.user_id' \
     -e 'e.context = ctx'  # ERROR: ctx doesn't exist here!
 
 # ✅ CORRECT - Use semicolons within one stage
 kelora -j app.log \
-    -e 'let ctx = e.user_id; e.context = ctx; emit(e)'
+    -e 'let ctx = e.user_id; e.context = ctx'
 ```
 
 **What DOES persist between stages:**
@@ -438,7 +438,7 @@ kelora -j app.log \
 Use **semicolons within one `-e`** when you need shared local variables:
 ```bash
 kelora -j app.log \
-    -e 'let total = e.count + e.bonus; e.result = total * 2; emit(e)'
+    -e 'let total = e.count + e.bonus; e.result = total * 2'
 ```
 
 Use **multiple `-e` stages** for stage snapshotting (see below).

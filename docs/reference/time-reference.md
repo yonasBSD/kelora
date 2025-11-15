@@ -442,11 +442,9 @@ e.duration_ms = duration.as_milliseconds();
 ### Filter Business Hours
 
 ```rhai
-// Filter events during business hours (9 AM - 5 PM)
+// Use inside a --filter stage to keep only business hours (9 AM - 5 PM)
 let dt = to_datetime(e.timestamp);
-if dt.hour() >= 9 && dt.hour() < 17 {
-    emit(e);
-}
+dt.hour() >= 9 && dt.hour() < 17
 ```
 
 ### Compare Against Current Time

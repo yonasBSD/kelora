@@ -330,7 +330,7 @@ When you need local variables to persist across operations, use semicolons withi
 ```bash
 # ✅ CORRECT - Both operations in one stage
 kelora -j \
-    --exec 'let ctx = e.user_id; e.context = ctx; emit(e)' \
+    --exec 'let ctx = e.user_id; e.context = ctx' \
     app.log
 ```
 
