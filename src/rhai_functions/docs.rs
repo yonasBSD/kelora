@@ -192,7 +192,7 @@ window.pluck_as_nums(field)          Extract numeric field values from current w
 
 TRACKING/METRICS FUNCTIONS (requires --metrics):
 track_bucket(key, bucket)            Track values in buckets for histograms (skips () values)
-track_count(key)                     Increment counter for key by 1
+track_count(key)                     Increment counter for key by 1 (string key; use to_string() for numbers)
 track_max(key, value)                Track maximum value for key (skips () values)
 track_min(key, value)                Track minimum value for key (skips () values)
 track_sum(key, value)                Accumulate numeric values for key (skips () values)

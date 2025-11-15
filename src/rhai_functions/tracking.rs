@@ -472,13 +472,27 @@ pub fn extract_error_summary_from_tracking(
 pub fn register_functions(engine: &mut Engine) {
     // Track functions using thread-local storage - clean user API
     // Store operation metadata for proper parallel merging
-    engine.register_fn("track_count", |key: &str| {
-        with_user_tracking(|state| {
-            let updated = merge_numeric(state.get(key).cloned(), Dynamic::from(1_i64));
-            state.insert(key.to_string(), updated);
-        });
-        record_operation_metadata(key, "count");
-    });
+    engine.register_fn(
+        "track_count",
+        |key: Dynamic| -> Result<(), Box<rhai::EvalAltResult>> {
+            let type_name = key.type_name().to_string();
+            let key = key.into_string().map_err(|_| -> Box<rhai::EvalAltResult> {
+                format!(
+                    "track_count requires a string key; got {}. Hint: use to_string() for numbers (e.g. track_count(e.status.to_string()))",
+                    type_name
+                )
+                .into()
+            })?;
+
+            with_user_tracking(|state| {
+                let updated =
+                    merge_numeric(state.get(key.as_str()).cloned(), Dynamic::from(1_i64));
+                state.insert(key.to_string(), updated);
+            });
+            record_operation_metadata(&key, "count");
+            Ok(())
+        },
+    );
 
     engine.register_fn("track_sum", |key: &str, value: i64| {
         with_user_tracking(|state| {
