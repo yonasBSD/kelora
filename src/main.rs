@@ -1704,9 +1704,6 @@ fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
         if raw_args[i] == "--save-alias" {
             // Skip --save-alias and its argument
             i += 2;
-        } else if raw_args[i] == "--no-emoji" {
-            // Skip --no-emoji as it's only for the save operation display
-            i += 1;
         } else if raw_args[i] == "--config-file" && i + 1 < raw_args.len() {
             // Extract --config-file for saving
             config_file_path = Some(raw_args[i + 1].clone());

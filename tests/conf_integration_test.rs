@@ -4,15 +4,17 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 use tempfile::TempDir;
 
-/// Helper function to run kelora with given arguments and input via stdin
-fn run_kelora_with_input(args: &[&str], input: &str) -> (String, String, i32) {
-    let binary_path = if cfg!(debug_assertions) {
+fn kelora_binary_path() -> &'static str {
+    if cfg!(debug_assertions) {
         "./target/debug/kelora"
     } else {
         "./target/release/kelora"
-    };
+    }
+}
 
-    let mut cmd = Command::new(binary_path)
+/// Helper function to run kelora with given arguments and input via stdin
+fn run_kelora_with_input(args: &[&str], input: &str) -> (String, String, i32) {
+    let mut cmd = Command::new(kelora_binary_path())
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -217,6 +219,41 @@ fn test_empty_file_handling() {
     assert_eq!(exit_code, 0, "Command should succeed. stderr: {}", stderr);
     assert!(stdout.contains("\"empty_content_len\":0"));
     assert!(stdout.contains("\"empty_lines_len\":0"));
+}
+
+#[test]
+fn test_save_alias_preserves_no_emoji_flag() {
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let config_path = temp_dir.path().join("kelora.ini");
+
+    let status = Command::new(kelora_binary_path())
+        .args([
+            "--save-alias",
+            "noemoji",
+            "--config-file",
+            config_path.to_str().unwrap(),
+            "-f",
+            "json",
+            "--no-emoji",
+            "examples/simple_json.jsonl",
+        ])
+        .status()
+        .expect("Failed to run kelora --save-alias command");
+
+    assert!(
+        status.success(),
+        "kelora --save-alias exited with {:?}",
+        status
+    );
+
+    let config_contents =
+        fs::read_to_string(&config_path).expect("Failed to read generated config file");
+
+    assert!(
+        config_contents.contains("--no-emoji"),
+        "Alias should retain --no-emoji flag. Contents:\n{}",
+        config_contents
+    );
 }
 
 #[test]
