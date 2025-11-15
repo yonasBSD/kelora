@@ -1,4 +1,5 @@
 use anyhow::Result;
+use clap::parser::ValueSource;
 use clap::{ArgMatches, CommandFactory, FromArgMatches};
 use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
 use std::sync::atomic::Ordering;
@@ -1021,6 +1022,37 @@ fn write_formatted_output<W: Write>(
     Ok(())
 }
 
+fn maybe_print_missing_format_tip(
+    matches: &ArgMatches,
+    cli: &Cli,
+    config: &KeloraConfig,
+    stderr: &mut SafeStderr,
+) {
+    // Respect explicit suppression and quiet modes
+    if std::env::var("KELORA_NO_TIPS").is_ok() || config.processing.quiet_level > 0 {
+        return;
+    }
+
+    // Avoid polluting pipelines
+    if !crate::tty::is_stdout_tty() {
+        return;
+    }
+
+    // Skip when an explicit format shortcut/selection is in use
+    if cli.json_input || cli.no_input {
+        return;
+    }
+
+    let format_source = matches.value_source("format");
+    if matches!(format_source, Some(ValueSource::DefaultValue) | None) {
+        stderr
+            .writeln(
+                "Tip: missing -f. Use -f auto (or defaults = -f auto in ~/.config/kelora/kelora.ini). Set KELORA_NO_TIPS=1 to hide.",
+            )
+            .unwrap_or(());
+    }
+}
+
 fn main() -> Result<()> {
     install_broken_pipe_panic_hook();
     // Broadcast channel for shutdown requests from signal handler or other sources
@@ -1067,6 +1099,9 @@ fn main() -> Result<()> {
     let mut config = KeloraConfig::from_cli(&cli)?;
     // Set the ordered stages directly
     config.processing.stages = ordered_stages;
+
+    // Hint about format selection when user didn't specify -f/--input-format
+    maybe_print_missing_format_tip(&matches, &cli, &config, &mut stderr);
 
     if config.processing.span.is_some()
         && config.processing.quiet_level == 0
