@@ -1,3 +1,4 @@
+use crate::stats::ProcessingStats;
 use rhai::{Dynamic, Engine};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -330,6 +331,7 @@ pub fn has_errors_in_tracking(snapshot: &TrackingSnapshot) -> bool {
 pub fn extract_error_summary_from_tracking(
     snapshot: &TrackingSnapshot,
     verbose: u8,
+    stats: Option<&ProcessingStats>,
     _config: Option<&crate::config::KeloraConfig>,
 ) -> Option<String> {
     let mut total_errors = 0;
@@ -445,6 +447,23 @@ pub fn extract_error_summary_from_tracking(
         };
 
         summary.push_str(&format!("\n  [+{} more. {}]", remaining, message));
+    }
+
+    if let Some(stats) = stats {
+        if stats.yearless_timestamps > 0 {
+            summary.push_str(&format!(
+                "\n  Warning: Year-less timestamp format detected ({} parse{})",
+                stats.yearless_timestamps,
+                if stats.yearless_timestamps == 1 {
+                    ""
+                } else {
+                    "s"
+                }
+            ));
+            summary.push_str("\n    Format lacks year (e.g., \"Dec 31 23:59:59\")");
+            summary.push_str("\n    Year inferred using heuristic (+/- 1 year from current date)");
+            summary.push_str("\n    Timestamps >18 months old may be incorrect");
+        }
     }
 
     Some(summary)
@@ -1687,7 +1706,7 @@ mod tests {
     #[test]
     fn test_extract_error_summary_from_tracking_no_errors() {
         let snapshot = TrackingSnapshot::default();
-        let summary = extract_error_summary_from_tracking(&snapshot, 0, None);
+        let summary = extract_error_summary_from_tracking(&snapshot, 0, None, None);
         assert!(summary.is_none());
     }
 
@@ -1713,12 +1732,34 @@ mod tests {
         );
 
         let snapshot = TrackingSnapshot::from_parts(HashMap::new(), internal);
-        let summary = extract_error_summary_from_tracking(&snapshot, 0, None);
+        let summary = extract_error_summary_from_tracking(&snapshot, 0, None, None);
 
         assert!(summary.is_some());
         let text = summary.unwrap();
         assert!(text.contains("Parse errors: 3 total"));
         assert!(text.contains("Test error"));
+    }
+
+    #[test]
+    fn test_extract_error_summary_adds_yearless_warning() {
+        let mut internal = HashMap::new();
+        internal.insert(
+            "__kelora_error_count_parse".to_string(),
+            Dynamic::from(2i64),
+        );
+
+        let snapshot = TrackingSnapshot::from_parts(HashMap::new(), internal);
+
+        let stats = ProcessingStats {
+            yearless_timestamps: 5,
+            ..Default::default()
+        };
+
+        let summary =
+            extract_error_summary_from_tracking(&snapshot, 0, Some(&stats), None).unwrap();
+
+        assert!(summary.contains("Year-less timestamp format detected"));
+        assert!(summary.contains("5 parse"));
     }
 
     #[test]
