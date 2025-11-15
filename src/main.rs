@@ -2045,14 +2045,14 @@ fn print_quick_help() {
     let help_text = r#"Kelora Quick Help
 
 Workflows:
-  kelora -f logfmt --level error examples/simple_logfmt.log
+  kelora -f logfmt --levels error examples/simple_logfmt.log
   kelora -j examples/simple_json.jsonl --filter 'e.service == "database"' --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' -k timestamp,message,duration_s
   kelora -f combined examples/web_access_large.log.gz --parallel --stats
 
 High-frequency flags:
   -f, --input-format <FORMAT>   Choose parser (json, logfmt, combined, cols:<spec>)
   --filter <expr>               Rhai boolean guard (repeatable)
-  --level <levels>              Comma-separated log levels to include
+  --levels <levels>             Comma-separated log levels to include
   -e, --exec <expr>             Transform events or emit metrics
   -k, --keys <fields>           Pick or reorder output fields
   -F, --output-format <FORMAT>  Switch formatter (default, json, logfmt, inspect, none)
