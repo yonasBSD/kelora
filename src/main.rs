@@ -2063,7 +2063,7 @@ Docs & references:
   kelora --help          Full CLI reference grouped by stage
   kelora --help-rhai     Rhai language guide + stage semantics
   kelora --help-functions  Built-in function catalogue
-  https://github.com/dloss/kelora/blob/main/examples/README.md (Examples index)
+  kelora --help-examples Common patterns and example walkthroughs
 
 Need the timestamp catalogue?  kelora --help-time
 Multiline strategies?          kelora --help-multiline
