@@ -237,7 +237,7 @@ impl ErrorEnhancer {
                 }
             },
             EvalAltResult::ErrorPropertyNotFound(prop_name, _) => {
-                Some(format!("Property '{}' not found. Use 'if \"{}\" in e {{ ... }}' to check existence first", prop_name, prop_name))
+                Some(format!("Property '{}' not found. Try `--stats` or `-F inspect` to see available fields", prop_name))
             },
             EvalAltResult::ErrorIndexNotFound(index, _) => {
                 Some(format!("Index '{}' not found. Check array bounds with 'if e.array.len() > {} {{ ... }}'", index, index))
