@@ -139,6 +139,16 @@ fuzz-regex *args:
     fi
     cargo +nightly fuzz run regex_parser "$@"
 
+# Run multiline chunker fuzzing locally (requires cargo-fuzz + nightly toolchain)
+fuzz-multiline *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! cargo fuzz --help >/dev/null 2>&1; then
+        echo "error: cargo-fuzz is not installed. Install with 'cargo install cargo-fuzz'." >&2
+        exit 1
+    fi
+    cargo +nightly fuzz run multiline_chunker "$@"
+
 # Generate documentation screenshots using VHS
 screenshots:
     #!/usr/bin/env bash

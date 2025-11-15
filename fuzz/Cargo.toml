@@ -22,3 +22,9 @@ name = "regex_parser"
 path = "fuzz_targets/regex_parser.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "multiline_chunker"
+path = "fuzz_targets/multiline_chunker.rs"
+test = false
+doc = false
