@@ -16,3 +16,9 @@ name = "json_parser"
 path = "fuzz_targets/json_parser.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "regex_parser"
+path = "fuzz_targets/regex_parser.rs"
+test = false
+doc = false

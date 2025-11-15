@@ -129,6 +129,16 @@ fuzz-json *args:
     fi
     cargo +nightly fuzz run json_parser "$@"
 
+# Run Regex parser fuzzing locally (requires cargo-fuzz + nightly toolchain)
+fuzz-regex *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! cargo fuzz --help >/dev/null 2>&1; then
+        echo "error: cargo-fuzz is not installed. Install with 'cargo install cargo-fuzz'." >&2
+        exit 1
+    fi
+    cargo +nightly fuzz run regex_parser "$@"
+
 # Generate documentation screenshots using VHS
 screenshots:
     #!/usr/bin/env bash
