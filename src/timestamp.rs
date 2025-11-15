@@ -1381,9 +1381,10 @@ mod tests {
     fn test_custom_format_with_timezone() {
         let mut parser = AdaptiveTsParser::new();
 
-        // Custom format: DD/MM/YYYY HH:MM:SS
+        // Custom format: DD/MM/YYYY HH:MM:SS (parse as UTC to avoid local timezone issues)
         let custom_format = "%d/%m/%Y %H:%M:%S";
-        let result = parser.parse_ts_with_config("15/07/2023 14:30:45", Some(custom_format), None);
+        let result =
+            parser.parse_ts_with_config("15/07/2023 14:30:45", Some(custom_format), Some("UTC"));
         assert!(result.is_some());
         let dt = result.unwrap();
         assert_eq!(dt.day(), 15);
@@ -1422,15 +1423,15 @@ mod tests {
     fn test_syslog_year_rollover() {
         let mut parser = AdaptiveTsParser::new();
 
-        // Syslog format without year - should add current year
-        let result = parser.parse_ts("Dec 31 23:59:59");
+        // Syslog format without year - should add current year (parse as UTC to avoid local timezone issues)
+        let result = parser.parse_ts_with_config("Dec 31 23:59:59", None, Some("UTC"));
         assert!(result.is_some());
         let dt = result.unwrap();
         assert_eq!(dt.month(), 12);
         assert_eq!(dt.day(), 31);
 
         // Should also try previous year if it's early January
-        let result = parser.parse_ts("Jan 1 00:00:01");
+        let result = parser.parse_ts_with_config("Jan 1 00:00:01", None, Some("UTC"));
         assert!(result.is_some());
         let dt = result.unwrap();
         assert_eq!(dt.month(), 1);

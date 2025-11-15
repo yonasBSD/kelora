@@ -15,6 +15,7 @@ fn run_kelora_in_dir(dir: &std::path::Path, args: &[&str], input: &str) -> (Stri
 
     let mut cmd = Command::new(&binary_path)
         .current_dir(dir)
+        .env("HOME", dir) // Set HOME to temp dir for isolated config testing
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
