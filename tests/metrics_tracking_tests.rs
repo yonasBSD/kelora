@@ -1051,3 +1051,240 @@ fn test_stats_format_consistency() {
     assert!(stderr1.contains("Events created") || stderr1.contains("Events"));
     assert!(stderr2.contains("Events created") || stderr2.contains("Events"));
 }
+
+#[test]
+fn test_metrics_json_with_metrics_file_writes_json_to_file() {
+    // Test that --metrics-json with --metrics-file writes JSON to the file
+    let input = r#"{"level": "info", "message": "test1"}
+{"level": "error", "message": "test2"}"#;
+
+    let temp_file = NamedTempFile::new().expect("Failed to create temp file");
+    let metrics_file_path = temp_file.path().to_str().unwrap();
+
+    let (_stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "track_count(\"total\");",
+            "--metrics-json",
+            "--metrics-file",
+            metrics_file_path,
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let metrics_content =
+        std::fs::read_to_string(metrics_file_path).expect("Failed to read metrics file");
+
+    // File content should be valid JSON
+    let _: serde_json::Value = serde_json::from_str(&metrics_content)
+        .expect("Metrics file should contain valid JSON");
+
+    // Should contain our tracked metric
+    assert!(
+        metrics_content.contains("total"),
+        "Metrics file should contain tracked metric"
+    );
+}
+
+#[test]
+fn test_stats_only_with_metrics_json() {
+    // Test that --stats-only works with --metrics-json
+    let input = r#"{"level": "info", "message": "test1"}
+{"level": "error", "message": "test2"}"#;
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "track_count(\"total\");",
+            "--stats-only",
+            "--metrics-json",
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    // Should NOT output events to stdout
+    assert!(
+        !stdout.contains("test1") && !stdout.contains("test2"),
+        "Should not output events with --stats-only"
+    );
+
+    // Should output JSON metrics to stderr
+    assert!(
+        stderr.contains("{") && stderr.contains("}"),
+        "Should output JSON format"
+    );
+}
+
+#[test]
+fn test_conflicting_stats_flags() {
+    // Test that --stats and --no-stats together is handled
+    // (--no-stats should take precedence as it's more specific)
+    let input = r#"{"level": "info", "message": "test"}"#;
+
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "--stats", "--no-stats"], input);
+
+    assert_eq!(exit_code, 0, "kelora should handle conflicting flags");
+
+    // With --no-stats, stats should be suppressed
+    assert!(
+        !stderr.contains("Stats:") && !stderr.contains("📈 Stats:"),
+        "--no-stats should suppress stats output"
+    );
+}
+
+#[test]
+fn test_quiet_level_1_suppresses_diagnostics() {
+    // Test that -q suppresses diagnostics (stats, errors) but keeps events
+    let input = r#"{"level": "info", "message": "test1"}
+{"level": "error", "message": "test2"}"#;
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--stats",
+            "-q",
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    // Events should be output to stdout
+    assert!(
+        stdout.contains("level"),
+        "Events should be output with -q"
+    );
+
+    // stderr should be empty (stats suppressed by -q)
+    assert!(
+        stderr.is_empty() || stderr.trim().is_empty(),
+        "stderr should be empty with -q, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_quiet_level_2_suppresses_events() {
+    // Test that -qq suppresses event output
+    let input = r#"{"level": "info", "message": "test1"}
+{"level": "error", "message": "test2"}"#;
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "-qq",
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    // stdout should be empty (events suppressed by -qq)
+    assert!(
+        stdout.is_empty() || stdout.trim().is_empty(),
+        "stdout should be empty with -qq (events suppressed)"
+    );
+
+    // stderr should also be empty (diagnostics suppressed)
+    assert!(
+        stderr.is_empty() || stderr.trim().is_empty(),
+        "stderr should be empty with -qq"
+    );
+}
+
+#[test]
+fn test_quiet_level_3_suppresses_script_output() {
+    // Test that -qqq suppresses script print/eprint
+    let input = r#"{"level": "info", "message": "test"}"#;
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "print(\"this should not appear\");",
+            "-qqq",
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    // stdout should be empty (events suppressed by -qq, script output by -qqq)
+    assert!(
+        !stdout.contains("this should not appear"),
+        "Script print() output should be suppressed with -qqq"
+    );
+
+    // Both stdout and stderr should be empty
+    assert!(
+        stdout.is_empty() || stdout.trim().is_empty(),
+        "stdout should be empty with -qqq"
+    );
+    assert!(
+        stderr.is_empty() || stderr.trim().is_empty(),
+        "stderr should be empty with -qqq"
+    );
+}
+
+#[test]
+fn test_metrics_with_large_number_of_unique_values() {
+    // Stress test: track many unique values
+    let input: String = (0..1000)
+        .map(|i| format!(r#"{{"id": {}, "value": "item_{}"}}"#, i, i))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "track_unique(\"unique_ids\", e.id);",
+            "--end",
+            "print(`Unique count: ${metrics[\"unique_ids\"].len()}`);",
+        ],
+        &input,
+    );
+
+    assert_eq!(exit_code, 0, "kelora should handle large unique sets");
+
+    // Should track all 1000 unique IDs
+    assert!(
+        stdout.contains("Unique count: 1000"),
+        "Should track 1000 unique values"
+    );
+}
+
+#[test]
+fn test_stats_only_with_no_input() {
+    // Test --stats-only with empty input
+    let input = "";
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--stats-only"], input);
+
+    assert_eq!(exit_code, 0, "kelora should handle empty input");
+
+    // Stdout should be empty (no events)
+    assert!(
+        stdout.is_empty() || stdout.trim().is_empty(),
+        "stdout should be empty with no input"
+    );
+
+    // Stats should show 0 events
+    assert!(
+        stderr.contains("0 total") || stderr.contains("Lines processed: 0"),
+        "Stats should show 0 events"
+    );
+}

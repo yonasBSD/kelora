@@ -6,7 +6,7 @@ use std::io::{self, Write};
 use std::panic::{self, PanicHookInfo};
 use std::path::Path;
 use std::process;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::Once;
 use std::thread;
 
@@ -53,6 +53,10 @@ impl ExitCode {
 /// Global termination flag for graceful shutdown
 pub static SHOULD_TERMINATE: AtomicBool = AtomicBool::new(false);
 pub static TERMINATED_BY_SIGNAL: AtomicBool = AtomicBool::new(false);
+
+/// Track which signal caused termination (for correct exit code)
+/// 0 = no signal, 2 = SIGINT, 15 = SIGTERM, etc.
+pub static TERMINATION_SIGNAL: AtomicI32 = AtomicI32::new(0);
 
 /// Control messages broadcast by the signal handler to processing components
 #[derive(Debug, Clone)]
@@ -105,6 +109,7 @@ impl SignalHandler {
                         SIGINT => {
                             SHOULD_TERMINATE.store(true, Ordering::Relaxed);
                             TERMINATED_BY_SIGNAL.store(true, Ordering::Relaxed);
+                            TERMINATION_SIGNAL.store(SIGINT, Ordering::Relaxed);
                             shutdown_count += 1;
                             let immediate = shutdown_count > 1;
                             let _ = sender.send(Ctrl::Shutdown { immediate });
@@ -127,6 +132,7 @@ impl SignalHandler {
                             );
                             SHOULD_TERMINATE.store(true, Ordering::Relaxed);
                             TERMINATED_BY_SIGNAL.store(true, Ordering::Relaxed);
+                            TERMINATION_SIGNAL.store(SIGTERM, Ordering::Relaxed);
                             shutdown_count += 1;
                             let immediate = shutdown_count > 1;
                             let _ = sender.send(Ctrl::Shutdown { immediate });
@@ -185,6 +191,7 @@ impl SignalHandler {
                     if term_flag.load(Ordering::Relaxed) {
                         SHOULD_TERMINATE.store(true, Ordering::Relaxed);
                         TERMINATED_BY_SIGNAL.store(true, Ordering::Relaxed);
+                        TERMINATION_SIGNAL.store(SIGINT, Ordering::Relaxed);
                         shutdown_count += 1;
                         let immediate = shutdown_count > 1;
                         let _ = sender.send(Ctrl::Shutdown { immediate });

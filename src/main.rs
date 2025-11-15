@@ -3,6 +3,9 @@ use clap::{ArgMatches, CommandFactory, FromArgMatches};
 use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
 use std::sync::atomic::Ordering;
 
+#[cfg(unix)]
+use signal_hook::consts::{SIGINT, SIGTERM};
+
 use crate::engine::RhaiEngine;
 use crate::rhai_functions::tracking::{self, TrackingSnapshot};
 
@@ -30,7 +33,7 @@ use config::KeloraConfig;
 use config_file::ConfigFile;
 use platform::{
     install_broken_pipe_panic_hook, Ctrl, ExitCode, ProcessCleanup, SafeFileOut, SafeStderr,
-    SafeStdout, SignalHandler, SHOULD_TERMINATE, TERMINATED_BY_SIGNAL,
+    SafeStdout, SignalHandler, SHOULD_TERMINATE, TERMINATED_BY_SIGNAL, TERMINATION_SIGNAL,
 };
 
 // Internal CLI imports
@@ -1510,7 +1513,22 @@ fn main() -> Result<()> {
                 .writeln(&config.format_stats_message("Processing interrupted"))
                 .unwrap_or(());
         }
-        ExitCode::SignalInt.exit();
+
+        // Exit with the correct code based on which signal was received
+        #[cfg(unix)]
+        {
+            let signal = TERMINATION_SIGNAL.load(Ordering::Relaxed);
+            match signal {
+                sig if sig == SIGTERM => ExitCode::SignalTerm.exit(),
+                sig if sig == SIGINT => ExitCode::SignalInt.exit(),
+                _ => ExitCode::SignalInt.exit(), // fallback for unknown signal
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            // Windows only supports SIGINT
+            ExitCode::SignalInt.exit();
+        }
     }
 
     let override_failed = final_stats
