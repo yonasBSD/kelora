@@ -199,7 +199,8 @@ fn test_double_sigterm_immediate_exit() {
     // Should exit with SIGTERM code (143)
     assert_eq!(
         exit_code, 143,
-        "Should exit with 143 (SIGTERM) on graceful SIGTERM shutdown. stderr: {}", stderr
+        "Should exit with 143 (SIGTERM) on graceful SIGTERM shutdown. stderr: {}",
+        stderr
     );
 
     // Verify that SIGTERM was actually received (message in stderr confirms it)
@@ -351,7 +352,8 @@ fn test_signal_during_file_processing() {
     assert!(
         exit_code == 143 || exit_code == 0,
         "Should exit with 143 (SIGTERM) or 0 (completed). Got {}. stderr: {}",
-        exit_code, stderr
+        exit_code,
+        stderr
     );
 }
 

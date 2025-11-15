@@ -1080,8 +1080,8 @@ fn test_metrics_json_with_metrics_file_writes_json_to_file() {
         std::fs::read_to_string(metrics_file_path).expect("Failed to read metrics file");
 
     // File content should be valid JSON
-    let _: serde_json::Value = serde_json::from_str(&metrics_content)
-        .expect("Metrics file should contain valid JSON");
+    let _: serde_json::Value =
+        serde_json::from_str(&metrics_content).expect("Metrics file should contain valid JSON");
 
     // Should contain our tracked metric
     assert!(
@@ -1147,23 +1147,13 @@ fn test_quiet_level_1_suppresses_diagnostics() {
     let input = r#"{"level": "info", "message": "test1"}
 {"level": "error", "message": "test2"}"#;
 
-    let (stdout, stderr, exit_code) = run_kelora_with_input(
-        &[
-            "-f",
-            "json",
-            "--stats",
-            "-q",
-        ],
-        input,
-    );
+    let (stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "--stats", "-q"], input);
 
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
     // Events should be output to stdout
-    assert!(
-        stdout.contains("level"),
-        "Events should be output with -q"
-    );
+    assert!(stdout.contains("level"), "Events should be output with -q");
 
     // stderr should be empty (stats suppressed by -q)
     assert!(
@@ -1179,14 +1169,7 @@ fn test_quiet_level_2_suppresses_events() {
     let input = r#"{"level": "info", "message": "test1"}
 {"level": "error", "message": "test2"}"#;
 
-    let (stdout, stderr, exit_code) = run_kelora_with_input(
-        &[
-            "-f",
-            "json",
-            "-qq",
-        ],
-        input,
-    );
+    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "-qq"], input);
 
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 

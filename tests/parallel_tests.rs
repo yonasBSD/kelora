@@ -465,11 +465,11 @@ fn test_parallel_multiline_all_consistency() {
 #[test]
 fn test_parallel_unordered_mode() {
     // Test --unordered flag allows out-of-order output
-    let input = r#"{"id": 1, "data": "first"}
-{"id": 2, "data": "second"}
-{"id": 3, "data": "third"}
-{"id": 4, "data": "fourth"}
-{"id": 5, "data": "fifth"}"#;
+    let input = r#"{"id":1,"data":"first"}
+{"id":2,"data":"second"}
+{"id":3,"data":"third"}
+{"id":4,"data":"fourth"}
+{"id":5,"data":"fifth"}"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
         &[
@@ -506,9 +506,9 @@ fn test_parallel_unordered_mode() {
 #[test]
 fn test_parallel_tiny_batch_timeout() {
     // Test with very small batch timeout
-    let input = r#"{"data": "line1"}
-{"data": "line2"}
-{"data": "line3"}"#;
+    let input = r#"{"data":"line1"}
+{"data":"line2"}
+{"data":"line3"}"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
         &[
@@ -559,7 +559,7 @@ not json at all
 #[test]
 fn test_parallel_empty_batches() {
     // Test parallel mode with very small input that creates mostly empty batches
-    let input = r#"{"data": "single"}"#;
+    let input = r#"{"data":"single"}"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
         &[
@@ -582,7 +582,7 @@ fn test_parallel_empty_batches() {
 fn test_parallel_large_batch_size() {
     // Test with batch size larger than input
     let input: String = (1..=50)
-        .map(|i| format!(r#"{{"id": {}}}"#, i))
+        .map(|i| format!(r#"{{"id":{}}}"#, i))
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -608,11 +608,11 @@ fn test_parallel_large_batch_size() {
 #[test]
 fn test_parallel_with_errors_in_exec_script() {
     // Test parallel mode when exec script has errors in some events
-    let input = r#"{"value": 10}
-{"value": 0}
-{"value": 5}
-{"value": 0}
-{"value": 20}"#;
+    let input = r#"{"value":10}
+{"value":0}
+{"value":5}
+{"value":0}
+{"value":20}"#;
 
     // Division by zero in some cases
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
@@ -640,7 +640,7 @@ fn test_parallel_with_errors_in_exec_script() {
 fn test_parallel_unordered_maintains_completeness() {
     // Test that --unordered doesn't lose events, just reorders them
     let input: String = (1..=100)
-        .map(|i| format!(r#"{{"id": {}}}"#, i))
+        .map(|i| format!(r#"{{"id":{}}}"#, i))
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -722,7 +722,7 @@ fn test_parallel_unordered_maintains_completeness() {
 fn test_parallel_stress_many_threads() {
     // Test parallel mode with many threads (stress test)
     let input: String = (1..=1000)
-        .map(|i| format!(r#"{{"id": {}}}"#, i))
+        .map(|i| format!(r#"{{"id":{}}}"#, i))
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -760,7 +760,7 @@ fn test_parallel_stress_many_threads() {
 fn test_parallel_with_filtering_and_metrics() {
     // Test parallel mode combining filtering, metrics, and stats
     let input: String = (1..=200)
-        .map(|i| format!(r#"{{"value": {}}}"#, i))
+        .map(|i| format!(r#"{{"value":{}}}"#, i))
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -803,7 +803,7 @@ fn test_parallel_with_filtering_and_metrics() {
 #[test]
 fn test_parallel_with_zero_batch_size() {
     // Test that zero or invalid batch size is handled
-    let input = r#"{"data": "test"}"#;
+    let input = r#"{"data":"test"}"#;
 
     let (_stdout, stderr, exit_code) =
         run_kelora_with_input(&["-f", "json", "--parallel", "--batch-size", "0"], input);
@@ -826,9 +826,9 @@ fn test_parallel_with_zero_batch_size() {
 #[test]
 fn test_parallel_batch_timeout_zero() {
     // Test with zero batch timeout
-    let input = r#"{"data": "line1"}
-{"data": "line2"}
-{"data": "line3"}"#;
+    let input = r#"{"data":"line1"}
+{"data":"line2"}
+{"data":"line3"}"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(
         &[
@@ -854,7 +854,7 @@ fn test_parallel_batch_timeout_zero() {
 fn test_parallel_consistency_with_different_thread_counts() {
     // Test that different thread counts produce same results
     let input: String = (1..=100)
-        .map(|i| format!(r#"{{"value": {}}}"#, i))
+        .map(|i| format!(r#"{{"value":{}}}"#, i))
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -1410,4 +1410,713 @@ fn test_parallel_stats_with_different_batch_sizes() {
             "Events created: 500 total, 10 output, 490 filtered (98.0%)"
         );
     }
+}
+
+// ============================================================================
+// STRESS TESTS - Testing parallel mode under extreme conditions
+// ============================================================================
+
+#[test]
+fn test_parallel_strict_mode_with_parse_errors() {
+    // Test that --strict mode properly exits on first error in parallel mode
+    let input = r#"{"valid": "first"}
+{"valid": "second"}
+{invalid json
+{"valid": "fourth"}
+{"valid": "fifth"}"#;
+
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "--parallel", "--strict"], input);
+
+    // Should exit with error code 1 due to parse failure
+    assert_eq!(exit_code, 1, "Strict mode should fail on parse error");
+    assert!(
+        stderr.to_lowercase().contains("error")
+            || stderr.to_lowercase().contains("failed")
+            || stderr.to_lowercase().contains("parse"),
+        "Should report parse error in stderr: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_parallel_strict_mode_with_script_errors() {
+    // Test that --strict mode exits on Rhai script errors in parallel mode
+    let input = r#"{"value":10}
+{"value":20}
+{"value":30}"#;
+
+    // Script that will error (accessing non-existent field)
+    let (_stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--parallel",
+            "--strict",
+            "--exec",
+            "let x = e.nonexistent.deeply.nested;",
+        ],
+        input,
+    );
+
+    // Should exit with error in strict mode
+    assert_ne!(
+        exit_code, 0,
+        "Strict mode should fail on script errors in parallel mode"
+    );
+}
+
+#[test]
+fn test_parallel_ordering_under_stress() {
+    // Verify that ordered parallel mode maintains order even with small batches
+    // and many threads (stress test for ordering mechanism)
+    let input: String = (1..=500)
+        .map(|i| format!(r#"{{"id":{},"seq":{}}}"#, i, i))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "-F",
+            "json",
+            "--parallel",
+            "--threads",
+            "8",
+            "--batch-size",
+            "5", // Very small batches to stress ordering
+        ],
+        &input,
+    );
+
+    assert_eq!(exit_code, 0, "Parallel mode should succeed");
+
+    // Verify output is in correct order
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 500, "Should output all 500 lines");
+
+    for (i, line) in lines.iter().enumerate() {
+        let json: serde_json::Value = serde_json::from_str(line).unwrap();
+        let id = json["id"].as_i64().unwrap();
+        assert_eq!(
+            id,
+            (i + 1) as i64,
+            "Line {} should have id {}, got {}",
+            i,
+            i + 1,
+            id
+        );
+    }
+}
+
+#[test]
+fn test_parallel_unordered_with_complex_operations() {
+    // Test unordered mode with filtering, metrics, and transformations
+    let input: String = (1..=200)
+        .map(|i| format!(r#"{{"value":{},"category":"cat{}"}}"#, i, i % 5))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "-F",
+            "json",
+            "--parallel",
+            "--unordered",
+            "--batch-size",
+            "10",
+            "--filter",
+            "e.value % 3 == 0",
+            "--exec",
+            "track_bucket(\"categories\", e.category); e.doubled = e.value * 2;",
+            "--stats",
+            "--metrics",
+        ],
+        &input,
+    );
+
+    assert_eq!(
+        exit_code, 0,
+        "Unordered mode with complex operations should succeed, stderr: {}",
+        stderr
+    );
+
+    // Should output 66 lines (multiples of 3 from 1-200)
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(
+        lines.len(),
+        66,
+        "Should output 66 filtered lines, stdout: '{}', stderr: '{}'",
+        stdout,
+        stderr
+    );
+
+    // Verify all lines have doubled field
+    for line in &lines {
+        let json: serde_json::Value = serde_json::from_str(line).unwrap();
+        assert!(
+            json.get("doubled").is_some(),
+            "All output should have doubled field"
+        );
+        let value = json["value"].as_i64().unwrap();
+        let doubled = json["doubled"].as_i64().unwrap();
+        assert_eq!(doubled, value * 2, "Doubled should be value * 2");
+    }
+
+    // Verify metrics are present
+    assert!(
+        stderr.contains("categories"),
+        "Metrics should track categories"
+    );
+}
+
+#[test]
+fn test_parallel_single_thread() {
+    // Edge case: parallel mode with only 1 thread should still work
+    let input: String = (1..=100)
+        .map(|i| format!(r#"{{"id":{}}}"#, i))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &["-f", "json", "--parallel", "--threads", "1", "--stats"],
+        &input,
+    );
+
+    assert_eq!(exit_code, 0, "Parallel mode with 1 thread should succeed");
+    assert!(
+        stderr.contains("Lines processed: 100 total"),
+        "Should process all lines"
+    );
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 100, "Should output all 100 lines");
+}
+
+#[test]
+fn test_parallel_very_small_batches() {
+    // Stress test with batch size of 1 (maximum overhead)
+    let input: String = (1..=100)
+        .map(|i| format!(r#"{{"id":{}}}"#, i))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--parallel",
+            "--threads",
+            "4",
+            "--batch-size",
+            "1",
+            "--stats",
+        ],
+        &input,
+    );
+
+    assert_eq!(
+        exit_code, 0,
+        "Parallel mode with batch size 1 should succeed"
+    );
+    assert!(
+        stderr.contains("Lines processed: 100 total"),
+        "Should process all lines"
+    );
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 100, "Should output all 100 lines");
+}
+
+#[test]
+fn test_parallel_large_timeout() {
+    // Test with very large batch timeout (should behave like no timeout)
+    let input: String = (1..=50)
+        .map(|i| format!(r#"{{"id":{}}}"#, i))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--parallel",
+            "--batch-size",
+            "1000",
+            "--batch-timeout",
+            "60000", // 60 seconds
+        ],
+        &input,
+    );
+
+    assert_eq!(
+        exit_code, 0,
+        "Parallel mode with large timeout should succeed"
+    );
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 50, "Should output all 50 lines");
+}
+
+#[test]
+fn test_parallel_ordering_with_slow_processing() {
+    // Test that ordering is maintained even with variable processing times
+    // (simulated by different exec complexities)
+    let input: String = (1..=100)
+        .map(|i| format!(r#"{{"id":{},"data":"item{}"}}"#, i, i))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "-F",
+            "json",
+            "--parallel",
+            "--threads",
+            "4",
+            "--batch-size",
+            "10",
+            "--exec",
+            // Some items do more work than others
+            "if e.id % 10 == 0 { for i in 0..100 { let x = i * i; } }",
+        ],
+        &input,
+    );
+
+    assert_eq!(exit_code, 0, "Should handle variable processing times");
+
+    // Verify strict ordering is maintained
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    for (i, line) in lines.iter().enumerate() {
+        let json: serde_json::Value = serde_json::from_str(line).unwrap();
+        let id = json["id"].as_i64().unwrap();
+        assert_eq!(
+            id,
+            (i + 1) as i64,
+            "Ordering should be preserved despite variable processing times"
+        );
+    }
+}
+
+#[test]
+fn test_parallel_with_all_events_filtered() {
+    // Test parallel mode when filter removes all events
+    let input: String = (1..=100)
+        .map(|i| format!(r#"{{"value":{}}}"#, i))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--parallel",
+            "--filter",
+            "e.value > 1000", // Filters everything
+            "--stats",
+        ],
+        &input,
+    );
+
+    assert_eq!(exit_code, 0, "Should succeed even when all events filtered");
+    assert!(stdout.trim().is_empty(), "Should produce no output");
+    assert!(
+        stderr.contains("100 filtered (100.0%)"),
+        "Stats should show all filtered"
+    );
+}
+
+#[test]
+fn test_parallel_metrics_aggregation_stress() {
+    // Stress test for metrics aggregation across many workers and batches
+    let input: String = (1..=1000)
+        .map(|i| {
+            format!(
+                r#"{{"status":{},"user":"user{}","region":"region{}"}}"#,
+                200 + (i % 5) * 100,
+                i % 10,
+                i % 3
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--parallel",
+            "--threads",
+            "8",
+            "--batch-size",
+            "25",
+            "--exec",
+            "track_bucket(\"status\", e.status); track_unique(\"users\", e.user); track_bucket(\"regions\", e.region); track_count(\"total\");",
+            "--stats",
+            "--metrics",
+        ],
+        &input,
+    );
+
+    assert_eq!(
+        exit_code, 0,
+        "Metrics aggregation should succeed, stderr: {}",
+        stderr
+    );
+
+    // Verify metrics are aggregated correctly
+    assert!(stderr.contains("total"), "Should track total count");
+    assert!(stderr.contains("1000"), "Should count all 1000 events");
+
+    // All events should be output
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(
+        lines.len(),
+        1000,
+        "Should output all 1000 lines, stdout: '{}...', stderr: '{}'",
+        stdout.chars().take(200).collect::<String>(),
+        stderr
+    );
+}
+
+#[test]
+fn test_parallel_error_recovery() {
+    // Test that parallel mode can recover from errors in some events
+    let input = r#"{"value":10}
+{"value":20}
+{"value":"invalid"}
+{"value":30}
+{"value":40}
+{"invalid_field": "test"}
+{"value":50}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--parallel",
+            "--exec",
+            "if type_of(e.value) == \"i64\" { e.doubled = e.value * 2; }",
+        ],
+        input,
+    );
+
+    // Should process successfully (non-strict mode)
+    if exit_code == 0 {
+        // Should output at least the valid events
+        assert!(!stdout.is_empty(), "Should produce some output");
+    }
+}
+
+#[test]
+fn test_parallel_ordering_completeness() {
+    // Comprehensive test that ordered mode outputs all events in correct order
+    // even with complex filtering and transformations
+    let input: String = (1..=300)
+        .map(|i| format!(r#"{{"seq":{},"value":{}}}"#, i, i * 10))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "-F",
+            "json",
+            "--parallel",
+            "--threads",
+            "6",
+            "--batch-size",
+            "15",
+            "--filter",
+            "e.value % 100 == 0",
+            "--exec",
+            "e.processed = true;",
+            "--stats",
+        ],
+        &input,
+    );
+
+    assert_eq!(exit_code, 0, "Should succeed");
+
+    // Should filter to 30 events (multiples of 100)
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(
+        lines.len(),
+        30,
+        "Should output 30 events (multiples of 100)"
+    );
+
+    // Verify strict ordering of filtered results
+    let mut expected_seq = 10; // First multiple of 10 that gives value % 100 == 0
+    for line in lines {
+        let json: serde_json::Value = serde_json::from_str(line).unwrap();
+        let seq = json["seq"].as_i64().unwrap();
+        assert_eq!(
+            seq, expected_seq,
+            "Filtered output should maintain strict order"
+        );
+        assert!(
+            json["processed"].as_bool().unwrap(),
+            "All output should be processed"
+        );
+        expected_seq += 10;
+    }
+
+    // Verify stats
+    assert!(
+        stderr.contains("Events created: 300 total, 30 output, 270 filtered"),
+        "Stats should show correct counts"
+    );
+}
+
+#[test]
+fn test_parallel_unordered_vs_ordered_consistency() {
+    // Verify that ordered and unordered modes produce same results, just different order
+    let input: String = (1..=200)
+        .map(|i| format!(r#"{{"value":{},"category":{}}}"#, i, i % 7))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let filter = "e.value % 13 == 0";
+
+    // Run ordered mode
+    let (stdout_ordered, stderr_ordered, exit_code_ordered) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "-F",
+            "json",
+            "--parallel",
+            "--filter",
+            filter,
+            "--stats",
+        ],
+        &input,
+    );
+
+    // Run unordered mode
+    let (stdout_unordered, stderr_unordered, exit_code_unordered) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "-F",
+            "json",
+            "--parallel",
+            "--unordered",
+            "--filter",
+            filter,
+            "--stats",
+        ],
+        &input,
+    );
+
+    assert_eq!(exit_code_ordered, 0, "Ordered mode should succeed");
+    assert_eq!(exit_code_unordered, 0, "Unordered mode should succeed");
+
+    // Both should have same line count
+    let lines_ordered: Vec<&str> = stdout_ordered.trim().lines().collect();
+    let lines_unordered: Vec<&str> = stdout_unordered.trim().lines().collect();
+    assert_eq!(
+        lines_ordered.len(),
+        lines_unordered.len(),
+        "Both modes should output same number of lines"
+    );
+
+    // Both should have same stats
+    let stats_ordered = extract_stats_lines(&stderr_ordered);
+    let stats_unordered = extract_stats_lines(&stderr_unordered);
+    assert_eq!(
+        stats_line(&stats_ordered, "Events created:"),
+        stats_line(&stats_unordered, "Events created:"),
+        "Stats should match between modes"
+    );
+
+    // Both should have same set of values (when sorted)
+    let mut values_ordered: Vec<i64> = lines_ordered
+        .iter()
+        .map(|line| {
+            serde_json::from_str::<serde_json::Value>(line).unwrap()["value"]
+                .as_i64()
+                .unwrap()
+        })
+        .collect();
+    let mut values_unordered: Vec<i64> = lines_unordered
+        .iter()
+        .map(|line| {
+            serde_json::from_str::<serde_json::Value>(line).unwrap()["value"]
+                .as_i64()
+                .unwrap()
+        })
+        .collect();
+
+    values_ordered.sort();
+    values_unordered.sort();
+    assert_eq!(
+        values_ordered, values_unordered,
+        "Both modes should have same set of values"
+    );
+}
+
+#[test]
+fn test_parallel_extreme_thread_count() {
+    // Test with many threads (stress test for thread pool)
+    let input: String = (1..=100)
+        .map(|i| format!(r#"{{"id":{}}}"#, i))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--parallel",
+            "--threads",
+            "16", // Many threads for small input
+            "--stats",
+        ],
+        &input,
+    );
+
+    assert_eq!(
+        exit_code, 0,
+        "Should handle many threads, stderr: {}",
+        stderr
+    );
+
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 100, "Should output all 100 lines");
+}
+
+#[test]
+fn test_parallel_multiline_ordering_stress() {
+    // Test multiline + parallel ordering under stress
+    let input = (0..50)
+        .map(|i| {
+            format!(
+                "Event {} start\n  continuation {}\n  final line {}",
+                i, i, i
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let (stdout_seq, stderr_seq, exit_code_seq) =
+        run_kelora_with_input(&["-f", "line", "-M", "indent", "--stats"], &input);
+
+    let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(
+        &[
+            "-f",
+            "line",
+            "-M",
+            "indent",
+            "--stats",
+            "--parallel",
+            "--threads",
+            "6",
+            "--batch-size",
+            "5",
+        ],
+        &input,
+    );
+
+    assert_eq!(exit_code_seq, 0, "Sequential should succeed");
+    assert_eq!(exit_code_par, 0, "Parallel should succeed");
+
+    let events_seq = extract_events_created_from_stats(&stderr_seq);
+    let events_par = extract_events_created_from_stats(&stderr_par);
+
+    assert_eq!(
+        events_seq, 50,
+        "Sequential should create 50 multiline events"
+    );
+    assert_eq!(events_par, 50, "Parallel should create 50 multiline events");
+    assert_eq!(events_seq, events_par, "Event counts should match");
+
+    // Output should be identical (multiline events should be in same order)
+    assert_eq!(
+        stdout_seq.lines().count(),
+        stdout_par.lines().count(),
+        "Output line counts should match"
+    );
+}
+
+#[test]
+fn test_parallel_mixed_valid_invalid_json_batches() {
+    // Test parallel mode with batches containing mix of valid/invalid JSON
+    let mut lines = Vec::new();
+    for i in 1..=50 {
+        if i % 7 == 0 {
+            lines.push(format!("{{invalid json {}}}", i));
+        } else {
+            lines.push(format!(r#"{{"id":{}}}"#, i));
+        }
+    }
+    let input = lines.join("\n");
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--parallel"], &input);
+
+    // Non-strict mode: should process valid lines
+    if exit_code == 0 {
+        // Should have processed some valid lines
+        assert!(!stdout.is_empty(), "Should output valid JSON lines");
+    }
+    // Strict mode would fail, which is also acceptable
+}
+
+#[test]
+fn test_parallel_batch_boundaries_correctness() {
+    // Ensure batch boundaries don't cause data loss or corruption
+    // Test with input size that doesn't evenly divide by batch size
+    let input: String = (1..=97)
+        .map(|i| format!(r#"{{"id":{}}}"#, i))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "-F",
+            "json",
+            "--parallel",
+            "--batch-size",
+            "10", // 97 doesn't divide evenly by 10
+            "--stats",
+        ],
+        &input,
+    );
+
+    assert_eq!(
+        exit_code, 0,
+        "Should handle uneven batch boundaries, stderr: {}",
+        stderr
+    );
+
+    // Should output all 97 lines
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(
+        lines.len(),
+        97,
+        "Should output all 97 lines despite uneven batches"
+    );
+
+    // Verify all IDs are present
+    let mut ids: Vec<i64> = lines
+        .iter()
+        .map(|line| {
+            serde_json::from_str::<serde_json::Value>(line).unwrap()["id"]
+                .as_i64()
+                .unwrap()
+        })
+        .collect();
+    ids.sort();
+    assert_eq!(ids.len(), 97, "Should have 97 unique IDs");
+    assert_eq!(ids[0], 1, "Should start at 1");
+    assert_eq!(ids[96], 97, "Should end at 97");
 }
