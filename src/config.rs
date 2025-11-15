@@ -604,6 +604,16 @@ impl KeloraConfig {
         };
 
         let default_timezone = determine_default_timezone(cli);
+        let quiet_alias_level = if cli.silent {
+            3
+        } else if cli.no_events {
+            2
+        } else if cli.no_diagnostics {
+            1
+        } else {
+            0
+        };
+        let quiet_level = cli.quiet.max(quiet_alias_level);
         let flatten_levels = |values: &[String]| -> Vec<String> {
             values
                 .iter()
@@ -642,7 +652,7 @@ impl KeloraConfig {
             output: OutputConfig {
                 format: if cli.stats_only {
                     OutputFormat::None
-                } else if cli.quiet >= 2 {
+                } else if quiet_level >= 2 {
                     // Quiet level 2+: suppress event output
                     OutputFormat::None
                 } else if cli.json_output {
@@ -678,8 +688,8 @@ impl KeloraConfig {
                 normalize_timestamps: cli.normalize_ts,
                 take_limit: cli.take,
                 strict: cli.strict,
-                verbose: if cli.quiet > 0 { 0 } else { cli.verbose },
-                quiet_level: cli.quiet,
+                verbose: if quiet_level > 0 { 0 } else { cli.verbose },
+                quiet_level,
                 context: create_context_config(cli)?,
                 allow_fs_writes: cli.allow_fs_writes,
             },

@@ -248,15 +248,39 @@ pub struct Cli {
     #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count, help_heading = "Error Handling")]
     pub verbose: u8,
 
-    /// Quiet mode with explicit levels (default: off).
+    /// Quiet mode with explicit levels (-q/-qq/-qqq). Aliases: --no-diagnostics, --no-events, --silent.
     #[arg(
         short = 'q',
         long = "quiet",
         action = clap::ArgAction::Count,
         help_heading = "Error Handling",
-        help = "Quiet mode with explicit levels (default: off).\n\n  -q   Suppress kelora diagnostics (errors, stats) and context markers (-A/-B/-C)\n  -qq  Additionally suppress event output (same as -F none)\n  -qqq Additionally suppress script side effects (print/eprint)"
+        help = "Quiet mode: -q suppresses diagnostics; -qq also suppresses events; -qqq also suppresses script output."
     )]
     pub quiet: u8,
+
+    /// Alias for -q (suppress diagnostics)
+    #[arg(
+        long = "no-diagnostics",
+        help_heading = "Error Handling",
+        help = "Quiet alias for -q: suppress diagnostics."
+    )]
+    pub no_diagnostics: bool,
+
+    /// Alias for -qq (suppress diagnostics and events)
+    #[arg(
+        long = "no-events",
+        help_heading = "Error Handling",
+        help = "Quiet alias for -qq: suppress diagnostics and events."
+    )]
+    pub no_events: bool,
+
+    /// Alias for -qqq (silent)
+    #[arg(
+        long = "silent",
+        help_heading = "Error Handling",
+        help = "Quiet alias for -qqq: no diagnostics, events, or script output."
+    )]
+    pub silent: bool,
 
     /// Include only events with these log levels
     #[arg(
