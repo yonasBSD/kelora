@@ -99,6 +99,6 @@ Justfile                 # Build automation
 
 **Test quickly:** `time ./target/release/kelora -f json logfile.json --filter "e.level == 'ERROR'" > /dev/null`
 
-**Quiet modes:** `-q` (suppress diagnostics), `-qq` (also suppress events), `-qqq` (also suppress script output)
+**Quiet/output toggles:** `-q/--no-events` (suppress events), `--no-diagnostics` (suppress diagnostics), `--silent` (suppress terminal output except fatal line; metrics files still write), `--no-script-output` (suppress Rhai print/eprint; implied by --silent, --metrics-only, --stats-only), `--metrics-only`, `--stats-only`
 
 **Config precedence:** CLI args > `.kelora.ini` (project) > `~/.config/kelora/kelora.ini` (user) > defaults

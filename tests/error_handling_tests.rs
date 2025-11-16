@@ -110,7 +110,7 @@ invalid json line
 
 #[test]
 fn test_quiet_levels_with_errors() {
-    // Test that quiet levels still preserve exit codes for errors
+    // Test that silent/quiet still preserve exit codes for errors
     let input = r#"{"level": "info", "message": "test"}"#;
 
     // Test with a filter that would cause an error
@@ -121,7 +121,7 @@ fn test_quiet_levels_with_errors() {
             "--filter",
             "e.nonexistent.field == true",
             "--strict",
-            "-qqq",
+            "--silent",
         ],
         input,
     );
@@ -129,10 +129,10 @@ fn test_quiet_levels_with_errors() {
     // Should have non-zero exit code due to error
     assert_ne!(exit_code, 0);
 
-    // Should have no output in quiet mode
+    // Should have no output in silent mode
     assert_eq!(stdout.trim(), "");
 
-    // In strict mode with -qqq, even error messages should be suppressed
+    // In strict mode with --silent, even error messages should be suppressed
     // but exit code should still indicate failure
 }
 

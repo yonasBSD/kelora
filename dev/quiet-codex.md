@@ -67,5 +67,5 @@
 ## Migration Guidance
 - Old `-q` (diagnostics off) becomes `--no-diagnostics`.
 - Old `-qq` (no events) becomes `-q` (or `-F none`/`--no-events`).
-- Old `-qqq/--silent` (mostly silent but still metrics) becomes new `--silent` (silent for stdout/stderr except the single fatal line; metrics files still write).
+- Old ladder superseded: use `--silent` for terminal silence (one fatal line allowed; metrics files still write).
 - New `--metrics-only`: use when you want metrics emitted without events/diagnostics/stats; not available in the prior ladder.

@@ -1100,7 +1100,7 @@ e.lines = read_lines("data.txt")
 ```
 
 #### `print(message)` / `eprint(message)`
-Print to stdout/stderr (suppressed with `-qqq`).
+Print to stdout/stderr (suppressed with `--no-script-output`/`--silent`).
 
 ```rhai
 print("Processing event: " + e.id)

@@ -80,12 +80,12 @@ Embed the pipeline in a script so that your automation platform can restart it o
 #!/usr/bin/env bash
 set -euo pipefail
 
-if ! tail -f /var/log/app.log | kelora -j -qqq -l critical; then
+if ! tail -f /var/log/app.log | kelora -j --silent -l critical; then
   printf 'Critical log seen at %s\n' "$(date -Is)" | mail -s "PROD critical" ops@example.com
 fi
 ```
 
-- `-qqq` suppresses both events and script output; only exit status remains.
+- `--silent` suppresses terminal output; only exit status (and metrics files) remains.
 - Add `systemd` or supervisor configuration around this script to handle restarts.
 
 ## Variations

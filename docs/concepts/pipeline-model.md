@@ -467,7 +467,7 @@ kelora -j app.log --strict
 
 - `-q` - Suppress diagnostics
 - `-qq` - Suppress diagnostics and events
-- `-qqq` - Suppress diagnostics, events, and script output
+- `--silent` - Suppress terminal output (events, diagnostics, stats, terminal metrics, script output); one fatal line on errors; metrics files still write
 
 ---
 

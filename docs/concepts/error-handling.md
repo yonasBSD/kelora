@@ -246,52 +246,25 @@ kelora -j --strict --verbose app.log
 
 Errors are shown immediately, then processing aborts.
 
-## Quiet Modes
+## Quiet/Silent Controls
 
-### Graduated Quiet Levels
+Use the new orthogonal toggles to control output for automation:
 
-Suppress output for automation:
+| Flag | Effect |
+|------|--------|
+| `-q` / `--no-events` | Suppress events (formatter output) |
+| `--no-diagnostics` | Suppress diagnostics/summaries (fatal line still emitted) |
+| `--silent` | Suppress all terminal output (events/diagnostics/stats/terminal metrics/script output); emit one fatal line on errors; metrics files still write |
+| `--no-script-output` | Suppress Rhai `print`/`eprint` (implied by `--silent`, `--metrics-only`, `--stats-only`) |
+| `--metrics-only` | Emit metrics only (suppress events, diagnostics except fatal line, stats, script output) |
+| `--stats-only` (`-S`) | Emit stats only (suppress events, script output; diagnostics stay on) |
 
-| Level | Effect |
-|-------|--------|
-| `-q` | Suppress diagnostics (errors, stats, context markers) |
-| `-qq` | Additionally suppress event output (same as `-F none`) |
-| `-qqq` | Additionally suppress script side effects (`print()`, `eprint()`) |
-
-### Level 1: Suppress Diagnostics
-
-```bash
-kelora -q -j app.log --stats
-```
-
-- Errors not shown
-- Stats not shown
-- Events still output
-- Exit code indicates success/failure
-
-### Level 2: Suppress Events
+Examples:
 
 ```bash
-kelora -qq -j app.log --exec 'track_count(e.service)' --metrics
-```
-
-- Errors not shown
-- Events not shown
-- Metrics still shown (if `--metrics`)
-- Exit code indicates success/failure
-
-### Level 3: Complete Silence
-
-```bash
-kelora -qqq -j app.log
-```
-
-- No output at all
-- Exit code is only indicator
-- Useful for validation pipelines
-
-```bash
-kelora -qqq -j app.log && echo "Clean" || echo "Has errors"
+kelora -q -j app.log --stats                         # No events; stats emit
+kelora --silent -j app.log && echo "Clean" || echo "Has errors"
+kelora --metrics-only --metrics-file metrics.json app.log
 ```
 
 ## Exit Codes
