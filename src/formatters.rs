@@ -567,7 +567,7 @@ impl DefaultFormatter {
     fn get_context_prefix(&self, event: &Event) -> String {
         use crate::event::ContextType;
 
-        // Suppress context markers in quiet modes (-q/-qq/-qqq)
+        // Suppress context markers when events are disabled (-q/--no-events/OutputFormat::None)
         if self.quiet_level > 0 {
             return String::new();
         }

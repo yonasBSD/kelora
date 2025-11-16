@@ -2299,9 +2299,8 @@ ERROR HANDLING MODES:
   --strict mode:
     • Any error → abort with exit code 1
 
-QUIET MODE SIDE EFFECTS:
-  print("msg")                         Levels -q/-qq: visible, -qqq: suppressed
-  eprint("err")                        Levels -q/-qq: visible, -qqq: suppressed
+OUTPUT SUPPRESSION:
+  print(\"msg\") / eprint(\"err\")           Visible by default; suppressed with --no-script-output or --silent
   File ops (append_file, etc.)         Always work (needs --allow-fs-writes)
 
 See also:
