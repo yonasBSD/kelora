@@ -248,39 +248,29 @@ pub struct Cli {
     #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count, help_heading = "Error Handling")]
     pub verbose: u8,
 
-    /// Quiet mode with explicit levels (-q/-qq/-qqq). Aliases: --no-diagnostics, --no-events, --silent.
-    #[arg(
-        short = 'q',
-        long = "quiet",
-        action = clap::ArgAction::Count,
-        help_heading = "Error Handling",
-        help = "Quiet mode: -q suppresses diagnostics; -qq also suppresses events; -qqq also suppresses script output."
-    )]
-    pub quiet: u8,
+    /// Suppress events (formatter output). Alias: --no-events / -F none.
+    #[arg(short = 'q', long = "quiet", help_heading = "Error Handling")]
+    pub quiet: bool,
 
-    /// Alias for -q (suppress diagnostics)
-    #[arg(
-        long = "no-diagnostics",
-        help_heading = "Error Handling",
-        help = "Quiet alias for -q: suppress diagnostics."
-    )]
-    pub no_diagnostics: bool,
-
-    /// Alias for -qq (suppress diagnostics and events)
-    #[arg(
-        long = "no-events",
-        help_heading = "Error Handling",
-        help = "Quiet alias for -qq: suppress diagnostics and events."
-    )]
+    /// Suppress events (formatter output). Alias for -q.
+    #[arg(long = "no-events", help_heading = "Error Handling")]
     pub no_events: bool,
 
-    /// Alias for -qqq (silent)
-    #[arg(
-        long = "silent",
-        help_heading = "Error Handling",
-        help = "Quiet alias for -qqq: no diagnostics, events, or script output."
-    )]
+    /// Suppress diagnostics and error summaries (fatal line still allowed).
+    #[arg(long = "no-diagnostics", help_heading = "Error Handling")]
+    pub no_diagnostics: bool,
+
+    /// Silence all stdout/stderr emitters except a single fatal line; metrics files still write.
+    #[arg(long = "silent", help_heading = "Error Handling")]
     pub silent: bool,
+
+    /// Disable a silent default coming from config.
+    #[arg(long = "no-silent", help_heading = "Error Handling")]
+    pub no_silent: bool,
+
+    /// Suppress Rhai print/eprint and side-effect warnings.
+    #[arg(long = "no-script-output", help_heading = "Error Handling")]
+    pub no_script_output: bool,
 
     /// Include only events with these log levels
     #[arg(
@@ -504,9 +494,17 @@ pub struct Cli {
         short = 'S',
         long = "stats-only",
         help_heading = "Metrics and Stats",
-        help = "Print processing statistics only (implies -F none)."
+        help = "Emit stats without events (implies -F none and --no-script-output). Diagnostics remain on."
     )]
     pub stats_only: bool,
+
+    /// Emit metrics only: suppress events, diagnostics (except fatal line), stats, and script output; still emit metrics.
+    #[arg(
+        long = "metrics-only",
+        help_heading = "Metrics and Stats",
+        help = "Emit metrics only: suppress events, diagnostics (except fatal line), stats, and script output; does not imply --silent. Metrics files still write; terminal metrics suppressed by --silent."
+    )]
+    pub metrics_only: bool,
 
     /// Show tracked metrics (default: off). Use -mm for full output without truncation.
     #[arg(

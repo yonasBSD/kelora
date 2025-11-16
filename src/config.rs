@@ -144,7 +144,15 @@ pub struct ProcessingConfig {
     pub span: Option<SpanConfig>,
     /// Show detailed error information (levels: 0-3) - new resiliency model
     pub verbose: u8,
-    /// Quiet mode level (0=normal, 1=suppress diagnostics, 2=suppress events, 3=suppress script output)
+    /// Suppress formatter/event output (-q/--no-events/-F none, stats-only, metrics-only)
+    pub quiet_events: bool,
+    /// Suppress diagnostics and summaries (--no-diagnostics)
+    pub suppress_diagnostics: bool,
+    /// Suppress all stdout/stderr emitters except the single fatal line (--silent)
+    pub silent: bool,
+    /// Suppress Rhai print/eprint and side-effect warnings (--no-script-output, --silent, stats-only, metrics-only)
+    pub suppress_script_output: bool,
+    /// Legacy quiet level used by some helpers (derived from the above flags)
     pub quiet_level: u8,
     /// Context options for showing surrounding lines around matches
     pub context: ContextConfig,
@@ -506,7 +514,7 @@ pub fn print_verbose_error_to_stderr(
 ) {
     // Check if output is suppressed (quiet mode)
     if let Some(cfg) = config {
-        if cfg.processing.quiet_level > 0 {
+        if cfg.processing.silent || cfg.processing.suppress_diagnostics {
             return;
         }
     }
@@ -525,7 +533,7 @@ pub fn print_verbose_error_to_stderr_pipeline(
 ) {
     // Check if output is suppressed (quiet mode)
     if let Some(cfg) = config {
-        if cfg.quiet_level > 0 {
+        if cfg.silent || cfg.suppress_diagnostics {
             return;
         }
     }
@@ -604,16 +612,15 @@ impl KeloraConfig {
         };
 
         let default_timezone = determine_default_timezone(cli);
-        let quiet_alias_level = if cli.silent {
-            3
-        } else if cli.no_events {
-            2
-        } else if cli.no_diagnostics {
-            1
-        } else {
-            0
-        };
-        let quiet_level = cli.quiet.max(quiet_alias_level);
+        let mut quiet_events = cli.quiet || cli.no_events;
+        let mut suppress_diagnostics = cli.no_diagnostics;
+        let mut silent = cli.silent;
+        if cli.no_silent {
+            silent = false;
+        }
+        let mut suppress_script_output = cli.no_script_output || silent;
+        let stats_only_mode = cli.stats_only;
+        let metrics_only_mode = cli.metrics_only;
         let flatten_levels = |values: &[String]| -> Vec<String> {
             values
                 .iter()
@@ -625,6 +632,83 @@ impl KeloraConfig {
         };
         let include_levels = flatten_levels(&cli.levels);
         let exclude_levels = flatten_levels(&cli.exclude_levels);
+        if stats_only_mode {
+            quiet_events = true;
+        }
+        if metrics_only_mode {
+            quiet_events = true;
+        }
+
+        let mut output_format = if cli.json_output {
+            OutputFormat::Json
+        } else {
+            cli.output_format.clone().into()
+        };
+
+        if stats_only_mode {
+            output_format = OutputFormat::None;
+            suppress_script_output = true;
+        }
+
+        if metrics_only_mode {
+            output_format = OutputFormat::None;
+            suppress_diagnostics = true;
+            suppress_script_output = true;
+        }
+
+        if matches!(output_format, OutputFormat::None) {
+            quiet_events = true;
+        }
+
+        if quiet_events {
+            output_format = OutputFormat::None;
+        }
+
+        if silent {
+            quiet_events = true;
+            suppress_script_output = true;
+        }
+
+        if quiet_events {
+            output_format = OutputFormat::None;
+        }
+
+        let mut stats_enabled = if cli.no_stats {
+            false
+        } else {
+            cli.stats || cli.stats_only
+        };
+        if metrics_only_mode {
+            stats_enabled = false;
+        }
+
+        let mut metrics_count = if cli.no_metrics { 0 } else { cli.metrics };
+        let metrics_json = if cli.no_metrics {
+            false
+        } else {
+            cli.metrics_json
+        };
+        let metrics_file = if cli.no_metrics {
+            None
+        } else {
+            cli.metrics_file.clone()
+        };
+        if metrics_only_mode && metrics_count == 0 && !metrics_json && metrics_file.is_none() {
+            metrics_count = 1;
+        }
+
+        let quiet_level = if suppress_script_output {
+            3
+        } else if suppress_diagnostics || silent {
+            1
+        } else {
+            0
+        };
+        let verbose_level = if suppress_diagnostics || silent {
+            0
+        } else {
+            cli.verbose
+        };
 
         Ok(Self {
             input: InputConfig {
@@ -650,16 +734,7 @@ impl KeloraConfig {
                 cols_sep: cli.cols_sep.clone(),
             },
             output: OutputConfig {
-                format: if cli.stats_only {
-                    OutputFormat::None
-                } else if quiet_level >= 2 {
-                    // Quiet level 2+: suppress event output
-                    OutputFormat::None
-                } else if cli.json_output {
-                    OutputFormat::Json
-                } else {
-                    cli.output_format.clone().into()
-                },
+                format: output_format,
                 keys: cli.keys.clone(),
                 exclude_keys: cli.exclude_keys.clone(),
                 core: cli.core,
@@ -668,10 +743,10 @@ impl KeloraConfig {
                 pretty: cli.expand_nested,
                 color: color_mode,
                 no_emoji: cli.no_emoji,
-                stats: cli.stats || cli.stats_only,
-                metrics: cli.metrics,
-                metrics_json: cli.metrics_json,
-                metrics_file: cli.metrics_file.clone(),
+                stats: stats_enabled,
+                metrics: metrics_count,
+                metrics_json,
+                metrics_file,
                 mark_gaps: None,
                 timestamp_formatting: create_timestamp_format_config(cli, default_timezone.clone()),
             },
@@ -688,7 +763,11 @@ impl KeloraConfig {
                 normalize_timestamps: cli.normalize_ts,
                 take_limit: cli.take,
                 strict: cli.strict,
-                verbose: if quiet_level > 0 { 0 } else { cli.verbose },
+                verbose: verbose_level,
+                quiet_events,
+                suppress_diagnostics,
+                silent,
+                suppress_script_output,
                 quiet_level,
                 context: create_context_config(cli)?,
                 allow_fs_writes: cli.allow_fs_writes,
@@ -782,6 +861,10 @@ impl Default for KeloraConfig {
                 take_limit: None,
                 strict: false,
                 verbose: 0,
+                quiet_events: false,
+                suppress_diagnostics: false,
+                silent: false,
+                suppress_script_output: false,
                 quiet_level: 0,
                 context: ContextConfig::disabled(),
                 allow_fs_writes: false,

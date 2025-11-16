@@ -113,7 +113,7 @@ See [Process Archives at Scale](batch-process-archives.md) for parallel processi
 
 ### tail / journalctl — Live Streaming
 
-Stream live log data into Kelora for real-time monitoring and alerting during deployments or incidents. Use `tail -F` (capital F) to survive log rotation. Combine with Kelora's `-qq` for quiet monitoring.
+Stream live log data into Kelora for real-time monitoring and alerting during deployments or incidents. Use `tail -F` (capital F) to survive log rotation. Combine with Kelora's `-q` to suppress event output while keeping diagnostics and metrics visible.
 
 ```bash
 # Monitor live logs for critical errors

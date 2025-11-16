@@ -176,7 +176,7 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
             detect_format_for_parallel_mode(&config.input.files, config.input.no_input)?;
 
         // Report detected format
-        if config.processing.quiet_level == 0 {
+        if !config.processing.silent && !config.processing.suppress_diagnostics {
             let format_name = format!("{:?}", detected_format).to_lowercase();
             let message =
                 config.format_error_message(&format!("auto-detected format: {}", format_name));
@@ -322,7 +322,7 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
 
         let detected_format = detect_format_from_peekable_reader(&mut peekable_reader)?;
 
-        if config.processing.quiet_level == 0 {
+        if !config.processing.silent && !config.processing.suppress_diagnostics {
             let format_name = format!("{:?}", detected_format).to_lowercase();
             let message =
                 config.format_error_message(&format!("auto-detected format: {}", format_name));
@@ -349,7 +349,7 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
             detect_format_from_peekable_reader(&mut peekable_reader)?
         };
 
-        if config.processing.quiet_level == 0 {
+        if !config.processing.silent && !config.processing.suppress_diagnostics {
             let format_name = format!("{:?}", detected_format).to_lowercase();
             let message =
                 config.format_error_message(&format!("auto-detected format: {}", format_name));
@@ -1029,7 +1029,10 @@ fn maybe_print_missing_format_tip(
     stderr: &mut SafeStderr,
 ) {
     // Respect explicit suppression and quiet modes
-    if std::env::var("KELORA_NO_TIPS").is_ok() || config.processing.quiet_level > 0 {
+    if std::env::var("KELORA_NO_TIPS").is_ok()
+        || config.processing.quiet_events
+        || config.processing.silent
+    {
         return;
     }
 
@@ -1099,12 +1102,13 @@ fn main() -> Result<()> {
     let mut config = KeloraConfig::from_cli(&cli)?;
     // Set the ordered stages directly
     config.processing.stages = ordered_stages;
+    let diagnostics_allowed = !config.processing.silent && !config.processing.suppress_diagnostics;
 
     // Hint about format selection when user didn't specify -f/--input-format
     maybe_print_missing_format_tip(&matches, &cli, &config, &mut stderr);
 
     if config.processing.span.is_some()
-        && config.processing.quiet_level == 0
+        && diagnostics_allowed
         && (config.performance.parallel
             || config.performance.threads > 0
             || config.performance.batch_size.is_some())
@@ -1117,7 +1121,7 @@ fn main() -> Result<()> {
 
     if let Some(span_cfg) = &config.processing.span {
         if let SpanMode::Count { events_per_span } = span_cfg.mode {
-            if events_per_span > 100_000 && config.processing.quiet_level == 0 {
+            if events_per_span > 100_000 && diagnostics_allowed {
                 let warning = config.format_error_message(
                     "span size above 100000 may require substantial memory; consider time-based spans",
                 );
@@ -1439,6 +1443,10 @@ fn main() -> Result<()> {
     }
 
     // Handle output destination and run pipeline
+    let diagnostics_allowed_runtime =
+        !config.processing.silent && !config.processing.suppress_diagnostics;
+    let terminal_allowed = !config.processing.silent;
+
     let result = if let Some(ref output_file_path) = cli.output_file {
         // Use file output
         let file_output = match SafeFileOut::new(output_file_path) {
@@ -1460,7 +1468,10 @@ fn main() -> Result<()> {
     let (final_stats, tracking_data) = match result {
         Ok(pipeline_result) => {
             // Print metrics if enabled (only if not terminated)
-            if config.output.metrics > 0 && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+            if config.output.metrics > 0
+                && terminal_allowed
+                && !SHOULD_TERMINATE.load(Ordering::Relaxed)
+            {
                 let metrics_output = crate::rhai_functions::tracking::format_metrics_output(
                     &pipeline_result.tracking_data.user,
                     config.output.metrics,
@@ -1473,7 +1484,10 @@ fn main() -> Result<()> {
             }
 
             // Print metrics as JSON to stderr if --metrics-json enabled
-            if config.output.metrics_json && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+            if config.output.metrics_json
+                && terminal_allowed
+                && !SHOULD_TERMINATE.load(Ordering::Relaxed)
+            {
                 if let Ok(json_output) = crate::rhai_functions::tracking::format_metrics_json(
                     &pipeline_result.tracking_data.user,
                 ) {
@@ -1502,15 +1516,15 @@ fn main() -> Result<()> {
             // Print output based on configuration (only if not terminated)
             if !SHOULD_TERMINATE.load(Ordering::Relaxed) {
                 if let Some(ref s) = pipeline_result.stats {
-                    if config.output.stats && config.processing.quiet_level == 0 {
-                        // Full stats when --stats flag is used (unless quiet level > 0)
+                    if config.output.stats && terminal_allowed {
+                        // Full stats when --stats flag is used (unless suppressed)
                         stderr
                             .writeln(&config.format_stats_message(
                                 &s.format_stats(config.input.multiline.is_some()),
                             ))
                             .unwrap_or(());
-                    } else if config.processing.quiet_level == 0 {
-                        // Error summary by default when errors occur (unless quiet level > 0)
+                    } else if diagnostics_allowed_runtime {
+                        // Error summary by default when errors occur (unless diagnostics suppressed)
                         if let Some(error_summary) =
                             crate::rhai_functions::tracking::extract_error_summary_from_tracking(
                                 &pipeline_result.tracking_data,
@@ -1529,9 +1543,7 @@ fn main() -> Result<()> {
             (pipeline_result.stats, Some(pipeline_result.tracking_data))
         }
         Err(e) => {
-            stderr
-                .writeln(&config.format_error_message(&format!("Pipeline error: {}", e)))
-                .unwrap_or(());
+            emit_fatal_line(&mut stderr, &config, &format!("Pipeline error: {}", e));
             ExitCode::GeneralError.exit();
         }
     };
@@ -1539,20 +1551,20 @@ fn main() -> Result<()> {
     // Check if we were terminated by a signal and print output
     if TERMINATED_BY_SIGNAL.load(Ordering::Relaxed) {
         if let Some(stats) = final_stats {
-            if config.output.stats && config.processing.quiet_level == 0 {
-                // Full stats when --stats flag is used (unless quiet level > 0)
+            if config.output.stats && terminal_allowed {
+                // Full stats when --stats flag is used (unless suppressed)
                 stderr
                     .writeln(&config.format_stats_message(
                         &stats.format_stats(config.input.multiline.is_some()),
                     ))
                     .unwrap_or(());
-            } else if stats.has_errors() && config.processing.quiet_level == 0 {
-                // Error summary by default when errors occur (unless quiet level > 0)
+            } else if stats.has_errors() && diagnostics_allowed_runtime {
+                // Error summary by default when errors occur (unless suppressed)
                 stderr
                     .writeln(&config.format_error_message(&stats.format_error_summary()))
                     .unwrap_or(());
             }
-        } else if config.output.stats && config.processing.quiet_level == 0 {
+        } else if config.output.stats && terminal_allowed {
             stderr
                 .writeln(&config.format_stats_message("Processing interrupted"))
                 .unwrap_or(());
@@ -1595,7 +1607,7 @@ fn main() -> Result<()> {
     };
 
     if config.processing.strict && override_failed {
-        if config.processing.quiet_level == 0 && !config.output.stats {
+        if diagnostics_allowed_runtime && !config.output.stats {
             if let Some(message) = override_message.clone() {
                 stderr
                     .writeln(&config.format_error_message(&message))
@@ -1605,11 +1617,21 @@ fn main() -> Result<()> {
         had_errors = true;
     }
 
+    if had_errors && !diagnostics_allowed_runtime {
+        emit_fatal_line(&mut stderr, &config, "fatal error encountered");
+    }
+
     if had_errors {
         ExitCode::GeneralError.exit();
     } else {
         ExitCode::Success.exit();
     }
+}
+
+fn emit_fatal_line(stderr: &mut SafeStderr, config: &KeloraConfig, message: &str) {
+    stderr
+        .writeln(&config.format_error_message(message))
+        .unwrap_or(());
 }
 
 /// Validate CLI arguments for early error detection

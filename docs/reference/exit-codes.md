@@ -115,20 +115,12 @@ echo $?
 
 ### Quiet Modes
 
-Exit codes preserved at all quiet levels:
+Exit codes are preserved under all quiet/silent combinations. Use the new toggles to control output without changing exit semantics:
 
-| Level | Suppresses | Exit Code | Use Case |
-|-------|-----------|-----------|----------|
-| `-q` | Diagnostics only | Preserved | Hide error details, keep events |
-| `-qq` | Diagnostics + events | Preserved | Silent validation, check exit code only |
-| `-qqq` | All output (including script) | Preserved | Complete silence, automation |
-
-```bash
-# All return 1 if errors occurred, just with different output
-kelora -q -j app.log      # Show events only
-kelora -qq -j app.log     # No output
-kelora -qqq -j app.log    # Complete silence
-```
+- `-q/--no-events`: suppress events only.
+- `--no-diagnostics`: suppress diagnostics and summaries (fatal line still emitted).
+- `--silent`: suppress all terminal emitters except a single fatal line; metrics files still write.
+- `--metrics-only` / `--stats-only`: suppress events and script output while emitting the selected channel.
 
 ## Using Exit Codes in Scripts
 

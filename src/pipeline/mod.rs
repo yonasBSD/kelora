@@ -199,7 +199,16 @@ pub struct PipelineConfig {
     pub strict: bool,
     /// Show detailed error information - new resiliency model (levels: 0-3)
     pub verbose: u8,
-    /// Quiet mode level (0=normal, 1=suppress diagnostics, 2=suppress events, 3=suppress script output)
+    /// Suppress formatter/event output
+    #[allow(dead_code)]
+    pub quiet_events: bool,
+    /// Suppress diagnostics and summaries
+    pub suppress_diagnostics: bool,
+    /// Suppress all stdout/stderr emitters except the fatal line
+    pub silent: bool,
+    /// Suppress Rhai print/eprint and side-effect warnings
+    pub suppress_script_output: bool,
+    /// Legacy quiet level (derived)
     pub quiet_level: u8,
     /// Disable emoji in error output
     pub no_emoji: bool,

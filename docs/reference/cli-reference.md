@@ -471,22 +471,48 @@ Show detailed error information. Use multiple times for more verbosity: `-v`, `-
 kelora -j --verbose app.log
 ```
 
-### Quiet Mode
+### Output/Quiet Controls
 
-#### `-q, --quiet`
+#### `-q, --quiet` / `--no-events`
 
-Graduated quiet mode with explicit levels:
-
-| Level | Effect |
-|-------|--------|
-| `-q` | Suppress kelora diagnostics (errors, stats, context markers) |
-| `-qq` | Additionally suppress event output (same as `-F none`) |
-| `-qqq` | Additionally suppress script side effects (`print()`, `eprint()`) |
+Suppress formatter output (events). Diagnostics, stats, metrics, and script output remain unless further flags are used. Same effect as `-F none`.
 
 ```bash
-kelora -qq --exec 'track_count("errors")' app.log     # Only metrics
-kelora -qqq app.log; echo "Exit: $?"                  # Exit code only
+kelora -q app.log                         # No events, diagnostics still emit
+kelora -q -s -m app.log                   # Stats + metrics, no events
 ```
+
+#### `--no-diagnostics`
+
+Suppress diagnostics and error summaries; a single fatal line is still emitted on errors. Does not affect events.
+
+```bash
+kelora -q --no-diagnostics app.log        # No events, no diagnostics
+```
+
+#### `--silent` / `--no-silent`
+
+Suppress all stdout/stderr emitters (events, diagnostics, stats, terminal metrics, script output). Metrics files still write. A single fatal line is emitted on errors. `--no-silent` disables a silent default from config.
+
+```bash
+kelora --silent --metrics-file out.json app.log   # Quiet terminal, metrics file written
+```
+
+#### `--no-script-output`
+
+Suppress Rhai `print`/`eprint` and side-effect warnings without affecting diagnostics/stats/metrics. Implied by `--silent`, `--metrics-only`, and `--stats-only`.
+
+#### `--metrics-only`
+
+Suppress events, diagnostics (except fatal line), stats, and script output; emit metrics (stderr/JSON/file). Terminal metrics are suppressed by `--silent`, but metrics files still write.
+
+```bash
+kelora --metrics-only --metrics-file metrics.json app.log
+```
+
+#### `-S, --stats-only`
+
+Suppress events; emit stats to stderr; diagnostics remain on (fatal line allowed); script output is suppressed for a clean stats channel.
 
 ## Filtering Options
 
