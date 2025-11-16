@@ -260,4 +260,4 @@ kelora --ignore-config -j app.log  # Ignore config files
 
 - [Error Handling](../concepts/error-handling.md) - Error handling modes and strategies
 - [CLI Reference](cli-reference.md) - Complete flag documentation
-- [Quiet Modes](../concepts/error-handling.md#quiet-modes) - Suppressing output for automation
+- [Quiet/Silent Controls](../concepts/error-handling.md#quietsilent-controls) - Suppressing output for automation
