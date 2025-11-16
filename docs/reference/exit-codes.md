@@ -171,7 +171,7 @@ fi
 
 ```bash
 # Basic validation
-kelora -qq -j --strict app.log && echo "✓ Valid" || echo "✗ Invalid"
+kelora --silent -j --strict app.log && echo "✓ Valid" || echo "✗ Invalid"
 
 # Ignore SIGPIPE in pipelines
 kelora -j large.log | head -n 10 || [ $? -eq 141 ]
@@ -183,7 +183,7 @@ kelora -j --strict logs/*.json > /dev/null || {
 }
 
 # Check for critical events
-if ! kelora -qq -j app.log --levels error,critical; then
+if ! kelora -q -j app.log --levels error,critical; then
     echo "✗ Found critical errors"
     exit 1
 fi

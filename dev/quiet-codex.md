@@ -1,7 +1,7 @@
 # Quiet/Output Control Redesign
 
 ## Rationale
-- Current ladder (-q/-qq/-qqq) couples diagnostics suppression to event suppression and still allows metrics/script output under --silent, leading to surprises.
+- Current quiet ladder couples diagnostics suppression to event suppression and still allows metrics/script output under --silent, leading to surprises.
 - Users often want short commands for common cases: "metrics only" or "stats+metrics without events"; mapping -q to "no events" is familiar (grep, curl) and keeps lines short.
 - We allow breaking changes; goal is a logical, orthogonal set of toggles that override config defaults cleanly.
 
@@ -66,6 +66,6 @@
 
 ## Migration Guidance
 - Old `-q` (diagnostics off) becomes `--no-diagnostics`.
-- Old `-qq` (no events) becomes `-q` (or `-F none`/`--no-events`).
+- Old no-events level becomes `-q` (or `-F none`/`--no-events`).
 - Old ladder superseded: use `--silent` for terminal silence (one fatal line allowed; metrics files still write).
 - New `--metrics-only`: use when you want metrics emitted without events/diagnostics/stats; not available in the prior ladder.

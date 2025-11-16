@@ -281,7 +281,7 @@ kelora -f json -l error --exec 'e.error_hash = e.message.hash("xxh3")' \
 # Pattern discovery with reusable alias
 kelora --save-alias patterns \
   --exec 'track_unique("patterns", e.message.normalized())' \
-  --metrics -qq
+  --metrics -q
 kelora -a patterns app.log
 
 # Normalize events for pattern identification
@@ -395,7 +395,7 @@ kelora -f json --exec 'for (idx, tag) in e.tags { e["tag_" + idx] = tag }'
 kelora -f json --exec 'e.syslog_compat = e.to_syslog()' -F json > output.jsonl
 
 # CI/CD integration with exit codes
-kelora -f json -qq -l error logs/*.json && echo "✓ No errors" || echo "✗ Errors found"
+kelora -f json -q -l error logs/*.json && echo "✓ No errors" || echo "✗ Errors found"
 
 # Export results to file from script
 kelora -f json --allow-fs-writes --exec '

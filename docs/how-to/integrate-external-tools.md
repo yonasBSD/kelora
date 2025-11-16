@@ -117,7 +117,7 @@ Stream live log data into Kelora for real-time monitoring and alerting during de
 
 ```bash
 # Monitor live logs for critical errors
-tail -F /var/log/app.log | kelora -j -l critical -qq
+tail -F /var/log/app.log | kelora -j -l critical -q
 
 # Stream systemd journal logs for a specific service
 journalctl -u myapp.service -f --output=json | \
@@ -283,7 +283,7 @@ qsv join user_id orders.csv user_id users.csv | qsv select 'user_id,name,order_i
 
 # Kelora can pre-aggregate before export for faster qsv processing
 kelora -j logs/app.jsonl --span 5m --span-close \
-  'print(span.id + "," + span.size.to_string())' -qq > summary.csv
+  'print(span.id + "," + span.size.to_string())' -q > summary.csv
 qsv stats summary.csv
 ```
 
@@ -633,7 +633,7 @@ rclone copy processed.json remote:logs/$(date +%Y-%m-%d)/
 # Pre-aggregate with spans before uploading
 kelora -j logs/*.jsonl.gz --span 5m \
   --span-close 'print(span.metrics.to_json())' \
-  -e 'track_count("events"); track_sum("bytes", e.size)' -qq > metrics.jsonl
+  -e 'track_count("events"); track_sum("bytes", e.size)' -q > metrics.jsonl
 curl -X POST http://victorialogs:9428/insert/jsonl -d @metrics.jsonl
 ```
 
@@ -702,7 +702,7 @@ tail -F /var/log/app.log | \
 
 # Simple alert on specific conditions
 tail -F /var/log/app.log | \
-  kelora -j -l error -qq \
+  kelora -j -l error -q \
     --filter 'e.service == "payments"' \
     -e 'eprint("PAYMENT ERROR: " + e.message)'
 
@@ -711,7 +711,7 @@ tail -F /var/log/app.log | \
   kelora -j --span 1m \
     -e 'if e.level == "ERROR" { track_count("errors") }' \
     --span-close 'if span.metrics["errors"].or_empty() > 10 { eprint("⚠️  High error rate: " + span.metrics["errors"].to_string() + " errors/min") }' \
-    -qq
+    -q
 
 # Spike detection with window functions
 tail -F /var/log/app.log | \
@@ -719,7 +719,7 @@ tail -F /var/log/app.log | \
     -e 'e.recent_500s = window.pluck("status").filter(|x| x >= 500).len()' \
     --filter 'e.recent_500s > 5' \
     -e 'eprint("🚨 Error spike detected: " + e.recent_500s.to_string() + " 5xx in last 20 requests")' \
-    -qq
+    -q
 ```
 
 ---
@@ -772,7 +772,7 @@ Before reaching for external tools, check if Kelora can handle it natively:
 ```bash
 # Measure each stage
 time grep "ERROR" logs/huge.log | wc -l
-time kelora -j logs/huge.log --filter 'e.level == "ERROR"' -qq | wc -l
+time kelora -j logs/huge.log --filter 'e.level == "ERROR"' -q | wc -l
 
 # Compare integrated vs multi-tool approaches
 hyperfine \

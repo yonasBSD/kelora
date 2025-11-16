@@ -36,13 +36,13 @@ tail -f /var/log/app.log | kelora -j \
 
 - Use `-l warn,error,critical` when log levels are reliable and you want broad coverage.
 - Reuse helpers like `e.message.contains()` or `e.get_path()` for structured payloads.
-- Keep `eprint()` output short; it routes to stderr and works well with `-qq` (see next step).
+- Keep `eprint()` output short; it routes to stderr and works well with `-q`/`--silent` (see next step).
 
 ## Step 3: Control Noise
 Quiet modes and counters help you avoid pager fatigue.
 
 ```bash
-tail -f /var/log/app.log | kelora -j -qq \
+tail -f /var/log/app.log | kelora -j -q \
   -e 'track_count("total")' \
   -e 'track_count("level|" + e.level)' \
   -m \
@@ -56,7 +56,7 @@ tail -f /var/log/app.log | kelora -j -qq \
   '
 ```
 
-- `-q` hides diagnostics; `-qq` also suppresses event output so only alerts are printed.
+-- `-q` suppresses events so only alerts are printed; add `--silent` to suppress diagnostics too.
 - Combine `--window N` with `window.pluck()` to examine rolling slices when bursts matter more than totals.
 - Call `exit(1)` to propagate failure into CI or cron jobs; Kelora exits with 0 otherwise.
 
@@ -64,7 +64,7 @@ tail -f /var/log/app.log | kelora -j -qq \
 Direct alerts to stderr for on-call use, files for dashboards, or downstream commands.
 
 ```bash
-tail -f /var/log/app.log | kelora -j --allow-fs-writes -qq \
+tail -f /var/log/app.log | kelora -j --allow-fs-writes -q \
   -l critical \
   -e 'append_file("/tmp/critical.log", `${e.timestamp} ${e.service} ${e.message}\n`)'
 ```
@@ -91,21 +91,21 @@ fi
 ## Variations
 - **Service-specific watcher**  
   ```bash
-  tail -f /var/log/app.log | kelora -j -qq \
+  tail -f /var/log/app.log | kelora -j -q \
     --filter 'e.service == "search"' \
     -l error \
     -e 'eprint("search error: " + e.message)'
   ```
 - **Spike detection**  
   ```bash
-  tail -f /var/log/app.log | kelora -j --window 50 -qq \
+  tail -f /var/log/app.log | kelora -j --window 50 -q \
     -l error \
     -e 'let recent = window_events();' \
     -e 'if recent.len() >= 10 { eprint("ALERT: error spike (" + recent.len().to_string() + " / 50)") }'
   ```
 - **Access log latency guard**  
   ```bash
-  tail -f /var/log/nginx/access.log | kelora -f combined -qq \
+  tail -f /var/log/nginx/access.log | kelora -f combined -q \
     --filter 'e.get_path("request_time", "0").to_float() > 1.5' \
     -e 'eprint(`SLOW: ${e.method} ${e.path} ${e.request_time}s`)'
   ```

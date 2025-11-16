@@ -1166,25 +1166,26 @@ fn test_quiet_level_1_suppresses_diagnostics() {
 }
 
 #[test]
-fn test_quiet_level_2_suppresses_events() {
-    // Test that -qq suppresses event output
+fn test_no_events_and_no_diagnostics_suppress_terminal_output() {
+    // Test that combining --no-events with --no-diagnostics suppresses both streams
     let input = r#"{"level": "info", "message": "test1"}
 {"level": "error", "message": "test2"}"#;
 
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "-qq"], input);
+    let (stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "-q", "--no-diagnostics"], input);
 
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
-    // stdout should be empty (events suppressed by -qq)
+    // stdout should be empty (events suppressed)
     assert!(
         stdout.is_empty() || stdout.trim().is_empty(),
-        "stdout should be empty with -qq (events suppressed)"
+        "stdout should be empty when events are suppressed"
     );
 
     // stderr should also be empty (diagnostics suppressed)
     assert!(
         stderr.is_empty() || stderr.trim().is_empty(),
-        "stderr should be empty with -qq"
+        "stderr should be empty when diagnostics are suppressed"
     );
 }
 

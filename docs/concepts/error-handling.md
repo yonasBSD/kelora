@@ -293,12 +293,12 @@ fi
 
 **In CI/CD:**
 ```bash
-kelora -qq --strict app.log || exit 1
+kelora --silent --strict app.log || exit 1
 ```
 
 **With automation:**
 ```bash
-kelora -qqq app.log; echo "Exit code: $?"
+kelora --silent app.log; echo "Exit code: $?"
 ```
 
 ## Atomic Transformations
@@ -547,7 +547,7 @@ kelora -j --strict app.log > /dev/null && echo "✓ Valid"
 For automation, use exit codes:
 
 ```bash
-kelora -qq app.log
+kelora --silent app.log
 if [ $? -eq 0 ]; then
     echo "No errors"
 else

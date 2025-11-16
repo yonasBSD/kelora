@@ -71,7 +71,7 @@ Confirm that the same inputs produce identical pseudonyms across runs and that e
 
 ```bash
 kelora -j pseudonymized.json \
-  -qq \
+  -q \
   --filter '!e.contains("user_email") && !e.contains("session_token")' \
   --stats
 

@@ -391,7 +391,7 @@ e.custom = e.message.normalized(["uuid", "sha256", "url"])
 # Recommended alias for easy pattern discovery
 kelora --save-alias patterns \
   --exec 'track_unique("patterns", e.message.normalized())' \
-  --metrics -qq
+  --metrics -q
 
 # Usage
 kelora -a patterns app.log

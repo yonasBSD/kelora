@@ -113,7 +113,7 @@ kelora -j "$OUTPUT" --stats
   ```bash
   for size in 500 1000 5000; do
     echo "Batch size $size"
-    time kelora -j logs/2024-04-*.jsonl.gz --parallel --batch-size $size -qq
+    time kelora -j logs/2024-04-*.jsonl.gz --parallel --batch-size $size -q
   done
   ```
 

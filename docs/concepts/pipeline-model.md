@@ -463,10 +463,10 @@ kelora -j app.log --strict
 - `-vv` - More verbose (level 2)
 - `-vvv` - Maximum verbosity (level 3)
 
-### Quiet Modes
+### Quiet/Output Modes
 
-- `-q` - Suppress diagnostics
-- `-qq` - Suppress diagnostics and events
+- `-q` / `--no-events` - Suppress events
+- `--no-diagnostics` - Suppress diagnostics (fatal line still emitted)
 - `--silent` - Suppress terminal output (events, diagnostics, stats, terminal metrics, script output); one fatal line on errors; metrics files still write
 
 ---

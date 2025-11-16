@@ -84,7 +84,7 @@ kelora -j examples/simple_json.jsonl \
 
 Alternatives:
 - `-J` (or `-F json`) for structured archives.
-- `-q` or `-qq` when piping into shell scripts that only care about exit codes.
+- `-q` or `--silent` when piping into shell scripts that only care about exit codes.
 
 ## Variations
 - **Web server failures**  
@@ -109,7 +109,7 @@ Alternatives:
   ```
 - **Fail fast in CI**  
   ```bash
-  kelora -qq -j build/kelora.log -l error \
+  kelora -q -j build/kelora.log -l error \
     && echo "no errors" \
     || (echo "errors detected" >&2; exit 1)
   ```
