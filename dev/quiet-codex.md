@@ -18,12 +18,12 @@
 - `--no-diagnostics`: suppress diagnostics and error summaries; does not affect events.
 - `--silent`: suppress everything except exit code: events, diagnostics, stats, metrics (stderr and file), script output. Also sets Rhai side effect suppression (prints, fs warnings).
 - `--no-silent`: disable a silent default from config; restores normal output unless suppressed by other flags (e.g., `-q`).
-- `--metrics-only`: suppress events and diagnostics, suppress stats; emit metrics (stderr/JSON/file) unless `--silent` is present. Implies `-F none`, `--no-diagnostics`, `--no-stats`; does **not** imply `--silent`.
-- Conflicts: `--silent` with any explicit emitter (`--metrics*`, `--metrics-only`, `--stats`) is an invalid CLI combination (exit 2) with a clear error; suppress-only flags are allowed but redundant.
+- `--metrics-only`: suppress events and diagnostics, suppress stats; emit metrics (stderr/JSON/file) unless `--silent` is present. Implies `-F none`, `--no-diagnostics`, `--no-stats`; does **not** imply `--silent`. Fatal errors should still emit a single diagnostic line to stderr before exiting non-zero (match current `--stats-only` experience).
+- Conflicts: `--silent` with any explicit emitter (`--metrics*`, `--metrics-only`, `--stats`) is an invalid CLI combination (exit 2) with a clear error, evaluated after flag/config overrides (i.e., effective/last value only). Suppress-only flags are allowed but redundant.
 - `--no-script-output` (optional): suppress Rhai print/eprint without affecting diagnostics/stats/metrics; implied by --silent.
 - `-F none`: explicit formatter choice for "no events"; identical effect to -q/--no-events for event stream. Keeps diagnostics unless --no-diagnostics or --silent.
 - `--stats` / `--no-stats`: as today, but honored by --silent.
-- `--metrics` / `--no-metrics` / `--metrics-json` / `--metrics-file`: as today, but honored by --silent (no stderr/file writes under --silent).
+- `--metrics` / `--no-metrics` / `--metrics-json` / `--metrics-file`: as today, but honored by --silent (no stderr/file writes under --silent). Emit to all selected sinks except where existing conflicts remain (table vs stderr JSON): `--metrics` conflicts with `--metrics-json`; `--metrics-file` can combine with either.
 
 ## Effective Behavior Matrix
 - Default: events on; diagnostics on; stats/metrics off unless requested; script output on.
