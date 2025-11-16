@@ -945,7 +945,7 @@ fn test_stats_only_with_exec() {
 
 #[test]
 fn test_conflicting_quiet_and_stats_flags() {
-    // Test that -q (quiet) and --stats work together (quiet suppresses other diagnostics)
+    // Test that -q (no events) and --stats work together (stats still emit)
     let input = r#"{"level": "info", "message": "test"}"#;
 
     let (_stdout, stderr, exit_code) =
@@ -953,10 +953,10 @@ fn test_conflicting_quiet_and_stats_flags() {
 
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
-    // With -q, stats should be suppressed
+    // With -q, stats should still emit even though events are suppressed
     assert!(
-        !stderr.contains("Lines processed"),
-        "Quiet mode should suppress stats"
+        stderr.contains("Lines processed"),
+        "Stats should emit with -q"
     );
 }
 
@@ -1143,7 +1143,7 @@ fn test_conflicting_stats_flags() {
 
 #[test]
 fn test_quiet_level_1_suppresses_diagnostics() {
-    // Test that -q suppresses diagnostics (stats, errors) but keeps events
+    // Test that -q suppresses events (diagnostics remain)
     let input = r#"{"level": "info", "message": "test1"}
 {"level": "error", "message": "test2"}"#;
 
@@ -1152,14 +1152,16 @@ fn test_quiet_level_1_suppresses_diagnostics() {
 
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
-    // Events should be output to stdout
-    assert!(stdout.contains("level"), "Events should be output with -q");
-
-    // stderr should be empty (stats suppressed by -q)
+    // Events should be suppressed
     assert!(
-        stderr.is_empty() || stderr.trim().is_empty(),
-        "stderr should be empty with -q, got: {}",
-        stderr
+        stdout.is_empty() || stdout.trim().is_empty(),
+        "Events should be suppressed with -q"
+    );
+
+    // stderr should still show stats
+    assert!(
+        stderr.contains("Lines processed"),
+        "Stats should emit with -q"
     );
 }
 
@@ -1188,7 +1190,7 @@ fn test_quiet_level_2_suppresses_events() {
 
 #[test]
 fn test_quiet_level_3_suppresses_script_output() {
-    // Test that -qqq suppresses script print/eprint
+    // Test that --no-script-output suppresses script print/eprint
     let input = r#"{"level": "info", "message": "test"}"#;
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
@@ -1197,28 +1199,25 @@ fn test_quiet_level_3_suppresses_script_output() {
             "json",
             "--exec",
             "print(\"this should not appear\");",
-            "-qqq",
+            "--no-script-output",
         ],
         input,
     );
 
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
-    // stdout should be empty (events suppressed by -qq, script output by -qqq)
+    // Script output should be suppressed while events still emit
     assert!(
         !stdout.contains("this should not appear"),
-        "Script print() output should be suppressed with -qqq"
+        "Script print() output should be suppressed with --no-script-output"
     );
 
-    // Both stdout and stderr should be empty
+    // Events should still appear
     assert!(
-        stdout.is_empty() || stdout.trim().is_empty(),
-        "stdout should be empty with -qqq"
+        stdout.contains("test"),
+        "Event output should remain with --no-script-output"
     );
-    assert!(
-        stderr.is_empty() || stderr.trim().is_empty(),
-        "stderr should be empty with -qqq"
-    );
+    assert!(stderr.is_empty() || stderr.trim().is_empty());
 }
 
 #[test]

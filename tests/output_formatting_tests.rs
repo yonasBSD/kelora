@@ -293,7 +293,7 @@ fn test_quiet_level_0_normal_output() {
 
 #[test]
 fn test_quiet_level_1_suppress_diagnostics() {
-    // Test quiet level 1 (-q) - suppress diagnostics but show events and script output
+    // Test -q (suppress events) - script output stays, stats still emit when requested
     let input = r#"{"level": "info", "message": "test"}"#;
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
@@ -309,21 +309,19 @@ fn test_quiet_level_1_suppress_diagnostics() {
     );
     assert_eq!(exit_code, 0);
 
-    // Should show event output
-    assert!(stdout.contains("level='info'"));
-    assert!(stdout.contains("message='test'"));
-
-    // Should show script output
+    // Events are suppressed, but script output remains
+    assert!(!stdout.contains("level='info'"));
+    assert!(!stdout.contains("message='test'"));
     assert!(stdout.contains("Script output"));
 
-    // Should NOT show stats
-    assert!(!stderr.contains("Stats"));
-    assert!(!stderr.contains("Lines processed"));
+    // Stats still emit when requested
+    assert!(stderr.contains("Stats"));
+    assert!(stderr.contains("Lines processed"));
 }
 
 #[test]
 fn test_quiet_level_2_suppress_events() {
-    // Test quiet level 2 (-qq) - suppress diagnostics and events but show script output
+    // Test -q with --no-diagnostics - suppress events and diagnostics but show script output
     let input = r#"{"level": "info", "message": "test"}"#;
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
@@ -333,7 +331,8 @@ fn test_quiet_level_2_suppress_events() {
             "--stats",
             "--exec",
             "print(\"Script output\")",
-            "-qq",
+            "-q",
+            "--no-diagnostics",
         ],
         input,
     );
@@ -343,17 +342,17 @@ fn test_quiet_level_2_suppress_events() {
     assert!(!stdout.contains("level='info'"));
     assert!(!stdout.contains("message='test'"));
 
-    // Should still show script output
+    // Should still show script output (not tied to diagnostics)
     assert!(stdout.contains("Script output"));
 
-    // Should NOT show stats
-    assert!(!stderr.contains("Stats"));
-    assert!(!stderr.contains("Lines processed"));
+    // Stats should still emit when requested even if diagnostics are suppressed
+    assert!(stderr.contains("Stats"));
+    assert!(stderr.contains("Lines processed"));
 }
 
 #[test]
 fn test_quiet_level_3_suppress_all() {
-    // Test quiet level 3 (-qqq) - suppress everything including script output
+    // Test --silent - suppress everything including script output
     let input = r#"{"level": "info", "message": "test"}"#;
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
@@ -363,7 +362,7 @@ fn test_quiet_level_3_suppress_all() {
             "--stats",
             "--exec",
             "print(\"Script output\")",
-            "-qqq",
+            "--silent",
         ],
         input,
     );
