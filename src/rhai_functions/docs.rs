@@ -229,242 +229,135 @@ pub fn generate_examples_text() -> &'static str {
     r###"
 Common Log Analysis Patterns:
 
-DISCOVERING FIELDS:
-# See all fields, types, and structure
-kelora -f json app.log -F inspect | head -20
+GETTING STARTED:
+# Preview first 100 lines to understand structure
+kelora -j app.jsonl --head 100 -F inspect
 
-# View discovered fields and parsing statistics
-kelora -f json app.log --stats
+# Quick field discovery and parsing statistics
+kelora -j app.jsonl --stats
 
-# Inspect with full value detail (no truncation)
-kelora -f json app.log -F inspect -vv | head -50
+# Filter by log level
+kelora -j app.jsonl --levels error,critical
 
-MICRO SEARCH HELPERS:
+# Your first filter - exact match
+kelora -j app.jsonl --filter 'e.status_code >= 500'
+
+FILTERING & SEARCHING:
 # Case-insensitive wildcard search
-kelora -f json --filter 'e.message.ilike("*timeout*")'
+kelora -j app.jsonl --filter 'e.message.ilike("*timeout*")'
 
-# Regex search with cached compilation
-kelora -f json --filter 'e.message.matches(#"[Uu]ser\s+not\s+found"#)'
+# Regex with Rhai raw string syntax (no escaping backslashes)
+kelora -j app.jsonl --filter 'e.message.matches(#"\d{3}-\d{2}-\d{4}"#)'
 
-# Field existence that ignores () sentinel
-kelora -f logfmt --filter 'e.has("user") && e.user.like("alice*")'
+# Regex with regular string (requires escaping)
+kelora -j app.jsonl --filter 'e.url.matches("/api/v\\d+/users")'
 
-WEB LOG ANALYSIS:
-# Extract HTTP details from combined log
-kelora -f combined --exec 'e.large_response = e.bytes > 50000' --filter 'e.large_response'
+# Field existence check (ignores () sentinel)
+kelora --format logfmt app.log --filter 'e.has("user_id") && e.user_id != "anonymous"'
 
-# Parse request path parameters
-kelora -f combined --exec '
-  let params = e.path.after("?").parse_query_params();
-  e.utm_source = params.utm_source ?? "";
-  e.user_id = (params.user_id ?? "").to_int()
-'
+# Combine multiple conditions
+kelora -j app.jsonl --filter 'e.has("method") && e.method == "POST" && e.status >= 400'
 
-# Mask IPs and extract domains from referers
-kelora -f json --exec 'e.ip = e.client_ip.mask_ip(2)' \
-  --exec 'e.referer_domain = (e.referer ?? "").extract_domain()'
-
-# Detect suspicious user agents
-kelora -f combined --filter 'e.user_agent.has_matches("(?i)(bot|crawler|scanner)")'
-
-ERROR TRACKING:
-# Extract stack traces and error types
-kelora -f json --filter 'e.level == "ERROR"' --exec '
-  e.error_type = e.error.before(":");
-  e.line_number = e.stack_trace.extract_re(#":(\d+)"#, 1).to_int()
-'
-
-# Group errors by hash for deduplication
-kelora -f json -l error --exec 'e.error_hash = e.message.hash("xxh3")' \
-  --metrics --exec 'track_unique("errors", e.error_hash)'
-
-# Pattern discovery with reusable alias
-kelora --save-alias patterns \
-  --exec 'track_unique("patterns", e.message.normalized())' \
-  --metrics -q
-kelora -a patterns app.log
-
-# Normalize events for pattern identification
-kelora -f json --exec 'e = e.normalized(["ipv4", "email", "uuid"])'
-
-# Time-based error clustering (5min windows)
-kelora -f json -l error --window 100 --exec '
-  let recent = window.pluck("timestamp").map(|ts| to_datetime(ts));
-  let time_span = (recent[-1] - recent[0]).as_minutes();
-  e.error_burst = time_span < 5 && recent.len() > 10
-' --filter 'e.error_burst'
-
-SECURITY & AUDIT:
-# Check for private IPs in external traffic
-kelora -f json --exec 'e.is_public = e.source_ip.is_private_ip() == false' --filter 'e.is_public'
-
-# JWT token analysis without verification
-kelora -f json --exec 'let jwt = e.token.parse_jwt(); e.jwt_user = jwt.claims.sub; e.jwt_role = jwt.claims.role'
-
-# Detect CIDR-based access patterns
-kelora -f json --exec 'e.internal = e.client_ip.is_in_cidr("10.0.0.0/8")' --filter 'e.internal == false'
-
-# Hash sensitive fields with domain separation
-export KELORA_SECRET="your-secret-key"
-kelora -f json --exec 'e.user_hash = pseudonym(e.email, "users")' --exec 'e.email = ()'
-
-DATA TRANSFORMATION:
-# Parse nested JSON strings
-kelora -f json --exec 'e.metadata = e.json_payload.parse_json()' \
+PARSING & TRANSFORMATION:
+# Parse nested JSON strings from a field
+kelora -j app.jsonl --exec 'e.metadata = e.json_payload.parse_json()' \
   --exec 'e.user_tier = e.get_path("metadata.subscription.tier", "free")'
 
-# Column extraction from structured text
-kelora -f line --exec 'e.cols = e.line.col("1,3,5", " ")' \
-  --exec 'e.timestamp = e.cols[0]; e.level = e.cols[1]; e.msg = e.cols[2]'
+# Extract data with regex (raw vs regular strings)
+kelora -j app.jsonl --exec 'e.duration = e.msg.extract_re(#"took (\d+)ms"#, 1).to_int()'
+kelora -j app.jsonl --exec 'e.ip = e.msg.extract_re("ip=([\\d.]+)", 1)'
 
-# Parse key-value logs (multiple formats)
-kelora -f line --exec 'e = e.line.parse_logfmt()'  # logfmt: key=value
-kelora -f line --exec 'e = e.line.parse_kv(" ", "=")'  # custom separators, extracts only key=value pairs
+# Fan out nested arrays into separate events
+kelora -j batch.jsonl --exec 'emit_each(e.items)' --filter 'e.status == "active"'
 
-# Absorb inline key=value tails without losing the original message
-kelora -f line --exec '
-  let res = e.absorb_kv("msg", #{ keep_source: true });
-  if res.status == "applied" {
-    e.cleaned_msg = res.remainder ?? ""
-  }
-'
+# Parse key=value pairs from unstructured text
+kelora --format line app.log --exec 'e.absorb_kv("line", #{ keep_source: true })'
 
-# Email header parsing
-kelora -f line --exec 'let email = e.from.parse_email(); e.domain = email.domain; e.user = email.local'
-
-METRICS & AGGREGATION:
-# Response time percentiles (requires --window)
-kelora -f json --window 1000 --metrics --end '
-  let times = window.pluck_as_nums("response_time");
-  print("p50: " + times.percentile(50));
-  print("p95: " + times.percentile(95));
-  print("p99: " + times.percentile(99))
-'
-
-# Status code distribution
-kelora -f combined --metrics --exec 'track_bucket("status", e.status / 100 * 100)' \
-  --end 'print(metrics.status)'
-
-# Unique users per endpoint
-kelora -f json --metrics --exec 'track_unique(e.path, e.user_id)' \
-  --end 'for path in metrics.keys() { let users = metrics[path]; print(path + ": " + users.len() + " users") }'
-
-ARRAY & FAN-OUT PROCESSING:
-# Process nested arrays - fan out items
-kelora -f json --exec 'emit_each(e.items)' --filter 'e.status == "active"'
-
-# Multi-level fan-out with context preservation
-kelora -f json --exec 'emit_each(e.batches)' \
-  --exec 'let ctx = #{batch: e.id}; emit_each(e.items, ctx)' \
-  --filter 'e.priority == "high"'
-
-# Array transformations and sorting
-kelora -f json --exec 'let s = sorted(e.scores); let len = s.len(); e.top_3 = [s[len-3], s[len-2], s[len-1]]'
-
-# Remove duplicate elements
-kelora -f json --exec 'e.unique_tags = unique(e.tags)'
-
-DATETIME & FILTERING:
-# Recent events (last 2 hours)
-kelora -f json --since -2h --until now
+TIME HANDLING:
+# Events from the last 2 hours
+kelora -j app.jsonl --since -2h --until now
 
 # Business hours filter (9-5 local time)
-kelora -f json --exec 'let dt = to_datetime(e.timestamp).to_local(); e.hour = dt.hour()' \
-  --filter 'e.hour >= 9 && e.hour < 17'
+kelora -j app.jsonl --exec 'let h = to_datetime(e.timestamp).to_local().hour()' \
+  --filter 'h >= 9 && h < 17'
 
-# Calculate durations and SLA violations
-kelora -f json --exec '
-  let start = to_datetime(e.start_time);
-  let end = to_datetime(e.end_time);
-  let duration = end - start;
+# Calculate duration and flag SLA violations
+kelora -j app.jsonl --exec '
+  let duration = to_datetime(e.end_time) - to_datetime(e.start_time);
   e.duration_ms = duration.as_milliseconds();
   e.sla_breach = duration.as_seconds() > 5
 ' --filter 'e.sla_breach'
 
-ADVANCED PATTERNS:
-# Sampling - process 10% of events
-kelora -f json --filter 'e.request_id.bucket() % 10 == 0'
+METRICS & AGGREGATION:
+# Count errors by type with metrics
+kelora -j app.jsonl -l error --metrics \
+  --exec 'track_count(e.error_type)' \
+  --end 'for key in metrics.keys() { print(key + ": " + metrics[key]) }'
 
-# Conditional field removal based on sensitivity
-kelora -f json --exec 'if e.level != "DEBUG" { e.stack_trace = (); e.locals = () }'
+# Track unique users and compute percentiles (requires --window)
+kelora -j access.jsonl --window 1000 --metrics \
+  --exec 'track_unique("users", e.user_id)' \
+  --end 'let times = window.pluck_as_nums("response_ms"); print("p95: " + times.percentile(95))'
 
-# Dynamic field creation from arrays
-kelora -f json --exec 'for (idx, tag) in e.tags { e["tag_" + idx] = tag }'
+# Histogram of status codes by bucket
+kelora --format combined access.log --metrics \
+  --exec 'track_bucket("status", e.status / 100 * 100)' \
+  --end 'print(metrics.status)'
 
-# Format conversion pipeline
-kelora -f json --exec 'e.syslog_compat = e.to_syslog()' -F json > output.jsonl
+MULTI-FILE PROCESSING:
+# Add source filename to each event
+kelora -j logs/*.jsonl --exec 'e.source = meta.filename'
 
-# CI/CD integration with exit codes
-kelora -f json -q -l error logs/*.json && echo "✓ No errors" || echo "✗ Errors found"
-
-# Export results to file from script
-kelora -f json --allow-fs-writes --exec '
-  if e.severity == "critical" {
-    append_file("alerts.log", e.to_json())
-  }
-'
-
-MULTI-FILE & METADATA:
-# Track errors by source file (meta.filename)
-kelora -f json logs/*.log --metrics --exec '
+# Count errors per file
+kelora -j logs/*.jsonl --metrics --exec '
   if e.level == "ERROR" {
     track_count(meta.filename)
   }
+' --end 'for file in metrics.keys() { print(file + ": " + metrics[file]) }'
+
+# Debug with line numbers
+kelora -j app.jsonl --filter 'e.status >= 500' --exec '
+  eprint("⚠️  Error at " + meta.filename + ":" + meta.line_num)
 '
 
-# Add source context to each event
-kelora -f json server1.log server2.log --exec 'e.source = meta.filename'
+SECURITY & DATA PRIVACY:
+# Mask IP addresses (keep first 3 octets)
+kelora -j app.jsonl --exec 'e.client_ip = e.client_ip.mask_ip(1)'
 
-# Debugging with line numbers (meta.line_num)
-kelora -f json --filter 'e.status >= 500' --exec '
-  eprint("⚠️  Server error at " + meta.filename + ":" + meta.line_num)
-'
+# Check for private IPs in external traffic
+kelora -j app.jsonl --filter 'e.source_ip.is_private_ip() == false'
 
-# Conditional processing based on filename
-kelora -f json prod-*.log staging-*.log --exec '
-  e.environment = if meta.filename.contains("prod") { "production" } else { "staging" }
-' --filter 'e.environment == "production" && e.level == "ERROR"'
+# Parse JWT tokens (no verification)
+kelora -j app.jsonl --exec 'let jwt = e.token.parse_jwt(); e.user = jwt.claims.sub'
 
-# Access raw line for re-parsing (meta.line)
-kelora -f json --exec '
-  if e.message.contains("CUSTOM:") {
-    let custom = meta.line.after("CUSTOM:").parse_json();
-    e.custom_data = custom
-  }
-'
+# Hash sensitive fields with domain separation (requires KELORA_SECRET env var)
+kelora -j app.jsonl --exec 'e.email_hash = pseudonym(e.email, "users"); e.email = ()'
 
-# Track unique files with errors
-kelora -f json logs/**/*.log --metrics --exec '
-  if e.level == "ERROR" {
-    track_unique("error_files", meta.filename)
-  }
-' --end 'print("Files with errors: " + metrics.error_files.len())'
+PERFORMANCE PATTERNS:
+# Quick preview with --head (stops reading early)
+kelora -j huge.jsonl --head 1000 -F inspect
 
-# Create audit trail with source location
-kelora -f json --allow-fs-writes --exec '
-  if e.action == "admin_action" {
-    let audit = "File: " + meta.filename + " Line: " + meta.line_num + " Event: " + e.to_json();
-    append_file("audit.log", audit)
-  }
-'
+# Sample 10% of events for analysis
+kelora -j app.jsonl --filter 'e.request_id.bucket() % 10 == 0'
+
+# Limit output events (reads entire file)
+kelora -j app.jsonl --filter 'e.level == "ERROR"' --take 50
 
 COMMON IDIOMS:
 # Method chaining              → e.domain = e.url.extract_domain().to_lower().strip()
-# Top-level default value      → e.referer ?? "unknown"
-# Nested field with default    → e.get_path("user.role", "guest")
+# Default value if missing     → e.referer ?? "direct"
+# Nested field with default    → e.get_path("user.profile.tier", "free")
 # Safe type conversion         → to_int_or(e.port, 8080)
-# Check top-level field        → e.has("user")
-# Check nested field exists    → e.has_path("user.id")
-# Only process if field exists → --filter 'e.has("referer")' --exec '...'
+# Check field exists & not ()  → e.has("user_id")
+# Check nested field exists    → e.has_path("response.body.status")
 # Remove sensitive fields      → e.password = (); e.ssn = ()
-# Hash for grouping/sampling   → e.session_id.bucket() % 100
-# Parse then extract           → e.url.parse_url().path
-# Regex capture groups         → e.log.extract_re(r"duration: (\d+)", 1)
+# Hash for sampling/bucketing  → e.session_id.bucket() % 100
+# Regex with raw strings       → e.log.extract_re(#"duration: (\d+)ms"#, 1)
+# Regex with regular strings   → e.log.extract_re("took (\\d+)", 1)
 # Array bounds safety          → if e.items.len() > 0 { e.first = e.items[0] }
-# Negative indexing            → e.last_score = e.scores[-1]
-# Clamp values to range        → e.normalized = clamp(e.value, 0, 100)
-# Remove duplicate elements    → unique([1,2,2,3,2,1]) = [1,2,3]
-# Pattern normalization        → e.message.normalized("ipv4,email,uuid")
+# Negative array indexing      → e.last = e.items[-1]
+# Remove array duplicates      → e.unique_tags = e.tags.unique()
+# Pattern normalization        → e.normalized_msg = e.message.normalized("ipv4,email,uuid")
 
 See --help-functions for complete function reference. Visit https://rhai.rs for Rhai language details.
 "###
