@@ -326,6 +326,113 @@ pub fn has_errors_in_tracking(snapshot: &TrackingSnapshot) -> bool {
     false
 }
 
+/// Format a concise single-line fatal error summary for --silent mode
+/// Uses smart hybrid approach: adapts based on error count and type
+#[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
+pub fn format_fatal_error_line(snapshot: &TrackingSnapshot) -> String {
+    let mut total_errors = 0;
+    let mut error_types = Vec::new();
+    let mut all_samples: Vec<rhai::Map> = Vec::new();
+
+    // Collect error counts by type
+    for (key, value) in &snapshot.internal {
+        if let Some(error_type) = key.strip_prefix("__kelora_error_count_") {
+            if let Ok(count) = value.as_int() {
+                if count > 0 {
+                    total_errors += count;
+                    error_types.push((error_type.to_string(), count));
+                }
+            }
+        }
+    }
+
+    if total_errors == 0 {
+        return "fatal error encountered".to_string();
+    }
+
+    // Collect sample objects for context
+    for (key, value) in &snapshot.internal {
+        if let Some(_error_type) = key.strip_prefix("__kelora_error_samples_") {
+            if let Ok(sample_array) = value.clone().into_array() {
+                for sample in sample_array {
+                    if let Some(sample_map) = sample.try_cast::<rhai::Map>() {
+                        all_samples.push(sample_map);
+                    }
+                }
+            }
+        }
+    }
+
+    // Single error type
+    if error_types.len() == 1 {
+        let (error_type, count) = &error_types[0];
+
+        if *count == 1 && !all_samples.is_empty() {
+            // Single error: show message
+            let sample = &all_samples[0];
+            let message = sample
+                .get("message")
+                .and_then(|v| v.clone().into_string().ok())
+                .unwrap_or_else(|| "unknown error".to_string());
+
+            // Truncate very long messages for single line
+            let message = if message.len() > 80 {
+                format!("{}...", &message[..77])
+            } else {
+                message
+            };
+
+            format!("1 {} error: {}", error_type, message)
+        } else if *count <= 3 && all_samples.len() as i64 == *count {
+            // Few errors: show line numbers for all
+            let lines: Vec<String> = all_samples
+                .iter()
+                .map(|s| {
+                    s.get("line_num")
+                        .and_then(|v| v.as_int().ok())
+                        .map(|n| n.to_string())
+                        .unwrap_or_else(|| "?".to_string())
+                })
+                .collect();
+
+            format!(
+                "{} {} errors at lines {}",
+                count,
+                error_type,
+                lines.join(", ")
+            )
+        } else if !all_samples.is_empty() {
+            // More errors: show count + first error location
+            let first_line = all_samples[0]
+                .get("line_num")
+                .and_then(|v| v.as_int().ok())
+                .unwrap_or(0);
+
+            format!(
+                "{} {} errors (first at line {})",
+                count, error_type, first_line
+            )
+        } else {
+            // No samples available: just show count
+            format!("{} {} errors", count, error_type)
+        }
+    } else {
+        // Mixed error types
+        if total_errors <= 10 {
+            // Show breakdown for small counts
+            let breakdown: Vec<String> = error_types
+                .iter()
+                .map(|(t, c)| format!("{} {}", c, t))
+                .collect();
+
+            format!("{} errors: {}", total_errors, breakdown.join(", "))
+        } else {
+            // Large mixed counts
+            format!("{} errors (mixed types)", total_errors)
+        }
+    }
+}
+
 /// Extract error summary from tracking state with different verbosity levels
 #[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
 pub fn extract_error_summary_from_tracking(

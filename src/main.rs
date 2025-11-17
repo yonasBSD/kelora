@@ -1618,7 +1618,12 @@ fn main() -> Result<()> {
     }
 
     if had_errors && !diagnostics_allowed_runtime {
-        emit_fatal_line(&mut stderr, &config, "fatal error encountered");
+        let fatal_message = if let Some(ref tracking) = tracking_data {
+            crate::rhai_functions::tracking::format_fatal_error_line(tracking)
+        } else {
+            "fatal error encountered".to_string()
+        };
+        emit_fatal_line(&mut stderr, &config, &fatal_message);
     }
 
     if had_errors {
