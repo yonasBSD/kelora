@@ -10,16 +10,16 @@ New to Kelora? Try these first:
 
 ```bash
 # Basic filtering and transformation
-kelora examples/quickstart.log --filter "level == 'ERROR'"
+kelora examples/quickstart.log --filter 'e.line.contains("ERROR")'
 
 # JSON log analysis
-kelora -f json examples/simple_json.jsonl --filter "e.level == 'ERROR'" --transform "#{level: e.level, message: e.message}"
+kelora -f json examples/simple_json.jsonl --filter 'e.level == "ERROR"' --exec '#{level: e.level, message: e.message}'
 
 # Web access log parsing
-kelora examples/web_access.log --filter "status >= 400"
+kelora examples/web_access.log --filter 'e.status >= 400'
 
 # Using Rhai helper functions
-kelora --include examples/helpers.rhai examples/api_logs.jsonl --filter "is_problem(e)"
+kelora --include examples/helpers.rhai examples/api_logs.jsonl --exec 'if is_problem(e) { emit(e) }'
 ```
 
 Then run `kelora --help-examples` for common patterns and usage recipes.
@@ -110,30 +110,13 @@ Complex scenarios for testing performance and correctness:
 
 Reusable Rhai functions that you can include in your pipelines with `--include`:
 
-### `patterns.rhai`
-
-Curated regex helpers for common patterns (URLs, IPs, emails, UUIDs, etc.):
-
-```bash
-kelora --include examples/patterns.rhai examples/web_access.log \
-  --transform "emit_patterns(e.line, 'ipv4', 'client_ip')"
-```
-
-Available patterns: `duration`, `email`, `error_token`, `fqdn`, `ipv4`, `ipv6`, `jwt`, `mac`, `md5`, `sha1`, `sha256`, `url`, `uuid`, and more.
-
-Functions:
-- `has_pattern(text, name)` - Check if pattern exists
-- `extract_pattern(text, name)` - Extract first match
-- `extract_patterns(text, name)` - Extract all matches
-- `emit_patterns(text, name, key)` - Emit events for each match
-
 ### `helpers.rhai`
 
 Common utility functions for log analysis:
 
 ```bash
 kelora --include examples/helpers.rhai examples/api_logs.jsonl \
-  --filter "is_problem(e)"
+  --exec "if is_problem(e) { emit(e) }"
 ```
 
 Functions:
@@ -167,10 +150,10 @@ kelora examples/simple_json.jsonl
 kelora -f json examples/api_logs.jsonl
 
 # Chain operations
-kelora examples/web_access.log --filter "status >= 400" --transform "#{ip: client_ip, path: path}"
+kelora examples/web_access.log --filter 'e.status >= 400' --exec '#{ip: e.client_ip, path: e.path}'
 
 # Include helper scripts
-kelora --include examples/helpers.rhai examples/api_logs.jsonl --filter "is_problem(e)"
+kelora --include examples/helpers.rhai examples/api_logs.jsonl --exec 'if is_problem(e) { emit(e) }'
 
 # Compressed files work too
 kelora examples/web_access_large.log.gz
