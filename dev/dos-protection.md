@@ -1,42 +1,40 @@
-# DoS Protection for Rhai Execution
+# Hardened and Sandbox Modes for Rhai Execution
 
-## Problem
-- Current Rhai execution (`--exec`, `--begin`, `--end`, filters, span hooks) has no resource guards. An infinite loop or unbounded push can peg CPU and exhaust memory until the process is killed, as the security reviewer demonstrated.
-- Production deployments that accept untrusted scripts (or trusted operators making mistakes) are exposed to trivial denial of service.
+## Baseline (unchanged)
+- Default: no resource limits on Rhai execution; filesystem writes are blocked unless `--allow-rhai-io` is set. Filesystem reads remain allowed unless explicitly sandboxed.
+- Goal: keep parity with jq/awk/Python so normal/local usage is not surprised by limits.
 
-## Goals
-- Provide safe-by-default execution budgets for all Rhai code paths.
-- Make limits configurable via CLI/config, with explicit opt-out for trusted/bench scenarios.
-- Fail fast with clear diagnostics and exit code 1 when a guard trips.
-- Keep defaults high enough that normal scripts/examples are unaffected.
+## Objectives
+- Provide opt-in hardening knobs for users running untrusted scripts or shared automation.
+- Keep behavior unchanged for trusted/local workflows unless flags/configs opt in.
 
-## Non-Goals
-- Full multitenant sandboxing—focus on stopping runaway CPU/memory from Rhai itself.
-- OS-level cgroups or job objects; this spec stays within the process and Rhai engine hooks.
+## Modes
+### `--hardened` (DoS resilience preset)
+- Purpose: protect against runaway CPU/time/memory/depth in Rhai code paths.
+- Effect: applies a preset of resource budgets to every Rhai engine (filters, `--exec`, `--begin`/`--end`, span hooks, per-worker in `--parallel`).
+- Preset values (tunable constants in config layer):
+  - Max operations: 100_000_000
+  - Wall-clock: 60s per engine
+  - Total allocation: 256 MiB
+  - Max string: 32 MiB
+  - Max array/map: 200_000 elements
+  - Max call depth: 128
+- All budgets remain configurable individually via flags/config (see Configuration).
+- Diagnostics: terminate with exit code 1 and name the tripped guard (“Rhai limit hit: exceeded max operations (100,000,000)”); honor emoji/no-emoji.
+- `--script-unlimited` still disables all budgets even if `--hardened` is present (mutual exclusion with a warning).
 
-## Guardrails to Add (per Engine instance)
-1) **Operation budget**
-   - Use `Engine::set_max_operations(Some(N))` with a sensible default (e.g., 5_000_000).
-   - Applies to every script stage (filters, exec, begin/end, span hooks) and each worker in `--parallel`.
-   - Hitting the limit raises `ErrorTooManyOperations` → map to a fatal diagnostic and exit code 1.
-
-2) **Wall-clock budget**
-   - Use Rhai progress hook (`Engine::on_progress` or equivalent) to check elapsed time since the script started and terminate with `ErrorTerminated` when over the limit.
-   - Default: 2s for sequential mode; 1s per task in `--parallel` to keep work-stealing healthy.
-
-3) **Memory caps**
-   - Set `set_max_string_size`, `set_max_array_size`, and `set_max_map_size` to cap runaway allocations.
-   - Add a coarse total allocation cap via a shared counter checked in the progress hook; abort with `ErrorDataTooLarge` when exceeded.
-   - Default suggestion: 128 MiB total across all Rhai values, strings ≤ 16 MiB, arrays/maps ≤ 100_000 elements.
-
-4) **Depth limits**
-   - Set `set_max_call_levels(Some(depth))` to stop stack explosions (default 64).
-
-5) **Side-effect controls**
-   - Already gated by `--allow-rhai-io`; keep those unchanged. Limits above still apply whether or not IO is allowed.
+### `--sandbox` (capability restriction)
+- Purpose: reduce data exfiltration/side effects from Rhai scripts.
+- Effect:
+  - Deny filesystem reads and writes from Rhai by default.
+  - `--allow-rhai-io` re-allows both reads and writes explicitly (still blocked by OS perms).
+  - Environment access remains as currently implemented; if we add env restrictions later, gate them here.
+- Independent of `--hardened`; users can combine both.
 
 ## Configuration Surface
-- CLI flags (and matching config keys):
+- New CLI flags (with config keys):
+  - `--hardened` / `script.hardened = true`
+  - `--sandbox` / `script.sandbox = true`
   - `--script-max-ops <u64>` / `script.max_ops`
   - `--script-max-wall <duration>` / `script.max_wall`
   - `--script-max-mem <bytes>` / `script.max_mem`
@@ -44,31 +42,27 @@
   - `--script-max-array <len>` / `script.max_array`
   - `--script-max-map <len>` / `script.max_map`
   - `--script-max-depth <u32>` / `script.max_depth`
-  - `--script-unlimited` (explicit opt-out; disables all of the above)
-- Defaults baked into config layer; flags override config; `--script-unlimited` wins.
-- Show current limits in `--help-rhai` and `--help-functions` intro.
+  - `--script-unlimited` / `script.unlimited = true` (disables all budgets, even if `--hardened`)
+- Precedence: CLI > project config > user config; `--script-unlimited` overrides others.
+- Help/Docs: show current limits and whether sandbox is active in `--help-rhai` intro.
 
 ## Behavior
-- Limits are applied when constructing each `RhaiEngine` (both main and per-thread clones) so parallel mode inherits them.
-- When a limit is exceeded:
-  - Emit a clear diagnostic naming the tripped guard (e.g., “Rhai limit hit: exceeded max operations (5,000,000)”).
-  - Respect emoji/no-emoji output conventions; exit code 1.
-  - No partial output flush beyond whatever was already emitted before the error.
-- Scripts compiled before limits change keep using the active limits of their `Engine`; cloning must copy the guard settings.
+- Hardened budgets are applied when constructing each `RhaiEngine` and cloned into worker engines.
+- Sandbox applies at IO gating points: deny FS reads/writes unless `--allow-rhai-io`; other side-effect gates unchanged.
+- When a limit is exceeded: fail fast, emit guard-specific diagnostic, exit code 1; avoid partial output flushing beyond what already streamed.
 
 ## Testing
-- Add integration tests:
-  - Infinite loop under `--exec` exits with TooManyOperations within a short wall time.
-  - Tight loop with `while true { arr.push(0); }` fails with DataTooLarge under default mem cap.
-  - Recursive call chain hits max call depth.
-  - Normal scripts/examples still succeed under defaults.
-  - `--script-unlimited` allows the above to run without early termination (but mark as slow/ignored in CI).
-- Add a quick smoke test in `--parallel` mode to ensure per-worker limits apply.
+- Hardened:
+  - Infinite loop under `--exec --hardened` hits TooManyOperations quickly.
+  - Push loop hits DataTooLarge under default hardened mem cap.
+  - Recursion hits max call depth.
+  - Normal examples still pass under default (non-hardened) mode.
+  - Parallel smoke: per-worker budget applies.
+  - `--script-unlimited` allows above to run (mark slow/ignored in CI).
+- Sandbox:
+  - Rhai FS read/write fails under `--sandbox` without `--allow-rhai-io`.
+  - FS operations succeed when `--allow-rhai-io` is combined with `--sandbox`.
 
 ## Migration & Rollout
-- Implement limits with conservative defaults, document in CHANGELOG, and note that behavior is stricter (breaking change acceptable).
-- Guard flags are backwards compatible; only opt-out users need to update scripts (`--script-unlimited` or bump values).
-
-## Open Questions
-- Precise defaults—tune after measuring typical example workloads.
-- Whether to enforce limits during `--begin` separately (single shot) versus per-event; current plan: per-engine per-run.
+- Defaults unchanged; features are opt-in.
+- Document in CHANGELOG and `--help-rhai`; clarify that `--hardened` targets runaway scripts and `--sandbox` targets IO isolation.
