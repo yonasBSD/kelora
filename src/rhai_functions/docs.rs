@@ -231,117 +231,170 @@ Common Log Analysis Patterns:
 
 GETTING STARTED:
 # Preview first 100 lines to understand structure
-kelora -j app.jsonl --head 100 -F inspect
+kelora web_access.log --head 100 -F inspect
 
 # Quick field discovery and parsing statistics
-kelora -j app.jsonl --stats
+kelora api_logs.jsonl --stats
 
-# Filter by log level
-kelora -j app.jsonl --levels error,critical
+# Filter by log level (works with any structured format)
+kelora -f syslog syslog.log --levels error,critical
 
 # Your first filter - exact match
-kelora -j app.jsonl --filter 'e.status_code >= 500'
+kelora -f combined web_access.log --filter 'e.status >= 500'
 
 FILTERING & SEARCHING:
-# Case-insensitive wildcard search
-kelora -j app.jsonl --filter 'e.message.ilike("*timeout*")'
+# Case-insensitive wildcard search in JSON logs
+kelora -j api_logs.jsonl --filter 'e.message.ilike("*timeout*")'
 
 # Regex with Rhai raw string syntax (no escaping backslashes)
-kelora -j app.jsonl --filter 'e.message.matches(#"\d{3}-\d{2}-\d{4}"#)'
+kelora email_logs.log --filter 'e.line.matches(#"\d{3}-\d{2}-\d{4}"#)'
 
 # Regex with regular string (requires escaping)
-kelora -j app.jsonl --filter 'e.url.matches("/api/v\\d+/users")'
+kelora -j api_logs.jsonl --filter 'e.url.matches("/api/v\\d+/users")'
 
-# Field existence check (ignores () sentinel)
-kelora --format logfmt app.log --filter 'e.has("user_id") && e.user_id != "anonymous"'
+# Field existence check on logfmt (ignores () sentinel)
+kelora -f logfmt app.log --filter 'e.has("user_id") && e.user_id != "anonymous"'
 
-# Combine multiple conditions
-kelora -j app.jsonl --filter 'e.has("method") && e.method == "POST" && e.status >= 400'
+# Combine multiple conditions on CSV data
+kelora -f csv access_data.csv --filter 'e.has("method") && e.method == "POST" && e.status >= 400'
 
 PARSING & TRANSFORMATION:
 # Parse nested JSON strings from a field
-kelora -j app.jsonl --exec 'e.metadata = e.json_payload.parse_json()' \
+kelora -j api_logs.jsonl --exec 'e.metadata = e.json_payload.parse_json()' \
   --exec 'e.user_tier = e.get_path("metadata.subscription.tier", "free")'
 
-# Extract data with regex (raw vs regular strings)
-kelora -j app.jsonl --exec 'e.duration = e.msg.extract_re(#"took (\d+)ms"#, 1).to_int()'
-kelora -j app.jsonl --exec 'e.ip = e.msg.extract_re("ip=([\\d.]+)", 1)'
+# Extract data with regex from plain text logs (regex in Rhai's raw strings)
+kelora email_logs.log --exec 'e.duration = e.line.extract_re(#"took (\d+)ms"#, 1).to_int()'
+kelora app.log --exec 'e.ip = e.line.extract_re(#"ip=([\d.]+)"#, 1)'
 
 # Fan out nested arrays into separate events
-kelora -j batch.jsonl --exec 'emit_each(e.items)' --filter 'e.status == "active"'
+kelora -j fan_out_batches.jsonl --exec 'emit_each(e.items)' --filter 'e.status == "active"'
 
 # Parse key=value pairs from unstructured text
-kelora --format line app.log --exec 'e.absorb_kv("line", #{ keep_source: true })'
+kelora incident_story.log --exec 'e.absorb_kv("line", #{ keep_source: true })'
+
+OUTPUT FORMATS & CLI OPTIONS:
+# Output as JSON (from any input format)
+kelora -f combined web_access.log -F json
+
+# Output as logfmt (from JSON input)
+kelora -j api_logs.jsonl -F logfmt
+
+# Output as CSV with headers
+kelora -j api_logs.jsonl -F csv
+
+# Inspect format shows structure (useful for debugging)
+kelora email_logs.log --head 20 -F inspect
+
+# Select specific fields only (-k)
+kelora -f combined web_access.log -k client_ip,status,path
+
+# Brief output: field values only, no labels (-b)
+kelora -j api_logs.jsonl -b -k timestamp,level,message
+
+# Core fields only: exclude metadata (-c)
+kelora -j api_logs.jsonl -c --filter 'e.level == "ERROR"'
+
+# Quiet mode: suppress event output, show only stats (-q or --quiet)
+kelora web_access.log --filter 'e.status >= 500' -q --stats
+
+# Silent mode: suppress all output except fatal errors (metrics files still write)
+kelora -j api_logs.jsonl --metrics --metrics-file errors.json \
+  --filter 'e.level == "ERROR"' --exec 'track_count(e.error_type)' --silent
+
+# Convert format using Rhai methods
+kelora -j api_logs.jsonl --exec 'print(e.to_logfmt())' -q
+kelora -f logfmt app.log --exec 'print(e.to_json())' -q
+
+COMPRESSION:
+# Transparent decompression of .gz files
+kelora web_access_large.log.gz --filter 'e.status >= 400' --stats
+
+# Compressed JSON logs
+kelora sampling_hash.jsonl.gz -k session_id,event,timestamp
+
+# Mix compressed and uncompressed files
+kelora logs/*.log logs/*.log.gz --filter 'e.level == "ERROR"'
 
 TIME HANDLING:
 # Events from the last 2 hours
-kelora -j app.jsonl --since -2h --until now
+kelora -j duration_logs.jsonl --since -2h --until now
 
 # Business hours filter (9-5 local time)
-kelora -j app.jsonl --exec 'let h = to_datetime(e.timestamp).to_local().hour()' \
+kelora -j api_logs.jsonl --exec 'let h = to_datetime(e.timestamp).to_local().hour()' \
   --filter 'h >= 9 && h < 17'
 
 # Calculate duration and flag SLA violations
-kelora -j app.jsonl --exec '
+kelora -j duration_logs.jsonl --exec '
   let duration = to_datetime(e.end_time) - to_datetime(e.start_time);
   e.duration_ms = duration.as_milliseconds();
   e.sla_breach = duration.as_seconds() > 5
 ' --filter 'e.sla_breach'
 
+# Show local timestamps
+kelora -j api_logs.jsonl -z --since yesterday
+
 METRICS & AGGREGATION:
 # Count errors by type with metrics
-kelora -j app.jsonl -l error --metrics \
+kelora -j api_errors.jsonl -l error --metrics \
   --exec 'track_count(e.error_type)' \
   --end 'for key in metrics.keys() { print(key + ": " + metrics[key]) }'
 
 # Track unique users and compute percentiles (requires --window)
-kelora -j access.jsonl --window 1000 --metrics \
-  --exec 'track_unique("users", e.user_id)' \
-  --end 'let times = window.pluck_as_nums("response_ms"); print("p95: " + times.percentile(95))'
+kelora -f combined web_access.log --window 1000 --metrics \
+  --exec 'track_unique("users", e.user)' \
+  --end 'let times = window.pluck_as_nums("response_time"); print("p95: " + times.percentile(95))'
 
 # Histogram of status codes by bucket
-kelora --format combined access.log --metrics \
+kelora web_access.log --metrics \
   --exec 'track_bucket("status", e.status / 100 * 100)' \
   --end 'print(metrics.status)'
 
+# Save metrics to JSON file
+kelora -j api_logs.jsonl --metrics --metrics-file stats.json \
+  --exec 'track_count(e.level); track_sum("bytes", e.bytes)' --silent
+
 MULTI-FILE PROCESSING:
 # Add source filename to each event
-kelora -j logs/*.jsonl --exec 'e.source = meta.filename'
+kelora logs/*.jsonl --exec 'e.source = meta.filename'
 
 # Count errors per file
-kelora -j logs/*.jsonl --metrics --exec '
+kelora logs/*.{log,jsonl} --metrics --exec '
   if e.level == "ERROR" {
     track_count(meta.filename)
   }
 ' --end 'for file in metrics.keys() { print(file + ": " + metrics[file]) }'
 
 # Debug with line numbers
-kelora -j app.jsonl --filter 'e.status >= 500' --exec '
+kelora -j api_logs.jsonl --filter 'e.status >= 500' --exec '
   eprint("⚠️  Error at " + meta.filename + ":" + meta.line_num)
 '
 
 SECURITY & DATA PRIVACY:
 # Mask IP addresses (keep first 3 octets)
-kelora -j app.jsonl --exec 'e.client_ip = e.client_ip.mask_ip(1)'
+kelora -f combined web_access.log --exec 'e.client_ip = e.client_ip.mask_ip(1)'
 
 # Check for private IPs in external traffic
-kelora -j app.jsonl --filter 'e.source_ip.is_private_ip() == false'
+kelora -j security_audit.jsonl --filter 'e.source_ip.is_private_ip() == false'
 
 # Parse JWT tokens (no verification)
-kelora -j app.jsonl --exec 'let jwt = e.token.parse_jwt(); e.user = jwt.claims.sub'
+kelora -j auth_burst.jsonl --exec 'let jwt = e.token.parse_jwt(); e.user = jwt.claims.sub'
 
 # Hash sensitive fields with domain separation (requires KELORA_SECRET env var)
-kelora -j app.jsonl --exec 'e.email_hash = pseudonym(e.email, "users"); e.email = ()'
+kelora -j audit_findings.jsonl --exec 'e.email_hash = pseudonym(e.email, "users"); e.email = ()'
 
 PERFORMANCE PATTERNS:
 # Quick preview with --head (stops reading early)
-kelora -j huge.jsonl --head 1000 -F inspect
+kelora huge.log.gz --head 1000 -F inspect
 
-# Sample 10% of events for analysis
-kelora -j app.jsonl --filter 'e.request_id.bucket() % 10 == 0'
+# Sample 10% of events for analysis (deterministic)
+kelora -j api_logs.jsonl --filter 'e.request_id.bucket() % 10 == 0'
 
 # Limit output events (reads entire file)
-kelora -j app.jsonl --filter 'e.level == "ERROR"' --take 50
+kelora web_access.log --filter 'e.status == 404' --take 50
+
+# Stats-only mode: no event output
+kelora -j api_logs.jsonl --stats-only
 
 COMMON IDIOMS:
 # Method chaining              → e.domain = e.url.extract_domain().to_lower().strip()
