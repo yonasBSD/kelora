@@ -67,6 +67,7 @@ Choose Kelora when you need **programmable log processing** in one streaming pip
 
 **Reach for Kelora when:**
 
+- You're processing small to medium logs (a few hundred thousand lines; Kelora is slow)
 - You need multi-stage transformations (parse → filter → enrich → filter)
 - Your logs mix formats or use custom delimiters
 - You want windowed analysis (error bursts, sliding metrics)
@@ -79,6 +80,7 @@ Choose Kelora when you need **programmable log processing** in one streaming pip
 - Pure JSON queries: `jq` (ubiquitous, similar speed)
 - Interactive exploration: `lnav` (TUI with SQL)
 - CSV analytics: `qsv`/`miller` (faster for stats)
+- Large logs (millions of events): `loki`/`victoria-logs`/`openobserve` (production log systems)
 
 Kelora trades raw speed for expressiveness. See [Performance Comparisons](concepts/performance-comparisons.md) for benchmarks and the full decision matrix.
 
