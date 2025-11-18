@@ -12,13 +12,14 @@ The original verbose redesign attempted to solve all three problems (errors, lea
 - **Sampling gaps**: Showing only every 100th event means missing the specific event a user is debugging
 - **Mixed concerns**: Combining error output, progress indicators, and pipeline transparency into `-v` levels makes each use case noisier
 - **Unclear intent**: Does `-vv` mean "show me errors in detail" or "teach me how Kelora works" or "debug this specific event"?
+- **Reinventing progress**: Kelora already supports SIGUSR1/CTRL-T for on-demand stats (zero-noise, proven UX pattern)
 
 **Solution**: Separate the three concerns into orthogonal features:
 - `-v/-vv/-vvv` = error verbosity (current behavior, proven and understood)
-- `--explain` = learning/transparency (show config and stage statistics)
+- `--explain` = learning/transparency (enhance SIGUSR1/CTRL-T with per-stage stats, show startup config)
 - `--trace=<selector>` = targeted debugging (show specific events' pipeline journeys)
 
-This allows users to compose what they need: `-v` for errors, `--explain` to understand the pipeline, `--trace=drops` to debug filtering logic.
+This allows users to compose what they need: `-v` for errors, `--explain` to understand the pipeline, `--trace=drops` to debug filtering logic. Progress checking uses the existing SIGUSR1/CTRL-T mechanism (no automatic output).
 
 ---
 
@@ -54,6 +55,9 @@ This allows users to compose what they need: `-v` for errors, `--explain` to und
 - Understanding which stages are in the pipeline and in what order
 - Seeing aggregate statistics: which filters drop events, which stages succeed/fail
 - Debugging pipeline construction (not individual event behavior)
+- Checking progress during long-running jobs (via SIGUSR1/CTRL-T)
+
+**Progress checking**: Kelora already supports SIGUSR1 (all Unix) and SIGINFO/CTRL-T (BSD/macOS) for on-demand stats. When `--explain` is enabled, these signals show enhanced output including per-stage breakdowns.
 
 #### Output: Startup Plan
 
@@ -97,7 +101,7 @@ Span tracking: disabled
 
 #### Output: Stage Statistics
 
-Printed at end of processing (or periodically if combined with `--progress`):
+Printed at end of processing, or on-demand via SIGUSR1/CTRL-T:
 
 ```
 🔹 Pipeline Statistics
@@ -155,10 +159,11 @@ Summary:
 - Honors `--no-diagnostics` (suppress final stats, show startup plan only)
 - Honors `--no-emoji` and `NO_EMOJI` env var
 
-**Combination with `--progress`:**
-- `--explain --progress`: Show startup plan, then periodic stats updates (every 5s or 5000 events)
-- Progress updates show incremental counts since last update
-- Useful for long-running jobs to monitor pipeline health
+**Integration with SIGUSR1/CTRL-T:**
+- **Without `--explain`** (current behavior): SIGUSR1/CTRL-T shows global stats (events, throughput, timestamps)
+- **With `--explain`**: SIGUSR1/CTRL-T shows global stats PLUS per-stage breakdown
+- Zero noise by default - stats only appear when user requests them (signal) or at end
+- Useful for long-running jobs and slow streaming: "Press CTRL-T to check progress"
 
 ---
 
@@ -330,6 +335,57 @@ Stage #5 emit: EMITTED
 
 ---
 
+## Progress Monitoring (Existing Feature)
+
+Kelora already supports **on-demand progress checking** via Unix signals - no automatic output needed:
+
+- **SIGUSR1** (all Unix): `kill -USR1 <pid>`
+- **SIGINFO/CTRL-T** (BSD/macOS): Press `Ctrl-T` in terminal
+
+**Current behavior** (without `--explain`):
+```
+📈 Stats:
+Events created: 12340 total, 1523 output, 10817 filtered (87.7%)
+Throughput: 19609 lines/s in 2.3s
+Timestamp: timestamp (auto-detected); 12340 parsed, 0 missing
+Time span: 2024-01-15 10:00:00 to 2024-01-15 10:05:00
+```
+
+**Enhanced behavior** (with `--explain`):
+Shows the above PLUS per-stage breakdown:
+```
+📈 Stats:
+Events created: 12340 total, 1523 output, 10817 filtered (87.7%)
+Throughput: 19609 lines/s in 2.3s
+
+Stage Results:
+  #1 filter (e.level != "DEBUG"): ✓ 12340 passed, ✗ 32762 dropped (72.6%)
+  #2 exec (duration calc): ✓ 12340 ok, ⚠ 0 errors
+  #3 filter (e.duration_ms > 1000): ✓ 1523 passed, ✗ 10817 dropped (87.7%)
+
+Timestamp: timestamp (auto-detected); 12340 parsed, 0 missing
+Time span: 2024-01-15 10:00:00 to 2024-01-15 10:05:00
+```
+
+**Why this is better than automatic progress:**
+- ✅ Zero noise - only prints when user requests it
+- ✅ Works perfectly for slow streaming (`tail -f | kelora`)
+- ✅ No complexity of periodic updates, buffering, or terminal detection
+- ✅ Proven UX pattern (used by `dd`, `rsync`, database clients, etc.)
+- ✅ Already implemented - just needs enhancement for `--explain`
+
+**Use case: Slow streaming**
+```bash
+# Tailing a log that updates infrequently
+tail -f /var/log/app.log | kelora --explain -f json --filter 'e.level == "ERROR"'
+
+# Is it working or hung? Press CTRL-T to check:
+# → Shows: "Events created: 47 total, 12 output, 35 filtered (74.5%)"
+# → Proves it's alive and processing
+```
+
+---
+
 ## Feature Interactions
 
 ### Combining Flags
@@ -349,8 +405,9 @@ kelora --explain --trace=drops app.log
 # All three: errors, transparency, and debugging
 kelora -v --explain --trace=errors app.log
 
-# With progress monitoring
-kelora -v --explain --progress --trace=sample:5:100 large.log
+# Check progress anytime with CTRL-T (or kill -USR1 <pid>)
+kelora --explain large.log
+# Press CTRL-T → see per-stage stats while processing
 ```
 
 ### Suppression Flags
@@ -404,8 +461,8 @@ All three features work in parallel mode:
 2. Implement startup plan formatting (gather from `PipelineConfig`)
 3. Add stage pass/drop/error counters to tracking infrastructure
 4. Implement final statistics formatting (aggregate from reducer state)
-5. Add `--explain --progress` for periodic updates
-6. Tests: verify stats accuracy, parallel aggregation, suppression flags
+5. Enhance SIGUSR1/CTRL-T handler to show per-stage stats when `--explain` active
+6. Tests: verify stats accuracy, parallel aggregation, suppression flags, signal handling
 
 **Estimated complexity:** Low (mostly formatting, uses existing tracking)
 
@@ -525,6 +582,10 @@ This design separates three distinct user needs:
 2. **Pipeline transparency** (`--explain`): Help users understand what Kelora is doing
 3. **Event debugging** (`--trace=<selector>`): Show specific events' journeys through stages
 
+**Progress monitoring** uses existing SIGUSR1/CTRL-T signals - no automatic output needed. When `--explain` is active, signals show enhanced per-stage statistics.
+
 Each feature is orthogonal, minimal in hot-path overhead, and composable with others. Users get clearer intent, more control, and no sampling gaps in debugging output.
 
-**The key insight:** Verbosity is not one problem - it's three. Solve each separately.
+**The key insights:**
+- Verbosity is not one problem - it's three. Solve each separately.
+- Progress is already solved - enhance it, don't reinvent it.
