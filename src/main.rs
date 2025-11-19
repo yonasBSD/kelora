@@ -1880,8 +1880,8 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
         std::process::exit(0);
     }
 
-    // Check for --help-quick (short cheat sheet)
-    if raw_args.iter().any(|arg| arg == "--help-quick") {
+    // Check for -h (brief help)
+    if raw_args.iter().any(|arg| arg == "-h") {
         print_quick_help();
         std::process::exit(0);
     }
@@ -2069,31 +2069,36 @@ fn print_examples_help() {
 }
 
 fn print_quick_help() {
-    let help_text = r#"Kelora Quick Help
+    let help_text = r#"Kelora - Scriptable log processor for the command line
 
-Workflows:
+Usage:
+  kelora [OPTIONS] [FILES]...
+  kelora [OPTIONS] < input.log
+  kelora --help     # Full CLI reference (all options)
+
+Quick Examples:
   kelora -f logfmt --levels error examples/simple_logfmt.log
   kelora -j examples/simple_json.jsonl --filter 'e.service == "database"' --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' -k timestamp,message,duration_s
-  kelora -f combined examples/web_access_large.log.gz --parallel --stats
+  kelora -f combined examples/web_access_large.log.gz --stats-only
 
-High-frequency flags:
-  -f, --input-format <FORMAT>   Choose parser (json, logfmt, combined, cols:<spec>)
-  --filter <expr>               Rhai boolean guard (repeatable)
-  --levels <levels>             Comma-separated log levels to include
-  -e, --exec <expr>             Transform events or emit metrics
+Common Options:
+  -f, --input-format <FORMAT>   Choose parser (json, logfmt, combined, cols:<spec>, regex:<pattern>)
+  --filter <expr>               Keep events where expression is true (can repeat; run in the order given)
+  --levels <levels>             Keep only these log levels (comma-separated)
+  -e, --exec <expr>             Transform events or emit metrics (can repeat; run in the order given)
   -k, --keys <fields>           Pick or reorder output fields
-  -F, --output-format <FORMAT>  Switch formatter (default, json, logfmt, inspect, none)
+  -F, --output-format <FORMAT>  Output format (default, json, logfmt, inspect, none)
+  -n, --take <N>                Limit output to first N events
   --stats                       Show stats with discovered fields and parsing metrics
-  --metrics                     Show tracked counters from track_*() functions
 
-Docs & references:
-  kelora --help          Full CLI reference grouped by stage
-  kelora --help-rhai     Rhai language guide + stage semantics
-  kelora --help-functions  Built-in function catalogue
-  kelora --help-examples Common patterns and example walkthroughs
-
-Need the timestamp catalogue?  kelora --help-time
-Multiline strategies?          kelora --help-multiline
+More Help:
+  kelora --help              Full CLI reference (all 100+ options grouped by category)
+  kelora --help-rhai         Rhai language guide + stage semantics
+  kelora --help-functions    Complete built-in function catalogue (150+ functions)
+  kelora --help-examples     Common patterns and example walkthroughs
+  kelora --help-time         Timestamp format reference
+  kelora --help-multiline    Multiline event strategies
+  kelora --help-regex        Regex format parsing guide
 "#;
     println!("{}", help_text);
 }
