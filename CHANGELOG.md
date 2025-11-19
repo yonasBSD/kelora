@@ -4,6 +4,57 @@ All notable changes to Kelora will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.10.0] - 2025-11-19
+
+### Added
+
+- **Regex input format parser (#17):**
+  - Parse logs using regex patterns with named capture groups
+  - Type annotations for automatic field conversion
+  - `--help-regex` comprehensive documentation
+  - Fuzzing harnesses for regex parser robustness
+- **New Rhai function:**
+  - `text.extract_json([nth])` - Extract JSON objects from unstructured text (#19)
+- **CLI flags:**
+  - `--head N` - Limit number of input lines read (complements `--take` for output)
+  - `-h` - Quick reference (one-screen cheat sheet)
+  - `--help` - Full CLI reference (detailed, auto-generated)
+- **UX improvements:**
+  - Enhanced field-not-found errors to suggest `--stats` and `-F inspect`
+  - Smart fatal error summaries in `--silent` mode with actionable context
+  - Format detection hints when `-f` is missing
+  - "Discovering Fields" section in `--help-examples`
+  - Improved `--help-examples` with filenames and modern syntax
+- **Documentation:**
+  - `examples/README.md` as discovery guide with file navigation
+  - Performance limitations guidance in documentation
+  - Cargo.toml dependency documentation with purpose comments
+  - Year-less timestamp format warnings
+
+### Changed
+
+- **Breaking:** Replaced `--help-quick` with `-h` following standard CLI conventions (ripgrep, fd, cargo)
+- **Breaking:** Revamped quiet/silent controls for clearer semantics and flag interactions
+- **Breaking:** Anchored timestamp syntax renamed for clarity:
+  - `start+DURATION` → `since+DURATION`
+  - `start-DURATION` → `since-DURATION`
+  - `end+DURATION` → `until+DURATION`
+  - `end-DURATION` → `until-DURATION`
+  - Added: `now+DURATION` and `now-DURATION` for current time anchoring
+- **Breaking:** Regex parser now returns errors for non-matching lines instead of silently skipping
+- Preserve `--no-emoji` flag in saved aliases
+
+### Fixed
+
+- **Critical:** Regex parsing failure on file inputs (worked on stdin, failed on files due to newline handling)
+- Syslog year rollover bug for year-less timestamps
+- u64 JSON precision loss by adding explicit u64 conversion path
+- Signal exit codes with comprehensive integration tests
+- Function API inconsistencies and documentation gaps
+- Test failures caused by timezone and environment dependencies
+- Syntax errors in `examples/README.md` and `patterns.rhai`
+- Broken anchor links in documentation and glossary
+
 ## [0.9.1] - 2025-11-12
 
 ### Added
@@ -125,7 +176,8 @@ _Initial release (yanked)._
 
 ---
 
-[Unreleased]: https://github.com/dloss/kelora/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/dloss/kelora/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/dloss/kelora/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/dloss/kelora/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/dloss/kelora/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/dloss/kelora/compare/v0.8.0...v0.8.1
