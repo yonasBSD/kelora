@@ -12,7 +12,6 @@ use anyhow::Result;
 /// 5. Logfmt - contains key=value pairs
 /// 6. CSV/TSV - contains delimiters with reasonable structure
 /// 7. Line - fallback for everything else
-#[allow(dead_code)] // Used by lib.rs for format auto-detection
 pub fn detect_format(sample_line: &str) -> Result<ConfigInputFormat> {
     let trimmed = sample_line.trim();
 
@@ -56,7 +55,6 @@ pub fn detect_format(sample_line: &str) -> Result<ConfigInputFormat> {
 }
 
 /// Detect JSON format - starts with '{' and is valid JSON
-#[allow(dead_code)] // Used by detect_format function
 fn detect_json(line: &str) -> bool {
     if !line.starts_with('{') {
         return false;
@@ -67,13 +65,11 @@ fn detect_json(line: &str) -> bool {
 }
 
 /// Detect CEF format - starts with "CEF:"
-#[allow(dead_code)] // Used by detect_format function
 fn detect_cef(line: &str) -> bool {
     line.starts_with("CEF:")
 }
 
 /// Detect Syslog format using patterns similar to SyslogParser
-#[allow(dead_code)] // Used by detect_format function
 fn detect_syslog(line: &str) -> bool {
     // RFC5424 pattern: <priority>version timestamp hostname app-name procid msgid structured-data message
     // Example: <34>1 2023-04-15T10:00:00.000Z hostname app-name - - - message
@@ -167,7 +163,6 @@ fn detect_syslog(line: &str) -> bool {
 }
 
 /// Detect combined log formats (Apache/Nginx compatible)
-#[allow(dead_code)] // Used by detect_format function
 fn detect_combined_logs(line: &str) -> bool {
     // Common patterns in web logs:
     // Combined: IP - - [timestamp] "REQUEST" status size "referer" "user-agent" [request_time]
@@ -197,7 +192,6 @@ fn detect_combined_logs(line: &str) -> bool {
 }
 
 /// Check if a string looks like an IP address (v4 or v6, or hostname)
-#[allow(dead_code)] // Used by detect_combined_logs function
 fn is_likely_ip_address(s: &str) -> bool {
     // IPv4 pattern (rough check)
     if s.chars().all(|c| c.is_ascii_digit() || c == '.') && s.contains('.') {
@@ -221,7 +215,6 @@ fn is_likely_ip_address(s: &str) -> bool {
 }
 
 /// Detect logfmt format - contains key=value pairs
-#[allow(dead_code)] // Used by detect_format function
 fn detect_logfmt(line: &str) -> bool {
     // Look for patterns like key=value
     let mut has_equals = false;
@@ -251,7 +244,6 @@ fn detect_logfmt(line: &str) -> bool {
 }
 
 /// Detect CSV/TSV variants
-#[allow(dead_code)] // Used by detect_format function
 fn detect_csv_variants(line: &str) -> Option<ConfigInputFormat> {
     let comma_count = line.matches(',').count();
     let tab_count = line.matches('\t').count();

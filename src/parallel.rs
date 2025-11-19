@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
@@ -1123,7 +1122,13 @@ impl ParallelProcessor {
                                     }
                                 }
                             }
-                            Ok(LineMessage::Error { error, .. }) => return Err(error.into()),
+                            Ok(LineMessage::Error { error, filename }) => {
+                                let context = filename
+                                    .as_deref()
+                                    .map(|f| format!("while reading {}", f))
+                                    .unwrap_or_else(|| "while reading stdin".to_string());
+                                return Err(anyhow::Error::from(error).context(context));
+                            }
                             Ok(LineMessage::Eof) => {
                                 if !current_batch.is_empty() {
                                     Self::send_batch(
@@ -1234,7 +1239,13 @@ impl ParallelProcessor {
                                     }
                                 }
                             }
-                            Ok(LineMessage::Error { error, .. }) => return Err(error.into()),
+                            Ok(LineMessage::Error { error, filename }) => {
+                                let context = filename
+                                    .as_deref()
+                                    .map(|f| format!("while reading {}", f))
+                                    .unwrap_or_else(|| "while reading stdin".to_string());
+                                return Err(anyhow::Error::from(error).context(context));
+                            }
                             Ok(LineMessage::Eof) => {
                                 if !current_batch.is_empty() {
                                     Self::send_batch(
@@ -1401,7 +1412,13 @@ impl ParallelProcessor {
                                     }
                                 }
                             }
-                            Ok(LineMessage::Error { error, .. }) => return Err(error.into()),
+                            Ok(LineMessage::Error { error, filename }) => {
+                                let context = filename
+                                    .as_deref()
+                                    .map(|f| format!("while reading {}", f))
+                                    .unwrap_or_else(|| "while reading stdin".to_string());
+                                return Err(anyhow::Error::from(error).context(context));
+                            }
                             Ok(LineMessage::Eof) => {
                                 if !current_batch.is_empty() {
                                     Self::send_batch_with_filenames_and_headers(
@@ -1527,7 +1544,13 @@ impl ParallelProcessor {
                                     }
                                 }
                             }
-                            Ok(LineMessage::Error { error, .. }) => return Err(error.into()),
+                        Ok(LineMessage::Error { error, filename }) => {
+                            let context = filename
+                                .as_deref()
+                                .map(|f| format!("while reading {}", f))
+                                .unwrap_or_else(|| "while reading stdin".to_string());
+                            return Err(anyhow::Error::from(error).context(context));
+                        }
                             Ok(LineMessage::Eof) => {
                                 if !current_batch.is_empty() {
                                     Self::send_batch_with_filenames_and_headers(

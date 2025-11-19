@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use crate::config::ColorMode;
 use std::io::IsTerminal;
 

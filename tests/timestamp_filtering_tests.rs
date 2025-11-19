@@ -2,7 +2,6 @@
 use chrono::{Duration, Timelike, Utc};
 use std::io::Write;
 use std::process::{Command, Stdio};
-use tempfile::NamedTempFile;
 
 /// Helper function to run kelora with given arguments and input via stdin
 fn run_kelora_with_input(args: &[&str], input: &str) -> (String, String, i32) {
@@ -27,37 +26,6 @@ fn run_kelora_with_input(args: &[&str], input: &str) -> (String, String, i32) {
     }
 
     let output = cmd.wait_with_output().expect("Failed to read output");
-
-    (
-        String::from_utf8_lossy(&output.stdout).to_string(),
-        String::from_utf8_lossy(&output.stderr).to_string(),
-        output.status.code().unwrap_or(-1),
-    )
-}
-
-/// Helper function to run kelora with a temporary file
-#[allow(dead_code)]
-fn run_kelora_with_file(args: &[&str], file_content: &str) -> (String, String, i32) {
-    let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
-    temp_file
-        .write_all(file_content.as_bytes())
-        .expect("Failed to write to temp file");
-
-    let mut full_args = args.to_vec();
-    full_args.push(temp_file.path().to_str().unwrap());
-
-    let binary_path = if cfg!(debug_assertions) {
-        "./target/debug/kelora"
-    } else {
-        "./target/release/kelora"
-    };
-
-    let output = Command::new(binary_path)
-        .args(&full_args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .expect("Failed to execute kelora");
 
     (
         String::from_utf8_lossy(&output.stdout).to_string(),

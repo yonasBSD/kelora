@@ -1,7 +1,8 @@
+#![allow(dead_code)] // Builder API keeps unused setters for future CLI/config surfaces
 use anyhow::Result;
 use std::collections::HashMap;
 use std::fs;
-use std::io::{self, BufRead, BufReader};
+use std::io::{BufRead, BufReader};
 
 use crate::stats::stats_set_timestamp_override;
 
@@ -24,7 +25,6 @@ impl TimestampConfiguredParser {
                 custom_field: ts_field,
                 custom_format: ts_format,
                 default_timezone,
-                auto_parse: true,
             },
         }
     }
@@ -45,7 +45,6 @@ use super::{
     PipelineContext, ScriptStage, SimpleChunker, SimpleWindowManager, SlidingWindowManager,
     StdoutWriter, TakeNLimiter, TimestampConversionStage, TimestampFilterStage,
 };
-use crate::decompression::DecompressionReader;
 use crate::engine::{DebugConfig, RhaiEngine};
 use crate::readers::MultiFileReader;
 use crate::rhai_functions::file_ops::{self, RuntimeConfig};
@@ -55,9 +54,7 @@ use crate::rhai_functions::hashing;
 #[derive(Clone)]
 pub struct PipelineBuilder {
     config: PipelineConfig,
-    #[allow(dead_code)] // Used in builder pattern, stored for build() method
     begin: Option<String>,
-    #[allow(dead_code)] // Used in builder pattern, stored for build() method
     end: Option<String>,
     input_format: crate::config::InputFormat,
     output_format: crate::OutputFormat,
@@ -134,14 +131,12 @@ impl PipelineBuilder {
         }
     }
 
-    #[allow(dead_code)] // Used in builder pattern, called by helper functions
     pub fn with_config(mut self, config: PipelineConfig) -> Self {
         self.config = config;
         self
     }
 
     /// Build pipeline with stages
-    #[allow(dead_code)] // Used in builder pattern, called by create_pipeline_from_config
     pub fn build(
         self,
         stages: Vec<crate::config::ScriptStageType>,
@@ -536,7 +531,6 @@ impl PipelineBuilder {
             custom_field: self.ts_field.clone(),
             custom_format: self.ts_format.clone(),
             default_timezone: self.default_timezone.clone(),
-            auto_parse: true,
         };
 
         // Create pipeline
@@ -556,31 +550,26 @@ impl PipelineBuilder {
         Ok((pipeline, begin_stage, end_stage, ctx))
     }
 
-    #[allow(dead_code)] // Used in builder pattern, called by create_pipeline_builder_from_config
     pub fn with_begin(mut self, begin: Option<String>) -> Self {
         self.begin = begin;
         self
     }
 
-    #[allow(dead_code)] // Used in builder pattern, called by create_pipeline_builder_from_config
     pub fn with_end(mut self, end: Option<String>) -> Self {
         self.end = end;
         self
     }
 
-    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
     pub fn with_input_format(mut self, format: crate::config::InputFormat) -> Self {
         self.input_format = format;
         self
     }
 
-    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
     pub fn with_output_format(mut self, format: crate::OutputFormat) -> Self {
         self.output_format = format;
         self
     }
 
-    #[allow(dead_code)]
     pub fn with_take_limit(mut self, limit: Option<usize>) -> Self {
         self.take_limit = limit;
         self
@@ -954,7 +943,6 @@ impl PipelineBuilder {
             custom_field: self.ts_field.clone(),
             custom_format: self.ts_format.clone(),
             default_timezone: self.default_timezone.clone(),
-            auto_parse: true,
         };
 
         // Create worker pipeline (no output writer - results are collected by the processor)
@@ -979,7 +967,6 @@ impl PipelineBuilder {
         self
     }
 
-    #[allow(dead_code)]
     pub fn with_timestamp_filter(
         mut self,
         timestamp_filter: Option<crate::config::TimestampFilterConfig>,
@@ -988,43 +975,36 @@ impl PipelineBuilder {
         self
     }
 
-    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
     pub fn with_ts_field(mut self, ts_field: Option<String>) -> Self {
         self.ts_field = ts_field;
         self
     }
 
-    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
     pub fn with_ts_format(mut self, ts_format: Option<String>) -> Self {
         self.ts_format = ts_format;
         self
     }
 
-    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
     pub fn with_default_timezone(mut self, default_timezone: Option<String>) -> Self {
         self.default_timezone = default_timezone;
         self
     }
 
-    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
     pub fn with_extract_prefix(mut self, extract_prefix: Option<String>) -> Self {
         self.extract_prefix = extract_prefix;
         self
     }
 
-    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
     pub fn with_prefix_sep(mut self, prefix_sep: String) -> Self {
         self.prefix_sep = prefix_sep;
         self
     }
 
-    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
     pub fn with_cols_spec(mut self, cols_spec: Option<String>) -> Self {
         self.cols_spec = cols_spec;
         self
     }
 
-    #[allow(dead_code)] // Used in builder pattern, may be called by helper functions
     pub fn with_cols_sep(mut self, cols_sep: Option<String>) -> Self {
         self.cols_sep = cols_sep;
         self
@@ -1038,7 +1018,6 @@ impl Default for PipelineBuilder {
 }
 
 /// Create a pipeline from configuration
-#[allow(dead_code)] // Used by lib.rs sequential processing, not detected across crate targets
 pub fn create_pipeline_from_config(
     config: &crate::config::KeloraConfig,
 ) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
@@ -1047,7 +1026,6 @@ pub fn create_pipeline_from_config(
 }
 
 /// Create a pipeline builder from configuration (useful for parallel processing)
-#[allow(dead_code)] // Used by lib.rs for both sequential and parallel processing
 pub fn create_pipeline_builder_from_config(
     config: &crate::config::KeloraConfig,
 ) -> PipelineBuilder {
@@ -1107,30 +1085,7 @@ pub fn create_pipeline_builder_from_config(
     builder
 }
 
-/// Create concatenated content from multiple files for parallel processing
-/// DEPRECATED: Use streaming readers instead
-#[allow(dead_code)]
-fn read_all_files_to_memory(
-    files: &[String],
-    _config: &crate::config::KeloraConfig,
-) -> Result<Vec<u8>> {
-    let mut all_content = Vec::new();
-
-    for file_path in files {
-        let mut reader = DecompressionReader::new(file_path)?;
-        io::Read::read_to_end(&mut reader, &mut all_content)?;
-
-        // Add a newline between files if the last file doesn't end with one
-        if !all_content.is_empty() && all_content[all_content.len() - 1] != b'\n' {
-            all_content.push(b'\n');
-        }
-    }
-
-    Ok(all_content)
-}
-
 /// Create input reader with optional decompression for parallel processing
-#[allow(dead_code)] // Used by lib.rs for parallel processing setup
 pub fn create_input_reader(
     config: &crate::config::KeloraConfig,
 ) -> Result<Box<dyn BufRead + Send>> {

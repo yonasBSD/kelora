@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Pipeline API exposes embedding/legacy hooks not all used by the current binary
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use rhai::Dynamic;
@@ -149,14 +150,12 @@ fn collect_discovered_levels_and_keys(event: &Event, ctx: &mut PipelineContext) 
 pub enum ScriptResult {
     Skip,
     Emit(Event),
-    #[allow(dead_code)]
     EmitMultiple(Vec<Event>), // For future emit_each() support
     Error(String),
 }
 
 impl ScriptResult {
     /// Try to unwrap the event from Emit variant, returns error if not Emit
-    #[allow(dead_code)]
     pub fn try_unwrap_emit(self) -> Result<Event> {
         match self {
             ScriptResult::Emit(event) => Ok(event),
@@ -186,7 +185,6 @@ pub struct PipelineContext {
 /// Pipeline configuration
 #[derive(Debug, Clone)]
 pub struct PipelineConfig {
-    #[allow(dead_code)]
     // LEGACY: Remove during resiliency migration (see dev/resiliency-todos.md #4)
     pub error_report: crate::config::ErrorReportConfig,
     pub brief: bool,
@@ -200,7 +198,6 @@ pub struct PipelineConfig {
     /// Show detailed error information - new resiliency model (levels: 0-3)
     pub verbose: u8,
     /// Suppress formatter/event output
-    #[allow(dead_code)]
     pub quiet_events: bool,
     /// Suppress diagnostics and summaries
     pub suppress_diagnostics: bool,
@@ -221,7 +218,6 @@ pub struct PipelineConfig {
 /// Metadata about current processing context
 #[derive(Debug, Clone, Default)]
 pub struct MetaData {
-    #[allow(dead_code)]
     pub filename: Option<String>,
     pub line_num: Option<usize>,
     pub span_status: Option<crate::event::SpanStatus>,
@@ -263,7 +259,6 @@ pub trait ScriptStage: Send {
 /// Optional event limiting (--take N)
 pub trait EventLimiter: Send {
     fn allow(&mut self) -> bool;
-    #[allow(dead_code)] // Used by implementors
     fn is_exhausted(&self) -> bool;
 }
 
@@ -278,7 +273,6 @@ pub trait Formatter: Send + Sync {
 }
 
 /// Write formatted output
-#[allow(dead_code)]
 pub trait OutputWriter: Send {
     fn write(&mut self, line: &str) -> std::io::Result<()>;
     fn flush(&mut self) -> std::io::Result<()>;
@@ -292,7 +286,6 @@ pub struct Pipeline {
     pub script_stages: Vec<Box<dyn ScriptStage>>,
     pub limiter: Option<Box<dyn EventLimiter>>,
     pub formatter: Box<dyn Formatter>,
-    #[allow(dead_code)]
     pub output: Box<dyn OutputWriter>,
     pub window_manager: Box<dyn WindowManager>,
     pub span_processor: Option<SpanProcessor>,
@@ -861,7 +854,6 @@ impl Pipeline {
     }
 
     /// Check if the event limiter (--take N) is exhausted
-    #[allow(dead_code)] // Used by parallel processing logic
     pub fn is_take_limit_exhausted(&self) -> bool {
         self.limiter.as_ref().is_some_and(|l| l.is_exhausted())
     }

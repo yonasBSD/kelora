@@ -1718,31 +1718,6 @@ fn validate_cli_args(cli: &Cli) -> Result<()> {
     Ok(())
 }
 
-/// Validate configuration for consistency
-#[allow(dead_code)]
-fn validate_config(config: &KeloraConfig) -> Result<()> {
-    // Check if files exist (if specified)
-    for file_path in &config.input.files {
-        if !std::path::Path::new(file_path).exists() {
-            return Err(anyhow::anyhow!("File not found: {}", file_path));
-        }
-    }
-
-    // Validate batch size
-    if let Some(batch_size) = config.performance.batch_size {
-        if batch_size == 0 {
-            return Err(anyhow::anyhow!("Batch size must be greater than 0"));
-        }
-    }
-
-    // Validate thread count
-    if config.performance.threads > 1000 {
-        return Err(anyhow::anyhow!("Thread count too high (max 1000)"));
-    }
-
-    Ok(())
-}
-
 /// Extract --config-file argument from raw args
 fn extract_config_file_arg(args: &[String]) -> Option<String> {
     for i in 0..args.len() {

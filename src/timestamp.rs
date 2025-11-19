@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use chrono::{DateTime, Datelike, Local, TimeZone, Utc};
 
 /// Adaptive timestamp parser that dynamically reorders formats based on success
@@ -13,12 +12,6 @@ impl AdaptiveTsParser {
         Self {
             formats: get_initial_timestamp_formats(),
         }
-    }
-
-    /// Parse timestamp using adaptive format ordering
-    /// Successful formats are moved to front of the list for faster future parsing
-    pub fn parse_ts(&mut self, ts_str: &str) -> Option<DateTime<Utc>> {
-        self.parse_ts_with_config(ts_str, None, None)
     }
 
     /// Parse timestamp with full configuration support
@@ -116,15 +109,21 @@ impl AdaptiveTsParser {
 
         None
     }
+}
+
+#[cfg(test)]
+impl AdaptiveTsParser {
+    /// Parse timestamp using adaptive format ordering (test-only convenience wrapper)
+    pub fn parse_ts(&mut self, ts_str: &str) -> Option<chrono::DateTime<chrono::Utc>> {
+        self.parse_ts_with_config(ts_str, None, None)
+    }
 
     /// Reset the format ordering to initial state (for testing/debugging)
-    #[allow(dead_code)]
     pub fn reset_ordering(&mut self) {
         self.formats = get_initial_timestamp_formats();
     }
 
     /// Get current format ordering (for debugging/monitoring)
-    #[allow(dead_code)]
     pub fn get_format_ordering(&self) -> Vec<String> {
         self.formats.clone()
     }
@@ -384,7 +383,7 @@ fn get_initial_timestamp_formats() -> Vec<String> {
 }
 
 /// Configuration for timestamp field identification and parsing
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TsConfig {
     /// Custom timestamp field name (overrides auto-detection)
     pub custom_field: Option<String>,
@@ -392,20 +391,6 @@ pub struct TsConfig {
     pub custom_format: Option<String>,
     /// Default timezone for naive timestamps (None = local time)
     pub default_timezone: Option<String>,
-    /// Whether to automatically parse timestamps from events (reserved for future features)
-    #[allow(dead_code)]
-    pub auto_parse: bool,
-}
-
-impl Default for TsConfig {
-    fn default() -> Self {
-        Self {
-            custom_field: None,
-            custom_format: None,
-            default_timezone: None,
-            auto_parse: true,
-        }
-    }
 }
 
 /// Identify and extract timestamp from event fields
@@ -763,7 +748,6 @@ mod tests {
             custom_field: Some("custom_time".to_string()),
             custom_format: None,
             default_timezone: None,
-            auto_parse: true,
         };
 
         let result = identify_timestamp_field(&fields, &config);
@@ -786,7 +770,6 @@ mod tests {
             custom_field: Some("custom_time".to_string()),
             custom_format: None,
             default_timezone: None,
-            auto_parse: true,
         };
 
         let result = identify_timestamp_field(&fields, &config);
@@ -807,7 +790,6 @@ mod tests {
             custom_field: Some("custom_time".to_string()),
             custom_format: None,
             default_timezone: None,
-            auto_parse: true,
         };
 
         let result = identify_timestamp_field(&fields, &config);

@@ -51,21 +51,18 @@ thread_local! {
 
 // Public API functions for stats collection (following track_count pattern)
 // Note: These functions are conditionally called based on config.output.stats flag
-#[allow(dead_code)] // Used conditionally in lib.rs when stats are enabled
 pub fn stats_add_line_read() {
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().lines_read += 1;
     });
 }
 
-#[allow(dead_code)] // Used conditionally in lib.rs when stats are enabled
 pub fn stats_add_line_output() {
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().lines_output += 1;
     });
 }
 
-#[allow(dead_code)] // Used conditionally in lib.rs when stats are enabled
 pub fn stats_add_line_filtered() {
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().lines_filtered += 1;
@@ -112,7 +109,6 @@ pub fn stats_add_yearless_timestamp() {
     });
 }
 
-#[allow(dead_code)] // Used conditionally in lib.rs when stats are enabled
 pub fn stats_add_error() {
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().errors += 1;
@@ -366,7 +362,6 @@ impl ProcessingStats {
     }
 
     /// Extract discovered levels and keys from tracking data (for sequential processing)
-    #[allow(dead_code)] // Used in sequential processing, but clippy doesn't detect it properly
     pub fn extract_discovered_from_tracking(
         &mut self,
         tracking_data: &std::collections::HashMap<String, rhai::Dynamic>,
@@ -395,13 +390,11 @@ impl ProcessingStats {
     }
 
     /// Format stats according to the specification
-    #[allow(dead_code)] // Used in main.rs when stats are enabled
     pub fn format_stats(&self, _multiline_enabled: bool) -> String {
         self.format_stats_internal(_multiline_enabled, false)
     }
 
     /// Format stats for signal handlers (skips line counts which are always 0)
-    #[allow(dead_code)]
     pub fn format_stats_for_signal(&self, _multiline_enabled: bool) -> String {
         self.format_stats_internal(_multiline_enabled, true)
     }
@@ -573,13 +566,11 @@ impl ProcessingStats {
     }
 
     /// Check if any errors occurred during processing
-    #[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
     pub fn has_errors(&self) -> bool {
         self.lines_errors > 0
     }
 
     /// Format a concise error summary for default output (when errors occur)
-    #[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
     pub fn format_error_summary(&self) -> String {
         if !self.has_errors() {
             return String::new();

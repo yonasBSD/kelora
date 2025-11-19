@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code)] // Error-reporting helpers and legacy config paths are kept for planned CLI surfacing
 use clap::ValueEnum;
 
 /// Main configuration struct for Kelora
@@ -24,7 +24,6 @@ pub struct InputConfig {
     pub keep_lines: Option<regex::Regex>,
     pub multiline: Option<MultilineConfig>,
     /// Custom timestamp field name (reserved for --since/--until features)
-    #[allow(dead_code)]
     pub ts_field: Option<String>,
     /// Custom timestamp format string
     pub ts_format: Option<String>,

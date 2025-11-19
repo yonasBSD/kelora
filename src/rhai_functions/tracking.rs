@@ -312,7 +312,6 @@ pub fn track_error(
 }
 
 /// Check if any errors occurred based on tracking data
-#[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
 pub fn has_errors_in_tracking(snapshot: &TrackingSnapshot) -> bool {
     for (key, value) in &snapshot.internal {
         if let Some(_error_type) = key.strip_prefix("__kelora_error_count_") {
@@ -328,7 +327,6 @@ pub fn has_errors_in_tracking(snapshot: &TrackingSnapshot) -> bool {
 
 /// Format a concise single-line fatal error summary for --silent mode
 /// Uses smart hybrid approach: adapts based on error count and type
-#[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
 pub fn format_fatal_error_line(snapshot: &TrackingSnapshot) -> String {
     let mut total_errors = 0;
     let mut error_types = Vec::new();
@@ -434,7 +432,6 @@ pub fn format_fatal_error_line(snapshot: &TrackingSnapshot) -> String {
 }
 
 /// Extract error summary from tracking state with different verbosity levels
-#[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
 pub fn extract_error_summary_from_tracking(
     snapshot: &TrackingSnapshot,
     verbose: u8,
@@ -1120,7 +1117,6 @@ pub fn register_functions(engine: &mut Engine) {
 }
 
 /// Merge thread-local tracking state into context tracker for sequential mode
-#[allow(dead_code)] // Planned feature for parallel mode metrics merging
 pub fn merge_thread_tracking_to_context(ctx: &mut crate::pipeline::PipelineContext) {
     let snapshot = get_thread_snapshot();
     for (key, value) in snapshot.user {
@@ -1131,14 +1127,7 @@ pub fn merge_thread_tracking_to_context(ctx: &mut crate::pipeline::PipelineConte
     }
 }
 
-/// Create a dynamic map that gives access to current metrics state
-#[allow(dead_code)] // Planned feature for exposing metrics to Rhai scripts
-fn get_metrics_map() -> Dynamic {
-    Dynamic::from(rhai::Map::new()) // Will be populated by accessing current state
-}
-
 /// Format metrics for CLI output according to specification
-#[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
 pub fn format_metrics_output(metrics: &HashMap<String, Dynamic>, metrics_level: u8) -> String {
     let mut output = String::new();
 
@@ -1247,7 +1236,6 @@ fn dynamic_to_json(value: Dynamic) -> serde_json::Value {
 }
 
 /// Format metrics for JSON output
-#[allow(dead_code)] // Used by main.rs binary target, not detected by clippy in lib context
 pub fn format_metrics_json(
     metrics: &HashMap<String, Dynamic>,
 ) -> Result<String, serde_json::Error> {
@@ -1269,7 +1257,7 @@ pub fn format_metrics_json(
 }
 
 /// Extract error summary from tracking state
-#[allow(dead_code)] // Planned feature for error reporting
+#[allow(dead_code)] // Retained for potential future CLI summary output
 pub fn extract_error_summary(metrics: &HashMap<String, Dynamic>) -> Option<String> {
     let mut has_errors = false;
     let mut summary = serde_json::Map::new();

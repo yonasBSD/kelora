@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code)] // Debugging/tracing scaffolding kept for verbose dev builds and future CLI toggles
 use anyhow::{Context, Result};
 use indexmap::IndexMap;
 use rhai::{Dynamic, Engine, EvalAltResult, Scope, AST};
@@ -1511,64 +1511,6 @@ impl RhaiEngine {
     fn register_variable_resolver(_engine: &mut Engine) {
         // For now, keep this empty - we'll implement proper function-based approach
         // Variable resolver is not the right tool for function calls
-    }
-
-    #[allow(dead_code)]
-    pub fn execute_begin(
-        &mut self,
-        metrics: &mut HashMap<String, Dynamic>,
-        internal: &mut HashMap<String, Dynamic>,
-    ) -> Result<()> {
-        if let Some(compiled) = &self.compiled_begin {
-            // Set thread-local state from metrics
-            Self::set_thread_tracking_state(metrics, internal);
-
-            let mut scope = self.scope_template.clone();
-
-            let _ = self
-                .engine
-                .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
-                .map_err(|e| {
-                    let detailed_msg =
-                        Self::format_rhai_error(e, "begin expression", &compiled.expr);
-                    anyhow::anyhow!("{}", detailed_msg)
-                })?;
-
-            // Update metrics from thread-local state
-            *metrics = Self::get_thread_tracking_state();
-            *internal = Self::get_thread_internal_state();
-        }
-
-        Ok(())
-    }
-
-    #[allow(dead_code)]
-    pub fn execute_end(&mut self, metrics: &HashMap<String, Dynamic>) -> Result<()> {
-        if let Some(compiled) = &self.compiled_end {
-            let mut scope = self.scope_template.clone();
-            let mut tracked_map = rhai::Map::new();
-
-            // Convert HashMap to Rhai Map (read-only)
-            for (k, v) in metrics.iter() {
-                tracked_map.insert(k.clone().into(), v.clone());
-            }
-            scope.set_value("metrics", tracked_map);
-
-            // Set the frozen conf map (read-only)
-            if let Some(ref conf_map) = self.conf_map {
-                scope.set_value("conf", conf_map.clone());
-            }
-
-            let _ = self
-                .engine
-                .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
-                .map_err(|e| {
-                    let detailed_msg = Self::format_rhai_error(e, "end expression", &compiled.expr);
-                    anyhow::anyhow!("{}", detailed_msg)
-                })?;
-        }
-
-        Ok(())
     }
 
     // Window-aware execution methods

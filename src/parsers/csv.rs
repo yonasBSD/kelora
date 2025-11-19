@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use crate::event::Event;
 use crate::parsers::type_conversion::{convert_value_to_type, parse_field_with_type, TypeMap};
 use crate::pipeline::EventParser;

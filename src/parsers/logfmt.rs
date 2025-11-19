@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use crate::event::Event;
 use crate::pipeline::EventParser;
 use anyhow::Result;

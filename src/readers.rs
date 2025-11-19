@@ -17,7 +17,6 @@ pub struct PeekableLineReader<R: BufRead> {
 unsafe impl<R: BufRead + Send> Send for PeekableLineReader<R> {}
 
 impl<R: BufRead> PeekableLineReader<R> {
-    #[allow(dead_code)] // Used by lib.rs for format auto-detection
     pub fn new(reader: R) -> Self {
         Self {
             inner: reader,
@@ -27,7 +26,6 @@ impl<R: BufRead> PeekableLineReader<R> {
     }
 
     /// Peek at the first line without consuming it
-    #[allow(dead_code)] // Used by lib.rs for format auto-detection
     pub fn peek_first_line(&mut self) -> io::Result<Option<String>> {
         if self.peeked_line.is_some() {
             return Ok(self.peeked_line.clone());
@@ -84,7 +82,6 @@ pub struct ChannelStdinReader {
 }
 
 impl ChannelStdinReader {
-    #[allow(dead_code)] // Used by create_input_reader in builders.rs for stdin handling
     pub fn new() -> Result<Self> {
         let (sender, receiver) = crossbeam_channel::unbounded();
 

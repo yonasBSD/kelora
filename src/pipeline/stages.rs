@@ -416,13 +416,11 @@ impl ScriptStage for ExecStage {
 }
 
 /// Begin stage for --begin expressions
-#[allow(dead_code)] // Used by builders.rs, instantiated in build() method
 pub struct BeginStage {
     compiled_begin: Option<crate::engine::CompiledExpression>,
 }
 
 impl BeginStage {
-    #[allow(dead_code)] // Used by builders.rs in build() method
     pub fn new(begin: Option<String>, engine: &mut RhaiEngine) -> Result<Self> {
         let compiled_begin = if let Some(begin_expr) = begin {
             Some(engine.compile_begin(&begin_expr)?)
@@ -432,7 +430,6 @@ impl BeginStage {
         Ok(Self { compiled_begin })
     }
 
-    #[allow(dead_code)] // Used by sequential processing pipeline
     pub fn execute(&self, ctx: &mut PipelineContext) -> Result<()> {
         if let Some(ref compiled) = self.compiled_begin {
             columns::set_parse_cols_strict(ctx.config.strict);
@@ -453,13 +450,11 @@ impl BeginStage {
 }
 
 /// End stage for --end expressions
-#[allow(dead_code)] // Used by builders.rs, instantiated in build() method
 pub struct EndStage {
     compiled_end: Option<crate::engine::CompiledExpression>,
 }
 
 impl EndStage {
-    #[allow(dead_code)] // Used by builders.rs in build() method
     pub fn new(end: Option<String>, engine: &mut RhaiEngine) -> Result<Self> {
         let compiled_end = if let Some(end_expr) = end {
             Some(engine.compile_end(&end_expr)?)
@@ -469,7 +464,6 @@ impl EndStage {
         Ok(Self { compiled_end })
     }
 
-    #[allow(dead_code)] // Used by sequential processing pipeline
     pub fn execute(&self, ctx: &PipelineContext) -> Result<()> {
         if let Some(ref compiled) = self.compiled_end {
             columns::set_parse_cols_strict(ctx.config.strict);
@@ -834,7 +828,6 @@ impl TimestampConversionStage {
                 custom_field: ts_field,
                 custom_format: ts_format,
                 default_timezone,
-                auto_parse: true,
             },
         }
     }

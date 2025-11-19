@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code)] // Flattening helpers and type enums are kept for potential future output formats
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use rhai::Dynamic;
@@ -698,7 +698,6 @@ mod tests {
             custom_field: Some("custom_ts".to_string()),
             custom_format: None,
             default_timezone: None,
-            auto_parse: true,
         };
 
         event.extract_timestamp_with_config(None, &config);
@@ -721,7 +720,6 @@ mod tests {
             custom_field: Some("custom_ts".to_string()),
             custom_format: None,
             default_timezone: None,
-            auto_parse: true,
         };
 
         event.extract_timestamp_with_config(None, &config);
@@ -746,7 +744,6 @@ mod tests {
             custom_field: Some("custom_ts".to_string()),
             custom_format: None,
             default_timezone: None,
-            auto_parse: true,
         };
 
         event.extract_timestamp_with_config(None, &config);

@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code)] // Cross-platform I/O wrappers include spare helpers not yet wired in the bin CLI
 use anyhow::Result;
 use crossbeam_channel::Sender;
 use std::fs::File;

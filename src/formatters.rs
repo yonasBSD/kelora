@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use crate::colors::ColorScheme;
 use crate::event::{flatten_dynamic, Event, FlattenStyle};
 use crate::pipeline;
@@ -55,18 +54,6 @@ fn escape_logfmt_string(input: &str) -> String {
     }
 
     output
-}
-
-/// Check if a string value needs to be quoted with single quotes for default formatter
-fn needs_single_quote_quoting(value: &str) -> bool {
-    // Quote values that contain spaces, tabs, newlines, single quotes, equals, or are empty
-    value.is_empty()
-        || value.contains(' ')
-        || value.contains('\t')
-        || value.contains('\n')
-        || value.contains('\r')
-        || value.contains('\'')
-        || value.contains('=')
 }
 
 /// Check if a string value needs to be quoted per logfmt rules
@@ -230,35 +217,6 @@ pub struct DefaultFormatter {
 }
 
 impl DefaultFormatter {
-    pub fn new(
-        use_colors: bool,
-        use_emoji: bool,
-        brief: bool,
-        timestamp_formatting: crate::config::TimestampFormatConfig,
-        pretty_nested: bool,
-        quiet_level: u8,
-    ) -> Self {
-        Self {
-            colors: ColorScheme::new(use_colors),
-            level_keys: vec![
-                "level",
-                "loglevel",
-                "log_level",
-                "lvl",
-                "severity",
-                "levelname",
-                "@l",
-            ],
-            brief,
-            timestamp_formatting,
-            enable_wrapping: true, // Default to enabled
-            terminal_width: crate::tty::get_terminal_width(),
-            pretty_nested,
-            use_emoji: use_emoji && use_colors,
-            quiet_level,
-        }
-    }
-
     pub fn new_with_wrapping(
         use_colors: bool,
         use_emoji: bool,
@@ -546,6 +504,29 @@ impl DefaultFormatter {
             // Use the original format_dynamic_value for scalar values
             format_dynamic_value(value)
         }
+    }
+}
+
+#[cfg(test)]
+impl DefaultFormatter {
+    /// Test-only ctor that defaults to wrapping enabled (historical behavior)
+    pub fn new(
+        use_colors: bool,
+        use_emoji: bool,
+        brief: bool,
+        timestamp_formatting: crate::config::TimestampFormatConfig,
+        pretty_nested: bool,
+        quiet_level: u8,
+    ) -> Self {
+        Self::new_with_wrapping(
+            use_colors,
+            use_emoji,
+            brief,
+            timestamp_formatting,
+            true,
+            pretty_nested,
+            quiet_level,
+        )
     }
 }
 

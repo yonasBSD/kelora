@@ -76,7 +76,6 @@ pub struct TakeNLimiter {
 }
 
 impl TakeNLimiter {
-    #[allow(dead_code)] // Used by builders.rs when take_limit is configured
     pub fn new(limit: usize) -> Self {
         Self { remaining: limit }
     }

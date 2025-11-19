@@ -85,16 +85,6 @@ pub fn set_mode(mode: FileOpMode) {
     FILE_OP_MODE.store(mode as u8, Ordering::Relaxed);
 }
 
-/// Get the active execution mode.
-#[allow(dead_code)]
-pub fn current_mode() -> FileOpMode {
-    match FILE_OP_MODE.load(Ordering::Relaxed) {
-        0 => FileOpMode::Sequential,
-        1 => FileOpMode::ParallelOrdered,
-        _ => FileOpMode::ParallelUnordered,
-    }
-}
-
 /// Drain pending file operations recorded for the current thread.
 pub fn take_pending_ops() -> Vec<FileOp> {
     PENDING_OPS.with(|slot| slot.borrow_mut().drain(..).collect())

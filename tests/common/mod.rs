@@ -1,6 +1,6 @@
 // tests/common/mod.rs
-// Shared test utilities for integration tests
-#![allow(dead_code)]
+// Shared test utilities for integration tests (only a subset is exercised in current suites)
+#![allow(dead_code)] // Helpers are used selectively by specific integration tests
 
 use std::io::Write;
 use std::process::{Command, Stdio};

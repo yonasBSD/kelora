@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code)] // Config file helpers for future CLI edits are not exercised by current binary paths
 use anyhow::{anyhow, Context, Result};
 use std::collections::HashMap;
 use std::env;
