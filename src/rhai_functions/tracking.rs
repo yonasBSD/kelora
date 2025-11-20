@@ -545,9 +545,9 @@ pub fn extract_error_summary_from_tracking(
     if total_errors as usize > shown_samples {
         let remaining = total_errors as usize - shown_samples;
         let message = if verbose > 0 {
-            "Each error shown above. Use -q to suppress."
+            "All errors shown during processing. Use --no-diagnostics to suppress this summary."
         } else {
-            "Use -v to see each error or -q to suppress."
+            "Use -v to see each error or --no-diagnostics to suppress this summary."
         };
 
         summary.push_str(&format!("\n  [+{} more. {}]", remaining, message));
