@@ -1913,6 +1913,12 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
         std::process::exit(0);
     }
 
+    // Check for --help-formats
+    if raw_args.iter().any(|arg| arg == "--help-formats") {
+        print_formats_help();
+        std::process::exit(0);
+    }
+
     // Check for --save-alias before other processing
     if let Some(alias_name) = extract_save_alias_arg(&raw_args) {
         let no_emoji =
@@ -2099,6 +2105,7 @@ More Help:
   kelora --help-rhai         Rhai language guide + stage semantics
   kelora --help-functions    Complete built-in function catalogue (150+ functions)
   kelora --help-examples     Common patterns and example walkthroughs
+  kelora --help-formats      Format reference with extracted fields
   kelora --help-time         Timestamp format reference
   kelora --help-multiline    Multiline event strategies
   kelora --help-regex        Regex format parsing guide
@@ -2471,6 +2478,98 @@ When patterns don't match:
 For complete CLI reference: kelora --help
 For timestamp parsing help: kelora --help-time
 For Rhai scripting help: kelora --help-rhai
+"#;
+    println!("{}", help_text);
+}
+
+fn print_formats_help() {
+    let help_text = r#"
+Format Reference
+
+INPUT FORMATS:
+
+Specify with -f, --input-format <format>
+
+json (-j)
+  JSON Lines format, one object per line
+  Fields: All JSON keys preserved with types
+
+line (default)
+  Plain text, one line per event
+  Fields: line
+
+logfmt
+  Heroku-style key=value pairs
+  Fields: All parsed keys
+
+syslog
+  RFC5424/RFC3164 system logs
+  Fields: pri, facility, severity, level, ts, host, prog, pid, msg
+          [msgid, version - RFC5424 only]
+
+combined
+  Apache/Nginx access logs (CLF, Combined, Nginx+request_time)
+  Fields: ip, ts, method, path, protocol, status
+          [identity, user, bytes, referer, agent, request_time]
+  Note: Fields in brackets are optional (omitted if value is "-")
+
+cef
+  ArcSight Common Event Format
+  Fields: cefver, vendor, product, version, eventid, event, severity
+          [ts, host - from optional syslog prefix]
+          + all extension key=value pairs become top-level fields
+
+csv / tsv / csvnh / tsvnh
+  Comma/tab-separated values, with/without headers
+  Fields: Header names or c1, c2, c3...
+  Type annotations: 'csv status:int bytes:int response_time:float'
+  Supported types: int, float, bool
+
+cols:<spec>
+  Custom column-based parsing with whitespace or custom separator
+  Fields: User-defined via spec
+  Examples: 'cols:ts level *msg'
+            'cols:ts(2) level *msg'  (ts consumes 2 tokens)
+            'cols:name age:int city' --cols-sep '|'
+  Tokens: field       - consume one column
+          field(N)    - consume N columns and join
+          -           - skip one column
+          -(N)        - skip N columns
+          *field      - capture rest of line (must be last)
+          field:type  - apply type (int, float, bool, string)
+
+regex:<pattern>
+  Regular expression with named capture groups
+  Fields: Named groups (?P<name>...) with optional type annotations
+  Examples: 'regex:(?P<code:int>\d+) (?P<msg>.*)'
+            'regex:(?P<ip>\S+) - - \[(?P<ts>[^\]]+)\] "(?P<method>\w+) (?P<path>\S+)'
+  Types: (?P<name:int>...), (?P<name:float>...), (?P<name:bool>...)
+  Note: Pattern automatically anchored with ^...$
+
+auto
+  Auto-detect format from first non-empty line
+  Detection order: json → syslog → cef → combined → logfmt → csv → line
+  Note: Detects once and applies to all lines
+
+OUTPUT FORMATS:
+
+Specify with -F, --output-format <format>
+
+default   - Colored key-value format
+json      - JSON Lines (one object per line)
+logfmt    - Key-value pairs
+inspect   - Debug format with type information
+levelmap  - Compact visual with timestamps and level indicators
+csv       - Comma-separated with header row
+tsv       - Tab-separated with header row
+csvnh     - CSV without header
+tsvnh     - TSV without header
+none      - No output (useful with --stats or --metrics)
+
+For complete CLI reference: kelora --help
+For regex parsing details: kelora --help-regex
+For timestamp parsing help: kelora --help-time
+For multiline strategies: kelora --help-multiline
 "#;
     println!("{}", help_text);
 }

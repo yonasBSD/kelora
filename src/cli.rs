@@ -588,6 +588,10 @@ pub struct Cli {
     /// Show regex format help and exit
     #[arg(long = "help-regex", help_heading = "Help Options")]
     pub help_regex: bool,
+
+    /// Show format reference and exit
+    #[arg(long = "help-formats", help_heading = "Help Options")]
+    pub help_formats: bool,
 }
 
 impl Cli {
