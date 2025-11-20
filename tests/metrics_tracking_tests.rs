@@ -37,6 +37,38 @@ fn test_metrics_output_exposes_only_user_keys() {
 }
 
 #[test]
+fn test_metrics_output_has_no_leading_newline_when_events_suppressed() {
+    let input = r#"{"level": "INFO"}
+{"level": "ERROR"}"#;
+
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "track_count(e.level)",
+            "--metrics",
+            "-q",
+        ],
+        input,
+    );
+
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully when metrics are requested"
+    );
+    assert!(
+        !stderr.starts_with('\n'),
+        "Metrics output should not start with a leading newline when no events are shown: {:?}",
+        stderr
+    );
+    assert!(
+        stderr.contains("Tracked metrics"),
+        "Metrics header should be present"
+    );
+}
+
+#[test]
 fn test_global_tracking() {
     let input = r#"{"level": "INFO", "status": 200}
 {"level": "ERROR", "status": 500}

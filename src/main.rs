@@ -1470,8 +1470,7 @@ fn main() -> Result<()> {
             let events_were_output = pipeline_result
                 .stats
                 .as_ref()
-                .map(|s| s.events_output > 0)
-                .unwrap_or(false);
+                .is_some_and(|s| !config.processing.quiet_events && s.events_output > 0);
 
             // Print metrics if enabled (only if not terminated)
             if config.output.metrics > 0
@@ -1583,8 +1582,7 @@ fn main() -> Result<()> {
     // Determine if any events were output (to conditionally suppress leading newlines)
     let events_were_output = final_stats
         .as_ref()
-        .map(|s| s.events_output > 0)
-        .unwrap_or(false);
+        .is_some_and(|s| !config.processing.quiet_events && s.events_output > 0);
 
     // Check if we were terminated by a signal and print output
     if TERMINATED_BY_SIGNAL.load(Ordering::Relaxed) {
