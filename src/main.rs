@@ -1467,6 +1467,13 @@ fn main() -> Result<()> {
 
     let (final_stats, tracking_data) = match result {
         Ok(pipeline_result) => {
+            // Determine if any events were output (to conditionally suppress leading newlines)
+            let events_were_output = pipeline_result
+                .stats
+                .as_ref()
+                .map(|s| s.events_output > 0)
+                .unwrap_or(false);
+
             // Print metrics if enabled (only if not terminated)
             if config.output.metrics > 0
                 && terminal_allowed
@@ -1477,9 +1484,11 @@ fn main() -> Result<()> {
                     config.output.metrics,
                 );
                 if !metrics_output.is_empty() && metrics_output != "No metrics tracked" {
-                    stderr
-                        .writeln(&config.format_metrics_message(&metrics_output))
-                        .unwrap_or(());
+                    let mut formatted = config.format_metrics_message(&metrics_output);
+                    if !events_were_output {
+                        formatted = formatted.trim_start_matches('\n').to_string();
+                    }
+                    stderr.writeln(&formatted).unwrap_or(());
                 }
             }
 
@@ -1491,9 +1500,11 @@ fn main() -> Result<()> {
                 if let Ok(json_output) = crate::rhai_functions::tracking::format_metrics_json(
                     &pipeline_result.tracking_data.user,
                 ) {
-                    stderr
-                        .writeln(&config.format_metrics_message(&json_output))
-                        .unwrap_or(());
+                    let mut formatted = config.format_metrics_message(&json_output);
+                    if !events_were_output {
+                        formatted = formatted.trim_start_matches('\n').to_string();
+                    }
+                    stderr.writeln(&formatted).unwrap_or(());
                 }
             }
 
@@ -1518,11 +1529,13 @@ fn main() -> Result<()> {
                 if let Some(ref s) = pipeline_result.stats {
                     if config.output.stats && terminal_allowed {
                         // Full stats when --stats flag is used (unless suppressed)
-                        stderr
-                            .writeln(&config.format_stats_message(
-                                &s.format_stats(config.input.multiline.is_some()),
-                            ))
-                            .unwrap_or(());
+                        let mut formatted = config.format_stats_message(
+                            &s.format_stats(config.input.multiline.is_some()),
+                        );
+                        if !events_were_output {
+                            formatted = formatted.trim_start_matches('\n').to_string();
+                        }
+                        stderr.writeln(&formatted).unwrap_or(());
                     } else if diagnostics_allowed_runtime {
                         // Error summary by default when errors occur (unless diagnostics suppressed)
                         if let Some(error_summary) =
@@ -1533,9 +1546,11 @@ fn main() -> Result<()> {
                                 Some(&config),
                             )
                         {
-                            stderr
-                                .writeln(&config.format_error_message(&error_summary))
-                                .unwrap_or(());
+                            let mut formatted = config.format_error_message(&error_summary);
+                            if !events_were_output {
+                                formatted = formatted.trim_start_matches('\n').to_string();
+                            }
+                            stderr.writeln(&formatted).unwrap_or(());
                         }
                     }
                 }
@@ -1548,26 +1563,37 @@ fn main() -> Result<()> {
         }
     };
 
+    // Determine if any events were output (to conditionally suppress leading newlines)
+    let events_were_output = final_stats
+        .as_ref()
+        .map(|s| s.events_output > 0)
+        .unwrap_or(false);
+
     // Check if we were terminated by a signal and print output
     if TERMINATED_BY_SIGNAL.load(Ordering::Relaxed) {
         if let Some(stats) = final_stats {
             if config.output.stats && terminal_allowed {
                 // Full stats when --stats flag is used (unless suppressed)
-                stderr
-                    .writeln(&config.format_stats_message(
-                        &stats.format_stats(config.input.multiline.is_some()),
-                    ))
-                    .unwrap_or(());
+                let mut formatted = config
+                    .format_stats_message(&stats.format_stats(config.input.multiline.is_some()));
+                if !events_were_output {
+                    formatted = formatted.trim_start_matches('\n').to_string();
+                }
+                stderr.writeln(&formatted).unwrap_or(());
             } else if stats.has_errors() && diagnostics_allowed_runtime {
                 // Error summary by default when errors occur (unless suppressed)
-                stderr
-                    .writeln(&config.format_error_message(&stats.format_error_summary()))
-                    .unwrap_or(());
+                let mut formatted = config.format_error_message(&stats.format_error_summary());
+                if !events_were_output {
+                    formatted = formatted.trim_start_matches('\n').to_string();
+                }
+                stderr.writeln(&formatted).unwrap_or(());
             }
         } else if config.output.stats && terminal_allowed {
-            stderr
-                .writeln(&config.format_stats_message("Processing interrupted"))
-                .unwrap_or(());
+            let mut formatted = config.format_stats_message("Processing interrupted");
+            if !events_were_output {
+                formatted = formatted.trim_start_matches('\n').to_string();
+            }
+            stderr.writeln(&formatted).unwrap_or(());
         }
 
         // Exit with the correct code based on which signal was received
@@ -1609,9 +1635,11 @@ fn main() -> Result<()> {
     if config.processing.strict && override_failed {
         if diagnostics_allowed_runtime && !config.output.stats {
             if let Some(message) = override_message.clone() {
-                stderr
-                    .writeln(&config.format_error_message(&message))
-                    .unwrap_or(());
+                let mut formatted = config.format_error_message(&message);
+                if !events_were_output {
+                    formatted = formatted.trim_start_matches('\n').to_string();
+                }
+                stderr.writeln(&formatted).unwrap_or(());
             }
         }
         had_errors = true;
