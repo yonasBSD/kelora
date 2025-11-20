@@ -78,7 +78,7 @@ kelora -f combined examples/simple_combined.log \
 
 Alternatives:
 - `-J` to produce JSON for ingestion into a SIEM.
-- Add `-q` to suppress diagnostics if the output is piped into another script.
+- Add `--no-diagnostics` to suppress diagnostics if the output is piped into another script.
 
 ## Variations
 - **Focus on a specific endpoint**  
