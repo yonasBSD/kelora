@@ -673,7 +673,7 @@ impl Clone for RhaiEngine {
     fn clone(&self) -> Self {
         let mut engine = Engine::new();
         // Use Simple optimization, not Full. Full optimization breaks side-effect functions
-        // like track_count("key"), print("msg"), emit(), etc. by trying to evaluate them at
+        // like track_count("key"), print("msg"), emit_each(), etc. by trying to evaluate them at
         // compile time when their arguments are constants. These functions MUST run at runtime.
         engine.set_optimization_level(rhai::OptimizationLevel::Simple);
 
@@ -996,7 +996,7 @@ impl RhaiEngine {
         let mut engine = Engine::new();
 
         // Use Simple optimization, not Full. Full optimization breaks side-effect functions
-        // like track_count("key"), print("msg"), emit(), etc. by trying to evaluate them at
+        // like track_count("key"), print("msg"), emit_each(), etc. by trying to evaluate them at
         // compile time when their arguments are constants. These functions MUST run at runtime.
         engine.set_optimization_level(rhai::OptimizationLevel::Simple);
 

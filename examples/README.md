@@ -19,7 +19,7 @@ kelora -f json examples/simple_json.jsonl --filter 'e.level == "ERROR"' --exec '
 kelora examples/web_access.log --filter 'e.status >= 400'
 
 # Using Rhai helper functions
-kelora --include examples/helpers.rhai examples/api_logs.jsonl --exec 'if is_problem(e) { emit(e) }'
+kelora --include examples/helpers.rhai examples/api_logs.jsonl --filter 'is_problem(e)'
 ```
 
 Then run `kelora --help-examples` for common patterns and usage recipes.
@@ -116,7 +116,7 @@ Common utility functions for log analysis:
 
 ```bash
 kelora --include examples/helpers.rhai examples/api_logs.jsonl \
-  --exec "if is_problem(e) { emit(e) }"
+  --filter "is_problem(e)"
 ```
 
 Functions:
@@ -153,7 +153,7 @@ kelora -f json examples/api_logs.jsonl
 kelora examples/web_access.log --filter 'e.status >= 400' --exec '#{ip: e.client_ip, path: e.path}'
 
 # Include helper scripts
-kelora --include examples/helpers.rhai examples/api_logs.jsonl --exec 'if is_problem(e) { emit(e) }'
+kelora --include examples/helpers.rhai examples/api_logs.jsonl --filter 'is_problem(e)'
 
 # Compressed files work too
 kelora examples/web_access_large.log.gz
