@@ -1524,6 +1524,24 @@ fn main() -> Result<()> {
                 }
             }
 
+            // Hint when metrics were tracked but no metrics output option was requested
+            let metrics_were_requested = config.output.metrics > 0
+                || config.output.metrics_json
+                || config.output.metrics_file.is_some();
+            if !metrics_were_requested
+                && !pipeline_result.tracking_data.user.is_empty()
+                && diagnostics_allowed_runtime
+                && !SHOULD_TERMINATE.load(Ordering::Relaxed)
+            {
+                let mut hint = config.format_info_message(
+                    "Metrics recorded; rerun with -m (table) or --metrics-json to view them.",
+                );
+                if !events_were_output {
+                    hint = hint.trim_start_matches('\n').to_string();
+                }
+                stderr.writeln(&hint).unwrap_or(());
+            }
+
             // Print output based on configuration (only if not terminated)
             if !SHOULD_TERMINATE.load(Ordering::Relaxed) {
                 if let Some(ref s) = pipeline_result.stats {
