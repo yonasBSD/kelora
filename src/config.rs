@@ -433,6 +433,18 @@ impl KeloraConfig {
         }
     }
 
+    /// Format an informational message with appropriate prefix (emoji or "kelora:")
+    pub fn format_info_message(&self, message: &str) -> String {
+        let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
+        let use_emoji = use_colors && !self.output.no_emoji;
+
+        if use_emoji {
+            format!("🔹 {}", message)
+        } else {
+            format!("kelora: {}", message)
+        }
+    }
+
     /// Format a stats message with appropriate prefix (emoji or "Stats:")
     pub fn format_stats_message(&self, message: &str) -> String {
         let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);

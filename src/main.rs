@@ -179,7 +179,7 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
         if !config.processing.silent && !config.processing.suppress_diagnostics {
             let format_name = format!("{:?}", detected_format).to_lowercase();
             let message =
-                config.format_error_message(&format!("auto-detected format: {}", format_name));
+                config.format_info_message(&format!("Auto-detected format: {}", format_name));
             eprintln!("{}", message);
         }
 
@@ -325,7 +325,7 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         if !config.processing.silent && !config.processing.suppress_diagnostics {
             let format_name = format!("{:?}", detected_format).to_lowercase();
             let message =
-                config.format_error_message(&format!("auto-detected format: {}", format_name));
+                config.format_info_message(&format!("Auto-detected format: {}", format_name));
             eprintln!("{}", message);
         }
 
@@ -352,7 +352,7 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         if !config.processing.silent && !config.processing.suppress_diagnostics {
             let format_name = format!("{:?}", detected_format).to_lowercase();
             let message =
-                config.format_error_message(&format!("auto-detected format: {}", format_name));
+                config.format_info_message(&format!("Auto-detected format: {}", format_name));
             eprintln!("{}", message);
         }
 
