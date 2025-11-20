@@ -445,6 +445,18 @@ impl KeloraConfig {
         }
     }
 
+    /// Format a hint/tip message with a lightbulb emoji when allowed
+    pub fn format_hint_message(&self, message: &str) -> String {
+        let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
+        let use_emoji = use_colors && !self.output.no_emoji;
+
+        if use_emoji {
+            format!("💡 {}", message)
+        } else {
+            format!("kelora hint: {}", message)
+        }
+    }
+
     /// Format a stats message with appropriate prefix (emoji or "Stats:")
     pub fn format_stats_message(&self, message: &str) -> String {
         let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
