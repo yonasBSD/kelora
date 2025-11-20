@@ -2118,11 +2118,9 @@ More Help:
 /// Print Rhai scripting guide
 fn print_rhai_help() {
     let help_text = r###"
-Rhai Language Guide for Kelora:
+Rhai Language Guide:
 
 This guide covers Rhai language fundamentals for programmers familiar with Python, JavaScript, or Bash.
-For practical examples: kelora --help-examples
-For complete function reference: kelora --help-functions
 For Rhai language details: https://rhai.rs
 
 VARIABLES & TYPES:
@@ -2479,7 +2477,7 @@ For other help topics: kelora -h
 
 fn print_formats_help() {
     let help_text = r#"
-Format Reference
+Format Reference:
 
 INPUT FORMATS:
 

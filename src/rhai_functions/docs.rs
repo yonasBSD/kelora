@@ -1,7 +1,7 @@
 /// Generate comprehensive function reference documentation
 pub fn generate_help_text() -> &'static str {
     r#"
-Available Rhai Functions for Kelora:
+Available Rhai Functions:
 
 STRING FUNCTIONS:
 text.after(delimiter [,nth])         Text after occurrence of delimiter (nth: 1=first, -1=last)
