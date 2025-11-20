@@ -2061,6 +2061,8 @@ Timestamp filtering with --since and --until:
 
 For the full chrono format reference, see:
 https://docs.rs/chrono/latest/chrono/format/strftime/index.html
+
+For other help topics: kelora -h
 "#;
     println!("{}", help_text);
 }
@@ -2323,11 +2325,7 @@ OUTPUT SUPPRESSION:
   print(\"msg\") / eprint(\"err\")           Visible by default; suppressed with --no-script-output or --silent
   File ops (append_file, etc.)         Always work (needs --allow-fs-writes)
 
-See also:
-  kelora --help-examples   Practical log analysis patterns
-  kelora --help-functions  Complete function catalogue
-  kelora --help-time       Timestamp format reference
-  https://rhai.rs          Full Rhai language documentation
+For other help topics: kelora -h
 "###;
     println!("{}", help_text);
 }
@@ -2371,8 +2369,7 @@ TROUBLESHOOTING:
 - If buffers grow unbounded, tighten the regex or disable multiline temporarily.
 - Remember that `--multiline all` reads the entire stream into memory.
 
-For complete CLI reference: kelora --help
-For Rhai scripting help: kelora --help-rhai
+For other help topics: kelora -h
 "#;
     println!("{}", help_text);
 }
@@ -2475,9 +2472,7 @@ When patterns don't match:
   4. Verify pattern works in a regex tester (remember Kelora adds ^$)
   5. Consider using -f cols for simpler whitespace-delimited logs
 
-For complete CLI reference: kelora --help
-For timestamp parsing help: kelora --help-time
-For Rhai scripting help: kelora --help-rhai
+For other help topics: kelora -h
 "#;
     println!("{}", help_text);
 }
@@ -2566,10 +2561,7 @@ csvnh     - CSV without header
 tsvnh     - TSV without header
 none      - No output (useful with --stats or --metrics)
 
-For complete CLI reference: kelora --help
-For regex parsing details: kelora --help-regex
-For timestamp parsing help: kelora --help-time
-For multiline strategies: kelora --help-multiline
+For other help topics: kelora -h
 "#;
     println!("{}", help_text);
 }

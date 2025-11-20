@@ -221,6 +221,8 @@ e.has("key")                         Check if key exists and value is not ()
 e.rename_field("old", "new")         Rename field, returns true if successful
 
 Rhai lets you call functions as either `value.method(args)` or `function(value, args)`.
+
+For other help topics: kelora -h
 "#
 }
 
@@ -412,6 +414,6 @@ COMMON IDIOMS:
 # Remove array duplicates      → e.unique_tags = e.tags.unique()
 # Pattern normalization        → e.normalized_msg = e.message.normalized("ipv4,email,uuid")
 
-See --help-functions for complete function reference. Visit https://rhai.rs for Rhai language details.
+For other help topics: kelora -h
 "###
 }
