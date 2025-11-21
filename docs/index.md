@@ -1,65 +1,99 @@
 # Kelora
 
-**Scriptable log processor for the command line.**
+**Turn messy logs into structured data with one command.**
 
-Parse messy logs into structured events, then filter, transform, and analyze them with embedded [Rhai](https://rhai.rs) scripting (a Rust-based scripting language with JavaScript-like syntax).
+Kelora is a scriptable log processor for the command line. Parse mixed formats, filter with complex logic, and analyze streams using embedded [Rhai](https://rhai.rs) scripting—all in a single binary.
+
+```bash
+cargo install kelora
+```
+> Or download pre-built binaries for **Windows, macOS, and Linux** from [GitHub Releases](https://github.com/dloss/kelora/releases).
 
 !!! note "Development Status"
     Pre-1.0 tool generated entirely by AI agents. Validated by a large test suite and Rust security tools; see [Development Approach](#development-approach) and the [Security Policy](https://github.com/dloss/kelora/blob/main/SECURITY.md) before relying on it in production. APIs might change without notice before v1.0.
 
-## Usage Examples
+## The Right Tool for the Job
 
-**Detect problems** - Filter server errors and slow requests. Each log line becomes an event (`e`) you can query with expressions like `e.status >= 500`:
+Kelora fills the gap between simple text processing and heavy observability platforms. It introduces **state** and **structure** to your CLI pipeline.
+
+| Feature | `grep` / `rg` | `awk` | `jq` | **Kelora** |
+| :--- | :---: | :---: | :---: | :---: |
+| **Best For** | **Instant Search** | **Simple Splitting** | **JSON Query** | **Logic, State & Metrics** |
+| **State & Metrics** | ❌ | ⚠️ (Variables) | ❌ | **✅ Aggregations & Maps** |
+| **External Data** | ❌ | ❌ | ❌ | **✅ Load Files / Envs** |
+| **Window Analysis**| ❌ | ❌ | ❌ | **✅ Sliding Windows** |
+| **Structure** | ❌ | ⚠️ (Manual) | ✅ (JSON only) | **✅ Mixed Formats** |
+
+**Reach for Kelora when:**
+
+*   **You need Logic:** "Show me 500 errors, but only if latency > 1s."
+*   **You need to Transform:** Convert Logfmt to JSON, or anonymize IP addresses.
+*   **You need Context:** Look at the logs *before* an error occurred.
+*   **You need State:** Count errors per service or load external CSV data.
+
+---
+
+## Live Examples
+
+### 1. Filter & Convert (The Basics)
+*Scenario: Filter a Logfmt file for slow requests and output clean JSON.*
 
 === "Command/Output"
 
     ```bash exec="on" source="above" result="ansi"
     kelora -f logfmt examples/traffic_logfmt.log \
-      --filter 'e.status.to_int() >= 500 || e.latency_ms.to_int() > 1200'
+      --filter 'e.status.to_int() >= 500 || e.latency_ms.to_int() > 1000' \
+      -F json
     ```
 
-=== "Log Data"
+=== "Input Data"
 
     ```bash exec="on" result="ansi"
     cat examples/traffic_logfmt.log
     ```
 
-**Parse custom formats and extract structured data** - Name columns by position, with `*message` capturing everything remaining, then extract nested key-value pairs:
+### 2. Modify & Anonymize (Scripting)
+*Scenario: Mask user emails for privacy and convert milliseconds to seconds before printing.*
 
 === "Command/Output"
 
     ```bash exec="on" source="above" result="ansi"
-    kelora -f 'cols:ts level service request_id *message' examples/release_pipe.log \
-      --cols-sep '|' \
-      --levels warn,error \
-      --exec 'e.absorb_kv("message")' \
-      -F json
+    kelora -j examples/audit.jsonl \
+      --exec 'e.email = "***"; e.duration_sec = e.ms / 1000.0;' \
+      --keys timestamp,user_id,email,duration_sec
     ```
 
-=== "Log Data"
+=== "Input Data"
 
     ```bash exec="on" result="ansi"
-    cat examples/release_pipe.log
+    cat examples/audit.jsonl
     ```
 
-**Enrich events with recent context** - Keep recent events in a sliding window to analyze patterns and add context:
+### 3. Contextual Analysis (Pipeline Order)
+*Scenario: An error occurred. We want to see the error, but enrich it with context from the **previous** log line (even if that line wasn't an error).*
+
+!!! tip "Sequential Pipeline"
+    Kelora processes flags in order. We run `--exec` **before** `--filter` so the sliding window can see the normal events before they are discarded.
 
 === "Command/Output"
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/api_errors.jsonl \
-      --window 5 \
-      --exec 'let err = window.filter(|x| x.level == "ERROR");
-              if err.len() > 0 { e.ctx = err[0].error; }' \
-      --keys timestamp,endpoint,ctx \
+      --window 2 \
+      --exec 'if e.level == "ERROR" && window.len() > 1 {
+          e.prev_ctx = window[1].info;
+      }' \
+      --filter 'e.level == "ERROR"' \
       -F logfmt
     ```
 
-=== "Log Data"
+=== "Input Data"
 
     ```bash exec="on" result="ansi"
     cat examples/api_errors.jsonl
     ```
+
+---
 
 ## Advanced Features
 
@@ -72,36 +106,25 @@ Beyond basic filtering, Kelora includes specialized functions that solve problem
 - **[Pattern normalization](how-to/power-user-techniques.md#pattern-normalization)** - Group error messages by replacing IPs, UUIDs, emails with placeholders
 - **[Deterministic sampling](how-to/power-user-techniques.md#deterministic-sampling-with-bucket)** - Hash-based sampling that's consistent across log rotations and distributed systems
 
-See **[Power-User Techniques](how-to/power-user-techniques.md)** for real-world examples.
+See **[Power-User Techniques](how-to/power-user-techniques.md)** for real-world examples. For performance characteristics and when to use specialized tools instead, see [Performance Comparisons](concepts/performance-comparisons.md).
 
-## When to Use Kelora
+---
 
-Choose Kelora when you need **programmable log processing** in one streaming pipeline—filtering, transforming, and analyzing structured events with embedded scripts.
+## Integration & Ecosystem
 
-**Reach for Kelora when:**
+Kelora focuses strictly on the **Transformation** step of your pipeline.
 
-- You're processing small to medium logs (a few hundred thousand lines; Kelora is slow)
-- You need multi-stage transformations (parse → filter → enrich → filter)
-- Your logs mix formats or use custom delimiters
-- You want windowed analysis (error bursts, sliding metrics)
-- You're chaining grep + awk + jq + custom scripts
+*   **Input:** Files, Stdin, Pipes.
+*   **Output:** JSON, Logfmt, CSV, or Raw text.
 
-**Use specialized tools for:**
+**Common Pipelines:**
+*   **Interactive:** `kelora ... | lnav` (Visualize formatted logs)
+*   **Analytics:** `kelora ... | qsv` (Heavy CSV number crunching)
+*   **Storage:** `kelora ... | sqlite-utils` (Insert directly into DB)
 
-- Simple text search: `grep`/`rg` (50-100× faster)
-- Basic field extraction: `awk` (faster for simple splits)
-- Pure JSON queries: `jq` (ubiquitous, similar speed)
-- Interactive exploration: `lnav` (TUI with SQL)
-- CSV analytics: `qsv`/`miller` (faster for stats)
-- Large logs (millions of events): `loki`/`victoria-logs`/`openobserve` (production log systems)
+See [Integrate Kelora with External Tools](how-to/integrate-external-tools.md) for 18 specific usage patterns.
 
-Kelora trades raw speed for expressiveness. See [Performance Comparisons](concepts/performance-comparisons.md) for benchmarks and the full decision matrix.
-
-## Integrate With
-
-Pipe Kelora's output to: **jq** (JSON transforms) · **lnav** (interactive TUI) · **SQLite/DuckDB** (SQL queries) · **qsv/miller** (CSV analytics) · **rare** (visualizations)
-
-See [Integrate Kelora with External Tools](how-to/integrate-external-tools.md) for 18 tools and usage patterns.
+---
 
 ## Get Started
 
@@ -114,6 +137,8 @@ See [Integrate Kelora with External Tools](how-to/integrate-external-tools.md) f
 **[→ How-To Guides](how-to/index.md)** - Solve specific problems
 
 For deeper understanding, see [Concepts](concepts/index.md). For complete reference, see [Glossary](glossary.md), [Functions](reference/functions.md), [Formats](reference/formats.md), and [CLI options](reference/cli-reference.md).
+
+---
 
 ## License
 
