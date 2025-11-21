@@ -18,9 +18,9 @@ Kelora trades speed for programmability. It's **slower than grep, awk, and jq**,
 
 **Reach for Kelora when:**
 
-- You need **stateful logic** - Counting errors per service, windowed metrics, lookup tables
-- You're **chaining tools** - Replacing `grep | awk | jq | custom-script.py` with one command
 - You have **mixed formats** - Logs that aren't consistently JSON or need custom parsing
+- You're **chaining tools** - Replacing `grep | awk | jq | custom-script.py` with one command
+- You need **stateful logic** - Counting errors per service, windowed metrics, lookup tables
 - You want **embedded scripting** - Complex transformations without leaving your shell
 
 **Use specialized tools for:**
