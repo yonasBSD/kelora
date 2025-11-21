@@ -97,6 +97,7 @@ nav:
       - Process Archives at Scale: how-to/batch-process-archives.md
       - Roll Up Logs with Span Windows: how-to/span-aggregation-cookbook.md
       - Integrate Kelora with External Tools: how-to/integrate-external-tools.md
+      - Power-User Techniques: how-to/power-user-techniques.md
   - Concepts:
       - Overview: concepts/index.md
       - Processing Architecture: concepts/pipeline-model.md
