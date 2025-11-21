@@ -7,7 +7,7 @@ Parse messy logs into structured events, then filter, transform, and analyze the
 !!! note "Development Status"
     Pre-1.0 tool generated entirely by AI agents. Validated by a large test suite and Rust security tools; see [Development Approach](#development-approach) and the [Security Policy](https://github.com/dloss/kelora/blob/main/SECURITY.md) before relying on it in production. APIs might change without notice before v1.0.
 
-## Quick Examples
+## Usage Examples
 
 **Detect problems** - Filter server errors and slow requests. Each log line becomes an event (`e`) you can query with expressions like `e.status >= 500`:
 
@@ -74,7 +74,7 @@ Beyond basic filtering, Kelora includes specialized functions that solve problem
 
 See **[Power-User Techniques](how-to/power-user-techniques.md)** for real-world examples.
 
-## Why Kelora
+## When to Use Kelora
 
 Choose Kelora when you need **programmable log processing** in one streaming pipeline—filtering, transforming, and analyzing structured events with embedded scripts.
 
