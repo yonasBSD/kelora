@@ -236,37 +236,41 @@ Kelora provides powerful string manipulation beyond basic regex:
 
 ### Extract Text Between Delimiters
 
-```bash
-# Extract content between XML-like tags
-echo '{"log":"Response: <data>secret content</data>"}' | \
-  kelora -j --exec 'e.content = e.log.between("<data>", "</data>")' \
-  -k content
-```
+=== "Command/Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    echo '{"log":"Response: <data>secret content</data>"}' | \
+      kelora -j --exec 'e.content = e.log.between("<data>", "</data>")' \
+      -k content
+    ```
 
 ### Extract Before/After Markers
 
-```bash
-# Parse custom log format
-echo '{"line":"2024-01-15 10:00:00 | INFO | User logged in"}' | \
-  kelora -j --exec 'e.timestamp = e.line.before(" | ");
-                     e.level = e.line.after(" | ").before(" | ");
-                     e.message = e.line.after(" | ", -1)' \
-  -k timestamp,level,message
-```
+=== "Command/Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    echo '{"line":"2024-01-15 10:00:00 | INFO | User logged in"}' | \
+      kelora -j --exec 'e.timestamp = e.line.before(" | ");
+                         e.level = e.line.after(" | ").before(" | ");
+                         e.message = e.line.after(" | ", -1)' \
+      -k timestamp,level,message
+    ```
 
 **Nth occurrence support:**
+
 - `e.text.after(" | ", 1)` - after first occurrence (default)
 - `e.text.after(" | ", -1)` - after last occurrence
 - `e.text.after(" | ", 2)` - after second occurrence
 
 ### Extract Multiple Items
 
-```bash
-# Extract all URLs from a field
-kelora -j logs.jsonl \
-  --exec 'e.urls = e.message.extract_all_re(#"https?://[^\s]+"#)' \
-  -F inspect
-```
+=== "Command/Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    echo '{"message":"Check https://example.com and http://test.org for more info"}' | \
+      kelora -j --exec 'e.urls = e.message.extract_all_re(#"https?://[^\s]+"#)' \
+      -F inspect
+    ```
 
 ## Fuzzy Matching with Edit Distance
 
