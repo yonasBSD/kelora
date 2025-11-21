@@ -1,0 +1,4 @@
+{"timestamp":"2024-01-15T10:00:00Z","user_id":"usr_123","email":"alice@example.com","action":"login","ms":1250}
+{"timestamp":"2024-01-15T10:05:00Z","user_id":"usr_456","email":"bob@company.org","action":"view_document","ms":340}
+{"timestamp":"2024-01-15T10:10:00Z","user_id":"usr_789","email":"charlie@domain.net","action":"update_profile","ms":2100}
+{"timestamp":"2024-01-15T10:15:00Z","user_id":"usr_234","email":"diana@email.com","action":"download_report","ms":890}
