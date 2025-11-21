@@ -14,7 +14,7 @@ cargo install kelora
 
 ## When to Use Kelora
 
-Kelora trades speed for programmability. It's **slower than grep, awk, and jq**, but adds stateful scripting for complex multi-stage transformations.
+Kelora trades speed for programmability. It's slower than grep, awk, and jq, but adds stateful scripting for complex multi-stage transformations.
 
 **Reach for Kelora when:**
 
