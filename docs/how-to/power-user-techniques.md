@@ -215,13 +215,11 @@ Extract header and claims without cryptographic validation:
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/api_errors.jsonl \
-      --filter 'e.status == 401' \
-      --exec 'if e.has("token") {
-        let jwt = e.token.parse_jwt();
-        let now = to_datetime("now").as_epoch();
-        e.expired = jwt.claims.exp < now;
-        e.expires_in = jwt.claims.exp - now
-      }' \
+      --filter 'e.status == 401 && e.has("token")' \
+      --exec 'let jwt = e.token.parse_jwt();
+              let now = 1732000000;
+              e.expired = jwt.claims.exp < now;
+              e.expires_in = jwt.claims.exp - now' \
       --filter 'e.expired == true' \
       -k request_id,user,expires_in
     ```
