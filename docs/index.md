@@ -12,24 +12,23 @@ cargo install kelora
 !!! note "Development Status"
     Pre-1.0 tool generated entirely by AI agents. Validated by a large test suite and Rust security tools; see [Development Approach](#development-approach) and the [Security Policy](https://github.com/dloss/kelora/blob/main/SECURITY.md) before relying on it in production. APIs might change without notice before v1.0.
 
-## The Right Tool for the Job
+## When to Use Kelora
 
-Kelora fills the gap between simple text processing and heavy observability platforms. It introduces **state** and **structure** to your CLI pipeline.
-
-| Feature | `grep` / `rg` | `awk` | `jq` | **Kelora** |
-| :--- | :---: | :---: | :---: | :---: |
-| **Best For** | **Instant Search** | **Simple Splitting** | **JSON Query** | **Logic, State & Metrics** |
-| **State & Metrics** | ❌ | ⚠️ (Variables) | ❌ | **✅ Aggregations & Maps** |
-| **External Data** | ❌ | ❌ | ❌ | **✅ Load Files / Envs** |
-| **Window Analysis**| ❌ | ❌ | ❌ | **✅ Sliding Windows** |
-| **Structure** | ❌ | ⚠️ (Manual) | ✅ (JSON only) | **✅ Mixed Formats** |
+Kelora trades speed for programmability. It's **slower than grep, awk, and jq**, but adds stateful scripting for complex multi-stage transformations.
 
 **Reach for Kelora when:**
 
-*   **You need Logic:** "Show me 500 errors, but only if latency > 1s."
-*   **You need to Transform:** Convert Logfmt to JSON, or anonymize IP addresses.
-*   **You need Context:** Look at the logs *before* an error occurred.
-*   **You need State:** Count errors per service or load external CSV data.
+- You need **stateful logic** - Counting errors per service, windowed metrics, lookup tables
+- You're **chaining tools** - Replacing `grep | awk | jq | custom-script.py` with one command
+- You have **mixed formats** - Logs that aren't consistently JSON or need custom parsing
+- You want **embedded scripting** - Complex transformations without leaving your shell
+
+**Use specialized tools for:**
+
+- **Fast search**: `grep`/`rg` (50-100× faster) - Finding text patterns in logs
+- **Simple splitting**: `awk` (faster, ubiquitous) - Field extraction and simple statistics
+- **JSON queries**: `jq` (faster, everywhere) - Querying structured JSON documents
+- **Interactive exploration**: `lnav` (TUI with SQL) - Browsing logs with a visual interface
 
 ---
 
