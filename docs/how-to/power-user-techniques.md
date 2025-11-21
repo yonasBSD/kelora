@@ -295,13 +295,14 @@ The `edit_distance()` function calculates Levenshtein distance to find errors wi
 
 ### Use Case: Detect Configuration Drift
 
-```bash
-# Compare server hostnames to expected pattern
-echo -e '{"host":"prod-web-01"}\n{"host":"prod-web-02"}\n{"host":"prd-web-01"}' | \
-  kelora -j --exec 'e.distance = e.host.edit_distance("prod-web-01")' \
-  --filter 'e.distance > 2' \
-  -k host,distance
-```
+=== "Command/Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    echo -e '{"host":"prod-web-01"}\n{"host":"prod-web-02"}\n{"host":"prd-web-01"}' | \
+      kelora -j --exec 'e.distance = e.host.edit_distance("prod-web-01")' \
+      --filter 'e.distance > 2' \
+      -k host,distance
+    ```
 
 ## Multiple Hash Algorithms
 
@@ -329,6 +330,7 @@ Different systems use different hash algorithms. You might need SHA-256 for one 
     ```
 
 **Available algorithms:**
+
 - `sha256` - SHA-256 (default, most common)
 - `sha1` - SHA-1 (legacy)
 - `md5` - MD5 (legacy, fast but not secure)
@@ -368,22 +370,26 @@ Logs contain JSON snippets embedded in plain text:
 ### The Solution: `extract_json()` and `extract_jsons()`
 
 **Extract first JSON object:**
-```bash
-kelora logs.log \
-  --exec 'e.json_str = e.line.extract_json()' \
-  --filter 'e.has("json_str")' \
-  --exec 'e.error_data = e.json_str' \
-  -k line,error_data
-```
+
+=== "Command/Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    echo '2024-01-15 ERROR: Failed with response: {"code":500,"message":"Internal error"}' | \
+      kelora --exec 'e.json_str = e.line.extract_json()' \
+      --filter 'e.has("json_str")' \
+      --exec 'e.error_data = e.json_str' \
+      -k line,error_data
+    ```
 
 **Extract all JSON objects:**
-```bash
-echo '{"log":"Found errors: {\"a\":1} and {\"b\":2} in output"}' | \
-  kelora -j --exec 'e.all_jsons = e.log.extract_jsons()' \
-  -F inspect
-```
 
-Output shows an array: `["{"a":1}", "{"b":2}"]`
+=== "Command/Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    echo '{"log":"Found errors: {\"a\":1} and {\"b\":2} in output"}' | \
+      kelora -j --exec 'e.all_jsons = e.log.extract_jsons()' \
+      -F inspect
+    ```
 
 ## Parse Key-Value Pairs from Text
 
