@@ -452,6 +452,104 @@ kelora mixed.log \
   -F json
 ```
 
+## Stateful Processing with `state`
+
+### When to Use `state`
+
+The `state` global map enables complex stateful processing that `track_*()` functions cannot handle:
+
+- **Deduplication**: Track which IDs have already been seen
+- **Cross-event dependencies**: Make decisions based on previous events
+- **Complex objects**: Store nested maps, arrays, or other structured data
+- **Conditional logic**: Remember arbitrary state across events
+
+**Important**: For simple counting and metrics, prefer `track_count()`, `track_sum()`, etc.—they work in both sequential and parallel modes. `state` only works in sequential mode.
+
+### The Problem: Deduplication
+
+You have logs with duplicate entries for the same request ID, but you only want to process each unique request once:
+
+```
+{"request_id": "req-001", "status": "start"}
+{"request_id": "req-002", "status": "start"}
+{"request_id": "req-001", "status": "duplicate"}  ← Skip this
+{"request_id": "req-003", "status": "start"}
+```
+
+### The Solution: Track Seen IDs with `state`
+
+```bash
+kelora -j logs.jsonl \
+  --exec 'if !state.contains(e.request_id) {
+    state[e.request_id] = true;
+    e.is_first = true;
+  } else {
+    e.is_first = false;
+  }' \
+  --filter 'e.is_first == true' \
+  -k request_id,status
+```
+
+Only first occurrences pass through; duplicates are filtered out.
+
+### Use Case: Track Complex Per-User State
+
+Store nested maps to track multiple attributes per user:
+
+```bash
+kelora -j user-events.jsonl \
+  --exec 'if !state.contains(e.user) {
+    state[e.user] = #{login_count: 0, last_seen: (), errors: []};
+  }
+  let user_state = state[e.user];
+  user_state.login_count += 1;
+  user_state.last_seen = e.timestamp;
+  if e.has("error") {
+    user_state.errors.push(e.error);
+  }
+  state[e.user] = user_state;
+  e.user_login_count = user_state.login_count' \
+  -k timestamp,user,user_login_count
+```
+
+### Use Case: Sequential Event Numbering
+
+Assign a global sequence number across all events:
+
+```bash
+kelora -j logs.jsonl \
+  --begin 'state["count"] = 0' \
+  --exec 'state["count"] += 1; e.seq = state["count"]' \
+  -k seq,timestamp,message -F csv
+```
+
+**Note**: For simple counting by category, use `track_count(e.category)` instead.
+
+### Converting State to Regular Map
+
+`state` is a special `StateMap` type with limited operations. To use map functions like `.to_logfmt()` or `.to_kv()`, convert it first:
+
+```bash
+kelora -j logs.jsonl \
+  --exec 'state[e.level] = (state.get(e.level) ?? 0) + 1' \
+  --end 'print(state.to_map().to_logfmt())' -q
+```
+
+Output: `ERROR=42 WARN=103 INFO=5234`
+
+### Parallel Mode Restriction
+
+`state` requires sequential processing to maintain consistency. Using it with `--parallel` causes a runtime error:
+
+```bash
+# This will fail:
+kelora -j logs.jsonl --parallel \
+  --exec 'state["count"] += 1'
+# Error: 'state' is not available in --parallel mode
+```
+
+For parallel-safe tracking, use `track_*()` functions instead.
+
 ## Combining Techniques
 
 The real power comes from combining these features. Here's a complex real-world example:

@@ -6,10 +6,10 @@ Kelora exposes several built-in variables to Rhai scripts. Their availability de
 
 | Stage / Feature | Variables Available | Notes |
 |-----------------|---------------------|-------|
-| `--filter`, `--exec`, `--exec-file` | `line`, `e`, `meta`, `conf` | Per-event context. `e` is writable; the others are read-only. |
-| `--filter` / `--exec` with `--window` | `line`, `e`, `meta`, `conf`, `window` | Adds the sliding `window` array (current event at index `0`; read-only). |
-| `--begin` | `conf` | Map to seed configuration before events arrive. Read-only. |
-| `--end` | `metrics`, `conf` | Inspect final tracker totals in `metrics`; both bindings are read-only. |
+| `--filter`, `--exec`, `--exec-file` | `line`, `e`, `meta`, `conf`, `state` | Per-event context. `e` and `state` are writable; the others are read-only. `state` only in sequential mode. |
+| `--filter` / `--exec` with `--window` | `line`, `e`, `meta`, `conf`, `state`, `window` | Adds the sliding `window` array (current event at index `0`; read-only). `state` only in sequential mode. |
+| `--begin` | `conf`, `state` | Map to seed configuration before events arrive. `conf` is read-only; `state` is writable (sequential mode only). |
+| `--end` | `metrics`, `conf`, `state` | Inspect final tracker totals in `metrics` and final `state`; `conf` and `metrics` are read-only. `state` only in sequential mode. |
 | `--span-close` | `span`, `metrics`, `conf` | Summarises the closed span with per-span data (`span`) and cumulative totals (`metrics`). All read-only. |
 
 > Reading a variable that does not exist in the current stage raises a Rhai error. Variables listed here are populated with meaningful data (individual fields inside maps may still be `()`). Other globals such as `line`/`e` exist behind the scenes for compatibility but start empty in stages where they are not useful.
@@ -41,6 +41,47 @@ Kelora exposes several built-in variables to Rhai scripts. Their availability de
 ### `conf`
 - Type: `Map`
 - Configuration produced by `--begin` and CLI options; the map is frozen so mutation attempts are ignored. Read-only.
+
+### `state`
+- Type: `StateMap` (special wrapper, not a regular `Map`)
+- Mutable global map for complex state tracking across events. Available in all per-event stages (`--filter`, `--exec`, `--begin`, `--end`) **in sequential mode only**.
+- **When to use**: Deduplication, storing complex objects, cross-event dependencies that `track_*()` functions cannot handle.
+- **When NOT to use**: Simple counting or metrics—prefer `track_count()`, `track_sum()`, etc., which work in parallel mode too.
+
+**Direct operations** (no conversion needed):
+- Indexing: `state["key"]` for get/set, returns `()` if key doesn't exist
+- Methods: `contains(key)`, `get(key)`, `set(key, value)`, `len()`, `is_empty()`, `keys()`, `values()`, `clear()`, `remove(key)`
+- Operators: `+=`, `mixin(map)`, `fill_with(map)`
+
+**For other map functions**: Convert to regular map first using `state.to_map()`, then use any map function:
+```rhai
+// Convert state to use functions like to_logfmt(), to_kv(), etc.
+print(state.to_map().to_logfmt());
+let json_str = state.to_map().to_json();
+```
+
+**Parallel mode restriction**: Accessing `state` in `--parallel` mode causes a runtime panic with a clear error message. State requires sequential processing to maintain consistency.
+
+**Example use cases**:
+```rhai
+// Deduplication - track seen IDs
+if !state.contains(e.request_id) {
+    state[e.request_id] = true;
+    // Process first occurrence
+} else {
+    // Skip duplicate
+    e = ();
+}
+
+// Store complex nested state
+if !state.contains(e.user) {
+    state[e.user] = #{login_count: 0, last_seen: ()};
+}
+let user_data = state[e.user];
+user_data.login_count += 1;
+user_data.last_seen = e.timestamp;
+state[e.user] = user_data;
+```
 
 ## Span Hooks (`--span-close`)
 

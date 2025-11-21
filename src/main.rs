@@ -2322,6 +2322,14 @@ COMMON PATTERNS:
   for (key, val) in e { print(key + " = " + val); }
 
 GLOBAL CONTEXT:
+  state                                Mutable global map for complex state tracking (sequential mode only)
+                                       Use for: deduplication, storing complex objects, cross-event logic
+                                       For simple counting/metrics, prefer track_*() (works in parallel too)
+                                       Supports: state["key"], contains(), get(), set(), len(), is_empty(),
+                                       keys(), values(), clear(), remove(), +=, mixin(), fill_with()
+                                       Use state.to_map() to convert to regular map for other operations
+                                       (e.g., state.to_map().to_logfmt(), state.to_map().to_kv())
+                                       Note: Accessing state in --parallel mode will cause a runtime error
   conf                                 Global config map (read-only after --begin)
   metrics                              Global metrics map (from track_* calls, read in --end)
   get_env("VAR", "default")            Environment variable access
