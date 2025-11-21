@@ -61,6 +61,19 @@ Parse messy logs into structured events, then filter, transform, and analyze the
     cat examples/api_errors.jsonl
     ```
 
+## Advanced Features
+
+Beyond basic filtering, Kelora includes specialized functions that solve problems you'd otherwise need multiple tools or custom scripts for:
+
+- **[Deep flattening](how-to/power-user-techniques.md#deep-structure-flattening)** - Fan out nested JSON arrays to flat records (`emit_each()`)
+- **[Extract JSON from text](how-to/power-user-techniques.md#extract-json-from-unstructured-text)** - Pull structured data from unstructured log lines
+- **[JWT parsing](how-to/power-user-techniques.md#jwt-parsing-without-verification)** - Extract claims without signature verification for debugging
+- **[Cryptographic pseudonymization](how-to/power-user-techniques.md#multiple-hash-algorithms)** - Privacy-preserving anonymization with Argon2id + HKDF + HMAC
+- **[Pattern normalization](how-to/power-user-techniques.md#pattern-normalization)** - Group error messages by replacing IPs, UUIDs, emails with placeholders
+- **[Deterministic sampling](how-to/power-user-techniques.md#deterministic-sampling-with-bucket)** - Hash-based sampling that's consistent across log rotations and distributed systems
+
+See **[Power-User Techniques](how-to/power-user-techniques.md)** for real-world examples.
+
 ## Why Kelora
 
 Choose Kelora when you need **programmable log processing** in one streaming pipeline—filtering, transforming, and analyzing structured events with embedded scripts.
