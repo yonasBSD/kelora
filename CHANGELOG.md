@@ -4,6 +4,50 @@ All notable changes to Kelora will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.10.1] - 2025-11-21
+
+### Added
+
+- **Global state map for Rhai scripts:**
+  - `state` global map for persisting data across log events
+  - Full Rhai map API support (get(), set(), keys(), values(), etc.)
+  - `to_map()` conversion for StateMap compatibility
+  - Comprehensive documentation in `--help` and `--help-functions`
+- **CLI flags:**
+  - `--help-formats` - Format reference documentation
+- **Documentation improvements:**
+  - Comprehensive power-user techniques guide
+  - Runnable example files for power-user techniques
+  - Power-User Techniques added to docs navigation
+  - Interactive tabbed examples throughout documentation
+  - Interactive examples for string extraction and multi-format logs
+  - Advanced features section on landing page
+  - Missing `audit.jsonl` example file
+- **UX improvements:**
+  - Hint formatter for tips and guidance
+  - Hint for unseen metrics output
+  - Auto-detected format now shown as info instead of warning
+
+### Changed
+
+- Polished help page titles to reduce redundancy
+- Standardized help page footers to reference `-h` consistently
+- Improved landing page structure and messaging
+- Simplified integration and ecosystem messaging
+- Clarified Kelora input/output capabilities in documentation
+- Replaced comparison table with narrative format
+- Reordered use cases from concrete to abstract
+
+### Fixed
+
+- Suppressed leading newline in diagnostics when no events are output
+- Fixed metrics banner newline handling under quiet mode
+- Fixed error suppression guidance in diagnostics summary
+- Fixed `emit()` documentation references
+- Fixed incorrect `-q` reference in web traffic docs
+- Fixed JWT expiration tracking example
+- Cleaned up dead code allows and unused items
+
 ## [0.10.0] - 2025-11-19
 
 ### Added
@@ -176,7 +220,8 @@ _Initial release (yanked)._
 
 ---
 
-[Unreleased]: https://github.com/dloss/kelora/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/dloss/kelora/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/dloss/kelora/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/dloss/kelora/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/dloss/kelora/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/dloss/kelora/compare/v0.8.1...v0.9.0
