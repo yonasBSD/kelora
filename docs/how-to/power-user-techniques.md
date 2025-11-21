@@ -500,18 +500,27 @@ You want to see the distribution of response times, not just average/max.
 
 ### Use Case: Normalize Multi-Format Logs
 
-```bash
-# Handle logs with mixed JSON and logfmt lines
-kelora mixed.log \
-  --exec 'if e.line.contains("{") {
-    let json_str = e.line.extract_json();
-    e.data = json_str
-  } else if e.line.contains("=") {
-    e.data = e.line.parse_kv()
-  }' \
-  --filter 'e.has("data")' \
-  -F json
-```
+Handle logs with mixed JSON and logfmt lines:
+
+=== "Command/Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora examples/nightmare_mixed_formats.log \
+      --exec 'if e.line.contains("{") {
+        let json_str = e.line.extract_json();
+        e.data = json_str
+      } else if e.line.contains("=") {
+        e.data = e.line.parse_kv()
+      }' \
+      --filter 'e.has("data")' \
+      -F json | head -5
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    head -5 examples/nightmare_mixed_formats.log
+    ```
 
 ## Stateful Processing with `state`
 
@@ -648,6 +657,7 @@ kelora -j api-responses.jsonl \
 ```
 
 This pipeline:
+
 1. Filters to API v2 only
 2. Fans out nested orders → items (multi-level)
 3. Normalizes error patterns
@@ -677,10 +687,12 @@ All in a single command without temporary files or custom scripts.
 - Use safe conversions: `to_int_or(e.field, 0)`
 
 **Pattern normalization doesn't work:**
+
 - Check that patterns exist in input: `echo "test 192.168.1.1" | kelora --exec '...'`
 - Verify pattern names: `normalized(["ipv4", "email"])` not `["ip", "emails"]`
 
 **Hash consistency issues:**
+
 - Same input + same algorithm = same hash (deterministic)
 - Different Kelora versions may use different hash implementations
 - Use `KELORA_SECRET` env var for `pseudonym()` to ensure domain separation
