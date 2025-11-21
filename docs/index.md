@@ -30,6 +30,8 @@ Kelora trades speed for programmability. It's **slower than grep, awk, and jq**,
 - **JSON queries**: `jq` (faster, everywhere) - Querying structured JSON documents
 - **Interactive exploration**: `lnav` (TUI with SQL) - Browsing logs with a visual interface
 
+Kelora focuses on transformation—pipe its output to `lnav` (visualization), `jq` (further processing), `qsv` (analytics), or `sqlite-utils` (storage). See [Integrate with External Tools](how-to/integrate-external-tools.md) for more patterns.
+
 ---
 
 ## Live Examples
@@ -106,22 +108,6 @@ Beyond basic filtering, Kelora includes specialized functions that solve problem
 - **[Deterministic sampling](how-to/power-user-techniques.md#deterministic-sampling-with-bucket)** - Hash-based sampling that's consistent across log rotations and distributed systems
 
 See **[Power-User Techniques](how-to/power-user-techniques.md)** for real-world examples. For performance characteristics and when to use specialized tools instead, see [Performance Comparisons](concepts/performance-comparisons.md).
-
----
-
-## Integration & Ecosystem
-
-Kelora focuses strictly on the **Transformation** step of your pipeline.
-
-*   **Input:** Files, Stdin, Pipes.
-*   **Output:** JSON, Logfmt, CSV, or Raw text.
-
-**Common Pipelines:**
-*   **Interactive:** `kelora ... | lnav` (Visualize formatted logs)
-*   **Analytics:** `kelora ... | qsv` (Heavy CSV number crunching)
-*   **Storage:** `kelora ... | sqlite-utils` (Insert directly into DB)
-
-See [Integrate Kelora with External Tools](how-to/integrate-external-tools.md) for 18 specific usage patterns.
 
 ---
 
