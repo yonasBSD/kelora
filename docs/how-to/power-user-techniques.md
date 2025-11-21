@@ -28,35 +28,33 @@ These are the same error pattern but appear as three different messages.
 
 The `normalized()` function automatically detects and replaces common patterns with placeholders:
 
-```bash
-echo '{"msg":"User 192.168.1.1 sent email to alice@example.com with ID a1b2c3d4-e5f6-7890-1234-567890abcdef"}' | \
-  kelora -j --exec 'e.pattern = e.msg.normalized()' \
-  -k msg,pattern -J
-```
+=== "Command/Output"
 
-Output:
-```json
-{
-  "msg": "User 192.168.1.1 sent email to alice@example.com with ID a1b2c3d4-e5f6-7890-1234-567890abcdef",
-  "pattern": "User <ipv4> sent email to <email> with ID <uuid>"
-}
-```
+    ```bash exec="on" source="above" result="ansi"
+    echo '{"msg":"User 192.168.1.1 sent email to alice@example.com with ID a1b2c3d4-e5f6-7890-1234-567890abcdef"}' | \
+      kelora -j --exec 'e.pattern = e.msg.normalized()' \
+      -k msg,pattern -J
+    ```
 
 ### Real-World Use Case: Error Grouping
 
-Group errors by pattern rather than exact message:
+Group errors by pattern rather than exact message to see that many different error messages are actually the same pattern repeated with different IPs/UUIDs:
 
-```bash
-kelora -j production-errors.jsonl \
-  --exec 'e.error_pattern = e.message.normalized()' \
-  --metrics \
-  --exec 'track_count(e.error_pattern)' \
-  --end 'for pattern in metrics.keys() {
-    print(pattern + ": " + metrics[pattern])
-  }' -q
-```
+=== "Command/Output"
 
-This reveals that 500 different error messages are actually 3 patterns repeated with different IPs/UUIDs.
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/production-errors.jsonl \
+      --exec 'e.error_pattern = e.message.normalized()' \
+      --metrics \
+      --exec 'track_count(e.error_pattern)' \
+      --no-events
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    cat examples/production-errors.jsonl
+    ```
 
 ### Supported Patterns
 
@@ -84,29 +82,25 @@ Random sampling (`--head N` or `random() < 0.1`) gives different results each ru
 
 ### The Solution: Hash-Based Sampling
 
-The `bucket()` function returns a consistent integer hash for any string, enabling deterministic sampling:
+The `bucket()` function returns a consistent integer hash for any string, enabling deterministic sampling.
 
-```bash
-# Always get the same 10% of requests
-kelora -j api-logs.jsonl \
-  --filter 'e.request_id.bucket() % 10 == 0' \
-  -k timestamp,request_id,path,status
-```
+The same `request_id` always hashes to the same number, so you'll get consistent sampling across multiple log files, log rotations, different days, and distributed systems.
 
-The same `request_id` always hashes to the same number, so you'll get consistent sampling across:
-- Multiple log files
-- Log rotations
-- Different days
-- Distributed systems (as long as the hash input is the same)
+=== "Command/Output"
 
-### Use Cases
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/user-activity.jsonl \
+      --filter 'e.user_id.bucket() % 20 == 0' \
+      -k user_id,action,timestamp
+    ```
 
-**Consistent user sampling for behavior analysis:**
-```bash
-# Always analyze the same 5% of users
-kelora -j user-activity.jsonl \
-  --filter 'e.user_id.bucket() % 20 == 0'
-```
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    cat examples/user-activity.jsonl
+    ```
+
+This always returns the same 5% of users - run it multiple times and you'll get identical results.
 
 **Partition logs for parallel processing:**
 ```bash
@@ -151,20 +145,19 @@ APIs return deeply nested JSON that's hard to query or export to flat formats (C
 
 The `flattened()` function creates a flat map with bracket-notation keys:
 
-```bash
-kelora -j deeply-nested.jsonl \
-  --exec 'e.flat = e.api.flattened()' \
-  --exec 'print(e.flat.to_json())' -q
-```
+=== "Command/Output"
 
-Output:
-```json
-{
-  "queries[0].results.users[0].id": 1,
-  "queries[0].results.users[0].permissions.read": true,
-  "queries[0].results.users[0].permissions.write": true
-}
-```
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/deeply-nested.jsonl \
+      --exec 'e.flat = e.api.flattened()' \
+      --exec 'print(e.flat.to_json())' -q
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    cat examples/deeply-nested.jsonl
+    ```
 
 ### Advanced: Multi-Level Fan-Out
 
@@ -189,16 +182,24 @@ You need to inspect JWT claims for debugging but don't want to set up signature 
 
 Extract header and claims without cryptographic validation:
 
-```bash
-kelora -j auth-logs.jsonl \
-  --filter 'e.has("token")' \
-  --exec 'let jwt = e.token.parse_jwt();
-          e.user = jwt.claims.sub;
-          e.role = jwt.claims.role;
-          e.expires = jwt.claims.exp;
-          e.token = ()' \
-  -k timestamp,user,role,expires
-```
+=== "Command/Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/auth-logs.jsonl \
+      --filter 'e.has("token")' \
+      --exec 'let jwt = e.token.parse_jwt();
+              e.user = jwt.claims.sub;
+              e.role = jwt.claims.role;
+              e.expires = jwt.claims.exp;
+              e.token = ()' \
+      -k timestamp,user,role,expires
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    cat examples/auth-logs.jsonl
+    ```
 
 **Security Warning:** This does NOT validate signatures. Use only for debugging or parsing tokens you already trust.
 
@@ -259,15 +260,22 @@ kelora -j logs.jsonl \
 
 ### Use Case: Find Typos or Similar Errors
 
-The `edit_distance()` function calculates Levenshtein distance:
+The `edit_distance()` function calculates Levenshtein distance to find errors with typos or slight variations:
 
-```bash
-# Find error messages similar to a known issue
-kelora -j error-logs.jsonl \
-  --exec 'e.similarity = e.error.edit_distance("connection timeout")' \
-  --filter 'e.similarity < 5' \
-  -k error,similarity
-```
+=== "Command/Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/error-logs.jsonl \
+      --exec 'e.similarity = e.error.edit_distance("connection timeout")' \
+      --filter 'e.similarity < 5' \
+      -k error,similarity
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    cat examples/error-logs.jsonl
+    ```
 
 ### Use Case: Detect Configuration Drift
 
@@ -286,16 +294,23 @@ Different systems use different hash algorithms. You might need SHA-256 for one 
 
 ### The Solution: Multi-Algorithm Hashing
 
-```bash
-# Generate multiple hash formats
-kelora -j user-data.jsonl \
-  --exec 'e.sha256 = e.email.hash("sha256");
-          e.md5 = e.email.hash("md5");
-          e.blake3 = e.email.hash("blake3");
-          e.xxh3 = e.email.hash("xxh3");
-          e.email = ()' \
-  -k user_id,sha256,blake3 -F csv
-```
+=== "Command/Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/user-data.jsonl \
+      --exec 'e.sha256 = e.email.hash("sha256");
+              e.md5 = e.email.hash("md5");
+              e.blake3 = e.email.hash("blake3");
+              e.xxh3 = e.email.hash("xxh3");
+              e.email = ()' \
+      -k user_id,sha256,blake3 -F csv
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    cat examples/user-data.jsonl
+    ```
 
 **Available algorithms:**
 - `sha256` - SHA-256 (default, most common)
@@ -351,20 +366,21 @@ Output shows an array: `["{"a":1}", "{"b":2}"]`
 
 ### The Solution: `absorb_kv()`
 
-Extract `key=value` pairs from unstructured log lines:
+Extract `key=value` pairs from unstructured log lines and convert them to structured fields:
 
-```bash
-kelora examples/kv_pairs.log \
-  --exec 'e.absorb_kv("line")' \
-  -k timestamp,action,user,ip,success -F csv
-```
+=== "Command/Output"
 
-This automatically parses:
-```
-2024-01-15T10:00:00Z action=login user=alice ip=192.168.1.10 success=true
-```
+    ```bash exec="on" source="above" result="ansi"
+    kelora examples/kv_pairs.log \
+      --exec 'e.absorb_kv("line")' \
+      -k timestamp,action,user,ip,success -F csv
+    ```
 
-Into structured fields: `timestamp`, `action`, `user`, `ip`, `success`.
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    cat examples/kv_pairs.log
+    ```
 
 ### Options
 
@@ -496,21 +512,29 @@ Only first occurrences pass through; duplicates are filtered out.
 
 Store nested maps to track multiple attributes per user:
 
-```bash
-kelora -j user-events.jsonl \
-  --exec 'if !state.contains(e.user) {
-    state[e.user] = #{login_count: 0, last_seen: (), errors: []};
-  }
-  let user_state = state[e.user];
-  user_state.login_count += 1;
-  user_state.last_seen = e.timestamp;
-  if e.has("error") {
-    user_state.errors.push(e.error);
-  }
-  state[e.user] = user_state;
-  e.user_login_count = user_state.login_count' \
-  -k timestamp,user,user_login_count
-```
+=== "Command/Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/user-events.jsonl \
+      --exec 'if !state.contains(e.user) {
+        state[e.user] = #{login_count: 0, last_seen: (), errors: []};
+      }
+      let user_state = state[e.user];
+      user_state.login_count += 1;
+      user_state.last_seen = e.timestamp;
+      if e.has("error") {
+        user_state.errors.push(e.error);
+      }
+      state[e.user] = user_state;
+      e.user_login_count = user_state.login_count' \
+      -k timestamp,user,user_login_count
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    cat examples/user-events.jsonl
+    ```
 
 ### Use Case: Sequential Event Numbering
 
