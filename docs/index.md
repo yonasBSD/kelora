@@ -1,6 +1,6 @@
 # Kelora
 
-**Turn messy logs into structured data with one command.**
+**Turn messy logs into structured data.**
 
 Kelora is a scriptable log processor for the command line. Parse mixed formats, filter with complex logic, and analyze streams using embedded [Rhai](https://rhai.rs) scripting—all in a single binary.
 
