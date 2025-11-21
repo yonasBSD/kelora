@@ -30,7 +30,7 @@ Kelora trades speed for programmability. It's **slower than grep, awk, and jq**,
 - **JSON queries**: `jq` (faster, everywhere) - Querying structured JSON documents
 - **Interactive exploration**: `lnav` (TUI with SQL) - Browsing logs with a visual interface
 
-Kelora works well in pipelines—combine it with [lnav, jq, qsv, and other tools](how-to/integrate-external-tools.md) for visualization, analytics, and storage.
+Kelora reads from files or stdin and outputs JSON, CSV, or Logfmt. Combine it with [lnav, jq, qsv, and other tools](how-to/integrate-external-tools.md) for visualization, analytics, and storage.
 
 ---
 
@@ -98,7 +98,7 @@ Kelora works well in pipelines—combine it with [lnav, jq, qsv, and other tools
 
 ## Advanced Features
 
-Beyond basic filtering, Kelora includes specialized functions that solve problems you'd otherwise need multiple tools or custom scripts for:
+Beyond basic filtering and conversion, Kelora includes specialized functions that solve problems you'd otherwise need multiple tools or custom scripts for:
 
 - **[Deep flattening](how-to/power-user-techniques.md#deep-structure-flattening)** - Fan out nested JSON arrays to flat records (`emit_each()`)
 - **[Extract JSON from text](how-to/power-user-techniques.md#extract-json-from-unstructured-text)** - Pull structured data from unstructured log lines
