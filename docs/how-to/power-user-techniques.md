@@ -33,7 +33,7 @@ The `normalized()` function automatically detects and replaces common patterns w
     ```bash exec="on" source="above" result="ansi"
     echo '{"msg":"User 192.168.1.1 sent email to alice@example.com with ID a1b2c3d4-e5f6-7890-1234-567890abcdef"}' | \
       kelora -j --exec 'e.pattern = e.msg.normalized()' \
-      -k msg,pattern -J
+      -k pattern
     ```
 
 ### Real-World Use Case: Error Grouping
@@ -161,17 +161,23 @@ The `flattened()` function creates a flat map with bracket-notation keys:
 
 ### Advanced: Multi-Level Fan-Out
 
-For extremely nested data, combine `flattened()` with `emit_each()`:
+For extremely nested data, combine `flattened()` with `emit_each()` to chain multiple levels of nesting into flat records:
 
-```bash
-kelora -j examples/nightmare_deeply_nested_transform.jsonl \
-  --filter 'e.request_id == "req_002"' \
-  --exec 'emit_each(e.get_path("api.queries[0].results.orders", []))' \
-  --exec 'emit_each(e.items)' \
-  -k sku,quantity,unit_price,final_price -F csv
-```
+=== "Command/Output"
 
-This chains three levels of nesting (request → orders → items) into flat CSV records in a single pipeline.
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/nightmare_deeply_nested_transform.jsonl \
+      --filter 'e.request_id == "req_002"' \
+      --exec 'emit_each(e.get_path("api.queries[0].results.orders", []))' \
+      --exec 'emit_each(e.items)' \
+      -k sku,quantity,unit_price,final_price -F csv
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    head -3 examples/nightmare_deeply_nested_transform.jsonl
+    ```
 
 ## JWT Parsing Without Verification
 
@@ -205,18 +211,26 @@ Extract header and claims without cryptographic validation:
 
 ### Use Case: Track Token Expiration Issues
 
-```bash
-kelora -j api-errors.jsonl \
-  --filter 'e.status == 401' \
-  --exec 'if e.has("token") {
-    let jwt = e.token.parse_jwt();
-    let now = to_datetime("now").as_epoch();
-    e.expired = jwt.claims.exp < now;
-    e.expires_in = jwt.claims.exp - now
-  }' \
-  --filter 'e.expired == true' \
-  -k request_id,user,expires_in
-```
+=== "Command/Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/api_errors.jsonl \
+      --filter 'e.status == 401' \
+      --exec 'if e.has("token") {
+        let jwt = e.token.parse_jwt();
+        let now = to_datetime("now").as_epoch();
+        e.expired = jwt.claims.exp < now;
+        e.expires_in = jwt.claims.exp - now
+      }' \
+      --filter 'e.expired == true' \
+      -k request_id,user,expires_in
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    cat examples/api_errors.jsonl
+    ```
 
 ## Advanced String Extraction
 
@@ -321,17 +335,24 @@ Different systems use different hash algorithms. You might need SHA-256 for one 
 
 ### Use Case: Privacy-Preserving Analytics
 
-```bash
-# Create consistent anonymous IDs
-KELORA_SECRET="your-secret-key" kelora -j analytics.jsonl \
-  --exec 'e.anon_user = pseudonym(e.email, "users");
-          e.anon_session = pseudonym(e.session_id, "sessions");
-          e.email = ();
-          e.session_id = ()' \
-  -F csv > anonymized.csv
-```
+Create consistent anonymous IDs using HMAC-SHA256 with a secret key for domain-separated hashing:
 
-The `pseudonym()` function uses HMAC-SHA256 with a secret key for domain-separated hashing.
+=== "Command/Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    KELORA_SECRET="your-secret-key" kelora -j examples/analytics.jsonl \
+      --exec 'e.anon_user = pseudonym(e.email, "users");
+              e.anon_session = pseudonym(e.session_id, "sessions");
+              e.email = ();
+              e.session_id = ()' \
+      -k anon_user,anon_session,page,duration -F csv
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    cat examples/analytics.jsonl
+    ```
 
 ## Extract JSON from Unstructured Text
 
@@ -401,57 +422,73 @@ You want to see the distribution of response times, not just average/max.
 
 ### The Solution: Bucket Tracking
 
-```bash
-kelora -j api-logs.jsonl \
-  --metrics \
-  --exec 'let bucket = (e.response_time / 0.5).floor() * 0.5;
-          track_bucket("response_ms", bucket)' \
-  --end 'print("Response time distribution:");
-         for bucket in metrics.response_ms.keys() {
-           print("  " + bucket + "s: " + metrics.response_ms[bucket])
-         }' -q
-```
+=== "Command/Output"
 
-Output:
-```
-Response time distribution:
-  0s: 1523
-  0.5s: 234
-  1s: 89
-  1.5s: 23
-  2s: 12
-  5s: 3
-```
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/api_logs.jsonl \
+      --filter 'e.has("response_time")' \
+      --metrics \
+      --exec 'let bucket = (e.response_time / 0.5).floor() * 0.5;
+              track_bucket("response_ms", bucket)' \
+      --no-events
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    cat examples/api_logs.jsonl
+    ```
 
 ### Use Case: HTTP Status Code Distribution
 
-```bash
-kelora -f combined web-access.log \
-  --metrics \
-  --exec 'track_bucket("status", e.status / 100 * 100)' \
-  --end 'print(metrics.status)' -q
-```
+=== "Command/Output"
 
-Shows `200: 5000, 300: 234, 400: 89, 500: 12`
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f combined examples/web_access.log \
+      --metrics \
+      --exec 'track_bucket("status", e.status / 100 * 100)' \
+      --no-events
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    head -5 examples/web_access.log
+    ```
 
 ## Format Conversion in Pipelines
 
 ### Convert Between Formats On-The-Fly
 
-```bash
-# JSON to logfmt
-kelora -j app.jsonl \
-  --exec 'print(e.to_logfmt())' -q
+**JSON to logfmt:**
 
-# Logfmt to JSON
-kelora -f logfmt app.log \
-  --exec 'print(e.to_json())' -q
+=== "Command/Output"
 
-# Any format to CSV with specific fields
-kelora mixed-logs.log \
-  --exec 'e.parse_if_needed()' \
-  -k timestamp,level,message -F csv
-```
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/simple_json.jsonl \
+      --exec 'print(e.to_logfmt())' -q | head -3
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    head -3 examples/simple_json.jsonl
+    ```
+
+**Logfmt to JSON:**
+
+=== "Command/Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -f logfmt examples/app.log \
+      --exec 'print(e.to_json())' -q | head -3
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    head -3 examples/app.log
+    ```
 
 ### Use Case: Normalize Multi-Format Logs
 
@@ -553,13 +590,19 @@ kelora -j logs.jsonl \
 
 `state` is a special `StateMap` type with limited operations. To use map functions like `.to_logfmt()` or `.to_kv()`, convert it first:
 
-```bash
-kelora -j logs.jsonl \
-  --exec 'state[e.level] = (state.get(e.level) ?? 0) + 1' \
-  --end 'print(state.to_map().to_logfmt())' -q
-```
+=== "Command/Output"
 
-Output: `ERROR=42 WARN=103 INFO=5234`
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/simple_json.jsonl \
+      --exec 'state[e.level] = (state.get(e.level) ?? 0) + 1' \
+      --end 'print(state.to_map().to_logfmt())' -q
+    ```
+
+=== "Log Data"
+
+    ```bash exec="on" result="ansi"
+    head -5 examples/simple_json.jsonl
+    ```
 
 ### Parallel Mode Restriction
 
