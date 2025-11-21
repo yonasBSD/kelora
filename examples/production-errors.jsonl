@@ -1,0 +1,10 @@
+{"message":"Failed to connect to 192.168.1.10","service":"api","level":"ERROR"}
+{"message":"Failed to connect to 10.0.5.23","service":"web","level":"ERROR"}
+{"message":"Failed to connect to 172.16.88.5","service":"worker","level":"ERROR"}
+{"message":"User alice@example.com sent invalid request","service":"api","level":"WARN"}
+{"message":"User bob@test.org sent invalid request","service":"web","level":"WARN"}
+{"message":"Timeout on request a1b2c3d4-e5f6-7890-1234-567890abcdef","service":"api","level":"ERROR"}
+{"message":"Timeout on request f1e2d3c4-b5a6-9807-5432-098765fedcba","service":"worker","level":"ERROR"}
+{"message":"Failed to connect to 203.0.113.42","service":"api","level":"ERROR"}
+{"message":"User charlie@example.net sent invalid request","service":"api","level":"WARN"}
+{"message":"Timeout on request 11111111-2222-3333-4444-555555555555","service":"web","level":"ERROR"}

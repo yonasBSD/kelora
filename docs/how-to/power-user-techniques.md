@@ -333,8 +333,8 @@ Logs contain JSON snippets embedded in plain text:
 ```bash
 kelora logs.log \
   --exec 'e.json_str = e.line.extract_json()' \
-  --filter 'e.json_str != ""' \
-  --exec 'e.error_data = e.json_str; e.parsed = true' \
+  --filter 'e.has("json_str")' \
+  --exec 'e.error_data = e.json_str' \
   -k line,error_data
 ```
 

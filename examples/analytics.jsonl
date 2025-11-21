@@ -1,0 +1,6 @@
+{"email":"alice@example.com","session_id":"sess_a1b2c3d4","page":"/home","duration":45}
+{"email":"bob@example.org","session_id":"sess_e5f6g7h8","page":"/products","duration":120}
+{"email":"alice@example.com","session_id":"sess_a1b2c3d4","page":"/cart","duration":30}
+{"email":"charlie@test.net","session_id":"sess_i9j0k1l2","page":"/home","duration":15}
+{"email":"bob@example.org","session_id":"sess_e5f6g7h8","page":"/checkout","duration":90}
+{"email":"alice@example.com","session_id":"sess_m3n4o5p6","page":"/home","duration":20}

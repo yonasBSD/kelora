@@ -1,0 +1,5 @@
+{"user_id":"user001","email":"alice@example.com","action":"login","ip":"192.168.1.10"}
+{"user_id":"user002","email":"bob@example.org","action":"purchase","ip":"10.0.5.23"}
+{"user_id":"user003","email":"charlie@test.net","action":"view","ip":"172.16.88.5"}
+{"user_id":"user004","email":"diana@company.com","action":"logout","ip":"192.168.1.11"}
+{"user_id":"user005","email":"eve@sample.io","action":"login","ip":"10.0.5.24"}

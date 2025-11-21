@@ -81,6 +81,19 @@ Production-like log files for testing realistic use cases:
 - `incident_story.log` - Simulated incident timeline
 - And many more...
 
+### Power-User Technique Examples
+
+Examples for advanced features from the [Power-User Techniques](https://kelora.dev/how-to/power-user-techniques/) guide:
+
+- `production-errors.jsonl` - Pattern normalization with `normalized()`
+- `user-activity.jsonl` - Deterministic sampling with `bucket()`
+- `deeply-nested.jsonl` - Structure flattening with `flattened()`
+- `auth-logs.jsonl` - JWT parsing with `parse_jwt()`
+- `error-logs.jsonl` - Fuzzy matching with `edit_distance()`
+- `user-data.jsonl` - Multi-algorithm hashing
+- `analytics.jsonl` - Privacy-preserving pseudonymization
+- `user-events.jsonl` - Stateful processing with `state` map
+
 ### Specialized Formats
 
 - `cols_fixed.log`, `cols_mixed.log` - Fixed-width columns

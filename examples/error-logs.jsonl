@@ -1,0 +1,6 @@
+{"timestamp":"2024-01-15T10:00:00Z","error":"connection timeout","service":"api"}
+{"timestamp":"2024-01-15T10:01:00Z","error":"connection timed out","service":"web"}
+{"timestamp":"2024-01-15T10:02:00Z","error":"conecttion timeout","service":"worker"}
+{"timestamp":"2024-01-15T10:03:00Z","error":"network timeout","service":"api"}
+{"timestamp":"2024-01-15T10:04:00Z","error":"conection timeot","service":"web"}
+{"timestamp":"2024-01-15T10:05:00Z","error":"timeout on connection","service":"api"}

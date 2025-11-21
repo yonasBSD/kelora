@@ -1,0 +1,4 @@
+{"timestamp":"2024-01-15T10:00:00Z","token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTIzIiwibmFtZSI6IkFsaWNlIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzMyMTUzNjAwfQ.sig1","status":200}
+{"timestamp":"2024-01-15T10:05:00Z","token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyNDU2IiwibmFtZSI6IkJvYiIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzMyMTU3MjAwfQ.sig2","status":200}
+{"timestamp":"2024-01-15T10:10:00Z","token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyNzg5IiwibmFtZSI6IkNoYXJsaWUiLCJyb2xlIjoiZ3Vlc3QiLCJleHAiOjE3MDAwMDAwMDB9.sig3","status":401}
+{"timestamp":"2024-01-15T10:15:00Z","token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMTExIiwibmFtZSI6IkRpYW5hIiwicm9sZSI6Im1vZGVyYXRvciIsImV4cCI6MTczMjE2MDgwMH0.sig4","status":200}

@@ -1,0 +1,10 @@
+{"timestamp":"2024-01-15T10:00:00Z","user":"alice","event":"login"}
+{"timestamp":"2024-01-15T10:01:00Z","user":"bob","event":"login"}
+{"timestamp":"2024-01-15T10:02:00Z","user":"alice","event":"view_page"}
+{"timestamp":"2024-01-15T10:03:00Z","user":"alice","event":"error","error":"timeout"}
+{"timestamp":"2024-01-15T10:04:00Z","user":"bob","event":"purchase"}
+{"timestamp":"2024-01-15T10:05:00Z","user":"charlie","event":"login"}
+{"timestamp":"2024-01-15T10:06:00Z","user":"alice","event":"login"}
+{"timestamp":"2024-01-15T10:07:00Z","user":"bob","event":"error","error":"payment_failed"}
+{"timestamp":"2024-01-15T10:08:00Z","user":"charlie","event":"view_page"}
+{"timestamp":"2024-01-15T10:09:00Z","user":"alice","event":"logout"}
