@@ -30,7 +30,7 @@ Kelora trades speed for programmability. It's **slower than grep, awk, and jq**,
 - **JSON queries**: `jq` (faster, everywhere) - Querying structured JSON documents
 - **Interactive exploration**: `lnav` (TUI with SQL) - Browsing logs with a visual interface
 
-Kelora focuses on transformation—pipe its output to `lnav` (visualization), `jq` (further processing), `qsv` (analytics), or `sqlite-utils` (storage). See [Integrate with External Tools](how-to/integrate-external-tools.md) for more patterns.
+Kelora works well in pipelines—combine it with [lnav, jq, qsv, and other tools](how-to/integrate-external-tools.md) for visualization, analytics, and storage.
 
 ---
 
