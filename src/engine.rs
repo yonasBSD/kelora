@@ -379,6 +379,52 @@ impl ErrorEnhancer {
     }
 
     fn suggest_function_alternatives(&self, func_sig: &str) -> Option<String> {
+        // Detect operations on missing fields (unit type)
+        if func_sig.contains("()") {
+            let func_name = func_sig.split('(').next().unwrap_or("").trim();
+
+            // Check for binary operations with () operand
+            if matches!(
+                func_name,
+                "+" | "-"
+                    | "*"
+                    | "/"
+                    | "%"
+                    | "=="
+                    | "!="
+                    | "<"
+                    | ">"
+                    | "<="
+                    | ">="
+                    | "&&"
+                    | "||"
+                    | "&"
+                    | "|"
+                    | "^"
+            ) {
+                return Some(format!(
+                    "Cannot perform operation '{}' with missing field (evaluates to ()). \
+                     () is Rhai's unit type for undefined values. \
+                     Guard optional fields with e.has(\"field_name\") or provide defaults with e.get(\"field_name\", default_value)",
+                    func_name
+                ));
+            }
+
+            // Check for method/function calls with () as parameter
+            // Matches: "method (())", "method ((), other)", "method (other, ())", etc.
+            if func_sig.contains(" (())")
+                || func_sig.contains("((), ")
+                || func_sig.contains(", ())")
+            {
+                return Some(
+                    "Cannot call method/function on missing field (evaluates to ()). \
+                     () is Rhai's unit type for undefined values. \
+                     Guard optional fields with e.has(\"field_name\") before chaining methods"
+                        .to_string(),
+                );
+            }
+        }
+
         let func_name = func_sig.split('(').next().unwrap_or(func_sig).trim();
 
         let mut best: Vec<(String, f64)> = RhaiEngine::function_catalog()
