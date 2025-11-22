@@ -809,6 +809,9 @@ impl RhaiEngine {
         scope: Option<&Scope>,
         debug_tracker: Option<&DebugTracker>,
     ) -> String {
+        let call_stack = Self::collect_call_stack(err.as_ref());
+        let err_display = format!("{}", err);
+
         if let Some(tracker) = debug_tracker {
             let enhancer = ErrorEnhancer::new(tracker.config.clone());
             let context = tracker.get_context();
@@ -843,8 +846,32 @@ impl RhaiEngine {
         }
 
         // Raw message from Rhai
-        output.push_str(&format!("  Rhai: {}\n", err));
+        output.push_str(&format!("  Rhai: {}\n", err_display));
+
+        if !call_stack.is_empty() {
+            output.push_str("  Call stack (most recent first):\n");
+            for (func, pos) in call_stack.iter().rev().take(3) {
+                output.push_str(&format!("    • {} @ {}\n", func, pos));
+            }
+        }
         output
+    }
+
+    /// Collect nested function call frames from Rhai errors.
+    fn collect_call_stack(err: &EvalAltResult) -> Vec<(String, rhai::Position)> {
+        match err {
+            EvalAltResult::ErrorInFunctionCall(func, _src, inner, pos) => {
+                let mut frames = vec![(func.clone(), *pos)];
+                frames.extend(Self::collect_call_stack(inner.as_ref()));
+                frames
+            }
+            EvalAltResult::ErrorInModule(module, inner, pos) => {
+                let mut frames = vec![(format!("module {}", module), *pos)];
+                frames.extend(Self::collect_call_stack(inner.as_ref()));
+                frames
+            }
+            _ => Vec::new(),
+        }
     }
 
     /// Build a small two-line snippet with a caret under the offending column.
@@ -2249,6 +2276,34 @@ mod tests {
         assert!(
             out.contains("len"),
             "function suggestion should offer len() for length typo; got: {out}"
+        );
+    }
+
+    #[test]
+    fn nested_function_errors_show_call_stack() {
+        let inner = Box::new(EvalAltResult::ErrorRuntime(
+            "boom".into(),
+            rhai::Position::new(3, 1),
+        ));
+        let mid = Box::new(EvalAltResult::ErrorInFunctionCall(
+            "child".into(),
+            "".into(),
+            inner,
+            rhai::Position::new(2, 1),
+        ));
+        let outer = Box::new(EvalAltResult::ErrorInFunctionCall(
+            "parent".into(),
+            "".into(),
+            mid,
+            rhai::Position::new(1, 1),
+        ));
+
+        let msg =
+            RhaiEngine::format_rhai_diagnostic(outer, "filter", "script", "child()", None, None);
+
+        assert!(
+            msg.contains("Call stack") && msg.contains("parent") && msg.contains("child"),
+            "call stack should include nested function frames; got: {msg}"
         );
     }
 
