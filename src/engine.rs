@@ -992,7 +992,10 @@ impl RhaiEngine {
         let suggestions = Self::get_function_suggestions(func_name);
 
         if suggestions.is_empty() {
-            base_msg
+            format!(
+                "{}. Note: method calls are sugar—x.{}(y) == {}(x, y)",
+                base_msg, func_name, func_name
+            )
         } else {
             format!("{}. Did you mean: {}", base_msg, suggestions.join(", "))
         }
@@ -2231,6 +2234,39 @@ mod tests {
         assert!(
             out.contains("status"),
             "output should surface available fields even when verbosity is zero"
+        );
+    }
+
+    #[test]
+    fn function_suggestion_offers_len_for_length_typo() {
+        let config = DebugConfig::new(0);
+        let enhancer = ErrorEnhancer::new(config);
+        let scope = Scope::new();
+        let err =
+            EvalAltResult::ErrorFunctionNotFound("length(string)".into(), rhai::Position::NONE);
+        let ctx = ExecutionContext::default();
+        let out = enhancer.enhance_error(&err, &scope, "length(s)", "filter", &ctx);
+        assert!(
+            out.contains("len"),
+            "function suggestion should offer len() for length typo; got: {out}"
+        );
+    }
+
+    #[test]
+    fn type_mismatch_hints_bool_in_filter() {
+        let config = DebugConfig::new(0);
+        let enhancer = ErrorEnhancer::new(config);
+        let scope = Scope::new();
+        let err = EvalAltResult::ErrorMismatchDataType(
+            "bool".into(),
+            "string".into(),
+            rhai::Position::NONE,
+        );
+        let ctx = ExecutionContext::default();
+        let out = enhancer.enhance_error(&err, &scope, "e.level", "filter", &ctx);
+        assert!(
+            out.contains("Filters must return true/false"),
+            "type mismatch in filter should remind about boolean return; got: {out}"
         );
     }
 }
