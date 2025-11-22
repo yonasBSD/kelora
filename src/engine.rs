@@ -1197,10 +1197,19 @@ impl RhaiEngine {
     }
 
     pub fn compile_exec(&mut self, exec: &str) -> Result<CompiledExpression> {
-        let ast = self
-            .engine
-            .compile(exec)
-            .with_context(|| format!("Failed to compile exec script: {}", exec))?;
+        let ast = self.engine.compile(exec).map_err(|e| {
+            // Show the actual Rhai error without dumping the entire script
+            let script_preview = if exec.len() > 200 {
+                format!("{}... ({} chars total)", &exec[..200], exec.len())
+            } else {
+                exec.to_string()
+            };
+            anyhow::anyhow!(
+                "Failed to compile exec script:\n  Rhai error: {}\n  Script preview: {}",
+                e,
+                script_preview
+            )
+        })?;
         Ok(CompiledExpression {
             ast,
             expr: exec.to_string(),
@@ -1208,10 +1217,19 @@ impl RhaiEngine {
     }
 
     pub fn compile_begin(&mut self, begin: &str) -> Result<CompiledExpression> {
-        let ast = self
-            .engine
-            .compile(begin)
-            .with_context(|| format!("Failed to compile begin expression: {}", begin))?;
+        let ast = self.engine.compile(begin).map_err(|e| {
+            // Show the actual Rhai error without dumping the entire script
+            let script_preview = if begin.len() > 200 {
+                format!("{}... ({} chars total)", &begin[..200], begin.len())
+            } else {
+                begin.to_string()
+            };
+            anyhow::anyhow!(
+                "Failed to compile begin script:\n  Rhai error: {}\n  Script preview: {}",
+                e,
+                script_preview
+            )
+        })?;
         Ok(CompiledExpression {
             ast,
             expr: begin.to_string(),
@@ -1219,10 +1237,19 @@ impl RhaiEngine {
     }
 
     pub fn compile_end(&mut self, end: &str) -> Result<CompiledExpression> {
-        let ast = self
-            .engine
-            .compile(end)
-            .with_context(|| format!("Failed to compile end expression: {}", end))?;
+        let ast = self.engine.compile(end).map_err(|e| {
+            // Show the actual Rhai error without dumping the entire script
+            let script_preview = if end.len() > 200 {
+                format!("{}... ({} chars total)", &end[..200], end.len())
+            } else {
+                end.to_string()
+            };
+            anyhow::anyhow!(
+                "Failed to compile end script:\n  Rhai error: {}\n  Script preview: {}",
+                e,
+                script_preview
+            )
+        })?;
         Ok(CompiledExpression {
             ast,
             expr: end.to_string(),

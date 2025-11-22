@@ -1,11 +1,31 @@
 // patterns.rhai — curated regex helpers for Kelora pipelines.
-// Usage:
-//   kelora --include examples/patterns.rhai ...
-//   e.message.has_pattern("url")
-//   let urls = e.message.extract_patterns("url");
-//   emit_patterns(e.line, "email", "email");
+//
+// Provides functions for detecting and extracting common patterns from log text:
+//   - has_pattern(text, name) → bool
+//   - extract_pattern(text, name) → string (first match)
+//   - extract_patterns(text, name) → array (all matches)
+//   - emit_patterns(text, name, key) → emits events for each match
+//   - pattern_names() → array of available pattern names
+//
+// Usage examples:
+//   # Detect URLs in messages
+//   kelora --include examples/patterns.rhai -f json logs.jsonl \
+//     --exec 'if has_pattern(e.message, "url") { e } else { () }'
+//
+//   # Extract all email addresses
+//   kelora --include examples/patterns.rhai -f json logs.jsonl \
+//     --exec 'let emails = extract_patterns(e.message, "email"); print(emails)'
+//
+//   # Emit separate events for each IPv4 address found
+//   kelora --include examples/patterns.rhai -f json logs.jsonl \
+//     --exec 'emit_patterns(e.message, "ipv4", "ip_address")'
+//
+//   # List all available patterns
+//   kelora --include examples/patterns.rhai -f json logs.jsonl \
+//     --exec 'print(pattern_names())'
 
-const PATTERN_DEFS = #{
+fn _get_pattern_defs() {
+    #{
     duration: [
         #{ re: #"\b\d+(?:\.\d+)?(?:ns|us|ms|s|m|h)\b"#, desc: "Short units like 12ms or 500us" },
         #{ re: #"(?i)\b\d+(?:\.\d+)?\s*(?:microsecond|millisecond|second|minute|hour|day|week|month|year)s?\b"#, desc: "Verbose durations such as 3 minutes" },
@@ -84,19 +104,19 @@ const PATTERN_DEFS = #{
         #{ re: #"\bya29\.[0-9A-Za-z_-]+\b"#, desc: "Google OAuth token" },
     ],
     path_unix: [
-        #{ re: r"(?:(?:/|~)[^\s\"'<>]+)", desc: "/var/log/app.log" },
+        #{ re: #"(?:(?:/|~)[^\s\"'<>]+)"#, desc: "/var/log/app.log" },
     ],
     path_windows: [
-        #{ re: r"(?i)\b(?:[A-Z]:\\|\\\\)[^\s\"'<>]+\b", desc: "C:\\Windows\\System32" },
+        #{ re: #"(?i)\b(?:[A-Z]:\\|\\\\)[^\s\"'<>]+\b"#, desc: "C:\\Windows\\System32" },
     ],
     win_registry: [
         #{ re: #"\bHKEY_[A-Z_]+(?:\\[A-Za-z0-9_]+)+\b"#, desc: "Windows registry path" },
     ],
     sql_statement: [
-        #{ re: r#""(?:(?:SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE|GRANT|REVOKE|MERGE)\s+(?:(?:""|[^"])+))""#, desc: "Quoted SQL statement" },
+        #{ re: ##""(?:(?:SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE|GRANT|REVOKE|MERGE)\s+(?:(?:""|[^"])+))"##, desc: "Quoted SQL statement" },
     ],
     url: [
-        #{ re: r"(?i)\b(?:[a-z][a-z0-9+.-]*://[^\s\"'<>]+)", desc: "http://example.com/path" },
+        #{ re: #"(?i)\b(?:[a-z][a-z0-9+.-]*://[^\s\"'<>]+)"#, desc: "http://example.com/path" },
     ],
     uuid: [
         #{ re: #"(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b"#, desc: "UUID/GUID" },
@@ -104,9 +124,11 @@ const PATTERN_DEFS = #{
     version: [
         #{ re: #"\b[vV]?\d+\.\d+(?:\.\d+)?(?:-[A-Za-z0-9]+)?\b"#, desc: "Semantic version" },
     ],
-};
+    }
+}
 
 fn _pattern_exists(name) {
+    let PATTERN_DEFS = _get_pattern_defs();
     for key in PATTERN_DEFS.keys() {
         if key == name {
             return true;
@@ -119,6 +141,7 @@ fn _pattern_defs(name) {
     if !_pattern_exists(name) {
         return [];
     }
+    let PATTERN_DEFS = _get_pattern_defs();
     PATTERN_DEFS[name]
 }
 
@@ -132,6 +155,7 @@ fn _def_group(def) {
 }
 
 fn pattern_names() {
+    let PATTERN_DEFS = _get_pattern_defs();
     let names = PATTERN_DEFS.keys();
     names.sort();
     names

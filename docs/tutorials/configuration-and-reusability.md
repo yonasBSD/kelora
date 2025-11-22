@@ -272,8 +272,11 @@ We've created `examples/helpers.rhai` with useful functions:
 **How it works:**
 
 1. `-I examples/helpers.rhai` loads the function definitions
-2. Functions become available in all `--exec` and `--filter` stages
+2. Functions become available in `--exec`, `--exec-file`, `--begin`, and `--end` stages
 3. Call them like any built-in function
+
+!!! note "Filter Limitations"
+    `--include` does not work with `--filter` because filters must be pure expressions. Use `--exec` instead for filtering with custom functions.
 
 ### Multiple Include Files
 
@@ -341,7 +344,7 @@ We've created `examples/enrich_events.rhai`:
 | Need | Use | Why |
 |------|-----|-----|
 | **Common flag combinations** | Alias | Quick, sharable, version-controlled |
-| **Reusable functions** | `--include` | Define once, use in any `--exec`/`--filter` |
+| **Reusable functions** | `--include` | Define once, use in `--exec`/`--begin`/`--end` |
 | **Multi-step transformations** | `--exec-file` | Keep complex logic organized in files |
 | **Personal shortcuts** | User config alias | Quick access to your patterns |
 | **Team conventions** | Project config alias | Everyone uses same workflows |
