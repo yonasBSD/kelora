@@ -2,6 +2,9 @@
 
 Pick the scenario that matches your job-to-be-done and follow the playbook. Each guide links to deeper concepts and tutorials when you want more background.
 
+## Debugging & Troubleshooting
+- [Debug Issues Systematically](debug-issues.md) - Diagnose problems, use debugging tools, and fix common issues
+
 ## Operational Response
 - [Triage Production Errors](find-errors-in-logs.md)
 - [Build a Service Health Snapshot](monitor-application-health.md)

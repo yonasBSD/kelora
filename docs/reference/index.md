@@ -3,6 +3,7 @@
 Authoritative details for Kelora's command line, scripting API, formats, and integration points.
 
 - [Glossary](../glossary.md) - Definitions of key terms and concepts
+- [Common Errors](common-errors.md) - Quick reference for common issues and error messages
 - [CLI Reference](cli-reference.md) - Complete command-line flags and options
 - [Input Formats](formats.md) - Supported log formats and parsing
 - [Time Reference](time-reference.md) - Timestamp formats and time filtering

@@ -54,7 +54,7 @@ kelora --help-functions    # All built-in Rhai functions
 kelora --help-time         # Timestamp format reference
 ```
 
-**Having trouble?** See the **[Troubleshooting Guide](troubleshooting.md)** for solutions to common issues.
+**Having trouble?** See **[Debug Issues Systematically](how-to/debug-issues.md)** or the **[Common Errors Reference](reference/common-errors.md)**.
 
 ## Next Steps
 

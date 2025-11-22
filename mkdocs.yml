@@ -70,7 +70,6 @@ extra:
 nav:
   - Home: index.md
   - Quickstart: quickstart.md
-  - Troubleshooting: troubleshooting.md
   - Tutorials:
       - Overview: tutorials/index.md
       - Basics: tutorials/basics.md
@@ -84,6 +83,7 @@ nav:
       - Configuration and Reusability: tutorials/configuration-and-reusability.md
   - How-To Guides:
       - Overview: how-to/index.md
+      - Debug Issues Systematically: how-to/debug-issues.md
       - Triage Production Errors: how-to/find-errors-in-logs.md
       - Analyze Web Traffic: how-to/analyze-web-traffic.md
       - Build a Service Health Snapshot: how-to/monitor-application-health.md
@@ -112,6 +112,7 @@ nav:
   - Reference:
       - Overview: reference/index.md
       - Glossary: glossary.md
+      - Common Errors: reference/common-errors.md
       - CLI Reference: reference/cli-reference.md
       - Format Reference: reference/formats.md
       - Time Reference: reference/time-reference.md

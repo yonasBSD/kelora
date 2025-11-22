@@ -117,9 +117,7 @@ See **[Power-User Techniques](how-to/power-user-techniques.md)** for real-world 
 
 **[→ Tutorial: Basics (30 minutes)](tutorials/basics.md)** - Learn input formats, filtering, and output
 
-**[→ Troubleshooting](troubleshooting.md)** - Fix common issues and debug effectively
-
-**[→ How-To Guides](how-to/index.md)** - Solve specific problems
+**[→ How-To Guides](how-to/index.md)** - Solve specific problems (including [debugging](how-to/debug-issues.md))
 
 For deeper understanding, see [Concepts](concepts/index.md). For complete reference, see [Glossary](glossary.md), [Functions](reference/functions.md), [Formats](reference/formats.md), and [CLI options](reference/cli-reference.md).
 
