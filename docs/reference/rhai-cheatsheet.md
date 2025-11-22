@@ -442,6 +442,9 @@ e.has_path("a.b.c")                   // Check nested exists
 to_int_or(val, 0)                     // Safe int conversion
 to_float_or(val, 0.0)                 // Safe float conversion
 to_bool_or(val, false)                // Safe bool conversion
+try { risky_call(); } catch (err) {   // Catch runtime errors (type mismatch, missing fields); slower than guards
+  eprint(err);                        // Prefer to_int_or/has_path for common cases
+}
 
 // Arrays
 e.items.len()                         // Length
