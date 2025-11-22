@@ -67,7 +67,7 @@ max_depth = 128
 ## Implementation Notes
 
 ### Rhai Engine Limits
-All proposed limits are directly supported by Rhai 1.22's `Engine` API:
+All proposed limits are directly supported by Rhai `Engine` API:
 - `set_max_operations(u64)` - Operation budget
 - `on_progress(callback)` - Wall-clock timeout via callback
 - `set_max_string_size(usize)` - String size limit

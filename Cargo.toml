@@ -1,6 +1,6 @@
 [package]
 name = "kelora"
-version = "0.10.1"
+version = "0.10.2"
 edition = "2021"
 authors = ["Dirk Loss <mail@dirk-loss.de>"]
 description = "A command-line log analysis tool with embedded Rhai scripting"
@@ -14,7 +14,7 @@ categories = ["command-line-utilities", "parsing"]
 clap = { version = "4.0", features = ["derive"] }  # Command-line argument parsing and help generation
 
 # Core functionality
-rhai = { version = "1.22", features = ["sync", "debugging"] }  # Embedded scripting engine for log filtering and transformation
+rhai = { version = "1.23", features = ["sync", "debugging"] }  # Embedded scripting engine for log filtering and transformation
 anyhow = "1.0"  # Error handling and propagation
 
 # Serialization and parsing
