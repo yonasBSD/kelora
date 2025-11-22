@@ -24,10 +24,21 @@ if e.has("level") {
 }
 
 // Add duration classification if present
-if e.has("duration_ms") {
-    e.speed = if e.duration_ms < 100 {
+// Handle response_time (seconds), duration_ms (milliseconds), or latency_ms (milliseconds)
+let duration_in_ms = if e.has("response_time") {
+    e.response_time * 1000.0
+} else if e.has("duration_ms") {
+    e.duration_ms
+} else if e.has("latency_ms") {
+    e.latency_ms
+} else {
+    -1.0
+};
+
+if duration_in_ms >= 0.0 {
+    e.speed = if duration_in_ms < 100.0 {
         "fast"
-    } else if e.duration_ms < 1000 {
+    } else if duration_in_ms < 1000.0 {
         "normal"
     } else {
         "slow"
@@ -38,3 +49,6 @@ if e.has("duration_ms") {
 if e.has("service") && e.has("level") {
     track_count(e.service + ":" + e.level);
 }
+
+// Return enriched event
+e
