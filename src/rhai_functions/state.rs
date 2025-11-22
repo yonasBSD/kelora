@@ -146,7 +146,7 @@ pub fn register(engine: &mut Engine) {
             panic!("'state' is not available in --parallel mode (requires sequential processing)");
         })
         .register_indexer_set(
-            |_state: &mut StateNotAvailable, _key: &str, _value: Dynamic| {
+            |_state: &mut StateNotAvailable, _key: &str, _value: Dynamic| -> () {
                 panic!(
                     "'state' is not available in --parallel mode (requires sequential processing)"
                 );
