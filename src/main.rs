@@ -1049,7 +1049,7 @@ fn maybe_print_missing_format_tip(
     let format_source = matches.value_source("format");
     if matches!(format_source, Some(ValueSource::DefaultValue) | None) {
         let tip = config.format_hint_message(
-            "Missing -f. Use -f auto (or defaults = -f auto in ~/.config/kelora/kelora.ini). Set KELORA_NO_TIPS=1 to hide.",
+            "No format given; Kelora won’t auto-guess. Use -f auto (or defaults = -f auto in ~/.config/kelora/kelora.ini) or pick a format. Set KELORA_NO_TIPS=1 to hide.",
         );
         stderr.writeln(&tip).unwrap_or(());
     }
