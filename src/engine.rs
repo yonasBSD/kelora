@@ -292,6 +292,12 @@ impl ErrorEnhancer {
                             .to_string(),
                     );
                 }
+                if actual.contains("()") || expected.contains("()") {
+                    hints.push(
+                        "Missing fields return () by default; guard with e.has(\"field\") or e.get(\"field\", default) before chaining"
+                            .to_string(),
+                    );
+                }
                 hints.push(
                     "Use type_of() to check types or to_string()/to_number()/parse_json() for conversion"
                         .to_string(),
@@ -994,10 +1000,10 @@ impl RhaiEngine {
         .trim();
 
         // Check if this looks like a type mismatch rather than a missing function
+        let called_types = Self::extract_called_types(&func_signature);
         if Self::is_likely_type_mismatch(&func_signature, func_name) {
             let expected_types = Self::get_expected_function_signature(func_name);
             if !expected_types.is_empty() {
-                let called_types = Self::extract_called_types(&func_signature);
                 return format!(
                     "Wrong argument types for '{}' in {} at {}: got {}, expected {}. Note: x.{}() = {}(x)",
                     func_name,
@@ -1017,14 +1023,27 @@ impl RhaiEngine {
             func_signature, script_name, pos
         );
         let suggestions = Self::get_function_suggestions(func_name);
+        let mut notes = Vec::new();
+
+        if Self::signature_has_unit(&called_types) {
+            notes.push(
+                "One of the arguments is '()' (missing field?). Use e.has(\"field\") or e.get(\"field\", default) before chaining."
+                    .to_string(),
+            );
+        }
 
         if suggestions.is_empty() {
-            format!(
-                "{}. Note: method calls are sugar—x.{}(y) == {}(x, y)",
-                base_msg, func_name, func_name
-            )
+            notes.push(format!(
+                "Note: method calls are sugar—x.{}(y) == {}(x, y)",
+                func_name, func_name
+            ));
+            format!("{}. {}", base_msg, notes.join(" "))
         } else {
-            format!("{}. Did you mean: {}", base_msg, suggestions.join(", "))
+            let mut msg = format!("{}. Did you mean: {}", base_msg, suggestions.join(", "));
+            if !notes.is_empty() {
+                msg.push_str(&format!(" {}", notes.join(" ")));
+            }
+            msg
         }
     }
 
@@ -1034,11 +1053,15 @@ impl RhaiEngine {
 
     fn extract_called_types(func_signature: &str) -> String {
         if let Some(start) = func_signature.find('(') {
-            if let Some(end) = func_signature.find(')') {
+            if let Some(end) = func_signature.rfind(')') {
                 return func_signature[start + 1..end].to_string();
             }
         }
         "unknown types".to_string()
+    }
+
+    fn signature_has_unit(called_types: &str) -> bool {
+        called_types.contains("()")
     }
 
     fn get_expected_function_signature(func_name: &str) -> String {
@@ -2304,6 +2327,19 @@ mod tests {
         assert!(
             msg.contains("Call stack") && msg.contains("parent") && msg.contains("child"),
             "call stack should include nested function frames; got: {msg}"
+        );
+    }
+
+    #[test]
+    fn unit_arg_suggestion_points_to_missing_field() {
+        let msg = RhaiEngine::format_function_not_found_error(
+            "foo((), string)".to_string(),
+            "script",
+            rhai::Position::NONE,
+        );
+        assert!(
+            msg.contains("missing field") || msg.contains("e.has"),
+            "unit arg hint should mention missing field guards; got: {msg}"
         );
     }
 
