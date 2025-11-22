@@ -144,12 +144,13 @@ fn test_init_map_immutability() {
         input,
     );
 
-    // Note: Full immutability enforcement is not yet implemented
-    // For now, we just check that the command runs without crashing
-    // TODO: Implement proper immutability enforcement
-    assert_eq!(
+    assert_ne!(
         exit_code, 0,
-        "Command should succeed (immutability not fully enforced yet). stderr: {}",
+        "Conf mutations after --begin should be rejected"
+    );
+    assert!(
+        stderr.contains("conf map is read-only"),
+        "Should surface immutability error. stderr: {}",
         stderr
     );
 }

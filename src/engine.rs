@@ -59,6 +59,75 @@ pub struct ExecutionContext {
     pub error_location: Option<String>,
 }
 
+#[derive(Debug)]
+pub struct ConfMutationError;
+
+impl std::fmt::Display for ConfMutationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "conf map is read-only outside --begin; modifications are not allowed"
+        )
+    }
+}
+
+impl std::error::Error for ConfMutationError {}
+
+fn dynamics_equal(lhs: &Dynamic, rhs: &Dynamic) -> bool {
+    if lhs.type_name() != rhs.type_name() {
+        return false;
+    }
+
+    // Primitive comparisons
+    if let (Some(l), Some(r)) = (lhs.as_int().ok(), rhs.as_int().ok()) {
+        return l == r;
+    }
+    if let (Some(l), Some(r)) = (lhs.as_float().ok(), rhs.as_float().ok()) {
+        return l == r;
+    }
+    if let (Some(l), Some(r)) = (lhs.as_bool().ok(), rhs.as_bool().ok()) {
+        return l == r;
+    }
+    if let (Ok(l), Ok(r)) = (lhs.clone().into_string(), rhs.clone().into_string()) {
+        return l == r;
+    }
+
+    // Array comparison
+    if let (Some(l_arr), Some(r_arr)) = (
+        lhs.clone().try_cast::<rhai::Array>(),
+        rhs.clone().try_cast::<rhai::Array>(),
+    ) {
+        if l_arr.len() != r_arr.len() {
+            return false;
+        }
+        return l_arr
+            .iter()
+            .zip(r_arr.iter())
+            .all(|(l, r)| dynamics_equal(l, r));
+    }
+
+    // Map comparison
+    if let (Some(l_map), Some(r_map)) = (
+        lhs.clone().try_cast::<rhai::Map>(),
+        rhs.clone().try_cast::<rhai::Map>(),
+    ) {
+        return maps_equal(&l_map, &r_map);
+    }
+
+    false
+}
+
+fn maps_equal(lhs: &rhai::Map, rhs: &rhai::Map) -> bool {
+    if lhs.len() != rhs.len() {
+        return false;
+    }
+
+    lhs.iter().all(|(k, v)| match rhs.get(k) {
+        Some(rv) => dynamics_equal(v, rv),
+        None => false,
+    })
+}
+
 use std::sync::{Arc, Mutex};
 pub struct DebugTracker {
     pub config: DebugConfig,
@@ -1568,6 +1637,9 @@ impl RhaiEngine {
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 
+        self.assert_conf_not_mutated(&scope)
+            .map_err(anyhow::Error::from)?;
+
         // Add execution result tracing
         if let Some(ref tracer) = self.execution_tracer {
             let action = if result { "passed" } else { "filtered out" };
@@ -1651,6 +1723,9 @@ impl RhaiEngine {
                 );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
+
+        self.assert_conf_not_mutated(&scope)
+            .map_err(anyhow::Error::from)?;
 
         // Add execution result tracing
         if let Some(ref tracer) = self.execution_tracer {
@@ -1770,6 +1845,9 @@ impl RhaiEngine {
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 
+        self.assert_conf_not_mutated(&scope)
+            .map_err(anyhow::Error::from)?;
+
         Ok(())
     }
 
@@ -1820,6 +1898,9 @@ impl RhaiEngine {
                 );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
+
+        self.assert_conf_not_mutated(&scope)
+            .map_err(anyhow::Error::from)?;
 
         let ops = crate::rhai_functions::file_ops::take_pending_ops();
         crate::rhai_functions::file_ops::execute_ops(&ops)?;
@@ -1904,6 +1985,9 @@ impl RhaiEngine {
                 );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
+
+        self.assert_conf_not_mutated(&scope)
+            .map_err(anyhow::Error::from)?;
 
         // Add execution result tracing
         if let Some(ref tracer) = self.execution_tracer {
@@ -2001,6 +2085,9 @@ impl RhaiEngine {
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 
+        self.assert_conf_not_mutated(&scope)
+            .map_err(anyhow::Error::from)?;
+
         // Add execution result tracing
         if let Some(ref tracer) = self.execution_tracer {
             tracer.trace_event_result(true, "executed successfully");
@@ -2021,6 +2108,17 @@ impl RhaiEngine {
         *metrics = Self::get_thread_tracking_state();
         *internal = Self::get_thread_internal_state();
         Ok(())
+    }
+
+    fn assert_conf_not_mutated(&self, scope: &Scope) -> Result<(), ConfMutationError> {
+        if let Some(original) = &self.conf_map {
+            match scope.get_value::<Map>("conf") {
+                Some(conf) if maps_equal(&conf, original) => Ok(()),
+                _ => Err(ConfMutationError),
+            }
+        } else {
+            Ok(())
+        }
     }
 
     fn create_scope_for_event(&self, event: &Event) -> Scope<'_> {

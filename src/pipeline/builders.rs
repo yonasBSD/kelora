@@ -85,9 +85,6 @@ impl PipelineBuilder {
     pub fn new() -> Self {
         Self {
             config: PipelineConfig {
-                error_report: crate::config::ErrorReportConfig {
-                    style: crate::config::ErrorReportStyle::Summary,
-                },
                 brief: false,
                 wrap: true, // Default to enabled
                 pretty: false,
@@ -1031,7 +1028,6 @@ pub fn create_pipeline_builder_from_config(
     config: &crate::config::KeloraConfig,
 ) -> PipelineBuilder {
     let pipeline_config = PipelineConfig {
-        error_report: config.processing.error_report.clone(),
         brief: config.output.brief,
         wrap: config.output.wrap,
         pretty: config.output.pretty,

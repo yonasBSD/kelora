@@ -3,6 +3,9 @@ use chrono::{Duration, Timelike, Utc};
 use std::io::Write;
 use std::process::{Command, Stdio};
 
+mod common;
+use common::{extract_stats_lines, stats_line};
+
 /// Helper function to run kelora with given arguments and input via stdin
 fn run_kelora_with_input(args: &[&str], input: &str) -> (String, String, i32) {
     let binary_path = if cfg!(debug_assertions) {
@@ -718,193 +721,155 @@ fn test_timestamp_filtering_parallel_mode() {
     );
 }
 
-// TODO: Update test for new stats format
-// #[test]
-// fn test_timestamp_filtering_with_stats() {
-//     let old_ts = get_test_timestamp_iso(-60);
-//     let new_ts = get_test_timestamp_iso(-30);
-//
-//     let input = format!(
-//         r#"{{"ts": "{}", "level": "info", "msg": "old event"}}
-// {{"ts": "{}", "level": "info", "msg": "new event"}}"#,
-//         old_ts, new_ts
-//     );
-//
-//     let since_ts = get_test_timestamp_iso(-45);
-//     let (_stdout, stderr, exit_code) =
-//         run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
-//
-//     assert_eq!(
-//         exit_code, 0,
-//         "kelora should exit successfully with stats. stderr: {}",
-//         stderr
-//     );
-//     // Note: with --stats, output goes to stderr, not stdout
-//     assert!(
-//         stderr.contains("Events created: 2 total"),
-//         "Should show 2 events created"
-//     );
-//     assert!(
-//         stderr.contains("1 output, 1 filtered"),
-//         "Should show 1 output and 1 filtered"
-//     );
-// }
+#[test]
+fn test_timestamp_filtering_with_stats() {
+    let old_ts = get_test_timestamp_iso(-60);
+    let new_ts = get_test_timestamp_iso(-30);
 
-// TODO: Update test for new stats format
-// #[test]
-// fn test_timestamp_filtering_stats_counts() {
-//     let very_old_ts = get_test_timestamp_iso(-180); // 3 hours ago
-//     let old_ts = get_test_timestamp_iso(-90); // 1.5 hours ago
-//     let recent_ts = get_test_timestamp_iso(-30); // 30 minutes ago
-//     let new_ts = get_test_timestamp_iso(-10); // 10 minutes ago
-//
-//     let input = format!(
-//         r#"{{"ts": "{}", "level": "info", "msg": "very old"}}
-// {{"ts": "{}", "level": "info", "msg": "old"}}
-// {{"ts": "{}", "level": "info", "msg": "recent"}}
-// {{"ts": "{}", "level": "info", "msg": "new"}}"#,
-//         very_old_ts, old_ts, recent_ts, new_ts
-//     );
-//
-//     // Filter to only include events from the last hour
-//     let since_ts = get_test_timestamp_iso(-60); // 1 hour ago
-//     let (_stdout, stderr, exit_code) =
-//         run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
-//
-//     assert_eq!(
-//         exit_code, 0,
-//         "kelora should exit successfully. stderr: {}",
-//         stderr
-//     );
-//
-//     // Should have 4 events created total
-//     assert!(
-//         stderr.contains("Events created: 4 total"),
-//         "Should show 4 events created total"
-//     );
-//
-//     // Should have 2 events output (recent and new), 2 filtered (very old and old)
-//     assert!(
-//         stderr.contains("2 output, 2 filtered"),
-//         "Should show 2 output and 2 filtered"
-//     );
-//
-//     // Lines should all be processed (none filtered at line level)
-//     assert!(
-//         stderr.contains("Lines processed: 4 total, 0 filtered"),
-//         "Should show 4 lines processed, 0 filtered"
-//     );
-// }
+    let input = format!(
+        r#"{{"ts": "{}", "level": "info", "msg": "old event"}}
+{{"ts": "{}", "level": "info", "msg": "new event"}}"#,
+        old_ts, new_ts
+    );
 
-// TODO: Update test for new stats format
-// #[test]
-// fn test_timestamp_filtering_stats_with_mixed_timestamps() {
-//     let old_ts = get_test_timestamp_iso(-90); // 1.5 hours ago
-//     let recent_ts = get_test_timestamp_iso(-30); // 30 minutes ago
-//
-//     let input = format!(
-//         r#"{{"ts": "{}", "level": "info", "msg": "old with timestamp"}}
-// {{"level": "info", "msg": "no timestamp event"}}
-// {{"ts": "{}", "level": "info", "msg": "recent with timestamp"}}
-// {{"random_field": "value", "msg": "another no timestamp"}}"#,
-//         old_ts, recent_ts
-//     );
-//
-//     // Filter to only include events from the last hour
-//     let since_ts = get_test_timestamp_iso(-60); // 1 hour ago
-//     let (_stdout, stderr, exit_code) =
-//         run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
-//
-//     assert_eq!(
-//         exit_code, 0,
-//         "kelora should exit successfully. stderr: {}",
-//         stderr
-//     );
-//
-//     // Should have 4 events created total
-//     assert!(
-//         stderr.contains("Events created: 4 total"),
-//         "Should show 4 events created total"
-//     );
-//
-//     // Should have 3 events output (recent + 2 without timestamps), 1 filtered (old)
-//     assert!(
-//         stderr.contains("3 output, 1 filtered"),
-//         "Should show 3 output and 1 filtered"
-//     );
-// }
+    let since_ts = get_test_timestamp_iso(-45);
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
 
-// TODO: Update test for new stats format
-// #[test]
-// fn test_timestamp_filtering_stats_all_filtered() {
-//     let old_ts1 = get_test_timestamp_iso(-180); // 3 hours ago
-//     let old_ts2 = get_test_timestamp_iso(-120); // 2 hours ago
-//
-//     let input = format!(
-//         r#"{{"ts": "{}", "level": "info", "msg": "old event 1"}}
-// {{"ts": "{}", "level": "info", "msg": "old event 2"}}"#,
-//         old_ts1, old_ts2
-//     );
-//
-//     // Filter to only include events from the last 30 minutes
-//     let since_ts = get_test_timestamp_iso(-30); // 30 minutes ago
-//     let (_stdout, stderr, exit_code) =
-//         run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
-//
-//     assert_eq!(
-//         exit_code, 0,
-//         "kelora should exit successfully. stderr: {}",
-//         stderr
-//     );
-//
-//     // Should have 2 events created total
-//     assert!(
-//         stderr.contains("Events created: 2 total"),
-//         "Should show 2 events created total"
-//     );
-//
-//     // Should have 0 events output, 2 filtered
-//     assert!(
-//         stderr.contains("0 output, 2 filtered"),
-//         "Should show 0 output and 2 filtered"
-//     );
-// }
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully with stats. stderr: {}",
+        stderr
+    );
+    let stats = extract_stats_lines(&stderr);
+    let events = stats_line(&stats, "Events created:");
+    assert_eq!(
+        events,
+        "Events created: 2 total, 1 output, 1 filtered (50.0%)"
+    );
+}
 
-// TODO: Update test for new stats format
-// #[test]
-// fn test_timestamp_filtering_stats_none_filtered() {
-//     let recent_ts1 = get_test_timestamp_iso(-20); // 20 minutes ago
-//     let recent_ts2 = get_test_timestamp_iso(-10); // 10 minutes ago
-//
-//     let input = format!(
-//         r#"{{"ts": "{}", "level": "info", "msg": "recent event 1"}}
-// {{"ts": "{}", "level": "info", "msg": "recent event 2"}}"#,
-//         recent_ts1, recent_ts2
-//     );
-//
-//     // Filter to include events from the last hour (should include all)
-//     let since_ts = get_test_timestamp_iso(-60); // 1 hour ago
-//     let (_stdout, stderr, exit_code) =
-//         run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
-//
-//     assert_eq!(
-//         exit_code, 0,
-//         "kelora should exit successfully. stderr: {}",
-//         stderr
-//     );
-//
-//     // Should have 2 events created total
-//     assert!(
-//         stderr.contains("Events created: 2 total"),
-//         "Should show 2 events created total"
-//     );
-//
-//     // Should have 2 events output, 0 filtered
-//     assert!(
-//         stderr.contains("2 output, 0 filtered"),
-//         "Should show 2 output and 0 filtered"
-//     );
-// }
+#[test]
+fn test_timestamp_filtering_stats_counts() {
+    let very_old_ts = get_test_timestamp_iso(-180); // 3 hours ago
+    let old_ts = get_test_timestamp_iso(-90); // 1.5 hours ago
+    let recent_ts = get_test_timestamp_iso(-30); // 30 minutes ago
+    let new_ts = get_test_timestamp_iso(-10); // 10 minutes ago
+
+    let input = format!(
+        r#"{{"ts": "{}", "level": "info", "msg": "very old"}}
+{{"ts": "{}", "level": "info", "msg": "old"}}
+{{"ts": "{}", "level": "info", "msg": "recent"}}
+{{"ts": "{}", "level": "info", "msg": "new"}}"#,
+        very_old_ts, old_ts, recent_ts, new_ts
+    );
+
+    let since_ts = get_test_timestamp_iso(-60); // 1 hour ago
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
+
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully. stderr: {}",
+        stderr
+    );
+
+    let stats = extract_stats_lines(&stderr);
+    let events = stats_line(&stats, "Events created:");
+    assert_eq!(
+        events,
+        "Events created: 4 total, 2 output, 2 filtered (50.0%)"
+    );
+}
+
+#[test]
+fn test_timestamp_filtering_stats_with_mixed_timestamps() {
+    let old_ts = get_test_timestamp_iso(-90); // 1.5 hours ago
+    let recent_ts = get_test_timestamp_iso(-30); // 30 minutes ago
+
+    let input = format!(
+        r#"{{"ts": "{}", "level": "info", "msg": "old with timestamp"}}
+{{"level": "info", "msg": "no timestamp event"}}
+{{"ts": "{}", "level": "info", "msg": "recent with timestamp"}}
+{{"random_field": "value", "msg": "another no timestamp"}}"#,
+        old_ts, recent_ts
+    );
+
+    let since_ts = get_test_timestamp_iso(-60); // 1 hour ago
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
+
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully. stderr: {}",
+        stderr
+    );
+
+    let stats = extract_stats_lines(&stderr);
+    let events = stats_line(&stats, "Events created:");
+    assert_eq!(
+        events,
+        "Events created: 4 total, 1 output, 3 filtered (75.0%)"
+    );
+}
+
+#[test]
+fn test_timestamp_filtering_stats_all_filtered() {
+    let old_ts1 = get_test_timestamp_iso(-180); // 3 hours ago
+    let old_ts2 = get_test_timestamp_iso(-120); // 2 hours ago
+
+    let input = format!(
+        r#"{{"ts": "{}", "level": "info", "msg": "old event 1"}}
+{{"ts": "{}", "level": "info", "msg": "old event 2"}}"#,
+        old_ts1, old_ts2
+    );
+
+    let since_ts = get_test_timestamp_iso(-30); // 30 minutes ago
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
+
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully. stderr: {}",
+        stderr
+    );
+
+    let stats = extract_stats_lines(&stderr);
+    let events = stats_line(&stats, "Events created:");
+    assert_eq!(
+        events,
+        "Events created: 2 total, 0 output, 2 filtered (100.0%)"
+    );
+}
+
+#[test]
+fn test_timestamp_filtering_stats_none_filtered() {
+    let recent_ts1 = get_test_timestamp_iso(-20); // 20 minutes ago
+    let recent_ts2 = get_test_timestamp_iso(-10); // 10 minutes ago
+
+    let input = format!(
+        r#"{{"ts": "{}", "level": "info", "msg": "recent event 1"}}
+{{"ts": "{}", "level": "info", "msg": "recent event 2"}}"#,
+        recent_ts1, recent_ts2
+    );
+
+    let since_ts = get_test_timestamp_iso(-60); // 1 hour ago
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
+
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully. stderr: {}",
+        stderr
+    );
+
+    let stats = extract_stats_lines(&stderr);
+    let events = stats_line(&stats, "Events created:");
+    assert_eq!(
+        events,
+        "Events created: 2 total, 2 output, 0 filtered (0.0%)"
+    );
+}
 
 #[test]
 fn test_anchored_timestamp_since_plus() {

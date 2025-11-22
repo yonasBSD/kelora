@@ -346,9 +346,41 @@ fn test_stdin_with_gzip() {
 
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
     encoder.write_all(log_content.as_bytes()).unwrap();
-    let _compressed_data = encoder.finish().unwrap();
+    let compressed_data = encoder.finish().unwrap();
 
-    // Note: This test might be difficult to implement with current test infrastructure
-    // as it requires passing binary data to stdin. Skipping for now or marking as TODO.
-    // This is a known limitation of the test suite.
+    let binary_path = if cfg!(debug_assertions) {
+        "./target/debug/kelora"
+    } else {
+        "./target/release/kelora"
+    };
+
+    let mut cmd = std::process::Command::new(binary_path)
+        .args(["-f", "json"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("Failed to start kelora with gzip stdin");
+
+    if let Some(stdin) = cmd.stdin.as_mut() {
+        stdin.write_all(&compressed_data).unwrap();
+    }
+
+    let output = cmd
+        .wait_with_output()
+        .expect("Failed to read kelora output");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert_eq!(
+        output.status.code().unwrap_or(-1),
+        0,
+        "Should successfully read gzipped data from stdin. stderr: {}",
+        stderr
+    );
+    assert!(
+        stdout.contains("from stdin gzip"),
+        "Should decode gzip data from stdin. stdout: {}",
+        stdout
+    );
 }

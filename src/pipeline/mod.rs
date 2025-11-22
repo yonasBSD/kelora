@@ -185,8 +185,6 @@ pub struct PipelineContext {
 /// Pipeline configuration
 #[derive(Debug, Clone)]
 pub struct PipelineConfig {
-    // LEGACY: Remove during resiliency migration (see dev/resiliency-todos.md #4)
-    pub error_report: crate::config::ErrorReportConfig,
     pub brief: bool,
     pub wrap: bool,
     pub pretty: bool,
@@ -708,11 +706,7 @@ impl Pipeline {
                     Some(&ctx.config),
                 );
 
-                if ctx.config.strict {
-                    return Err(anyhow!(msg));
-                } else {
-                    return Ok(());
-                }
+                return Err(anyhow!(msg));
             }
         }
 

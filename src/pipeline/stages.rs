@@ -3,7 +3,7 @@ use crate::config::TimestampFilterConfig;
 use crate::engine::RhaiEngine;
 use crate::event::Event;
 use crate::rhai_functions::file_ops;
-use crate::rhai_functions::{absorb, columns};
+use crate::rhai_functions::{absorb, columns, emit};
 use anyhow::Result;
 
 /// Cached event along with whether it satisfied the stage filter.
@@ -128,7 +128,10 @@ impl FilterStage {
                     Some(&ctx.config),
                 );
 
-                if ctx.config.strict {
+                if e.downcast_ref::<crate::engine::ConfMutationError>()
+                    .is_some()
+                    || ctx.config.strict
+                {
                     return ScriptResult::Error(format!("Filter error: {}", e));
                 } else {
                     false // Filter errors evaluate to false in resilient mode
@@ -267,7 +270,10 @@ impl ScriptStage for FilterStage {
 
                 // New resiliency model: filter errors evaluate to false (Skip)
                 // unless in strict mode, where they still propagate as errors
-                if ctx.config.strict {
+                if e.downcast_ref::<crate::engine::ConfMutationError>()
+                    .is_some()
+                    || ctx.config.strict
+                {
                     ScriptResult::Error(format!("Filter error: {}", e))
                 } else {
                     ScriptResult::Skip
@@ -313,6 +319,7 @@ impl ScriptStage for ExecStage {
 
         columns::set_parse_cols_strict(ctx.config.strict);
         absorb::set_absorb_strict(ctx.config.strict);
+        emit::set_emit_strict(ctx.config.strict);
 
         file_ops::clear_pending_ops();
 
@@ -404,7 +411,10 @@ impl ScriptStage for ExecStage {
 
                 // New resiliency model: atomic rollback - return original event unchanged
                 // unless in strict mode, where errors still propagate
-                if ctx.config.strict {
+                if e.downcast_ref::<crate::engine::ConfMutationError>()
+                    .is_some()
+                    || ctx.config.strict
+                {
                     ScriptResult::Error(format!("Exec error: {}", e))
                 } else {
                     // Rollback: return original event unchanged
@@ -882,9 +892,6 @@ mod tests {
 
         let mut ctx = PipelineContext {
             config: PipelineConfig {
-                error_report: crate::config::ErrorReportConfig {
-                    style: crate::config::ErrorReportStyle::Summary,
-                },
                 brief: false,
                 wrap: true,
                 pretty: false,
@@ -988,9 +995,6 @@ mod tests {
 
         let mut ctx = PipelineContext {
             config: PipelineConfig {
-                error_report: crate::config::ErrorReportConfig {
-                    style: crate::config::ErrorReportStyle::Summary,
-                },
                 brief: false,
                 wrap: true,
                 pretty: false,
@@ -1066,9 +1070,6 @@ mod tests {
 
         let mut ctx = PipelineContext {
             config: PipelineConfig {
-                error_report: crate::config::ErrorReportConfig {
-                    style: crate::config::ErrorReportStyle::Summary,
-                },
                 brief: false,
                 wrap: true,
                 pretty: false,
@@ -1147,9 +1148,6 @@ mod tests {
         // Create dummy context
         let mut ctx = PipelineContext {
             config: PipelineConfig {
-                error_report: crate::config::ErrorReportConfig {
-                    style: crate::config::ErrorReportStyle::Summary,
-                },
                 brief: false,
                 wrap: true, // Default to enabled
                 pretty: false,
@@ -1205,9 +1203,6 @@ mod tests {
         // Create dummy context
         let mut ctx = PipelineContext {
             config: PipelineConfig {
-                error_report: crate::config::ErrorReportConfig {
-                    style: crate::config::ErrorReportStyle::Summary,
-                },
                 brief: false,
                 wrap: true, // Default to enabled
                 pretty: false,
@@ -1262,9 +1257,6 @@ mod tests {
         // Create dummy context
         let mut ctx = PipelineContext {
             config: PipelineConfig {
-                error_report: crate::config::ErrorReportConfig {
-                    style: crate::config::ErrorReportStyle::Summary,
-                },
                 brief: false,
                 wrap: true, // Default to enabled
                 pretty: false,

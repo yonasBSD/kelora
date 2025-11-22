@@ -5,6 +5,7 @@ use std::cell::{Cell, RefCell};
 thread_local! {
     static PENDING_EMISSIONS: RefCell<Vec<Map>> = const { RefCell::new(Vec::new()) };
     static SUPPRESS_CURRENT: Cell<bool> = const { Cell::new(false) };
+    static EMIT_STRICT: Cell<bool> = const { Cell::new(false) };
 }
 
 /// Get and clear pending emissions for this thread
@@ -27,6 +28,15 @@ pub fn clear_suppression_flag() {
     SUPPRESS_CURRENT.with(|suppress| suppress.set(false));
 }
 
+/// Configure strictness for emit_each error handling
+pub fn set_emit_strict(strict: bool) {
+    EMIT_STRICT.with(|flag| flag.set(strict));
+}
+
+fn is_emit_strict() -> bool {
+    EMIT_STRICT.with(|flag| flag.get())
+}
+
 /// Rhai function: emit_each(items: array<map>) -> int
 /// Fan out an array of event maps into individual events and suppress the original.
 pub fn emit_each_single(items: Dynamic) -> Result<Dynamic, Box<rhai::EvalAltResult>> {
@@ -47,9 +57,7 @@ fn emit_each_impl(
     items_val: Dynamic,
     base_val: Dynamic,
 ) -> Result<Dynamic, Box<rhai::EvalAltResult>> {
-    // Get strict mode from engine - we'll determine this from error handling patterns
-    // For now, implement resilient behavior by default with proper error propagation
-    let strict = false; // TODO: Get from engine configuration if available
+    let strict = is_emit_strict();
 
     // Validate and extract items array
     let items = match items_val.clone().try_cast::<Array>() {
