@@ -1,5 +1,5 @@
 #![allow(dead_code)] // Debugging/tracing scaffolding kept for verbose dev builds and future CLI toggles
-use anyhow::{Context, Result};
+use anyhow::Result;
 use indexmap::IndexMap;
 use rhai::{Dynamic, Engine, EvalAltResult, Scope, AST};
 use std::collections::HashMap;
@@ -189,7 +189,12 @@ impl ErrorEnhancer {
             output.push_str(&format!("   Position: {}\n", pos));
         }
 
-        // Show scope information if debug enabled
+        // Suggestions and stage tips should be shown even without verbose mode
+        if let Some(suggestions) = self.generate_suggestions(error, scope) {
+            output.push_str(&format!("   💡 {}\n", suggestions));
+        }
+
+        // Show scope information only if debug enabled (can be verbose)
         if self.debug_config.is_enabled() {
             output.push_str("\n   Variables in scope:\n");
             for (name, _is_const, value) in scope.iter() {
@@ -206,15 +211,10 @@ impl ErrorEnhancer {
                     preview
                 ));
             }
-
-            // Add suggestions based on error type
-            if let Some(suggestions) = self.generate_suggestions(error, scope) {
-                output.push_str(&format!("\n   💡 {}\n", suggestions));
-            }
-
-            // Add stage-specific help
-            output.push_str(&self.get_stage_help(stage, error));
         }
+
+        // Add stage-specific help (applies even without debug verbosity)
+        output.push_str(&self.get_stage_help(stage, error));
 
         output
     }
@@ -235,27 +235,101 @@ impl ErrorEnhancer {
                         Some("Available variables: e (event), meta (metadata), conf (initialization data), line (raw line)".to_string())
                     }
                 }
-            },
+            }
             EvalAltResult::ErrorPropertyNotFound(prop_name, _) => {
-                Some(format!("Property '{}' not found. Try `--stats` or `-F inspect` to see available fields", prop_name))
-            },
-            EvalAltResult::ErrorIndexNotFound(index, _) => {
-                Some(format!("Index '{}' not found. Check array bounds with 'if e.array.len() > {} {{ ... }}'", index, index))
-            },
+                let mut suggestions = Vec::new();
+
+                // Offer similar field names from `e` map if available
+                if let Some(fields) = self.event_field_names(scope) {
+                    let similar: Vec<_> = fields
+                        .iter()
+                        .filter(|name| {
+                            let sim = self.calculate_similarity(
+                                &prop_name.to_lowercase(),
+                                &name.to_lowercase(),
+                            );
+                            sim > 0.6
+                                || name.contains(prop_name)
+                                || prop_name.contains(name.as_str())
+                        })
+                        .take(3)
+                        .cloned()
+                        .collect();
+                    if !similar.is_empty() {
+                        suggestions.push(format!("Did you mean field: {}?", similar.join(", ")));
+                    } else {
+                        let preview: Vec<_> = fields.into_iter().take(5).collect();
+                        if !preview.is_empty() {
+                            suggestions.push(format!(
+                                "Available fields include: {}{}",
+                                preview.join(", "),
+                                if preview.len() == 5 { " ..." } else { "" }
+                            ));
+                        }
+                    }
+                }
+
+                suggestions
+                    .push("Try `--stats` or `-F inspect` to see available fields".to_string());
+                Some(suggestions.join(" "))
+            }
+            EvalAltResult::ErrorIndexNotFound(index, _) => Some(format!(
+                "Index '{}' not found. Check array bounds with 'if e.array.len() > {} {{ ... }}'",
+                index, index
+            )),
             EvalAltResult::ErrorFunctionNotFound(func_sig, _) => {
                 self.suggest_function_alternatives(func_sig)
-            },
+            }
             EvalAltResult::ErrorMismatchDataType(expected, actual, _) => {
-                Some(format!("Type mismatch: expected {}, got {}. Use type_of() to check types or to_string(), to_number() for conversion", expected, actual))
-            },
-            _ => None
+                let mut hints = vec![format!(
+                    "Type mismatch: expected {}, got {}.",
+                    expected, actual
+                )];
+
+                if expected.contains("bool") {
+                    hints.push(
+                        "Filters must return true/false; use comparisons like `e.level == \"ERROR\"` or `contains(...)`"
+                            .to_string(),
+                    );
+                }
+                hints.push(
+                    "Use type_of() to check types or to_string()/to_number()/parse_json() for conversion"
+                        .to_string(),
+                );
+
+                Some(hints.join(" "))
+            }
+            _ => None,
         }
     }
 
     fn suggest_function_alternatives(&self, func_sig: &str) -> Option<String> {
         let func_name = func_sig.split('(').next().unwrap_or(func_sig).trim();
 
-        // Common function alternatives
+        let mut best: Vec<(String, f64)> = RhaiEngine::function_catalog()
+            .into_iter()
+            .map(|candidate| {
+                let sim =
+                    self.calculate_similarity(&func_name.to_lowercase(), &candidate.to_lowercase());
+                (candidate, sim)
+            })
+            .filter(|(_, sim)| *sim > 0.45)
+            .collect();
+
+        best.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        best.truncate(3);
+
+        if !best.is_empty() {
+            return Some(format!(
+                "Did you mean: {}?",
+                best.iter()
+                    .map(|(c, _)| c.clone())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+
+        // Common function alternatives as fallbacks
         match func_name {
             "length" => Some("Use 'len()' instead of 'length()'".to_string()),
             "size" => Some("Use 'len()' instead of 'size()'".to_string()),
@@ -313,6 +387,20 @@ impl ErrorEnhancer {
         // Return top 3 suggestions
         suggestions.truncate(3);
         suggestions
+    }
+
+    fn event_field_names(&self, scope: &Scope) -> Option<Vec<String>> {
+        if let Some(e_map) = scope.get_value::<Map>("e") {
+            let mut keys: Vec<String> = e_map
+                .into_keys()
+                .map(|k| k.to_string())
+                .filter(|k| !k.is_empty())
+                .collect();
+            keys.sort();
+            keys.dedup();
+            return Some(keys);
+        }
+        None
     }
 
     fn calculate_similarity(&self, s1: &str, s2: &str) -> f64 {
@@ -712,6 +800,78 @@ impl Clone for RhaiEngine {
 }
 
 impl RhaiEngine {
+    /// Render a short diagnostic with stage/name, position, snippet, and the raw Rhai message.
+    fn format_rhai_diagnostic(
+        err: Box<EvalAltResult>,
+        stage: &str,
+        script_name: &str,
+        script_text: &str,
+        scope: Option<&Scope>,
+        debug_tracker: Option<&DebugTracker>,
+    ) -> String {
+        if let Some(tracker) = debug_tracker {
+            let enhancer = ErrorEnhancer::new(tracker.config.clone());
+            let context = tracker.get_context();
+            if let Some(scope) = scope {
+                return enhancer.enhance_error(&err, scope, script_text, stage, &context);
+            }
+        }
+
+        // Basic header
+        let mut output = String::new();
+        output.push_str(&format!("⚠️ {} error\n", stage));
+
+        // Position + snippet
+        let pos = err.position();
+        if let Some(line_num) = pos.line() {
+            let col_num = pos.position().unwrap_or(1);
+            output.push_str(&format!(
+                "  At {}:{} in {}\n",
+                line_num, col_num, script_name
+            ));
+            if let Some(snippet) = Self::render_snippet(
+                script_text,
+                line_num.saturating_sub(1),
+                col_num.saturating_sub(1),
+            ) {
+                output.push_str(&snippet);
+            }
+        } else if pos.is_none() {
+            output.push_str(&format!("  In {}\n", script_name));
+        } else {
+            output.push_str(&format!("  At {} in {}\n", pos, script_name));
+        }
+
+        // Raw message from Rhai
+        output.push_str(&format!("  Rhai: {}\n", err));
+        output
+    }
+
+    /// Build a small two-line snippet with a caret under the offending column.
+    fn render_snippet(
+        script: &str,
+        zero_based_line: usize,
+        zero_based_col: usize,
+    ) -> Option<String> {
+        let lines: Vec<&str> = script.lines().collect();
+        let line_content = lines.get(zero_based_line)?.trim_end_matches('\r');
+        let line_num = zero_based_line + 1;
+        let col_num = zero_based_col + 1;
+        let gutter_width = line_num.to_string().len();
+        let mut snippet = String::new();
+        snippet.push_str(&format!(
+            "  {line_num:>width$} | {line_content}\n",
+            width = gutter_width
+        ));
+        let caret_padding = " ".repeat(col_num.saturating_sub(1));
+        snippet.push_str(&format!(
+            "  {empty:>width$} | {caret_padding}^\n",
+            empty = "",
+            width = gutter_width
+        ));
+        Some(snippet)
+    }
+
     // Thread-local state management functions
     pub fn set_thread_tracking_state(
         metrics: &HashMap<String, Dynamic>,
@@ -883,83 +1043,87 @@ impl RhaiEngine {
         }
     }
 
-    fn get_function_suggestions(func_name: &str) -> Vec<String> {
+    fn function_catalog() -> Vec<String> {
         // List of common Rhai built-in functions and our custom functions
-        let available_functions = vec![
+        vec![
             // String functions
-            "lower",
-            "upper",
-            "trim",
-            "len",
-            "contains",
-            "starts_with",
-            "ends_with",
-            "split",
-            "replace",
-            "substring",
-            "to_string",
-            "parse",
+            "lower".to_string(),
+            "upper".to_string(),
+            "trim".to_string(),
+            "len".to_string(),
+            "contains".to_string(),
+            "starts_with".to_string(),
+            "ends_with".to_string(),
+            "split".to_string(),
+            "replace".to_string(),
+            "substring".to_string(),
+            "to_string".to_string(),
+            "parse".to_string(),
             // Our custom string functions
-            "extract_re",
-            "extract_all_re",
-            "split_re",
-            "replace_re",
-            "count",
-            "strip",
-            "before",
-            "after",
-            "between",
-            "starting_with",
-            "ending_with",
-            "is_digit",
-            "join",
-            "extract_ip",
-            "extract_ips",
-            "mask_ip",
-            "is_private_ip",
-            "extract_url",
-            "extract_domain",
+            "extract_re".to_string(),
+            "extract_all_re".to_string(),
+            "split_re".to_string(),
+            "replace_re".to_string(),
+            "count".to_string(),
+            "strip".to_string(),
+            "before".to_string(),
+            "after".to_string(),
+            "between".to_string(),
+            "starting_with".to_string(),
+            "ending_with".to_string(),
+            "is_digit".to_string(),
+            "join".to_string(),
+            "extract_ip".to_string(),
+            "extract_ips".to_string(),
+            "mask_ip".to_string(),
+            "is_private_ip".to_string(),
+            "extract_url".to_string(),
+            "extract_domain".to_string(),
             // Math functions
-            "abs",
-            "floor",
-            "ceil",
-            "round",
-            "min",
-            "max",
-            "pow",
-            "sqrt",
+            "abs".to_string(),
+            "floor".to_string(),
+            "ceil".to_string(),
+            "round".to_string(),
+            "min".to_string(),
+            "max".to_string(),
+            "pow".to_string(),
+            "sqrt".to_string(),
             // Array functions
-            "push",
-            "pop",
-            "shift",
-            "unshift",
-            "reverse",
-            "sort",
-            "clear",
+            "push".to_string(),
+            "pop".to_string(),
+            "shift".to_string(),
+            "unshift".to_string(),
+            "reverse".to_string(),
+            "sort".to_string(),
+            "clear".to_string(),
             // Map functions
-            "keys",
-            "values",
-            "remove",
-            "contains",
+            "keys".to_string(),
+            "values".to_string(),
+            "remove".to_string(),
+            "contains".to_string(),
             // Our custom functions
-            "parse_json",
-            "parse_kv",
-            "col",
-            "cols",
-            "status_class",
-            "track_count",
-            "track_sum",
-            "track_min",
-            "track_max",
-            "track_avg",
-            "track_unique",
-            "track_bucket",
+            "parse_json".to_string(),
+            "parse_kv".to_string(),
+            "col".to_string(),
+            "cols".to_string(),
+            "status_class".to_string(),
+            "track_count".to_string(),
+            "track_sum".to_string(),
+            "track_min".to_string(),
+            "track_max".to_string(),
+            "track_avg".to_string(),
+            "track_unique".to_string(),
+            "track_bucket".to_string(),
             // Utility functions
-            "print",
-            "debug",
-            "type_of",
-            "is_def_fn",
-        ];
+            "print".to_string(),
+            "debug".to_string(),
+            "type_of".to_string(),
+            "is_def_fn".to_string(),
+        ]
+    }
+
+    fn get_function_suggestions(func_name: &str) -> Vec<String> {
+        let available_functions = Self::function_catalog();
 
         // Find functions that are similar to the requested one
         let suggestions: Vec<String> = available_functions
@@ -1186,10 +1350,17 @@ impl RhaiEngine {
 
     // Individual compilation methods for pipeline stages
     pub fn compile_filter(&mut self, filter: &str) -> Result<CompiledExpression> {
-        let ast = self
-            .engine
-            .compile_expression(filter)
-            .with_context(|| format!("Failed to compile filter expression: {}", filter))?;
+        let ast = self.engine.compile_expression(filter).map_err(|e| {
+            let msg = Self::format_rhai_diagnostic(
+                e.into(),
+                "filter compilation",
+                "filter expression",
+                filter,
+                None,
+                None,
+            );
+            anyhow::anyhow!(msg)
+        })?;
         Ok(CompiledExpression {
             ast,
             expr: filter.to_string(),
@@ -1198,17 +1369,15 @@ impl RhaiEngine {
 
     pub fn compile_exec(&mut self, exec: &str) -> Result<CompiledExpression> {
         let ast = self.engine.compile(exec).map_err(|e| {
-            // Show the actual Rhai error without dumping the entire script
-            let script_preview = if exec.len() > 200 {
-                format!("{}... ({} chars total)", &exec[..200], exec.len())
-            } else {
-                exec.to_string()
-            };
-            anyhow::anyhow!(
-                "Failed to compile exec script:\n  Rhai error: {}\n  Script preview: {}",
-                e,
-                script_preview
-            )
+            let msg = Self::format_rhai_diagnostic(
+                e.into(),
+                "exec compilation",
+                "exec script",
+                exec,
+                None,
+                None,
+            );
+            anyhow::anyhow!(msg)
         })?;
         Ok(CompiledExpression {
             ast,
@@ -1218,17 +1387,15 @@ impl RhaiEngine {
 
     pub fn compile_begin(&mut self, begin: &str) -> Result<CompiledExpression> {
         let ast = self.engine.compile(begin).map_err(|e| {
-            // Show the actual Rhai error without dumping the entire script
-            let script_preview = if begin.len() > 200 {
-                format!("{}... ({} chars total)", &begin[..200], begin.len())
-            } else {
-                begin.to_string()
-            };
-            anyhow::anyhow!(
-                "Failed to compile begin script:\n  Rhai error: {}\n  Script preview: {}",
-                e,
-                script_preview
-            )
+            let msg = Self::format_rhai_diagnostic(
+                e.into(),
+                "begin compilation",
+                "begin script",
+                begin,
+                None,
+                None,
+            );
+            anyhow::anyhow!(msg)
         })?;
         Ok(CompiledExpression {
             ast,
@@ -1238,17 +1405,15 @@ impl RhaiEngine {
 
     pub fn compile_end(&mut self, end: &str) -> Result<CompiledExpression> {
         let ast = self.engine.compile(end).map_err(|e| {
-            // Show the actual Rhai error without dumping the entire script
-            let script_preview = if end.len() > 200 {
-                format!("{}... ({} chars total)", &end[..200], end.len())
-            } else {
-                end.to_string()
-            };
-            anyhow::anyhow!(
-                "Failed to compile end script:\n  Rhai error: {}\n  Script preview: {}",
-                e,
-                script_preview
-            )
+            let msg = Self::format_rhai_diagnostic(
+                e.into(),
+                "end compilation",
+                "end script",
+                end,
+                None,
+                None,
+            );
+            anyhow::anyhow!(msg)
         })?;
         Ok(CompiledExpression {
             ast,
@@ -1257,10 +1422,17 @@ impl RhaiEngine {
     }
 
     pub fn compile_span_close(&mut self, script: &str) -> Result<CompiledExpression> {
-        let ast = self
-            .engine
-            .compile(script)
-            .with_context(|| format!("Failed to compile span-close script: {}", script))?;
+        let ast = self.engine.compile(script).map_err(|e| {
+            let msg = Self::format_rhai_diagnostic(
+                e.into(),
+                "span-close compilation",
+                "span-close script",
+                script,
+                None,
+                None,
+            );
+            anyhow::anyhow!(msg)
+        })?;
         Ok(CompiledExpression {
             ast,
             expr: script.to_string(),
@@ -1313,13 +1485,14 @@ impl RhaiEngine {
                 // Track errors in debug statistics
                 debug_stats_increment_errors();
 
-                let detailed_msg = if let Some(ref debug_tracker) = self.debug_tracker {
-                    let enhancer = ErrorEnhancer::new(debug_tracker.config.clone());
-                    let context = debug_tracker.get_context();
-                    enhancer.enhance_error(&e, &scope, &compiled.expr, "filter", &context)
-                } else {
-                    Self::format_rhai_error(e, "filter expression", &compiled.expr)
-                };
+                let detailed_msg = Self::format_rhai_diagnostic(
+                    e,
+                    "filter",
+                    "filter expression",
+                    &compiled.expr,
+                    Some(&scope),
+                    self.debug_tracker.as_ref(),
+                );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 
@@ -1395,13 +1568,14 @@ impl RhaiEngine {
                 // Track errors in debug statistics
                 debug_stats_increment_errors();
 
-                let detailed_msg = if let Some(ref debug_tracker) = self.debug_tracker {
-                    let enhancer = ErrorEnhancer::new(debug_tracker.config.clone());
-                    let context = debug_tracker.get_context();
-                    enhancer.enhance_error(&e, &scope, &compiled.expr, "exec", &context)
-                } else {
-                    Self::format_rhai_error(e, "exec script", &compiled.expr)
-                };
+                let detailed_msg = Self::format_rhai_diagnostic(
+                    e,
+                    "exec",
+                    "exec script",
+                    &compiled.expr,
+                    Some(&scope),
+                    self.debug_tracker.as_ref(),
+                );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 
@@ -1451,7 +1625,14 @@ impl RhaiEngine {
             .engine
             .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
             .map_err(|e| {
-                let detailed_msg = Self::format_rhai_error(e, "begin expression", &compiled.expr);
+                let detailed_msg = Self::format_rhai_diagnostic(
+                    e,
+                    "begin",
+                    "begin expression",
+                    &compiled.expr,
+                    Some(&scope),
+                    self.debug_tracker.as_ref(),
+                );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 
@@ -1503,7 +1684,14 @@ impl RhaiEngine {
             .engine
             .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
             .map_err(|e| {
-                let detailed_msg = Self::format_rhai_error(e, "end expression", &compiled.expr);
+                let detailed_msg = Self::format_rhai_diagnostic(
+                    e,
+                    "end",
+                    "end expression",
+                    &compiled.expr,
+                    Some(&scope),
+                    self.debug_tracker.as_ref(),
+                );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 
@@ -1546,7 +1734,14 @@ impl RhaiEngine {
             .engine
             .eval_ast_with_scope::<Dynamic>(&mut scope, &compiled.ast)
             .map_err(|e| {
-                let detailed_msg = Self::format_rhai_error(e, "span-close script", &compiled.expr);
+                let detailed_msg = Self::format_rhai_diagnostic(
+                    e,
+                    "span-close",
+                    "span-close script",
+                    &compiled.expr,
+                    Some(&scope),
+                    self.debug_tracker.as_ref(),
+                );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 
@@ -1622,7 +1817,14 @@ impl RhaiEngine {
                 // Track errors in debug statistics
                 debug_stats_increment_errors();
 
-                let detailed_msg = Self::format_rhai_error(e, "filter expression", &compiled.expr);
+                let detailed_msg = Self::format_rhai_diagnostic(
+                    e,
+                    "windowed-filter",
+                    "filter expression",
+                    &compiled.expr,
+                    Some(&scope),
+                    self.debug_tracker.as_ref(),
+                );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 
@@ -1710,7 +1912,14 @@ impl RhaiEngine {
                 // Track errors in debug statistics
                 debug_stats_increment_errors();
 
-                let detailed_msg = Self::format_rhai_error(e, "exec script", &compiled.expr);
+                let detailed_msg = Self::format_rhai_diagnostic(
+                    e,
+                    "windowed-exec",
+                    "exec script",
+                    &compiled.expr,
+                    Some(&scope),
+                    self.debug_tracker.as_ref(),
+                );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
 
@@ -1990,5 +2199,38 @@ mod tests {
 
         let keys: Vec<String> = event_clone.fields.keys().cloned().collect();
         assert_eq!(keys, vec!["line", "z", "a", "b", "foo"]);
+    }
+
+    #[test]
+    fn render_snippet_marks_correct_line_and_col() {
+        let script = "let x = 1;\nlet y = foo(x);\nlet z = y + 1;";
+        let snippet = RhaiEngine::render_snippet(script, 1, 7).expect("snippet");
+        assert!(snippet.contains("2 | let y = foo(x);"));
+        assert!(snippet.contains("^"));
+        // caret should land under the 8th character (zero-based 7) of line 2
+        let caret_line = snippet.lines().nth(1).unwrap_or_default();
+        assert!(caret_line.ends_with("^"));
+        assert!(caret_line.contains("|        ^"));
+    }
+
+    #[test]
+    fn property_suggestion_shows_available_fields_without_verbose() {
+        let config = DebugConfig::new(0);
+        let enhancer = ErrorEnhancer::new(config);
+        let mut scope = Scope::new();
+        let mut e_map = Map::new();
+        e_map.insert("status".into(), Dynamic::from("OK"));
+        e_map.insert("status_code".into(), Dynamic::from(200_i64));
+        scope.push("e", e_map);
+
+        let err = EvalAltResult::ErrorPropertyNotFound("statsu".into(), rhai::Position::NONE);
+        let ctx = ExecutionContext::default();
+        let out = enhancer.enhance_error(&err, &scope, "e.statsu", "filter", &ctx);
+
+        eprintln!("enhanced error:\n{}", out);
+        assert!(
+            out.contains("status"),
+            "output should surface available fields even when verbosity is zero"
+        );
     }
 }
