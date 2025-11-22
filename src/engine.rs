@@ -831,8 +831,8 @@ impl RhaiEngine {
 
         // Basic header
         let mut output = String::new();
-        let prefix = if use_emoji { "⚠️ " } else { "" };
-        output.push_str(&format!("{}{} error\n", prefix, stage));
+        let _ = use_emoji; // prefixing handled by outer error formatters
+        output.push_str(&format!("{} error\n", stage));
 
         // Position + snippet
         let pos = err.position();
