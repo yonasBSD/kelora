@@ -1025,6 +1025,10 @@ impl RhaiEngine {
         let suggestions = Self::get_function_suggestions(func_name);
         let mut notes = Vec::new();
 
+        if called_types != "unknown types" {
+            notes.push(format!("Called with: {}", called_types));
+        }
+
         if Self::signature_has_unit(&called_types) {
             notes.push(
                 "One of the arguments is '()' (missing field?). Use e.has(\"field\") or e.get(\"field\", default) before chaining."
@@ -2338,8 +2342,8 @@ mod tests {
             rhai::Position::NONE,
         );
         assert!(
-            msg.contains("missing field") || msg.contains("e.has"),
-            "unit arg hint should mention missing field guards; got: {msg}"
+            (msg.contains("missing field") || msg.contains("e.has")) && msg.contains("Called with"),
+            "unit arg hint should mention missing field guards and show called types; got: {msg}"
         );
     }
 
