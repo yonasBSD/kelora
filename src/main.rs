@@ -2106,9 +2106,9 @@ Quick Examples:
   kelora -f logfmt --levels error examples/simple_logfmt.log
   kelora -j examples/simple_json.jsonl --filter 'e.service == "database"' --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' -k timestamp,message,duration_s
   kelora -f combined examples/web_access_large.log.gz --stats-only
-  kelora examples/app.log --since 2025-01-15T10:00:00 --levels warn,error --stats
+  kelora -j examples/simple_json.jsonl --since 2024-01-15T10:01:00Z --levels warn,error --stats
   kelora -j examples/audit.jsonl -F none --exec 'track_count(e.action)' --metrics
-  kelora --parallel examples/payments_latency.jsonl --filter 'e.duration_ms > 500' -k order_id,duration_ms,status
+  kelora -j examples/payments_latency.jsonl --parallel --filter 'e.duration_ms > 500' -k order_id,duration_ms,status
 
 Common Options:
   -f, --input-format <FORMAT>   Choose parser (json, logfmt, combined, cols:<spec>, regex:<pattern>)
