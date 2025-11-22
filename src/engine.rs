@@ -762,6 +762,7 @@ pub struct RhaiEngine {
     state_map: Option<crate::rhai_functions::state::StateMap>,
     debug_tracker: Option<DebugTracker>,
     execution_tracer: Option<ExecutionTracer>,
+    use_emoji: bool,
 }
 
 impl Clone for RhaiEngine {
@@ -801,6 +802,7 @@ impl Clone for RhaiEngine {
             state_map: self.state_map.clone(),
             debug_tracker: self.debug_tracker.clone(),
             execution_tracer: self.execution_tracer.clone(),
+            use_emoji: self.use_emoji,
         }
     }
 }
@@ -814,6 +816,7 @@ impl RhaiEngine {
         script_text: &str,
         scope: Option<&Scope>,
         debug_tracker: Option<&DebugTracker>,
+        use_emoji: bool,
     ) -> String {
         let call_stack = Self::collect_call_stack(err.as_ref());
         let err_display = format!("{}", err);
@@ -828,7 +831,8 @@ impl RhaiEngine {
 
         // Basic header
         let mut output = String::new();
-        output.push_str(&format!("⚠️ {} error\n", stage));
+        let prefix = if use_emoji { "⚠️ " } else { "" };
+        output.push_str(&format!("{}{} error\n", prefix, stage));
 
         // Position + snippet
         let pos = err.position();
@@ -1259,7 +1263,12 @@ impl RhaiEngine {
             state_map: Some(crate::rhai_functions::state::StateMap::new()),
             debug_tracker: None,
             execution_tracer: None,
+            use_emoji: true,
         }
+    }
+
+    pub fn set_use_emoji(&mut self, use_emoji: bool) {
+        self.use_emoji = use_emoji;
     }
 
     pub fn get_execution_tracer(&self) -> &Option<ExecutionTracer> {
@@ -1415,6 +1424,7 @@ impl RhaiEngine {
                 filter,
                 None,
                 None,
+                self.use_emoji,
             );
             anyhow::anyhow!(msg)
         })?;
@@ -1433,6 +1443,7 @@ impl RhaiEngine {
                 exec,
                 None,
                 None,
+                self.use_emoji,
             );
             anyhow::anyhow!(msg)
         })?;
@@ -1451,6 +1462,7 @@ impl RhaiEngine {
                 begin,
                 None,
                 None,
+                self.use_emoji,
             );
             anyhow::anyhow!(msg)
         })?;
@@ -1469,6 +1481,7 @@ impl RhaiEngine {
                 end,
                 None,
                 None,
+                self.use_emoji,
             );
             anyhow::anyhow!(msg)
         })?;
@@ -1487,6 +1500,7 @@ impl RhaiEngine {
                 script,
                 None,
                 None,
+                self.use_emoji,
             );
             anyhow::anyhow!(msg)
         })?;
@@ -1549,6 +1563,7 @@ impl RhaiEngine {
                     &compiled.expr,
                     Some(&scope),
                     self.debug_tracker.as_ref(),
+                    self.use_emoji,
                 );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
@@ -1632,6 +1647,7 @@ impl RhaiEngine {
                     &compiled.expr,
                     Some(&scope),
                     self.debug_tracker.as_ref(),
+                    self.use_emoji,
                 );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
@@ -1689,6 +1705,7 @@ impl RhaiEngine {
                     &compiled.expr,
                     Some(&scope),
                     self.debug_tracker.as_ref(),
+                    self.use_emoji,
                 );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
@@ -1748,6 +1765,7 @@ impl RhaiEngine {
                     &compiled.expr,
                     Some(&scope),
                     self.debug_tracker.as_ref(),
+                    self.use_emoji,
                 );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
@@ -1798,6 +1816,7 @@ impl RhaiEngine {
                     &compiled.expr,
                     Some(&scope),
                     self.debug_tracker.as_ref(),
+                    self.use_emoji,
                 );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
@@ -1881,6 +1900,7 @@ impl RhaiEngine {
                     &compiled.expr,
                     Some(&scope),
                     self.debug_tracker.as_ref(),
+                    self.use_emoji,
                 );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
@@ -1976,6 +1996,7 @@ impl RhaiEngine {
                     &compiled.expr,
                     Some(&scope),
                     self.debug_tracker.as_ref(),
+                    self.use_emoji,
                 );
                 anyhow::anyhow!("{}", detailed_msg)
             })?;
@@ -2325,8 +2346,9 @@ mod tests {
             rhai::Position::new(1, 1),
         ));
 
-        let msg =
-            RhaiEngine::format_rhai_diagnostic(outer, "filter", "script", "child()", None, None);
+        let msg = RhaiEngine::format_rhai_diagnostic(
+            outer, "filter", "script", "child()", None, None, true,
+        );
 
         assert!(
             msg.contains("Call stack") && msg.contains("parent") && msg.contains("child"),

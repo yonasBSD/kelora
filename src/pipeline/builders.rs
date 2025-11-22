@@ -142,6 +142,7 @@ impl PipelineBuilder {
         stages: Vec<crate::config::ScriptStageType>,
     ) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
+        rhai_engine.set_use_emoji(!self.config.no_emoji);
 
         // Set up debugging if enabled
         let debug_config = DebugConfig::new(self.config.verbose).with_emoji(!self.config.no_emoji);
