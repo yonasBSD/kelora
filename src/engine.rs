@@ -1895,7 +1895,7 @@ impl RhaiEngine {
 
                 let detailed_msg = Self::format_rhai_diagnostic(
                     e,
-                    "windowed-filter",
+                    "filter",
                     "filter expression",
                     &compiled.expr,
                     Some(&scope),
@@ -1991,7 +1991,7 @@ impl RhaiEngine {
 
                 let detailed_msg = Self::format_rhai_diagnostic(
                     e,
-                    "windowed-exec",
+                    "exec",
                     "exec script",
                     &compiled.expr,
                     Some(&scope),
