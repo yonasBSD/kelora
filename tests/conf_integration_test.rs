@@ -227,7 +227,7 @@ fn test_save_alias_preserves_no_emoji_flag() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let config_path = temp_dir.path().join("kelora.ini");
 
-    let status = Command::new(kelora_binary_path())
+    let output = Command::new(kelora_binary_path())
         .args([
             "--save-alias",
             "noemoji",
@@ -238,13 +238,21 @@ fn test_save_alias_preserves_no_emoji_flag() {
             "--no-emoji",
             "examples/simple_json.jsonl",
         ])
-        .status()
+        .output()
         .expect("Failed to run kelora --save-alias command");
 
     assert!(
-        status.success(),
-        "kelora --save-alias exited with {:?}",
-        status
+        output.status.success(),
+        "kelora --save-alias exited with {:?}. stderr: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Alias 'noemoji' saved to"),
+        "Should print success message. stdout: {}",
+        stdout
     );
 
     let config_contents =
