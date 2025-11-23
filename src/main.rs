@@ -2,13 +2,14 @@ use anyhow::Result;
 use clap::parser::ValueSource;
 use clap::{ArgMatches, CommandFactory, FromArgMatches};
 use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
+use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 
 #[cfg(unix)]
 use signal_hook::consts::{SIGINT, SIGTERM};
 
 use crate::engine::RhaiEngine;
-use crate::rhai_functions::tracking::{self, TrackingSnapshot};
+use crate::rhai_functions::tracking::{self, TrackingSnapshot, WarningDetail};
 
 mod cli;
 mod colors;
@@ -121,6 +122,7 @@ use std::time::{Duration, Instant};
 struct PipelineResult {
     pub stats: Option<ProcessingStats>,
     pub tracking_data: TrackingSnapshot,
+    pub warnings: HashMap<String, WarningDetail>,
 }
 
 /// Core pipeline processing function using KeloraConfig  
@@ -155,10 +157,12 @@ fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
         let mut stats = get_thread_stats();
         stats.extract_discovered_from_tracking(&tracking_data.internal);
         let final_stats = Some(stats);
+        let warnings = tracking::get_thread_warnings();
 
         Ok(PipelineResult {
             stats: final_stats,
             tracking_data,
+            warnings,
         })
     }
 }
@@ -270,6 +274,7 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     Ok(PipelineResult {
         stats: Some(processor.get_final_stats()),
         tracking_data: parallel_snapshot,
+        warnings: processor.get_final_warnings(),
     })
 }
 
@@ -1572,10 +1577,10 @@ fn main() -> Result<()> {
 
                     // Display field access warnings (unless suppressed) - show independently of errors
                     if diagnostics_allowed_runtime && !config.processing.no_warnings {
-                        let warnings = crate::rhai_functions::tracking::get_thread_warnings();
+                        let warnings = &pipeline_result.warnings;
                         if let Some(warning_summary) =
                             crate::rhai_functions::tracking::format_warning_summary(
-                                &warnings,
+                                warnings,
                                 pipeline_result.stats.as_ref(),
                                 crate::tty::should_use_colors_with_mode(&config.output.color),
                                 config.output.no_emoji,

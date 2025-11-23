@@ -625,10 +625,51 @@ pub fn get_thread_warnings() -> HashMap<String, WarningDetail> {
     THREAD_WARNINGS.with(|warnings| warnings.borrow().clone())
 }
 
+/// Take thread-local warnings and clear storage
+pub fn take_thread_warnings() -> HashMap<String, WarningDetail> {
+    THREAD_WARNINGS.with(|warnings| warnings.take())
+}
+
 /// Clear thread-local warnings
 #[allow(dead_code)]
 pub fn clear_thread_warnings() {
     THREAD_WARNINGS.with(|warnings| warnings.borrow_mut().clear());
+}
+
+/// Merge warning maps, combining counts and line samples with caps
+pub fn merge_warning_maps(
+    target: &mut HashMap<String, WarningDetail>,
+    source: HashMap<String, WarningDetail>,
+) {
+    for (key, incoming) in source {
+        if let Some(existing) = target.get_mut(&key) {
+            existing.count += incoming.count;
+
+            for line in incoming.line_numbers {
+                if existing.line_numbers.len() >= 100 {
+                    break;
+                }
+                if !existing.line_numbers.contains(&line) {
+                    existing.line_numbers.push(line);
+                }
+            }
+
+            if existing.operation.is_none() {
+                existing.operation = incoming.operation.clone();
+            }
+
+            for suggestion in incoming.suggestions {
+                if existing.suggestions.len() >= 3 {
+                    break;
+                }
+                if !existing.suggestions.contains(&suggestion) {
+                    existing.suggestions.push(suggestion);
+                }
+            }
+        } else {
+            target.insert(key, incoming);
+        }
+    }
 }
 
 /// Suggest similar field names using Levenshtein distance
@@ -2160,5 +2201,65 @@ mod tests {
         clear_tracking_state();
         let state2 = get_thread_tracking_state();
         assert!(state2.is_empty());
+    }
+
+    #[test]
+    fn test_merge_warning_maps_combines_counts_and_lines() {
+        let mut target = HashMap::new();
+        target.insert(
+            "field:op".to_string(),
+            WarningDetail {
+                field_name: "field".to_string(),
+                operation: Some("op".to_string()),
+                line_numbers: vec![1],
+                count: 1,
+                suggestions: vec!["foo".to_string()],
+            },
+        );
+
+        let mut source = HashMap::new();
+        source.insert(
+            "field:op".to_string(),
+            WarningDetail {
+                field_name: "field".to_string(),
+                operation: Some("op".to_string()),
+                line_numbers: vec![2, 3],
+                count: 2,
+                suggestions: vec!["bar".to_string(), "foo".to_string()],
+            },
+        );
+
+        merge_warning_maps(&mut target, source);
+
+        let merged = target.get("field:op").unwrap();
+        assert_eq!(merged.count, 3);
+        assert_eq!(merged.operation.as_deref(), Some("op"));
+        assert!(merged.line_numbers.contains(&1));
+        assert!(merged.line_numbers.contains(&2));
+        assert!(merged.line_numbers.contains(&3));
+        assert!(merged.suggestions.contains(&"foo".to_string()));
+        assert!(merged.suggestions.contains(&"bar".to_string()));
+    }
+
+    #[test]
+    fn test_take_thread_warnings_clears_state() {
+        THREAD_WARNINGS.with(|warnings| {
+            warnings.borrow_mut().insert(
+                "field:".to_string(),
+                WarningDetail {
+                    field_name: "field".to_string(),
+                    operation: None,
+                    line_numbers: vec![10],
+                    count: 1,
+                    suggestions: vec![],
+                },
+            );
+        });
+
+        let taken = take_thread_warnings();
+        assert_eq!(taken.len(), 1);
+
+        let after = get_thread_warnings();
+        assert!(after.is_empty());
     }
 }
