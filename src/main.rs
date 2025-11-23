@@ -1584,6 +1584,7 @@ fn main() -> Result<()> {
                                 pipeline_result.stats.as_ref(),
                                 crate::tty::should_use_colors_with_mode(&config.output.color),
                                 config.output.no_emoji,
+                                config.processing.verbose,
                             )
                         {
                             stderr.writeln(&warning_summary).unwrap_or(());

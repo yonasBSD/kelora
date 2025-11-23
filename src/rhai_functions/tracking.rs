@@ -606,6 +606,17 @@ pub fn track_warning(
                     // Limit stored line numbers
                     w.line_numbers.push(line_num);
                 }
+                if w.suggestions.len() < 3 {
+                    let new_suggestions = suggest_similar_fields(field_name, available_fields, 3);
+                    for suggestion in new_suggestions {
+                        if w.suggestions.len() >= 3 {
+                            break;
+                        }
+                        if !w.suggestions.contains(&suggestion) {
+                            w.suggestions.push(suggestion);
+                        }
+                    }
+                }
             })
             .or_insert_with(|| {
                 let suggestions = suggest_similar_fields(field_name, available_fields, 3);
@@ -781,6 +792,7 @@ pub fn format_warning_summary(
     _stats: Option<&ProcessingStats>,
     use_colors: bool,
     no_emoji: bool,
+    verbose_level: u8,
 ) -> Option<String> {
     if warnings.is_empty() {
         return None;
@@ -794,53 +806,71 @@ pub fn format_warning_summary(
     };
 
     let mut summary = format!(
-        "\n{}Field access warnings: {} total",
+        "\n{}Field access warnings ({} total)",
         prefix, total_warnings
     );
 
     // Sort by field name for consistent output
     let mut sorted_warnings: Vec<_> = warnings.values().collect();
-    sorted_warnings.sort_by(|a, b| a.field_name.cmp(&b.field_name));
+    sorted_warnings.sort_by(|a, b| {
+        b.count
+            .cmp(&a.count)
+            .then_with(|| a.field_name.cmp(&b.field_name))
+    });
 
-    // Limit to 20 warnings displayed
-    const MAX_WARNINGS_DISPLAYED: usize = 20;
-    let display_count = std::cmp::min(sorted_warnings.len(), MAX_WARNINGS_DISPLAYED);
+    // Limit displayed entries to keep output compact
+    const MAX_WARNINGS_DISPLAYED_DEFAULT: usize = 5;
+    const MAX_WARNINGS_DISPLAYED_VERBOSE: usize = 15;
+    let max_display = if verbose_level > 0 {
+        MAX_WARNINGS_DISPLAYED_VERBOSE
+    } else {
+        MAX_WARNINGS_DISPLAYED_DEFAULT
+    };
+    let display_count = std::cmp::min(sorted_warnings.len(), max_display);
 
     for detail in sorted_warnings.iter().take(display_count) {
-        let line_range = format_line_range(&detail.line_numbers);
-
-        summary.push_str(&format!(
-            "\n  • Field '{}' not found in {} event{}{}",
+        let mut line = format!(
+            "\n  • '{}' missing in {} event{}",
             detail.field_name,
             detail.count,
             if detail.count == 1 { "" } else { "s" },
+        );
+
+        if verbose_level > 0 {
+            let line_range = format_line_range(&detail.line_numbers);
             if !line_range.is_empty() {
-                format!(" ({})", line_range)
+                line.push_str(&format!(" ({})", line_range));
+            }
+            if let Some(op) = &detail.operation {
+                line.push_str(&format!(" | operation: {}", op));
+            }
+            if !detail.suggestions.is_empty() {
+                line.push_str(&format!(
+                    " | suggestions: {}",
+                    detail.suggestions.join(", ")
+                ));
+            }
+        } else if !detail.suggestions.is_empty() {
+            line.push_str(&format!(" (suggestion: {})", detail.suggestions.join(", ")));
+        }
+
+        summary.push_str(&line);
+    }
+
+    if sorted_warnings.len() > display_count {
+        summary.push_str(&format!(
+            "\n  … {} more field{} (use -v for details)",
+            sorted_warnings.len() - display_count,
+            if sorted_warnings.len() - display_count == 1 {
+                ""
             } else {
-                String::new()
+                "s"
             }
         ));
-
-        if !detail.suggestions.is_empty() {
-            let suggestions_str = detail.suggestions.join(", ");
-            summary.push_str(&format!("\n    Did you mean: {}?", suggestions_str));
-        }
-
-        if let Some(op) = &detail.operation {
-            summary.push_str(&format!("\n    Operation: {}", op));
-        }
     }
 
-    if sorted_warnings.len() > MAX_WARNINGS_DISPLAYED {
-        summary.push_str(&format!(
-            "\n  ... and {} more field warnings",
-            sorted_warnings.len() - MAX_WARNINGS_DISPLAYED
-        ));
-    }
-
-    summary.push_str("\n\n  💡 Tip: Use e.has(\"field\") to check existence before accessing");
-    summary
-        .push_str("\n  💡 Tip: Use e.get_path(\"field\", default) for safe access with defaults");
+    summary.push_str("\n\n  💡 Tip: Use e.has(\"field\") before accessing");
+    summary.push_str("\n  💡 Tip: Use e.get_path(\"field\", default) for safe access");
     summary.push_str("\n  💡 Tip: Run with -F inspect to see actual field names");
 
     Some(summary)

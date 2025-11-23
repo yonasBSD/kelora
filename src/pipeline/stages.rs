@@ -126,9 +126,20 @@ impl FilterStage {
                     .unwrap_or_else(|| "unknown".to_string());
                     let operation = crate::rhai_functions::tracking::extract_operation(&error_msg);
 
-                    // Get available field names from the current event
-                    let available_fields: std::collections::BTreeSet<String> =
+                    // Get available field names from the current event and discovered keys so far
+                    let mut available_fields: std::collections::BTreeSet<String> =
                         event.fields.keys().cloned().collect();
+                    if let Some(dynamic_keys) =
+                        ctx.internal_tracker.get("__kelora_stats_discovered_keys")
+                    {
+                        if let Ok(arr) = dynamic_keys.clone().into_array() {
+                            for entry in arr {
+                                if let Ok(key) = entry.into_string() {
+                                    available_fields.insert(key);
+                                }
+                            }
+                        }
+                    }
 
                     crate::rhai_functions::tracking::track_warning(
                         &field_name,
@@ -138,17 +149,24 @@ impl FilterStage {
                     );
                 }
 
-                // Handle error (same as original FilterStage)
-                crate::rhai_functions::tracking::track_error(
-                    "filter",
-                    ctx.meta.line_num,
-                    &format!("Filter error: {}", e),
-                    Some(&event.original_line),
-                    ctx.meta.filename.as_deref(),
-                    ctx.config.verbose,
-                    ctx.config.quiet_level,
-                    Some(&ctx.config),
-                );
+                // Handle error (same as original FilterStage), but avoid escalating unit-type
+                // warnings to errors in resilient mode so exit codes stay success.
+                if !ctx.config.strict
+                    && crate::rhai_functions::tracking::is_unit_type_error(&error_msg)
+                {
+                    // Treat as warning only
+                } else {
+                    crate::rhai_functions::tracking::track_error(
+                        "filter",
+                        ctx.meta.line_num,
+                        &format!("Filter error: {}", e),
+                        Some(&event.original_line),
+                        ctx.meta.filename.as_deref(),
+                        ctx.config.verbose,
+                        ctx.config.quiet_level,
+                        Some(&ctx.config),
+                    );
+                }
 
                 if e.downcast_ref::<crate::engine::ConfMutationError>()
                     .is_some()
@@ -429,9 +447,20 @@ impl ScriptStage for ExecStage {
                     .unwrap_or_else(|| "unknown".to_string());
                     let operation = crate::rhai_functions::tracking::extract_operation(&error_msg);
 
-                    // Get available field names from the current event
-                    let available_fields: std::collections::BTreeSet<String> =
+                    // Get available field names from the current event and discovered keys so far
+                    let mut available_fields: std::collections::BTreeSet<String> =
                         event.fields.keys().cloned().collect();
+                    if let Some(dynamic_keys) =
+                        ctx.internal_tracker.get("__kelora_stats_discovered_keys")
+                    {
+                        if let Ok(arr) = dynamic_keys.clone().into_array() {
+                            for entry in arr {
+                                if let Ok(key) = entry.into_string() {
+                                    available_fields.insert(key);
+                                }
+                            }
+                        }
+                    }
 
                     crate::rhai_functions::tracking::track_warning(
                         &field_name,
@@ -441,17 +470,24 @@ impl ScriptStage for ExecStage {
                     );
                 }
 
-                // Track error for reporting even in resilient mode
-                crate::rhai_functions::tracking::track_error(
-                    "exec",
-                    ctx.meta.line_num,
-                    &format!("Exec error: {}", e),
-                    Some(&event.original_line),
-                    ctx.meta.filename.as_deref(),
-                    ctx.config.verbose,
-                    ctx.config.quiet_level,
-                    Some(&ctx.config),
-                );
+                // Track error for reporting even in resilient mode, unless this is the
+                // unit-type warning case where we only want a warning (not an error exit).
+                if !ctx.config.strict
+                    && crate::rhai_functions::tracking::is_unit_type_error(&error_msg)
+                {
+                    // Treat as warning only
+                } else {
+                    crate::rhai_functions::tracking::track_error(
+                        "exec",
+                        ctx.meta.line_num,
+                        &format!("Exec error: {}", e),
+                        Some(&event.original_line),
+                        ctx.meta.filename.as_deref(),
+                        ctx.config.verbose,
+                        ctx.config.quiet_level,
+                        Some(&ctx.config),
+                    );
+                }
 
                 // New resiliency model: atomic rollback - return original event unchanged
                 // unless in strict mode, where errors still propagate
