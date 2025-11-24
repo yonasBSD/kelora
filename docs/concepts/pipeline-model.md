@@ -12,6 +12,9 @@ Kelora's processing model consists of three distinct layers operating on differe
 
 This layered architecture enables efficient streaming with low memory usage while supporting both sequential and parallel processing modes.
 
+![Kelora Pipeline Architecture](pipeline-model.png#only-light)
+![Kelora Pipeline Architecture](pipeline-model-dark.png#only-dark)
+
 ---
 
 ## Layer 1: Input Layer
