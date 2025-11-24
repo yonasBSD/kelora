@@ -98,6 +98,7 @@ impl PipelineBuilder {
                 suppress_script_output: false,
                 quiet_level: 0,
                 no_emoji: false,
+                no_warnings: false,
                 input_files: Vec::new(),
                 allow_fs_writes: false,
             },
@@ -1041,6 +1042,7 @@ pub fn create_pipeline_builder_from_config(
         suppress_script_output: config.processing.suppress_script_output,
         quiet_level: config.processing.quiet_level,
         no_emoji: config.output.no_emoji,
+        no_warnings: config.processing.no_warnings,
         input_files: config.input.files.clone(),
         allow_fs_writes: config.processing.allow_fs_writes,
     };

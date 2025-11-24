@@ -412,6 +412,7 @@ fn test_ordered_filter_exec_stages() {
         &[
             "-f",
             "json",
+            "--no-warnings", // Suppress warnings from AST field detection
             "--exec",
             "e.status=e.status.to_int()",
             "--filter",
@@ -461,6 +462,7 @@ fn test_complex_ordered_pipeline() {
         &[
             "-f",
             "json",
+            "--no-warnings", // Suppress warnings from AST field detection for dynamically created fields
             "--exec",
             "e.doubled = e.value * 2",
             "--filter",

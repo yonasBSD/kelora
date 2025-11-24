@@ -2465,7 +2465,7 @@ impl ParallelProcessor {
             results: batch_results,
             user_tracked_updates: user_deltas,
             internal_tracked_updates: internal_deltas,
-            warnings: HashMap::new(),
+            warnings: tracking::take_thread_warnings(),
             worker_stats: get_thread_stats(),
         };
 

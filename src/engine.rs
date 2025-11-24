@@ -859,16 +859,74 @@ pub fn debug_stats_set_thread_state(stats: &DebugStatistics) {
     });
 }
 
+/// Extract field names accessed on variable 'e' from a Rhai AST
+///
+/// Uses AST walking to find all property access patterns like `e.field_name`
+/// including chained method calls like `e.field.to_upper()`.
+///
+/// Requires the 'debugging' feature which provides AST access.
+fn extract_field_accesses(ast: &AST) -> std::collections::HashSet<String> {
+    use std::collections::HashSet;
+
+    let mut fields = HashSet::new();
+
+    ast.walk(&mut |path| {
+        if let Some(node) = path.first() {
+            let node_str = format!("{:?}", node);
+            extract_fields_from_node_string(&node_str, &mut fields);
+        }
+        true // Continue walking
+    });
+
+    fields
+}
+
+/// Helper function to extract field names from AST node debug string
+fn extract_fields_from_node_string(node_str: &str, fields: &mut std::collections::HashSet<String>) {
+    // Only process nodes involving Variable(e)
+    if !node_str.contains("Variable(e)") {
+        return;
+    }
+
+    // Pattern 1: Direct property access - Variable(e) ... Property(field_name)
+    // Matches: Dot { lhs: Variable(e) ... rhs: Property(field_name) }
+    if let Ok(re) = regex::Regex::new(r"Variable\(e\)[^}]*Property\((\w+)\)") {
+        for cap in re.captures_iter(node_str) {
+            if let Some(field_name) = cap.get(1) {
+                fields.insert(field_name.as_str().to_string());
+            }
+        }
+    }
+
+    // Pattern 2: Nested case for method calls - rhs: Dot { lhs: Property(field)
+    // Matches: e.field.to_upper() where field is accessed before method call
+    if node_str.contains("lhs: Variable(e)") {
+        if let Ok(nested_re) = regex::Regex::new(r"rhs: Dot \{ lhs: Property\((\w+)\)") {
+            for cap in nested_re.captures_iter(node_str) {
+                if let Some(field_name) = cap.get(1) {
+                    fields.insert(field_name.as_str().to_string());
+                }
+            }
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct CompiledExpression {
     ast: AST,
     expr: String,
+    accessed_fields: std::collections::HashSet<String>,
 }
 
 impl CompiledExpression {
     /// Get the source expression
     pub fn source(&self) -> &str {
         &self.expr
+    }
+
+    /// Get the set of field names accessed on variable 'e' in this expression
+    pub fn accessed_fields(&self) -> &std::collections::HashSet<String> {
+        &self.accessed_fields
     }
 }
 
@@ -1550,9 +1608,11 @@ impl RhaiEngine {
             );
             anyhow::anyhow!(msg)
         })?;
+        let accessed_fields = extract_field_accesses(&ast);
         Ok(CompiledExpression {
             ast,
             expr: filter.to_string(),
+            accessed_fields,
         })
     }
 
@@ -1569,9 +1629,11 @@ impl RhaiEngine {
             );
             anyhow::anyhow!(msg)
         })?;
+        let accessed_fields = extract_field_accesses(&ast);
         Ok(CompiledExpression {
             ast,
             expr: exec.to_string(),
+            accessed_fields,
         })
     }
 
@@ -1588,9 +1650,11 @@ impl RhaiEngine {
             );
             anyhow::anyhow!(msg)
         })?;
+        let accessed_fields = extract_field_accesses(&ast);
         Ok(CompiledExpression {
             ast,
             expr: begin.to_string(),
+            accessed_fields,
         })
     }
 
@@ -1607,9 +1671,11 @@ impl RhaiEngine {
             );
             anyhow::anyhow!(msg)
         })?;
+        let accessed_fields = extract_field_accesses(&ast);
         Ok(CompiledExpression {
             ast,
             expr: end.to_string(),
+            accessed_fields,
         })
     }
 
@@ -1626,9 +1692,11 @@ impl RhaiEngine {
             );
             anyhow::anyhow!(msg)
         })?;
+        let accessed_fields = extract_field_accesses(&ast);
         Ok(CompiledExpression {
             ast,
             expr: script.to_string(),
+            accessed_fields,
         })
     }
 

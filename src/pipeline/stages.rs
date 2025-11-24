@@ -284,6 +284,25 @@ impl ScriptStage for FilterStage {
             return self.process_with_context(event, ctx);
         }
 
+        // AST-based field access validation (catches ALL field accesses including comparisons)
+        if !ctx.config.no_warnings {
+            let accessed = self.compiled_filter.accessed_fields();
+            let available: std::collections::BTreeSet<String> =
+                event.fields.keys().cloned().collect();
+
+            // Warn about fields that are accessed but don't exist
+            for field in accessed {
+                if !available.contains(field) {
+                    crate::rhai_functions::tracking::track_warning(
+                        field,
+                        None, // No operation info from AST
+                        ctx.meta.line_num.unwrap_or(0),
+                        &available,
+                    );
+                }
+            }
+        }
+
         // Original non-context filtering logic
         let result = self.evaluate_filter(&event, ctx);
 
@@ -401,6 +420,25 @@ impl ScriptStage for ExecStage {
         emit::set_emit_strict(ctx.config.strict);
 
         file_ops::clear_pending_ops();
+
+        // AST-based field access validation (catches ALL field accesses including comparisons)
+        if !ctx.config.no_warnings {
+            let accessed = self.compiled_exec.accessed_fields();
+            let available: std::collections::BTreeSet<String> =
+                event.fields.keys().cloned().collect();
+
+            // Warn about fields that are accessed but don't exist
+            for field in accessed {
+                if !available.contains(field) {
+                    crate::rhai_functions::tracking::track_warning(
+                        field,
+                        None, // No operation info from AST
+                        ctx.meta.line_num.unwrap_or(0),
+                        &available,
+                    );
+                }
+            }
+        }
 
         let result = if ctx.window.is_empty() {
             // No window context - use standard method
@@ -1026,6 +1064,7 @@ mod tests {
                 no_emoji: false,
                 input_files: vec![],
                 allow_fs_writes: false,
+                no_warnings: false,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),
@@ -1129,6 +1168,7 @@ mod tests {
                 no_emoji: false,
                 input_files: vec![],
                 allow_fs_writes: false,
+                no_warnings: false,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),
@@ -1204,6 +1244,7 @@ mod tests {
                 no_emoji: false,
                 input_files: vec![],
                 allow_fs_writes: false,
+                no_warnings: false,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),
@@ -1282,6 +1323,7 @@ mod tests {
                 no_emoji: false,
                 input_files: vec![],
                 allow_fs_writes: false,
+                no_warnings: false,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),
@@ -1337,6 +1379,7 @@ mod tests {
                 no_emoji: false,
                 input_files: vec![],
                 allow_fs_writes: false,
+                no_warnings: false,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),
@@ -1391,6 +1434,7 @@ mod tests {
                 no_emoji: false,
                 input_files: vec![],
                 allow_fs_writes: false,
+                no_warnings: false,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),

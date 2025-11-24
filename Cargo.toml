@@ -14,7 +14,7 @@ categories = ["command-line-utilities", "parsing"]
 clap = { version = "4.0", features = ["derive"] }  # Command-line argument parsing and help generation
 
 # Core functionality
-rhai = { version = "1.23", features = ["sync", "debugging"] }  # Embedded scripting engine for log filtering and transformation
+rhai = { version = "1.23", features = ["sync", "debugging", "internals"] }  # Embedded scripting engine for log filtering and transformation
 anyhow = "1.0"  # Error handling and propagation
 
 # Serialization and parsing
