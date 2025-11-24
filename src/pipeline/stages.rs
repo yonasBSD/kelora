@@ -112,6 +112,25 @@ impl FilterStage {
             context_type: crate::event::ContextType::None,
         });
 
+        // AST-based field access validation (catches ALL field accesses including comparisons)
+        if !ctx.config.no_warnings {
+            let accessed = self.compiled_filter.accessed_fields();
+            let available: std::collections::BTreeSet<String> =
+                event.fields.keys().cloned().collect();
+
+            // Warn about fields that are accessed but don't exist
+            for field in accessed {
+                if !available.contains(field) {
+                    crate::rhai_functions::tracking::track_warning(
+                        field,
+                        None, // No operation info from AST
+                        ctx.meta.line_num.unwrap_or(0),
+                        &available,
+                    );
+                }
+            }
+        }
+
         // Check if current event matches filter
         let is_match = match self.evaluate_filter(&event, ctx) {
             Ok(result) => result,
