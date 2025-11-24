@@ -296,17 +296,56 @@ impl ScriptStage for FilterStage {
                 }
             }
             Err(e) => {
-                // Track error for reporting even in resilient mode
-                crate::rhai_functions::tracking::track_error(
-                    "filter",
-                    ctx.meta.line_num,
-                    &format!("Filter error: {}", e),
-                    Some(&event.original_line),
-                    ctx.meta.filename.as_deref(),
-                    ctx.config.verbose,
-                    ctx.config.quiet_level,
-                    Some(&ctx.config),
-                );
+                let error_msg = format!("{}", e);
+
+                // Detect unit type operations and track as warnings
+                if crate::rhai_functions::tracking::is_unit_type_error(&error_msg) {
+                    let field_name = crate::rhai_functions::tracking::extract_field_from_script(
+                        self.compiled_filter.source(),
+                    )
+                    .unwrap_or_else(|| "unknown".to_string());
+                    let operation = crate::rhai_functions::tracking::extract_operation(&error_msg);
+
+                    // Get available field names from the current event and discovered keys so far
+                    let mut available_fields: std::collections::BTreeSet<String> =
+                        event.fields.keys().cloned().collect();
+                    if let Some(dynamic_keys) =
+                        ctx.internal_tracker.get("__kelora_stats_discovered_keys")
+                    {
+                        if let Ok(arr) = dynamic_keys.clone().into_array() {
+                            for entry in arr {
+                                if let Ok(key) = entry.into_string() {
+                                    available_fields.insert(key);
+                                }
+                            }
+                        }
+                    }
+
+                    crate::rhai_functions::tracking::track_warning(
+                        &field_name,
+                        operation.as_deref(),
+                        ctx.meta.line_num.unwrap_or(0),
+                        &available_fields,
+                    );
+                }
+
+                // Track error for reporting (but not for unit-type warnings in resilient mode)
+                if !ctx.config.strict
+                    && crate::rhai_functions::tracking::is_unit_type_error(&error_msg)
+                {
+                    // Treat as warning only
+                } else {
+                    crate::rhai_functions::tracking::track_error(
+                        "filter",
+                        ctx.meta.line_num,
+                        &format!("Filter error: {}", e),
+                        Some(&event.original_line),
+                        ctx.meta.filename.as_deref(),
+                        ctx.config.verbose,
+                        ctx.config.quiet_level,
+                        Some(&ctx.config),
+                    );
+                }
 
                 // New resiliency model: filter errors evaluate to false (Skip)
                 // unless in strict mode, where they still propagate as errors
