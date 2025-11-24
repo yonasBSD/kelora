@@ -112,17 +112,17 @@ impl FilterStage {
             context_type: crate::event::ContextType::None,
         });
 
-        // AST-based field access validation (catches ALL field accesses including comparisons)
+        // AST-based field access validation (catches field reads, not writes)
         if !ctx.config.no_warnings {
-            let accessed = self.compiled_filter.accessed_fields();
+            let accessed = self.compiled_filter.read_fields();
             let available: std::collections::BTreeSet<String> =
                 event.fields.keys().cloned().collect();
 
             // Warn about fields that are accessed but don't exist
             for field in accessed {
-                if !available.contains(field) {
+                if !available.contains(&field) {
                     crate::rhai_functions::tracking::track_warning(
-                        field,
+                        &field,
                         None, // No operation info from AST
                         ctx.meta.line_num.unwrap_or(0),
                         &available,
@@ -303,17 +303,17 @@ impl ScriptStage for FilterStage {
             return self.process_with_context(event, ctx);
         }
 
-        // AST-based field access validation (catches ALL field accesses including comparisons)
+        // AST-based field access validation (catches field reads, not writes)
         if !ctx.config.no_warnings {
-            let accessed = self.compiled_filter.accessed_fields();
+            let accessed = self.compiled_filter.read_fields();
             let available: std::collections::BTreeSet<String> =
                 event.fields.keys().cloned().collect();
 
             // Warn about fields that are accessed but don't exist
             for field in accessed {
-                if !available.contains(field) {
+                if !available.contains(&field) {
                     crate::rhai_functions::tracking::track_warning(
-                        field,
+                        &field,
                         None, // No operation info from AST
                         ctx.meta.line_num.unwrap_or(0),
                         &available,
@@ -440,17 +440,17 @@ impl ScriptStage for ExecStage {
 
         file_ops::clear_pending_ops();
 
-        // AST-based field access validation (catches ALL field accesses including comparisons)
+        // AST-based field access validation (catches field reads, not writes)
         if !ctx.config.no_warnings {
-            let accessed = self.compiled_exec.accessed_fields();
+            let accessed = self.compiled_exec.read_fields();
             let available: std::collections::BTreeSet<String> =
                 event.fields.keys().cloned().collect();
 
             // Warn about fields that are accessed but don't exist
             for field in accessed {
-                if !available.contains(field) {
+                if !available.contains(&field) {
                     crate::rhai_functions::tracking::track_warning(
-                        field,
+                        &field,
                         None, // No operation info from AST
                         ctx.meta.line_num.unwrap_or(0),
                         &available,

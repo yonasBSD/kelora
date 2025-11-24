@@ -859,63 +859,186 @@ pub fn debug_stats_set_thread_state(stats: &DebugStatistics) {
     });
 }
 
+/// Represents the type of access to a field in a Rhai expression
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum AccessType {
+    Read,      // Field is being read/accessed
+    Write,     // Field is being assigned (LHS of simple assignment)
+    ReadWrite, // Field is both read and written (compound assignments: +=, -=, etc.)
+}
+
+/// Represents a field access with its access type
+#[derive(Debug, Clone)]
+struct FieldAccess {
+    field_name: String,
+    access_type: AccessType,
+}
+
 /// Extract field names accessed on variable 'e' from a Rhai AST
 ///
 /// Uses AST walking to find all property access patterns like `e.field_name`
 /// including chained method calls like `e.field.to_upper()`.
+/// Distinguishes between field reads and writes to avoid false warnings.
 ///
 /// Requires the 'debugging' feature which provides AST access.
-fn extract_field_accesses(ast: &AST) -> std::collections::HashSet<String> {
-    use std::collections::HashSet;
+fn extract_field_accesses(ast: &AST) -> Vec<FieldAccess> {
+    use std::collections::HashMap;
 
-    let mut fields = HashSet::new();
+    let mut accesses: HashMap<String, AccessType> = HashMap::new();
 
     ast.walk(&mut |path| {
         if let Some(node) = path.first() {
             let node_str = format!("{:?}", node);
-            extract_fields_from_node_string(&node_str, &mut fields);
+
+            // Skip nodes that don't involve Variable(e)
+            if !node_str.contains("Variable(e)") {
+                return true;
+            }
+
+            // Check if this is an assignment statement
+            if node_str.contains("Assignment(") {
+                extract_assignment_fields(&node_str, &mut accesses);
+            } else {
+                // Not an assignment - all fields are reads
+                extract_read_fields(&node_str, &mut accesses);
+            }
         }
-        true // Continue walking
+        true
     });
 
-    fields
+    // Convert HashMap to Vec<FieldAccess>
+    accesses
+        .into_iter()
+        .map(|(field_name, access_type)| FieldAccess {
+            field_name,
+            access_type,
+        })
+        .collect()
 }
 
-/// Helper function to extract field names from AST node debug string
-fn extract_fields_from_node_string(node_str: &str, fields: &mut std::collections::HashSet<String>) {
-    // Only process nodes involving Variable(e)
-    if !node_str.contains("Variable(e)") {
-        return;
+/// Extract field accesses from assignment statements
+fn extract_assignment_fields(
+    node_str: &str,
+    accesses: &mut std::collections::HashMap<String, AccessType>,
+) {
+    use AccessType::*;
+
+    // Determine if this is a compound assignment (+=, -=, *=, etc.)
+    let is_compound = node_str.contains("PlusAssign")
+        || node_str.contains("MinusAssign")
+        || node_str.contains("MultiplyAssign")
+        || node_str.contains("DivideAssign")
+        || node_str.contains("ModuloAssign")
+        || node_str.contains("PowerOfAssign")
+        || node_str.contains("ShiftLeftAssign")
+        || node_str.contains("ShiftRightAssign")
+        || node_str.contains("AndAssign")
+        || node_str.contains("OrAssign")
+        || node_str.contains("XOrAssign");
+
+    // For assignments, Rhai uses: Stmt(Assignment((op, BinaryExpr { lhs: ..., rhs: ... })))
+    // Find the BinaryExpr within the assignment
+    if let Some(binary_start) = node_str.find("BinaryExpr {") {
+        let binary_section = &node_str[binary_start..];
+
+        // Extract LHS fields (target of assignment)
+        if let Some(lhs_start) = binary_section.find("lhs:") {
+            // Find the end of the lhs section (before "rhs:")
+            let lhs_section = if let Some(rhs_pos) = binary_section[lhs_start..].find(", rhs:") {
+                &binary_section[lhs_start..lhs_start + rhs_pos]
+            } else {
+                &binary_section[lhs_start..]
+            };
+
+            let lhs_fields = extract_fields_from_section(lhs_section);
+            for field in lhs_fields {
+                if is_compound {
+                    // Compound assignment: field is both read and written
+                    merge_access_type(accesses, field, ReadWrite);
+                } else {
+                    // Regular assignment: field is only written
+                    merge_access_type(accesses, field, Write);
+                }
+            }
+        }
+
+        // Extract RHS fields (value being assigned)
+        if let Some(rhs_start) = binary_section.find("rhs:") {
+            let rhs_section = &binary_section[rhs_start..];
+            let rhs_fields = extract_fields_from_section(rhs_section);
+
+            for field in rhs_fields {
+                // RHS fields are always reads
+                merge_access_type(accesses, field, Read);
+            }
+        }
     }
+}
+
+/// Extract field accesses from non-assignment contexts (all reads)
+fn extract_read_fields(
+    node_str: &str,
+    accesses: &mut std::collections::HashMap<String, AccessType>,
+) {
+    // Non-assignment context - all fields are reads
+    let fields = extract_fields_from_section(node_str);
+    for field in fields {
+        merge_access_type(accesses, field, AccessType::Read);
+    }
+}
+
+/// Helper function to extract field names from AST node section
+fn extract_fields_from_section(section: &str) -> Vec<String> {
+    let mut fields = Vec::new();
 
     // Pattern 1: Direct property access - Variable(e) ... Property(field_name)
-    // Matches: Dot { lhs: Variable(e) ... rhs: Property(field_name) }
     if let Ok(re) = regex::Regex::new(r"Variable\(e\)[^}]*Property\((\w+)\)") {
-        for cap in re.captures_iter(node_str) {
+        for cap in re.captures_iter(section) {
             if let Some(field_name) = cap.get(1) {
-                fields.insert(field_name.as_str().to_string());
+                fields.push(field_name.as_str().to_string());
             }
         }
     }
 
     // Pattern 2: Nested case for method calls - rhs: Dot { lhs: Property(field)
-    // Matches: e.field.to_upper() where field is accessed before method call
-    if node_str.contains("lhs: Variable(e)") {
+    if section.contains("lhs: Variable(e)") {
         if let Ok(nested_re) = regex::Regex::new(r"rhs: Dot \{ lhs: Property\((\w+)\)") {
-            for cap in nested_re.captures_iter(node_str) {
+            for cap in nested_re.captures_iter(section) {
                 if let Some(field_name) = cap.get(1) {
-                    fields.insert(field_name.as_str().to_string());
+                    fields.push(field_name.as_str().to_string());
                 }
             }
         }
     }
+
+    fields
+}
+
+/// Merge access types for a field, upgrading to ReadWrite if accessed both ways
+fn merge_access_type(
+    accesses: &mut std::collections::HashMap<String, AccessType>,
+    field: String,
+    new_type: AccessType,
+) {
+    use AccessType::*;
+
+    let current = accesses.entry(field.clone()).or_insert(new_type.clone());
+
+    // Merge logic: if a field is both read and written, mark as ReadWrite
+    *current = match (&*current, &new_type) {
+        (Read, Write) | (Write, Read) => ReadWrite,
+        (Read, ReadWrite) | (ReadWrite, Read) => ReadWrite,
+        (Write, ReadWrite) | (ReadWrite, Write) => ReadWrite,
+        (ReadWrite, ReadWrite) => ReadWrite,
+        _ => new_type,
+    };
 }
 
 #[derive(Clone)]
 pub struct CompiledExpression {
     ast: AST,
     expr: String,
-    accessed_fields: std::collections::HashSet<String>,
+    field_accesses: Vec<FieldAccess>,
 }
 
 impl CompiledExpression {
@@ -924,9 +1047,30 @@ impl CompiledExpression {
         &self.expr
     }
 
-    /// Get the set of field names accessed on variable 'e' in this expression
-    pub fn accessed_fields(&self) -> &std::collections::HashSet<String> {
-        &self.accessed_fields
+    /// Get fields that are READ (including ReadWrite, excluding pure Write)
+    pub fn read_fields(&self) -> std::collections::HashSet<String> {
+        self.field_accesses
+            .iter()
+            .filter(|fa| matches!(fa.access_type, AccessType::Read | AccessType::ReadWrite))
+            .map(|fa| fa.field_name.clone())
+            .collect()
+    }
+
+    /// Get fields that are WRITTEN (including ReadWrite, excluding pure Read)
+    pub fn written_fields(&self) -> std::collections::HashSet<String> {
+        self.field_accesses
+            .iter()
+            .filter(|fa| matches!(fa.access_type, AccessType::Write | AccessType::ReadWrite))
+            .map(|fa| fa.field_name.clone())
+            .collect()
+    }
+
+    /// Get all accessed fields (backward compatibility)
+    pub fn accessed_fields(&self) -> std::collections::HashSet<String> {
+        self.field_accesses
+            .iter()
+            .map(|fa| fa.field_name.clone())
+            .collect()
     }
 }
 
@@ -1608,11 +1752,11 @@ impl RhaiEngine {
             );
             anyhow::anyhow!(msg)
         })?;
-        let accessed_fields = extract_field_accesses(&ast);
+        let field_accesses = extract_field_accesses(&ast);
         Ok(CompiledExpression {
             ast,
             expr: filter.to_string(),
-            accessed_fields,
+            field_accesses,
         })
     }
 
@@ -1629,11 +1773,11 @@ impl RhaiEngine {
             );
             anyhow::anyhow!(msg)
         })?;
-        let accessed_fields = extract_field_accesses(&ast);
+        let field_accesses = extract_field_accesses(&ast);
         Ok(CompiledExpression {
             ast,
             expr: exec.to_string(),
-            accessed_fields,
+            field_accesses,
         })
     }
 
@@ -1650,11 +1794,11 @@ impl RhaiEngine {
             );
             anyhow::anyhow!(msg)
         })?;
-        let accessed_fields = extract_field_accesses(&ast);
+        let field_accesses = extract_field_accesses(&ast);
         Ok(CompiledExpression {
             ast,
             expr: begin.to_string(),
-            accessed_fields,
+            field_accesses,
         })
     }
 
@@ -1671,11 +1815,11 @@ impl RhaiEngine {
             );
             anyhow::anyhow!(msg)
         })?;
-        let accessed_fields = extract_field_accesses(&ast);
+        let field_accesses = extract_field_accesses(&ast);
         Ok(CompiledExpression {
             ast,
             expr: end.to_string(),
-            accessed_fields,
+            field_accesses,
         })
     }
 
@@ -1692,11 +1836,11 @@ impl RhaiEngine {
             );
             anyhow::anyhow!(msg)
         })?;
-        let accessed_fields = extract_field_accesses(&ast);
+        let field_accesses = extract_field_accesses(&ast);
         Ok(CompiledExpression {
             ast,
             expr: script.to_string(),
-            accessed_fields,
+            field_accesses,
         })
     }
 
