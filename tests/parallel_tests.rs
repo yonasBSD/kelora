@@ -164,7 +164,7 @@ fn test_parallel_stats_output_counts_lines_and_events() {
             "-f",
             "json",
             "--parallel",
-            "--stats",
+            "--with-stats",
             "--exec",
             "if status >= 400 { track_count(\"errors\"); }",
         ],
@@ -339,12 +339,12 @@ fn test_parallel_multiline_indent_consistency() {
 
     // Sequential processing
     let (stdout_seq, stderr_seq, exit_code_seq) =
-        run_kelora_with_input(&["-f", "line", "-M", "indent", "--stats"], input);
+        run_kelora_with_input(&["-f", "line", "-M", "indent", "--with-stats"], input);
     assert_eq!(exit_code_seq, 0, "Sequential should succeed");
 
     // Parallel processing
     let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(
-        &["-f", "line", "-M", "indent", "--stats", "--parallel"],
+        &["-f", "line", "-M", "indent", "--with-stats", "--parallel"],
         input,
     );
     assert_eq!(exit_code_par, 0, "Parallel should succeed");
@@ -388,12 +388,19 @@ Jan  1 10:00:15 host app: Event four debug message"#;
 
     // Sequential processing
     let (stdout_seq, stderr_seq, exit_code_seq) =
-        run_kelora_with_input(&["-f", "syslog", "-M", "timestamp", "--stats"], input);
+        run_kelora_with_input(&["-f", "syslog", "-M", "timestamp", "--with-stats"], input);
     assert_eq!(exit_code_seq, 0, "Sequential should succeed");
 
     // Parallel processing
     let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(
-        &["-f", "syslog", "-M", "timestamp", "--stats", "--parallel"],
+        &[
+            "-f",
+            "syslog",
+            "-M",
+            "timestamp",
+            "--with-stats",
+            "--parallel",
+        ],
         input,
     );
     assert_eq!(exit_code_par, 0, "Parallel should succeed");
@@ -433,12 +440,14 @@ fn test_parallel_multiline_all_consistency() {
 
     // Sequential processing
     let (stdout_seq, stderr_seq, exit_code_seq) =
-        run_kelora_with_input(&["-f", "line", "-M", "all", "--stats"], input);
+        run_kelora_with_input(&["-f", "line", "-M", "all", "--with-stats"], input);
     assert_eq!(exit_code_seq, 0, "Sequential should succeed");
 
     // Parallel processing
-    let (stdout_par, stderr_par, exit_code_par) =
-        run_kelora_with_input(&["-f", "line", "-M", "all", "--stats", "--parallel"], input);
+    let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(
+        &["-f", "line", "-M", "all", "--with-stats", "--parallel"],
+        input,
+    );
     assert_eq!(exit_code_par, 0, "Parallel should succeed");
 
     // Parse event counts
@@ -735,7 +744,7 @@ fn test_parallel_stress_many_threads() {
             "8",
             "--batch-size",
             "50",
-            "--stats",
+            "--with-stats",
         ],
         &input,
     );
@@ -775,8 +784,8 @@ fn test_parallel_with_filtering_and_metrics() {
             "e.value % 10 == 0",
             "--exec",
             "track_count(\"divisible_by_10\");",
-            "--stats",
-            "--metrics",
+            "--with-stats",
+            "--with-metrics",
         ],
         &input,
     );
@@ -928,7 +937,7 @@ fn test_parallel_multiline_filtering_accuracy() {
             "line",
             "-M",
             "indent",
-            "--stats",
+            "--with-stats",
             "--parallel",
             "--filter",
             "e.line.contains(\"ERROR\")",
@@ -959,7 +968,7 @@ fn test_parallel_multiline_filtering_accuracy() {
             "line",
             "-M",
             "indent",
-            "--stats",
+            "--with-stats",
             "--parallel",
             "--filter",
             "e.line.contains(\"INFO\") || e.line.contains(\"DEBUG\")",
@@ -992,7 +1001,7 @@ Event 2 start
   continuation 2"#;
 
     let (_, stderr1, exit_code1) = run_kelora_with_input(
-        &["-f", "line", "-M", "indent", "--stats", "--parallel"],
+        &["-f", "line", "-M", "indent", "--with-stats", "--parallel"],
         input1,
     );
     assert_eq!(exit_code1, 0);
@@ -1011,7 +1020,7 @@ Final multiline start
   final continuation"#;
 
     let (_, stderr2, exit_code2) = run_kelora_with_input(
-        &["-f", "line", "-M", "indent", "--stats", "--parallel"],
+        &["-f", "line", "-M", "indent", "--with-stats", "--parallel"],
         input2,
     );
     assert_eq!(exit_code2, 0);
@@ -1028,7 +1037,7 @@ Final multiline start
         .join("\n");
 
     let (_, stderr3, exit_code3) = run_kelora_with_input(
-        &["-f", "line", "-M", "indent", "--stats", "--parallel"],
+        &["-f", "line", "-M", "indent", "--with-stats", "--parallel"],
         &input3,
     );
     assert_eq!(exit_code3, 0);
@@ -1078,7 +1087,7 @@ final line"#,
                 },
                 "-M",
                 strategy,
-                "--stats",
+                "--with-stats",
             ],
             input,
         );
@@ -1092,7 +1101,7 @@ final line"#,
                 },
                 "-M",
                 strategy,
-                "--stats",
+                "--with-stats",
                 "--parallel",
             ],
             input,
@@ -1133,7 +1142,7 @@ final line"#,
                     "line",
                     "-M",
                     strategy,
-                    "--stats",
+                    "--with-stats",
                     "--filter",
                     "e.line.contains(\"Error\")",
                 ],
@@ -1145,7 +1154,7 @@ final line"#,
                     "line",
                     "-M",
                     strategy,
-                    "--stats",
+                    "--with-stats",
                     "--parallel",
                     "--filter",
                     "e.line.contains(\"Error\")",
@@ -1188,7 +1197,7 @@ fn test_parallel_stats_counting_basic() {
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
         &[
-            "--stats",
+            "--with-stats",
             "--filter",
             "line.to_int() % 10 == 0",
             "--parallel",
@@ -1230,7 +1239,7 @@ fn test_parallel_stats_counting_large_dataset() {
 
     let (_stdout, stderr, exit_code) = run_kelora_with_input(
         &[
-            "--stats",
+            "--with-stats",
             "--filter",
             "line.to_int() % 10 == 0",
             "--parallel",
@@ -1269,11 +1278,13 @@ fn test_parallel_vs_sequential_stats_consistency() {
         .collect::<Vec<_>>()
         .join("\n");
 
-    let (stdout_seq, stderr_seq, exit_code_seq) =
-        run_kelora_with_input(&["--stats", "--filter", "line.to_int() % 100 == 0"], &input);
+    let (stdout_seq, stderr_seq, exit_code_seq) = run_kelora_with_input(
+        &["--with-stats", "--filter", "line.to_int() % 100 == 0"],
+        &input,
+    );
     let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(
         &[
-            "--stats",
+            "--with-stats",
             "--filter",
             "line.to_int() % 100 == 0",
             "--parallel",
@@ -1320,7 +1331,12 @@ fn test_parallel_stats_with_errors() {
     let input = "1\n2\ninvalid\n4\n5\n";
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
-        &["--stats", "--filter", "line.to_int() > 3", "--parallel"],
+        &[
+            "--with-stats",
+            "--filter",
+            "line.to_int() > 3",
+            "--parallel",
+        ],
         input,
     );
 
@@ -1365,7 +1381,7 @@ fn test_parallel_stats_with_different_batch_sizes() {
     for batch_size in batch_sizes {
         let (stdout, stderr, exit_code) = run_kelora_with_input(
             &[
-                "--stats",
+                "--with-stats",
                 "--filter",
                 "line.to_int() % 50 == 0",
                 "--parallel",
@@ -1532,8 +1548,8 @@ fn test_parallel_unordered_with_complex_operations() {
             "e.value % 3 == 0",
             "--exec",
             "track_bucket(\"categories\", e.category); e.doubled = e.value * 2;",
-            "--stats",
-            "--metrics",
+            "--with-stats",
+            "--with-metrics",
         ],
         &input,
     );
@@ -1582,7 +1598,7 @@ fn test_parallel_single_thread() {
         .join("\n");
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
-        &["-f", "json", "--parallel", "--threads", "1", "--stats"],
+        &["-f", "json", "--parallel", "--threads", "1", "--with-stats"],
         &input,
     );
 
@@ -1613,7 +1629,7 @@ fn test_parallel_very_small_batches() {
             "4",
             "--batch-size",
             "1",
-            "--stats",
+            "--with-stats",
         ],
         &input,
     );
@@ -1718,7 +1734,7 @@ fn test_parallel_with_all_events_filtered() {
             "--parallel",
             "--filter",
             "e.value > 1000", // Filters everything
-            "--stats",
+            "--with-stats",
         ],
         &input,
     );
@@ -1757,8 +1773,8 @@ fn test_parallel_metrics_aggregation_stress() {
             "25",
             "--exec",
             "track_bucket(\"status\", e.status); track_unique(\"users\", e.user); track_bucket(\"regions\", e.region); track_count(\"total\");",
-            "--stats",
-            "--metrics",
+            "--with-stats",
+            "--with-metrics",
         ],
         &input,
     );
@@ -1837,7 +1853,7 @@ fn test_parallel_ordering_completeness() {
             "e.value % 100 == 0",
             "--exec",
             "e.processed = true;",
-            "--stats",
+            "--with-stats",
             "--no-warnings", // Suppress warnings from AST field detection for dynamically created fields
         ],
         &input,
@@ -1896,7 +1912,7 @@ fn test_parallel_unordered_vs_ordered_consistency() {
             "--parallel",
             "--filter",
             filter,
-            "--stats",
+            "--with-stats",
         ],
         &input,
     );
@@ -1912,7 +1928,7 @@ fn test_parallel_unordered_vs_ordered_consistency() {
             "--unordered",
             "--filter",
             filter,
-            "--stats",
+            "--with-stats",
         ],
         &input,
     );
@@ -1979,7 +1995,7 @@ fn test_parallel_extreme_thread_count() {
             "--parallel",
             "--threads",
             "16", // Many threads for small input
-            "--stats",
+            "--with-stats",
         ],
         &input,
     );
@@ -2008,7 +2024,7 @@ fn test_parallel_multiline_ordering_stress() {
         .join("\n");
 
     let (stdout_seq, stderr_seq, exit_code_seq) =
-        run_kelora_with_input(&["-f", "line", "-M", "indent", "--stats"], &input);
+        run_kelora_with_input(&["-f", "line", "-M", "indent", "--with-stats"], &input);
 
     let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(
         &[
@@ -2016,7 +2032,7 @@ fn test_parallel_multiline_ordering_stress() {
             "line",
             "-M",
             "indent",
-            "--stats",
+            "--with-stats",
             "--parallel",
             "--threads",
             "6",
@@ -2088,7 +2104,7 @@ fn test_parallel_batch_boundaries_correctness() {
             "--parallel",
             "--batch-size",
             "10", // 97 doesn't divide evenly by 10
-            "--stats",
+            "--with-stats",
         ],
         &input,
     );

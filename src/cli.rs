@@ -46,6 +46,19 @@ pub enum FileOrder {
     Mtime,
 }
 
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub enum MetricsFormat {
+    Table,
+    Full,
+    Json,
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub enum StatsFormat {
+    Table,
+    Json,
+}
+
 // CLI structure - contains all command-line arguments and options
 #[derive(Parser)]
 #[command(name = "kelora")]
@@ -481,9 +494,19 @@ pub struct Cli {
     #[arg(long = "unordered", help_heading = "Performance Options")]
     pub no_preserve_order: bool,
 
-    /// Show processing statistics (default: off).
-    #[arg(short = 's', long = "stats", help_heading = "Metrics and Stats")]
-    pub stats: bool,
+    /// Show stats only (suppress events). Use -s for default (table), or --stats=FORMAT for explicit format.
+    #[arg(
+        short = 's',
+        long = "stats",
+        value_enum,
+        value_name = "FORMAT",
+        require_equals = true,
+        num_args = 0..=1,
+        default_missing_value = "table",
+        help_heading = "Metrics and Stats",
+        help = "Show stats only (suppress events).\n\nFormats: table, json\n\nExamples:\n  -s              Default table format\n  --stats=json    JSON output"
+    )]
+    pub stats: Option<StatsFormat>,
 
     /// Disable processing statistics explicitly (default: off).
     #[arg(
@@ -493,32 +516,23 @@ pub struct Cli {
     )]
     pub no_stats: bool,
 
-    /// Show processing statistics with no output
-    #[arg(
-        short = 'S',
-        long = "stats-only",
-        help_heading = "Metrics and Stats",
-        help = "Emit stats without events (implies -F none and --no-script-output). Diagnostics remain on."
-    )]
-    pub stats_only: bool,
+    /// Show stats alongside events (rare case).
+    #[arg(long = "with-stats", help_heading = "Metrics and Stats")]
+    pub with_stats: bool,
 
-    /// Emit metrics only: suppress events, diagnostics (except fatal line), stats, and script output; still emit metrics.
-    #[arg(
-        long = "metrics-only",
-        help_heading = "Metrics and Stats",
-        help = "Emit metrics only: suppress events, diagnostics (except fatal line), stats, and script output; does not imply --silent. Metrics files still write; terminal metrics suppressed by --silent."
-    )]
-    pub metrics_only: bool,
-
-    /// Show tracked metrics (default: off). Use -mm for full output without truncation.
+    /// Show metrics only (suppress events). Use -m for default (table), or --metrics=FORMAT for explicit format.
     #[arg(
         short = 'm',
         long = "metrics",
-        action = clap::ArgAction::Count,
+        value_enum,
+        value_name = "FORMAT",
+        require_equals = true,
+        num_args = 0..=1,
+        default_missing_value = "table",
         help_heading = "Metrics and Stats",
-        help = "Expose metrics recorded via track_*() in Rhai (see --help-rhai).\n\n  -m   Abbreviated table (large arrays show first 5 items)\n  -mm  Full table (all items, no truncation)"
+        help = "Show metrics only (suppress events).\n\nFormats: table, full, json\n\nExamples:\n  -m              Default table format\n  --metrics=full  Full table\n  --metrics=json  JSON output"
     )]
-    pub metrics: u8,
+    pub metrics: Option<MetricsFormat>,
 
     /// Disable tracked metrics explicitly (default: off).
     #[arg(
@@ -528,14 +542,9 @@ pub struct Cli {
     )]
     pub no_metrics: bool,
 
-    /// Output metrics as JSON to stderr (conflicts with -m).
-    #[arg(
-        long = "metrics-json",
-        help_heading = "Metrics and Stats",
-        conflicts_with = "metrics",
-        help = "Print metrics as JSON to stderr. Use --metrics-file to write to a file instead."
-    )]
-    pub metrics_json: bool,
+    /// Show metrics alongside events (rare case).
+    #[arg(long = "with-metrics", help_heading = "Metrics and Stats")]
+    pub with_metrics: bool,
 
     /// Write metrics to file (JSON format). Can combine with -m for both table and file.
     #[arg(
@@ -603,7 +612,7 @@ impl Cli {
     pub fn resolve_boolean_flags(&mut self) {
         // Handle stats/no-stats
         if self.no_stats {
-            self.stats = false;
+            self.stats = None;
         }
 
         // Handle parallel/no-parallel
@@ -613,7 +622,7 @@ impl Cli {
 
         // Handle metrics/no-metrics
         if self.no_metrics {
-            self.metrics = 0;
+            self.metrics = None;
         }
 
         // Handle strict/no-strict

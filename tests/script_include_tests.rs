@@ -23,7 +23,7 @@ fn include_functionality_basic() {
         include_path,
         "--exec",
         "e.doubled = double_value(e.value);",
-        "--stats",
+        "--with-stats",
     ];
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(&args, input);
@@ -62,7 +62,7 @@ fn include_functionality_parallel_compatibility() {
         include_path,
         "--exec",
         "e.score = calculate_score(e.base, e.mult);",
-        "--stats",
+        "--with-stats",
     ];
 
     let (stdout_seq, stderr_seq, exit_code_seq) = run_kelora_with_input(&args_seq, input);
@@ -80,7 +80,7 @@ fn include_functionality_parallel_compatibility() {
         "--exec",
         "e.score = calculate_score(e.base, e.mult);",
         "--parallel",
-        "--stats",
+        "--with-stats",
     ];
 
     let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(&args_par, input);
@@ -145,7 +145,7 @@ fn include_multiple_files_with_parallel() {
         "--exec",
         "e.is_positive = is_positive(e.sum);",
         "--parallel",
-        "--stats",
+        "--with-stats",
     ];
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(&args, input);

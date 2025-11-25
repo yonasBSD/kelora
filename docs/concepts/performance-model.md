@@ -84,7 +84,7 @@ Real-world gains depend on disk speed, decompression cost, and script workload.
 
 ## Measuring Performance
 
-- `--stats` or `--stats-only` print throughput, error counts, time span, and
+- `--stats` or `-s` print throughput, error counts, time span, and
   key inventory. Compare sequential vs parallel runs with the same dataset.
 
 - `--metrics` combined with `track_sum`/`track_bucket` can act as lightweight
@@ -120,7 +120,7 @@ Real-world gains depend on disk speed, decompression cost, and script workload.
 | Scenario | Suggested Flags |
 |----------|-----------------|
 | Watching logs live | Sequential (default), `--stats` for quick counters |
-| Importing nightly archives | `--parallel --batch-size 2000 --stats-only` |
+| Importing nightly archives | `--parallel --batch-size 2000 -s` |
 | CPU-heavy Rhai transforms | `--parallel --threads 0 --unordered` (if orderless) |
 | Tail with alerts | Sequential + `--metrics` for low-latency thresholds |
 

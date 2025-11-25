@@ -335,7 +335,7 @@ fn test_ignore_lines_with_stats() {
             "json",
             "--ignore-lines",
             "^#",
-            "--stats",
+            "--with-stats",
         ],
         input,
     );
@@ -504,7 +504,7 @@ fn test_levels_before_exec_limits_exec_work() {
             "error",
             "--exec",
             "track_count(\"exec_runs\")",
-            "--metrics",
+            "--with-metrics",
         ],
         input,
     );
@@ -539,7 +539,7 @@ fn test_exec_before_levels_observes_all_events() {
             "track_count(\"exec_runs\")",
             "--levels",
             "error",
-            "--metrics",
+            "--with-metrics",
         ],
         input,
     );

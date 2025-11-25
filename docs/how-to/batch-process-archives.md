@@ -72,7 +72,7 @@ kelora -j logs/2024-04-*.jsonl.gz \
 ```
 
 - `--unordered` flushes worker buffers immediately; expect non-deterministic ordering in the output stream.
-- Combine with `--metrics` or `--stats-only` when you only care about aggregates.
+- Combine with `--metrics` or `-s` when you only care about aggregates.
 
 ## Step 5: Automate and Monitor
 Wrap the tuned command in a script so you can schedule it via cron or CI.

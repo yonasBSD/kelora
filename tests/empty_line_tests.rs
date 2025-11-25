@@ -197,7 +197,7 @@ fn test_empty_line_handling_parallel_mode_line_format() {
 fn test_empty_line_handling_line_format_with_stats() {
     let input = "alpha\n\nbeta\n";
 
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["--stats"], input);
+    let (stdout, stderr, exit_code) = run_kelora_with_input(&["--with-stats"], input);
     assert_eq!(
         exit_code, 0,
         "Line format should exit successfully with stats"
@@ -227,7 +227,7 @@ fn test_empty_line_handling_structured_format_with_stats() {
 
 {"value": 2}"#;
 
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--stats"], input);
+    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--with-stats"], input);
     assert_eq!(exit_code, 0, "Structured format should exit successfully");
 
     let lines: Vec<&str> = stdout.trim().lines().collect();

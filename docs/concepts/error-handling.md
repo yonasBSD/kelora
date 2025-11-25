@@ -255,16 +255,19 @@ Use the new orthogonal toggles to control output for automation:
 | `-q` / `--no-events` | Suppress events (formatter output) |
 | `--no-diagnostics` | Suppress diagnostics/summaries (fatal line still emitted) |
 | `--silent` | Suppress all terminal output (events/diagnostics/stats/terminal metrics/script output); emit one fatal line on errors; metrics files still write |
-| `--no-script-output` | Suppress Rhai `print`/`eprint` (implied by `--silent`, `--metrics-only`, `--stats-only`) |
-| `--metrics-only` | Emit metrics only (suppress events, diagnostics except fatal line, stats, script output) |
-| `--stats-only` (`-S`) | Emit stats only (suppress events, script output; diagnostics stay on) |
+| `--no-script-output` | Suppress Rhai `print`/`eprint` (implied by `--silent`) |
+| `-s` / `--stats=FORMAT` | Show stats only (suppress events, script output; diagnostics stay on). Format: table, json |
+| `-m` / `--metrics=FORMAT` | Show metrics only (suppress events, diagnostics except fatal line, stats, script output). Format: table, full, json |
+| `--with-stats` | Show stats alongside events (rare case) |
+| `--with-metrics` | Show metrics alongside events (rare case) |
 
 Examples:
 
 ```bash
-kelora -q -j app.log --stats                         # No events; stats emit
+kelora -q -j app.log --with-stats                    # No events; stats emit
 kelora --silent -j app.log && echo "Clean" || echo "Has errors"
-kelora --metrics-only --metrics-file metrics.json app.log
+kelora -m --metrics-file metrics.json app.log        # Metrics only
+kelora --metrics=json app.log                        # Metrics in JSON format
 ```
 
 ## Exit Codes
@@ -482,7 +485,7 @@ kelora -j --exec 'if type_of(e.value) != "i64" { eprint("Value is not integer: "
 Test parsing with strict mode:
 
 ```bash
-kelora -j --strict --stats-only app.log
+kelora -j --strict -s app.log
 ```
 
 No output, but exits with error if parsing fails.

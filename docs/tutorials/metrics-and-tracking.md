@@ -194,28 +194,28 @@ Use `metrics["services"].len()` later to compute the number of distinct members.
 ### Viewing Full Metrics
 
 When `track_unique()` collects many items, `-m` shows only the first 5 with a
-hint. Use `-mm` for the complete list or `--metrics-json` for JSON format:
+hint. Use `--metrics=full` for the complete list or `--metrics=json` for JSON format:
 
-=== "Full table with -mm"
-
-    ```bash
-    kelora -j examples/simple_json.jsonl \
-      -F none \
-      -e 'track_unique("services", e.service)' \
-      -mm
-    ```
-
-=== "JSON format with --metrics-json"
+=== "Full table with --metrics=full"
 
     ```bash
     kelora -j examples/simple_json.jsonl \
       -F none \
       -e 'track_unique("services", e.service)' \
-      --metrics-json
+      --metrics=full
     ```
 
-The `-mm` flag shows all items in table format, while `--metrics-json` outputs
-structured JSON to stderr. Both are mutually exclusive—pick the format that
+=== "JSON format with --metrics=json"
+
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'track_unique("services", e.service)' \
+      --metrics=json
+    ```
+
+The `--metrics=full` flag shows all items in table format, while `--metrics=json` outputs
+structured JSON to stdout. Both are mutually exclusive—pick the format that
 matches your workflow. You can also combine `-m` with `--metrics-file` to get
 both table output and a JSON file.
 
@@ -425,8 +425,8 @@ human-readable histogram once processing finishes.
 - **No metrics printed**: Ensure you pass `-m` (or `--metrics`) or consume `metrics`
   within an `--end` script. Tracking functions alone do not emit output.
 
-- **Truncated arrays**: If `-m` shows only the first 5 items with a hint, use `-mm`
-  for full table output, `--metrics-json` for JSON format, or `--metrics-file` to
+- **Truncated arrays**: If `-m` shows only the first 5 items with a hint, use `--metrics=full`
+  for full table output, `--metrics=json` for JSON format, or `--metrics-file` to
   write JSON to disk.
 
 - **Huge maps**: Reset counters between runs by clearing your terminal or using
@@ -464,7 +464,7 @@ You've learned:
 - ✅ Calculate averages in `--end` stage from sum and count
 - ✅ Build histograms with `track_bucket()`
 - ✅ Count unique values with `track_unique()`
-- ✅ View metrics with `-m`, `-mm`, and `--metrics-json`
+- ✅ View metrics with `-m`, `--metrics=full`, and `--metrics=json`
 - ✅ Persist metrics with `--metrics-file`
 - ✅ Generate custom reports in `--end` stage
 - ✅ Use sliding windows for percentile analysis

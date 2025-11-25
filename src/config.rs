@@ -49,9 +49,10 @@ pub struct OutputConfig {
     pub pretty: bool,
     pub color: ColorMode,
     pub no_emoji: bool,
-    pub stats: bool,
-    pub metrics: u8,
-    pub metrics_json: bool,
+    pub stats: Option<crate::cli::StatsFormat>,
+    pub stats_with_events: bool,
+    pub metrics: Option<crate::cli::MetricsFormat>,
+    pub metrics_with_events: bool,
     pub metrics_file: Option<String>,
     pub mark_gaps: Option<chrono::Duration>,
     /// Timestamp formatting configuration (display-only)
@@ -645,8 +646,7 @@ impl KeloraConfig {
             silent = false;
         }
         let mut suppress_script_output = cli.no_script_output || silent;
-        let stats_only_mode = cli.stats_only;
-        let metrics_only_mode = cli.metrics_only;
+
         let flatten_levels = |values: &[String]| -> Vec<String> {
             values
                 .iter()
@@ -658,10 +658,37 @@ impl KeloraConfig {
         };
         let include_levels = flatten_levels(&cli.levels);
         let exclude_levels = flatten_levels(&cli.exclude_levels);
-        if stats_only_mode {
-            quiet_events = true;
-        }
-        if metrics_only_mode {
+
+        // Stats logic: determine format and whether events should be shown
+        // Check no_stats first to handle flag conflicts
+        let stats_format = if cli.no_stats {
+            None
+        } else if cli.stats.is_some() {
+            cli.stats.clone()
+        } else if cli.with_stats {
+            Some(crate::cli::StatsFormat::Table)
+        } else {
+            None
+        };
+        let stats_with_events = cli.with_stats;
+        let suppress_events_for_stats = stats_format.is_some() && !stats_with_events;
+
+        // Metrics logic: determine format and whether events should be shown
+        // Check no_metrics first to handle flag conflicts
+        let metrics_format = if cli.no_metrics {
+            None
+        } else if cli.metrics.is_some() {
+            cli.metrics.clone()
+        } else if cli.with_metrics {
+            Some(crate::cli::MetricsFormat::Table)
+        } else {
+            None
+        };
+        let metrics_with_events = cli.with_metrics;
+        let suppress_events_for_metrics = metrics_format.is_some() && !metrics_with_events;
+
+        // Combine suppressions from stats/metrics data-only modes
+        if suppress_events_for_stats || suppress_events_for_metrics {
             quiet_events = true;
         }
 
@@ -671,13 +698,11 @@ impl KeloraConfig {
             cli.output_format.clone().into()
         };
 
-        if stats_only_mode {
-            output_format = OutputFormat::None;
+        // Data-only modes suppress script output
+        if suppress_events_for_stats {
             suppress_script_output = true;
         }
-
-        if metrics_only_mode {
-            output_format = OutputFormat::None;
+        if suppress_events_for_metrics {
             suppress_diagnostics = true;
             suppress_script_output = true;
         }
@@ -699,29 +724,7 @@ impl KeloraConfig {
             output_format = OutputFormat::None;
         }
 
-        let mut stats_enabled = if cli.no_stats {
-            false
-        } else {
-            cli.stats || cli.stats_only
-        };
-        if metrics_only_mode {
-            stats_enabled = false;
-        }
-
-        let mut metrics_count = if cli.no_metrics { 0 } else { cli.metrics };
-        let metrics_json = if cli.no_metrics {
-            false
-        } else {
-            cli.metrics_json
-        };
-        let metrics_file = if cli.no_metrics {
-            None
-        } else {
-            cli.metrics_file.clone()
-        };
-        if metrics_only_mode && metrics_count == 0 && !metrics_json && metrics_file.is_none() {
-            metrics_count = 1;
-        }
+        let metrics_file = cli.metrics_file.clone();
 
         let quiet_level = if suppress_script_output {
             3
@@ -769,9 +772,10 @@ impl KeloraConfig {
                 pretty: cli.expand_nested,
                 color: color_mode,
                 no_emoji: cli.no_emoji,
-                stats: stats_enabled,
-                metrics: metrics_count,
-                metrics_json,
+                stats: stats_format,
+                stats_with_events,
+                metrics: metrics_format,
+                metrics_with_events,
                 metrics_file,
                 mark_gaps: None,
                 timestamp_formatting: create_timestamp_format_config(cli, default_timezone.clone()),
@@ -865,9 +869,10 @@ impl Default for KeloraConfig {
                 pretty: false,
                 color: ColorMode::Auto,
                 no_emoji: false,
-                stats: false,
-                metrics: 0,
-                metrics_json: false,
+                stats: None,
+                stats_with_events: false,
+                metrics: None,
+                metrics_with_events: false,
                 metrics_file: None,
                 mark_gaps: None,
                 timestamp_formatting: TimestampFormatConfig::default(),

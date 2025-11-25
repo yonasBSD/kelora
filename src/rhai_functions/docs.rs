@@ -396,7 +396,7 @@ kelora -j api_logs.jsonl --filter 'e.request_id.bucket() % 10 == 0'
 kelora web_access.log --filter 'e.status == 404' --take 50
 
 # Stats-only mode: no event output
-kelora -j api_logs.jsonl --stats-only
+kelora -j api_logs.jsonl -s
 
 COMMON IDIOMS:
 # Method chaining              → e.domain = e.url.extract_domain().to_lower().strip()

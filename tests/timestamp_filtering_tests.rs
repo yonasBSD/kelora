@@ -429,25 +429,25 @@ fn test_timestamp_filtering_with_other_filters() {
 fn test_stats_report_custom_ts_field_failures() {
     let input = r#"{"timestamp":"2024-01-15T10:00:00Z","service":"api","message":"event"}"#;
 
-    let (_stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "json", "-S", "--ts-field", "service"], input);
+    let (stdout, _stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "-s", "--ts-field", "service"], input);
 
     assert_eq!(
         exit_code, 0,
-        "kelora should exit successfully. stderr: {}",
-        stderr
+        "kelora should exit successfully. stdout: {}",
+        stdout
     );
     assert!(
-        stderr.contains(
+        stdout.contains(
             "Timestamp: service (--ts-field) - 0/1 parsed (0.0%). Hint: Adjust --ts-format."
         ),
-        "Stats should report the failure for the user-specified timestamp field.\nSTDERR:\n{}",
-        stderr
+        "Stats should report the failure for the user-specified timestamp field.\nSTDOUT:\n{}",
+        stdout
     );
     assert!(
-        stderr.contains("Warning: --ts-field service values could not be parsed"),
-        "Should emit a summary warning for the failed --ts-field override.\nSTDERR:\n{}",
-        stderr
+        stdout.contains("Warning: --ts-field service values could not be parsed"),
+        "Should emit a summary warning for the failed --ts-field override.\nSTDOUT:\n{}",
+        stdout
     );
 }
 
@@ -455,25 +455,25 @@ fn test_stats_report_custom_ts_field_failures() {
 fn test_stats_report_custom_ts_format_failures() {
     let input = r#"{"timestamp":"not-a-timestamp","message":"event"}"#;
 
-    let (_stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "json", "-S", "--ts-format", "%d"], input);
+    let (stdout, _stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "-s", "--ts-format", "%d"], input);
 
     assert_eq!(
         exit_code, 0,
-        "kelora should exit successfully. stderr: {}",
-        stderr
+        "kelora should exit successfully. stdout: {}",
+        stdout
     );
     assert!(
-        stderr.contains(
+        stdout.contains(
             "Timestamp: timestamp (auto-detected) - 0/1 parsed (0.0%). Hint: Try --ts-field or --ts-format."
         ),
-        "Overall timestamp parsing should reflect the failure.\nSTDERR:\n{}",
-        stderr
+        "Overall timestamp parsing should reflect the failure.\nSTDOUT:\n{}",
+        stdout
     );
     assert!(
-        stderr.contains("Warning: --ts-format '%d' did not match any timestamp values"),
-        "Should emit a summary warning for the failed --ts-format override.\nSTDERR:\n{}",
-        stderr
+        stdout.contains("Warning: --ts-format '%d' did not match any timestamp values"),
+        "Should emit a summary warning for the failed --ts-format override.\nSTDOUT:\n{}",
+        stdout
     );
 }
 
@@ -481,8 +481,8 @@ fn test_stats_report_custom_ts_format_failures() {
 fn test_custom_ts_field_failure_strict_exits() {
     let input = r#"{"timestamp":"2024-01-15T10:00:00Z","service":"api","message":"event"}"#;
 
-    let (_stdout, stderr, exit_code) = run_kelora_with_input(
-        &["-f", "json", "-S", "--ts-field", "service", "--strict"],
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &["-f", "json", "-s", "--ts-field", "service", "--strict"],
         input,
     );
 
@@ -491,9 +491,9 @@ fn test_custom_ts_field_failure_strict_exits() {
         "strict mode should cause non-zero exit on override failure"
     );
     assert!(
-        stderr.contains("Warning: --ts-field service values could not be parsed"),
-        "Strict mode should still display the warning in stats output.\nSTDERR:\n{}",
-        stderr
+        stdout.contains("Warning: --ts-field service values could not be parsed"),
+        "Strict mode should still display the warning in stats output.\nSTDOUT:\n{}",
+        stdout
     );
 }
 
@@ -733,8 +733,10 @@ fn test_timestamp_filtering_with_stats() {
     );
 
     let since_ts = get_test_timestamp_iso(-45);
-    let (_stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(
+        &["-f", "json", "--since", &since_ts, "--with-stats"],
+        &input,
+    );
 
     assert_eq!(
         exit_code, 0,
@@ -765,8 +767,10 @@ fn test_timestamp_filtering_stats_counts() {
     );
 
     let since_ts = get_test_timestamp_iso(-60); // 1 hour ago
-    let (_stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(
+        &["-f", "json", "--since", &since_ts, "--with-stats"],
+        &input,
+    );
 
     assert_eq!(
         exit_code, 0,
@@ -796,8 +800,10 @@ fn test_timestamp_filtering_stats_with_mixed_timestamps() {
     );
 
     let since_ts = get_test_timestamp_iso(-60); // 1 hour ago
-    let (_stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(
+        &["-f", "json", "--since", &since_ts, "--with-stats"],
+        &input,
+    );
 
     assert_eq!(
         exit_code, 0,
@@ -825,8 +831,10 @@ fn test_timestamp_filtering_stats_all_filtered() {
     );
 
     let since_ts = get_test_timestamp_iso(-30); // 30 minutes ago
-    let (_stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(
+        &["-f", "json", "--since", &since_ts, "--with-stats"],
+        &input,
+    );
 
     assert_eq!(
         exit_code, 0,
@@ -854,8 +862,10 @@ fn test_timestamp_filtering_stats_none_filtered() {
     );
 
     let since_ts = get_test_timestamp_iso(-60); // 1 hour ago
-    let (_stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "json", "--since", &since_ts, "--stats"], &input);
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(
+        &["-f", "json", "--since", &since_ts, "--with-stats"],
+        &input,
+    );
 
     assert_eq!(
         exit_code, 0,

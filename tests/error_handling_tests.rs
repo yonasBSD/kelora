@@ -144,7 +144,7 @@ fn test_error_stats_sequential_mode() {
 not json at all
 {"final": "entry", "status": 500}"#;
 
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--stats"], input);
+    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--with-stats"], input);
     assert_eq!(
         exit_code, 1,
         "Sequential mode should return a non-zero exit status when parse errors occur"
@@ -173,7 +173,14 @@ not json at all
 {"final": "entry", "status": 500}"#;
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
-        &["-f", "json", "--stats", "--parallel", "--batch-size", "2"],
+        &[
+            "-f",
+            "json",
+            "--with-stats",
+            "--parallel",
+            "--batch-size",
+            "2",
+        ],
         input,
     );
     assert_eq!(
@@ -204,7 +211,7 @@ not json at all
 {"final": "entry", "status": 500}"#;
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
-        &["-f", "json", "--filter", "e.status >= 400", "--stats"],
+        &["-f", "json", "--filter", "e.status >= 400", "--with-stats"],
         input,
     );
     assert_eq!(
@@ -234,8 +241,10 @@ fn test_error_stats_with_ignore_lines() {
 # Another comment
 {"another": "valid", "status": 404}"#;
 
-    let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "json", "--ignore-lines", "^#", "--stats"], input);
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &["-f", "json", "--ignore-lines", "^#", "--with-stats"],
+        input,
+    );
     assert_eq!(
         exit_code, 1,
         "Ignoring comments still propagates parse errors in sequential mode"
@@ -262,7 +271,7 @@ fn test_error_stats_no_errors() {
 {"final": "entry", "status": 500}"#;
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
-        &["-f", "json", "--filter", "e.status >= 400", "--stats"],
+        &["-f", "json", "--filter", "e.status >= 400", "--with-stats"],
         input,
     );
     assert_eq!(exit_code, 0, "All-valid input should exit successfully");
@@ -291,7 +300,7 @@ not json at all
 invalid json again"#;
 
     let (stdout_seq, stderr_seq, exit_code_seq) = run_kelora_with_input(
-        &["-f", "json", "--filter", "e.status >= 400", "--stats"],
+        &["-f", "json", "--filter", "e.status >= 400", "--with-stats"],
         input,
     );
     let (stdout_par, stderr_par, exit_code_par) = run_kelora_with_input(
@@ -300,7 +309,7 @@ invalid json again"#;
             "json",
             "--filter",
             "e.status >= 400",
-            "--stats",
+            "--with-stats",
             "--parallel",
             "--batch-size",
             "2",
@@ -351,7 +360,7 @@ fn test_error_stats_multiline_mode() {
 {malformed json line}
 {"another": "valid", "message": "single line"}"#;
 
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--stats"], input);
+    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--with-stats"], input);
     assert_eq!(
         exit_code, 1,
         "Sequential mode should return an error when multiline input has parse failures"
@@ -369,8 +378,10 @@ fn test_error_stats_multiline_mode() {
         "Events created: 2 total, 2 output, 0 filtered (0.0%)"
     );
 
-    let (_stdout_multi, stderr_multi, exit_code_multi) =
-        run_kelora_with_input(&["-f", "json", "--multiline", "indent", "--stats"], input);
+    let (_stdout_multi, stderr_multi, exit_code_multi) = run_kelora_with_input(
+        &["-f", "json", "--multiline", "indent", "--with-stats"],
+        input,
+    );
     assert_eq!(
         exit_code_multi, 1,
         "Multiline mode should still surface parse errors through the exit status"

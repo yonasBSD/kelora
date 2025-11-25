@@ -501,19 +501,7 @@ kelora --silent --metrics-file out.json app.log   # Quiet terminal, metrics file
 
 #### `--no-script-output`
 
-Suppress Rhai `print`/`eprint` and side-effect warnings without affecting diagnostics/stats/metrics. Implied by `--silent`, `--metrics-only`, and `--stats-only`.
-
-#### `--metrics-only`
-
-Suppress events, diagnostics (except fatal line), stats, and script output; emit metrics (stderr/JSON/file). Terminal metrics are suppressed by `--silent`, but metrics files still write.
-
-```bash
-kelora --metrics-only --metrics-file metrics.json app.log
-```
-
-#### `-S, --stats-only`
-
-Suppress events; emit stats to stderr; diagnostics remain on (fatal line allowed); script output is suppressed for a clean stats channel.
+Suppress Rhai `print`/`eprint` and side-effect warnings without affecting diagnostics/stats/metrics. Implied by `--silent` and data-only modes (`-s`, `-m` without `--with-*` flags).
 
 ## Filtering Options
 
@@ -876,34 +864,49 @@ kelora -j --parallel --unordered app.log
 
 ### Statistics
 
-#### `-s, --stats`
+#### `-s, --stats[=FORMAT]`
 
-Show processing statistics at end (default: off).
+Show stats only (suppress events). Use `-s` for default table format, or `--stats=FORMAT` for explicit format.
+
+Formats: `table`, `json`
 
 ```bash
-kelora -j --stats app.log
+kelora -j -s app.log                    # Default table format
+kelora -j --stats=json app.log          # JSON format
+```
+
+#### `--with-stats`
+
+Show stats alongside events (rare case).
+
+```bash
+kelora -j --with-stats app.log
 ```
 
 #### `--no-stats`
 
 Disable processing statistics explicitly (default: off).
 
-#### `-S, --stats-only`
-
-Print processing statistics only (implies `-F none`).
-
-```bash
-kelora -j --stats-only app.log
-```
-
 ### Tracked Metrics
 
-#### `-m, --metrics`
+#### `-m, --metrics[=FORMAT]`
 
-Show metrics recorded via `track_*()` functions in Rhai scripts.
+Show metrics only (suppress events). Use `-m` for default table format, or `--metrics=FORMAT` for explicit format.
+
+Formats: `table`, `full`, `json`
 
 ```bash
-kelora -j --exec 'track_count(e.service)' --metrics app.log
+kelora -j --exec 'track_count(e.service)' -m app.log              # Default table
+kelora -j --exec 'track_count(e.service)' --metrics=full app.log  # Full table
+kelora -j --exec 'track_count(e.service)' --metrics=json app.log  # JSON format
+```
+
+#### `--with-metrics`
+
+Show metrics alongside events (rare case).
+
+```bash
+kelora -j --exec 'track_count(e.service)' --with-metrics app.log
 ```
 
 #### `--no-metrics`

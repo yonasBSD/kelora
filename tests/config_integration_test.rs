@@ -45,7 +45,7 @@ fn test_config_file_with_defaults() {
     let config_path = temp_dir.path().join(".kelora.ini");
 
     // Create a config file with defaults
-    fs::write(&config_path, "defaults = -f json --stats\n").unwrap();
+    fs::write(&config_path, "defaults = -f json --with-stats\n").unwrap();
 
     // Create a simple JSON log file
     let log_file = temp_dir.path().join("test.log");
@@ -129,7 +129,7 @@ fn test_ignore_config_flag() {
     let config_path = temp_dir.path().join(".kelora.ini");
 
     // Create a config file with defaults that would affect output
-    fs::write(&config_path, "defaults = --stats\n").unwrap();
+    fs::write(&config_path, "defaults = --with-stats\n").unwrap();
 
     // Create a simple log file
     let log_file = temp_dir.path().join("test.log");
@@ -159,7 +159,7 @@ fn test_project_config_precedence() {
     let project_config = temp_dir.path().join(".kelora.ini");
     fs::write(
         &project_config,
-        "defaults = --stats\n[aliases]\ntest-alias = -q\n",
+        "defaults = --with-stats\n[aliases]\ntest-alias = -q\n",
     )
     .unwrap();
 
@@ -186,7 +186,7 @@ fn test_custom_config_file_path() {
 
     // Create a config file in a non-standard location
     let custom_config = temp_dir.path().join("custom.ini");
-    fs::write(&custom_config, "defaults = --stats\n").unwrap();
+    fs::write(&custom_config, "defaults = --with-stats\n").unwrap();
 
     // Create a log file
     let log_file = temp_dir.path().join("test.log");
@@ -488,7 +488,7 @@ fn test_config_with_comments() {
 
     // Create config with comments
     fs::write(&config_path,
-        "# This is a comment\ndefaults = --stats\n; Another comment\n[aliases]\n# Alias comment\nerrors = -l error\n").unwrap();
+        "# This is a comment\ndefaults = --with-stats\n; Another comment\n[aliases]\n# Alias comment\nerrors = -l error\n").unwrap();
 
     let log_file = temp_dir.path().join("test.log");
     fs::write(&log_file, "test\n").unwrap();
@@ -517,7 +517,7 @@ fn test_show_config_displays_content() {
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join(".kelora.ini");
 
-    let config_content = "defaults = -f json\n[aliases]\ntest = --stats\n";
+    let config_content = "defaults = -f json\n[aliases]\ntest = --with-stats\n";
     fs::write(&config_path, config_content).unwrap();
 
     let (stdout, _stderr, exit_code) = run_kelora_in_dir(temp_dir.path(), &["--show-config"], "");
@@ -533,7 +533,7 @@ fn test_show_config_displays_content() {
         stdout
     );
     assert!(stdout.contains("[aliases]"), "Should show aliases section");
-    assert!(stdout.contains("test = --stats"), "Should show alias");
+    assert!(stdout.contains("test = --with-stats"), "Should show alias");
 }
 
 #[test]

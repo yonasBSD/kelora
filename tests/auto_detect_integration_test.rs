@@ -216,7 +216,8 @@ fn test_auto_detect_with_stats() {
 {"level": "error", "message": "msg2"}
 {"level": "info", "message": "msg3"}"#;
 
-    let (_stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "auto", "--stats"], input);
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "auto", "--with-stats"], input);
 
     assert_eq!(exit_code, 0, "kelora should exit successfully");
     assert!(

@@ -283,7 +283,7 @@ fn test_gzip_with_multiline_mode() {
 
     // Read with multiline mode
     let (_stdout, stderr, exit_code) = run_kelora_with_files(
-        &["-f", "line", "-M", "indent", "--stats"],
+        &["-f", "line", "-M", "indent", "--with-stats"],
         &[gz_file_path.to_str().unwrap()],
     );
 

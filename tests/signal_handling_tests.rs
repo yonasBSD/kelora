@@ -36,7 +36,7 @@ fn test_sigusr1_prints_stats_and_continues() {
 "#;
 
     let mut child = Command::new(kelora_binary())
-        .args(["-f", "json", "-s"]) // Enable stats
+        .args(["-f", "json", "--with-stats"]) // Enable stats alongside events
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -425,7 +425,7 @@ fn test_stats_printed_on_normal_exit() {
 "#;
 
     let output = Command::new(kelora_binary())
-        .args(["-f", "json", "-s"]) // Enable stats
+        .args(["-f", "json", "--with-stats"]) // Enable stats alongside events
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

@@ -132,7 +132,7 @@ fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
     ctrl_rx: &Receiver<Ctrl>,
 ) -> Result<PipelineResult> {
     // Start statistics collection if enabled
-    if config.output.stats {
+    if config.output.stats.is_some() {
         stats_start_timer();
     }
 
@@ -834,7 +834,7 @@ fn process_line_sequential<W: Write>(
     *line_num += 1;
 
     // Count line read for stats
-    if config.output.stats {
+    if config.output.stats.is_some() {
         stats_add_line_read();
     }
 
@@ -849,7 +849,7 @@ fn process_line_sequential<W: Write>(
     if *skipped_lines < config.input.skip_lines {
         *skipped_lines += 1;
         // Count skipped line for stats
-        if config.output.stats {
+        if config.output.stats.is_some() {
             stats_add_line_filtered();
         }
         return Ok(ProcessingResult::Continue);
@@ -859,7 +859,7 @@ fn process_line_sequential<W: Write>(
     if let Some(selector) = section_selector {
         if !selector.should_include_line(&line) {
             // Count filtered line for stats
-            if config.output.stats {
+            if config.output.stats.is_some() {
                 stats_add_line_filtered();
             }
             return Ok(ProcessingResult::Continue);
@@ -870,7 +870,7 @@ fn process_line_sequential<W: Write>(
     if let Some(ref keep_regex) = config.input.keep_lines {
         if !keep_regex.is_match(&line) {
             // Count filtered line for stats
-            if config.output.stats {
+            if config.output.stats.is_some() {
                 stats_add_line_filtered();
             }
             return Ok(ProcessingResult::Continue);
@@ -881,7 +881,7 @@ fn process_line_sequential<W: Write>(
     if let Some(ref ignore_regex) = config.input.ignore_lines {
         if ignore_regex.is_match(&line) {
             // Count filtered line for stats
-            if config.output.stats {
+            if config.output.stats.is_some() {
                 stats_add_line_filtered();
             }
             return Ok(ProcessingResult::Continue);
@@ -967,7 +967,7 @@ fn process_line_sequential<W: Write>(
     match pipeline.process_line(line, ctx) {
         Ok(results) => {
             // Count output lines for stats
-            if config.output.stats && !results.is_empty() {
+            if config.output.stats.is_some() && !results.is_empty() {
                 stats_add_line_output();
             }
             // Note: Empty results are now counted as either:
@@ -987,7 +987,7 @@ fn process_line_sequential<W: Write>(
         }
         Err(e) => {
             // Count errors for stats
-            if config.output.stats {
+            if config.output.stats.is_some() {
                 stats_add_error();
             }
 
@@ -1079,6 +1079,7 @@ fn main() -> Result<()> {
 
     // Initialize safe I/O wrappers
     let mut stderr = SafeStderr::new();
+    let mut stdout = SafeStdout::new();
 
     // Process command line arguments with config file support
     let (matches, cli) = process_args_with_config(&mut stderr);
@@ -1478,32 +1479,50 @@ fn main() -> Result<()> {
                 .is_some_and(|s| !config.processing.quiet_events && s.events_output > 0);
 
             // Print metrics if enabled (only if not terminated)
-            if config.output.metrics > 0
-                && terminal_allowed
-                && !SHOULD_TERMINATE.load(Ordering::Relaxed)
-            {
-                let metrics_output = crate::rhai_functions::tracking::format_metrics_output(
-                    &pipeline_result.tracking_data.user,
-                    config.output.metrics,
-                );
-                if !metrics_output.is_empty() && metrics_output != "No metrics tracked" {
-                    let mut formatted = config.format_metrics_message(&metrics_output);
-                    if !events_were_output {
-                        formatted = formatted.trim_start_matches('\n').to_string();
+            if let Some(ref metrics_format) = config.output.metrics {
+                if terminal_allowed && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+                    use crate::cli::MetricsFormat;
+                    // Route to stdout in data-only mode, stderr when showing with events
+                    let use_stdout = !config.output.metrics_with_events;
+                    match metrics_format {
+                        MetricsFormat::Table | MetricsFormat::Full => {
+                            let metrics_level = match metrics_format {
+                                MetricsFormat::Table => 1,
+                                MetricsFormat::Full => 2,
+                                _ => 1,
+                            };
+                            let metrics_output =
+                                crate::rhai_functions::tracking::format_metrics_output(
+                                    &pipeline_result.tracking_data.user,
+                                    metrics_level,
+                                );
+                            if !metrics_output.is_empty() && metrics_output != "No metrics tracked"
+                            {
+                                let mut formatted = config.format_metrics_message(&metrics_output);
+                                if !events_were_output {
+                                    formatted = formatted.trim_start_matches('\n').to_string();
+                                }
+                                if use_stdout {
+                                    stdout.writeln(&formatted).unwrap_or(());
+                                } else {
+                                    stderr.writeln(&formatted).unwrap_or(());
+                                }
+                            }
+                        }
+                        MetricsFormat::Json => {
+                            if let Ok(json_output) =
+                                crate::rhai_functions::tracking::format_metrics_json(
+                                    &pipeline_result.tracking_data.user,
+                                )
+                            {
+                                if use_stdout {
+                                    stdout.writeln(&json_output).unwrap_or(());
+                                } else {
+                                    stderr.writeln(&json_output).unwrap_or(());
+                                }
+                            }
+                        }
                     }
-                    stderr.writeln(&formatted).unwrap_or(());
-                }
-            }
-
-            // Print metrics as JSON to stderr if --metrics-json enabled
-            if config.output.metrics_json
-                && terminal_allowed
-                && !SHOULD_TERMINATE.load(Ordering::Relaxed)
-            {
-                if let Ok(json_output) = crate::rhai_functions::tracking::format_metrics_json(
-                    &pipeline_result.tracking_data.user,
-                ) {
-                    stderr.writeln(&json_output).unwrap_or(());
                 }
             }
 
@@ -1524,9 +1543,8 @@ fn main() -> Result<()> {
             }
 
             // Hint when metrics were tracked but no metrics output option was requested
-            let metrics_were_requested = config.output.metrics > 0
-                || config.output.metrics_json
-                || config.output.metrics_file.is_some();
+            let metrics_were_requested =
+                config.output.metrics.is_some() || config.output.metrics_file.is_some();
             if !metrics_were_requested
                 && !pipeline_result.tracking_data.user.is_empty()
                 && diagnostics_allowed_runtime
@@ -1544,15 +1562,21 @@ fn main() -> Result<()> {
             // Print output based on configuration (only if not terminated)
             if !SHOULD_TERMINATE.load(Ordering::Relaxed) {
                 if let Some(ref s) = pipeline_result.stats {
-                    if config.output.stats && terminal_allowed {
+                    if config.output.stats.is_some() && terminal_allowed {
                         // Full stats when --stats flag is used (unless suppressed)
+                        // Route to stdout in data-only mode, stderr when showing with events
+                        let use_stdout = !config.output.stats_with_events;
                         let mut formatted = config.format_stats_message(
                             &s.format_stats(config.input.multiline.is_some()),
                         );
                         if !events_were_output {
                             formatted = formatted.trim_start_matches('\n').to_string();
                         }
-                        stderr.writeln(&formatted).unwrap_or(());
+                        if use_stdout {
+                            stdout.writeln(&formatted).unwrap_or(());
+                        } else {
+                            stderr.writeln(&formatted).unwrap_or(());
+                        }
                     } else if diagnostics_allowed_runtime {
                         // Error summary by default when errors occur (unless diagnostics suppressed)
                         if let Some(error_summary) =
@@ -1604,7 +1628,7 @@ fn main() -> Result<()> {
     // Check if we were terminated by a signal and print output
     if TERMINATED_BY_SIGNAL.load(Ordering::Relaxed) {
         if let Some(stats) = final_stats {
-            if config.output.stats && terminal_allowed {
+            if config.output.stats.is_some() && terminal_allowed {
                 // Full stats when --stats flag is used (unless suppressed)
                 let mut formatted = config
                     .format_stats_message(&stats.format_stats(config.input.multiline.is_some()));
@@ -1620,7 +1644,7 @@ fn main() -> Result<()> {
                 }
                 stderr.writeln(&formatted).unwrap_or(());
             }
-        } else if config.output.stats && terminal_allowed {
+        } else if config.output.stats.is_some() && terminal_allowed {
             let mut formatted = config.format_stats_message("Processing interrupted");
             if !events_were_output {
                 formatted = formatted.trim_start_matches('\n').to_string();
@@ -1665,7 +1689,7 @@ fn main() -> Result<()> {
     };
 
     if config.processing.strict && override_failed {
-        if diagnostics_allowed_runtime && !config.output.stats {
+        if diagnostics_allowed_runtime && config.output.stats.is_none() {
             if let Some(message) = override_message.clone() {
                 let mut formatted = config.format_error_message(&message);
                 if !events_were_output {

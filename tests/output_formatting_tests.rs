@@ -271,7 +271,7 @@ fn test_quiet_level_0_normal_output() {
         &[
             "-f",
             "json",
-            "--stats",
+            "--with-stats",
             "--exec",
             "print(\"Script output\")",
         ],
@@ -300,7 +300,7 @@ fn test_quiet_level_1_suppress_diagnostics() {
         &[
             "-f",
             "json",
-            "--stats",
+            "--with-stats",
             "--exec",
             "print(\"Script output\")",
             "-q",
@@ -328,7 +328,7 @@ fn test_quiet_level_2_suppress_events() {
         &[
             "-f",
             "json",
-            "--stats",
+            "--with-stats",
             "--exec",
             "print(\"Script output\")",
             "-q",
@@ -359,7 +359,7 @@ fn test_quiet_level_3_suppress_all() {
         &[
             "-f",
             "json",
-            "--stats",
+            "--with-stats",
             "--exec",
             "print(\"Script output\")",
             "--silent",
@@ -447,9 +447,9 @@ fn test_no_emoji_flag() {
     let input = r#"{"level": "error", "message": "test error"}"#;
 
     let (_stdout_with_emoji, _stderr_with_emoji, _) =
-        run_kelora_with_input(&["-f", "json", "--stats"], input);
+        run_kelora_with_input(&["-f", "json", "--with-stats"], input);
     let (stdout_no_emoji, stderr_no_emoji, _) =
-        run_kelora_with_input(&["-f", "json", "--stats", "--no-emoji"], input);
+        run_kelora_with_input(&["-f", "json", "--with-stats", "--no-emoji"], input);
 
     // Stats output might contain emojis by default
     // With --no-emoji, no emojis should be present

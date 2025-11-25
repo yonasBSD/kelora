@@ -144,7 +144,7 @@ kelora -f raw big.json --multiline all --exec 'print(e.raw.len())'
 
 ## Observability and Debugging
 
-- Run with `--stats` or `--stats-only` to see how many events were emitted after
+- Run with `--stats` or `-s` to see how many events were emitted after
   chunking. A sudden drop or spike indicates the strategy might be too broad or
   too narrow.
 

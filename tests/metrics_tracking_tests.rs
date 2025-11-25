@@ -13,7 +13,7 @@ fn test_metrics_output_exposes_only_user_keys() {
             "json",
             "--exec",
             "track_count(\"events_total\");",
-            "--metrics",
+            "--with-metrics",
         ],
         input,
     );
@@ -47,7 +47,7 @@ fn test_metrics_output_has_no_leading_newline_when_events_suppressed() {
             "json",
             "--exec",
             "track_count(e.level)",
-            "--metrics",
+            "--with-metrics",
             "-q",
         ],
         input,
@@ -291,7 +291,7 @@ fn test_track_unique_with_empty_arrays() {
             "let tag_str = e.tags.join(\",\"); track_unique(\"tag_sets\", tag_str.or_empty());",
             "--end",
             "print(`Unique: ${metrics[\"tag_sets\"].len()}`);",
-            "--metrics",
+            "--with-metrics",
         ],
         input,
     );
@@ -384,7 +384,7 @@ fn test_metrics_sequential_mode_basic() {
             "json",
             "--exec",
             "track_count(\"total\"); track_count(\"level_\" + e.level); track_sum(\"message_length\", e.message.len())",
-            "--metrics",
+            "--with-metrics",
         ],
         input,
     );
@@ -437,7 +437,7 @@ fn test_metrics_parallel_mode_basic() {
             "json",
             "--exec",
             "track_count(\"total\"); track_count(\"level_\" + e.level); track_sum(\"message_length\", e.message.len())",
-            "--metrics",
+            "--with-metrics",
             "--parallel",
             "--batch-size",
             "2",
@@ -586,7 +586,7 @@ fn test_metrics_parallel_consistency() {
             "json",
             "--exec",
             exec_script,
-            "--metrics",
+            "--with-metrics",
             "--parallel",
             "--batch-size",
             "1",
@@ -605,7 +605,7 @@ fn test_metrics_parallel_consistency() {
             "json",
             "--exec",
             exec_script,
-            "--metrics",
+            "--with-metrics",
             "--parallel",
             "--batch-size",
             "2",
@@ -756,58 +756,51 @@ fn test_span_close_requires_span() {
 
 #[test]
 fn test_metrics_json_flag() {
-    // Test --metrics-json outputs JSON format
+    // Test --metrics=json outputs JSON format
     let input = r#"{"level": "info", "message": "test1"}
 {"level": "error", "message": "test2"}"#;
 
-    let (_stdout, stderr, exit_code) = run_kelora_with_input(
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
         &[
             "-f",
             "json",
             "--exec",
             "track_count(\"total\"); track_count(\"level_\" + e.level);",
-            "--metrics-json",
+            "--metrics=json",
         ],
         input,
     );
 
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
-    // Check that metrics output is in JSON format
+    // Check that metrics output is in JSON format (data-only mode outputs to stdout)
     assert!(
-        stderr.contains("{") && stderr.contains("}"),
+        stdout.contains("{") && stdout.contains("}"),
         "Metrics output should be JSON format"
     );
     // Should be parseable as JSON
-    let json_start = stderr.find('{').expect("Should find JSON start");
-    let json_str = &stderr[json_start..];
+    let json_start = stdout.find('{').expect("Should find JSON start");
+    let json_str = &stdout[json_start..];
     let _: serde_json::Value =
         serde_json::from_str(json_str).expect("Metrics output should be valid JSON");
 }
 
 #[test]
 fn test_stats_only_flag() {
-    // Test --stats-only suppresses event output, only shows stats
+    // Test -s suppresses event output, only shows stats
     let input = r#"{"level": "info", "message": "test1"}
 {"level": "error", "message": "test2"}
 {"level": "info", "message": "test3"}"#;
 
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--stats-only"], input);
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json", "-s"], input);
 
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
-    // Stdout should be empty (no events output)
+    // Stdout should contain stats (data-only mode outputs to stdout)
     assert!(
-        stdout.trim().is_empty(),
-        "Stdout should be empty with --stats-only, got: {}",
+        stdout.contains("Lines processed") || stdout.contains("Events"),
+        "Should show stats in stdout, got: {}",
         stdout
-    );
-
-    // Stderr should contain stats
-    assert!(
-        stderr.contains("Lines processed") || stderr.contains("Events"),
-        "Should show stats in stderr, got: {}",
-        stderr
     );
 }
 
@@ -823,8 +816,8 @@ fn test_metrics_and_stats_together() {
             "json",
             "--exec",
             "track_count(\"total\");",
-            "--metrics",
-            "--stats",
+            "--with-metrics",
+            "--with-stats",
         ],
         input,
     );
@@ -857,7 +850,7 @@ fn test_metrics_file_and_metrics_flag_together() {
             "json",
             "--exec",
             "track_count(\"total\");",
-            "--metrics",
+            "--with-metrics",
             "--metrics-file",
             metrics_file_path,
         ],
@@ -881,7 +874,7 @@ fn test_metrics_file_and_metrics_flag_together() {
 
 #[test]
 fn test_metrics_json_with_file_output() {
-    // Test --metrics-json with --metrics-file
+    // Test --metrics=json with --metrics-file
     let input = r#"{"level": "info", "message": "test1"}
 {"level": "error", "message": "test2"}"#;
 
@@ -894,7 +887,7 @@ fn test_metrics_json_with_file_output() {
             "json",
             "--exec",
             "track_count(\"total\");",
-            "--metrics-json",
+            "--metrics=json",
             "--metrics-file",
             metrics_file_path,
         ],
@@ -912,39 +905,30 @@ fn test_metrics_json_with_file_output() {
 
 #[test]
 fn test_stats_only_with_filter() {
-    // Test --stats-only with filtering to verify stats show filtered counts
+    // Test -s with filtering to verify stats show filtered counts
     let input = r#"{"level": "info", "message": "test1"}
 {"level": "error", "message": "test2"}
 {"level": "info", "message": "test3"}
 {"level": "error", "message": "test4"}"#;
 
-    let (stdout, stderr, exit_code) = run_kelora_with_input(
-        &[
-            "-f",
-            "json",
-            "--filter",
-            "e.level == \"error\"",
-            "--stats-only",
-        ],
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &["-f", "json", "--filter", "e.level == \"error\"", "-s"],
         input,
     );
 
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
-    // Stdout should be empty
-    assert!(stdout.trim().is_empty(), "Stdout should be empty");
-
-    // Stats should show 2 output events and 2 filtered
+    // Stats should show 2 output events and 2 filtered (in stdout for data-only mode)
     assert!(
-        stderr.contains("Events") && (stderr.contains("2 output") || stderr.contains("output, 2")),
+        stdout.contains("Events") && (stdout.contains("2 output") || stdout.contains("output, 2")),
         "Stats should show filtered counts, got: {}",
-        stderr
+        stdout
     );
 }
 
 #[test]
 fn test_stats_only_with_exec() {
-    // Test that --stats-only suppresses event output but exec script still runs
+    // Test that -s suppresses event output but exec script still runs
     let input = r#"{"count": 1}
 {"count": 2}
 {"count": 3}"#;
@@ -955,22 +939,22 @@ fn test_stats_only_with_exec() {
             "json",
             "--exec",
             "track_sum(\"total\", e.count);",
-            "--stats-only",
-            "--metrics",
+            "-s",
+            "--with-metrics",
         ],
         input,
     );
 
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
-    // Stdout should be empty (no event output)
-    assert!(stdout.trim().is_empty(), "Stdout should be empty");
-
-    // Stats and metrics should still appear
-    assert!(stderr.contains("Lines processed"), "Should show stats");
+    // With -s and --with-metrics: stats go to stdout, metrics to stderr, events suppressed
+    assert!(
+        stdout.contains("Lines processed"),
+        "Should show stats in stdout"
+    );
     assert!(
         stderr.contains("total") && stderr.contains("6"),
-        "Should show metrics with correct sum, got: {}",
+        "Should show metrics in stderr with correct sum, got: {}",
         stderr
     );
 }
@@ -981,7 +965,7 @@ fn test_conflicting_quiet_and_stats_flags() {
     let input = r#"{"level": "info", "message": "test"}"#;
 
     let (_stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "json", "--stats", "-q"], input);
+        run_kelora_with_input(&["-f", "json", "--with-stats", "-q"], input);
 
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
@@ -1023,7 +1007,7 @@ fn test_stats_with_parallel_mode() {
         &[
             "--filter",
             "line.to_int() % 10 == 0",
-            "--stats",
+            "--with-stats",
             "--parallel",
         ],
         &input,
@@ -1071,8 +1055,10 @@ fn test_stats_format_consistency() {
     let input = r#"{"level": "info", "message": "test1"}
 {"level": "error", "message": "test2"}"#;
 
-    let (_stdout1, stderr1, exit_code1) = run_kelora_with_input(&["-f", "json", "--stats"], input);
-    let (_stdout2, stderr2, exit_code2) = run_kelora_with_input(&["-f", "json", "--stats"], input);
+    let (_stdout1, stderr1, exit_code1) =
+        run_kelora_with_input(&["-f", "json", "--with-stats"], input);
+    let (_stdout2, stderr2, exit_code2) =
+        run_kelora_with_input(&["-f", "json", "--with-stats"], input);
 
     assert_eq!(exit_code1, 0);
     assert_eq!(exit_code2, 0);
@@ -1086,7 +1072,7 @@ fn test_stats_format_consistency() {
 
 #[test]
 fn test_metrics_json_with_metrics_file_writes_json_to_file() {
-    // Test that --metrics-json with --metrics-file writes JSON to the file
+    // Test that --metrics=json with --metrics-file writes JSON to the file
     let input = r#"{"level": "info", "message": "test1"}
 {"level": "error", "message": "test2"}"#;
 
@@ -1099,7 +1085,7 @@ fn test_metrics_json_with_metrics_file_writes_json_to_file() {
             "json",
             "--exec",
             "track_count(\"total\");",
-            "--metrics-json",
+            "--metrics=json",
             "--metrics-file",
             metrics_file_path,
         ],
@@ -1124,34 +1110,38 @@ fn test_metrics_json_with_metrics_file_writes_json_to_file() {
 
 #[test]
 fn test_stats_only_with_metrics_json() {
-    // Test that --stats-only works with --metrics-json
+    // Test that -s works with --metrics=json (both in data-only mode)
     let input = r#"{"level": "info", "message": "test1"}
 {"level": "error", "message": "test2"}"#;
 
-    let (stdout, stderr, exit_code) = run_kelora_with_input(
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
         &[
             "-f",
             "json",
             "--exec",
             "track_count(\"total\");",
-            "--stats-only",
-            "--metrics-json",
+            "-s",
+            "--metrics=json",
         ],
         input,
     );
 
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
-    // Should NOT output events to stdout
+    // Should NOT output events
     assert!(
         !stdout.contains("test1") && !stdout.contains("test2"),
-        "Should not output events with --stats-only"
+        "Should not output events in data-only mode"
     );
 
-    // Should output JSON metrics to stderr
+    // Should output both stats and JSON metrics to stdout (data-only mode)
     assert!(
-        stderr.contains("{") && stderr.contains("}"),
-        "Should output JSON format"
+        stdout.contains("Lines processed") || stdout.contains("Events"),
+        "Should output stats in data-only mode"
+    );
+    assert!(
+        stdout.contains("{") && stdout.contains("}"),
+        "Should output JSON metrics in data-only mode"
     );
 }
 
@@ -1161,14 +1151,17 @@ fn test_conflicting_stats_flags() {
     // (--no-stats should take precedence as it's more specific)
     let input = r#"{"level": "info", "message": "test"}"#;
 
-    let (_stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "json", "--stats", "--no-stats"], input);
+    let (stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "--with-stats", "--no-stats"], input);
 
     assert_eq!(exit_code, 0, "kelora should handle conflicting flags");
 
-    // With --no-stats, stats should be suppressed
+    // With --no-stats, stats should be suppressed in both stdout and stderr
     assert!(
-        !stderr.contains("Stats:") && !stderr.contains("📈 Stats:"),
+        !stderr.contains("Stats:")
+            && !stderr.contains("📈 Stats:")
+            && !stdout.contains("Lines processed")
+            && !stdout.contains("Events"),
         "--no-stats should suppress stats output"
     );
 }
@@ -1180,7 +1173,7 @@ fn test_quiet_level_1_suppresses_diagnostics() {
 {"level": "error", "message": "test2"}"#;
 
     let (stdout, stderr, exit_code) =
-        run_kelora_with_input(&["-f", "json", "--stats", "-q"], input);
+        run_kelora_with_input(&["-f", "json", "--with-stats", "-q"], input);
 
     assert_eq!(exit_code, 0, "kelora should exit successfully");
 
@@ -1284,22 +1277,17 @@ fn test_metrics_with_large_number_of_unique_values() {
 
 #[test]
 fn test_stats_only_with_no_input() {
-    // Test --stats-only with empty input
+    // Test -s with empty input
     let input = "";
 
-    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--stats-only"], input);
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json", "-s"], input);
 
     assert_eq!(exit_code, 0, "kelora should handle empty input");
 
-    // Stdout should be empty (no events)
+    // Stats should show 0 events (in stdout for data-only mode)
     assert!(
-        stdout.is_empty() || stdout.trim().is_empty(),
-        "stdout should be empty with no input"
-    );
-
-    // Stats should show 0 events
-    assert!(
-        stderr.contains("0 total") || stderr.contains("Lines processed: 0"),
-        "Stats should show 0 events"
+        stdout.contains("0 total") || stdout.contains("Lines processed: 0"),
+        "Stats should show 0 events in stdout, got: {}",
+        stdout
     );
 }
