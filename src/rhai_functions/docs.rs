@@ -297,7 +297,7 @@ kelora -j api_logs.jsonl -b -k timestamp,level,message
 # Core fields only: exclude metadata (-c)
 kelora -j api_logs.jsonl -c --filter 'e.level == "ERROR"'
 
-# Quiet mode: suppress event output, show only stats (-q or --quiet)
+# Quiet mode: suppress event output, show only stats (-q or --no-events)
 kelora web_access.log --filter 'e.status >= 500' -q --stats
 
 # Silent mode: suppress all output except fatal errors (metrics files still write)

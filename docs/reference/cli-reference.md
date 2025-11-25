@@ -474,13 +474,13 @@ kelora -j --verbose app.log
 
 ### Output/Quiet Controls
 
-#### `-q, --quiet` / `--no-events`
+#### `-q` / `--no-events`
 
 Suppress formatter output (events). Diagnostics, stats, metrics, and script output remain unless further flags are used. Same effect as `-F none`.
 
 ```bash
 kelora -q app.log                         # No events, diagnostics still emit
-kelora -q -s -m app.log                   # Stats + metrics, no events
+kelora --no-events -s -m app.log          # Stats + metrics, no events
 ```
 
 #### `--no-diagnostics`

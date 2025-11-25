@@ -1503,11 +1503,7 @@ fn main() -> Result<()> {
                 if let Ok(json_output) = crate::rhai_functions::tracking::format_metrics_json(
                     &pipeline_result.tracking_data.user,
                 ) {
-                    let mut formatted = config.format_metrics_message(&json_output);
-                    if !events_were_output {
-                        formatted = formatted.trim_start_matches('\n').to_string();
-                    }
-                    stderr.writeln(&formatted).unwrap_or(());
+                    stderr.writeln(&json_output).unwrap_or(());
                 }
             }
 

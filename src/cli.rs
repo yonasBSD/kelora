@@ -248,11 +248,11 @@ pub struct Cli {
     #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count, help_heading = "Error Handling")]
     pub verbose: u8,
 
-    /// Suppress events (formatter output). Alias: --no-events / -F none.
-    #[arg(short = 'q', long = "quiet", help_heading = "Error Handling")]
+    /// Suppress events (formatter output). Alternatives: --no-events, -F none
+    #[arg(short = 'q', help_heading = "Error Handling")]
     pub quiet: bool,
 
-    /// Suppress events (formatter output). Alias for -q.
+    /// Suppress events (formatter output). Alternatives: -q, -F none
     #[arg(long = "no-events", help_heading = "Error Handling")]
     pub no_events: bool,
 

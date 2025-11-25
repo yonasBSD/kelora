@@ -325,7 +325,7 @@ Stage #5 emit: EMITTED
 - Honors `--silent` (suppress trace output)
 - Honors `--no-diagnostics` (still show traces, only progress/stats suppressed)
 - Honors `--no-emoji` in trace formatting
-- NOT suppressed by `--quiet` (traces are debugging output, not event output)
+- NOT suppressed by `-q` (traces are debugging output, not event output)
 
 **Volume control:**
 - NO automatic sampling (sampling is only via explicit `--trace=sample:K:M`)
@@ -418,13 +418,13 @@ kelora --explain large.log
 | `--metrics-only` | ✗ | ✗ | ✓ | ✗ |
 | `--stats-only` | ✗ | ✗ | ✓ | ✗ |
 | `--no-diagnostics` | ✓ | ✓ | ✗ | ✓ |
-| `--quiet` / `--no-events` | ✓ | ✓ | ✓ | ✓ |
+| `-q` / `--no-events` | ✓ | ✓ | ✓ | ✓ |
 
 **Rationale:**
 - `--silent`: Suppress everything except fatal errors and metrics files
 - `--metrics-only`/`--stats-only`: Only show final statistics
 - `--no-diagnostics`: Suppress progress/stats but allow errors and traces
-- `--quiet`: Suppress event output but allow diagnostics/errors/traces
+- `-q` / `--no-events`: Suppress event output but allow diagnostics/errors/traces
 
 ### Parallel Mode
 
