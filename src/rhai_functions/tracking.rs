@@ -789,7 +789,7 @@ pub fn extract_field_from_script(script: &str) -> Option<String> {
 /// Format warning summary for display
 pub fn format_warning_summary(
     warnings: &HashMap<String, WarningDetail>,
-    _stats: Option<&ProcessingStats>,
+    stats: Option<&ProcessingStats>,
     use_colors: bool,
     no_emoji: bool,
     verbose_level: u8,
@@ -869,9 +869,44 @@ pub fn format_warning_summary(
         ));
     }
 
-    summary.push_str("\n\n  💡 Tip: Use e.has(\"field\") before accessing");
-    summary.push_str("\n  💡 Tip: Use e.get_path(\"field\", default) for safe access");
-    summary.push_str("\n  💡 Tip: Run with -F inspect to see actual field names");
+    // Smart context-aware tip: show the most helpful advice based on the warning pattern
+    if !sorted_warnings.is_empty() {
+        let detail = sorted_warnings[0];
+        if !detail.suggestions.is_empty() {
+            // Has suggestions = likely a typo. The suggestion itself is the actionable advice.
+            // No additional tip needed - would just be noise.
+        } else if let Some(stats) = stats {
+            // Use percentage-based heuristic when we have stats
+            let total_events = stats.events_created;
+            let missing_percentage = if total_events > 0 {
+                (detail.count as f64 / total_events as f64) * 100.0
+            } else {
+                0.0
+            };
+
+            // Key insight: Small datasets suggest exploration, large datasets suggest intentional optional fields
+            if total_events < 50 || missing_percentage > 10.0 {
+                // Small dataset OR high missing rate = likely exploration/discovery
+                if total_events < 100 {
+                    // Small dataset: -F inspect shows structure clearly
+                    summary.push_str("\n\n  💡 Tip: Run with -F inspect to see actual field names");
+                } else {
+                    // Larger dataset: -S is more concise for field discovery
+                    summary.push_str("\n\n  💡 Tip: Run with -S to see all available keys, or use e.has(\"field\") for conditional access");
+                }
+            } else {
+                // Large dataset with low missing rate = legitimate optional fields
+                summary.push_str("\n\n  💡 Tip: Use e.has(\"field\") or e.get_path(\"field\", default) for missing fields");
+            }
+        } else {
+            // Fallback when no stats available (shouldn't normally happen)
+            if detail.count <= 5 {
+                summary.push_str("\n\n  💡 Tip: Run with -F inspect to see actual field names");
+            } else {
+                summary.push_str("\n\n  💡 Tip: Use e.has(\"field\") or e.get_path(\"field\", default) for missing fields");
+            }
+        }
+    }
 
     Some(summary)
 }
