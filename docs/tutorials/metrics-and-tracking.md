@@ -120,7 +120,7 @@ response sizes and latency as rolling aggregates.
 --end 'let avg = metrics.total_duration / metrics.duration_count; print("Average: " + avg)'
 ```
 
-## Step 2.5 – Histograms with track_bucket()
+## Step 3 – Histograms with track_bucket()
 
 Build histograms by grouping values into buckets—perfect for latency distributions.
 
@@ -164,7 +164,7 @@ track_bucket("file_sizes", (bytes / 1024))
 track_bucket("hour_of_day", timestamp.hour())
 ```
 
-## Step 2.75 – Top N Rankings with track_top() / track_bottom()
+## Step 4 – Top N Rankings with track_top() / track_bottom()
 
 When you need the "top 10 errors" or "5 slowest endpoints" without tracking everything, use `track_top()` and `track_bottom()`. These functions maintain bounded, sorted lists—much more memory-efficient than `track_bucket()` for high-cardinality data.
 
@@ -232,7 +232,7 @@ In weighted mode:
 | "10 slowest API calls" | `track_top()` | Only care about extremes |
 | Millions of unique IPs | `track_top()` | Bucket would exhaust memory |
 
-## Step 3 – Unique Values and Cardinality
+## Step 5 – Unique Values and Cardinality
 
 `track_unique()` stores distinct values for a key—handy for unique user counts or
 cardinality analysis.
@@ -287,7 +287,7 @@ structured JSON to stdout. Both are mutually exclusive—pick the format that
 matches your workflow. You can also combine `-m` with `--metrics-file` to get
 both table output and a JSON file.
 
-## Step 4 – Sliding Windows and Percentiles
+## Step 6 – Sliding Windows and Percentiles
 
 Enable the window buffer to examine recent events. The example below tracks a
 five-event moving average and P95 latency for CPU metrics.
@@ -332,7 +332,7 @@ The special `window` variable becomes available once you pass `--window`. Use
 `window.pluck_as_nums("FIELD")` for numeric arrays and `window.pluck("FIELD")`
 for raw values.
 
-## Step 5 – Custom Reports with `--end`
+## Step 7 – Custom Reports with `--end`
 
 Sometimes you need a formatted report instead of raw maps. Store a short Rhai
 script and include it with `-I` so the same layout works across platforms, then
@@ -389,7 +389,7 @@ call the helper from `--end`.
 The automatically printed `--metrics` block remains, while `--end` gives you a
 clean text summary that you can redirect or feed into alerts.
 
-## Step 6 – Persist Metrics to Disk
+## Step 8 – Persist Metrics to Disk
 
 Use `--metrics-file` to serialize the metrics map as JSON for other tools.
 
@@ -422,7 +422,7 @@ Use `--metrics-file` to serialize the metrics map as JSON for other tools.
 The JSON structure mirrors the in-memory map, so you can load it with `jq`, a
 dashboard agent, or any scripting language.
 
-## Step 7 – Streaming Scoreboards
+## Step 9 – Streaming Scoreboards
 
 Kelora keeps metrics up to date even when tailing files or processing archives.
 This command watches a gzipped access log and surfaces top status classes.
