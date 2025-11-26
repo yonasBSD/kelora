@@ -164,6 +164,74 @@ track_bucket("file_sizes", (bytes / 1024))
 track_bucket("hour_of_day", timestamp.hour())
 ```
 
+## Step 2.75 – Top N Rankings with track_top() / track_bottom()
+
+When you need the "top 10 errors" or "5 slowest endpoints" without tracking everything, use `track_top()` and `track_bottom()`. These functions maintain bounded, sorted lists—much more memory-efficient than `track_bucket()` for high-cardinality data.
+
+### Frequency Rankings (Count Mode)
+
+Track the most/least frequent items:
+
+=== "Command"
+
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'if e.level == "error" { track_top("top_errors", e.message, 5) }' \
+      --metrics
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'if e.level == "error" { track_top("top_errors", e.message, 5) }' \
+      --metrics
+    ```
+
+Each entry shows the item key and its occurrence count. Results are sorted by count (descending), then alphabetically.
+
+### Value-Based Rankings (Weighted Mode)
+
+Track items by custom values like latency, bytes, or CPU time:
+
+=== "Command"
+
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'if e.has("duration_ms") {
+              track_top("slowest", e.service, 3, e.duration_ms);
+              track_bottom("fastest", e.service, 3, e.duration_ms)
+          }' \
+      --metrics
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'if e.has("duration_ms") { track_top("slowest", e.service, 3, e.duration_ms); track_bottom("fastest", e.service, 3, e.duration_ms) }' \
+      --metrics
+    ```
+
+In weighted mode:
+- `track_top()` keeps the N items with **highest** values (slowest, largest, etc.)
+- `track_bottom()` keeps the N items with **lowest** values (fastest, smallest, etc.)
+- For each item, the **maximum** (top) or **minimum** (bottom) value seen is retained
+
+**When to use top/bottom vs bucket:**
+
+| Scenario | Use This | Why |
+|----------|----------|-----|
+| "Top 10 error messages" | `track_top()` | Bounded memory, auto-sorted |
+| "Error count by type" (low cardinality) | `track_bucket()` | Tracks all types |
+| "Latency distribution 0-1000ms" | `track_bucket()` | Need full histogram |
+| "10 slowest API calls" | `track_top()` | Only care about extremes |
+| Millions of unique IPs | `track_top()` | Bucket would exhaust memory |
+
 ## Step 3 – Unique Values and Cardinality
 
 `track_unique()` stores distinct values for a key—handy for unique user counts or

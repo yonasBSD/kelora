@@ -1471,6 +1471,512 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("track_bucket", |_key: &str, _value: ()| {
         // Silently ignore Unit values - no tracking occurs
     });
+
+    // track_top - Count mode: Most frequent items
+    engine.register_fn(
+        "track_top",
+        |key: &str, item_key: &str, n: i64| -> Result<(), Box<rhai::EvalAltResult>> {
+            if n < 1 {
+                return Err(format!("track_top requires n >= 1, got {}", n).into());
+            }
+
+            let updated = with_user_tracking(|state| {
+                // Get existing array or create new one
+                let current = state
+                    .get(key)
+                    .cloned()
+                    .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
+
+                if let Ok(mut arr) = current.into_array() {
+                    // Find existing item in array
+                    let mut found_idx = None;
+                    for (idx, elem) in arr.iter().enumerate() {
+                        if let Some(map) = elem.clone().try_cast::<rhai::Map>() {
+                            if let Some(k) = map.get("key") {
+                                if k.clone().into_string().unwrap_or_default() == item_key {
+                                    found_idx = Some(idx);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Update count or add new item
+                    if let Some(idx) = found_idx {
+                        // Increment count for existing item
+                        if let Some(map) = arr[idx].clone().try_cast::<rhai::Map>() {
+                            let count = map.get("count").cloned().unwrap_or(Dynamic::from(0i64));
+                            let new_count = count.as_int().unwrap_or(0) + 1;
+                            let mut new_map = rhai::Map::new();
+                            new_map.insert("key".into(), Dynamic::from(item_key.to_string()));
+                            new_map.insert("count".into(), Dynamic::from(new_count));
+                            arr[idx] = Dynamic::from(new_map);
+                        }
+                    } else {
+                        // Add new item with count=1
+                        let mut new_map = rhai::Map::new();
+                        new_map.insert("key".into(), Dynamic::from(item_key.to_string()));
+                        new_map.insert("count".into(), Dynamic::from(1i64));
+                        arr.push(Dynamic::from(new_map));
+                    }
+
+                    // Sort by count descending, then by key ascending (stable sort)
+                    arr.sort_by(|a, b| {
+                        let a_map = a.clone().try_cast::<rhai::Map>();
+                        let b_map = b.clone().try_cast::<rhai::Map>();
+
+                        if let (Some(a_m), Some(b_m)) = (a_map, b_map) {
+                            let a_count = a_m.get("count").and_then(|v| v.as_int().ok()).unwrap_or(0);
+                            let b_count = b_m.get("count").and_then(|v| v.as_int().ok()).unwrap_or(0);
+                            let a_key = a_m
+                                .get("key")
+                                .and_then(|v| v.clone().into_string().ok())
+                                .unwrap_or_default();
+                            let b_key = b_m
+                                .get("key")
+                                .and_then(|v| v.clone().into_string().ok())
+                                .unwrap_or_default();
+
+                            // Sort by count descending, then key ascending
+                            match b_count.cmp(&a_count) {
+                                std::cmp::Ordering::Equal => a_key.cmp(&b_key),
+                                other => other,
+                            }
+                        } else {
+                            std::cmp::Ordering::Equal
+                        }
+                    });
+
+                    // Trim to top N
+                    if arr.len() > n as usize {
+                        arr.truncate(n as usize);
+                    }
+
+                    state.insert(key.to_string(), Dynamic::from(arr));
+                    true
+                } else {
+                    false
+                }
+            });
+
+            if updated {
+                record_operation_metadata(key, "top");
+            }
+            Ok(())
+        },
+    );
+
+    // track_top - Weighted mode: Highest values
+    engine.register_fn(
+        "track_top",
+        |key: &str, item_key: &str, n: i64, value: i64| -> Result<(), Box<rhai::EvalAltResult>> {
+            if n < 1 {
+                return Err(format!("track_top requires n >= 1, got {}", n).into());
+            }
+
+            track_top_weighted_impl(key, item_key, n, value as f64)
+        },
+    );
+
+    engine.register_fn(
+        "track_top",
+        |key: &str, item_key: &str, n: i64, value: i32| -> Result<(), Box<rhai::EvalAltResult>> {
+            if n < 1 {
+                return Err(format!("track_top requires n >= 1, got {}", n).into());
+            }
+
+            track_top_weighted_impl(key, item_key, n, value as f64)
+        },
+    );
+
+    engine.register_fn(
+        "track_top",
+        |key: &str, item_key: &str, n: i64, value: f64| -> Result<(), Box<rhai::EvalAltResult>> {
+            if n < 1 {
+                return Err(format!("track_top requires n >= 1, got {}", n).into());
+            }
+
+            track_top_weighted_impl(key, item_key, n, value)
+        },
+    );
+
+    engine.register_fn(
+        "track_top",
+        |key: &str, item_key: &str, n: i64, value: f32| -> Result<(), Box<rhai::EvalAltResult>> {
+            if n < 1 {
+                return Err(format!("track_top requires n >= 1, got {}", n).into());
+            }
+
+            track_top_weighted_impl(key, item_key, n, value as f64)
+        },
+    );
+
+    // Unit overload - no-op for missing/empty values
+    engine.register_fn(
+        "track_top",
+        |_key: &str,
+         _item_key: &str,
+         _n: i64,
+         _value: ()|
+         -> Result<(), Box<rhai::EvalAltResult>> { Ok(()) },
+    );
+
+    // track_bottom - Count mode: Least frequent items
+    engine.register_fn(
+        "track_bottom",
+        |key: &str, item_key: &str, n: i64| -> Result<(), Box<rhai::EvalAltResult>> {
+            if n < 1 {
+                return Err(format!("track_bottom requires n >= 1, got {}", n).into());
+            }
+
+            let updated = with_user_tracking(|state| {
+                // Get existing array or create new one
+                let current = state
+                    .get(key)
+                    .cloned()
+                    .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
+
+                if let Ok(mut arr) = current.into_array() {
+                    // Find existing item in array
+                    let mut found_idx = None;
+                    for (idx, elem) in arr.iter().enumerate() {
+                        if let Some(map) = elem.clone().try_cast::<rhai::Map>() {
+                            if let Some(k) = map.get("key") {
+                                if k.clone().into_string().unwrap_or_default() == item_key {
+                                    found_idx = Some(idx);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Update count or add new item
+                    if let Some(idx) = found_idx {
+                        // Increment count for existing item
+                        if let Some(map) = arr[idx].clone().try_cast::<rhai::Map>() {
+                            let count = map.get("count").cloned().unwrap_or(Dynamic::from(0i64));
+                            let new_count = count.as_int().unwrap_or(0) + 1;
+                            let mut new_map = rhai::Map::new();
+                            new_map.insert("key".into(), Dynamic::from(item_key.to_string()));
+                            new_map.insert("count".into(), Dynamic::from(new_count));
+                            arr[idx] = Dynamic::from(new_map);
+                        }
+                    } else {
+                        // Add new item with count=1
+                        let mut new_map = rhai::Map::new();
+                        new_map.insert("key".into(), Dynamic::from(item_key.to_string()));
+                        new_map.insert("count".into(), Dynamic::from(1i64));
+                        arr.push(Dynamic::from(new_map));
+                    }
+
+                    // Sort by count ascending, then by key ascending (stable sort)
+                    arr.sort_by(|a, b| {
+                        let a_map = a.clone().try_cast::<rhai::Map>();
+                        let b_map = b.clone().try_cast::<rhai::Map>();
+
+                        if let (Some(a_m), Some(b_m)) = (a_map, b_map) {
+                            let a_count = a_m.get("count").and_then(|v| v.as_int().ok()).unwrap_or(0);
+                            let b_count = b_m.get("count").and_then(|v| v.as_int().ok()).unwrap_or(0);
+                            let a_key = a_m
+                                .get("key")
+                                .and_then(|v| v.clone().into_string().ok())
+                                .unwrap_or_default();
+                            let b_key = b_m
+                                .get("key")
+                                .and_then(|v| v.clone().into_string().ok())
+                                .unwrap_or_default();
+
+                            // Sort by count ascending, then key ascending
+                            match a_count.cmp(&b_count) {
+                                std::cmp::Ordering::Equal => a_key.cmp(&b_key),
+                                other => other,
+                            }
+                        } else {
+                            std::cmp::Ordering::Equal
+                        }
+                    });
+
+                    // Trim to bottom N
+                    if arr.len() > n as usize {
+                        arr.truncate(n as usize);
+                    }
+
+                    state.insert(key.to_string(), Dynamic::from(arr));
+                    true
+                } else {
+                    false
+                }
+            });
+
+            if updated {
+                record_operation_metadata(key, "bottom");
+            }
+            Ok(())
+        },
+    );
+
+    // track_bottom - Weighted mode: Lowest values
+    engine.register_fn(
+        "track_bottom",
+        |key: &str, item_key: &str, n: i64, value: i64| -> Result<(), Box<rhai::EvalAltResult>> {
+            if n < 1 {
+                return Err(format!("track_bottom requires n >= 1, got {}", n).into());
+            }
+
+            track_bottom_weighted_impl(key, item_key, n, value as f64)
+        },
+    );
+
+    engine.register_fn(
+        "track_bottom",
+        |key: &str, item_key: &str, n: i64, value: i32| -> Result<(), Box<rhai::EvalAltResult>> {
+            if n < 1 {
+                return Err(format!("track_bottom requires n >= 1, got {}", n).into());
+            }
+
+            track_bottom_weighted_impl(key, item_key, n, value as f64)
+        },
+    );
+
+    engine.register_fn(
+        "track_bottom",
+        |key: &str, item_key: &str, n: i64, value: f64| -> Result<(), Box<rhai::EvalAltResult>> {
+            if n < 1 {
+                return Err(format!("track_bottom requires n >= 1, got {}", n).into());
+            }
+
+            track_bottom_weighted_impl(key, item_key, n, value)
+        },
+    );
+
+    engine.register_fn(
+        "track_bottom",
+        |key: &str, item_key: &str, n: i64, value: f32| -> Result<(), Box<rhai::EvalAltResult>> {
+            if n < 1 {
+                return Err(format!("track_bottom requires n >= 1, got {}", n).into());
+            }
+
+            track_bottom_weighted_impl(key, item_key, n, value as f64)
+        },
+    );
+
+    // Unit overload - no-op for missing/empty values
+    engine.register_fn(
+        "track_bottom",
+        |_key: &str,
+         _item_key: &str,
+         _n: i64,
+         _value: ()|
+         -> Result<(), Box<rhai::EvalAltResult>> { Ok(()) },
+    );
+}
+
+/// Helper function for track_top weighted mode
+fn track_top_weighted_impl(
+    key: &str,
+    item_key: &str,
+    n: i64,
+    value: f64,
+) -> Result<(), Box<rhai::EvalAltResult>> {
+    let updated = with_user_tracking(|state| {
+        // Get existing array or create new one
+        let current = state
+            .get(key)
+            .cloned()
+            .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
+
+        if let Ok(mut arr) = current.into_array() {
+            // Find existing item in array
+            let mut found_idx = None;
+            for (idx, elem) in arr.iter().enumerate() {
+                if let Some(map) = elem.clone().try_cast::<rhai::Map>() {
+                    if let Some(k) = map.get("key") {
+                        if k.clone().into_string().unwrap_or_default() == item_key {
+                            found_idx = Some(idx);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Update value or add new item
+            if let Some(idx) = found_idx {
+                // Update value for existing item (take max)
+                if let Some(map) = arr[idx].clone().try_cast::<rhai::Map>() {
+                    let current_val = map
+                        .get("value")
+                        .and_then(|v| v.as_float().ok())
+                        .unwrap_or(f64::NEG_INFINITY);
+                    let new_val = value.max(current_val);
+                    let mut new_map = rhai::Map::new();
+                    new_map.insert("key".into(), Dynamic::from(item_key.to_string()));
+                    new_map.insert("value".into(), Dynamic::from(new_val));
+                    arr[idx] = Dynamic::from(new_map);
+                }
+            } else {
+                // Add new item
+                let mut new_map = rhai::Map::new();
+                new_map.insert("key".into(), Dynamic::from(item_key.to_string()));
+                new_map.insert("value".into(), Dynamic::from(value));
+                arr.push(Dynamic::from(new_map));
+            }
+
+            // Sort by value descending, then by key ascending (stable sort)
+            arr.sort_by(|a, b| {
+                let a_map = a.clone().try_cast::<rhai::Map>();
+                let b_map = b.clone().try_cast::<rhai::Map>();
+
+                if let (Some(a_m), Some(b_m)) = (a_map, b_map) {
+                    let a_val = a_m
+                        .get("value")
+                        .and_then(|v| v.as_float().ok())
+                        .unwrap_or(f64::NEG_INFINITY);
+                    let b_val = b_m
+                        .get("value")
+                        .and_then(|v| v.as_float().ok())
+                        .unwrap_or(f64::NEG_INFINITY);
+                    let a_key = a_m
+                        .get("key")
+                        .and_then(|v| v.clone().into_string().ok())
+                        .unwrap_or_default();
+                    let b_key = b_m
+                        .get("key")
+                        .and_then(|v| v.clone().into_string().ok())
+                        .unwrap_or_default();
+
+                    // Sort by value descending, then key ascending
+                    match b_val
+                        .partial_cmp(&a_val)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                    {
+                        std::cmp::Ordering::Equal => a_key.cmp(&b_key),
+                        other => other,
+                    }
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            });
+
+            // Trim to top N
+            if arr.len() > n as usize {
+                arr.truncate(n as usize);
+            }
+
+            state.insert(key.to_string(), Dynamic::from(arr));
+            true
+        } else {
+            false
+        }
+    });
+
+    if updated {
+        record_operation_metadata(key, "top");
+    }
+    Ok(())
+}
+
+/// Helper function for track_bottom weighted mode
+fn track_bottom_weighted_impl(
+    key: &str,
+    item_key: &str,
+    n: i64,
+    value: f64,
+) -> Result<(), Box<rhai::EvalAltResult>> {
+    let updated = with_user_tracking(|state| {
+        // Get existing array or create new one
+        let current = state
+            .get(key)
+            .cloned()
+            .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
+
+        if let Ok(mut arr) = current.into_array() {
+            // Find existing item in array
+            let mut found_idx = None;
+            for (idx, elem) in arr.iter().enumerate() {
+                if let Some(map) = elem.clone().try_cast::<rhai::Map>() {
+                    if let Some(k) = map.get("key") {
+                        if k.clone().into_string().unwrap_or_default() == item_key {
+                            found_idx = Some(idx);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Update value or add new item
+            if let Some(idx) = found_idx {
+                // Update value for existing item (take min)
+                if let Some(map) = arr[idx].clone().try_cast::<rhai::Map>() {
+                    let current_val = map
+                        .get("value")
+                        .and_then(|v| v.as_float().ok())
+                        .unwrap_or(f64::INFINITY);
+                    let new_val = value.min(current_val);
+                    let mut new_map = rhai::Map::new();
+                    new_map.insert("key".into(), Dynamic::from(item_key.to_string()));
+                    new_map.insert("value".into(), Dynamic::from(new_val));
+                    arr[idx] = Dynamic::from(new_map);
+                }
+            } else {
+                // Add new item
+                let mut new_map = rhai::Map::new();
+                new_map.insert("key".into(), Dynamic::from(item_key.to_string()));
+                new_map.insert("value".into(), Dynamic::from(value));
+                arr.push(Dynamic::from(new_map));
+            }
+
+            // Sort by value ascending, then by key ascending (stable sort)
+            arr.sort_by(|a, b| {
+                let a_map = a.clone().try_cast::<rhai::Map>();
+                let b_map = b.clone().try_cast::<rhai::Map>();
+
+                if let (Some(a_m), Some(b_m)) = (a_map, b_map) {
+                    let a_val = a_m
+                        .get("value")
+                        .and_then(|v| v.as_float().ok())
+                        .unwrap_or(f64::INFINITY);
+                    let b_val = b_m
+                        .get("value")
+                        .and_then(|v| v.as_float().ok())
+                        .unwrap_or(f64::INFINITY);
+                    let a_key = a_m
+                        .get("key")
+                        .and_then(|v| v.clone().into_string().ok())
+                        .unwrap_or_default();
+                    let b_key = b_m
+                        .get("key")
+                        .and_then(|v| v.clone().into_string().ok())
+                        .unwrap_or_default();
+
+                    // Sort by value ascending, then key ascending
+                    match a_val
+                        .partial_cmp(&b_val)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                    {
+                        std::cmp::Ordering::Equal => a_key.cmp(&b_key),
+                        other => other,
+                    }
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            });
+
+            // Trim to bottom N
+            if arr.len() > n as usize {
+                arr.truncate(n as usize);
+            }
+
+            state.insert(key.to_string(), Dynamic::from(arr));
+            true
+        } else {
+            false
+        }
+    });
+
+    if updated {
+        record_operation_metadata(key, "bottom");
+    }
+    Ok(())
 }
 
 /// Merge thread-local tracking state into context tracker for sequential mode
@@ -1502,29 +2008,144 @@ pub fn format_metrics_output(metrics: &HashMap<String, Dynamic>, metrics_level: 
     user_values.sort_by_key(|(k, _)| k.as_str());
 
     for (key, value) in user_values {
-        // Handle arrays (from track_unique) with smart truncation
+        // Handle arrays (from track_unique, track_top, track_bottom) with smart truncation
         if value.is::<rhai::Array>() {
             if let Ok(arr) = value.clone().into_array() {
                 let len = arr.len();
-                // Full output mode (-mm or higher): show everything
-                if metrics_level >= 2 {
-                    output.push_str(&format!("{:<12} ({} unique):\n", key, len));
-                    for item in arr.iter() {
-                        output.push_str(&format!("  {}\n", item));
+
+                // Check if this is a top/bottom array (array of maps with {key, count} or {key, value})
+                let is_top_bottom = if !arr.is_empty() {
+                    if let Some(first_map) = arr[0].clone().try_cast::<rhai::Map>() {
+                        first_map.contains_key("key")
+                            && (first_map.contains_key("count") || first_map.contains_key("value"))
+                    } else {
+                        false
                     }
-                } else if len <= 10 {
-                    // Small arrays: show inline
-                    output.push_str(&format!("{:<12} = {}\n", key, value));
                 } else {
-                    // Large arrays in abbreviated mode: show count + preview + hint
-                    output.push_str(&format!("{:<12} ({} unique):\n", key, len));
-                    for item in arr.iter().take(5) {
-                        output.push_str(&format!("  {}\n", item));
+                    false
+                };
+
+                if is_top_bottom {
+                    // Format track_top/track_bottom results
+                    let field_name = if let Some(first_map) = arr[0].clone().try_cast::<rhai::Map>()
+                    {
+                        if first_map.contains_key("count") {
+                            "count"
+                        } else {
+                            "value"
+                        }
+                    } else {
+                        "count"
+                    };
+
+                    // Full output mode (-mm or higher): show everything
+                    if metrics_level >= 2 {
+                        output.push_str(&format!("{:<12} ({} items):\n", key, len));
+                        for (idx, item) in arr.iter().enumerate() {
+                            if let Some(map) = item.clone().try_cast::<rhai::Map>() {
+                                if let (Some(k), Some(v)) = (map.get("key"), map.get(field_name)) {
+                                    let key_str = k.clone().into_string().unwrap_or_default();
+                                    if field_name == "count" {
+                                        let count = v.as_int().unwrap_or(0);
+                                        output.push_str(&format!(
+                                            "  #{:<2} {:<30} {}\n",
+                                            idx + 1,
+                                            key_str,
+                                            count
+                                        ));
+                                    } else {
+                                        let val = v.as_float().unwrap_or(0.0);
+                                        output.push_str(&format!(
+                                            "  #{:<2} {:<30} {:.2}\n",
+                                            idx + 1,
+                                            key_str,
+                                            val
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    } else if len <= 10 {
+                        // Small arrays: show all inline
+                        output.push_str(&format!("{:<12} ({} items):\n", key, len));
+                        for (idx, item) in arr.iter().enumerate() {
+                            if let Some(map) = item.clone().try_cast::<rhai::Map>() {
+                                if let (Some(k), Some(v)) = (map.get("key"), map.get(field_name)) {
+                                    let key_str = k.clone().into_string().unwrap_or_default();
+                                    if field_name == "count" {
+                                        let count = v.as_int().unwrap_or(0);
+                                        output.push_str(&format!(
+                                            "  #{:<2} {:<30} {}\n",
+                                            idx + 1,
+                                            key_str,
+                                            count
+                                        ));
+                                    } else {
+                                        let val = v.as_float().unwrap_or(0.0);
+                                        output.push_str(&format!(
+                                            "  #{:<2} {:<30} {:.2}\n",
+                                            idx + 1,
+                                            key_str,
+                                            val
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // Large arrays in abbreviated mode: show top 5 + hint
+                        output.push_str(&format!("{:<12} ({} items):\n", key, len));
+                        for (idx, item) in arr.iter().take(5).enumerate() {
+                            if let Some(map) = item.clone().try_cast::<rhai::Map>() {
+                                if let (Some(k), Some(v)) = (map.get("key"), map.get(field_name)) {
+                                    let key_str = k.clone().into_string().unwrap_or_default();
+                                    if field_name == "count" {
+                                        let count = v.as_int().unwrap_or(0);
+                                        output.push_str(&format!(
+                                            "  #{:<2} {:<30} {}\n",
+                                            idx + 1,
+                                            key_str,
+                                            count
+                                        ));
+                                    } else {
+                                        let val = v.as_float().unwrap_or(0.0);
+                                        output.push_str(&format!(
+                                            "  #{:<2} {:<30} {:.2}\n",
+                                            idx + 1,
+                                            key_str,
+                                            val
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                        output.push_str(&format!(
+                            "  [+{} more. Use -mm, --metrics-json, or --metrics-file for full list]\n",
+                            len - 5
+                        ));
                     }
-                    output.push_str(&format!(
-                        "  [+{} more. Use -mm, --metrics-json, or --metrics-file for full list]\n",
-                        len - 5
-                    ));
+                } else {
+                    // Regular array (track_unique)
+                    // Full output mode (-mm or higher): show everything
+                    if metrics_level >= 2 {
+                        output.push_str(&format!("{:<12} ({} unique):\n", key, len));
+                        for item in arr.iter() {
+                            output.push_str(&format!("  {}\n", item));
+                        }
+                    } else if len <= 10 {
+                        // Small arrays: show inline
+                        output.push_str(&format!("{:<12} = {}\n", key, value));
+                    } else {
+                        // Large arrays in abbreviated mode: show count + preview + hint
+                        output.push_str(&format!("{:<12} ({} unique):\n", key, len));
+                        for item in arr.iter().take(5) {
+                            output.push_str(&format!("  {}\n", item));
+                        }
+                        output.push_str(&format!(
+                            "  [+{} more. Use -mm, --metrics-json, or --metrics-file for full list]\n",
+                            len - 5
+                        ));
+                    }
                 }
                 continue;
             }
@@ -2326,5 +2947,329 @@ mod tests {
 
         let after = get_thread_warnings();
         assert!(after.is_empty());
+    }
+
+    #[test]
+    fn test_track_top_count_mode() {
+        clear_tracking_state();
+
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Track some items
+        engine
+            .eval::<()>(r#"track_top("test", "apple", 3)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_top("test", "banana", 3)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_top("test", "apple", 3)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_top("test", "cherry", 3)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_top("test", "apple", 3)"#)
+            .unwrap();
+
+        let state = get_thread_tracking_state();
+        let result = state.get("test").unwrap().clone().into_array().unwrap();
+
+        assert_eq!(result.len(), 3);
+
+        // Check first item (apple: 3)
+        let first = result[0].clone().try_cast::<rhai::Map>().unwrap();
+        assert_eq!(
+            first.get("key").unwrap().clone().into_string().unwrap(),
+            "apple"
+        );
+        assert_eq!(first.get("count").unwrap().as_int().unwrap(), 3);
+
+        // Check second item (banana: 1 or cherry: 1, sorted alphabetically on tie)
+        let second = result[1].clone().try_cast::<rhai::Map>().unwrap();
+        assert_eq!(second.get("count").unwrap().as_int().unwrap(), 1);
+
+        clear_tracking_state();
+    }
+
+    #[test]
+    fn test_track_top_n_limit() {
+        clear_tracking_state();
+
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Track 5 items but limit to top 2
+        engine
+            .eval::<()>(r#"track_top("test", "item1", 2)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_top("test", "item2", 2)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_top("test", "item2", 2)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_top("test", "item3", 2)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_top("test", "item4", 2)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_top("test", "item5", 2)"#)
+            .unwrap();
+
+        let state = get_thread_tracking_state();
+        let result = state.get("test").unwrap().clone().into_array().unwrap();
+
+        // Should only have top 2
+        assert_eq!(result.len(), 2);
+
+        // First should be item2 (count=2)
+        let first = result[0].clone().try_cast::<rhai::Map>().unwrap();
+        assert_eq!(
+            first.get("key").unwrap().clone().into_string().unwrap(),
+            "item2"
+        );
+        assert_eq!(first.get("count").unwrap().as_int().unwrap(), 2);
+
+        clear_tracking_state();
+    }
+
+    #[test]
+    fn test_track_top_weighted_mode() {
+        clear_tracking_state();
+
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Track with custom values (latency)
+        engine
+            .eval::<()>(r#"track_top("slow", "/api/users", 2, 150)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_top("slow", "/api/products", 2, 50)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_top("slow", "/api/users", 2, 200)"#)
+            .unwrap(); // Should update to max (200)
+        engine
+            .eval::<()>(r#"track_top("slow", "/api/orders", 2, 75)"#)
+            .unwrap();
+
+        let state = get_thread_tracking_state();
+        let result = state.get("slow").unwrap().clone().into_array().unwrap();
+
+        assert_eq!(result.len(), 2);
+
+        // First should be /api/users with value=200 (max)
+        let first = result[0].clone().try_cast::<rhai::Map>().unwrap();
+        assert_eq!(
+            first.get("key").unwrap().clone().into_string().unwrap(),
+            "/api/users"
+        );
+        assert_eq!(first.get("value").unwrap().as_float().unwrap(), 200.0);
+
+        // Second should be /api/orders (75) or /api/products (50) - orders is higher
+        let second = result[1].clone().try_cast::<rhai::Map>().unwrap();
+        assert_eq!(
+            second.get("key").unwrap().clone().into_string().unwrap(),
+            "/api/orders"
+        );
+        assert_eq!(second.get("value").unwrap().as_float().unwrap(), 75.0);
+
+        clear_tracking_state();
+    }
+
+    #[test]
+    fn test_track_bottom_count_mode() {
+        clear_tracking_state();
+
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Track items with different frequencies
+        // apple: 3 times, banana: 2 times, cherry: 1 time, date: 1 time
+        engine
+            .eval::<()>(r#"track_bottom("test", "apple", 3)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_bottom("test", "apple", 3)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_bottom("test", "apple", 3)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_bottom("test", "banana", 3)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_bottom("test", "banana", 3)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_bottom("test", "cherry", 3)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_bottom("test", "date", 3)"#)
+            .unwrap();
+
+        let state = get_thread_tracking_state();
+        let result = state.get("test").unwrap().clone().into_array().unwrap();
+
+        // Should have bottom 3 (by count ascending, then alphabetically)
+        assert_eq!(result.len(), 3);
+
+        // First and second should both have count=1 (cherry and date, alphabetically)
+        let first = result[0].clone().try_cast::<rhai::Map>().unwrap();
+        assert_eq!(first.get("count").unwrap().as_int().unwrap(), 1);
+        assert_eq!(
+            first.get("key").unwrap().clone().into_string().unwrap(),
+            "cherry"
+        );
+
+        let second = result[1].clone().try_cast::<rhai::Map>().unwrap();
+        assert_eq!(second.get("count").unwrap().as_int().unwrap(), 1);
+        assert_eq!(
+            second.get("key").unwrap().clone().into_string().unwrap(),
+            "date"
+        );
+
+        // Third should be banana with count=2
+        let third = result[2].clone().try_cast::<rhai::Map>().unwrap();
+        assert_eq!(third.get("count").unwrap().as_int().unwrap(), 2);
+        assert_eq!(
+            third.get("key").unwrap().clone().into_string().unwrap(),
+            "banana"
+        );
+
+        clear_tracking_state();
+    }
+
+    #[test]
+    fn test_track_bottom_weighted_mode() {
+        clear_tracking_state();
+
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Track with custom values (latency - bottom = fastest)
+        engine
+            .eval::<()>(r#"track_bottom("fast", "/api/users", 2, 150.5)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_bottom("fast", "/api/products", 2, 30.0)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_bottom("fast", "/api/users", 2, 100.0)"#)
+            .unwrap(); // Should update to min (100)
+        engine
+            .eval::<()>(r#"track_bottom("fast", "/api/orders", 2, 75.0)"#)
+            .unwrap();
+
+        let state = get_thread_tracking_state();
+        let result = state.get("fast").unwrap().clone().into_array().unwrap();
+
+        assert_eq!(result.len(), 2);
+
+        // First should be /api/products with value=30.0 (min)
+        let first = result[0].clone().try_cast::<rhai::Map>().unwrap();
+        assert_eq!(
+            first.get("key").unwrap().clone().into_string().unwrap(),
+            "/api/products"
+        );
+        assert_eq!(first.get("value").unwrap().as_float().unwrap(), 30.0);
+
+        // Second should be /api/orders (75.0) or /api/users (100.0) - orders is smaller
+        let second = result[1].clone().try_cast::<rhai::Map>().unwrap();
+        assert_eq!(
+            second.get("key").unwrap().clone().into_string().unwrap(),
+            "/api/orders"
+        );
+        assert_eq!(second.get("value").unwrap().as_float().unwrap(), 75.0);
+
+        clear_tracking_state();
+    }
+
+    #[test]
+    fn test_track_top_invalid_n() {
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // N must be >= 1
+        let result = engine.eval::<()>(r#"track_top("test", "item", 0)"#);
+        assert!(result.is_err());
+
+        let result = engine.eval::<()>(r#"track_top("test", "item", -1)"#);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_track_top_unit_value() {
+        clear_tracking_state();
+
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Unit values should be silently ignored
+        engine
+            .eval::<()>(r#"track_top("test", "apple", 3, ())"#)
+            .unwrap();
+
+        let state = get_thread_tracking_state();
+        // Should not have created any entry or should be empty
+        assert!(
+            !state.contains_key("test")
+                || state
+                    .get("test")
+                    .unwrap()
+                    .clone()
+                    .into_array()
+                    .unwrap()
+                    .is_empty()
+        );
+
+        clear_tracking_state();
+    }
+
+    #[test]
+    fn test_track_top_stable_sort() {
+        clear_tracking_state();
+
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Create ties - all have count=1
+        engine
+            .eval::<()>(r#"track_top("test", "zebra", 5)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_top("test", "apple", 5)"#)
+            .unwrap();
+        engine
+            .eval::<()>(r#"track_top("test", "mango", 5)"#)
+            .unwrap();
+
+        let state = get_thread_tracking_state();
+        let result = state.get("test").unwrap().clone().into_array().unwrap();
+
+        // All have same count, so should be sorted alphabetically
+        let first = result[0].clone().try_cast::<rhai::Map>().unwrap();
+        let second = result[1].clone().try_cast::<rhai::Map>().unwrap();
+        let third = result[2].clone().try_cast::<rhai::Map>().unwrap();
+
+        assert_eq!(
+            first.get("key").unwrap().clone().into_string().unwrap(),
+            "apple"
+        );
+        assert_eq!(
+            second.get("key").unwrap().clone().into_string().unwrap(),
+            "mango"
+        );
+        assert_eq!(
+            third.get("key").unwrap().clone().into_string().unwrap(),
+            "zebra"
+        );
+
+        clear_tracking_state();
     }
 }

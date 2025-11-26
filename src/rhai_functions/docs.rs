@@ -191,11 +191,15 @@ window.pluck(field)                  Extract field values from current window/wi
 window.pluck_as_nums(field)          Extract numeric field values from current window/window array
 
 TRACKING/METRICS FUNCTIONS (requires --metrics):
+track_bottom(key, item, n)           Track bottom N least frequent items (skips () values)
+track_bottom(key, item, n, value)    Track bottom N items by lowest values (skips () values)
 track_bucket(key, bucket)            Track values in buckets for histograms (skips () values)
 track_count(key)                     Increment counter for key by 1 (string key; use to_string() for numbers)
 track_max(key, value)                Track maximum value for key (skips () values)
 track_min(key, value)                Track minimum value for key (skips () values)
 track_sum(key, value)                Accumulate numeric values for key (skips () values)
+track_top(key, item, n)              Track top N most frequent items (skips () values)
+track_top(key, item, n, value)       Track top N items by highest values (skips () values)
 track_unique(key, value)             Track unique values for key (skips () values)
 
 FILE OUTPUT (requires --allow-fs-writes):
@@ -355,6 +359,18 @@ kelora web_access.log --metrics \
 # Save metrics to JSON file
 kelora -j api_logs.jsonl --metrics --metrics-file stats.json \
   --exec 'track_count(e.level); track_sum("bytes", e.bytes)' --silent
+
+# Top 10 most common errors
+kelora -j api_logs.jsonl --metrics \
+  --exec 'if e.level == "ERROR" { track_top("common_errors", e.error_type, 10) }'
+
+# Top 10 slowest endpoints by latency
+kelora access.log --metrics \
+  --exec 'track_top("slowest", e.endpoint, 10, e.latency_ms)'
+
+# Bottom 5 fastest queries (least CPU time)
+kelora db.log --metrics \
+  --exec 'track_bottom("fastest", e.query_id, 5, e.cpu_time)'
 
 MULTI-FILE PROCESSING:
 # Add source filename to each event

@@ -419,6 +419,230 @@ impl GlobalTracker {
                             continue;
                         }
                     }
+                    "top" => {
+                        if let (Ok(existing_arr), Ok(new_arr)) =
+                            (existing.clone().into_array(), value.clone().into_array())
+                        {
+                            // Merge arrays from both workers
+                            let mut merged_map: std::collections::HashMap<String, f64> =
+                                std::collections::HashMap::new();
+
+                            // Determine if this is count mode or weighted mode
+                            let field_name = if !existing_arr.is_empty() {
+                                if let Some(first_map) =
+                                    existing_arr[0].clone().try_cast::<rhai::Map>()
+                                {
+                                    if first_map.contains_key("count") {
+                                        "count"
+                                    } else {
+                                        "value"
+                                    }
+                                } else {
+                                    "count"
+                                }
+                            } else {
+                                "count"
+                            };
+
+                            // Merge existing array
+                            for item in existing_arr {
+                                if let Some(map) = item.try_cast::<rhai::Map>() {
+                                    if let (Some(k), Some(v)) =
+                                        (map.get("key"), map.get(field_name))
+                                    {
+                                        if let Ok(key_str) = k.clone().into_string() {
+                                            let val = if field_name == "count" {
+                                                v.as_int().unwrap_or(0) as f64
+                                            } else {
+                                                v.as_float().unwrap_or(0.0)
+                                            };
+                                            merged_map.insert(key_str, val);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Merge new array (for count: add counts, for value: take max)
+                            for item in new_arr {
+                                if let Some(map) = item.try_cast::<rhai::Map>() {
+                                    if let (Some(k), Some(v)) =
+                                        (map.get("key"), map.get(field_name))
+                                    {
+                                        if let Ok(key_str) = k.clone().into_string() {
+                                            let val = if field_name == "count" {
+                                                v.as_int().unwrap_or(0) as f64
+                                            } else {
+                                                v.as_float().unwrap_or(0.0)
+                                            };
+
+                                            if field_name == "count" {
+                                                // Count mode: sum counts
+                                                *merged_map.entry(key_str).or_insert(0.0) += val;
+                                            } else {
+                                                // Weighted mode: take max
+                                                merged_map
+                                                    .entry(key_str)
+                                                    .and_modify(|e| *e = e.max(val))
+                                                    .or_insert(val);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Convert to vec and sort (descending by value, ascending by key)
+                            let mut items: Vec<(String, f64)> = merged_map.into_iter().collect();
+                            items.sort_by(|a, b| {
+                                match b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal) {
+                                    std::cmp::Ordering::Equal => a.0.cmp(&b.0),
+                                    other => other,
+                                }
+                            });
+
+                            // Determine N from original array sizes (use max of both)
+                            let n = existing
+                                .clone()
+                                .into_array()
+                                .unwrap()
+                                .len()
+                                .max(value.clone().into_array().unwrap().len());
+
+                            // Trim to top N
+                            if items.len() > n {
+                                items.truncate(n);
+                            }
+
+                            // Convert back to rhai array of maps
+                            let result_arr: rhai::Array = items
+                                .into_iter()
+                                .map(|(k, v)| {
+                                    let mut map = rhai::Map::new();
+                                    map.insert("key".into(), Dynamic::from(k));
+                                    if field_name == "count" {
+                                        map.insert("count".into(), Dynamic::from(v as i64));
+                                    } else {
+                                        map.insert("value".into(), Dynamic::from(v));
+                                    }
+                                    Dynamic::from(map)
+                                })
+                                .collect();
+
+                            target.insert(key.clone(), Dynamic::from(result_arr));
+                            continue;
+                        }
+                    }
+                    "bottom" => {
+                        if let (Ok(existing_arr), Ok(new_arr)) =
+                            (existing.clone().into_array(), value.clone().into_array())
+                        {
+                            // Merge arrays from both workers
+                            let mut merged_map: std::collections::HashMap<String, f64> =
+                                std::collections::HashMap::new();
+
+                            // Determine if this is count mode or weighted mode
+                            let field_name = if !existing_arr.is_empty() {
+                                if let Some(first_map) =
+                                    existing_arr[0].clone().try_cast::<rhai::Map>()
+                                {
+                                    if first_map.contains_key("count") {
+                                        "count"
+                                    } else {
+                                        "value"
+                                    }
+                                } else {
+                                    "count"
+                                }
+                            } else {
+                                "count"
+                            };
+
+                            // Merge existing array
+                            for item in existing_arr {
+                                if let Some(map) = item.try_cast::<rhai::Map>() {
+                                    if let (Some(k), Some(v)) =
+                                        (map.get("key"), map.get(field_name))
+                                    {
+                                        if let Ok(key_str) = k.clone().into_string() {
+                                            let val = if field_name == "count" {
+                                                v.as_int().unwrap_or(0) as f64
+                                            } else {
+                                                v.as_float().unwrap_or(0.0)
+                                            };
+                                            merged_map.insert(key_str, val);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Merge new array (for count: add counts, for value: take min)
+                            for item in new_arr {
+                                if let Some(map) = item.try_cast::<rhai::Map>() {
+                                    if let (Some(k), Some(v)) =
+                                        (map.get("key"), map.get(field_name))
+                                    {
+                                        if let Ok(key_str) = k.clone().into_string() {
+                                            let val = if field_name == "count" {
+                                                v.as_int().unwrap_or(0) as f64
+                                            } else {
+                                                v.as_float().unwrap_or(0.0)
+                                            };
+
+                                            if field_name == "count" {
+                                                // Count mode: sum counts
+                                                *merged_map.entry(key_str).or_insert(0.0) += val;
+                                            } else {
+                                                // Weighted mode: take min
+                                                merged_map
+                                                    .entry(key_str)
+                                                    .and_modify(|e| *e = e.min(val))
+                                                    .or_insert(val);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Convert to vec and sort (ascending by value, ascending by key)
+                            let mut items: Vec<(String, f64)> = merged_map.into_iter().collect();
+                            items.sort_by(|a, b| {
+                                match a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal) {
+                                    std::cmp::Ordering::Equal => a.0.cmp(&b.0),
+                                    other => other,
+                                }
+                            });
+
+                            // Determine N from original array sizes (use max of both)
+                            let n = existing
+                                .clone()
+                                .into_array()
+                                .unwrap()
+                                .len()
+                                .max(value.clone().into_array().unwrap().len());
+
+                            // Trim to bottom N
+                            if items.len() > n {
+                                items.truncate(n);
+                            }
+
+                            // Convert back to rhai array of maps
+                            let result_arr: rhai::Array = items
+                                .into_iter()
+                                .map(|(k, v)| {
+                                    let mut map = rhai::Map::new();
+                                    map.insert("key".into(), Dynamic::from(k));
+                                    if field_name == "count" {
+                                        map.insert("count".into(), Dynamic::from(v as i64));
+                                    } else {
+                                        map.insert("value".into(), Dynamic::from(v));
+                                    }
+                                    Dynamic::from(map)
+                                })
+                                .collect();
+
+                            target.insert(key.clone(), Dynamic::from(result_arr));
+                            continue;
+                        }
+                    }
                     "error_examples" => {
                         if let (Ok(existing_arr), Ok(new_arr)) =
                             (existing.clone().into_array(), value.clone().into_array())

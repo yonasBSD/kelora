@@ -1195,6 +1195,71 @@ track_bucket("latency", bucket)
 track_bucket("user_types", e.user_type.or_empty())  // Skips empty/missing
 ```
 
+#### `track_top(key, item, n)` / `track_top(key, item, n, value)`
+Track top N most frequent items (count mode) or highest-valued items (weighted mode). Skips Unit `()` values.
+
+**Count mode** tracks the N items that appear most frequently:
+
+```rhai
+// Track top 10 most common errors
+track_top("common_errors", e.error_type, 10)
+
+// Track top 5 most active users
+track_top("active_users", e.user_id, 5)
+```
+
+**Weighted mode** tracks the N items with the highest custom values:
+
+```rhai
+// Track top 10 slowest endpoints by latency
+track_top("slowest_endpoints", e.endpoint, 10, e.latency_ms)
+
+// Track top 5 biggest requests by bytes
+track_top("heavy_requests", e.request_id, 5, e.bytes)
+
+// Handles missing values gracefully
+track_top("cpu_hogs", e.process, 10, e.cpu_time.or_empty())  // Skips ()
+```
+
+**Output format:**
+- Count mode: `[{key: "item", count: 42}, ...]`
+- Weighted mode: `[{key: "item", value: 123.4}, ...]`
+- Results are sorted by value descending, then alphabetically by key
+
+#### `track_bottom(key, item, n)` / `track_bottom(key, item, n, value)`
+Track bottom N least frequent items (count mode) or lowest-valued items (weighted mode). Skips Unit `()` values.
+
+**Count mode** tracks the N items that appear least frequently:
+
+```rhai
+// Track bottom 5 rarest errors
+track_bottom("rare_errors", e.error_type, 5)
+
+// Track least active users
+track_bottom("inactive_users", e.user_id, 10)
+```
+
+**Weighted mode** tracks the N items with the lowest custom values:
+
+```rhai
+// Track 10 fastest endpoints by latency
+track_bottom("fastest_endpoints", e.endpoint, 10, e.latency_ms)
+
+// Track smallest requests
+track_bottom("tiny_requests", e.request_id, 5, e.bytes)
+```
+
+**Output format:**
+- Count mode: `[{key: "item", count: 1}, ...]`
+- Weighted mode: `[{key: "item", value: 0.5}, ...]`
+- Results are sorted by value ascending, then alphabetically by key
+
+!!! tip "Memory Efficiency"
+    `track_top()` and `track_bottom()` use bounded memory (O(N) per key) unlike `track_bucket()` which stores all unique values. For high-cardinality fields, prefer top/bottom tracking over bucketing.
+
+!!! note "Parallel Mode Behavior"
+    In parallel mode, each worker maintains its own top/bottom N. During merge, the lists are combined, re-sorted, and trimmed to N. Final results are deterministic.
+
 ---
 
 ## File Output Functions
