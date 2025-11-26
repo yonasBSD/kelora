@@ -9,20 +9,21 @@ Kelora is a scriptable log processor for the command line. Parse mixed formats, 
 ## Quick Example
 
 ```bash
-kelora -f syslog examples/syslog_multiline.log --filter 'e.prog == "nginx"' -F json
+kelora examples/quickstart.log -f 'cols:ts(3) level *msg' -l error -e 'e.absorb_kv("msg")' --normalize-ts -J
 ```
 
-**Input (mixed syslog):**
+**Input (unstructured logs with embedded key=value pairs):**
 ```
-Oct 25 08:15:23 webserver01 nginx[1234]: 192.168.1.100 - - [25/Oct/2024:08:15:23 +0000] "GET /api/users HTTP/1.1" 200 1432
-Oct 25 08:15:25 appserver01 backend[5678]: INFO: Processing order #12345
-Oct 25 08:15:32 webserver01 nginx[1234]: 192.168.1.102 - - [25/Oct/2024:08:15:32 +0000] "GET /api/health HTTP/1.1" 200 23
+Jan 15 10:00:15 ERROR Payment timeout order=1234 gateway=stripe duration=5s
+Jan 15 10:00:22 ERROR Gateway unreachable host=stripe.com
+Jan 15 10:00:28 ERROR Authentication failed user=admin ip=192.168.1.50 reason=invalid_token
 ```
 
-**Output (filtered & structured):**
+**Output (structured JSON with extracted fields):**
 ```json
-{"ts":"Oct 25 08:15:23","msg":"192.168.1.100 - - [25/Oct/2024:08:15:23 +0000] \"GET /api/users HTTP/1.1\" 200 1432","host":"webserver01","prog":"nginx","pid":1234}
-{"ts":"Oct 25 08:15:32","msg":"192.168.1.102 - - [25/Oct/2024:08:15:32 +0000] \"GET /api/health HTTP/1.1\" 200 23","host":"webserver01","prog":"nginx","pid":1234}
+{"ts":"2025-01-15T10:00:15+00:00","level":"ERROR","msg":"Payment timeout","order":"1234","gateway":"stripe","duration":"5s"}
+{"ts":"2025-01-15T10:00:22+00:00","level":"ERROR","msg":"Gateway unreachable","host":"stripe.com"}
+{"ts":"2025-01-15T10:00:28+00:00","level":"ERROR","msg":"Authentication failed","user":"admin","ip":"192.168.1.50","reason":"invalid_token"}
 ```
 
 ## When to Use Kelora
