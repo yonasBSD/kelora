@@ -1570,7 +1570,7 @@ fn main() -> Result<()> {
                 && !SHOULD_TERMINATE.load(Ordering::Relaxed)
             {
                 let mut hint = config.format_hint_message(
-                    "Metrics recorded; rerun with -m (table) or --metrics-json to view them.",
+                    "Metrics recorded; rerun with -m or --metrics=json to view them.",
                 );
                 if !events_were_output {
                     hint = hint.trim_start_matches('\n').to_string();

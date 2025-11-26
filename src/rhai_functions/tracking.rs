@@ -2055,7 +2055,7 @@ pub fn format_metrics_output(metrics: &HashMap<String, Dynamic>, metrics_level: 
                         "count"
                     };
 
-                    // Full output mode (-mm or higher): show everything
+                    // Full output mode (--metrics=full): show everything
                     if metrics_level >= 2 {
                         output.push_str(&format!("{:<12} ({} items):\n", key, len));
                         for (idx, item) in arr.iter().enumerate() {
@@ -2137,13 +2137,13 @@ pub fn format_metrics_output(metrics: &HashMap<String, Dynamic>, metrics_level: 
                             }
                         }
                         output.push_str(&format!(
-                            "  [+{} more. Use -mm, --metrics-json, or --metrics-file for full list]\n",
+                            "  [+{} more. Use --metrics=full or --metrics-file for full list]\n",
                             len - 5
                         ));
                     }
                 } else {
                     // Regular array (track_unique)
-                    // Full output mode (-mm or higher): show everything
+                    // Full output mode (--metrics=full): show everything
                     if metrics_level >= 2 {
                         output.push_str(&format!("{:<12} ({} unique):\n", key, len));
                         for item in arr.iter() {
@@ -2159,7 +2159,7 @@ pub fn format_metrics_output(metrics: &HashMap<String, Dynamic>, metrics_level: 
                             output.push_str(&format!("  {}\n", item));
                         }
                         output.push_str(&format!(
-                            "  [+{} more. Use -mm, --metrics-json, or --metrics-file for full list]\n",
+                            "  [+{} more. Use --metrics=full or --metrics-file for full list]\n",
                             len - 5
                         ));
                     }
