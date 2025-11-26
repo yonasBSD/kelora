@@ -4,6 +4,84 @@ All notable changes to Kelora will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Changed
+
+- Improved mixed-format log diagnostics with format hints
+- Updated metrics option references to new `--metrics` syntax throughout documentation
+
+### Fixed
+
+- Examples count in documentation
+
+## [0.11.1] - 2025-11-26
+
+### Fixed
+
+- Unhelpful exec error messages now preserve full diagnostic context
+
+## [0.11.0] - 2025-11-26
+
+### Added
+
+- **New Rhai functions:**
+  - `track_top()` and `track_bottom()` - Top-N aggregation with count and weighted modes
+  - Parallel-safe with bounded memory O(keys × N)
+  - Pretty-printed output with rankings and stable sorting
+- **Field access warning system:**
+  - Detects missing field access with helpful suggestions
+  - Levenshtein distance algorithm for field name suggestions
+  - Case mismatch detection for field names
+  - Context-aware tips based on warning frequency
+  - AST-based field access detection for better accuracy
+  - `--no-warnings` flag to suppress warnings
+  - Warnings automatically suppressed with `--silent` and `--no-diagnostics`
+- **Documentation improvements:**
+  - Pipeline architecture diagrams
+  - Try/catch guidance in error handling docs
+  - Working quick help examples
+  - Restructured troubleshooting docs aligned with Diataxis
+  - Improved README with concrete examples and clearer positioning
+
+### Changed
+
+- **Breaking:** Stats/metrics flags redesigned for stdout-first workflow:
+  - `-s` now means stats-only (outputs to stdout, was stats+events)
+  - `-m` now means metrics-only (outputs to stdout, was metrics+events)
+  - Use `--with-stats` or `--with-metrics` to show data alongside events
+  - Removed `-S`, `--stats-only`, `--metrics-only`, `--metrics-json`
+  - Added format parameters: `--stats=json`, `--metrics=json`
+- **Breaking:** `conf` object now immutable in Rhai scripts
+- **Breaking:** Strict `emit()` handling enforced
+- **Rhai error diagnostics significantly improved:**
+  - Call stack display with expanded hints
+  - Shows called argument types in error messages
+  - Better suggestions and hints for missing fields
+  - Explains unit type in error messages
+  - Honors `--no-emoji` flag in diagnostics
+  - Avoids double emoji prefixes
+  - Hints missing fields when unit arguments appear
+- Improved no-input error message to clarify missing filename vs `--no-input` flag
+- Updated Rhai to v1.23
+- Updated dependencies (Cargo update)
+- Renamed windowed stage labels to normal names
+- Clarified format hint message for missing `-f` flag
+
+### Fixed
+
+- Old `--stats-only`/`--metrics-only` flag references in documentation
+- Step numbering in metrics tutorial
+- False positive warnings for field assignments
+- Parallel warning reporting in parallel mode
+- Alias test terminal noise (now captured)
+- Format hint message clarity
+- Docs/example mismatch in window example
+- Example scripts handling of multiple timing field formats
+- `patterns.rhai` syntax and error reporting
+- Markdown formatting (empty lines before bullet lists)
+- Rust 2024 future incompatibility warning
+
 ## [0.10.1] - 2025-11-21
 
 ### Added
@@ -220,7 +298,9 @@ _Initial release (yanked)._
 
 ---
 
-[Unreleased]: https://github.com/dloss/kelora/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/dloss/kelora/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/dloss/kelora/compare/v0.11.0...v0.11.1
+[0.11.0]: https://github.com/dloss/kelora/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/dloss/kelora/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/dloss/kelora/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/dloss/kelora/compare/v0.9.0...v0.9.1
