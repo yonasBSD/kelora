@@ -533,7 +533,7 @@ impl ScriptStage for ExecStage {
                 crate::rhai_functions::emit::clear_suppression_flag();
                 let _ = crate::rhai_functions::emit::get_and_clear_pending_emissions();
 
-                let error_msg = format!("{}", e);
+                let error_msg = format!("{:#}", e);
 
                 // NEW: Detect unit type operations and track as warnings
                 if crate::rhai_functions::tracking::is_unit_type_error(&error_msg) {
@@ -573,10 +573,17 @@ impl ScriptStage for ExecStage {
                 {
                     // Treat as warning only
                 } else {
+                    // Extract just the Rhai error message from the full diagnostic for cleaner error summaries
+                    let error_for_summary = error_msg
+                        .lines()
+                        .find(|line| line.trim().starts_with("Rhai:"))
+                        .map(|line| line.trim().strip_prefix("Rhai:").unwrap_or(line).trim())
+                        .unwrap_or(&error_msg);
+
                     crate::rhai_functions::tracking::track_error(
                         "exec",
                         ctx.meta.line_num,
-                        &format!("Exec error: {}", e),
+                        error_for_summary,
                         Some(&event.original_line),
                         ctx.meta.filename.as_deref(),
                         ctx.config.verbose,
@@ -591,7 +598,7 @@ impl ScriptStage for ExecStage {
                     .is_some()
                     || ctx.config.strict
                 {
-                    ScriptResult::Error(format!("Exec error: {}", e))
+                    ScriptResult::Error(error_msg.clone())
                 } else {
                     // Rollback: return original event unchanged
                     ScriptResult::Emit(event)
