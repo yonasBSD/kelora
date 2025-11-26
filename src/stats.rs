@@ -42,6 +42,7 @@ pub struct ProcessingStats {
     pub timestamp_override_failed: bool,
     pub timestamp_override_warning: Option<String>,
     pub yearless_timestamps: usize, // Count of timestamps parsed with year inference
+    pub detected_format: Option<String>, // Format detected for this processing session
 }
 
 // Thread-local storage for statistics (following track_count pattern)
@@ -94,6 +95,12 @@ pub fn stats_set_timestamp_override(field: Option<String>, format: Option<String
         stats.timestamp_override_format = format;
         stats.timestamp_override_failed = false;
         stats.timestamp_override_warning = None;
+    });
+}
+
+pub fn stats_set_detected_format(format: String) {
+    THREAD_STATS.with(|stats| {
+        stats.borrow_mut().detected_format = Some(format);
     });
 }
 
@@ -401,6 +408,11 @@ impl ProcessingStats {
 
     fn format_stats_internal(&self, _multiline_enabled: bool, skip_line_counts: bool) -> String {
         let mut output = String::new();
+
+        // Show detected format if available
+        if let Some(ref format) = self.detected_format {
+            output.push_str(&format!("Detected format: {}\n", format));
+        }
 
         // Lines processed: N total, N filtered (X%), N errors (Y%)
         // Skip this line when called from signal handler (line counts are always 0 there)

@@ -184,6 +184,7 @@ impl FilterStage {
                         ctx.config.verbose,
                         ctx.config.quiet_level,
                         Some(&ctx.config),
+                        None,
                     );
                 }
 
@@ -382,6 +383,7 @@ impl ScriptStage for FilterStage {
                         ctx.config.verbose,
                         ctx.config.quiet_level,
                         Some(&ctx.config),
+                        None,
                     );
                 }
 
@@ -589,6 +591,7 @@ impl ScriptStage for ExecStage {
                         ctx.config.verbose,
                         ctx.config.quiet_level,
                         Some(&ctx.config),
+                        None,
                     );
                 }
 
@@ -1091,6 +1094,7 @@ mod tests {
                 input_files: vec![],
                 allow_fs_writes: false,
                 no_warnings: false,
+                format_name: None,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),
@@ -1195,6 +1199,7 @@ mod tests {
                 input_files: vec![],
                 allow_fs_writes: false,
                 no_warnings: false,
+                format_name: None,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),
@@ -1271,6 +1276,7 @@ mod tests {
                 input_files: vec![],
                 allow_fs_writes: false,
                 no_warnings: false,
+                format_name: None,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),
@@ -1350,6 +1356,7 @@ mod tests {
                 input_files: vec![],
                 allow_fs_writes: false,
                 no_warnings: false,
+                format_name: None,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),
@@ -1406,6 +1413,7 @@ mod tests {
                 input_files: vec![],
                 allow_fs_writes: false,
                 no_warnings: false,
+                format_name: None,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),
@@ -1461,6 +1469,7 @@ mod tests {
                 input_files: vec![],
                 allow_fs_writes: false,
                 no_warnings: false,
+                format_name: None,
             },
             tracker: std::collections::HashMap::new(),
             internal_tracker: std::collections::HashMap::new(),

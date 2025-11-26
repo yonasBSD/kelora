@@ -205,6 +205,28 @@ pub enum InputFormat {
     Regex(String), // Contains the regex pattern with optional type annotations
 }
 
+impl InputFormat {
+    /// Convert format to display string for error messages and stats
+    pub fn to_display_string(&self) -> String {
+        match self {
+            InputFormat::Auto => "auto".to_string(),
+            InputFormat::Json => "json".to_string(),
+            InputFormat::Line => "line".to_string(),
+            InputFormat::Raw => "raw".to_string(),
+            InputFormat::Logfmt => "logfmt".to_string(),
+            InputFormat::Syslog => "syslog".to_string(),
+            InputFormat::Cef => "cef".to_string(),
+            InputFormat::Csv(_) => "csv".to_string(),
+            InputFormat::Tsv(_) => "tsv".to_string(),
+            InputFormat::Csvnh => "csvnh".to_string(),
+            InputFormat::Tsvnh => "tsvnh".to_string(),
+            InputFormat::Combined => "combined".to_string(),
+            InputFormat::Cols(_) => "cols".to_string(),
+            InputFormat::Regex(_) => "regex".to_string(),
+        }
+    }
+}
+
 /// Output format enumeration
 #[derive(ValueEnum, Clone, Debug, Default, PartialEq)]
 pub enum OutputFormat {

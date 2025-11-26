@@ -90,6 +90,7 @@ impl PipelineBuilder {
                 pretty: false,
                 color_mode: crate::config::ColorMode::Auto,
                 timestamp_formatting: crate::config::TimestampFormatConfig::default(),
+                format_name: None,
                 strict: false,
                 verbose: 0,
                 quiet_events: false,
@@ -1045,6 +1046,7 @@ pub fn create_pipeline_builder_from_config(
         no_warnings: config.processing.no_warnings,
         input_files: config.input.files.clone(),
         allow_fs_writes: config.processing.allow_fs_writes,
+        format_name: Some(config.input.format.to_display_string()),
     };
 
     // Extract cols spec if needed before conversion

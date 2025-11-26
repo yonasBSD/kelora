@@ -134,6 +134,8 @@ fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
     // Start statistics collection if enabled
     if config.output.stats.is_some() {
         stats_start_timer();
+        // Set the initial format in stats (may be updated if auto-detected later)
+        stats::stats_set_detected_format(config.input.format.to_display_string());
     }
 
     let use_parallel = config.should_use_parallel();
@@ -190,6 +192,12 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
         // Create new config with detected format
         let mut new_config = config.clone();
         new_config.input.format = detected_format;
+
+        // Update detected format in stats if stats are enabled
+        if config.output.stats.is_some() {
+            stats::stats_set_detected_format(new_config.input.format.to_display_string());
+        }
+
         new_config
     } else {
         config.clone()
@@ -337,6 +345,11 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         let mut final_config = config.clone();
         final_config.input.format = detected_format;
 
+        // Set detected format in stats if stats are enabled
+        if config.output.stats.is_some() {
+            stats::stats_set_detected_format(final_config.input.format.to_display_string());
+        }
+
         let input = SequentialInput::Stdin(Box::new(peekable_reader));
         run_pipeline_sequential_internal(&final_config, output, ctrl_rx, input)
     } else {
@@ -363,6 +376,12 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
 
         let mut final_config = config.clone();
         final_config.input.format = detected_format;
+
+        // Set detected format in stats if stats are enabled
+        if config.output.stats.is_some() {
+            stats::stats_set_detected_format(final_config.input.format.to_display_string());
+        }
+
         let input = SequentialInput::Files(readers::MultiFileReader::new(sorted_files)?);
         run_pipeline_sequential_internal(&final_config, output, ctrl_rx, input)
     }

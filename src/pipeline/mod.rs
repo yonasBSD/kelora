@@ -213,6 +213,8 @@ pub struct PipelineConfig {
     pub input_files: Vec<String>,
     /// Allow Rhai scripts to create directories and write files on disk
     pub allow_fs_writes: bool,
+    /// Format name (for error reporting)
+    pub format_name: Option<String>,
 }
 
 /// Metadata about current processing context
@@ -353,6 +355,7 @@ impl Pipeline {
                         ctx.config.verbose,
                         ctx.config.quiet_level,
                         Some(&ctx.config),
+                        ctx.config.format_name.as_deref(),
                     );
 
                     // New resiliency model: skip unparseable lines by default,
@@ -403,6 +406,7 @@ impl Pipeline {
                                         ctx.config.verbose,
                                         ctx.config.quiet_level,
                                         Some(&ctx.config),
+                                        None,
                                     );
 
                                     // New resiliency model: use strict flag
@@ -706,6 +710,7 @@ impl Pipeline {
                     ctx.config.verbose,
                     ctx.config.quiet_level,
                     Some(&ctx.config),
+                    None,
                 );
 
                 return Err(anyhow!(msg));
@@ -765,6 +770,7 @@ impl Pipeline {
                     ctx.config.verbose,
                     ctx.config.quiet_level,
                     Some(&ctx.config),
+                    ctx.config.format_name.as_deref(),
                 );
 
                 // New resiliency model: skip unparseable lines by default,
@@ -815,6 +821,7 @@ impl Pipeline {
                                     ctx.config.verbose,
                                     ctx.config.quiet_level,
                                     Some(&ctx.config),
+                                    None,
                                 );
 
                                 // New resiliency model: use strict flag

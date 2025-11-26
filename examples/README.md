@@ -53,6 +53,25 @@ Test Kelora's robustness with malformed or unusual input:
 - `errors_filter_runtime.jsonl` - Filter expression errors
 - `errors_exec_transform.jsonl` - Transformation errors
 
+### Mixed Format Handling
+
+Real-world logs often contain multiple formats in the same file (Docker prefixes, stack traces mixed with JSON, etc.):
+
+- `mixed_format.log` - Sample file with JSON and plain text intermixed
+- `mixed_format_demo.sh` - Demonstrates preprocessing techniques for handling mixed formats
+
+**Key Insight:** Kelora excels at processing single-format structured logs. For mixed formats, the recommended approach is to **preprocess logs** to split by format before processing:
+
+```bash
+# Extract and process JSON lines only
+grep '^{' mixed_format.log | kelora -f json --filter 'e.level == "error"'
+
+# Process plain text lines separately
+grep -v '^{' mixed_format.log | kelora -f line --filter 'e.line.contains("ERROR")'
+```
+
+See `mixed_format_demo.sh` for more examples of handling mixed-format logs using standard Unix tools.
+
 ### Multiline Handling (`multiline_*`)
 
 Different strategies for parsing multi-line log entries:

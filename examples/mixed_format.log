@@ -1,0 +1,10 @@
+{"level":"info","msg":"JSON line 1","timestamp":"2024-01-15T10:00:00Z"}
+Plain text line - not JSON
+{"level":"error","msg":"JSON line 2","timestamp":"2024-01-15T10:00:01Z"}
+More plain text
+2024-01-15T10:00:02Z INFO Another format entirely
+{"level":"warn","msg":"JSON line 3","timestamp":"2024-01-15T10:00:03Z"}
+Even more unstructured text
+Stack trace line 1
+Stack trace line 2
+{"level":"info","msg":"JSON line 4","timestamp":"2024-01-15T10:00:04Z"}

@@ -165,6 +165,7 @@ pub fn track_error(
     verbose: u8,
     quiet_level: u8,
     config: Option<&crate::pipeline::PipelineConfig>,
+    format_name: Option<&str>,
 ) {
     // Use tracking infrastructure for error counting in all modes
     // This ensures consistent mapreduce behavior and avoids double counting
@@ -198,12 +199,18 @@ pub fn track_error(
             let input_files = config.map(|c| c.input_files.as_slice()).unwrap_or(&[]);
 
             let location = format_error_location(line_num, filename, input_files);
-            let formatted_error = if error_type == "parse" {
-                // For parse errors, omit the redundant "parse -" prefix
-                if !location.is_empty() && location != "unknown" {
-                    format!("{}{}: {}", prefix, location, message)
+            let mut formatted_error = if error_type == "parse" {
+                // For parse errors, include format name if available
+                let format_info = if let Some(fmt) = format_name {
+                    format!(" (format: {})", fmt)
                 } else {
-                    format!("{}{}", prefix, message)
+                    String::new()
+                };
+
+                if !location.is_empty() && location != "unknown" {
+                    format!("{}{}{}: {}", prefix, location, format_info, message)
+                } else {
+                    format!("{}{}{}", prefix, format_info.trim_start(), message)
                 }
             } else {
                 // For other error types, keep the existing format
@@ -213,6 +220,12 @@ pub fn track_error(
                     format!("{}{} - {}", prefix, error_type, message)
                 }
             };
+
+            // Add preprocessing hint for parse errors when format is known
+            if error_type == "parse" && format_name.is_some() && verbose > 0 {
+                let hint = "\n  Hint: Input may contain mixed formats. Consider preprocessing:\n    - Split by format: grep '^{' input.log | kelora -f json\n    - Use multiline detection: kelora -M 'regex:match=^{' -f json";
+                formatted_error.push_str(hint);
+            }
 
             if crate::rhai_functions::strings::is_parallel_mode() {
                 // In parallel mode, capture stderr message for ordered output later
