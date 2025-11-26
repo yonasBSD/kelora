@@ -2026,11 +2026,13 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
 
     // Show usage if on TTY and no input files provided (unless --no-input is specified)
     if crate::tty::is_stdin_tty() && cli.files.is_empty() && !cli.no_input {
-        // Print brief usage with description and help hint
-        println!("{}", Cli::command().render_usage());
-        println!("A command-line log analysis tool with embedded Rhai scripting");
-        println!("Try 'kelora --help' for more information.");
-        std::process::exit(0);
+        // Print error message to stderr following clap's error style
+        eprintln!("error: no input files or stdin provided");
+        eprintln!();
+        eprintln!("{}", Cli::command().render_usage());
+        eprintln!();
+        eprintln!("For more information, try '-h'.");
+        std::process::exit(2);
     }
 
     (matches, cli)

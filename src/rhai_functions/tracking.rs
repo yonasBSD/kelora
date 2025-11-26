@@ -1526,8 +1526,10 @@ pub fn register_functions(engine: &mut Engine) {
                         let b_map = b.clone().try_cast::<rhai::Map>();
 
                         if let (Some(a_m), Some(b_m)) = (a_map, b_map) {
-                            let a_count = a_m.get("count").and_then(|v| v.as_int().ok()).unwrap_or(0);
-                            let b_count = b_m.get("count").and_then(|v| v.as_int().ok()).unwrap_or(0);
+                            let a_count =
+                                a_m.get("count").and_then(|v| v.as_int().ok()).unwrap_or(0);
+                            let b_count =
+                                b_m.get("count").and_then(|v| v.as_int().ok()).unwrap_or(0);
                             let a_key = a_m
                                 .get("key")
                                 .and_then(|v| v.clone().into_string().ok())
@@ -1675,8 +1677,10 @@ pub fn register_functions(engine: &mut Engine) {
                         let b_map = b.clone().try_cast::<rhai::Map>();
 
                         if let (Some(a_m), Some(b_m)) = (a_map, b_map) {
-                            let a_count = a_m.get("count").and_then(|v| v.as_int().ok()).unwrap_or(0);
-                            let b_count = b_m.get("count").and_then(|v| v.as_int().ok()).unwrap_or(0);
+                            let a_count =
+                                a_m.get("count").and_then(|v| v.as_int().ok()).unwrap_or(0);
+                            let b_count =
+                                b_m.get("count").and_then(|v| v.as_int().ok()).unwrap_or(0);
                             let a_key = a_m
                                 .get("key")
                                 .and_then(|v| v.clone().into_string().ok())
