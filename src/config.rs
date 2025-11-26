@@ -144,7 +144,7 @@ pub struct ProcessingConfig {
     pub span: Option<SpanConfig>,
     /// Show detailed error information (levels: 0-3) - new resiliency model
     pub verbose: u8,
-    /// Suppress formatter/event output (-q/--no-events/-F none, stats-only, metrics-only)
+    /// Suppress formatter/event output (-q/--no-events/-F none, -s, -m)
     pub quiet_events: bool,
     /// Suppress diagnostics and summaries (--no-diagnostics)
     pub suppress_diagnostics: bool,
@@ -152,7 +152,7 @@ pub struct ProcessingConfig {
     pub no_warnings: bool,
     /// Suppress all stdout/stderr emitters except the single fatal line (--silent)
     pub silent: bool,
-    /// Suppress Rhai print/eprint and side-effect warnings (--no-script-output, --silent, stats-only, metrics-only)
+    /// Suppress Rhai print/eprint and side-effect warnings (--no-script-output, --silent, -s, -m)
     pub suppress_script_output: bool,
     /// Legacy quiet level used by some helpers (derived from the above flags)
     pub quiet_level: u8,
