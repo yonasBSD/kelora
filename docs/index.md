@@ -2,7 +2,7 @@
 
 **Turn messy logs into structured data.**
 
-Kelora is a scriptable log processor for the command line. Parse mixed formats, filter with complex logic, and analyze streams using embedded [Rhai](https://rhai.rs) scripting—all in a single binary.
+Kelora is a scriptable log processor for the command line. Parse structured or semi-structured logs (one format per file/stream), filter with complex logic, and analyze streams using embedded [Rhai](https://rhai.rs) scripting—all in a single binary. It can also extract logfmt/JSON blobs embedded inside a single event.
 
 ```bash
 cargo install kelora
@@ -18,7 +18,7 @@ Kelora trades speed for programmability. It's slower than grep, awk, and jq, but
 
 **Reach for Kelora when:**
 
-- You have **mixed formats** - Logs that aren't consistently JSON or need custom parsing
+- Your logs are **messy** - One format per file/stream, with embedded JSON/logfmt fields you want to pull out
 - You're **chaining tools** - Replacing `grep | awk | jq | custom-script.py` with one command
 - You need **stateful logic** - Counting errors per service, windowed metrics, lookup tables
 - You want **embedded scripting** - Complex transformations without leaving your shell

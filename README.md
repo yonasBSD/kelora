@@ -4,7 +4,7 @@
 
 **Turn messy logs into structured data.**
 
-Kelora is a scriptable log processor for the command line. Parse mixed formats, filter with complex logic, and analyze streams using embedded [Rhai](https://rhai.rs) scripting with 150+ built-in functions. Handles JSON, logfmt, syslog, CSV/TSV, gzip, with sequential or `--parallel` execution and built-in metrics.
+Kelora is a scriptable log processor for the command line. Parse structured or semi-structured logs (one format per file/stream), filter with complex logic, and analyze streams using embedded [Rhai](https://rhai.rs) scripting with 150+ built-in functions. Handles JSON, logfmt, syslog, CSV/TSV, gzip, with sequential or `--parallel` execution and built-in metrics. Can also extract logfmt/JSON blobs embedded inside a single event.
 
 ## Quick Example
 
@@ -28,7 +28,7 @@ Jan 15 10:00:28 ERROR Authentication failed user=admin ip=192.168.1.50 reason=in
 
 ## When to Use Kelora
 
-Kelora trades speed for programmability—slower than grep/awk/jq, but adds stateful scripting for complex transformations. Use it when you have **mixed formats**, need **stateful logic** (counters, windowed metrics, lookup tables), or are **chaining multiple tools**. For simple text search use `grep`, for JSON queries use `jq`.
+Kelora trades speed for programmability—slower than grep/awk/jq, but adds stateful scripting for complex transformations. Use it when your logs are **messy** (stick to one format per file/stream, but pull out embedded JSON/logfmt fields), need **stateful logic** (counters, windowed metrics, lookup tables), or are **chaining multiple tools**. For simple text search use `grep`, for JSON queries use `jq`.
 
 See [Power-User Techniques](https://kelora.dev/latest/how-to/power-user-techniques/) for JWT parsing, cryptographic pseudonymization, pattern normalization, and deterministic sampling.
 
