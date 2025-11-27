@@ -4,6 +4,25 @@ All notable changes to Kelora will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.12.0] - 2025-11-27
+
+### Added
+
+- **Span aggregation modes:**
+  - `--span-mode field` - Aggregate spans by field values (e.g., group by request ID)
+  - `--span-mode idle` - Aggregate spans by idle time gaps
+  - Comprehensive span variant tests
+- **Build improvements:**
+  - OpenBSD release builds in CI/CD pipeline
+- **Documentation:**
+  - Behaviour-neutral optimization ideas
+  - Span aggregation mode documentation
+
+### Changed
+
+- **Breaking:** Script output (`print()`/`eprint()`) now allowed in `--silent` mode
+- Clarified documentation on single-format streams and embedded extraction
+
 ## [0.11.2] - 2025-11-26
 
 ### Changed
@@ -298,7 +317,8 @@ _Initial release (yanked)._
 
 ---
 
-[0.11.2]: https://github.com/dloss/kelora/compare/v0.11.1...v0.11.2
+[0.12.0]: https://github.com/dloss/kelora/compare/v0.11.2...v0.12.0
+[0.11.2]: https://github.com/dloss/kelora/compare/v0.11.0...v0.11.2
 [0.11.1]: https://github.com/dloss/kelora/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/dloss/kelora/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/dloss/kelora/compare/v0.10.0...v0.10.1
