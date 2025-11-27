@@ -812,11 +812,7 @@ pub fn format_warning_summary(
     }
 
     let total_warnings: usize = warnings.values().map(|w| w.count).sum();
-    let prefix = if use_colors && !no_emoji {
-        "🔸"
-    } else {
-        ""
-    };
+    let prefix = if use_colors && !no_emoji { "🔸" } else { "" };
 
     // Sort by field name for consistent output
     let mut sorted_warnings: Vec<_> = warnings.values().collect();
@@ -862,14 +858,15 @@ pub fn format_warning_summary(
         .collect();
 
     if sorted_warnings.len() > display_count {
-        parts.push(format!(
-            "+{} more",
-            sorted_warnings.len() - display_count
-        ));
+        parts.push(format!("+{} more", sorted_warnings.len() - display_count));
     }
 
     let header = if prefix.is_empty() {
-        format!("Missing fields ({} total): {}", total_warnings, parts.join(", "))
+        format!(
+            "Missing fields ({} total): {}",
+            total_warnings,
+            parts.join(", ")
+        )
     } else {
         format!(
             "{} Missing fields ({} total): {}",

@@ -17,11 +17,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Documentation:**
   - Behaviour-neutral optimization ideas
   - Span aggregation mode documentation
+  - Warning behavior note: unguarded `e.field` reads emit warnings; `get_path`/`has`/`??` stay quiet
+  - Boolean logic filter examples expanded for complex filters
+  - Unit test to pin the compact missing-field warning summary format
 
 ### Changed
 
 - **Breaking:** Script output (`print()`/`eprint()`) now allowed in `--silent` mode
 - Clarified documentation on single-format streams and embedded extraction
+- Missing-field warnings now use a compact single-line summary with an orange diamond marker; other warning prints align to the same icon while errors stay unchanged
 
 ## [0.11.2] - 2025-11-26
 
