@@ -3130,7 +3130,8 @@ impl ParallelProcessor {
                     let internal_tracking = global_tracker.internal_tracked.lock().unwrap().clone();
                     current_stats.extract_discovered_from_tracking(&internal_tracking);
                     let stats_message = config.format_stats_message(
-                        &current_stats.format_stats_for_signal(config.input.multiline.is_some()),
+                        &current_stats
+                            .format_stats_for_signal(config.input.multiline.is_some(), false),
                     );
                     let _ = crate::platform::SafeStderr::new().writeln(&stats_message);
                 }

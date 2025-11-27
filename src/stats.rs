@@ -401,9 +401,17 @@ impl ProcessingStats {
         self.format_stats_internal(_multiline_enabled, false)
     }
 
-    /// Format stats for signal handlers (skips line counts which are always 0)
-    pub fn format_stats_for_signal(&self, _multiline_enabled: bool) -> String {
-        self.format_stats_internal(_multiline_enabled, true)
+    /// Format stats for signal handlers
+    ///
+    /// `include_line_counts` should only be true when we have accurate mid-run
+    /// counters (e.g., sequential mode). Parallel mode uses partial stats, so
+    /// keep line counts suppressed there to avoid misleading zeros.
+    pub fn format_stats_for_signal(
+        &self,
+        _multiline_enabled: bool,
+        include_line_counts: bool,
+    ) -> String {
+        self.format_stats_internal(_multiline_enabled, !include_line_counts)
     }
 
     fn format_stats_internal(&self, _multiline_enabled: bool, skip_line_counts: bool) -> String {

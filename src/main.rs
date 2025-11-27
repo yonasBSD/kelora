@@ -611,7 +611,10 @@ fn run_pipeline_sequential_internal<W: Write>(
                             let internal_tracking = RhaiEngine::get_thread_internal_state();
                             current_stats.extract_discovered_from_tracking(&internal_tracking);
                             let stats_message = config.format_stats_message(
-                                &current_stats.format_stats_for_signal(config.input.multiline.is_some())
+                                &current_stats.format_stats_for_signal(
+                                    config.input.multiline.is_some(),
+                                    true,
+                                ),
                             );
                             let _ = SafeStderr::new().writeln(&stats_message);
                         }
@@ -675,7 +678,10 @@ fn run_pipeline_sequential_internal<W: Write>(
                             let internal_tracking = RhaiEngine::get_thread_internal_state();
                             current_stats.extract_discovered_from_tracking(&internal_tracking);
                             let stats_message = config.format_stats_message(
-                                &current_stats.format_stats_for_signal(config.input.multiline.is_some())
+                                &current_stats.format_stats_for_signal(
+                                    config.input.multiline.is_some(),
+                                    true,
+                                ),
                             );
                             let _ = SafeStderr::new().writeln(&stats_message);
                         }
