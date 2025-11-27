@@ -2317,7 +2317,7 @@ KELORA PIPELINE STAGES:
 Prerequisites: --allow-fs-writes (file I/O), --window N (windowing), --metrics (tracking)
 
 VARIABLE SCOPE BETWEEN STAGES:
-  ⚠️  Each --exec stage runs in ISOLATION. Local variables (let) do NOT persist:
+  🔸  Each --exec stage runs in ISOLATION. Local variables (let) do NOT persist:
 
   WRONG:  kelora -e 'let ctx = e.id' -e 'e.context = ctx'     # ERROR: ctx undefined!
   RIGHT:  kelora -e 'let ctx = e.id; e.context = ctx'         # Use semicolons for shared vars
