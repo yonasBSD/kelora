@@ -2300,6 +2300,7 @@ RHAI QUIRKS & GOTCHAS:
   • Semicolons recommended (optional at end of blocks, required for multiple statements)
   • No null/undefined: use unit type () to represent "nothing"
   • No implicit type conversion: "5" + 3 is error (use "5".to_int() + 3)
+  • Unguarded e.field reads trigger missing-field warnings; use get_path/has/?? for optional fields
   • try/catch available: try { ... } catch (err) { ... } catches runtime errors (type/type-mismatch, missing fields); compile errors still abort; prefer guards/to_int_or over exceptions for speed
   • let required for new variables (x = 1 errors if x not declared)
   • Arrays/maps are reference types: modifying copies affects original

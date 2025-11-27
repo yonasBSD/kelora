@@ -2904,6 +2904,37 @@ mod tests {
     }
 
     #[test]
+    fn test_format_warning_summary_compact() {
+        let mut warnings = HashMap::new();
+        warnings.insert(
+            "foo:".to_string(),
+            WarningDetail {
+                field_name: "foo".to_string(),
+                operation: None,
+                line_numbers: vec![1],
+                count: 2,
+                suggestions: vec![],
+            },
+        );
+        warnings.insert(
+            "bar:".to_string(),
+            WarningDetail {
+                field_name: "bar".to_string(),
+                operation: None,
+                line_numbers: vec![2],
+                count: 1,
+                suggestions: vec![],
+            },
+        );
+
+        let summary = format_warning_summary(&warnings, None, true, false, 0).unwrap();
+        assert!(summary.contains("🔸 Missing fields (3 total):"));
+        assert!(summary.contains("foo*2"));
+        assert!(summary.contains("bar*1"));
+        assert!(summary.contains("use get_path/has if optional"));
+    }
+
+    #[test]
     fn test_take_thread_warnings_clears_state() {
         THREAD_WARNINGS.with(|warnings| {
             warnings.borrow_mut().insert(
