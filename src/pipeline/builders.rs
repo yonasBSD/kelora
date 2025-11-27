@@ -148,7 +148,7 @@ impl PipelineBuilder {
         rhai_engine.setup_debugging(debug_config);
 
         // Set up side effect suppression when script output is disabled
-        if self.config.suppress_script_output || self.config.silent {
+        if self.config.suppress_script_output {
             rhai_engine.set_suppress_side_effects(true);
         }
 
@@ -587,7 +587,7 @@ impl PipelineBuilder {
         rhai_engine.setup_debugging(debug_config);
 
         // Set up side effect suppression when script output is disabled
-        if self.config.suppress_script_output || self.config.silent {
+        if self.config.suppress_script_output {
             rhai_engine.set_suppress_side_effects(true);
         }
 

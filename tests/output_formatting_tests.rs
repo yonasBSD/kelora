@@ -352,7 +352,7 @@ fn test_quiet_level_2_suppress_events() {
 
 #[test]
 fn test_quiet_level_3_suppress_all() {
-    // Test --silent - suppress everything including script output
+    // Test --silent - suppress pipeline output but allow script output unless explicitly disabled
     let input = r#"{"level": "info", "message": "test"}"#;
 
     let (stdout, stderr, exit_code) = run_kelora_with_input(
@@ -372,15 +372,15 @@ fn test_quiet_level_3_suppress_all() {
     assert!(!stdout.contains("level='info'"));
     assert!(!stdout.contains("message='test'"));
 
-    // Should NOT show script output
-    assert!(!stdout.contains("Script output"));
+    // Should still show script output
+    assert!(stdout.contains("Script output"));
 
     // Should NOT show stats
     assert!(!stderr.contains("Stats"));
     assert!(!stderr.contains("Lines processed"));
 
-    // Should have no output at all
-    assert_eq!(stdout.trim(), "");
+    // Only script output should remain on stdout
+    assert_eq!(stderr.trim(), "");
 }
 
 #[test]

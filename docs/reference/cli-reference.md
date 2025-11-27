@@ -493,7 +493,7 @@ kelora -q --no-diagnostics app.log        # No events, no diagnostics
 
 #### `--silent` / `--no-silent`
 
-Suppress all stdout/stderr emitters (events, diagnostics, stats, terminal metrics, script output). Metrics files still write. A single fatal line is emitted on errors. `--no-silent` disables a silent default from config.
+Suppress pipeline emitters on stdout/stderr (events, diagnostics, stats, terminal metrics). Script output stays enabled unless you also use `--no-script-output` or data-only modes. Metrics files still write. A single fatal line is emitted on errors. `--no-silent` disables a silent default from config.
 
 ```bash
 kelora --silent --metrics-file out.json app.log   # Quiet terminal, metrics file written
@@ -501,7 +501,7 @@ kelora --silent --metrics-file out.json app.log   # Quiet terminal, metrics file
 
 #### `--no-script-output`
 
-Suppress Rhai `print`/`eprint` and side-effect warnings without affecting diagnostics/stats/metrics. Implied by `--silent` and data-only modes (`-s`, `-m` without `--with-*` flags).
+Suppress Rhai `print`/`eprint` and side-effect warnings without affecting diagnostics/stats/metrics. Implied by data-only modes (`-s`, `-m` without `--with-*` flags).
 
 ## Filtering Options
 

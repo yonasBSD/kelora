@@ -150,9 +150,9 @@ pub struct ProcessingConfig {
     pub suppress_diagnostics: bool,
     /// Suppress field access warnings (--no-warnings)
     pub no_warnings: bool,
-    /// Suppress all stdout/stderr emitters except the single fatal line (--silent)
+    /// Suppress pipeline stdout/stderr emitters except the single fatal line (--silent)
     pub silent: bool,
-    /// Suppress Rhai print/eprint and side-effect warnings (--no-script-output, --silent, -s, -m)
+    /// Suppress Rhai print/eprint and side-effect warnings (--no-script-output, data-only modes)
     pub suppress_script_output: bool,
     /// Legacy quiet level used by some helpers (derived from the above flags)
     pub quiet_level: u8,
@@ -667,7 +667,7 @@ impl KeloraConfig {
         if cli.no_silent {
             silent = false;
         }
-        let mut suppress_script_output = cli.no_script_output || silent;
+        let mut suppress_script_output = cli.no_script_output;
 
         let flatten_levels = |values: &[String]| -> Vec<String> {
             values
@@ -739,7 +739,6 @@ impl KeloraConfig {
 
         if silent {
             quiet_events = true;
-            suppress_script_output = true;
         }
 
         if quiet_events {

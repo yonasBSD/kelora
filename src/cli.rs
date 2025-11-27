@@ -277,7 +277,7 @@ pub struct Cli {
     #[arg(long = "no-warnings", help_heading = "Error Handling")]
     pub no_warnings: bool,
 
-    /// Silence all stdout/stderr emitters except a single fatal line; metrics files still write.
+    /// Silence pipeline stdout/stderr emitters (events/diagnostics/stats/terminal metrics); script output still allowed. Metrics files still write.
     #[arg(long = "silent", help_heading = "Error Handling")]
     pub silent: bool,
 
@@ -285,7 +285,7 @@ pub struct Cli {
     #[arg(long = "no-silent", help_heading = "Error Handling")]
     pub no_silent: bool,
 
-    /// Suppress Rhai print/eprint and side-effect warnings.
+    /// Suppress Rhai print/eprint and side-effect warnings (implied by data-only modes).
     #[arg(long = "no-script-output", help_heading = "Error Handling")]
     pub no_script_output: bool,
 

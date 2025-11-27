@@ -179,10 +179,10 @@ to_float_or(value, default)          Convert value to float with fallback
 to_bool_or(value, default)           Convert value to boolean with fallback
 
 UTILITY FUNCTIONS:
-eprint(message)                      Print to stderr (suppressed with --no-script-output/--silent)
+eprint(message)                      Print to stderr (suppressed with --no-script-output or data-only modes)
 exit(code)                           Exit kelora with given exit code
 get_env(var [,default])              Get environment variable with optional default
-print(message)                       Print to stdout (suppressed with --no-script-output/--silent)
+print(message)                       Print to stdout (suppressed with --no-script-output or data-only modes)
 pseudonym(value, domain)             Generate domain-separated pseudonym (requires KELORA_SECRET)
 read_file(path)                      Read file contents as string
 read_lines(path)                     Read file as array of lines

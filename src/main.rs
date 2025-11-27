@@ -2409,7 +2409,7 @@ ERROR HANDLING MODES:
     • Any error → abort with exit code 1
 
 OUTPUT SUPPRESSION:
-  print(\"msg\") / eprint(\"err\")           Visible by default; suppressed with --no-script-output or --silent
+  print(\"msg\") / eprint(\"err\")           Visible by default; suppressed with --no-script-output or data-only modes
   File ops (append_file, etc.)         Always work (needs --allow-fs-writes)
 
 For other help topics: kelora -h

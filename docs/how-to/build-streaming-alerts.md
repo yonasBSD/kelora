@@ -43,7 +43,7 @@ tail -f /var/log/app.log | kelora -j \
 Quiet modes and counters help you avoid pager fatigue.
 
 !!! note
-    Need alerts to come from `print`/`eprint`? Use `-q --no-diagnostics` to suppress events and diagnostics while keeping script output. `--silent` suppresses script output too.
+    Need alerts to come from `print`/`eprint`? Use `-q --no-diagnostics` to suppress events and diagnostics while keeping script output. Add `--no-script-output` if you want to mute script prints as well.
 
 ```bash
 tail -f /var/log/app.log | kelora -j -q \
