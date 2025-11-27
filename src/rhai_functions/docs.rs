@@ -268,6 +268,22 @@ kelora -f logfmt app.log --filter 'e.has("user_id") && e.user_id != "anonymous"'
 # Combine multiple conditions on CSV data
 kelora -f csv access_data.csv --filter 'e.has("method") && e.method == "POST" && e.status >= 400'
 
+BOOLEAN LOGIC & COMPLEX FILTERS:
+# Control precedence with parentheses (auth + gateway errors only)
+kelora -j api_logs.jsonl --filter '(e.service == "auth-service" || e.service == "api-gateway") && e.get_path("status", 0) >= 500'
+
+# Guard against missing fields before comparing (safe nested access)
+kelora -j api_logs.jsonl --filter 'e.get_path("stack_trace") != () && e.level == "ERROR"'
+
+# Mix OR/AND with negation and array membership
+kelora -j api_logs.jsonl --filter '["POST","PUT"].contains(e.get_path("method")) && (e.get_path("status", 0) >= 500 || e.get_path("response_time", 0.0) > 1.5)'
+
+# Chain filters for readability (evaluated in order)
+kelora -j api_logs.jsonl \
+  --filter 'e.get_path("status", 0) >= 400' \
+  --filter 'e.service == "auth-service" || e.get_path("metadata.subscription.tier") == "premium"' \
+  --filter 'e.get_path("response_time", 0.0) > 0.2'
+
 PARSING & TRANSFORMATION:
 # Parse nested JSON strings from a field
 kelora -j api_logs.jsonl --exec 'e.metadata = e.json_payload.parse_json()' \

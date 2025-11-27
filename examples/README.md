@@ -24,6 +24,25 @@ kelora --include examples/helpers.rhai examples/api_logs.jsonl --exec 'if is_pro
 
 Then run `kelora --help-examples` for common patterns and usage recipes.
 
+## Filter Patterns (Boolean Logic)
+
+```bash
+# Parentheses to combine OR within an AND
+kelora -j examples/api_logs.jsonl --filter '(e.service == "auth-service" || e.service == "api-gateway") && e.get_path("status", 0) >= 500'
+
+# Array membership with mixed thresholds
+kelora -j examples/api_logs.jsonl --filter '["POST","PUT"].contains(e.get_path("method")) && (e.get_path("status", 0) >= 500 || e.get_path("response_time", 0.0) > 1.5)'
+
+# Guard against missing fields before comparing
+kelora -j examples/api_logs.jsonl --filter 'e.get_path("stack_trace") != () && e.level == "ERROR"'
+
+# Chain multiple filters for readability (order preserved)
+kelora -j examples/api_logs.jsonl \
+  --filter 'e.get_path("status", 0) >= 400' \
+  --filter 'e.service == "auth-service" || e.get_path("metadata.subscription.tier") == "premium"' \
+  --filter 'e.get_path("response_time", 0.0) > 0.2'
+```
+
 ## File Organization
 
 Examples follow a naming convention for easy discovery:
