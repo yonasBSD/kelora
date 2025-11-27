@@ -5,6 +5,7 @@ use std::cell::Cell;
 thread_local! {
     static EXIT_REQUESTED: Cell<bool> = const { Cell::new(false) };
     static EXIT_CODE: Cell<i32> = const { Cell::new(0) };
+    static SKIP_REQUESTED: Cell<bool> = const { Cell::new(false) };
 }
 
 /// Rhai function: exit(code: INT, msg: STRING = null)
@@ -47,11 +48,37 @@ pub fn get_exit_code() -> i32 {
     EXIT_CODE.with(|ec| ec.get())
 }
 
+/// Rhai function: skip() - mark the current event to be skipped (filtered) and continue processing the next event.
+pub fn skip_event() -> Dynamic {
+    SKIP_REQUESTED.with(|skip| skip.set(true));
+    Dynamic::UNIT
+}
+
+/// Check if skip has been requested for the current event and clear the flag.
+pub fn take_skip_request() -> bool {
+    SKIP_REQUESTED.with(|skip| {
+        let requested = skip.get();
+        skip.set(false);
+        requested
+    })
+}
+
+/// Check without clearing if a skip was requested (used for testing/verification).
+pub fn is_skip_requested() -> bool {
+    SKIP_REQUESTED.with(|skip| skip.get())
+}
+
+/// Clear any pending skip request (used to reset state between events/tests).
+pub fn clear_skip_request() {
+    SKIP_REQUESTED.with(|skip| skip.set(false));
+}
+
 /// Reset exit state (useful for testing)
 #[cfg(test)]
 pub fn reset_exit_state() {
     EXIT_REQUESTED.with(|er| er.set(false));
     EXIT_CODE.with(|ec| ec.set(0));
+    SKIP_REQUESTED.with(|skip| skip.set(false));
 }
 
 /// Rhai function wrapper for single parameter: exit(code)
@@ -63,6 +90,7 @@ pub fn exit_process_single(code: i64) -> Dynamic {
 pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("exit", exit_process_single);
     engine.register_fn("exit", exit_process);
+    engine.register_fn("skip", skip_event);
 }
 
 #[cfg(test)]
@@ -135,5 +163,17 @@ mod tests {
         assert!(result.is_ok());
         assert!(is_exit_requested());
         assert_eq!(get_exit_code(), 1);
+    }
+
+    #[test]
+    fn test_skip_request_lifecycle() {
+        reset_exit_state();
+        assert!(!is_skip_requested());
+
+        let result = skip_event();
+        assert!(result.is_unit());
+        assert!(is_skip_requested());
+        assert!(take_skip_request());
+        assert!(!is_skip_requested());
     }
 }

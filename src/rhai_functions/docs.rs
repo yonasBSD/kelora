@@ -181,6 +181,7 @@ to_bool_or(value, default)           Convert value to boolean with fallback
 UTILITY FUNCTIONS:
 eprint(message)                      Print to stderr (suppressed with --no-script-output or data-only modes)
 exit(code)                           Exit kelora with given exit code
+skip()                               Skip the current event and continue with the next one
 get_env(var [,default])              Get environment variable with optional default
 print(message)                       Print to stdout (suppressed with --no-script-output or data-only modes)
 pseudonym(value, domain)             Generate domain-separated pseudonym (requires KELORA_SECRET)

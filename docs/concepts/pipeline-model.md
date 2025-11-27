@@ -214,6 +214,8 @@ Parsers: `json`, `logfmt`, `syslog`, `combined`, `csv`, `tsv`, `cols`, etc.
 
 You can mix and repeat these flags; each stage sees the output of the previous one.
 
+Inside `--exec`, call `skip()` to drop the current event immediately; later stages and output are skipped, and the event is counted as filtered.
+
 **Example:**
 ```bash
 kelora -j app.log \

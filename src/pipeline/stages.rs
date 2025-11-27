@@ -199,6 +199,10 @@ impl FilterStage {
             }
         };
 
+        if crate::rhai_functions::process::take_skip_request() {
+            return ScriptResult::Skip;
+        }
+
         if let Some(last) = self.buffer.back_mut() {
             last.is_match = is_match;
             if is_match {
@@ -328,6 +332,10 @@ impl ScriptStage for FilterStage {
 
         match result {
             Ok(result) => {
+                if crate::rhai_functions::process::take_skip_request() {
+                    return ScriptResult::Skip;
+                }
+
                 if result {
                     ScriptResult::Emit(event)
                 } else {
@@ -487,6 +495,13 @@ impl ScriptStage for ExecStage {
                     ctx.pending_file_ops.extend(ops);
                 }
 
+                if crate::rhai_functions::process::take_skip_request() {
+                    // Drop any deferred emissions and suppression flags to avoid leaking into the next event
+                    crate::rhai_functions::emit::clear_suppression_flag();
+                    let _ = crate::rhai_functions::emit::get_and_clear_pending_emissions();
+                    return ScriptResult::Skip;
+                }
+
                 // Check for deferred emissions from emit_each()
                 let pending_emissions =
                     crate::rhai_functions::emit::get_and_clear_pending_emissions();
@@ -601,8 +616,10 @@ impl ScriptStage for ExecStage {
                     .is_some()
                     || ctx.config.strict
                 {
+                    crate::rhai_functions::process::clear_skip_request();
                     ScriptResult::Error(error_msg.clone())
                 } else {
+                    crate::rhai_functions::process::clear_skip_request();
                     // Rollback: return original event unchanged
                     ScriptResult::Emit(event)
                 }
@@ -1068,6 +1085,65 @@ mod tests {
     use crate::pipeline::{MetaData, PipelineConfig};
     use chrono::{Duration, Utc};
     use rhai::Dynamic;
+
+    fn default_pipeline_config() -> PipelineConfig {
+        PipelineConfig {
+            brief: false,
+            wrap: true,
+            pretty: false,
+            color_mode: crate::config::ColorMode::Auto,
+            timestamp_formatting: crate::config::TimestampFormatConfig::default(),
+            strict: false,
+            verbose: 0,
+            quiet_events: false,
+            suppress_diagnostics: false,
+            silent: false,
+            suppress_script_output: false,
+            quiet_level: 0,
+            no_emoji: false,
+            input_files: vec![],
+            allow_fs_writes: false,
+            no_warnings: false,
+            format_name: None,
+        }
+    }
+
+    fn ctx_with_engine(engine: crate::engine::RhaiEngine) -> PipelineContext {
+        PipelineContext {
+            config: default_pipeline_config(),
+            tracker: std::collections::HashMap::new(),
+            internal_tracker: std::collections::HashMap::new(),
+            window: Vec::new(),
+            rhai: engine,
+            meta: MetaData::default(),
+            pending_file_ops: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn exec_stage_respects_skip_request() {
+        crate::rhai_functions::process::clear_skip_request();
+        crate::rhai_functions::emit::clear_suppression_flag();
+
+        let mut engine = crate::engine::RhaiEngine::new();
+        let script = r#"
+            let derived = #{ message: "should be dropped" };
+            emit_each([derived]);
+            skip();
+            e.value = 42;
+        "#;
+        let mut stage = ExecStage::new(script.to_string(), &mut engine)
+            .expect("exec compilation should succeed");
+
+        let mut ctx = ctx_with_engine(engine);
+        let event = Event::default();
+
+        let result = stage.apply(event, &mut ctx);
+        assert!(matches!(result, ScriptResult::Skip));
+        assert!(crate::rhai_functions::emit::get_and_clear_pending_emissions().is_empty());
+        assert!(!crate::rhai_functions::emit::should_suppress_current_event());
+        assert!(!crate::rhai_functions::process::is_skip_requested());
+    }
 
     #[test]
     fn filter_stage_marks_overlapping_matches_as_match() {

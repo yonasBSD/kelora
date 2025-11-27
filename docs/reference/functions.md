@@ -1118,6 +1118,15 @@ if e.critical {
 }
 ```
 
+#### `skip()`
+Skip the current event, mark it as filtered, and continue with the next one. Downstream stages and output for the skipped event do not run.
+
+```rhai
+if e.endpoint == "/health" {
+    skip();
+}
+```
+
 #### `type_of(value)`
 Get type name as string.
 

@@ -377,6 +377,9 @@ impl Pipeline {
             self.window_manager.update(&event);
             ctx.window = self.window_manager.get_window();
 
+            // Reset per-event skip flag for Rhai skip()
+            crate::rhai_functions::process::clear_skip_request();
+
             file_ops::clear_pending_ops();
             ctx.pending_file_ops.clear();
 
@@ -791,6 +794,9 @@ impl Pipeline {
         // Update window manager
         self.window_manager.update(&event);
         ctx.window = self.window_manager.get_window();
+
+        // Reset per-event skip flag for Rhai skip()
+        crate::rhai_functions::process::clear_skip_request();
 
         file_ops::clear_pending_ops();
         ctx.pending_file_ops.clear();
