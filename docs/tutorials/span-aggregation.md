@@ -231,6 +231,41 @@ Use durations (`5m`, `1h`, `30s`) to create fixed wall-clock windows:
 
 ---
 
+## Field-Based Spans – Value Changes
+
+Open a new span whenever a field value changes. This is great for per-request or per-session rollups without pre-sorting.
+
+```bash
+kelora -j examples/simple_json.jsonl \
+  --span request_id \
+  --span-close 'print("Request " + span.id + ": " + span.size.to_string() + " events")'
+```
+
+**Notes:**
+
+- Missing fields stay in the current span (error with `--strict`); the first missing field opens an `(unset)` span.
+- Single-active-span model: interleaved IDs (`req-1, req-2, req-1`) create multiple spans per ID.
+
+---
+
+## Idle-Based Spans – Inactivity Timeouts
+
+Detect sessions or bursts separated by quiet periods.
+
+```bash
+kelora -j examples/simple_json.jsonl \
+  --span-idle 5m \
+  --span-close 'print("Session " + span.id + ": " + span.size.to_string() + " events")'
+```
+
+**Notes:**
+
+- Requires timestamps; missing timestamps are `unassigned` (error with `--strict`).
+- Only forward-time gaps close spans. Out-of-order events are included in the current span; sort input first if you need strict ordering.
+- `--span-idle` is mutually exclusive with `--span`.
+
+---
+
 ## Step 4: Per-Span Metrics – Automatic Deltas
 
 Combine `track_*()` functions in `--exec` with `span.metrics` in `--span-close` for automatic per-window aggregation:

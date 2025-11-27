@@ -1783,9 +1783,9 @@ fn validate_cli_args(cli: &Cli) -> Result<()> {
         return Err(anyhow::anyhow!("Thread count too high (max 1000)"));
     }
 
-    if cli.span_close.is_some() && cli.span.is_none() {
+    if cli.span_close.is_some() && cli.span.is_none() && cli.span_idle.is_none() {
         return Err(anyhow::anyhow!(
-            "--span-close requires --span to be specified"
+            "--span-close requires --span or --span-idle to be specified"
         ));
     }
 

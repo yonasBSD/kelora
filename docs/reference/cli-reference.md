@@ -382,12 +382,13 @@ kelora -j \
 
 ### Span Aggregation
 
-#### `--span <N | DURATION>`
+#### `--span <N | DURATION | FIELD>`
 
 Group events into non-overlapping spans before running a span-close hook. Sequential mode is required (Kelora prints a warning and falls back to sequential if `--parallel` is also supplied).
 
 - `--span <N>` – Count-based spans. Close after every **N** events that survive all filters. Example: `--span 500`.
 - `--span <DURATION>` – Time-based spans aligned to the events' canonical timestamp (`ts`). The first event with a valid `ts` anchors fixed windows such as `1m`, `5m`, `30s`, `1h`.
+- `--span <FIELD>` – Field-based spans. Open a new span whenever the field value changes. With the single-active-span model, interleaved IDs (`req-1, req-2, req-1`) produce multiple spans per ID.
 
 How it works:
 
@@ -395,6 +396,16 @@ How it works:
 - Events missing a timestamp (time mode) are marked `meta.span_status == "unassigned"` and excluded from the span buffer.
 - Events with timestamps that fall into an already-closed window are emitted immediately with `meta.span_status == "late"`. Closed spans are never reopened.
 - Count spans keep buffered events in memory until the span closes. Kelora warns when `N > 100_000`.
+- Field spans continue the current span when the field is missing (error with `--strict`).
+
+#### `--span-idle <DURATION>`
+
+Close spans after a period of inactivity (no events). Requires timestamps and cannot be combined with `--span`.
+
+- Opens a span on the first event with a timestamp; closes when the forward gap between events exceeds the timeout.
+- Span IDs use `idle-#<seq>-<start_timestamp>`.
+- Missing timestamps: tagged `unassigned` (errors with `--strict`).
+- Interleaved/out-of-order events do not close spans; only forward-time gaps are considered. Sort input if you need strict wall-clock ordering.
 
 #### `--span-close <SCRIPT>`
 

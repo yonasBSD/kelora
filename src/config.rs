@@ -177,6 +177,8 @@ pub struct PerformanceConfig {
 pub enum SpanMode {
     Count { events_per_span: usize },
     Time { duration_ms: i64 },
+    Field { field_name: String },
+    Idle { timeout_ms: i64 },
 }
 
 /// Span aggregation configuration (--span / --span-close)
@@ -1088,21 +1090,59 @@ fn determine_default_timezone(cli: &crate::Cli) -> Option<String> {
 }
 
 fn parse_span_config(cli: &crate::Cli) -> anyhow::Result<Option<SpanConfig>> {
-    let span_spec = match &cli.span {
-        Some(spec) => spec.trim(),
-        None => {
-            if cli.span_close.is_some() {
-                return Err(anyhow::anyhow!(
-                    "--span-close requires --span to be specified"
-                ));
-            }
-            return Ok(None);
-        }
-    };
+    let span_spec = cli
+        .span
+        .as_ref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
+    let idle_spec = cli
+        .span_idle
+        .as_ref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
 
-    if span_spec.is_empty() {
-        return Err(anyhow::anyhow!("--span value cannot be empty"));
+    if span_spec.is_none() && idle_spec.is_none() {
+        if cli.span_close.is_some() {
+            return Err(anyhow::anyhow!(
+                "--span-close requires --span or --span-idle to be specified"
+            ));
+        }
+        return Ok(None);
     }
+
+    if span_spec.is_some() && idle_spec.is_some() {
+        return Err(anyhow::anyhow!(
+            "--span and --span-idle cannot be used together"
+        ));
+    }
+
+    if let Some(spec) = idle_spec {
+        let duration = humantime::parse_duration(spec).map_err(|e| {
+            anyhow::anyhow!(
+                "Invalid --span-idle duration '{}': {}. Use formats like 30s, 5m, 1h.",
+                spec,
+                e
+            )
+        })?;
+
+        if duration.is_zero() {
+            return Err(anyhow::anyhow!(
+                "--span-idle duration must be greater than zero"
+            ));
+        }
+
+        let timeout_ms: i64 = duration
+            .as_millis()
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("--span-idle duration is too large"))?;
+
+        return Ok(Some(SpanConfig {
+            mode: SpanMode::Idle { timeout_ms },
+            close_script: cli.span_close.clone(),
+        }));
+    }
+
+    let span_spec = span_spec.expect("span presence checked above");
 
     if let Ok(count) = span_spec.parse::<usize>() {
         if count == 0 {
@@ -1119,27 +1159,45 @@ fn parse_span_config(cli: &crate::Cli) -> anyhow::Result<Option<SpanConfig>> {
         }));
     }
 
-    let duration = humantime::parse_duration(span_spec).map_err(|e| {
-        anyhow::anyhow!(
-            "Invalid --span duration '{}': {}. Use formats like 30s, 5m, 1h.",
-            span_spec,
-            e
-        )
-    })?;
+    if let Ok(duration) = humantime::parse_duration(span_spec) {
+        if duration.is_zero() {
+            return Err(anyhow::anyhow!("--span duration must be greater than zero"));
+        }
 
-    if duration.is_zero() {
-        return Err(anyhow::anyhow!("--span duration must be greater than zero"));
+        let duration_ms: i64 = duration
+            .as_millis()
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("--span duration is too large"))?;
+
+        return Ok(Some(SpanConfig {
+            mode: SpanMode::Time { duration_ms },
+            close_script: cli.span_close.clone(),
+        }));
     }
 
-    let duration_ms: i64 = duration
-        .as_millis()
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("--span duration is too large"))?;
+    if !is_valid_field_name(span_spec) {
+        return Err(anyhow::anyhow!(
+            "Invalid --span field name '{}': must start with a letter and contain only letters, digits, or underscores",
+            span_spec
+        ));
+    }
 
     Ok(Some(SpanConfig {
-        mode: SpanMode::Time { duration_ms },
+        mode: SpanMode::Field {
+            field_name: span_spec.to_string(),
+        },
         close_script: cli.span_close.clone(),
     }))
+}
+
+fn is_valid_field_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() => {}
+        _ => return false,
+    }
+
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 // Conversion traits to maintain compatibility with existing CLI types

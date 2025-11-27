@@ -231,11 +231,20 @@ pub struct Cli {
     /// Aggregate events into fixed-size spans (count or duration) before running a span-close hook.
     #[arg(
         long = "span",
-        value_name = "N|DURATION",
+        value_name = "N|DURATION|FIELD",
         help_heading = "Processing Options",
-        help = "Aggregate events into consecutive spans.\n  --span <N>        Close after every N events that pass filters.\n  --span <DURATION> Close on aligned time windows (e.g. 5m, 1h, 30s).\nUse with --span-close to run a Rhai snippet when each span finishes."
+        help = "Aggregate events into consecutive spans.\n  --span <N>         Close after every N events that pass filters.\n  --span <DURATION>  Close on aligned time windows (e.g. 5m, 1h, 30s).\n  --span <FIELD>     Close when the specified field value changes.\nUse with --span-close to run a Rhai snippet when each span finishes."
     )]
     pub span: Option<String>,
+
+    /// Close span after a period of inactivity (mutually exclusive with --span)
+    #[arg(
+        long = "span-idle",
+        value_name = "DURATION",
+        help_heading = "Processing Options",
+        help = "Close span after this duration of inactivity (e.g. --span-idle 5m). Requires timestamps and cannot be combined with --span."
+    )]
+    pub span_idle: Option<String>,
 
     /// Rhai snippet executed once every time a span closes.
     #[arg(

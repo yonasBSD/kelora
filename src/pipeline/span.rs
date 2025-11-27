@@ -97,6 +97,7 @@ struct ActiveSpan {
     span_id: String,
     span_start: Option<DateTime<Utc>>,
     span_end: Option<DateTime<Utc>>,
+    last_event_timestamp: Option<DateTime<Utc>>,
     events: Vec<Event>,
     events_seen: usize,
     included_count: usize,
@@ -117,6 +118,7 @@ impl ActiveSpan {
             span_id,
             span_start: None,
             span_end: None,
+            last_event_timestamp: None,
             events: Vec::new(),
             events_seen: 0,
             included_count: 0,
@@ -148,6 +150,55 @@ impl ActiveSpan {
             span_id,
             span_start: Some(start),
             span_end: Some(end),
+            last_event_timestamp: None,
+            events: Vec::new(),
+            events_seen: 0,
+            included_count: 0,
+            baseline_user: if collect_details {
+                ctx.tracker.clone()
+            } else {
+                HashMap::new()
+            },
+            collect_details,
+        }
+    }
+
+    fn new_field(
+        sequence: u64,
+        field_value: String,
+        ctx: &PipelineContext,
+        collect_details: bool,
+    ) -> Self {
+        Self {
+            sequence,
+            span_id: field_value,
+            span_start: None,
+            span_end: None,
+            last_event_timestamp: None,
+            events: Vec::new(),
+            events_seen: 0,
+            included_count: 0,
+            baseline_user: if collect_details {
+                ctx.tracker.clone()
+            } else {
+                HashMap::new()
+            },
+            collect_details,
+        }
+    }
+
+    fn new_idle(
+        sequence: u64,
+        start_ts: DateTime<Utc>,
+        ctx: &PipelineContext,
+        collect_details: bool,
+    ) -> Self {
+        Self {
+            sequence,
+            span_id: format!("idle-#{}-{}", sequence, start_ts.to_rfc3339()),
+            span_start: Some(start_ts),
+            span_end: Some(start_ts),
+            last_event_timestamp: Some(start_ts),
             events: Vec::new(),
             events_seen: 0,
             included_count: 0,
@@ -209,9 +260,11 @@ impl SpanProcessor {
         event.set_span_info(SpanInfo::default());
         self.pending = None;
 
-        match self.mode {
+        match self.mode.clone() {
             SpanMode::Count { events_per_span: _ } => self.prepare_count_event(event, ctx),
             SpanMode::Time { duration_ms } => self.prepare_time_event(event, ctx, duration_ms),
+            SpanMode::Field { field_name } => self.prepare_field_event(event, ctx, &field_name),
+            SpanMode::Idle { timeout_ms } => self.prepare_idle_event(event, ctx, timeout_ms),
         }
     }
 
@@ -262,8 +315,8 @@ impl SpanProcessor {
 
     pub fn finish(&mut self, ctx: &mut PipelineContext) -> Result<()> {
         self.pending = None;
-        if let Some(span) = self.active_span.take() {
-            self.run_close_hook(span, ctx)?;
+        if self.active_span.is_some() {
+            self.close_current_span(ctx)?;
         }
         Ok(())
     }
@@ -355,6 +408,129 @@ impl SpanProcessor {
         Ok(())
     }
 
+    fn prepare_field_event(
+        &mut self,
+        event: &mut Event,
+        ctx: &mut PipelineContext,
+        field_name: &str,
+    ) -> Result<()> {
+        if let Some(value) = event.fields.get(field_name) {
+            let value_str = value.to_string();
+
+            let should_close = match &self.active_span {
+                Some(span) => span.span_id != value_str,
+                None => false,
+            };
+
+            if should_close {
+                self.close_current_span(ctx)?;
+            }
+
+            if self.active_span.is_none() {
+                self.open_field_span(ctx, value_str.clone());
+            }
+
+            let span = self
+                .active_span
+                .as_mut()
+                .ok_or_else(|| anyhow!("failed to open field span"))?;
+            span.note_assignment();
+
+            let assignment = SpanAssignment::new(SpanStatus::Included).with_span(span);
+            self.apply_assignment(event, ctx, &assignment);
+            self.pending = Some(PendingEvent::new(assignment));
+            return Ok(());
+        }
+
+        if ctx.config.strict {
+            return Err(anyhow!(
+                "event missing required field '{}' for --span",
+                field_name
+            ));
+        }
+
+        if self.active_span.is_none() {
+            self.open_field_span(ctx, "(unset)".to_string());
+        }
+
+        let span = self
+            .active_span
+            .as_mut()
+            .ok_or_else(|| anyhow!("failed to open field span"))?;
+        span.note_assignment();
+
+        let assignment = SpanAssignment::new(SpanStatus::Included).with_span(span);
+        self.apply_assignment(event, ctx, &assignment);
+        self.pending = Some(PendingEvent::new(assignment));
+        Ok(())
+    }
+
+    fn prepare_idle_event(
+        &mut self,
+        event: &mut Event,
+        ctx: &mut PipelineContext,
+        timeout_ms: i64,
+    ) -> Result<()> {
+        if event.parsed_ts.is_none() {
+            event.extract_timestamp();
+        }
+
+        let timestamp = match event.parsed_ts {
+            Some(ts) => ts,
+            None => {
+                if ctx.config.strict {
+                    return Err(anyhow!("event missing required timestamp for --span-idle"));
+                }
+
+                let assignment = SpanAssignment::new(SpanStatus::Unassigned);
+                self.apply_assignment(event, ctx, &assignment);
+                self.pending = Some(PendingEvent::new(assignment));
+                return Ok(());
+            }
+        };
+
+        let should_close = match &self.active_span {
+            Some(span) => {
+                if let Some(last_ts) = span.last_event_timestamp {
+                    let gap_ms = timestamp.timestamp_millis() - last_ts.timestamp_millis();
+                    gap_ms > timeout_ms
+                } else {
+                    false
+                }
+            }
+            None => false,
+        };
+
+        if should_close {
+            self.close_current_span(ctx)?;
+        }
+
+        if self.active_span.is_none() {
+            self.open_idle_span(ctx, timestamp);
+        }
+
+        let span = self
+            .active_span
+            .as_mut()
+            .ok_or_else(|| anyhow!("failed to open idle span"))?;
+        span.note_assignment();
+
+        if let Some(last_ts) = span.last_event_timestamp {
+            if timestamp > last_ts {
+                span.last_event_timestamp = Some(timestamp);
+                span.span_end = Some(timestamp);
+            }
+        } else {
+            span.last_event_timestamp = Some(timestamp);
+            span.span_end = Some(timestamp);
+        }
+
+        let assignment = SpanAssignment::new(SpanStatus::Included).with_span(span);
+        self.apply_assignment(event, ctx, &assignment);
+        self.pending = Some(PendingEvent::new(assignment));
+        Ok(())
+    }
+
     fn apply_assignment(
         &self,
         event: &mut Event,
@@ -387,6 +563,17 @@ impl SpanProcessor {
         ));
     }
 
+    fn open_field_span(&mut self, ctx: &PipelineContext, field_value: String) {
+        let sequence = self.next_span_sequence;
+        self.next_span_sequence += 1;
+        self.active_span = Some(ActiveSpan::new_field(
+            sequence,
+            field_value,
+            ctx,
+            self.collect_details,
+        ));
+    }
+
     fn open_time_span(&mut self, ctx: &PipelineContext, window: TimeWindow) {
         let sequence = self.next_span_sequence;
         self.next_span_sequence += 1;
@@ -398,8 +585,22 @@ impl SpanProcessor {
         ));
     }
 
+    fn open_idle_span(&mut self, ctx: &PipelineContext, start_ts: DateTime<Utc>) {
+        let sequence = self.next_span_sequence;
+        self.next_span_sequence += 1;
+        self.active_span = Some(ActiveSpan::new_idle(
+            sequence,
+            start_ts,
+            ctx,
+            self.collect_details,
+        ));
+    }
+
     fn close_current_span(&mut self, ctx: &mut PipelineContext) -> Result<()> {
-        if let Some(span) = self.active_span.take() {
+        if let Some(mut span) = self.active_span.take() {
+            if span.span_end.is_none() {
+                span.span_end = span.last_event_timestamp;
+            }
             self.run_close_hook(span, ctx)?;
         }
         Ok(())
