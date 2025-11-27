@@ -2171,6 +2171,7 @@ Usage:
   kelora --help     # Full CLI reference (all options)
 
 Quick Examples:
+  tail -f app.log | kelora -j -l error,warn
   kelora -f logfmt --levels error examples/simple_logfmt.log
   kelora -j examples/simple_json.jsonl --filter 'e.service == "database"' --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' -k timestamp,message,duration_s
   kelora -f combined examples/web_access_large.log.gz --stats-only

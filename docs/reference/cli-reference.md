@@ -1055,13 +1055,13 @@ kelora -j -F csv --keys timestamp,level,service,message -o report.csv app.log
 === "Linux/macOS"
 
     ```bash
-    tail -f app.log | kelora -j --levels error,warn
+    tail -f app.log | kelora -j -l error,warn
     ```
 
 === "Windows"
 
     ```powershell
-    Get-Content -Wait app.log | kelora -j --levels error,warn
+    Get-Content -Wait app.log | kelora -j -l error,warn
     ```
 
 ### High-Performance Batch Processing

@@ -26,6 +26,8 @@ Jan 15 10:00:28 ERROR Authentication failed user=admin ip=192.168.1.50 reason=in
 {"ts":"2025-01-15T10:00:28+00:00","level":"ERROR","msg":"Authentication failed","user":"admin","ip":"192.168.1.50","reason":"invalid_token"}
 ```
 
+Kelora also handles live streams: `tail -f app.log | kelora -j -l error,warn`.
+
 ## When to Use Kelora
 
 Kelora trades speed for programmability—slower than grep/awk/jq, but adds stateful scripting for complex transformations. Use it when your logs are **messy** (stick to one format per file/stream, but pull out embedded JSON/logfmt fields), need **stateful logic** (counters, windowed metrics, lookup tables), or are **chaining multiple tools**. For simple text search use `grep`, for JSON queries use `jq`.

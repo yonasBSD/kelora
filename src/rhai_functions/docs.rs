@@ -243,6 +243,9 @@ kelora web_access.log --head 100 -F inspect
 # Quick field discovery and parsing statistics
 kelora api_logs.jsonl --stats
 
+# Stream from stdin (tail -f, kubectl logs, etc.) and keep only error/warn
+tail -f app.log | kelora -j -l error,warn
+
 # Filter by log level (works with any structured format)
 kelora -f syslog syslog.log --levels error,critical
 

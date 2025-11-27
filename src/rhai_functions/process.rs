@@ -64,6 +64,7 @@ pub fn take_skip_request() -> bool {
 }
 
 /// Check without clearing if a skip was requested (used for testing/verification).
+#[cfg(test)]
 pub fn is_skip_requested() -> bool {
     SKIP_REQUESTED.with(|skip| skip.get())
 }
