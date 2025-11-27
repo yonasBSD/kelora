@@ -802,7 +802,7 @@ pub fn extract_field_from_script(script: &str) -> Option<String> {
 /// Format warning summary for display
 pub fn format_warning_summary(
     warnings: &HashMap<String, WarningDetail>,
-    stats: Option<&ProcessingStats>,
+    _stats: Option<&ProcessingStats>,
     use_colors: bool,
     no_emoji: bool,
     verbose_level: u8,
@@ -813,15 +813,10 @@ pub fn format_warning_summary(
 
     let total_warnings: usize = warnings.values().map(|w| w.count).sum();
     let prefix = if use_colors && !no_emoji {
-        "⚠️  "
+        "🔸"
     } else {
-        "kelora: "
+        ""
     };
-
-    let mut summary = format!(
-        "\n{}Field access warnings ({} total)",
-        prefix, total_warnings
-    );
 
     // Sort by field name for consistent output
     let mut sorted_warnings: Vec<_> = warnings.values().collect();
@@ -832,8 +827,8 @@ pub fn format_warning_summary(
     });
 
     // Limit displayed entries to keep output compact
-    const MAX_WARNINGS_DISPLAYED_DEFAULT: usize = 5;
-    const MAX_WARNINGS_DISPLAYED_VERBOSE: usize = 15;
+    const MAX_WARNINGS_DISPLAYED_DEFAULT: usize = 3;
+    const MAX_WARNINGS_DISPLAYED_VERBOSE: usize = 6;
     let max_display = if verbose_level > 0 {
         MAX_WARNINGS_DISPLAYED_VERBOSE
     } else {
@@ -841,87 +836,51 @@ pub fn format_warning_summary(
     };
     let display_count = std::cmp::min(sorted_warnings.len(), max_display);
 
-    for detail in sorted_warnings.iter().take(display_count) {
-        let mut line = format!(
-            "\n  • '{}' missing in {} event{}",
-            detail.field_name,
-            detail.count,
-            if detail.count == 1 { "" } else { "s" },
-        );
-
-        if verbose_level > 0 {
-            let line_range = format_line_range(&detail.line_numbers);
-            if !line_range.is_empty() {
-                line.push_str(&format!(" ({})", line_range));
+    let mut parts: Vec<String> = sorted_warnings
+        .iter()
+        .take(display_count)
+        .map(|detail| {
+            let mut chunk = format!("{}*{}", detail.field_name, detail.count);
+            if verbose_level > 0 {
+                let mut extras = Vec::new();
+                let line_range = format_line_range(&detail.line_numbers);
+                if !line_range.is_empty() {
+                    extras.push(line_range);
+                }
+                if let Some(op) = &detail.operation {
+                    extras.push(format!("op: {}", op));
+                }
+                if !detail.suggestions.is_empty() {
+                    extras.push(format!("suggest: {}", detail.suggestions.join("/")));
+                }
+                if !extras.is_empty() {
+                    chunk.push_str(&format!(" [{}]", extras.join(", ")));
+                }
             }
-            if let Some(op) = &detail.operation {
-                line.push_str(&format!(" | operation: {}", op));
-            }
-            if !detail.suggestions.is_empty() {
-                line.push_str(&format!(
-                    " | suggestions: {}",
-                    detail.suggestions.join(", ")
-                ));
-            }
-        } else if !detail.suggestions.is_empty() {
-            line.push_str(&format!(" (suggestion: {})", detail.suggestions.join(", ")));
-        }
-
-        summary.push_str(&line);
-    }
+            chunk
+        })
+        .collect();
 
     if sorted_warnings.len() > display_count {
-        summary.push_str(&format!(
-            "\n  … {} more field{} (use -v for details)",
-            sorted_warnings.len() - display_count,
-            if sorted_warnings.len() - display_count == 1 {
-                ""
-            } else {
-                "s"
-            }
+        parts.push(format!(
+            "+{} more",
+            sorted_warnings.len() - display_count
         ));
     }
 
-    // Smart context-aware tip: show the most helpful advice based on the warning pattern
-    if !sorted_warnings.is_empty() {
-        let detail = sorted_warnings[0];
-        if !detail.suggestions.is_empty() {
-            // Has suggestions = likely a typo. The suggestion itself is the actionable advice.
-            // No additional tip needed - would just be noise.
-        } else if let Some(stats) = stats {
-            // Use percentage-based heuristic when we have stats
-            let total_events = stats.events_created;
-            let missing_percentage = if total_events > 0 {
-                (detail.count as f64 / total_events as f64) * 100.0
-            } else {
-                0.0
-            };
+    let header = if prefix.is_empty() {
+        format!("Missing fields ({} total): {}", total_warnings, parts.join(", "))
+    } else {
+        format!(
+            "{} Missing fields ({} total): {}",
+            prefix,
+            total_warnings,
+            parts.join(", ")
+        )
+    };
 
-            // Key insight: Small datasets suggest exploration, large datasets suggest intentional optional fields
-            if total_events < 50 || missing_percentage > 10.0 {
-                // Small dataset OR high missing rate = likely exploration/discovery
-                if total_events < 100 {
-                    // Small dataset: -F inspect shows structure clearly
-                    summary.push_str("\n\n  💡 Tip: Run with -F inspect to see actual field names");
-                } else {
-                    // Larger dataset: -S is more concise for field discovery
-                    summary.push_str("\n\n  💡 Tip: Run with -S to see all available keys, or use e.has(\"field\") for conditional access");
-                }
-            } else {
-                // Large dataset with low missing rate = legitimate optional fields
-                summary.push_str("\n\n  💡 Tip: Use e.has(\"field\") or e.get_path(\"field\", default) for missing fields");
-            }
-        } else {
-            // Fallback when no stats available (shouldn't normally happen)
-            if detail.count <= 5 {
-                summary.push_str("\n\n  💡 Tip: Run with -F inspect to see actual field names");
-            } else {
-                summary.push_str("\n\n  💡 Tip: Use e.has(\"field\") or e.get_path(\"field\", default) for missing fields");
-            }
-        }
-    }
-
-    Some(summary)
+    let hint = "use get_path/has if optional";
+    Some(format!("\n{} ({})", header, hint))
 }
 
 fn format_line_range(line_numbers: &[usize]) -> String {
