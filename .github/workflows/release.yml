@@ -131,12 +131,26 @@ jobs:
           cd target/${{ matrix.target }}/release
           powershell Compress-Archive -Path kelora.exe -DestinationPath kelora-${{ matrix.target }}.zip
 
+      - name: Extract changelog for this version
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          awk -v ver="$VERSION" '
+            /^## \[/ {
+              if (found) exit
+              if ($0 ~ "\\[" ver "\\]") found=1
+            }
+            found && !/^## \[/ { print }
+          ' CHANGELOG.md > release_notes.md
+        shell: bash
+
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
           files: |
             target/${{ matrix.target }}/release/kelora-${{ matrix.target }}.tar.gz
             target/${{ matrix.target }}/release/kelora-${{ matrix.target }}.zip
+          body_path: ${{ matrix.target == 'x86_64-unknown-linux-musl' && 'release_notes.md' || '' }}
           generate_release_notes: ${{ matrix.target == 'x86_64-unknown-linux-musl' }}
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
