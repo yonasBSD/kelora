@@ -4,6 +4,19 @@ All notable changes to Kelora will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.12.1] - 2025-11-28
+
+### Added
+
+- **Release improvements:**
+  - CHANGELOG.md content now included in GitHub release notes
+  - Detailed Added/Changed/Fixed sections appear alongside auto-generated changelog links
+
+### Fixed
+
+- Duplicate "Full Changelog" entries in GitHub releases (was appearing 4-6 times)
+- OpenBSD release builds (updated vmactions/openbsd-vm to v1)
+
 ## [0.12.0] - 2025-11-27
 
 ### Added
