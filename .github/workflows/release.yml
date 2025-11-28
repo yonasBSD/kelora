@@ -137,7 +137,7 @@ jobs:
           files: |
             target/${{ matrix.target }}/release/kelora-${{ matrix.target }}.tar.gz
             target/${{ matrix.target }}/release/kelora-${{ matrix.target }}.zip
-          generate_release_notes: true
+          generate_release_notes: ${{ matrix.target == 'x86_64-unknown-linux-musl' }}
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
         env:
@@ -172,7 +172,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: target/x86_64-unknown-openbsd/release/kelora-x86_64-unknown-openbsd-${{ matrix.openbsd_release }}.tar.gz
-          generate_release_notes: true
+          generate_release_notes: false
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
         env:
