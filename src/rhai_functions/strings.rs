@@ -871,7 +871,8 @@ fn decode_jwt_segment(segment: &str) -> Option<Vec<u8>> {
         Ok(bytes) => Some(bytes),
         Err(_) => {
             let mut padded = segment.to_string();
-            while !padded.len().is_multiple_of(4) {
+            // Base64 requires lengths in multiples of 4; older Rust on OpenBSD lacks is_multiple_of.
+            while padded.len() % 4 != 0 {
                 padded.push('=');
                 if padded.len() > MAX_PARSE_LEN {
                     return None;
