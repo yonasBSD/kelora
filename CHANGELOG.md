@@ -4,6 +4,12 @@ All notable changes to Kelora will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.12.2] - 2025-11-29
+
+### Fixed
+
+- JWT base64 padding detection now works on OpenBSD/older Rust toolchains (no reliance on `is_multiple_of`)
+
 ## [0.12.1] - 2025-11-28
 
 ### Added
