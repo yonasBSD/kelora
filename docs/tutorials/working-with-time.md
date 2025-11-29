@@ -47,7 +47,7 @@ Kelora automatically detects common timestamp field names in your logs:
 
 **Auto-detected field names:**
 
-- `ts`, `timestamp`, `time`, `@timestamp`
+- `ts`, `_ts`, `timestamp`, `at`, `time`, `@timestamp`, `log_timestamp`, `event_time`, `datetime`, `date_time`, `created_at`, `logged_at`, `_t`, `@t`, `t`
 - Case-insensitive detection
 - First matching field in the event is used
 

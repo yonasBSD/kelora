@@ -2116,7 +2116,9 @@ Timestamp filtering with --since and --until:
   'start' anchors to --since, 'end' anchors to --until
   Cannot use both anchors in the same command (e.g., --since end-1h --until start+1h)
 
-  Common timestamp field names are auto-detected: ts, timestamp, time, @timestamp
+  Common timestamp field names are auto-detected:
+    ts, _ts, timestamp, at, time, @timestamp, log_timestamp, event_time,
+    datetime, date_time, created_at, logged_at, _t, @t, t
   Events without valid timestamps are filtered out in resilient mode (default)
   Use --strict to abort processing on missing/invalid timestamps
   Use --verbose to see detailed timestamp parsing errors
