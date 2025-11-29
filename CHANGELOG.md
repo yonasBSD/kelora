@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Removed
 
-- Missing-field warning detection and the `--no-warnings` flag (filter/exec now behave without implicit field warning tracking)
+- **Breaking:** Missing-field warning detection and the `--no-warnings` flag (filter/exec now behave without implicit field warning tracking)
 
 ## [0.12.2] - 2025-11-29
 
