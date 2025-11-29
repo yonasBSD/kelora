@@ -6,9 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.13.0] - 2025-11-29
+
 ### Removed
 
 - **Breaking:** Missing-field warning detection and the `--no-warnings` flag (filter/exec now behave without implicit field warning tracking)
+
+### Added
+
+- FreeBSD release builds in the CI/CD pipeline
+
+### Changed
+
+- Exec examples consolidated across docs to avoid duplication and keep guidance in sync
+- CLI help/time tutorial now documents all auto-detected timestamp fields
 
 ## [0.12.2] - 2025-11-29
 
