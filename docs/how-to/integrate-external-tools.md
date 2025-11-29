@@ -447,9 +447,9 @@ kelora -f logfmt logs/mixed.log \
 
 # For mixed prose + key=value tails, absorb them in-place
 kelora -f line logs/mixed.log \
-  -e 'let res = e.absorb_kv("message")' \
-  -e 'e.user = res.data["user_id"] ?? ""' \
-  -e 'track_count(e.user)' -m
+  -e 'let res = e.absorb_kv("message");
+      e.user = res.data["user_id"] ?? "";
+      track_count(e.user)' -m
 ```
 
 **When to use angle-grinder:** You prefer its query syntax, or need features Kelora doesn't have.

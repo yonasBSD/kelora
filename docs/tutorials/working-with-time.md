@@ -262,26 +262,26 @@ Extract components and format timestamps:
 # Extract time components
 echo '{"timestamp": "2024-01-15T10:30:45Z"}' | \
     kelora -j \
-    -e 'let dt = to_datetime(e.timestamp)' \
-    -e 'e.hour = dt.hour()' \
-    -e 'e.day = dt.day()' \
-    -e 'e.month = dt.month()' \
-    -e 'e.year = dt.year()' \
+    -e 'let dt = to_datetime(e.timestamp);
+        e.hour = dt.hour();
+        e.day = dt.day();
+        e.month = dt.month();
+        e.year = dt.year()' \
     -k hour,day,month,year
 
 # Format timestamp
 echo '{"timestamp": "2024-01-15T10:30:45Z"}' | \
     kelora -j \
-    -e 'let dt = to_datetime(e.timestamp)' \
-    -e 'e.formatted = dt.format("%b %d, %Y at %I:%M %p")'
+    -e 'let dt = to_datetime(e.timestamp);
+        e.formatted = dt.format("%b %d, %Y at %I:%M %p")'
 
 # Convert timezone
 echo '{"timestamp": "2024-01-15T10:30:45Z"}' | \
     kelora -j \
-    -e 'let dt = to_datetime(e.timestamp)' \
-    -e 'e.utc = dt.to_utc().to_iso()' \
-    -e 'e.berlin = dt.to_timezone("Europe/Berlin").to_iso()' \
-    -e 'e.ny = dt.to_timezone("America/New_York").to_iso()'
+    -e 'let dt = to_datetime(e.timestamp);
+        e.utc = dt.to_utc().to_iso();
+        e.berlin = dt.to_timezone("Europe/Berlin").to_iso();
+        e.ny = dt.to_timezone("America/New_York").to_iso()'
 ```
 
 **Available methods:**
@@ -302,27 +302,27 @@ Calculate time differences between events:
 # Calculate duration between timestamps
 echo '{"start": "2024-01-15T10:00:00Z", "end": "2024-01-15T10:30:00Z"}' | \
     kelora -j \
-    -e 'let start_dt = to_datetime(e.start)' \
-    -e 'let end_dt = to_datetime(e.end)' \
-    -e 'let duration = end_dt - start_dt' \
-    -e 'e.duration_seconds = duration.as_seconds()' \
-    -e 'e.duration_minutes = duration.as_minutes()' \
-    -e 'e.duration_human = duration.to_string()' \
+    -e 'let start_dt = to_datetime(e.start);
+        let end_dt = to_datetime(e.end);
+        let duration = end_dt - start_dt;
+        e.duration_seconds = duration.as_seconds();
+        e.duration_minutes = duration.as_minutes();
+        e.duration_human = duration.to_string()' \
     -k duration_seconds,duration_minutes,duration_human
 
 # Add duration to timestamp
 echo '{"timestamp": "2024-01-15T10:00:00Z"}' | \
     kelora -j \
-    -e 'let dt = to_datetime(e.timestamp)' \
-    -e 'let hour_later = dt + to_duration("1h")' \
-    -e 'e.plus_1h = hour_later.to_iso()'
+    -e 'let dt = to_datetime(e.timestamp);
+        let hour_later = dt + to_duration("1h");
+        e.plus_1h = hour_later.to_iso()'
 
 # Duration from number
 echo '{"timestamp": "2024-01-15T10:00:00Z"}' | \
     kelora -j \
-    -e 'let dt = to_datetime(e.timestamp)' \
-    -e 'let offset = duration_from_minutes(90)' \
-    -e 'e.plus_90m = (dt + offset).to_iso()'
+    -e 'let dt = to_datetime(e.timestamp);
+        let offset = duration_from_minutes(90);
+        e.plus_90m = (dt + offset).to_iso()'
 ```
 
 **Duration functions:**
@@ -353,11 +353,11 @@ cat api_logs.json
 # Analyze slow requests in the last hour
 kelora -j api_logs.json \
     --since 1h \
-    -e 'e.duration_human = humanize_duration(e.duration_ms)' \
     --filter 'e.duration_ms > 1000' \
-    -e 'let dt = to_datetime(e.timestamp)' \
-    -e 'e.hour = dt.hour()' \
-    -e 'e.formatted_time = dt.format("%H:%M:%S")' \
+    -e 'let dt = to_datetime(e.timestamp);
+        e.duration_human = humanize_duration(e.duration_ms);
+        e.hour = dt.hour();
+        e.formatted_time = dt.format("%H:%M:%S")' \
     -k formatted_time,endpoint,duration_human
 ```
 
@@ -369,15 +369,15 @@ Filter logs during business hours across timezones:
 # Filter for events during business hours (9 AM - 5 PM)
 kelora -j app.log \
     --input-tz America/New_York \
-    -e 'let dt = to_datetime(e.timestamp)' \
-    -e 'e.hour = dt.hour()' \
+    -e 'let dt = to_datetime(e.timestamp);
+        e.hour = dt.hour()' \
     --filter 'e.hour >= 9 && e.hour < 17'
 
 # Weekend vs weekday analysis
 kelora -j app.log \
-    -e 'let dt = to_datetime(e.timestamp)' \
-    -e 'let dow = dt.format("%w").to_int()' \
-    -e 'e.is_weekend = dow == 0 || dow == 6' \
+    -e 'let dt = to_datetime(e.timestamp);
+        let dow = dt.format("%w").to_int();
+        e.is_weekend = dow == 0 || dow == 6' \
     --filter 'e.is_weekend'
 ```
 
@@ -391,15 +391,15 @@ echo '{"timestamp": "2024-01-15T10:30:00Z", "message": "Event 1"}
 {"timestamp": "2024-01-15T11:00:00Z", "message": "Event 2"}
 {"timestamp": "2024-01-15T11:30:00Z", "message": "Event 3"}' | \
     kelora -j \
-    -e 'let dt = to_datetime(e.timestamp)' \
-    -e 'let cutoff = to_datetime("2024-01-15T11:00:00Z")' \
+    -e 'let dt = to_datetime(e.timestamp);
+        let cutoff = to_datetime("2024-01-15T11:00:00Z")' \
     --filter 'dt > cutoff'
 
 # Events within time window
 kelora -j app.log \
-    -e 'let dt = to_datetime(e.timestamp)' \
-    -e 'let start = to_datetime("2024-01-15T10:00:00Z")' \
-    -e 'let end = to_datetime("2024-01-15T11:00:00Z")' \
+    -e 'let dt = to_datetime(e.timestamp);
+        let start = to_datetime("2024-01-15T10:00:00Z");
+        let end = to_datetime("2024-01-15T11:00:00Z")' \
     --filter 'dt >= start && dt <= end'
 ```
 
@@ -416,8 +416,8 @@ Use `now()` for relative time calculations:
 ```bash
 # Find events in last 5 minutes using script
 kelora -j app.log \
-    -e 'let dt = to_datetime(e.timestamp)' \
-    -e 'let cutoff = now() - to_duration("5m")' \
+    -e 'let dt = to_datetime(e.timestamp);
+        let cutoff = now() - to_duration("5m")' \
     --filter 'dt > cutoff'
 
 # Add processing timestamp
@@ -426,9 +426,9 @@ kelora -j app.log \
 
 # Calculate event age
 kelora -j app.log \
-    -e 'let dt = to_datetime(e.timestamp)' \
-    -e 'let age = now() - dt' \
-    -e 'e.age_minutes = age.as_minutes()'
+    -e 'let dt = to_datetime(e.timestamp);
+        let age = now() - dt;
+        e.age_minutes = age.as_minutes()'
 ```
 
 ## Common Patterns
@@ -466,10 +466,10 @@ kelora -j app.log -Z
 ```bash
 # Add duration between start and end timestamps
 kelora -j app.log \
-    -e 'let start = to_datetime(e.start_time)' \
-    -e 'let end = to_datetime(e.end_time)' \
-    -e 'let duration = end - start' \
-    -e 'e.duration_ms = duration.as_milliseconds()'
+    -e 'let start = to_datetime(e.start_time);
+        let end = to_datetime(e.end_time);
+        let duration = end - start;
+        e.duration_ms = duration.as_milliseconds()'
 ```
 
 ### Pattern 5: Business Hours Analysis
@@ -478,8 +478,8 @@ kelora -j app.log \
 # Filter for business hours in specific timezone
 kelora -j app.log \
     --input-tz America/New_York \
-    -e 'let dt = to_datetime(e.timestamp)' \
-    -e 'let hour = dt.hour()' \
+    -e 'let dt = to_datetime(e.timestamp);
+        let hour = dt.hour()' \
     --filter 'hour >= 9 && hour < 17'
 ```
 
@@ -529,15 +529,15 @@ kelora -j app.log -e 'let dt = to_datetime(e.timestamp)' --filter 'now() - dt < 
 ```bash
 # Good - parse once, use multiple times
 kelora -j app.log \
-    -e 'let dt = to_datetime(e.timestamp)' \
-    -e 'e.hour = dt.hour()' \
-    -e 'e.day = dt.day()' \
-    -e 'e.formatted = dt.format("%Y-%m-%d")'
+    -e 'let dt = to_datetime(e.timestamp);
+        e.hour = dt.hour();
+        e.day = dt.day();
+        e.formatted = dt.format("%Y-%m-%d")'
 
 # Less efficient - parse multiple times
 kelora -j app.log \
-    -e 'e.hour = to_datetime(e.timestamp).hour()' \
-    -e 'e.day = to_datetime(e.timestamp).day()'
+    -e 'e.hour = to_datetime(e.timestamp).hour();
+        e.day = to_datetime(e.timestamp).day()'
 ```
 
 ### Use ISO Format for Interoperability
@@ -603,10 +603,10 @@ kelora --ts-format '%Y-%m-%d %H:%M:%S' app.log  # Ensure proper quoting
 ```bash
 # Check both timestamps are parsed correctly
 kelora -j app.log \
-    -e 'print("Start: " + e.start_time + ", End: " + e.end_time)' \
-    -e 'let start = to_datetime(e.start_time)' \
-    -e 'let end = to_datetime(e.end_time)' \
-    -e 'e.duration = (end - start).as_seconds()' \
+    -e 'print("Start: " + e.start_time + ", End: " + e.end_time);
+        let start = to_datetime(e.start_time);
+        let end = to_datetime(e.end_time);
+        e.duration = (end - start).as_seconds()' \
     -n 3
 ```
 

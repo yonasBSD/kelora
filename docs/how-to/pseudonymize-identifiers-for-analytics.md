@@ -56,10 +56,10 @@ When you only need grouping (and not reversibility), hashing may suffice. Benchm
 
 ```bash
 kelora -j app.log \
-  -e 'e.user_hash = e.user_id.hash("xxh3")' \
-  -e 'e.user_anon = pseudonym(e.user_id, "users")' \
-  -e 'track_unique("hashes", e.user_hash)' \
-  -e 'track_unique("pseudonyms", e.user_anon)' \
+  -e 'e.user_hash = e.user_id.hash("xxh3");
+      e.user_anon = pseudonym(e.user_id, "users");
+      track_unique("hashes", e.user_hash);
+      track_unique("pseudonyms", e.user_anon)' \
   --metrics
 ```
 
@@ -76,8 +76,8 @@ kelora -j pseudonymized.json \
   --stats
 
 kelora -j examples/security_audit.jsonl \
-  -e 'let token = pseudonym(e.user_email, "users");' \
-  -e 'track_unique("tokens", token)' \
+  -e 'let token = pseudonym(e.user_email, "users");
+      track_unique("tokens", token)' \
   --metrics
 ```
 
