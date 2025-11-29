@@ -207,8 +207,6 @@ pub struct PipelineConfig {
     pub quiet_level: u8,
     /// Disable emoji in error output
     pub no_emoji: bool,
-    /// Suppress field access warnings
-    pub no_warnings: bool,
     /// Input files for smart error message formatting
     pub input_files: Vec<String>,
     /// Allow Rhai scripts to create directories and write files on disk

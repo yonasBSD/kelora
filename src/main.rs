@@ -2,14 +2,13 @@ use anyhow::Result;
 use clap::parser::ValueSource;
 use clap::{ArgMatches, CommandFactory, FromArgMatches};
 use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
-use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 
 #[cfg(unix)]
 use signal_hook::consts::{SIGINT, SIGTERM};
 
 use crate::engine::RhaiEngine;
-use crate::rhai_functions::tracking::{self, TrackingSnapshot, WarningDetail};
+use crate::rhai_functions::tracking::{self, TrackingSnapshot};
 
 mod cli;
 mod colors;
@@ -122,7 +121,6 @@ use std::time::{Duration, Instant};
 struct PipelineResult {
     pub stats: Option<ProcessingStats>,
     pub tracking_data: TrackingSnapshot,
-    pub warnings: HashMap<String, WarningDetail>,
 }
 
 /// Core pipeline processing function using KeloraConfig  
@@ -159,12 +157,10 @@ fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
         let mut stats = get_thread_stats();
         stats.extract_discovered_from_tracking(&tracking_data.internal);
         let final_stats = Some(stats);
-        let warnings = tracking::get_thread_warnings();
 
         Ok(PipelineResult {
             stats: final_stats,
             tracking_data,
-            warnings,
         })
     }
 }
@@ -282,7 +278,6 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     Ok(PipelineResult {
         stats: Some(processor.get_final_stats()),
         tracking_data: parallel_snapshot,
-        warnings: processor.get_final_warnings(),
     })
 }
 
@@ -1619,22 +1614,6 @@ fn main() -> Result<()> {
                             stderr.writeln(&formatted).unwrap_or(());
                         }
                     }
-
-                    // Display field access warnings (unless suppressed) - show independently of errors
-                    if diagnostics_allowed_runtime && !config.processing.no_warnings {
-                        let warnings = &pipeline_result.warnings;
-                        if let Some(warning_summary) =
-                            crate::rhai_functions::tracking::format_warning_summary(
-                                warnings,
-                                pipeline_result.stats.as_ref(),
-                                crate::tty::should_use_colors_with_mode(&config.output.color),
-                                config.output.no_emoji,
-                                config.processing.verbose,
-                            )
-                        {
-                            stderr.writeln(&warning_summary).unwrap_or(());
-                        }
-                    }
                 }
             }
             (pipeline_result.stats, Some(pipeline_result.tracking_data))
@@ -2300,7 +2279,6 @@ RHAI QUIRKS & GOTCHAS:
   • Semicolons recommended (optional at end of blocks, required for multiple statements)
   • No null/undefined: use unit type () to represent "nothing"
   • No implicit type conversion: "5" + 3 is error (use "5".to_int() + 3)
-  • Unguarded e.field reads trigger missing-field warnings; use get_path/has/?? for optional fields
   • try/catch available: try { ... } catch (err) { ... } catches runtime errors (type/type-mismatch, missing fields); compile errors still abort; prefer guards/to_int_or over exceptions for speed
   • let required for new variables (x = 1 errors if x not declared)
   • Arrays/maps are reference types: modifying copies affects original

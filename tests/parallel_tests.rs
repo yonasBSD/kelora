@@ -1854,7 +1854,6 @@ fn test_parallel_ordering_completeness() {
             "--exec",
             "e.processed = true;",
             "--with-stats",
-            "--no-warnings", // Suppress warnings from AST field detection for dynamically created fields
         ],
         &input,
     );

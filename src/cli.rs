@@ -282,10 +282,6 @@ pub struct Cli {
     #[arg(long = "no-diagnostics", help_heading = "Error Handling")]
     pub no_diagnostics: bool,
 
-    /// Suppress field access warnings
-    #[arg(long = "no-warnings", help_heading = "Error Handling")]
-    pub no_warnings: bool,
-
     /// Silence pipeline stdout/stderr emitters (events/diagnostics/stats/terminal metrics); script output still allowed. Metrics files still write.
     #[arg(long = "silent", help_heading = "Error Handling")]
     pub silent: bool,

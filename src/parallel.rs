@@ -14,7 +14,7 @@ use crate::formatters::GapTracker;
 use crate::pipeline::{self, PipelineBuilder, DEFAULT_MULTILINE_FLUSH_TIMEOUT_MS};
 use crate::platform::{Ctrl, SHOULD_TERMINATE};
 use crate::rhai_functions::file_ops::{self, FileOp};
-use crate::rhai_functions::tracking::{self, TrackingSnapshot, WarningDetail};
+use crate::rhai_functions::tracking::{self, TrackingSnapshot};
 use crate::stats::{get_thread_stats, stats_finish_processing, stats_start_timer, ProcessingStats};
 
 struct PlainLineContext<'a> {
@@ -105,7 +105,6 @@ pub struct BatchResult {
     pub results: Vec<ProcessedEvent>,
     pub user_tracked_updates: HashMap<String, Dynamic>,
     pub internal_tracked_updates: HashMap<String, Dynamic>,
-    pub warnings: HashMap<String, WarningDetail>,
     pub worker_stats: ProcessingStats,
 }
 
@@ -126,7 +125,6 @@ pub struct GlobalTracker {
     user_tracked: Arc<Mutex<HashMap<String, Dynamic>>>,
     internal_tracked: Arc<Mutex<HashMap<String, Dynamic>>>,
     processing_stats: Arc<Mutex<ProcessingStats>>,
-    warnings: Arc<Mutex<HashMap<String, WarningDetail>>>,
     start_time: Option<Instant>,
 }
 
@@ -136,7 +134,6 @@ impl GlobalTracker {
             user_tracked: Arc::new(Mutex::new(HashMap::new())),
             internal_tracked: Arc::new(Mutex::new(HashMap::new())),
             processing_stats: Arc::new(Mutex::new(ProcessingStats::new())),
-            warnings: Arc::new(Mutex::new(HashMap::new())),
             start_time: Some(Instant::now()),
         }
     }
@@ -183,15 +180,6 @@ impl GlobalTracker {
         if let Some(start_time) = self.start_time {
             global_stats.processing_time = start_time.elapsed();
         }
-        Ok(())
-    }
-
-    pub fn merge_worker_warnings(&self, warnings: HashMap<String, WarningDetail>) -> Result<()> {
-        if warnings.is_empty() {
-            return Ok(());
-        }
-        let mut global_warnings = self.warnings.lock().unwrap();
-        tracking::merge_warning_maps(&mut global_warnings, warnings);
         Ok(())
     }
 
@@ -673,10 +661,6 @@ impl GlobalTracker {
         let internal = self.internal_tracked.lock().unwrap().clone();
         TrackingSnapshot::from_parts(user, internal)
     }
-
-    pub fn get_final_warnings(&self) -> HashMap<String, WarningDetail> {
-        self.warnings.lock().unwrap().clone()
-    }
 }
 
 /// Main parallel processor
@@ -1139,11 +1123,6 @@ impl ParallelProcessor {
     /// Get the final merged statistics from all workers
     pub fn get_final_stats(&self) -> ProcessingStats {
         self.global_tracker.get_final_stats()
-    }
-
-    /// Get the merged field warning details from all workers
-    pub fn get_final_warnings(&self) -> HashMap<String, WarningDetail> {
-        self.global_tracker.get_final_warnings()
     }
 
     /// Extract stats from tracking system into global stats
@@ -2405,13 +2384,7 @@ impl ParallelProcessor {
                     }
                 }
 
-                let warnings = if final_flush {
-                    tracking::take_thread_warnings()
-                } else {
-                    HashMap::new()
-                };
-
-                if flush_results.is_empty() && warnings.is_empty() {
+                if flush_results.is_empty() {
                     return Ok(());
                 }
 
@@ -2475,7 +2448,6 @@ impl ParallelProcessor {
                     results: flush_batch_results,
                     user_tracked_updates: flush_user_updates,
                     internal_tracked_updates: flush_internal_updates,
-                    warnings,
                     worker_stats: ProcessingStats::new(),
                 };
 
@@ -2689,7 +2661,6 @@ impl ParallelProcessor {
             results: batch_results,
             user_tracked_updates: user_deltas,
             internal_tracked_updates: internal_deltas,
-            warnings: tracking::take_thread_warnings(),
             worker_stats: get_thread_stats(),
         };
 
@@ -2891,7 +2862,6 @@ impl ParallelProcessor {
             results: batch_results,
             user_tracked_updates: user_deltas,
             internal_tracked_updates: internal_deltas,
-            warnings: HashMap::new(),
             worker_stats: get_thread_stats(),
         };
 
@@ -3012,12 +2982,10 @@ impl ParallelProcessor {
             let user_tracked_updates = std::mem::take(&mut batch_result.user_tracked_updates);
             let internal_tracked_updates =
                 std::mem::take(&mut batch_result.internal_tracked_updates);
-            let warnings = std::mem::take(&mut batch_result.warnings);
 
             // Merge global state and stats
             global_tracker.merge_worker_state(user_tracked_updates, internal_tracked_updates)?;
             global_tracker.merge_worker_stats(&batch_result.worker_stats)?;
-            global_tracker.merge_worker_warnings(warnings)?;
 
             // Handle special batches
             if batch_id == u64::MAX {
@@ -3155,10 +3123,8 @@ impl ParallelProcessor {
             // Merge global state and stats
             let user_updates = std::mem::take(&mut batch_result.user_tracked_updates);
             let internal_updates = std::mem::take(&mut batch_result.internal_tracked_updates);
-            let warnings = std::mem::take(&mut batch_result.warnings);
             global_tracker.merge_worker_state(user_updates, internal_updates)?;
             global_tracker.merge_worker_stats(&batch_result.worker_stats)?;
-            global_tracker.merge_worker_warnings(warnings)?;
 
             // Handle special batches
             if batch_result.batch_id == u64::MAX {

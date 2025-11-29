@@ -148,8 +148,6 @@ pub struct ProcessingConfig {
     pub quiet_events: bool,
     /// Suppress diagnostics and summaries (--no-diagnostics)
     pub suppress_diagnostics: bool,
-    /// Suppress field access warnings (--no-warnings)
-    pub no_warnings: bool,
     /// Suppress pipeline stdout/stderr emitters except the single fatal line (--silent)
     pub silent: bool,
     /// Suppress Rhai print/eprint and side-effect warnings (--no-script-output, data-only modes)
@@ -664,7 +662,6 @@ impl KeloraConfig {
         let default_timezone = determine_default_timezone(cli);
         let mut quiet_events = cli.quiet || cli.no_events;
         let mut suppress_diagnostics = cli.no_diagnostics;
-        let no_warnings = cli.no_warnings || cli.silent || cli.no_diagnostics;
         let mut silent = cli.silent;
         if cli.no_silent {
             silent = false;
@@ -819,7 +816,6 @@ impl KeloraConfig {
                 verbose: verbose_level,
                 quiet_events,
                 suppress_diagnostics,
-                no_warnings,
                 silent,
                 suppress_script_output,
                 quiet_level,
@@ -918,7 +914,6 @@ impl Default for KeloraConfig {
                 verbose: 0,
                 quiet_events: false,
                 suppress_diagnostics: false,
-                no_warnings: false,
                 silent: false,
                 suppress_script_output: false,
                 quiet_level: 0,

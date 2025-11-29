@@ -112,81 +112,21 @@ impl FilterStage {
             context_type: crate::event::ContextType::None,
         });
 
-        // AST-based field access validation (catches field reads, not writes)
-        if !ctx.config.no_warnings {
-            let accessed = self.compiled_filter.read_fields();
-            let available: std::collections::BTreeSet<String> =
-                event.fields.keys().cloned().collect();
-
-            // Warn about fields that are accessed but don't exist
-            for field in accessed {
-                if !available.contains(&field) {
-                    crate::rhai_functions::tracking::track_warning(
-                        &field,
-                        None, // No operation info from AST
-                        ctx.meta.line_num.unwrap_or(0),
-                        &available,
-                    );
-                }
-            }
-        }
-
         // Check if current event matches filter
         let is_match = match self.evaluate_filter(&event, ctx) {
             Ok(result) => result,
             Err(e) => {
-                let error_msg = format!("{}", e);
-
-                // NEW: Detect unit type operations and track as warnings
-                if crate::rhai_functions::tracking::is_unit_type_error(&error_msg) {
-                    let field_name = crate::rhai_functions::tracking::extract_field_from_script(
-                        self.compiled_filter.source(),
-                    )
-                    .unwrap_or_else(|| "unknown".to_string());
-                    let operation = crate::rhai_functions::tracking::extract_operation(&error_msg);
-
-                    // Get available field names from the current event and discovered keys so far
-                    let mut available_fields: std::collections::BTreeSet<String> =
-                        event.fields.keys().cloned().collect();
-                    if let Some(dynamic_keys) =
-                        ctx.internal_tracker.get("__kelora_stats_discovered_keys")
-                    {
-                        if let Ok(arr) = dynamic_keys.clone().into_array() {
-                            for entry in arr {
-                                if let Ok(key) = entry.into_string() {
-                                    available_fields.insert(key);
-                                }
-                            }
-                        }
-                    }
-
-                    crate::rhai_functions::tracking::track_warning(
-                        &field_name,
-                        operation.as_deref(),
-                        ctx.meta.line_num.unwrap_or(0),
-                        &available_fields,
-                    );
-                }
-
-                // Handle error (same as original FilterStage), but avoid escalating unit-type
-                // warnings to errors in resilient mode so exit codes stay success.
-                if !ctx.config.strict
-                    && crate::rhai_functions::tracking::is_unit_type_error(&error_msg)
-                {
-                    // Treat as warning only
-                } else {
-                    crate::rhai_functions::tracking::track_error(
-                        "filter",
-                        ctx.meta.line_num,
-                        &format!("Filter error: {}", e),
-                        Some(&event.original_line),
-                        ctx.meta.filename.as_deref(),
-                        ctx.config.verbose,
-                        ctx.config.quiet_level,
-                        Some(&ctx.config),
-                        None,
-                    );
-                }
+                crate::rhai_functions::tracking::track_error(
+                    "filter",
+                    ctx.meta.line_num,
+                    &format!("Filter error: {}", e),
+                    Some(&event.original_line),
+                    ctx.meta.filename.as_deref(),
+                    ctx.config.verbose,
+                    ctx.config.quiet_level,
+                    Some(&ctx.config),
+                    None,
+                );
 
                 if e.downcast_ref::<crate::engine::ConfMutationError>()
                     .is_some()
@@ -308,25 +248,6 @@ impl ScriptStage for FilterStage {
             return self.process_with_context(event, ctx);
         }
 
-        // AST-based field access validation (catches field reads, not writes)
-        if !ctx.config.no_warnings {
-            let accessed = self.compiled_filter.read_fields();
-            let available: std::collections::BTreeSet<String> =
-                event.fields.keys().cloned().collect();
-
-            // Warn about fields that are accessed but don't exist
-            for field in accessed {
-                if !available.contains(&field) {
-                    crate::rhai_functions::tracking::track_warning(
-                        &field,
-                        None, // No operation info from AST
-                        ctx.meta.line_num.unwrap_or(0),
-                        &available,
-                    );
-                }
-            }
-        }
-
         // Original non-context filtering logic
         let result = self.evaluate_filter(&event, ctx);
 
@@ -343,57 +264,17 @@ impl ScriptStage for FilterStage {
                 }
             }
             Err(e) => {
-                let error_msg = format!("{}", e);
-
-                // Detect unit type operations and track as warnings
-                if crate::rhai_functions::tracking::is_unit_type_error(&error_msg) {
-                    let field_name = crate::rhai_functions::tracking::extract_field_from_script(
-                        self.compiled_filter.source(),
-                    )
-                    .unwrap_or_else(|| "unknown".to_string());
-                    let operation = crate::rhai_functions::tracking::extract_operation(&error_msg);
-
-                    // Get available field names from the current event and discovered keys so far
-                    let mut available_fields: std::collections::BTreeSet<String> =
-                        event.fields.keys().cloned().collect();
-                    if let Some(dynamic_keys) =
-                        ctx.internal_tracker.get("__kelora_stats_discovered_keys")
-                    {
-                        if let Ok(arr) = dynamic_keys.clone().into_array() {
-                            for entry in arr {
-                                if let Ok(key) = entry.into_string() {
-                                    available_fields.insert(key);
-                                }
-                            }
-                        }
-                    }
-
-                    crate::rhai_functions::tracking::track_warning(
-                        &field_name,
-                        operation.as_deref(),
-                        ctx.meta.line_num.unwrap_or(0),
-                        &available_fields,
-                    );
-                }
-
-                // Track error for reporting (but not for unit-type warnings in resilient mode)
-                if !ctx.config.strict
-                    && crate::rhai_functions::tracking::is_unit_type_error(&error_msg)
-                {
-                    // Treat as warning only
-                } else {
-                    crate::rhai_functions::tracking::track_error(
-                        "filter",
-                        ctx.meta.line_num,
-                        &format!("Filter error: {}", e),
-                        Some(&event.original_line),
-                        ctx.meta.filename.as_deref(),
-                        ctx.config.verbose,
-                        ctx.config.quiet_level,
-                        Some(&ctx.config),
-                        None,
-                    );
-                }
+                crate::rhai_functions::tracking::track_error(
+                    "filter",
+                    ctx.meta.line_num,
+                    &format!("Filter error: {}", e),
+                    Some(&event.original_line),
+                    ctx.meta.filename.as_deref(),
+                    ctx.config.verbose,
+                    ctx.config.quiet_level,
+                    Some(&ctx.config),
+                    None,
+                );
 
                 // New resiliency model: filter errors evaluate to false (Skip)
                 // unless in strict mode, where they still propagate as errors
@@ -449,25 +330,6 @@ impl ScriptStage for ExecStage {
         emit::set_emit_strict(ctx.config.strict);
 
         file_ops::clear_pending_ops();
-
-        // AST-based field access validation (catches field reads, not writes)
-        if !ctx.config.no_warnings {
-            let accessed = self.compiled_exec.read_fields();
-            let available: std::collections::BTreeSet<String> =
-                event.fields.keys().cloned().collect();
-
-            // Warn about fields that are accessed but don't exist
-            for field in accessed {
-                if !available.contains(&field) {
-                    crate::rhai_functions::tracking::track_warning(
-                        &field,
-                        None, // No operation info from AST
-                        ctx.meta.line_num.unwrap_or(0),
-                        &available,
-                    );
-                }
-            }
-        }
 
         let result = if ctx.window.is_empty() {
             // No window context - use standard method
@@ -551,64 +413,24 @@ impl ScriptStage for ExecStage {
                 let _ = crate::rhai_functions::emit::get_and_clear_pending_emissions();
 
                 let error_msg = format!("{:#}", e);
+                // Extract just the Rhai error message from the full diagnostic for cleaner error summaries
+                let error_for_summary = error_msg
+                    .lines()
+                    .find(|line| line.trim().starts_with("Rhai:"))
+                    .map(|line| line.trim().strip_prefix("Rhai:").unwrap_or(line).trim())
+                    .unwrap_or(&error_msg);
 
-                // NEW: Detect unit type operations and track as warnings
-                if crate::rhai_functions::tracking::is_unit_type_error(&error_msg) {
-                    let field_name = crate::rhai_functions::tracking::extract_field_from_script(
-                        self.compiled_exec.source(),
-                    )
-                    .unwrap_or_else(|| "unknown".to_string());
-                    let operation = crate::rhai_functions::tracking::extract_operation(&error_msg);
-
-                    // Get available field names from the current event and discovered keys so far
-                    let mut available_fields: std::collections::BTreeSet<String> =
-                        event.fields.keys().cloned().collect();
-                    if let Some(dynamic_keys) =
-                        ctx.internal_tracker.get("__kelora_stats_discovered_keys")
-                    {
-                        if let Ok(arr) = dynamic_keys.clone().into_array() {
-                            for entry in arr {
-                                if let Ok(key) = entry.into_string() {
-                                    available_fields.insert(key);
-                                }
-                            }
-                        }
-                    }
-
-                    crate::rhai_functions::tracking::track_warning(
-                        &field_name,
-                        operation.as_deref(),
-                        ctx.meta.line_num.unwrap_or(0),
-                        &available_fields,
-                    );
-                }
-
-                // Track error for reporting even in resilient mode, unless this is the
-                // unit-type warning case where we only want a warning (not an error exit).
-                if !ctx.config.strict
-                    && crate::rhai_functions::tracking::is_unit_type_error(&error_msg)
-                {
-                    // Treat as warning only
-                } else {
-                    // Extract just the Rhai error message from the full diagnostic for cleaner error summaries
-                    let error_for_summary = error_msg
-                        .lines()
-                        .find(|line| line.trim().starts_with("Rhai:"))
-                        .map(|line| line.trim().strip_prefix("Rhai:").unwrap_or(line).trim())
-                        .unwrap_or(&error_msg);
-
-                    crate::rhai_functions::tracking::track_error(
-                        "exec",
-                        ctx.meta.line_num,
-                        error_for_summary,
-                        Some(&event.original_line),
-                        ctx.meta.filename.as_deref(),
-                        ctx.config.verbose,
-                        ctx.config.quiet_level,
-                        Some(&ctx.config),
-                        None,
-                    );
-                }
+                crate::rhai_functions::tracking::track_error(
+                    "exec",
+                    ctx.meta.line_num,
+                    error_for_summary,
+                    Some(&event.original_line),
+                    ctx.meta.filename.as_deref(),
+                    ctx.config.verbose,
+                    ctx.config.quiet_level,
+                    Some(&ctx.config),
+                    None,
+                );
 
                 // New resiliency model: atomic rollback - return original event unchanged
                 // unless in strict mode, where errors still propagate
@@ -1103,7 +925,6 @@ mod tests {
             no_emoji: false,
             input_files: vec![],
             allow_fs_writes: false,
-            no_warnings: false,
             format_name: None,
         }
     }
@@ -1169,7 +990,6 @@ mod tests {
                 no_emoji: false,
                 input_files: vec![],
                 allow_fs_writes: false,
-                no_warnings: false,
                 format_name: None,
             },
             tracker: std::collections::HashMap::new(),
@@ -1274,7 +1094,6 @@ mod tests {
                 no_emoji: false,
                 input_files: vec![],
                 allow_fs_writes: false,
-                no_warnings: false,
                 format_name: None,
             },
             tracker: std::collections::HashMap::new(),
@@ -1351,7 +1170,6 @@ mod tests {
                 no_emoji: false,
                 input_files: vec![],
                 allow_fs_writes: false,
-                no_warnings: false,
                 format_name: None,
             },
             tracker: std::collections::HashMap::new(),
@@ -1431,7 +1249,6 @@ mod tests {
                 no_emoji: false,
                 input_files: vec![],
                 allow_fs_writes: false,
-                no_warnings: false,
                 format_name: None,
             },
             tracker: std::collections::HashMap::new(),
@@ -1488,7 +1305,6 @@ mod tests {
                 no_emoji: false,
                 input_files: vec![],
                 allow_fs_writes: false,
-                no_warnings: false,
                 format_name: None,
             },
             tracker: std::collections::HashMap::new(),
@@ -1544,7 +1360,6 @@ mod tests {
                 no_emoji: false,
                 input_files: vec![],
                 allow_fs_writes: false,
-                no_warnings: false,
                 format_name: None,
             },
             tracker: std::collections::HashMap::new(),
