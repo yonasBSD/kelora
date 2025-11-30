@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use std::cell::RefCell;
 use std::collections::BTreeSet;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Default)]
@@ -45,6 +46,17 @@ pub struct ProcessingStats {
     pub detected_format: Option<String>, // Format detected for this processing session
 }
 
+// Allow disabling stats collection when diagnostics/stats are suppressed
+static COLLECT_STATS: AtomicBool = AtomicBool::new(true);
+
+pub fn set_collect_stats(enabled: bool) {
+    COLLECT_STATS.store(enabled, Ordering::Relaxed);
+}
+
+pub fn stats_enabled() -> bool {
+    COLLECT_STATS.load(Ordering::Relaxed)
+}
+
 // Thread-local storage for statistics (following track_count pattern)
 thread_local! {
     static THREAD_STATS: RefCell<ProcessingStats> = RefCell::new(ProcessingStats::new());
@@ -53,42 +65,63 @@ thread_local! {
 // Public API functions for stats collection (following track_count pattern)
 // Note: These functions are conditionally called based on config.output.stats flag
 pub fn stats_add_line_read() {
+    if !stats_enabled() {
+        return;
+    }
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().lines_read += 1;
     });
 }
 
 pub fn stats_add_line_output() {
+    if !stats_enabled() {
+        return;
+    }
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().lines_output += 1;
     });
 }
 
 pub fn stats_add_line_filtered() {
+    if !stats_enabled() {
+        return;
+    }
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().lines_filtered += 1;
     });
 }
 
 pub fn stats_add_event_created() {
+    if !stats_enabled() {
+        return;
+    }
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().events_created += 1;
     });
 }
 
 pub fn stats_add_event_output() {
+    if !stats_enabled() {
+        return;
+    }
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().events_output += 1;
     });
 }
 
 pub fn stats_add_event_filtered() {
+    if !stats_enabled() {
+        return;
+    }
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().events_filtered += 1;
     });
 }
 
 pub fn stats_set_timestamp_override(field: Option<String>, format: Option<String>) {
+    if !stats_enabled() {
+        return;
+    }
     THREAD_STATS.with(|stats| {
         let mut stats = stats.borrow_mut();
         stats.timestamp_override_field = field;
@@ -99,36 +132,54 @@ pub fn stats_set_timestamp_override(field: Option<String>, format: Option<String
 }
 
 pub fn stats_set_detected_format(format: String) {
+    if !stats_enabled() {
+        return;
+    }
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().detected_format = Some(format);
     });
 }
 
 pub fn stats_add_late_event() {
+    if !stats_enabled() {
+        return;
+    }
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().late_events += 1;
     });
 }
 
 pub fn stats_add_yearless_timestamp() {
+    if !stats_enabled() {
+        return;
+    }
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().yearless_timestamps += 1;
     });
 }
 
 pub fn stats_add_error() {
+    if !stats_enabled() {
+        return;
+    }
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().errors += 1;
     });
 }
 
 pub fn stats_start_timer() {
+    if !stats_enabled() {
+        return;
+    }
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().start_time = Some(Instant::now());
     });
 }
 
 pub fn stats_finish_processing() {
+    if !stats_enabled() {
+        return;
+    }
     THREAD_STATS.with(|stats| {
         let mut stats = stats.borrow_mut();
         if let Some(start) = stats.start_time {
@@ -146,6 +197,9 @@ pub fn get_thread_stats() -> ProcessingStats {
 }
 
 pub fn stats_record_timestamp_detection(field_name: &str, _raw_value: &str, parsed: bool) {
+    if !stats_enabled() {
+        return;
+    }
     let field = field_name.to_string();
     THREAD_STATS.with(|stats| {
         let mut stats = stats.borrow_mut();
@@ -164,12 +218,18 @@ pub fn stats_record_timestamp_detection(field_name: &str, _raw_value: &str, pars
 }
 
 pub fn stats_record_timestamp_absent() {
+    if !stats_enabled() {
+        return;
+    }
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().timestamp_absent_events += 1;
     });
 }
 
 pub fn stats_update_timestamp(timestamp: DateTime<Utc>) {
+    if !stats_enabled() {
+        return;
+    }
     THREAD_STATS.with(|stats| {
         let mut stats = stats.borrow_mut();
         match stats.first_timestamp {

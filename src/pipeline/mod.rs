@@ -57,6 +57,9 @@ impl FormattedOutput {
 
 /// Helper function to collect discovered levels and keys from an event for stats
 fn collect_discovered_levels_and_keys(event: &Event, ctx: &mut PipelineContext) {
+    if !crate::stats::stats_enabled() {
+        return;
+    }
     // Collect discovered level
     for level_field_name in crate::event::LEVEL_FIELD_NAMES {
         if let Some(value) = event.fields.get(*level_field_name) {

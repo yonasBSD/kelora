@@ -109,8 +109,9 @@ use pipeline::{
     create_input_reader, create_pipeline_builder_from_config, create_pipeline_from_config,
 };
 use stats::{
-    get_thread_stats, stats_add_error, stats_add_line_filtered, stats_add_line_output,
-    stats_add_line_read, stats_finish_processing, stats_start_timer, ProcessingStats,
+    get_thread_stats, set_collect_stats, stats_add_error, stats_add_line_filtered,
+    stats_add_line_output, stats_add_line_read, stats_finish_processing, stats_start_timer,
+    ProcessingStats,
 };
 use std::io::{self, BufRead, Write};
 use std::thread;
@@ -129,8 +130,13 @@ fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
     output: W,
     ctrl_rx: &Receiver<Ctrl>,
 ) -> Result<PipelineResult> {
+    // Enable/disable stats collection up front to avoid per-event overhead when diagnostics are off
+    let collect_stats = config.output.stats.is_some()
+        || (!config.processing.silent && !config.processing.suppress_diagnostics);
+    set_collect_stats(collect_stats);
+
     // Start statistics collection if enabled
-    if config.output.stats.is_some() {
+    if collect_stats {
         stats_start_timer();
         // Set the initial format in stats (may be updated if auto-detected later)
         stats::stats_set_detected_format(config.input.format.to_display_string());
