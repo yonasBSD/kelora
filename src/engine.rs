@@ -1885,7 +1885,7 @@ impl RhaiEngine {
 
         let result = self
             .engine
-            .eval_expression_with_scope::<bool>(&mut scope, &compiled.expr)
+            .eval_ast_with_scope::<bool>(&mut scope, &compiled.ast)
             .map_err(|e| {
                 // Track errors in debug statistics
                 debug_stats_increment_errors();
@@ -2234,7 +2234,7 @@ impl RhaiEngine {
 
         let result = self
             .engine
-            .eval_expression_with_scope::<bool>(&mut scope, &compiled.expr)
+            .eval_ast_with_scope::<bool>(&mut scope, &compiled.ast)
             .map_err(|e| {
                 // Track errors in debug statistics
                 debug_stats_increment_errors();
