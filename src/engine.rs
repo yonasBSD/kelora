@@ -1,7 +1,7 @@
 #![allow(dead_code)] // Debugging/tracing scaffolding kept for verbose dev builds and future CLI toggles
 use anyhow::Result;
 use indexmap::IndexMap;
-use rhai::{Dynamic, Engine, EvalAltResult, Scope, AST};
+use rhai::{Dynamic, Engine, EvalAltResult, FnCallExpr, Scope, Stmt, Token, Expr, AST};
 use std::collections::HashMap;
 
 use rhai::debugger::{DebuggerCommand, DebuggerEvent};
@@ -874,6 +874,49 @@ struct FieldAccess {
     access_type: AccessType,
 }
 
+#[derive(Clone)]
+struct NativePredicate {
+    root: NativeNode,
+}
+
+#[derive(Clone)]
+enum NativeNode {
+    And(Vec<NativeNode>),
+    Or(Vec<NativeNode>),
+    Not(Box<NativeNode>),
+    Value(NativeValueExpr),
+    Compare {
+        op: CompareOp,
+        lhs: NativeValueExpr,
+        rhs: NativeValueExpr,
+    },
+}
+
+#[derive(Clone)]
+enum NativeValueExpr {
+    Field(String),
+    Literal(NativeValue),
+}
+
+#[derive(Clone, Copy)]
+enum CompareOp {
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+}
+
+#[derive(Clone)]
+enum NativeValue {
+    Bool(bool),
+    Int(rhai::INT),
+    Float(rhai::FLOAT),
+    Str(String),
+    Unit,
+}
+
 /// Extract field names accessed on variable 'e' from a Rhai AST
 ///
 /// Uses AST walking to find all property access patterns like `e.field_name`
@@ -914,6 +957,260 @@ fn extract_field_accesses(ast: &AST) -> Vec<FieldAccess> {
             access_type,
         })
         .collect()
+}
+
+fn build_native_predicate(ast: &AST) -> Option<NativePredicate> {
+    let statements = ast.statements();
+    if statements.len() != 1 {
+        return None;
+    }
+
+    let expr = match &statements[0] {
+        Stmt::Expr(expr) => expr.as_ref(),
+        _ => return None,
+    };
+
+    let root = parse_native_node(expr)?;
+    Some(NativePredicate { root })
+}
+
+fn parse_native_node(expr: &Expr) -> Option<NativeNode> {
+    match expr {
+        Expr::And(list, _) => {
+            let mut nodes = Vec::with_capacity(list.len());
+            for item in list.iter() {
+                nodes.push(parse_native_node(item)?);
+            }
+            Some(NativeNode::And(nodes))
+        }
+        Expr::Or(list, _) => {
+            let mut nodes = Vec::with_capacity(list.len());
+            for item in list.iter() {
+                nodes.push(parse_native_node(item)?);
+            }
+            Some(NativeNode::Or(nodes))
+        }
+        Expr::FnCall(call, _) => {
+            if let Some(token) = call.op_token.clone() {
+                match token {
+                    Token::Bang if call.args.len() == 1 => {
+                        let node = parse_native_node(&call.args[0])?;
+                        Some(NativeNode::Not(Box::new(node)))
+                    }
+                    Token::EqualsTo => parse_compare_node(CompareOp::Eq, call),
+                    Token::NotEqualsTo => parse_compare_node(CompareOp::Ne, call),
+                    Token::LessThan => parse_compare_node(CompareOp::Lt, call),
+                    Token::LessThanEqualsTo => parse_compare_node(CompareOp::Le, call),
+                    Token::GreaterThan => parse_compare_node(CompareOp::Gt, call),
+                    Token::GreaterThanEqualsTo => parse_compare_node(CompareOp::Ge, call),
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        }
+        Expr::BoolConstant(value, _) => Some(NativeNode::Value(NativeValueExpr::Literal(
+            NativeValue::Bool(*value),
+        ))),
+        _ => parse_value_expr(expr).map(NativeNode::Value),
+    }
+}
+
+fn parse_compare_node(op: CompareOp, call: &FnCallExpr) -> Option<NativeNode> {
+    if call.args.len() != 2 {
+        return None;
+    }
+
+    let lhs = parse_value_expr(&call.args[0])?;
+    let rhs = parse_value_expr(&call.args[1])?;
+
+    Some(NativeNode::Compare { op, lhs, rhs })
+}
+
+fn parse_value_expr(expr: &Expr) -> Option<NativeValueExpr> {
+    match expr {
+        Expr::BoolConstant(value, _) => {
+            Some(NativeValueExpr::Literal(NativeValue::Bool(*value)))
+        }
+        Expr::IntegerConstant(value, _) => {
+            Some(NativeValueExpr::Literal(NativeValue::Int(*value)))
+        }
+        Expr::FloatConstant(value, _) => {
+            Some(NativeValueExpr::Literal(NativeValue::Float(**value)))
+        }
+        Expr::StringConstant(value, _) => {
+            Some(NativeValueExpr::Literal(NativeValue::Str(value.to_string())))
+        }
+        Expr::Unit(..) => Some(NativeValueExpr::Literal(NativeValue::Unit)),
+        _ => extract_field_path(expr)
+            .filter(|path| !path.is_empty())
+            .map(NativeValueExpr::Field),
+    }
+}
+
+fn extract_field_path(expr: &Expr) -> Option<String> {
+    match expr {
+        Expr::Dot(binary, options, _) if options.is_empty() => {
+            let mut base = extract_field_path(&binary.lhs)?;
+            let rhs = extract_field_path(&binary.rhs)?;
+            if base.is_empty() {
+                base = rhs;
+            } else {
+                base.push('.');
+                base.push_str(&rhs);
+            }
+            Some(base)
+        }
+        Expr::Index(binary, options, _) if options.is_empty() => {
+            let mut base = extract_field_path(&binary.lhs)?;
+            let rhs = match &binary.rhs {
+                Expr::StringConstant(s, _) => s.to_string(),
+                Expr::IntegerConstant(i, _) => i.to_string(),
+                _ => return None,
+            };
+
+            if !base.is_empty() {
+                base.push('.');
+            }
+            base.push_str(&rhs);
+            Some(base)
+        }
+        Expr::Property(prop, _) => Some(prop.2.to_string()),
+        Expr::Variable(var, ..) => {
+            let name = &var.1;
+            if name == "e" {
+                Some(String::new())
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+impl NativePredicate {
+    fn evaluate(&self, event: &Event) -> Option<bool> {
+        eval_native_node(&self.root, event)
+    }
+}
+
+fn eval_native_node(node: &NativeNode, event: &Event) -> Option<bool> {
+    match node {
+        NativeNode::And(nodes) => {
+            let mut result = true;
+            for n in nodes {
+                let value = eval_native_node(n, event)?;
+                result &= value;
+                if !result {
+                    break;
+                }
+            }
+            Some(result)
+        }
+        NativeNode::Or(nodes) => {
+            let mut result = false;
+            for n in nodes {
+                let value = eval_native_node(n, event)?;
+                result |= value;
+                if result {
+                    break;
+                }
+            }
+            Some(result)
+        }
+        NativeNode::Not(child) => eval_native_node(child, event).map(|v| !v),
+        NativeNode::Value(expr) => match eval_value_expr(expr, event)? {
+            NativeValue::Bool(b) => Some(b),
+            _ => None,
+        },
+        NativeNode::Compare { op, lhs, rhs } => {
+            let lhs_val = eval_value_expr(lhs, event)?;
+            let rhs_val = eval_value_expr(rhs, event)?;
+            compare_values(&lhs_val, &rhs_val, *op)
+        }
+    }
+}
+
+fn eval_value_expr(expr: &NativeValueExpr, event: &Event) -> Option<NativeValue> {
+    match expr {
+        NativeValueExpr::Literal(value) => Some(value.clone()),
+        NativeValueExpr::Field(path) => {
+            let value = event.fields.get(path).cloned().unwrap_or(Dynamic::UNIT);
+            dynamic_to_native(&value)
+        }
+    }
+}
+
+fn dynamic_to_native(value: &Dynamic) -> Option<NativeValue> {
+    if value.is_unit() {
+        return Some(NativeValue::Unit);
+    }
+
+    if let Ok(b) = value.as_bool() {
+        return Some(NativeValue::Bool(b));
+    }
+
+    if let Ok(i) = value.as_int() {
+        return Some(NativeValue::Int(i));
+    }
+
+    if let Ok(f) = value.as_float() {
+        return Some(NativeValue::Float(f));
+    }
+
+    if let Some(s) = value.clone().try_cast::<rhai::ImmutableString>() {
+        return Some(NativeValue::Str(s.to_string()));
+    }
+
+    if let Some(s) = value.clone().try_cast::<String>() {
+        return Some(NativeValue::Str(s));
+    }
+
+    None
+}
+
+fn compare_values(lhs: &NativeValue, rhs: &NativeValue, op: CompareOp) -> Option<bool> {
+    use CompareOp::*;
+
+    match (lhs, rhs) {
+        (NativeValue::Unit, NativeValue::Unit) => match op {
+            Eq => Some(true),
+            Ne => Some(false),
+            _ => Some(false),
+        },
+        (NativeValue::Unit, _) | (_, NativeValue::Unit) => match op {
+            Eq => Some(false),
+            Ne => Some(true),
+            _ => None,
+        },
+        (NativeValue::Bool(l), NativeValue::Bool(r)) => match op {
+            Eq => Some(l == r),
+            Ne => Some(l != r),
+            _ => None,
+        },
+        (NativeValue::Str(l), NativeValue::Str(r)) => match op {
+            Eq => Some(l == r),
+            Ne => Some(l != r),
+            _ => None,
+        },
+        (NativeValue::Int(l), NativeValue::Int(r)) => compare_numbers(*l as rhai::FLOAT, *r as rhai::FLOAT, op),
+        (NativeValue::Float(l), NativeValue::Float(r)) => compare_numbers(*l, *r, op),
+        (NativeValue::Int(l), NativeValue::Float(r)) => compare_numbers(*l as rhai::FLOAT, *r, op),
+        (NativeValue::Float(l), NativeValue::Int(r)) => compare_numbers(*l, *r as rhai::FLOAT, op),
+        _ => None,
+    }
+}
+
+fn compare_numbers(lhs: rhai::FLOAT, rhs: rhai::FLOAT, op: CompareOp) -> Option<bool> {
+    use CompareOp::*;
+    match op {
+        Eq => Some(lhs == rhs),
+        Ne => Some(lhs != rhs),
+        Lt => Some(lhs < rhs),
+        Le => Some(lhs <= rhs),
+        Gt => Some(lhs > rhs),
+        Ge => Some(lhs >= rhs),
+    }
 }
 
 /// Extract field accesses from assignment statements
@@ -1039,6 +1336,7 @@ pub struct CompiledExpression {
     ast: AST,
     expr: String,
     field_accesses: Vec<FieldAccess>,
+    native_predicate: Option<NativePredicate>,
 }
 
 impl CompiledExpression {
@@ -1752,11 +2050,13 @@ impl RhaiEngine {
             );
             anyhow::anyhow!(msg)
         })?;
+        let native_predicate = build_native_predicate(&ast);
         let field_accesses = extract_field_accesses(&ast);
         Ok(CompiledExpression {
             ast,
             expr: filter.to_string(),
             field_accesses,
+            native_predicate,
         })
     }
 
@@ -1778,6 +2078,7 @@ impl RhaiEngine {
             ast,
             expr: exec.to_string(),
             field_accesses,
+            native_predicate: None,
         })
     }
 
@@ -1799,6 +2100,7 @@ impl RhaiEngine {
             ast,
             expr: begin.to_string(),
             field_accesses,
+            native_predicate: None,
         })
     }
 
@@ -1820,6 +2122,7 @@ impl RhaiEngine {
             ast,
             expr: end.to_string(),
             field_accesses,
+            native_predicate: None,
         })
     }
 
@@ -1841,6 +2144,7 @@ impl RhaiEngine {
             ast,
             expr: script.to_string(),
             field_accesses,
+            native_predicate: None,
         })
     }
 
@@ -1852,12 +2156,32 @@ impl RhaiEngine {
         metrics: &mut HashMap<String, Dynamic>,
         internal: &mut HashMap<String, Dynamic>,
     ) -> Result<bool> {
+        let mut stats_recorded = false;
+
+        if let Some(native) = &compiled.native_predicate {
+            Self::set_thread_tracking_state(metrics, internal);
+            debug_stats_increment_events_processed();
+            debug_stats_increment_script_executions();
+            stats_recorded = true;
+
+            if let Some(result) = native.evaluate(event) {
+                if result {
+                    debug_stats_increment_events_passed();
+                }
+                *metrics = Self::get_thread_tracking_state();
+                *internal = Self::get_thread_internal_state();
+                return Ok(result);
+            }
+        }
+
         Self::set_thread_tracking_state(metrics, internal);
         let mut scope = self.create_scope_for_event(event);
 
         // Debug statistics tracking
-        debug_stats_increment_events_processed();
-        debug_stats_increment_script_executions();
+        if !stats_recorded {
+            debug_stats_increment_events_processed();
+            debug_stats_increment_script_executions();
+        }
 
         // Add execution tracing for filter execution
         if let Some(ref tracer) = self.execution_tracer {
@@ -2673,6 +2997,44 @@ mod tests {
             out.contains("status"),
             "output should surface available fields even when verbosity is zero"
         );
+    }
+
+    #[test]
+    fn native_filter_evaluates_simple_comparisons() {
+        let mut engine = RhaiEngine::new();
+        let compiled = engine
+            .compile_filter("e.level == \"ERROR\" && e.status >= 500")
+            .expect("filter should compile");
+
+        assert!(compiled.native_predicate.is_some());
+
+        let mut event = build_event_with_line("line");
+        event.set_field("level".to_string(), Dynamic::from("ERROR"));
+        event.set_field("status".to_string(), Dynamic::from(500_i64));
+
+        let mut metrics = HashMap::new();
+        let mut internal = HashMap::new();
+        let result = engine
+            .execute_compiled_filter(&compiled, &event, &mut metrics, &mut internal)
+            .expect("native filter should succeed");
+        assert!(result);
+
+        let mut event_nonmatch = event.clone();
+        event_nonmatch.set_field("status".to_string(), Dynamic::from(200_i64));
+        let result = engine
+            .execute_compiled_filter(&compiled, &event_nonmatch, &mut metrics, &mut internal)
+            .expect("native filter should succeed");
+        assert!(!result);
+    }
+
+    #[test]
+    fn native_filter_skips_function_calls() {
+        let mut engine = RhaiEngine::new();
+        let compiled = engine
+            .compile_filter("e.level.starts_with(\"ERR\")")
+            .expect("filter should compile");
+
+        assert!(compiled.native_predicate.is_none());
     }
 
     #[test]
