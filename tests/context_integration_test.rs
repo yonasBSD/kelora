@@ -5,12 +5,9 @@ use tempfile::NamedTempFile;
 
 /// Helper function to run kelora with given arguments and input via stdin
 fn run_kelora_with_input(args: &[&str], input: &str) -> (String, String, i32) {
-    // Use the built binary directly instead of cargo run to avoid compilation output
-    let binary_path = if cfg!(debug_assertions) {
-        "./target/debug/kelora"
-    } else {
-        "./target/release/kelora"
-    };
+    // Use CARGO_BIN_EXE_kelora env var set by cargo during test runs
+    // This works correctly for regular builds, coverage builds, and custom target dirs
+    let binary_path = env!("CARGO_BIN_EXE_kelora");
 
     let mut cmd = Command::new(binary_path)
         .args(args)
@@ -46,12 +43,9 @@ fn _run_kelora_with_file(args: &[&str], file_content: &str) -> (String, String, 
     let mut full_args = args.to_vec();
     full_args.push(temp_file.path().to_str().unwrap());
 
-    // Use the built binary directly instead of cargo run to avoid compilation output
-    let binary_path = if cfg!(debug_assertions) {
-        "./target/debug/kelora"
-    } else {
-        "./target/release/kelora"
-    };
+    // Use CARGO_BIN_EXE_kelora env var set by cargo during test runs
+    // This works correctly for regular builds, coverage builds, and custom target dirs
+    let binary_path = env!("CARGO_BIN_EXE_kelora");
 
     let cmd = Command::new(binary_path)
         .args(&full_args)

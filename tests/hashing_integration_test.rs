@@ -25,6 +25,7 @@ fn kelora_binary() -> PathBuf {
 fn test_bucket_function() {
     // Feed input via stdin
     let output = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .args(["-f", "line", "--exec", "e.bucket = bucket(e.line)"])
         .arg("-")
         .stdin(std::process::Stdio::piped())
@@ -46,6 +47,7 @@ fn test_bucket_function() {
 #[test]
 fn test_hash_function_default() {
     let output = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .args(["-f", "line", "--exec", "e.hash = hash(e.line)"])
         .arg("-")
         .stdin(std::process::Stdio::piped())
@@ -68,6 +70,7 @@ fn test_hash_function_default() {
 #[test]
 fn test_hash_function_with_algorithm() {
     let output = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .args([
             "-f",
             "line",
@@ -95,6 +98,7 @@ fn test_hash_function_with_algorithm() {
 #[test]
 fn test_pseudonym_with_env_secret() {
     let output = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .env("KELORA_SECRET", "test_secret_12345")
         .args([
             "-vv",
@@ -129,6 +133,7 @@ fn test_pseudonym_with_env_secret() {
 #[test]
 fn test_pseudonym_ephemeral_mode() {
     let output = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .env_remove("KELORA_SECRET")
         .args([
             "-vv",
@@ -163,6 +168,7 @@ fn test_pseudonym_ephemeral_mode() {
 #[test]
 fn test_pseudonym_domain_separation() {
     let output = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .env("KELORA_SECRET", "test_secret_12345")
         .args([
             "-f",
@@ -197,6 +203,7 @@ fn test_pseudonym_domain_separation() {
 fn test_pseudonym_deterministic() {
     // Run twice with same secret
     let output1 = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .env("KELORA_SECRET", "test_secret_12345")
         .args([
             "-f",
@@ -219,6 +226,7 @@ fn test_pseudonym_deterministic() {
         .expect("Failed to execute kelora");
 
     let output2 = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .env("KELORA_SECRET", "test_secret_12345")
         .args([
             "-f",
@@ -250,6 +258,7 @@ fn test_pseudonym_deterministic() {
 #[test]
 fn test_pseudonym_empty_domain_error() {
     let output = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .env("KELORA_SECRET", "test_secret_12345")
         .args([
             "-f",
@@ -278,6 +287,7 @@ fn test_pseudonym_empty_domain_error() {
 #[test]
 fn test_pseudonym_empty_secret_error() {
     let output = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .env("KELORA_SECRET", "")
         .args([
             "-f",

@@ -13,11 +13,9 @@ fn run_kelora_with_file(args: &[&str], file_content: &str) -> (String, String, i
     let mut full_args = args.to_vec();
     full_args.push(temp_file.path().to_str().unwrap());
 
-    let binary_path = if cfg!(debug_assertions) {
-        "./target/debug/kelora"
-    } else {
-        "./target/release/kelora"
-    };
+    // Use CARGO_BIN_EXE_kelora env var set by cargo during test runs
+    // This works correctly for regular builds, coverage builds, and custom target dirs
+    let binary_path = env!("CARGO_BIN_EXE_kelora");
 
     let output = Command::new(binary_path)
         .args(&full_args)

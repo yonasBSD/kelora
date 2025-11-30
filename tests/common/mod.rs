@@ -8,15 +8,13 @@ use tempfile::NamedTempFile;
 
 /// Helper function to run kelora with given arguments and input via stdin
 pub fn run_kelora_with_input(args: &[&str], input: &str) -> (String, String, i32) {
-    // Use the built binary directly instead of cargo run to avoid compilation output
-    let binary_path = if cfg!(debug_assertions) {
-        "./target/debug/kelora"
-    } else {
-        "./target/release/kelora"
-    };
+    // Use CARGO_BIN_EXE_kelora env var set by cargo during test runs
+    // This works correctly for regular builds, coverage builds, and custom target dirs
+    let binary_path = env!("CARGO_BIN_EXE_kelora");
 
     let mut cmd = Command::new(binary_path)
         .args(args)
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -49,15 +47,13 @@ pub fn run_kelora_with_file(args: &[&str], file_content: &str) -> (String, Strin
     let mut full_args = args.to_vec();
     full_args.push(temp_file.path().to_str().unwrap());
 
-    // Use the built binary directly instead of cargo run to avoid compilation output
-    let binary_path = if cfg!(debug_assertions) {
-        "./target/debug/kelora"
-    } else {
-        "./target/release/kelora"
-    };
+    // Use CARGO_BIN_EXE_kelora env var set by cargo during test runs
+    // This works correctly for regular builds, coverage builds, and custom target dirs
+    let binary_path = env!("CARGO_BIN_EXE_kelora");
 
     let cmd = Command::new(binary_path)
         .args(&full_args)
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
@@ -75,14 +71,13 @@ pub fn run_kelora_with_files(args: &[&str], files: &[&str]) -> (String, String, 
     let mut full_args = args.to_vec();
     full_args.extend(files);
 
-    let binary_path = if cfg!(debug_assertions) {
-        "./target/debug/kelora"
-    } else {
-        "./target/release/kelora"
-    };
+    // Use CARGO_BIN_EXE_kelora env var set by cargo during test runs
+    // This works correctly for regular builds, coverage builds, and custom target dirs
+    let binary_path = env!("CARGO_BIN_EXE_kelora");
 
     let output = Command::new(binary_path)
         .args(&full_args)
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .output()
         .expect("Failed to execute kelora");
 
@@ -95,14 +90,13 @@ pub fn run_kelora_with_files(args: &[&str], files: &[&str]) -> (String, String, 
 
 /// Helper function to run kelora without any input (for --no-input flag)
 pub fn run_kelora(args: &[&str]) -> (String, String, i32) {
-    let binary_path = if cfg!(debug_assertions) {
-        "./target/debug/kelora"
-    } else {
-        "./target/release/kelora"
-    };
+    // Use CARGO_BIN_EXE_kelora env var set by cargo during test runs
+    // This works correctly for regular builds, coverage builds, and custom target dirs
+    let binary_path = env!("CARGO_BIN_EXE_kelora");
 
     let output = Command::new(binary_path)
         .args(args)
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .output()
         .expect("Failed to execute kelora");
 

@@ -15,11 +15,9 @@ use tempfile::NamedTempFile;
 
 /// Get the kelora binary path
 fn kelora_binary() -> &'static str {
-    if cfg!(debug_assertions) {
-        "./target/debug/kelora"
-    } else {
-        "./target/release/kelora"
-    }
+    // Use CARGO_BIN_EXE_kelora env var set by cargo during test runs
+    // This works correctly for regular builds, coverage builds, and custom target dirs
+    env!("CARGO_BIN_EXE_kelora")
 }
 
 #[test]
@@ -36,6 +34,7 @@ fn test_sigusr1_prints_stats_and_continues() {
 "#;
 
     let mut child = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .args(["-f", "json", "--with-stats"]) // Enable stats alongside events
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -96,6 +95,7 @@ fn test_sigterm_graceful_shutdown() {
         .join("\n");
 
     let mut child = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .args(["-f", "json"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -158,6 +158,7 @@ fn test_double_sigterm_immediate_exit() {
         .join("\n");
 
     let mut child = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .args(["-f", "json"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -221,6 +222,7 @@ fn test_sigint_graceful_shutdown() {
         .join("\n");
 
     let mut child = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .args(["-f", "json"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -269,6 +271,7 @@ fn test_double_sigint_immediate_exit() {
         .join("\n");
 
     let mut child = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .args(["-f", "json"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -326,6 +329,7 @@ fn test_signal_during_file_processing() {
         .expect("Failed to write temp file");
 
     let child = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .args(["-f", "json", temp_file.path().to_str().unwrap()])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -370,6 +374,7 @@ fn test_broken_pipe_exit_code() {
     // Create a kelora process piped to `head -n 1`
     // head will close its stdin after reading 1 line, causing SIGPIPE
     let mut kelora_child = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .args(["-f", "json"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -425,6 +430,7 @@ fn test_stats_printed_on_normal_exit() {
 "#;
 
     let output = Command::new(kelora_binary())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .args(["-f", "json", "--with-stats"]) // Enable stats alongside events
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

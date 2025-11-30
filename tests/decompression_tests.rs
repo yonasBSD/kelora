@@ -348,11 +348,9 @@ fn test_stdin_with_gzip() {
     encoder.write_all(log_content.as_bytes()).unwrap();
     let compressed_data = encoder.finish().unwrap();
 
-    let binary_path = if cfg!(debug_assertions) {
-        "./target/debug/kelora"
-    } else {
-        "./target/release/kelora"
-    };
+    // Use CARGO_BIN_EXE_kelora env var set by cargo during test runs
+    // This works correctly for regular builds, coverage builds, and custom target dirs
+    let binary_path = env!("CARGO_BIN_EXE_kelora");
 
     let mut cmd = std::process::Command::new(binary_path)
         .args(["-f", "json"])

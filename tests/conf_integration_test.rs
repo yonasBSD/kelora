@@ -5,17 +5,16 @@ use std::process::{Command, Stdio};
 use tempfile::TempDir;
 
 fn kelora_binary_path() -> &'static str {
-    if cfg!(debug_assertions) {
-        "./target/debug/kelora"
-    } else {
-        "./target/release/kelora"
-    }
+    // Use CARGO_BIN_EXE_kelora env var set by cargo during test runs
+    // This works correctly for regular builds, coverage builds, and custom target dirs
+    env!("CARGO_BIN_EXE_kelora")
 }
 
 /// Helper function to run kelora with given arguments and input via stdin
 fn run_kelora_with_input(args: &[&str], input: &str) -> (String, String, i32) {
     let mut cmd = Command::new(kelora_binary_path())
         .args(args)
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -228,6 +227,7 @@ fn test_save_alias_preserves_no_emoji_flag() {
     let config_path = temp_dir.path().join("kelora.ini");
 
     let output = Command::new(kelora_binary_path())
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
         .args([
             "--save-alias",
             "noemoji",

@@ -29,17 +29,16 @@ fn test_stdin_mixed_with_files() {
     let stdin_input = r#"{"level": "info", "message": "from stdin"}"#;
 
     // Test file first, then stdin
-    let mut cmd = Command::new(if cfg!(debug_assertions) {
-        "./target/debug/kelora"
-    } else {
-        "./target/release/kelora"
-    })
-    .args(["-f", "json", temp_file.path().to_str().unwrap(), "-"])
-    .stdin(Stdio::piped())
-    .stdout(Stdio::piped())
-    .stderr(Stdio::piped())
-    .spawn()
-    .expect("Failed to start kelora");
+    // Use CARGO_BIN_EXE_kelora env var set by cargo during test runs
+    // This works correctly for regular builds, coverage builds, and custom target dirs
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_kelora"))
+        .env("LLVM_PROFILE_FILE", "/dev/null") // Disable profraw generation for subprocesses
+        .args(["-f", "json", temp_file.path().to_str().unwrap(), "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to start kelora");
 
     if let Some(stdin) = cmd.stdin.as_mut() {
         stdin

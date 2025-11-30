@@ -8,11 +8,9 @@ use common::{extract_stats_lines, stats_line};
 
 /// Helper function to run kelora with given arguments and input via stdin
 fn run_kelora_with_input(args: &[&str], input: &str) -> (String, String, i32) {
-    let binary_path = if cfg!(debug_assertions) {
-        "./target/debug/kelora"
-    } else {
-        "./target/release/kelora"
-    };
+    // Use CARGO_BIN_EXE_kelora env var set by cargo during test runs
+    // This works correctly for regular builds, coverage builds, and custom target dirs
+    let binary_path = env!("CARGO_BIN_EXE_kelora");
 
     let mut cmd = Command::new(binary_path)
         .args(args)
