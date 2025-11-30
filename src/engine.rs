@@ -1,7 +1,7 @@
 #![allow(dead_code)] // Debugging/tracing scaffolding kept for verbose dev builds and future CLI toggles
 use anyhow::Result;
 use indexmap::IndexMap;
-use rhai::{Dynamic, Engine, EvalAltResult, FnCallExpr, Scope, Stmt, Token, Expr, AST};
+use rhai::{Dynamic, Engine, EvalAltResult, Expr, FnCallExpr, Scope, Stmt, Token, AST};
 use std::collections::HashMap;
 
 use rhai::debugger::{DebuggerCommand, DebuggerEvent};
@@ -1029,18 +1029,14 @@ fn parse_compare_node(op: CompareOp, call: &FnCallExpr) -> Option<NativeNode> {
 
 fn parse_value_expr(expr: &Expr) -> Option<NativeValueExpr> {
     match expr {
-        Expr::BoolConstant(value, _) => {
-            Some(NativeValueExpr::Literal(NativeValue::Bool(*value)))
-        }
-        Expr::IntegerConstant(value, _) => {
-            Some(NativeValueExpr::Literal(NativeValue::Int(*value)))
-        }
+        Expr::BoolConstant(value, _) => Some(NativeValueExpr::Literal(NativeValue::Bool(*value))),
+        Expr::IntegerConstant(value, _) => Some(NativeValueExpr::Literal(NativeValue::Int(*value))),
         Expr::FloatConstant(value, _) => {
             Some(NativeValueExpr::Literal(NativeValue::Float(**value)))
         }
-        Expr::StringConstant(value, _) => {
-            Some(NativeValueExpr::Literal(NativeValue::Str(value.to_string())))
-        }
+        Expr::StringConstant(value, _) => Some(NativeValueExpr::Literal(NativeValue::Str(
+            value.to_string(),
+        ))),
         Expr::Unit(..) => Some(NativeValueExpr::Literal(NativeValue::Unit)),
         _ => extract_field_path(expr)
             .filter(|path| !path.is_empty())
@@ -1193,7 +1189,9 @@ fn compare_values(lhs: &NativeValue, rhs: &NativeValue, op: CompareOp) -> Option
             Ne => Some(l != r),
             _ => None,
         },
-        (NativeValue::Int(l), NativeValue::Int(r)) => compare_numbers(*l as rhai::FLOAT, *r as rhai::FLOAT, op),
+        (NativeValue::Int(l), NativeValue::Int(r)) => {
+            compare_numbers(*l as rhai::FLOAT, *r as rhai::FLOAT, op)
+        }
         (NativeValue::Float(l), NativeValue::Float(r)) => compare_numbers(*l, *r, op),
         (NativeValue::Int(l), NativeValue::Float(r)) => compare_numbers(*l as rhai::FLOAT, *r, op),
         (NativeValue::Float(l), NativeValue::Int(r)) => compare_numbers(*l, *r as rhai::FLOAT, op),
