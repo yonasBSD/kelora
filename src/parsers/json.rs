@@ -25,14 +25,14 @@ impl EventParser for JsonlParser {
         let line = line.trim_end_matches('\n').trim_end_matches('\r');
         let json_value: serde_json::Value = serde_json::from_str(line)?;
 
-        if let serde_json::Value::Object(ref map) = json_value {
+        if let serde_json::Value::Object(map) = json_value {
             // Pre-allocate HashMap with capacity based on JSON object size
             let mut event = Event::with_capacity(line.to_string(), map.len());
 
             for (key, value) in map {
-                // Convert serde_json::Value to rhai::Dynamic using shared function
-                let dynamic_value = crate::event::json_to_dynamic(value);
-                event.set_field(key.clone(), dynamic_value);
+                // Convert serde_json::Value to rhai::Dynamic using owned conversion to avoid clones
+                let dynamic_value = crate::event::json_to_dynamic_owned(value);
+                event.set_field(key, dynamic_value);
             }
 
             if self.auto_timestamp {

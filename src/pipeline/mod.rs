@@ -2,7 +2,7 @@
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use rhai::Dynamic;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::engine::RhaiEngine;
 use crate::event::{Event, SpanStatus};
@@ -61,47 +61,32 @@ fn collect_discovered_levels_and_keys(event: &Event, ctx: &mut PipelineContext) 
     for level_field_name in crate::event::LEVEL_FIELD_NAMES {
         if let Some(value) = event.fields.get(*level_field_name) {
             if let Ok(level_str) = value.clone().into_string() {
-                if !level_str.is_empty() {
-                    // Add to both ctx.internal_tracker (for parallel) and thread-local tracking (for sequential)
-                    // 1. Add to ctx.internal_tracker
+                if !level_str.is_empty() && ctx.discovered_levels.insert(level_str.clone()) {
+                    let level_dynamic = Dynamic::from(level_str);
                     let key = "__kelora_stats_discovered_levels".to_string();
+
+                    // Add to ctx.internal_tracker (for parallel)
                     let current = ctx
                         .internal_tracker
                         .get(&key)
                         .cloned()
                         .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
-
                     if let Ok(mut arr) = current.into_array() {
-                        let level_dynamic = Dynamic::from(level_str.clone());
-                        // Check if level already exists in array
-                        if !arr.iter().any(|v| {
-                            v.clone().into_string().unwrap_or_default()
-                                == level_dynamic.clone().into_string().unwrap_or_default()
-                        }) {
-                            arr.push(level_dynamic);
-                        }
+                        arr.push(level_dynamic.clone());
                         ctx.internal_tracker.insert(key.clone(), Dynamic::from(arr));
                         ctx.internal_tracker
                             .insert(format!("__op_{}", key), Dynamic::from("unique"));
                     }
 
-                    // 2. Add to thread-local tracking state (reuse existing track_unique pattern)
+                    // Add to thread-local tracking state (sequential)
                     tracking::with_internal_tracking(|state| {
                         let key = "__kelora_stats_discovered_levels";
-
                         let current = state
                             .get(key)
                             .cloned()
                             .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
-
                         if let Ok(mut arr) = current.into_array() {
-                            let level_dynamic = Dynamic::from(level_str.clone());
-                            if !arr.iter().any(|v| {
-                                v.clone().into_string().unwrap_or_default()
-                                    == level_dynamic.clone().into_string().unwrap_or_default()
-                            }) {
-                                arr.push(level_dynamic);
-                            }
+                            arr.push(level_dynamic.clone());
                             state.insert(key.to_string(), Dynamic::from(arr));
                             state.insert(format!("__op_{}", key), Dynamic::from("unique"));
                         }
@@ -121,27 +106,27 @@ fn collect_discovered_levels_and_keys(event: &Event, ctx: &mut PipelineContext) 
         .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
 
     if let Ok(mut arr) = current.into_array() {
+        let mut added = false;
         for field_key in event.fields.keys() {
-            let key_dynamic = Dynamic::from(field_key.clone());
-            // Check if key already exists in array
-            if !arr.iter().any(|v| {
-                v.clone().into_string().unwrap_or_default()
-                    == key_dynamic.clone().into_string().unwrap_or_default()
-            }) {
-                arr.push(key_dynamic.clone());
+            if ctx.discovered_keys.insert(field_key.clone()) {
+                arr.push(Dynamic::from(field_key.clone()));
+                added = true;
             }
         }
-        ctx.internal_tracker
-            .insert(key.clone(), Dynamic::from(arr.clone()));
-        ctx.internal_tracker
-            .insert(format!("__op_{}", key), Dynamic::from("unique"));
 
-        // Also add to thread-local tracking state
-        tracking::with_internal_tracking(|state| {
-            let key = "__kelora_stats_discovered_keys";
-            state.insert(key.to_string(), Dynamic::from(arr.clone()));
-            state.insert(format!("__op_{}", key), Dynamic::from("unique"));
-        });
+        if added {
+            ctx.internal_tracker
+                .insert(key.clone(), Dynamic::from(arr.clone()));
+            ctx.internal_tracker
+                .insert(format!("__op_{}", key), Dynamic::from("unique"));
+
+            // Also add to thread-local tracking state
+            tracking::with_internal_tracking(|state| {
+                let key = "__kelora_stats_discovered_keys";
+                state.insert(key.to_string(), Dynamic::from(arr.clone()));
+                state.insert(format!("__op_{}", key), Dynamic::from("unique"));
+            });
+        }
     }
 }
 
@@ -180,6 +165,8 @@ pub struct PipelineContext {
     pub rhai: RhaiEngine,
     pub meta: MetaData,
     pub pending_file_ops: Vec<FileOp>,
+    pub discovered_levels: HashSet<String>,
+    pub discovered_keys: HashSet<String>,
 }
 
 /// Pipeline configuration

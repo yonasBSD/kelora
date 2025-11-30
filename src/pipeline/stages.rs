@@ -938,6 +938,8 @@ mod tests {
             rhai: engine,
             meta: MetaData::default(),
             pending_file_ops: Vec::new(),
+            discovered_levels: std::collections::HashSet::new(),
+            discovered_keys: std::collections::HashSet::new(),
         }
     }
 
@@ -998,6 +1000,8 @@ mod tests {
             rhai: engine,
             meta: MetaData::default(),
             pending_file_ops: Vec::new(),
+            discovered_levels: std::collections::HashSet::new(),
+            discovered_keys: std::collections::HashSet::new(),
         };
 
         let methods = ["POST", "HEAD", "HEAD", "GET"];
@@ -1102,6 +1106,8 @@ mod tests {
             rhai: engine,
             meta: MetaData::default(),
             pending_file_ops: Vec::new(),
+            discovered_levels: std::collections::HashSet::new(),
+            discovered_keys: std::collections::HashSet::new(),
         };
 
         let methods = ["GET", "DELETE", "PUT", "DELETE"];
@@ -1178,6 +1184,8 @@ mod tests {
             rhai: crate::engine::RhaiEngine::new(),
             meta: MetaData::default(),
             pending_file_ops: Vec::new(),
+            discovered_levels: std::collections::HashSet::new(),
+            discovered_keys: std::collections::HashSet::new(),
         };
 
         let make_event = |level: &str, msg: &str| {
@@ -1257,6 +1265,8 @@ mod tests {
             rhai: crate::engine::RhaiEngine::new(),
             meta: MetaData::default(),
             pending_file_ops: Vec::new(),
+            discovered_levels: std::collections::HashSet::new(),
+            discovered_keys: std::collections::HashSet::new(),
         };
 
         // Test event before since time (should be skipped)
@@ -1313,6 +1323,8 @@ mod tests {
             rhai: crate::engine::RhaiEngine::new(),
             meta: MetaData::default(),
             pending_file_ops: Vec::new(),
+            discovered_levels: std::collections::HashSet::new(),
+            discovered_keys: std::collections::HashSet::new(),
         };
 
         // Test event before until time (should be emitted)
@@ -1368,6 +1380,8 @@ mod tests {
             rhai: crate::engine::RhaiEngine::new(),
             meta: MetaData::default(),
             pending_file_ops: Vec::new(),
+            discovered_levels: std::collections::HashSet::new(),
+            discovered_keys: std::collections::HashSet::new(),
         };
 
         // Test event without timestamp (should be emitted - pass through behavior)

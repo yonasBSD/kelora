@@ -218,6 +218,11 @@ pub fn flatten_event_fields(
 /// Convert serde_json::Value to rhai::Dynamic recursively
 /// This is the single source of truth for JSON to Rhai conversion
 pub fn json_to_dynamic(value: &serde_json::Value) -> Dynamic {
+    json_to_dynamic_owned(value.clone())
+}
+
+/// Owned variant that avoids cloning strings/numbers when possible.
+pub fn json_to_dynamic_owned(value: serde_json::Value) -> Dynamic {
     match value {
         serde_json::Value::String(s) => Dynamic::from(s.clone()),
         serde_json::Value::Number(n) => {
@@ -235,13 +240,13 @@ pub fn json_to_dynamic(value: &serde_json::Value) -> Dynamic {
                 Dynamic::from(n.to_string())
             }
         }
-        serde_json::Value::Bool(b) => Dynamic::from(*b),
+        serde_json::Value::Bool(b) => Dynamic::from(b),
         serde_json::Value::Null => Dynamic::UNIT,
         serde_json::Value::Array(arr) => {
             // Convert JSON array to Rhai array recursively
             let mut rhai_array = rhai::Array::new();
-            for item in arr {
-                rhai_array.push(json_to_dynamic(item));
+            for item in arr.into_iter() {
+                rhai_array.push(json_to_dynamic_owned(item));
             }
             Dynamic::from(rhai_array)
         }
@@ -249,7 +254,7 @@ pub fn json_to_dynamic(value: &serde_json::Value) -> Dynamic {
             // Convert JSON object to Rhai map recursively
             let mut rhai_map = rhai::Map::new();
             for (key, val) in obj {
-                rhai_map.insert(key.clone().into(), json_to_dynamic(val));
+                rhai_map.insert(key.into(), json_to_dynamic_owned(val));
             }
             Dynamic::from(rhai_map)
         }

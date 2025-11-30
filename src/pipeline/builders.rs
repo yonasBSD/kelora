@@ -508,6 +508,8 @@ impl PipelineBuilder {
             rhai: rhai_engine.clone(),
             meta: MetaData::default(),
             pending_file_ops: Vec::new(),
+            discovered_levels: std::collections::HashSet::new(),
+            discovered_keys: std::collections::HashSet::new(),
         };
 
         // Create chunker based on multiline configuration
@@ -920,6 +922,8 @@ impl PipelineBuilder {
             rhai: rhai_engine.clone(),
             meta: MetaData::default(),
             pending_file_ops: Vec::new(),
+            discovered_levels: std::collections::HashSet::new(),
+            discovered_keys: std::collections::HashSet::new(),
         };
 
         // Create chunker based on multiline configuration
