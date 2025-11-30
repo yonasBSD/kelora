@@ -341,7 +341,7 @@ Boolean filter expression. Events where expression returns `true` are kept. Mult
 
 ```bash
 kelora -j --filter 'e.status >= 400' app.log
-kelora -j --filter 'e.service == "api"' --filter 'e.level == "ERROR"' app.log
+kelora -j --levels error --filter 'e.service == "api"' app.log   # Use -l for level filtering (faster than Rhai)
 ```
 
 #### `-e, --exec <SCRIPT>`

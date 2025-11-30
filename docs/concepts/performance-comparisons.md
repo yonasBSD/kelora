@@ -137,6 +137,12 @@ klp --input-format jsonl -l error benchmarks/bench_100k.jsonl
 
 Kelora runs **~6× slower than jq** (and ~17× slower than angle-grinder) because it pulls every event into a Rhai context with metrics/windowing hooks; klp pays a similar tax for its Python runtime. Reach for Kelora when you need that scripting environment (multiple `--filter` stages, stateful metrics) or want to mix formats. For pure filtering, enable `--no-emoji` and emit `-F json` to hold the gap to ~4× on this machine, or run the query in `agrind`/`jq` and feed the structured output back into Kelora.
 
+!!! tip "Recent Kelora JSON fast paths (500k lines)"
+    - Ingest-only (`-j --silent`): ~7.1 s (≈70k lines/s) after JSON allocation and stats tweaks.
+    - Level filter (`-j -l debug --silent`): ~5.9 s (≈85k lines/s).
+    - Rhai filter (`-j --filter 'e.level==\"DEBUG\"' --silent`): ~11.9 s (≈42k lines/s).
+    - Takeaways: prefer native flags like `-l` when available, and use `--silent`/`--no-diagnostics` to bypass stats overhead during batch runs.
+
 ---
 
 ### 4. JSON Transformation

@@ -104,6 +104,9 @@ Real-world gains depend on disk speed, decompression cost, and script workload.
 
 - `--metrics` keeps maps in memory until the run ends. Guard high-cardinality
   structures (`track_unique`) with filters.
+- Stats/diagnostics cost CPU. Use `--silent` or `--no-diagnostics` to bypass
+  per-event stats tracking when you only care about output files. This removes
+  timestamp/key discovery and other counters from the hot path.
 
 ## Ordering Guarantees
 
@@ -157,6 +160,17 @@ Real-world gains depend on disk speed, decompression cost, and script workload.
 
 5. Ordering critical? Avoid `--unordered`; otherwise enabling it can flush
    parallel batches faster.
+
+## Fast Paths and Practical Hints
+
+- Prefer native flags over Rhai where available: e.g., `-l debug` is faster than
+  `--filter "e.level == 'DEBUG'"`.
+- Silence diagnostics when benchmarking or exporting: `--silent` (or at least
+  `--no-diagnostics`) skips stats collection and trims per-event overhead.
+- JSON ingest is a major cost. Keep filters simple, avoid unnecessary
+  `--exec` work, and project only needed keys.
+- If you need Rhai filters, stick to pure comparisons to hit the native filter
+  fast path; function calls fall back to the interpreter.
 
 ## Troubleshooting Cheats
 
