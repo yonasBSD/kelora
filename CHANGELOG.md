@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.13.1] - 2025-11-30
+
+### Added
+
+- `just coverage` helper wrapping `cargo-llvm-cov` (with LLVM tools checks) that generates an HTML report by default
+
+### Changed
+
+- Filter execution now reuses precompiled ASTs and takes a native fast path for simple comparisons to cut Rhai overhead
+- Event ingest stats and JSON parsing optimized (owned JSON→Dynamic conversion, deduped discovered level/key tracking) with stats collection skipped when diagnostics are suppressed
+- Documentation refreshed with clearer log-level filter examples, performance guidance, and a more visible docs link in the README
+
+### Fixed
+
+- Coverage/integration test runs now rely on `CARGO_BIN_EXE_kelora` and disable subprocess profraw files; benchmark filters use the event binding to measure correctly
+
 ## [0.13.0] - 2025-11-29
 
 ### Removed
