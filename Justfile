@@ -27,6 +27,25 @@ test-unit:
 test-integration:
     cargo test -q --tests
 
+# Generate coverage report (requires cargo-llvm-cov + llvm-tools-preview)
+coverage *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v cargo-llvm-cov >/dev/null 2>&1; then
+        echo "error: cargo-llvm-cov is not installed. Install with 'cargo install cargo-llvm-cov --locked'." >&2
+        exit 1
+    fi
+    if ! rustup component list --installed | grep -qE "llvm-tools(-preview)?"; then
+        echo "error: rustup component 'llvm-tools' is not installed. Install with 'rustup component add llvm-tools' (or llvm-tools-preview on older toolchains)." >&2
+        exit 1
+    fi
+    if [[ "$#" -eq 0 ]]; then
+        cargo llvm-cov --workspace --all-features --html
+        echo "Coverage HTML report: target/llvm-cov/html/index.html"
+    else
+        cargo llvm-cov --workspace --all-features "$@"
+    fi
+
 # Run cargo audit
 audit:
     cargo audit --no-fetch
