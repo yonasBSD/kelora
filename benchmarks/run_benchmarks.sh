@@ -22,13 +22,13 @@ BASELINE_FILE="${BENCHMARK_DIR}/baseline_results.json"
 get_test_cmd() {
     case "$1" in
         "small_filter")
-            echo "benchmarks/bench_100k.jsonl --filter \"level == 'ERROR'\""
+            echo "benchmarks/bench_100k.jsonl --filter \"e.level == 'ERROR'\""
             ;;
         "medium_processing") 
-            echo "benchmarks/bench_500k.jsonl --filter \"component == 'api'\" --exec \"track_sum('status_codes', status)\""
+            echo "benchmarks/bench_500k.jsonl --filter \"e.component == 'api'\" --exec \"track_sum('status_codes', e.status)\""
             ;;
         "large_parallel")
-            echo "benchmarks/bench_500k.jsonl --filter \"response_time.sub_string(0,2).to_int() > 100\" --parallel --threads 4"
+            echo "benchmarks/bench_500k.jsonl --filter \"e.response_time.sub_string(0,2).to_int() > 100\" --parallel --threads 4"
             ;;
         "sequential_throughput")
             echo "benchmarks/bench_500k.jsonl"
@@ -229,7 +229,7 @@ EOF
             case "$test_name" in
                 small_filter)
                     # Use 50k dataset for quick mode
-                    test_cmd="benchmarks/bench_50k.jsonl --filter \"level == 'ERROR'\""
+                    test_cmd="benchmarks/bench_50k.jsonl --filter \"e.level == 'ERROR'\""
                     ;;
                 *medium_processing*|*large_parallel*|*sequential_throughput*)
                     continue
