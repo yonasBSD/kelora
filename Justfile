@@ -40,10 +40,10 @@ coverage *args:
         exit 1
     fi
     if [[ "$#" -eq 0 ]]; then
-        cargo llvm-cov --workspace --all-features --target-dir target --html
+        CARGO_TARGET_DIR=target cargo llvm-cov --workspace --all-features --html
         echo "Coverage HTML report: target/llvm-cov/html/index.html"
     else
-        cargo llvm-cov --workspace --all-features --target-dir target "$@"
+        CARGO_TARGET_DIR=target cargo llvm-cov --workspace --all-features "$@"
     fi
 
 # Run cargo audit
