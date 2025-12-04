@@ -6,9 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `to_json()` function now accepts optional indent parameter for pretty-printing JSON output
+
 ### Changed
 
 - **Breaking:** `--metrics` now defaults to full output instead of abbreviated. Use `--metrics=short` for the old behavior (first 5 items). The `table` format has been renamed to `short` for clarity.
+- **Breaking:** Regex extraction functions renamed for clarity (`extract_pattern` → `extract_regex`, `extract_all_pattern` → `extract_all_regex`)
+- `--show-config` output now uses `#` as header prefix instead of `Config:`
+- `--mark-gaps` output format humanized for better readability
+- Help screen organization improved with better categorization of output and config options
+- Emojis removed from help screens (still available in main output unless `--no-emoji` is used)
+- Metrics and stats headers now only shown when using `--with-metrics` or `--with-stats` flags
+
+### Fixed
+
+- Documentation improvements across help screens and examples (corrected flag references, removed outdated warnings, improved examples)
 
 ## [0.13.1] - 2025-11-30
 
