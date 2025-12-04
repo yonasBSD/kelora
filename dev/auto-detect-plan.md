@@ -7,6 +7,12 @@ Planned behavior
 - Use the existing first-line detector. When it recognizes a format, print `Auto-detected format: <fmt>`.
 - If detection fails and we fall back to `line`, print once: `Auto-detect unknown; using line. Use -f <fmt> to force.` (respect quiet/silent/--no-diagnostics/KELORA_NO_TIPS and only on TTY).
 - If we chose a non-line format and parsing later fails heavily, emit a short hint suggesting an explicit `-f` (or `-f line`) so users can override.
+  - Trigger: only when starting from `-f auto` that resolved to a non-line format. Use merged tracking counters so it works with compressed inputs and parallel mode.
+  - Counters: `__kelora_error_count_parse` and `__kelora_stats_events_created` (fall back to 0 when absent).
+  - Condition: compute `seen = events_created + parse_errors` (min 1). Fire once at end of run if either:
+    - `parse_errors >= 10` **and** `parse_errors * 3 >= seen` (≥75% failures), or
+    - `events_created == 0` **and** `parse_errors >= 5` (short runs that all failed).
+  - Message: `Parsing errors detected; retry with -f line or -f <fmt> to override.` Respect diagnostics/TTY suppressions; emit once.
 
 Edge cases and impact
 - False positives (we think it’s JSON/CSV/syslog but it isn’t): parsing may error/produce odd fields; follow-up hint nudges users to force `-f line`.
@@ -16,4 +22,3 @@ Edge cases and impact
 
 Open items
 - Confirm wording for the fallback notice and the post-parse-error hint.
-- Decide how aggressive the “heavy parse failures” trigger should be (e.g., error rate threshold).
