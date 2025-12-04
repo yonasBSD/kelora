@@ -415,7 +415,7 @@ SECURITY & DATA PRIVACY:
 kelora -f combined web_access.log --exec 'e.client_ip = e.client_ip.mask_ip(1)'
 
 # Check for private IPs in external traffic
-kelora -j security_audit.jsonl --filter 'e.source_ip.is_private_ip() == false'
+kelora -j security_audit.jsonl --filter 'e.has("src_ip") && !e.src_ip.is_private_ip()'
 
 # Parse JWT tokens (no verification)
 kelora -j auth_burst.jsonl --exec 'let jwt = e.token.parse_jwt(); e.user = jwt.claims.sub'
