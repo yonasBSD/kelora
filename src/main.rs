@@ -2413,9 +2413,15 @@ ERROR HANDLING MODES:
   --strict mode:
     • Any error → abort with exit code 1
 
-OUTPUT SUPPRESSION:
-  print(\"msg\") / eprint(\"err\")           Visible by default; suppressed with --no-script-output or data-only modes
-  File ops (append_file, etc.)         Always work (needs --allow-fs-writes)
+SCRIPT OUTPUT (print/eprint):
+  print("msg")                        Write to stdout (visible by default)
+  eprint("err")                       Write to stderr (visible by default)
+
+  Suppression: --no-script-output, -s, -m suppress print/eprint
+               --silent does NOT suppress print/eprint (they still work)
+
+  File operations (always work, requires --allow-fs-writes):
+    append_file(path, content), write_file(path, content), --metrics-file
 
 For other help topics: kelora -h
 "###;

@@ -321,16 +321,23 @@ kelora -j api_logs.jsonl -b -k timestamp,level,message
 # Core fields only: exclude metadata (-c)
 kelora -j api_logs.jsonl -c --filter 'e.level == "ERROR"'
 
-# Quiet mode: suppress event output, show only stats (-q or --no-events)
-kelora -f combined web_access.log --filter 'e.status >= 500' -q --stats
-
-# Silent mode: suppress all output except fatal errors (metrics files still write)
-kelora -j api_logs.jsonl --metrics --metrics-file errors.json \
-  --filter 'e.level == "ERROR"' --exec 'track_count(e.error_type)' --silent
-
 # Convert format using Rhai methods
 kelora -j api_logs.jsonl --exec 'print(e.to_logfmt())' -q
 kelora -f logfmt app.log --exec 'print(e.to_json())' -q
+
+OUTPUT CONTROL (suppressing different streams):
+# Show only stats (automatically suppresses events)
+kelora -j api_logs.jsonl -s
+kelora -f combined web_access.log --filter 'e.status >= 500' --stats
+
+# Show only metrics, suppress events (-m)
+kelora -j api_logs.jsonl --exec 'track_count(e.level)' -m
+
+# Silent mode: suppress all terminal output, but print() still works & files still write
+kelora -j api_logs.jsonl --exec 'track_count(e.error_type)' --silent --metrics-file errors.json
+
+# Custom output format with print() (suppress default formatter with -q)
+kelora -j api_logs.jsonl --exec 'print(`${e.timestamp} | ${e.message}`)' -q
 
 COMPRESSION:
 # Transparent decompression of .gz files
@@ -432,9 +439,6 @@ kelora -j api_logs.jsonl --filter 'e.request_id.bucket() % 10 == 0'
 
 # Limit output events (reads entire file)
 kelora -f combined web_access.log --filter 'e.status == 404' --take 50
-
-# Stats-only mode: no event output
-kelora -j api_logs.jsonl -s
 
 COMMON IDIOMS:
 # Method chaining              → e.domain = e.url.extract_domain().to_lower().strip()
