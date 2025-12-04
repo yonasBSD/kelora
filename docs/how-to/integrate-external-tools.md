@@ -51,6 +51,14 @@ Tools that process data **from** Kelora:
 | **rare** | Visualization | Real-time histograms and charts | `-J`, `-F tsv` |
 | **angle-grinder** | Alternative processor | Different query syntax | `-J` |
 
+### Shippers (Alongside Kelora)
+
+Tools that handle **collection/transport**; Kelora runs before or after them.
+
+| Tool | Role | Use For |
+|------|------|---------|
+| **Fluentd / Fluent Bit / Vector** | Collection & delivery | Reliable shipping with buffering/backpressure; feed them normalized JSON/logfmt from Kelora, or replay their output into Kelora for ad-hoc analysis (one format per stream) |
+
 ---
 
 ## Log Shippers (Fluentd, Fluent Bit, Vector)
