@@ -306,11 +306,10 @@ e.text = e.html_entity.unescape_html()
 ```
 
 #### `text.hash([algo])`
-Hash with algorithm (default: sha256, also: sha1, md5, xxh3, blake3).
+Hash with algorithm (default: sha256, also: xxh3).
 
 ```rhai
 e.checksum = e.content.hash()                         // SHA-256
-e.md5 = e.file.hash("md5")
 e.fast = e.data.hash("xxh3")                          // Fast non-crypto hash
 ```
 
@@ -536,11 +535,12 @@ if e.message.edit_distance("connection reset") <= 3 {
 }
 ```
 
-#### `text.index_of(pattern)`
-Find position of substring (-1 if not found).
+#### `text.index_of(substring [, start])`
+Find 0-based position of literal substring (-1 if not found). Optional `start` parameter specifies where to begin searching.
 
 ```rhai
-e.at_pos = e.url.index_of("?")
+e.at_pos = e.url.index_of("?")                        // Find first "?"
+e.second = e.text.index_of("test", 10)                // Search starting at position 10
 ```
 
 ---

@@ -36,8 +36,8 @@ text.extract_regex(pattern [,group])    Extract regex match or capture group
 text.extract_url([nth])              Extract URL from text (nth: 1=first, -1=last)
 text.has_matches(pattern)            Regex search (legacy helper; invalid pattern returns false)
 text.matches(pattern)                Regex search (cached; invalid pattern raises error)
-text.hash([algo])                    Hash with algorithm (default: sha256, also: sha1, md5, xxh3, blake3)
-text.index_of(pattern)               Find position of substring (-1 if not found) (builtin)
+text.hash([algo])                    Hash with algorithm (default: sha256, also: xxh3)
+text.index_of(substring [,start])    Find position of literal substring (-1 if not found) (builtin)
 text.is_digit()                      Check if text contains only digits
 text.is_in_cidr(cidr)                Check if IP address is in CIDR network (e.g., "10.0.0.0/8")
 text.is_ipv4()                       Check if text is a valid IPv4 address
