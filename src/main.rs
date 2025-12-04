@@ -185,7 +185,7 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
 
         // Report detected format
         if !config.processing.silent && !config.processing.suppress_diagnostics {
-            let format_name = format!("{:?}", detected_format).to_lowercase();
+            let format_name = detected_format.to_display_string();
             let message =
                 config.format_info_message(&format!("Auto-detected format: {}", format_name));
             eprintln!("{}", message);
@@ -337,7 +337,7 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         let detected_format = detect_format_from_peekable_reader(&mut peekable_reader)?;
 
         if !config.processing.silent && !config.processing.suppress_diagnostics {
-            let format_name = format!("{:?}", detected_format).to_lowercase();
+            let format_name = detected_format.to_display_string();
             let message =
                 config.format_info_message(&format!("Auto-detected format: {}", format_name));
             eprintln!("{}", message);
@@ -369,7 +369,7 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         };
 
         if !config.processing.silent && !config.processing.suppress_diagnostics {
-            let format_name = format!("{:?}", detected_format).to_lowercase();
+            let format_name = detected_format.to_display_string();
             let message =
                 config.format_info_message(&format!("Auto-detected format: {}", format_name));
             eprintln!("{}", message);

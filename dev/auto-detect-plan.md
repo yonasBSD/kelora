@@ -5,7 +5,7 @@ Goal: switch the default input format to `auto` with guardrails so new users get
 Planned behavior
 - Default `-f` to `auto`.
 - Use the existing first-line detector. When it recognizes a format, print `Auto-detected format: <fmt>`.
-- If detection fails and we fall back to `line`, print once: `No format detected; using line. Override with -f <fmt>.` (respect quiet/silent/--no-diagnostics/KELORA_NO_TIPS and only on TTY).
+- If detection fails and we fall back to `line`, print once: `No input format detected; using line. Override with -f <fmt>.` (respect quiet/silent/--no-diagnostics/KELORA_NO_TIPS and only on TTY).
 - If we chose a non-line format and parsing later fails heavily, emit a short hint suggesting an explicit `-f` (or `-f line`) so users can override.
   - Trigger: only when starting from `-f auto` that resolved to a non-line format. Use merged tracking counters so it works with compressed inputs and parallel mode.
   - Counters: `__kelora_error_count_parse` and `__kelora_stats_events_created` (fall back to 0 when absent).
