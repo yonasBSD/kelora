@@ -559,13 +559,21 @@ pub struct Cli {
     )]
     pub metrics_file: Option<String>,
 
+    /// Specify custom configuration file path
+    #[arg(long = "config-file", help_heading = "Configuration Options")]
+    pub config_file: Option<String>,
+
+    /// Ignore configuration file
+    #[arg(long = "ignore-config", help_heading = "Configuration Options")]
+    pub ignore_config: bool,
+
     /// Use alias from configuration file
     #[arg(short = 'a', long = "alias", help_heading = "Configuration Options")]
     pub alias: Vec<String>,
 
-    /// Specify custom configuration file path
-    #[arg(long = "config-file", help_heading = "Configuration Options")]
-    pub config_file: Option<String>,
+    /// Save current command as alias to configuration file
+    #[arg(long = "save-alias", help_heading = "Configuration Options")]
+    pub save_alias: Option<String>,
 
     /// Show configuration file and exit
     #[arg(long = "show-config", help_heading = "Configuration Options")]
@@ -574,14 +582,6 @@ pub struct Cli {
     /// Edit configuration file in default editor and exit
     #[arg(long = "edit-config", help_heading = "Configuration Options")]
     pub edit_config: bool,
-
-    /// Ignore configuration file
-    #[arg(long = "ignore-config", help_heading = "Configuration Options")]
-    pub ignore_config: bool,
-
-    /// Save current command as alias to configuration file
-    #[arg(long = "save-alias", help_heading = "Configuration Options")]
-    pub save_alias: Option<String>,
 
     /// Show Rhai scripting guide and exit
     #[arg(long = "help-rhai", help_heading = "Help Options")]
