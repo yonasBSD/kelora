@@ -814,7 +814,8 @@ fn test_save_alias_nested_resolution_in_update() {
         config_content
     );
     assert!(
-        !config_content.contains("json-errors") || !config_content[config_content.find("errors = ").unwrap()..].contains("-a"),
+        !config_content.contains("json-errors")
+            || !config_content[config_content.find("errors = ").unwrap()..].contains("-a"),
         "Errors alias should not contain -a reference, got: {}",
         config_content
     );
