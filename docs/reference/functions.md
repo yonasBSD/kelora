@@ -630,6 +630,54 @@ e.doubled = e.numbers.map(|n| n * 2)
 e.names = e.users.map(|u| u.name)
 ```
 
+#### `array.pluck(field)` / `array.pluck_as_nums(field)`
+Extract a single field from each element in an array of maps/objects, returning a new array of just those field values.
+
+**`pluck(field)`** - Extract field values as-is, skipping elements where the field is missing or `()`.
+
+**`pluck_as_nums(field)`** - Extract and convert field values to `f64` numbers, skipping elements where conversion fails or the field is missing.
+
+```rhai
+// Given array of event objects
+let events = [
+    #{status: 200, time: "1.5"},
+    #{status: 404, time: "0.3"},
+    #{status: 200, time: "2.1"}
+]
+
+// Extract field values
+let statuses = events.pluck("status")        // [200, 404, 200]
+let times = events.pluck_as_nums("time")     // [1.5, 0.3, 2.1] (converted to numbers)
+
+// Compare to manual approach
+let manual = events.map(|e| e.status)        // Same result, but errors if field missing
+```
+
+**Common use cases:**
+
+```rhai
+// Calculate average response time
+let times = events.pluck_as_nums("response_time")
+let avg = times.reduce(|sum, x| sum + x, 0) / times.len()
+
+// Find most common status codes
+let codes = events.pluck("status")
+for code in codes {
+    track_count(code)
+}
+
+// With window for rolling analysis (requires --window)
+let recent_times = window.pluck_as_nums("response_time")
+e.avg_recent = recent_times.reduce(|sum, x| sum + x, 0) / recent_times.len()
+e.spike = recent_times.filter(|t| t > 1000).len()
+```
+
+**Why use `pluck()` vs `map()`:**
+
+- Safe: Automatically skips missing fields instead of erroring
+- Clear intent: Explicitly shows you're extracting one field
+- Type conversion: `pluck_as_nums()` handles string-to-number conversion
+
 #### `array.flattened([style [, max_depth]])`
 Flatten nested arrays/objects.
 
@@ -1135,12 +1183,22 @@ e.value_type = type_of(e.value)                       // "string", "int", "array
 ```
 
 #### `window.pluck(field)` / `window.pluck_as_nums(field)`
-Extract field values from the current window array (requires `--window`).
+Extract field values from the sliding window array (requires `--window`). See [`array.pluck()`](#arraypluckfield--arraypluck_as_numsfield) for detailed documentation.
+
+The `window` variable is an array containing the N most recent events, making `pluck()` especially useful for rolling calculations and burst detection.
 
 ```rhai
-let recent_statuses = window.pluck("status")
+// Rolling average of response times
 let recent_times = window.pluck_as_nums("response_time")
-e.avg_time = recent_times.reduce(|s, x| s + x, 0) / recent_times.len()
+e.avg_recent = recent_times.reduce(|sum, x| sum + x, 0) / recent_times.len()
+
+// Detect error bursts
+let recent_statuses = window.pluck("status")
+e.error_burst = recent_statuses.filter(|s| s >= 500).len() >= 3
+
+// Compare current vs recent average
+let recent_vals = window.pluck_as_nums("value")
+e.spike = e.value > (recent_vals.reduce(|s, x| s + x, 0) / recent_vals.len()) * 2
 ```
 
 ---

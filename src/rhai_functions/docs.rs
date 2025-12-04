@@ -91,8 +91,8 @@ array.flattened([style [,max_depth]]) Return new flattened map from nested array
 array.join(separator)                Join array elements with separator
 array.len                            Get array length (builtin)
 array.map(|item| expression)         Transform each element (builtin)
-array.pluck(field)                   Extract field from array of maps (skips missing/() values)
-array.pluck_as_nums(field)           Extract field as f64 from array of maps (skips invalid)
+array.pluck(field)                   Extract field from each map/object in array (skips missing/() values)
+array.pluck_as_nums(field)           Extract field as f64 from each map in array (skips invalid/missing)
 array.max()                          Find maximum value in array (no auto string-to-number coercion)
 array.min()                          Find minimum value in array (no auto string-to-number coercion)
 array.parse_cols(spec [,sep])        Apply column spec to pre-split values
@@ -188,8 +188,8 @@ pseudonym(value, domain)             Generate domain-separated pseudonym (requir
 read_file(path)                      Read file contents as string
 read_lines(path)                     Read file as array of lines
 type_of(value)                       Get type name as string (builtin)
-window.pluck(field)                  Extract field values from current window/window array
-window.pluck_as_nums(field)          Extract numeric field values from current window/window array
+window.pluck(field)                  Extract field values from window array (requires --window)
+window.pluck_as_nums(field)          Extract numeric field values from window array (requires --window)
 
 TRACKING/METRICS FUNCTIONS (requires --metrics):
 track_bottom(key, item, n)           Track bottom N least frequent items (counts occurrences)
