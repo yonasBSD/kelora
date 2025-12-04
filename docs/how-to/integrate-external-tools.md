@@ -53,6 +53,29 @@ Tools that process data **from** Kelora:
 
 ---
 
+## Log Shippers (Fluentd, Fluent Bit, Vector)
+
+Kelora sits next to shippers—it transforms, the shipper handles collection, buffering, retries, and delivery.
+
+### Pre-process before shipping
+
+Clean up messy logs, extract embedded JSON/logfmt, and emit newline-delimited JSON or logfmt for fast ingestion.
+
+```bash
+tail -F /var/log/app.log | \
+  kelora -f logfmt --exec 'e.absorb_kv("msg")' -J \
+  > /tmp/app.normalized.jsonl
+# Point Fluent Bit tail (or Fluentd tail/exec) at /tmp/app.normalized.jsonl
+```
+
+### Post-process after shipping
+
+Replay files or stdout streams produced by the shipper into Kelora for ad-hoc filtering, aggregation, or enrichment without touching the forwarding pipeline.
+
+**Tips:** Ensure each input stream uses a single format (mixed formats need explicit branching in `--exec`), prefer `-J` or `-F logfmt --no-emoji` for shipper-friendly output, and wrap Kelora with a supervisor if you need it to stay running.
+
+---
+
 ## Upstream Tools (Pre-Processing)
 
 ### grep / ripgrep — Fast Pre-Filtering
