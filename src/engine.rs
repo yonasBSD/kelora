@@ -455,7 +455,7 @@ impl ErrorEnhancer {
             "length" => Some("Use 'len()' instead of 'length()'".to_string()),
             "size" => Some("Use 'len()' instead of 'size()'".to_string()),
             "substr" | "substring" => Some(
-                "Use string slicing: s[start..end] or extract_re() for pattern matching"
+                "Use string slicing: s[start..end] or extract_regex() for pattern matching"
                     .to_string(),
             ),
             "indexOf" | "index_of" => Some(
@@ -467,11 +467,11 @@ impl ErrorEnhancer {
             }
             "to_str" | "toString" => Some("Use 'to_string()' for string conversion".to_string()),
             "match" => Some(
-                "Use 'extract_re()' for regex matching or 'contains()' for simple checks"
+                "Use 'extract_regex()' for regex matching or 'contains()' for simple checks"
                     .to_string(),
             ),
             name if name.ends_with("_re") => Some(
-                "Regex functions: extract_re(), extract_all_re(), split_re(), replace_re()"
+                "Regex functions: extract_regex(), extract_regexes(), split_re(), replace_re()"
                     .to_string(),
             ),
             _ => None,
@@ -1694,8 +1694,8 @@ impl RhaiEngine {
 
     fn get_expected_function_signature(func_name: &str) -> String {
         match func_name {
-            "extract_re" => "string, regex_pattern, optional_group_index".to_string(),
-            "extract_all_re" => "string, regex_pattern, optional_group_index".to_string(),
+            "extract_regex" => "string, regex_pattern, optional_group_index".to_string(),
+            "extract_regexes" => "string, regex_pattern, optional_group_index".to_string(),
             "split_re" => "string, regex_pattern".to_string(),
             "replace_re" => "string, regex_pattern, replacement".to_string(),
             "before" | "after" => "string, delimiter".to_string(),
@@ -1741,8 +1741,8 @@ impl RhaiEngine {
             "to_string".to_string(),
             "parse".to_string(),
             // Our custom string functions
-            "extract_re".to_string(),
-            "extract_all_re".to_string(),
+            "extract_regex".to_string(),
+            "extract_regexes".to_string(),
             "split_re".to_string(),
             "replace_re".to_string(),
             "count".to_string(),
@@ -1821,7 +1821,7 @@ impl RhaiEngine {
         if suggestions.is_empty() && func_name.len() > 2 {
             if func_name.contains("extract") {
                 return vec![
-                    "extract_re".to_string(),
+                    "extract_regex".to_string(),
                     "extract_ip".to_string(),
                     "extract_url".to_string(),
                 ];

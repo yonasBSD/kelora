@@ -1909,7 +1909,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     // Regex string methods
-    engine.register_fn("extract_re", |text: &str, pattern: &str| -> String {
+    engine.register_fn("extract_regex", |text: &str, pattern: &str| -> String {
         match regex::Regex::new(pattern) {
             Ok(re) => {
                 if let Some(captures) = re.captures(text) {
@@ -1936,7 +1936,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn(
-        "extract_re",
+        "extract_regex",
         |text: &str, pattern: &str, group: i64| -> String {
             match regex::Regex::new(pattern) {
                 Ok(re) => {
@@ -1962,7 +1962,7 @@ pub fn register_functions(engine: &mut Engine) {
     );
 
     engine.register_fn(
-        "extract_all_re",
+        "extract_regexes",
         |text: &str, pattern: &str| -> rhai::Array {
             match regex::Regex::new(pattern) {
                 Ok(re) => {
@@ -1993,7 +1993,7 @@ pub fn register_functions(engine: &mut Engine) {
     );
 
     engine.register_fn(
-        "extract_all_re",
+        "extract_regexes",
         |text: &str, pattern: &str, group: i64| -> rhai::Array {
             match regex::Regex::new(pattern) {
                 Ok(re) => {
@@ -4199,7 +4199,7 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_re_function() {
+    fn test_extract_regex_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
 
@@ -4208,31 +4208,31 @@ mod tests {
 
         // Extract with capture group
         let result: String = engine
-            .eval_with_scope(&mut scope, r##"text.extract_re("user=(\\w+)")"##)
+            .eval_with_scope(&mut scope, r##"text.extract_regex("user=(\\w+)")"##)
             .unwrap();
         assert_eq!(result, "alice");
 
         // Extract without capture group (returns full match)
         let result: String = engine
-            .eval_with_scope(&mut scope, r##"text.extract_re("\\d+")"##)
+            .eval_with_scope(&mut scope, r##"text.extract_regex("\\d+")"##)
             .unwrap();
         assert_eq!(result, "200");
 
         // No match
         let result: String = engine
-            .eval_with_scope(&mut scope, r##"text.extract_re("missing")"##)
+            .eval_with_scope(&mut scope, r##"text.extract_regex("missing")"##)
             .unwrap();
         assert_eq!(result, "");
 
         // Invalid regex
         let result: String = engine
-            .eval_with_scope(&mut scope, r##"text.extract_re("[")"##)
+            .eval_with_scope(&mut scope, r##"text.extract_regex("[")"##)
             .unwrap();
         assert_eq!(result, "");
     }
 
     #[test]
-    fn test_extract_re_with_group_function() {
+    fn test_extract_regex_with_group_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
 
@@ -4243,7 +4243,7 @@ mod tests {
         let result: String = engine
             .eval_with_scope(
                 &mut scope,
-                r##"text.extract_re("user=(\\w+).*status=(\\d+)", 0)"##,
+                r##"text.extract_regex("user=(\\w+).*status=(\\d+)", 0)"##,
             )
             .unwrap();
         assert_eq!(result, "user=alice status=200"); // Full match (group 0)
@@ -4251,7 +4251,7 @@ mod tests {
         let result: String = engine
             .eval_with_scope(
                 &mut scope,
-                r##"text.extract_re("user=(\\w+).*status=(\\d+)", 1)"##,
+                r##"text.extract_regex("user=(\\w+).*status=(\\d+)", 1)"##,
             )
             .unwrap();
         assert_eq!(result, "alice"); // First capture group
@@ -4259,26 +4259,26 @@ mod tests {
         let result: String = engine
             .eval_with_scope(
                 &mut scope,
-                r##"text.extract_re("user=(\\w+).*status=(\\d+)", 2)"##,
+                r##"text.extract_regex("user=(\\w+).*status=(\\d+)", 2)"##,
             )
             .unwrap();
         assert_eq!(result, "200"); // Second capture group
 
         // Out of bounds group (returns empty)
         let result: String = engine
-            .eval_with_scope(&mut scope, r##"text.extract_re("user=(\\w+)", 5)"##)
+            .eval_with_scope(&mut scope, r##"text.extract_regex("user=(\\w+)", 5)"##)
             .unwrap();
         assert_eq!(result, "");
 
         // Negative group index (defaults to 0)
         let result: String = engine
-            .eval_with_scope(&mut scope, r##"text.extract_re("user=(\\w+)", -1)"##)
+            .eval_with_scope(&mut scope, r##"text.extract_regex("user=(\\w+)", -1)"##)
             .unwrap();
         assert_eq!(result, "user=alice");
     }
 
     #[test]
-    fn test_extract_all_re_function() {
+    fn test_extract_regexes_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
 
@@ -4287,7 +4287,7 @@ mod tests {
 
         // Extract all with capture groups
         let result: rhai::Array = engine
-            .eval_with_scope(&mut scope, r##"text.extract_all_re("(\\w+)=(\\d+)")"##)
+            .eval_with_scope(&mut scope, r##"text.extract_regexes("(\\w+)=(\\d+)")"##)
             .unwrap();
         assert_eq!(result.len(), 3);
 
@@ -4299,7 +4299,7 @@ mod tests {
         // Extract all without capture groups (just matches)
         scope.push("numbers", "10 20 30 40");
         let result: rhai::Array = engine
-            .eval_with_scope(&mut scope, r##"numbers.extract_all_re("\\d+")"##)
+            .eval_with_scope(&mut scope, r##"numbers.extract_regexes("\\d+")"##)
             .unwrap();
         assert_eq!(result.len(), 4);
         assert_eq!(result[0].clone().into_string().unwrap(), "10");
@@ -4307,13 +4307,13 @@ mod tests {
 
         // No matches
         let result: rhai::Array = engine
-            .eval_with_scope(&mut scope, r##"text.extract_all_re("missing")"##)
+            .eval_with_scope(&mut scope, r##"text.extract_regexes("missing")"##)
             .unwrap();
         assert_eq!(result.len(), 0);
     }
 
     #[test]
-    fn test_extract_all_re_with_group_function() {
+    fn test_extract_regexes_with_group_function() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
 
@@ -4327,7 +4327,7 @@ mod tests {
         let result: rhai::Array = engine
             .eval_with_scope(
                 &mut scope,
-                r##"text.extract_all_re("user=(\\w+).*?status=(\\d+)", 1)"##,
+                r##"text.extract_regexes("user=(\\w+).*?status=(\\d+)", 1)"##,
             )
             .unwrap();
         assert_eq!(result.len(), 3);
@@ -4339,7 +4339,7 @@ mod tests {
         let result: rhai::Array = engine
             .eval_with_scope(
                 &mut scope,
-                r##"text.extract_all_re("user=(\\w+).*?status=(\\d+)", 2)"##,
+                r##"text.extract_regexes("user=(\\w+).*?status=(\\d+)", 2)"##,
             )
             .unwrap();
         assert_eq!(result.len(), 3);
@@ -4349,7 +4349,7 @@ mod tests {
 
         // Extract all full matches (group 0)
         let result: rhai::Array = engine
-            .eval_with_scope(&mut scope, r##"text.extract_all_re("user=(\\w+)", 0)"##)
+            .eval_with_scope(&mut scope, r##"text.extract_regexes("user=(\\w+)", 0)"##)
             .unwrap();
         assert_eq!(result.len(), 3);
         assert_eq!(result[0].clone().into_string().unwrap(), "user=alice");
@@ -4358,7 +4358,7 @@ mod tests {
 
         // Out of bounds group (returns empty array)
         let result: rhai::Array = engine
-            .eval_with_scope(&mut scope, r##"text.extract_all_re("user=(\\w+)", 5)"##)
+            .eval_with_scope(&mut scope, r##"text.extract_regexes("user=(\\w+)", 5)"##)
             .unwrap();
         assert_eq!(result.len(), 0);
     }

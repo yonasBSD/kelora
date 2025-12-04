@@ -25,20 +25,20 @@ Complete reference for all 150+ built-in Rhai functions available in Kelora. Fun
 
 ### Extraction and Searching
 
-#### `text.extract_re(pattern [, group])`
+#### `text.extract_regex(pattern [, group])`
 Extract first regex match or capture group.
 
 ```rhai
-e.error_code = e.message.extract_re(r"ERR-(\d+)", 1)  // "ERR-404" → "404"
-e.full_match = e.line.extract_re(r"\d{3}")            // First 3-digit number
+e.error_code = e.message.extract_regex(r"ERR-(\d+)", 1)  // "ERR-404" → "404"
+e.full_match = e.line.extract_regex(r"\d{3}")            // First 3-digit number
 ```
 
-#### `text.extract_all_re(pattern [, group])`
+#### `text.extract_regexes(pattern [, group])`
 Extract all regex matches as array.
 
 ```rhai
-e.numbers = e.line.extract_all_re(r"\d+")             // All numbers
-e.codes = e.message.extract_all_re(r"ERR-(\d+)", 1)   // All error codes
+e.numbers = e.line.extract_regexes(r"\d+")             // All numbers
+e.codes = e.message.extract_regexes(r"ERR-(\d+)", 1)   // All error codes
 ```
 
 #### `text.extract_re_maps(pattern, field)`
@@ -1421,7 +1421,7 @@ print(span.id + ": " + ratio.to_string() + "% failure rate");
 
 **Error Extraction:**
 ```rhai
-e.error_code = e.message.extract_re(r"ERR-(\d+)", 1)
+e.error_code = e.message.extract_regex(r"ERR-(\d+)", 1)
 ```
 
 **IP Anonymization:**

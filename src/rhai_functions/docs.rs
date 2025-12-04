@@ -25,14 +25,14 @@ text.encode_url()                    URL-encode text (percent encoding)
 text.ending_with(suffix [,nth])      Return substring from start to end of suffix (nth: 1=first, -1=last)
 text.escape_html()                   Escape HTML special characters (&, <, >, ", ')
 text.escape_json()                   Escape JSON special characters
-text.extract_all_re(pattern [,group]) Extract all regex matches as array
+text.extract_regexes(pattern [,group]) Extract all regex matches as array
 text.extract_domain()                Extract domain from URL or email address
 text.extract_ip([nth])               Extract IP address from text (nth: 1=first, -1=last)
 text.extract_ips()                   Extract all IP addresses as array
 text.extract_json([nth])             Extract JSON object/array from text (nth: 0=first, 1=second, etc.)
 text.extract_jsons()                 Extract all JSON objects/arrays from text as array of strings
 text.extract_re_maps(pattern, field) Extract regex matches as array of maps for fan-out
-text.extract_re(pattern [,group])    Extract regex match or capture group
+text.extract_regex(pattern [,group])    Extract regex match or capture group
 text.extract_url([nth])              Extract URL from text (nth: 1=first, -1=last)
 text.has_matches(pattern)            Regex search (legacy helper; invalid pattern returns false)
 text.matches(pattern)                Regex search (cached; invalid pattern raises error)
@@ -290,8 +290,8 @@ kelora -j api_logs.jsonl --exec 'e.metadata = e.json_payload.parse_json()' \
   --exec 'e.user_tier = e.get_path("metadata.subscription.tier", "free")'
 
 # Extract data with regex from plain text logs (regex in Rhai's raw strings)
-kelora -f line email_logs.log --exec 'e.duration = e.line.extract_re(#"took (\d+)ms"#, 1).to_int()'
-kelora -f line app.log --exec 'e.ip = e.line.extract_re(#"ip=([\d.]+)"#, 1)'
+kelora -f line email_logs.log --exec 'e.duration = e.line.extract_regex(#"took (\d+)ms"#, 1).to_int()'
+kelora -f line app.log --exec 'e.ip = e.line.extract_regex(#"ip=([\d.]+)"#, 1)'
 
 # Fan out nested arrays into separate events
 kelora -j fan_out_batches.jsonl --exec 'emit_each(e.items)' --filter 'e.status == "active"'

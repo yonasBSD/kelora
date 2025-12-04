@@ -191,10 +191,10 @@ fn has_pattern(text, name) {
     for def in defs {
         let group = _def_group(def);
         if group > 0 {
-            if text.extract_re(def.re, group) != "" {
+            if text.extract_regex(def.re, group) != "" {
                 return true;
             }
-        } else if text.extract_re(def.re) != "" {
+        } else if text.extract_regex(def.re) != "" {
             return true;
         }
     }
@@ -211,9 +211,9 @@ fn extract_pattern(text, name) {
     for def in defs {
         let group = _def_group(def);
         let found = if group > 0 {
-            text.extract_re(def.re, group)
+            text.extract_regex(def.re, group)
         } else {
-            text.extract_re(def.re)
+            text.extract_regex(def.re)
         };
 
         if found != "" {
@@ -231,9 +231,9 @@ fn extract_patterns(text, name) {
     for def in defs {
         let group = _def_group(def);
         let items = if group > 0 {
-            text.extract_all_re(def.re, group)
+            text.extract_regexes(def.re, group)
         } else {
-            text.extract_all_re(def.re)
+            text.extract_regexes(def.re)
         };
 
         if items.len() > 0 {

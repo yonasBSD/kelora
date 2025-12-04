@@ -2287,8 +2287,8 @@ FUNCTIONS & CLOSURES:
   [1,2,3].filter(|x| x > 1)            Predicate closures
 
 FUNCTION-AS-METHOD SYNTAX (Rhai special feature):
-  extract_re(e.line, "\d+")            Function call style
-  e.line.extract_re("\d+")             Method call style (same thing!)
+  extract_regex(e.line, "\d+")            Function call style
+  e.line.extract_regex("\d+")             Method call style (same thing!)
 
   Rhai allows calling any function as a method on its first argument.
   Use method style for chaining: e.url.extract_domain().lower().strip()

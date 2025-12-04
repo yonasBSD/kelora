@@ -268,7 +268,7 @@ Kelora provides powerful string manipulation beyond basic regex:
 
     ```bash exec="on" source="above" result="ansi"
     echo '{"message":"Check https://example.com and http://test.org for more info"}' | \
-      kelora -j --exec 'e.urls = e.message.extract_all_re(#"https?://[^\s]+"#)' \
+      kelora -j --exec 'e.urls = e.message.extract_regexes(#"https?://[^\s]+"#)' \
       -F inspect
     ```
 

@@ -179,8 +179,8 @@ Rhai allows calling any function as a method on its first argument:
 
 ```rhai
 // These are equivalent:
-extract_re(e.line, r"\d+")            // Function call style
-e.line.extract_re(r"\d+")             // Method call style
+extract_regex(e.line, r"\d+")            // Function call style
+e.line.extract_regex(r"\d+")             // Method call style
 
 // Use method style for chaining:
 e.domain = e.url
@@ -322,7 +322,7 @@ e.domain = e.url
 
 // Parse and extract from structured text
 e.error_line = e.stack_trace
-    .extract_re(r"line (\d+)", 1)
+    .extract_regex(r"line (\d+)", 1)
     .to_int_or(0);
 ```
 
@@ -458,7 +458,7 @@ e.text.to_lower()                     // Lowercase
 e.text.to_upper()                     // Uppercase
 e.text.strip()                        // Trim whitespace
 e.text.contains("word")               // Substring check
-e.text.extract_re(r"(\d+)", 1)        // Regex extraction
+e.text.extract_regex(r"(\d+)", 1)        // Regex extraction
 
 // Environment & Context
 get_env("VAR", "default")             // Get env var
