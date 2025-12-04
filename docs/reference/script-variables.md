@@ -73,6 +73,9 @@ This differs from `track_*()` functions, which are **write-only counters** that 
 - Simple counting or metrics → use `track_count()`, `track_sum()`, etc.
   - These work in parallel mode too
   - More efficient (atomic operations vs RwLock)
+- Time-based or count-based batching → use [spans](../tutorials/span-aggregation.md)
+  - `--span 5m` for time windows, `--span 1000` for event batches
+  - Automatic per-window metrics with `span.metrics`
 
 **Comparison with `track_*()`:**
 

@@ -156,6 +156,13 @@ A single processing step in the pipeline. User-controlled stages include:
 
 Stages run in the order specified on the command line. See [Scripting Stages](concepts/scripting-stages.md).
 
+### State
+A mutable global map for tracking complex stateful information across events. Accessible via the `state` variable. Only available in sequential mode (not with `--parallel`).
+
+Common uses: deduplication, session reconstruction, state machines, cross-event correlation. For simple counting, use `track_*()` functions instead.
+
+See [Script Variables](reference/script-variables.md#state) and `examples/state_examples.rhai`.
+
 ### Statistics
 Auto-collected processing metrics displayed with `--stats`. Includes events parsed, filtered, output; discovered levels and field names; errors; time span. Different from user-defined metrics. See [Processing Architecture](concepts/pipeline-model.md#internal-statistics-stats).
 

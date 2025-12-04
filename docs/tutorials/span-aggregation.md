@@ -730,6 +730,17 @@ kelora -j huge.log --span 1000000 --span-close 'for evt in span.events { ... }'
 
 ## Tips & Best Practices
 
+### Quick Span Type Reference
+
+Choose the right span mode for your use case:
+
+```bash
+--span N              # Count-based: Every N events (batch processing)
+--span 5m             # Time-based: Fixed time windows (dashboards, time-series)
+--span field_name     # Field-based: Group by field value (requests, sessions, IDs)
+--span-idle 10m       # Idle-based: Detect inactivity gaps (sessions, bursts)
+```
+
 ### Choosing Count vs Time Spans
 
 **Use count spans when:**
@@ -806,4 +817,5 @@ Now that you understand span aggregation, continue your journey:
 
 - [Metrics and Tracking](metrics-and-tracking.md) - Understanding `track_*()` functions
 - [Working with Time](working-with-time.md) - Timestamp parsing and filtering
+- [Script Variables: State](../reference/script-variables.md#state) - Complex cross-event state tracking
 - [How-To: Build a Service Health Snapshot](../how-to/monitor-application-health.md) - Real-world monitoring patterns
