@@ -5,14 +5,14 @@ Goal: switch the default input format to `auto` with guardrails so new users get
 Planned behavior
 - Default `-f` to `auto`.
 - Use the existing first-line detector. When it recognizes a format, print `Auto-detected format: <fmt>`.
-- If detection fails and we fall back to `line`, print once: `Auto-detect unknown; using line. Use -f <fmt> to force.` (respect quiet/silent/--no-diagnostics/KELORA_NO_TIPS and only on TTY).
+- If detection fails and we fall back to `line`, print once: `No format detected; using line. Override with -f <fmt>.` (respect quiet/silent/--no-diagnostics/KELORA_NO_TIPS and only on TTY).
 - If we chose a non-line format and parsing later fails heavily, emit a short hint suggesting an explicit `-f` (or `-f line`) so users can override.
   - Trigger: only when starting from `-f auto` that resolved to a non-line format. Use merged tracking counters so it works with compressed inputs and parallel mode.
   - Counters: `__kelora_error_count_parse` and `__kelora_stats_events_created` (fall back to 0 when absent).
   - Condition: compute `seen = events_created + parse_errors` (min 1). Fire once at end of run if either:
     - `parse_errors >= 10` **and** `parse_errors * 3 >= seen` (≥75% failures), or
     - `events_created == 0` **and** `parse_errors >= 3` (short runs that all failed).
-  - Message: `Many parsing errors; try -f line or -f <fmt>.` Respect diagnostics/TTY suppressions; emit once.
+  - Message: `Parsing mostly failed; rerun with -f line or specify -f <fmt>.` Respect diagnostics/TTY suppressions; emit once.
 
 Edge cases and impact
 - False positives (we think it’s JSON/CSV/syslog but it isn’t): parsing may error/produce odd fields; follow-up hint nudges users to force `-f line`.
@@ -21,7 +21,7 @@ Edge cases and impact
 - Pipelines/non-TTY or suppressed diagnostics: the notices are suppressed, but auto/fallback still happens.
 
 Open items
-- Confirm wording for the fallback notice and the post-parse-error hint.
+- Wording locked: fallback message and parse-error hint as above.
 
 Testing
 - Integration coverage for: auto-detected message on recognized formats; fallback notice on unknown; parse-error hint thresholds; suppression under quiet/silent/no-diagnostics/non-TTY.
