@@ -192,15 +192,15 @@ window.pluck(field)                  Extract field values from current window/wi
 window.pluck_as_nums(field)          Extract numeric field values from current window/window array
 
 TRACKING/METRICS FUNCTIONS (requires --metrics):
-track_bottom(key, item, n)           Track bottom N least frequent items (skips () values)
-track_bottom(key, item, n, value)    Track bottom N items by lowest values (skips () values)
+track_bottom(key, item, n)           Track bottom N least frequent items (counts occurrences)
+track_bottom(key, item, n, score)    Track bottom N items by lowest scores (ranks by numeric value)
 track_bucket(key, bucket)            Track values in buckets for histograms (skips () values)
 track_count(key)                     Increment counter for key by 1 (string key; use to_string() for numbers)
 track_max(key, value)                Track maximum value for key (skips () values)
 track_min(key, value)                Track minimum value for key (skips () values)
 track_sum(key, value)                Accumulate numeric values for key (skips () values)
-track_top(key, item, n)              Track top N most frequent items (skips () values)
-track_top(key, item, n, value)       Track top N items by highest values (skips () values)
+track_top(key, item, n)              Track top N most frequent items (counts occurrences)
+track_top(key, item, n, score)       Track top N items by highest scores (ranks by numeric value)
 track_unique(key, value)             Track unique values for key (skips () values)
 
 FILE OUTPUT (requires --allow-fs-writes):
@@ -377,15 +377,15 @@ kelora web_access.log --metrics=json \
 kelora -j api_logs.jsonl --metrics --metrics-file stats.json \
   --exec 'track_count(e.level); track_sum("bytes", e.bytes)' --silent
 
-# Top 10 most common errors
+# Top/bottom tracking: frequency vs scored
+# 3 params = count occurrences (most/least COMMON)
 kelora -j api_logs.jsonl -m \
   --exec 'if e.level == "ERROR" { track_top("common_errors", e.error_type, 10) }'
 
-# Top 10 slowest endpoints by latency
+# 4 params = rank by score (HIGHEST/LOWEST values)
 kelora -f combined access.log --metrics \
   --exec 'track_top("slowest", e.endpoint, 10, e.latency_ms)'
 
-# Bottom 5 fastest queries (least CPU time)
 kelora -j db.log --metrics \
   --exec 'track_bottom("fastest", e.query_id, 5, e.cpu_time)'
 
