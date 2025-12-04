@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `to_json()` function now accepts optional indent parameter for pretty-printing JSON output
 - `meta.parsed_ts` now exposed in Rhai scripts for accessing the parsed timestamp value
 - Log shipper integration guide and quick-reference entry for common pipelines (e.g., Filebeat, Vector, Logstash)
+- Auto-detect now emits detection/fallback notices (TTY-aware) and a parse-failure warning when the auto-chosen format mostly fails, nudging users to set `-f <fmt>` or `-f line`
 
 ### Removed
 
@@ -19,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **Breaking:** Default input format switched to content-based detection (`-f auto`) instead of raw lines
 - **Breaking:** `--metrics` now defaults to full output instead of abbreviated. Use `--metrics=short` for the old behavior (first 5 items). The `table` format has been renamed to `short` for clarity.
 - **Breaking:** Regex extraction functions renamed for clarity (`extract_pattern` → `extract_regex`, `extract_all_pattern` → `extract_all_regex`)
 - `--save-alias` now resolves referenced aliases when updating an alias in place while preserving composition when saving under a new name
