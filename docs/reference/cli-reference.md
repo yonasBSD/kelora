@@ -421,6 +421,7 @@ Run a Rhai snippet once whenever a span closes. Use it to emit per-span summarie
 
 **Metadata added to `meta` during per-event stages:**
 
+- `meta.parsed_ts` – Parsed UTC timestamp before any `--filter`/`--exec` scripts (or `()` when absent)
 - `meta.span_status` – `"included"`, `"late"`, `"unassigned"`, or `"filtered"`
 - `meta.span_id` – Span identifier (`null` for unassigned events)
 - `meta.span_start`, `meta.span_end` – Boundaries as DateTime values (or `()` when not applicable)

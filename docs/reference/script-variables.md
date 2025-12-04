@@ -34,6 +34,7 @@ Kelora exposes several built-in variables to Rhai scripts. Their availability de
 | `line` | `String` | Same as the standalone `line` variable. |
 | `line_num` | `Int` | 1-based line number when input comes from files. |
 | `filename` | `String` | Source filename, if known. |
+| `parsed_ts` | `DateTime` or `()` | Parsed UTC timestamp before any `--filter`/`--exec` scripts. Missing if the event had no timestamp. |
 | `span_status` | `String` | `"included"`, `"late"`, `"unassigned"`, or `"filtered"` when spans are enabled. Missing otherwise. |
 | `span_id` | `String` or `()` | Span identifier for the current event. |
 | `span_start` / `span_end` | `DateTime` or `()` | Span bounds for the current event. |

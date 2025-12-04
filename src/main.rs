@@ -2355,6 +2355,7 @@ EVENT METADATA:
   meta.line                            Original raw line from input (always available)
   meta.line_num                        Line number (1-based, available with files)
   meta.filename                        Source filename (available when processing multiple files)
+  meta.parsed_ts                       Parsed UTC timestamp before scripts (or () if missing)
 
   # Example: Track errors by filename
   --exec 'if e.level == "ERROR" { track_count(meta.filename) }'

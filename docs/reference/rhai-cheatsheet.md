@@ -367,6 +367,7 @@ get_env("VAR", "default")             // Environment variable access
 meta.line                             // Original raw line (always available)
 meta.line_num                         // Line number, 1-based (available with files)
 meta.filename                         // Source filename (multi-file processing)
+meta.parsed_ts                        // Parsed UTC timestamp before scripts (or () if missing)
 
 // Example usage:
 --begin 'conf.env = get_env("ENVIRONMENT", "dev")'

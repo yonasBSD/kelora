@@ -2747,6 +2747,12 @@ impl RhaiEngine {
                 Dynamic::from(DateTimeWrapper::from_utc(span_end)),
             );
         }
+        if let Some(parsed_ts) = event.parsed_ts {
+            meta_map.insert(
+                "parsed_ts".into(),
+                Dynamic::from(DateTimeWrapper::from_utc(parsed_ts)),
+            );
+        }
 
         // Add raw line to metadata
         meta_map.insert("line".into(), Dynamic::from(event.original_line.clone()));
@@ -2854,6 +2860,7 @@ impl RhaiEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{TimeZone, Utc};
 
     fn build_event_with_line(line: &str) -> Event {
         let mut event = Event::with_capacity(line.to_string(), 1);
@@ -2962,6 +2969,39 @@ mod tests {
 
         let keys: Vec<String> = event_clone.fields.keys().cloned().collect();
         assert_eq!(keys, vec!["line", "z", "a", "b", "foo"]);
+    }
+
+    #[test]
+    fn meta_includes_parsed_timestamp_before_scripts() {
+        let engine = RhaiEngine::new();
+        let mut event = build_event_with_line("orig line");
+        let ts = Utc.timestamp_opt(1_700_000_000, 123_000_000).unwrap();
+        event.parsed_ts = Some(ts);
+
+        let scope = engine.create_scope_for_event(&event);
+        let meta = scope.get_value::<Map>("meta").expect("meta map");
+
+        let parsed_ts = meta
+            .get("parsed_ts")
+            .cloned()
+            .expect("parsed_ts should be present in meta");
+        let dt = parsed_ts
+            .try_cast::<crate::rhai_functions::datetime::DateTimeWrapper>()
+            .expect("parsed_ts should be a DateTimeWrapper");
+        assert_eq!(dt.inner.to_rfc3339(), ts.to_rfc3339());
+    }
+
+    #[test]
+    fn meta_omits_parsed_timestamp_when_missing() {
+        let engine = RhaiEngine::new();
+        let event = build_event_with_line("orig line");
+
+        let scope = engine.create_scope_for_event(&event);
+        let meta = scope.get_value::<Map>("meta").expect("meta map");
+        assert!(
+            !meta.contains_key("parsed_ts"),
+            "meta.parsed_ts should be absent when event has no parsed timestamp"
+        );
     }
 
     #[test]

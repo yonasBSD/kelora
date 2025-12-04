@@ -92,6 +92,7 @@ Contextual information about log processing available in the `meta` variable. In
 
 - `meta.filename` - Current input file
 - `meta.line_number` - Line number in file
+- `meta.parsed_ts` - Parsed UTC timestamp before scripts (or empty when missing)
 - `meta.span_id` - Current span identifier (if using spans)
 
 See [Script Variables](reference/script-variables.md).

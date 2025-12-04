@@ -532,6 +532,7 @@ kelora -j \
 - `meta.line` - Original raw line from input (always available)
 - `meta.line_num` - Line number, 1-based (available when processing files)
 - `meta.filename` - Source filename (available with multiple files or explicit file arguments)
+- `meta.parsed_ts` - Parsed UTC timestamp before any scripts (or `()` when missing)
 
 **Multi-file tracking example:**
 
