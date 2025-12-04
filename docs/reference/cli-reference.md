@@ -902,14 +902,14 @@ Disable processing statistics explicitly (default: off).
 
 #### `-m, --metrics[=FORMAT]`
 
-Show metrics only (suppress events). Use `-m` for default table format, or `--metrics=FORMAT` for explicit format.
+Show metrics only (suppress events). Use `-m` for default full table format, or `--metrics=FORMAT` for explicit format.
 
-Formats: `table`, `full`, `json`
+Formats: `short` (first 5 items), `full` (default), `json`
 
 ```bash
-kelora -j --exec 'track_count(e.service)' -m app.log              # Default table
-kelora -j --exec 'track_count(e.service)' --metrics=full app.log  # Full table
-kelora -j --exec 'track_count(e.service)' --metrics=json app.log  # JSON format
+kelora -j --exec 'track_count(e.service)' -m app.log               # Default full table
+kelora -j --exec 'track_count(e.service)' --metrics=short app.log  # Abbreviated (first 5)
+kelora -j --exec 'track_count(e.service)' --metrics=json app.log   # JSON format
 ```
 
 #### `--with-metrics`

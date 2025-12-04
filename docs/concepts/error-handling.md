@@ -257,7 +257,7 @@ Use the new orthogonal toggles to control output for automation:
 | `--silent` | Suppress pipeline terminal output (events/diagnostics/stats/terminal metrics); script output allowed unless combined with `--no-script-output` or data-only modes; emit one fatal line on errors; metrics files still write |
 | `--no-script-output` | Suppress Rhai `print`/`eprint` (implied by data-only modes) |
 | `-s` / `--stats=FORMAT` | Show stats only (suppress events, script output; diagnostics stay on). Format: table, json |
-| `-m` / `--metrics=FORMAT` | Show metrics only (suppress events, diagnostics except fatal line, stats, script output). Format: table, full, json |
+| `-m` / `--metrics=FORMAT` | Show metrics only (suppress events, diagnostics except fatal line, stats, script output). Format: short, full (default), json |
 | `--with-stats` | Show stats alongside events (rare case) |
 | `--with-metrics` | Show metrics alongside events (rare case) |
 

@@ -711,7 +711,7 @@ impl KeloraConfig {
         } else if cli.metrics.is_some() {
             cli.metrics.clone()
         } else if cli.with_metrics {
-            Some(crate::cli::MetricsFormat::Table)
+            Some(crate::cli::MetricsFormat::Full)
         } else {
             None
         };

@@ -48,7 +48,7 @@ pub enum FileOrder {
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum MetricsFormat {
-    Table,
+    Short,
     Full,
     Json,
 }
@@ -533,9 +533,9 @@ pub struct Cli {
         value_name = "FORMAT",
         require_equals = true,
         num_args = 0..=1,
-        default_missing_value = "table",
+        default_missing_value = "full",
         help_heading = "Metrics and Stats",
-        help = "Show metrics only (suppress events).\n\nFormats: table, full, json\n\nExamples:\n  -m              Default table format\n  --metrics=full  Full table\n  --metrics=json  JSON output"
+        help = "Show metrics only (suppress events).\n\nFormats: short (first 5), full (default), json\n\nExamples:\n  -m               Full metrics table\n  --metrics=short  Abbreviated (first 5 items)\n  --metrics=json   JSON output"
     )]
     pub metrics: Option<MetricsFormat>,
 

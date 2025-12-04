@@ -1513,9 +1513,9 @@ fn main() -> Result<()> {
                     // Route to stdout in data-only mode, stderr when showing with events
                     let use_stdout = !config.output.metrics_with_events;
                     match metrics_format {
-                        MetricsFormat::Table | MetricsFormat::Full => {
+                        MetricsFormat::Short | MetricsFormat::Full => {
                             let metrics_level = match metrics_format {
-                                MetricsFormat::Table => 1,
+                                MetricsFormat::Short => 1,
                                 MetricsFormat::Full => 2,
                                 _ => 1,
                             };

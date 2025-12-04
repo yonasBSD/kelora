@@ -259,18 +259,28 @@ cardinality analysis.
 
 Use `metrics["services"].len()` later to compute the number of distinct members.
 
-### Viewing Full Metrics
+### Viewing Metrics in Different Formats
 
-When `track_unique()` collects many items, `-m` shows only the first 5 with a
-hint. Use `--metrics=full` for the complete list or `--metrics=json` for JSON format:
+By default, `-m` shows all tracked items in table format. For large collections,
+you can use `--metrics=short` to see just the first 5 items, or `--metrics=json`
+for structured JSON output:
 
-=== "Full table with --metrics=full"
+=== "Full table (default)"
 
     ```bash
     kelora -j examples/simple_json.jsonl \
       -F none \
       -e 'track_unique("services", e.service)' \
-      --metrics=full
+      -m
+    ```
+
+=== "Abbreviated with --metrics=short"
+
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+      -F none \
+      -e 'track_unique("services", e.service)' \
+      --metrics=short
     ```
 
 === "JSON format with --metrics=json"
@@ -282,10 +292,10 @@ hint. Use `--metrics=full` for the complete list or `--metrics=json` for JSON fo
       --metrics=json
     ```
 
-The `--metrics=full` flag shows all items in table format, while `--metrics=json` outputs
-structured JSON to stdout. Both are mutually exclusive—pick the format that
-matches your workflow. You can also combine `-m` with `--metrics-file` to get
-both table output and a JSON file.
+The `-m` flag defaults to full table format showing all items. Use `--metrics=short`
+for abbreviated output (first 5 items with a hint), or `--metrics=json` for structured
+JSON to stdout. You can also combine `-m` with `--metrics-file` to get both table
+output and a JSON file.
 
 ## Step 6 – Sliding Windows and Percentiles
 
