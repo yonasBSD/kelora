@@ -1013,8 +1013,8 @@ e.score = to_float(e.score_string)
 Convert value to type with fallback.
 
 ```rhai
-e.status = to_int_or(e.status_string, 0)
-e.score = to_float_or(e.score_string, 0.0)
+e.status = e.status_string.to_int_or(0)
+e.score = e.score_string.to_float_or(0.0)
 ```
 
 #### `value.or_empty()`

@@ -391,7 +391,7 @@ kelora -j --exec 'e.result = e.value * 2' app.log
 
 **Solution:** Use type conversion with defaults:
 ```bash
-kelora -j --exec 'e.result = to_int_or(e.value, 0) * 2' app.log
+kelora -j --exec 'e.result = e.value.to_int_or(0) * 2' app.log
 ```
 
 ### Invalid Timestamps

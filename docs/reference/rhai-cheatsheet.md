@@ -265,9 +265,9 @@ to_float(e.price)                     // String → float
 to_bool(e.active)                     // String → boolean
 
 // Safe conversions with defaults
-to_int_or(e.port, 8080)               // Use default if conversion fails
-to_float_or(e.price, 0.0)
-to_bool_or(e.active, false)
+e.port.to_int_or(8080)                // Use default if conversion fails
+e.price.to_float_or(0.0)
+e.active.to_bool_or(false)
 
 // String conversions
 to_string(42)                         // Any → string
@@ -285,7 +285,7 @@ type_of(e.field) != "()"              // Check if field has value
 ```rhai
 // With default fallback
 let role = e.get_path("user.role", "guest");
-let port = to_int_or(e.port, 8080);
+let port = e.port.to_int_or(8080);
 
 // With existence check
 if e.has_path("user.profile.avatar") {
@@ -439,9 +439,9 @@ e.get_path("a.b.c", default)          // Nested with fallback
 e.has_path("a.b.c")                   // Check nested exists
 
 // Conversions
-to_int_or(val, 0)                     // Safe int conversion
-to_float_or(val, 0.0)                 // Safe float conversion
-to_bool_or(val, false)                // Safe bool conversion
+val.to_int_or(0)                      // Safe int conversion
+val.to_float_or(0.0)                  // Safe float conversion
+val.to_bool_or(false)                 // Safe bool conversion
 try { risky_call(); } catch (err) {   // Catch runtime errors (type mismatch, missing fields); slower than guards
   eprint(err);                        // Prefer to_int_or/has_path for common cases
 }

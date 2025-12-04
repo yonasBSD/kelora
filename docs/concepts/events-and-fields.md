@@ -587,7 +587,7 @@ track_sum("total", score)      // Only tracks valid integers
 With defaults if conversion fails:
 
 ```rhai
-e.status_code = to_int_or(e.status, 0)
+e.status_code = e.status.to_int_or(0)
 e.duration = to_float_or(e.duration_str, 0.0)
 ```
 
@@ -725,8 +725,8 @@ e.get_path("items[5]", #{})
 
 **Solution:** Use type conversion with defaults:
 ```rhai
-e.status_code = to_int_or(e.status, 0)
-e.duration = to_float_or(e.duration_ms, 0.0)
+e.status_code = e.status.to_int_or(0)
+e.duration = e.duration_ms.to_float_or(0.0)
 ```
 
 ### Nested Field Access Errors

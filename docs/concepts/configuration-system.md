@@ -51,7 +51,7 @@ defaults = -f auto --stats
 
 [aliases]
 errors = -l error --stats
-slow-json = -f json --filter 'to_int_or(e.duration_ms, 0) > 1000'
+slow-json = -f json --filter 'e.duration_ms.to_int_or(0) > 1000'
 ```
 
 Running `kelora app.log` with this file automatically adds `-f auto --stats` to
