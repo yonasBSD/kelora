@@ -344,7 +344,7 @@ kelora -j logs/*.log logs/*.log.gz --filter 'e.level == "ERROR"'
 
 TIME HANDLING:
 # Events from the last 2 hours
-kelora -j duration_logs.jsonl --since -2h --until now
+kelora -j duration_logs.jsonl --since 2h --until now
 
 # Business hours filter (9-5 local time)
 kelora -j api_logs.jsonl --exec 'e.hour = to_datetime(e.timestamp).to_local().hour()' \

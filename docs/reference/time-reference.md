@@ -196,7 +196,7 @@ kelora --since "10:00" --until "since+30m" app.log
 kelora --since "until-1h" --until "11:00" app.log
 
 # Show 1 hour starting from 2 hours ago
-kelora --since "-2h" --until "since+1h" app.log
+kelora --since "2h" --until "since+1h" app.log
 
 # Show 45 minutes starting at a specific timestamp
 kelora --since "2024-01-15T10:00:00Z" --until "since+45m" app.log
