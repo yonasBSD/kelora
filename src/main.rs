@@ -2373,23 +2373,25 @@ Usage:
   kelora --help     # Full CLI reference (all options)
 
 Quick Examples:
+  kelora -f logfmt -l error simple_logfmt.log
+  kelora web_access_large.log.gz --stats
+  kelora simple_json.jsonl --filter 'e.service == "database"' --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' -k timestamp,message,duration_s
+  kelora simple_json.jsonl --since 2024-01-15T10:01:00Z --until levels warn,error --stats
+  kelora audit.jsonl --exec 'track_count(e.action)' --metrics
+  kelora payments_latency.jsonl --parallel --filter 'e.duration_ms > 500' -k order_id,duration_ms,status
   tail -f app.log | kelora -j -l error,warn
-  kelora -f logfmt --levels error examples/simple_logfmt.log
-  kelora -j examples/simple_json.jsonl --filter 'e.service == "database"' --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' -k timestamp,message,duration_s
-  kelora examples/web_access_large.log.gz -s                         # Auto-detects combined
-  kelora -j examples/simple_json.jsonl --since 2024-01-15T10:01:00Z --levels warn,error --stats
-  kelora -j examples/audit.jsonl -F none --exec 'track_count(e.action)' --metrics
-  kelora -j examples/payments_latency.jsonl --parallel --filter 'e.duration_ms > 500' -k order_id,duration_ms,status
 
 Common Options:
-  -f, --input-format <FORMAT>   Choose parser (json, logfmt, combined, cols:<spec>, regex:<pattern>)
+  -f, --input-format <FORMAT>   Choose parser (auto, json, logfmt, combined, line, cols:<spec>, regex:<pattern>)
+  -j                            Shortcut for -f json
   --filter <expr>               Keep events where expression is true (can repeat; run in the order given)
-  --levels <levels>             Keep only these log levels (comma-separated)
+  -l, --levels <levels>         Keep only these log levels (comma-separated)
   -e, --exec <expr>             Transform events or emit metrics (can repeat; run in the order given)
   -k, --keys <fields>           Pick or reorder output fields
   -F, --output-format <FORMAT>  Output format (default, json, logfmt, inspect, none)
   -n, --take <N>                Limit output to first N events
-  --stats                       Show stats with discovered fields and parsing metrics
+  -s, --stats                   Show only the statistics, with discovered fields
+  -m, --metrics                 Show only the tracked metrics
 
 More Help:
   kelora --help              Full CLI reference (all 100+ options grouped by category)
