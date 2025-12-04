@@ -347,8 +347,8 @@ TIME HANDLING:
 kelora -j duration_logs.jsonl --since -2h --until now
 
 # Business hours filter (9-5 local time)
-kelora -j api_logs.jsonl --exec 'let h = to_datetime(e.timestamp).to_local().hour()' \
-  --filter 'h >= 9 && h < 17'
+kelora -j api_logs.jsonl --exec 'e.hour = to_datetime(e.timestamp).to_local().hour()' \
+  --filter 'e.hour >= 9 && e.hour < 17'
 
 # Calculate duration and flag SLA violations
 kelora -j duration_logs.jsonl --exec '
