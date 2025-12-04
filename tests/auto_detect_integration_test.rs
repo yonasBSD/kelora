@@ -1,6 +1,20 @@
 mod common;
 use common::*;
 
+/// Default input format uses auto-detect
+#[test]
+fn test_default_format_is_auto() {
+    let input = r#"{"level": "info", "message": "auto"}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&[], input);
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    assert!(
+        stdout.contains("level='info'") || stdout.contains("\"level\""),
+        "Should parse JSON by default"
+    );
+}
+
 /// Test auto-detection of JSON format
 #[test]
 fn test_auto_detect_json() {

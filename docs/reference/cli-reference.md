@@ -78,15 +78,15 @@ Specify input format. Supports standard formats, column parsing, and CSV with ty
 
 **Standard Formats:**
 
+- `auto` - Auto-detect format from the first line (default)
 - `json` - JSON lines (one JSON object per line)
-- `line` - Plain text (default, one line per event)
+- `line` - Plain text (one line per event)
 - `csv` - CSV with header row
 - `tsv` - Tab-separated values with header
 - `logfmt` - Key-value pairs (logfmt format)
 - `syslog` - Syslog RFC5424 and RFC3164
 - `combined` - Apache/Nginx log formats (Common + Combined)
 - `cef` - ArcSight Common Event Format
-- `auto` - Auto-detect format
 
 **Column Parsing:**
 ```bash

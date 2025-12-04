@@ -10,8 +10,9 @@ Specify input format with `-f, --input-format <format>`.
 
 | Format | Description |
 |--------|----------|
+| `auto` | Auto-detect from first line (default) |
 | `json` | Application logs, structured data (shorthand: `-j`) |
-| `line` | Unstructured logs, raw text (default) |
+| `line` | Unstructured logs, raw text |
 | `logfmt` | Heroku-style logs, simple structured logs |
 | `csv` / `tsv` | Spreadsheet data, exports |
 | `syslog` | System logs, network devices |
@@ -19,7 +20,6 @@ Specify input format with `-f, --input-format <format>`.
 | `cef` | ArcSight Common Event Format, SIEM data |
 | `cols:<spec>` | Custom column-based logs |
 | `regex:<pattern>` | Custom regex parsing with named groups and type annotations |
-| `auto` | Auto-detect from first line |
 
 ### JSON Format
 
@@ -42,7 +42,7 @@ Specify input format with `-f, --input-format <format>`.
 
 ### Line Format
 
-**Syntax:** `-f line` (default)
+**Syntax:** `-f line`
 
 **Description:** Plain text, one line per event.
 
@@ -54,7 +54,7 @@ Specify input format with `-f, --input-format <format>`.
 
 **Notes:**
 
-- Default format when no `-f` specified
+- Auto-detect falls back to line when it can't identify a structured format
 - Empty lines are skipped
 - Useful for unstructured logs or custom parsing with `--exec`
 

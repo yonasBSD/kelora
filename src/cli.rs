@@ -82,7 +82,7 @@ pub struct Cli {
     #[arg(
         short = 'f',
         long = "input-format",
-        default_value = "line",
+        default_value = "auto",
         help_heading = "Input Options",
         value_parser = parse_format_value
     )]

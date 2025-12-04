@@ -33,11 +33,11 @@ If you cloned the project, run commands from the repository root.
 
 ## Part 1: Input Formats (`-f`, `-j`)
 
-### Explicit Format Selection Required
+### Auto-detect by Default
 
 You've seen `-j` in the [Quickstart](../quickstart.md) to read JSON logs. Let's understand what this flag really means and what other formats Kelora supports.
 
-**Important:** Kelora does **NOT** auto-detect format based on filename. The default is `-f line` (plain text). You must specify the format explicitly.
+**Important:** Kelora does **NOT** auto-detect format based on filename. The default is `-f auto`, which inspects the first line of content.
 
 Let's see what happens without specifying the format:
 
@@ -45,10 +45,10 @@ Let's see what happens without specifying the format:
 kelora examples/basics.jsonl
 ```
 
-Notice it treats the entire JSON line as plain text (`line='...'`). Now with `-j`:
+Kelora auto-detects JSON and parses the fields. To force plain-text treatment:
 
 ```bash exec="on" source="above" result="ansi"
-kelora -j examples/basics.jsonl
+kelora -f line examples/basics.jsonl
 ```
 
 **Three ways to read JSON logs:**
@@ -56,27 +56,27 @@ kelora -j examples/basics.jsonl
 ```bash
 kelora -f json examples/basics.jsonl    # Explicit format
 kelora -j examples/basics.jsonl         # -j is shortcut for -f json
-kelora -f auto examples/basics.jsonl    # Auto-detect by examining content
+kelora -f auto examples/basics.jsonl    # Default: auto-detect by examining content
 ```
 
 **Key Points:**
 
 - `-f auto` detects format by **examining the content** (not filename)
 - Kelora does **NOT** look at file extensions (`.jsonl`, `.log`, `.csv`)
-- Default is always `-f line` unless you specify otherwise
-- Best practice: Be explicit with `-j` for JSON
+- Use `-f line` to force raw lines when you don't want detection
+- `-j` remains a convenient shortcut for explicit JSON
 
 ### Common Input Formats
 
 ```bash
+-f auto         # Auto-detect by content (default)
 -f json         # JSON lines (or use -j shortcut)
 -f logfmt       # key=value format
 -f combined     # Apache/Nginx access logs
 -f syslog       # Syslog format (RFC3164/RFC5424)
 -f csv          # CSV with header
 -f tsv          # Tab-separated values
--f line         # Plain text (default)
--f auto         # Auto-detect by content
+-f line         # Plain text
 ```
 
 ---

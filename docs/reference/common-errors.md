@@ -10,7 +10,7 @@ Quick reference for common issues and their solutions.
 
 **Possible causes:**
 
-1. **Wrong format specified** - Default is `-f line` (plain text), not JSON
+1. **Wrong format specified** - Default is `-f auto` (content-based). Force `-f json`, `-f logfmt`, or `-f line` if detection disagrees.
 2. **Field doesn't exist** - Field name is misspelled or doesn't exist in all events
 3. **All events filtered out** - Your filters are too restrictive
 
@@ -20,6 +20,7 @@ Quick reference for common issues and their solutions.
 # Check if format is correct
 kelora -j app.log -F inspect --take 3        # For JSON
 kelora -f logfmt app.log -F inspect --take 3 # For logfmt
+kelora -f line app.log -F inspect --take 3   # For raw lines
 
 # See what fields are actually present
 kelora -j app.log -F inspect --head 20

@@ -873,7 +873,7 @@ impl Default for KeloraConfig {
             input: InputConfig {
                 files: Vec::new(),
                 no_input: false,
-                format: InputFormat::Json,
+                format: InputFormat::Auto,
                 file_order: FileOrder::Cli,
                 skip_lines: 0,
                 head_lines: None,

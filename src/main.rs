@@ -1,7 +1,7 @@
 use anyhow::Result;
-use clap::parser::ValueSource;
 use clap::{ArgMatches, CommandFactory, FromArgMatches};
 use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
+use std::io::IsTerminal;
 use std::sync::atomic::Ordering;
 
 #[cfg(unix)]
@@ -41,36 +41,55 @@ use platform::{
 use cli::{Cli, FileOrder, InputFormat, OutputFormat};
 use config::{MultilineConfig, SectionEnd, SectionStart, SpanMode, TimestampFilterConfig};
 
+#[derive(Debug, Clone)]
+struct DetectedFormat {
+    format: config::InputFormat,
+    had_input: bool,
+}
+
+impl DetectedFormat {
+    fn detected_non_line(&self) -> bool {
+        self.had_input && !matches!(self.format, config::InputFormat::Line)
+    }
+
+    fn fell_back_to_line(&self) -> bool {
+        self.had_input && matches!(self.format, config::InputFormat::Line)
+    }
+}
+
 /// Detect format from a peekable reader
 /// Returns the detected format without consuming the first line
 fn detect_format_from_peekable_reader<R: std::io::BufRead>(
     reader: &mut readers::PeekableLineReader<R>,
-) -> Result<config::InputFormat> {
+) -> Result<DetectedFormat> {
     match reader.peek_first_line()? {
-        None => {
-            // Empty input, default to line format
-            Ok(config::InputFormat::Line)
-        }
+        None => Ok(DetectedFormat {
+            format: config::InputFormat::Line,
+            had_input: false,
+        }),
         Some(line) => {
             // Remove newline for detection
             let trimmed_line = line.trim_end_matches(&['\r', '\n'][..]);
             let detected = parsers::detect_format(trimmed_line)?;
-            Ok(detected)
+            Ok(DetectedFormat {
+                format: detected,
+                had_input: true,
+            })
         }
     }
 }
 
 /// Detect format for parallel mode processing
 /// Returns the detected format
-fn detect_format_for_parallel_mode(
-    files: &[String],
-    no_input: bool,
-) -> Result<config::InputFormat> {
+fn detect_format_for_parallel_mode(files: &[String], no_input: bool) -> Result<DetectedFormat> {
     use std::io;
 
     if no_input {
         // For --no-input mode, default to Line format
-        return Ok(config::InputFormat::Line);
+        return Ok(DetectedFormat {
+            format: config::InputFormat::Line,
+            had_input: false,
+        });
     }
 
     if files.is_empty() {
@@ -80,26 +99,134 @@ fn detect_format_for_parallel_mode(
         let mut peekable_reader =
             readers::PeekableLineReader::new(io::BufReader::new(processed_stdin));
 
-        match detect_format_from_peekable_reader(&mut peekable_reader)? {
-            config::InputFormat::Auto => Ok(config::InputFormat::Line), // Fallback
-            format => Ok(format),
-        }
+        detect_format_from_peekable_reader(&mut peekable_reader)
     } else {
         // For files, read first line from first file
         let sorted_files = pipeline::builders::sort_files(files, &config::FileOrder::Cli)?;
 
         if sorted_files.is_empty() {
-            return Ok(config::InputFormat::Line);
+            return Ok(DetectedFormat {
+                format: config::InputFormat::Line,
+                had_input: false,
+            });
         }
 
         let first_file = &sorted_files[0];
         let decompressed = decompression::DecompressionReader::new(first_file)?;
         let mut peekable_reader = readers::PeekableLineReader::new(decompressed);
 
-        match detect_format_from_peekable_reader(&mut peekable_reader)? {
-            config::InputFormat::Auto => Ok(config::InputFormat::Line), // Fallback
-            format => Ok(format),
+        detect_format_from_peekable_reader(&mut peekable_reader)
+    }
+}
+
+fn detection_notices_allowed(config: &KeloraConfig, terminal_output: bool) -> bool {
+    if config.processing.silent
+        || config.processing.suppress_diagnostics
+        || config.processing.quiet_events
+        || std::env::var("KELORA_NO_TIPS").is_ok()
+    {
+        return false;
+    }
+
+    terminal_output
+}
+
+fn format_detected_format_notice(
+    config: &KeloraConfig,
+    detected: &DetectedFormat,
+    terminal_output: bool,
+) -> Option<String> {
+    if !detection_notices_allowed(config, terminal_output) {
+        return None;
+    }
+
+    if detected.detected_non_line() {
+        let format_name = detected.format.to_display_string();
+        let message = config.format_info_message(&format!("Auto-detected format: {}", format_name));
+        Some(message)
+    } else if detected.fell_back_to_line() {
+        let message = config
+            .format_hint_message("No input format detected; using line. Override with -f <fmt>.");
+        Some(message)
+    } else {
+        None
+    }
+}
+
+fn emit_detected_format_notice(
+    config: &KeloraConfig,
+    detected: &DetectedFormat,
+    terminal_output: bool,
+) {
+    if let Some(message) = format_detected_format_notice(config, detected, terminal_output) {
+        eprintln!("{}", message);
+    }
+}
+
+fn extract_counter_from_tracking(tracking: &TrackingSnapshot, key: &str) -> i64 {
+    tracking
+        .internal
+        .get(key)
+        .or_else(|| tracking.user.get(key))
+        .and_then(|value| {
+            if value.is_int() {
+                value.as_int().ok()
+            } else if value.is_float() {
+                value.as_float().ok().map(|v| v as i64)
+            } else {
+                None
+            }
+        })
+        .unwrap_or(0)
+}
+
+fn parse_failure_warning_message(
+    config: &KeloraConfig,
+    tracking: Option<&TrackingSnapshot>,
+    auto_detected_non_line: bool,
+    events_were_output: bool,
+    terminal_output: bool,
+) -> Option<String> {
+    if !auto_detected_non_line || !detection_notices_allowed(config, terminal_output) {
+        return None;
+    }
+
+    let tracking = tracking?;
+
+    let parse_errors = extract_counter_from_tracking(tracking, "__kelora_error_count_parse");
+    let events_created = extract_counter_from_tracking(tracking, "__kelora_stats_events_created");
+
+    let seen = std::cmp::max(1, events_created + parse_errors);
+    let should_warn = (parse_errors >= 10 && parse_errors * 3 >= seen)
+        || (events_created == 0 && parse_errors >= 3);
+
+    if should_warn {
+        let mut message = config
+            .format_error_message("Parsing mostly failed; rerun with -f line or specify -f <fmt>.");
+        if !events_were_output {
+            message = message.trim_start_matches('\n').to_string();
         }
+        Some(message)
+    } else {
+        None
+    }
+}
+
+fn emit_parse_failure_warning(
+    config: &KeloraConfig,
+    tracking: Option<&TrackingSnapshot>,
+    auto_detected_non_line: bool,
+    events_were_output: bool,
+    terminal_output: bool,
+) {
+    if let Some(message) = parse_failure_warning_message(
+        config,
+        tracking,
+        auto_detected_non_line,
+        events_were_output,
+        terminal_output,
+    ) {
+        eprintln!("{}", message);
     }
 }
 
@@ -122,6 +249,7 @@ use std::time::{Duration, Instant};
 struct PipelineResult {
     pub stats: Option<ProcessingStats>,
     pub tracking_data: TrackingSnapshot,
+    pub auto_detected_non_line: bool,
 }
 
 /// Core pipeline processing function using KeloraConfig  
@@ -154,7 +282,8 @@ fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
         run_pipeline_parallel(config, output, ctrl_rx)
     } else {
         let mut output = output;
-        run_pipeline_sequential(config, &mut output, ctrl_rx.clone())?;
+        let (_final_input_format, auto_detected_non_line) =
+            run_pipeline_sequential(config, &mut output, ctrl_rx.clone())?;
         let tracking_user = tracking::get_thread_tracking_state();
         let tracking_internal = tracking::get_thread_internal_state();
         let tracking_data = TrackingSnapshot::from_parts(tracking_user, tracking_internal);
@@ -167,6 +296,7 @@ fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
         Ok(PipelineResult {
             stats: final_stats,
             tracking_data,
+            auto_detected_non_line,
         })
     }
 }
@@ -177,33 +307,32 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     output: W,
     ctrl_rx: &Receiver<Ctrl>,
 ) -> Result<PipelineResult> {
+    let terminal_output = std::io::stderr().is_terminal();
+
     // Handle auto-detection for parallel mode
-    let final_config = if matches!(config.input.format, config::InputFormat::Auto) {
-        // For parallel mode, we need to detect format first
-        let detected_format =
-            detect_format_for_parallel_mode(&config.input.files, config.input.no_input)?;
+    let (final_config, auto_detected_non_line) =
+        if matches!(config.input.format, config::InputFormat::Auto) {
+            // For parallel mode, we need to detect format first
+            let detected_format =
+                detect_format_for_parallel_mode(&config.input.files, config.input.no_input)?;
 
-        // Report detected format
-        if !config.processing.silent && !config.processing.suppress_diagnostics {
-            let format_name = detected_format.to_display_string();
-            let message =
-                config.format_info_message(&format!("Auto-detected format: {}", format_name));
-            eprintln!("{}", message);
-        }
+            emit_detected_format_notice(config, &detected_format, terminal_output);
 
-        // Create new config with detected format
-        let mut new_config = config.clone();
-        new_config.input.format = detected_format;
+            // Create new config with detected format
+            let mut new_config = config.clone();
+            new_config.input.format = detected_format.format.clone();
 
-        // Update detected format in stats if stats are enabled
-        if config.output.stats.is_some() {
-            stats::stats_set_detected_format(new_config.input.format.to_display_string());
-        }
+            // Update detected format in stats if stats are enabled
+            if config.output.stats.is_some() {
+                stats::stats_set_detected_format(new_config.input.format.to_display_string());
+            }
 
-        new_config
-    } else {
-        config.clone()
-    };
+            let was_auto_detected_non_line = detected_format.detected_non_line();
+
+            (new_config, was_auto_detected_non_line)
+        } else {
+            (config.clone(), false)
+        };
 
     let config = &final_config;
     let batch_size = config.effective_batch_size();
@@ -284,6 +413,7 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     Ok(PipelineResult {
         stats: Some(processor.get_final_stats()),
         tracking_data: parallel_snapshot,
+        auto_detected_non_line,
     })
 }
 
@@ -292,7 +422,7 @@ fn run_pipeline_sequential<W: Write>(
     config: &KeloraConfig,
     output: &mut W,
     ctrl_rx: Receiver<Ctrl>,
-) -> Result<()> {
+) -> Result<(config::InputFormat, bool)> {
     if matches!(config.input.format, config::InputFormat::Auto) {
         return run_pipeline_sequential_with_auto_detection(config, output, ctrl_rx);
     }
@@ -310,7 +440,9 @@ fn run_pipeline_sequential<W: Write>(
         SequentialInput::Files(readers::MultiFileReader::new(sorted_files)?)
     };
 
-    run_pipeline_sequential_internal(config, output, ctrl_rx, input)
+    run_pipeline_sequential_internal(config, output, ctrl_rx, input)?;
+
+    Ok((config.input.format.clone(), false))
 }
 
 /// Run pipeline in sequential mode with auto-detection support
@@ -318,14 +450,17 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
     config: &KeloraConfig,
     output: &mut W,
     ctrl_rx: Receiver<Ctrl>,
-) -> Result<()> {
+) -> Result<(config::InputFormat, bool)> {
+    let terminal_output = std::io::stderr().is_terminal();
+
     if config.input.no_input {
         // For --no-input mode, skip auto-detection and use empty input with Line format
         let mut final_config = config.clone();
         final_config.input.format = config::InputFormat::Line;
         let input =
             SequentialInput::Stdin(Box::new(io::BufReader::new(io::Cursor::new(Vec::new()))));
-        return run_pipeline_sequential_internal(&final_config, output, ctrl_rx, input);
+        run_pipeline_sequential_internal(&final_config, output, ctrl_rx, input)?;
+        return Ok((final_config.input.format, false));
     }
 
     if config.input.files.is_empty() {
@@ -336,15 +471,10 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
 
         let detected_format = detect_format_from_peekable_reader(&mut peekable_reader)?;
 
-        if !config.processing.silent && !config.processing.suppress_diagnostics {
-            let format_name = detected_format.to_display_string();
-            let message =
-                config.format_info_message(&format!("Auto-detected format: {}", format_name));
-            eprintln!("{}", message);
-        }
+        emit_detected_format_notice(config, &detected_format, terminal_output);
 
         let mut final_config = config.clone();
-        final_config.input.format = detected_format;
+        final_config.input.format = detected_format.format.clone();
 
         // Set detected format in stats if stats are enabled
         if config.output.stats.is_some() {
@@ -352,13 +482,18 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         }
 
         let input = SequentialInput::Stdin(Box::new(peekable_reader));
-        run_pipeline_sequential_internal(&final_config, output, ctrl_rx, input)
+        run_pipeline_sequential_internal(&final_config, output, ctrl_rx, input)?;
+
+        Ok((
+            final_config.input.format,
+            detected_format.detected_non_line(),
+        ))
     } else {
         let sorted_files =
             pipeline::builders::sort_files(&config.input.files, &config.input.file_order)?;
 
         if sorted_files.is_empty() {
-            return Ok(());
+            return Ok((config::InputFormat::Line, false));
         }
 
         let first_file = &sorted_files[0];
@@ -368,15 +503,10 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
             detect_format_from_peekable_reader(&mut peekable_reader)?
         };
 
-        if !config.processing.silent && !config.processing.suppress_diagnostics {
-            let format_name = detected_format.to_display_string();
-            let message =
-                config.format_info_message(&format!("Auto-detected format: {}", format_name));
-            eprintln!("{}", message);
-        }
+        emit_detected_format_notice(config, &detected_format, terminal_output);
 
         let mut final_config = config.clone();
-        final_config.input.format = detected_format;
+        final_config.input.format = detected_format.format.clone();
 
         // Set detected format in stats if stats are enabled
         if config.output.stats.is_some() {
@@ -384,7 +514,12 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         }
 
         let input = SequentialInput::Files(readers::MultiFileReader::new(sorted_files)?);
-        run_pipeline_sequential_internal(&final_config, output, ctrl_rx, input)
+        run_pipeline_sequential_internal(&final_config, output, ctrl_rx, input)?;
+
+        Ok((
+            final_config.input.format,
+            detected_format.detected_non_line(),
+        ))
     }
 }
 
@@ -1055,39 +1190,6 @@ fn write_formatted_output<W: Write>(
     Ok(())
 }
 
-fn maybe_print_missing_format_tip(
-    matches: &ArgMatches,
-    cli: &Cli,
-    config: &KeloraConfig,
-    stderr: &mut SafeStderr,
-) {
-    // Respect explicit suppression and quiet modes
-    if std::env::var("KELORA_NO_TIPS").is_ok()
-        || config.processing.quiet_events
-        || config.processing.silent
-    {
-        return;
-    }
-
-    // Avoid polluting pipelines
-    if !crate::tty::is_stdout_tty() {
-        return;
-    }
-
-    // Skip when an explicit format shortcut/selection is in use
-    if cli.json_input || cli.no_input {
-        return;
-    }
-
-    let format_source = matches.value_source("format");
-    if matches!(format_source, Some(ValueSource::DefaultValue) | None) {
-        let tip = config.format_hint_message(
-            "No format given; Kelora won’t auto-guess. Use -f auto (or defaults = -f auto in ~/.config/kelora/kelora.ini) or pick a format. Set KELORA_NO_TIPS=1 to hide.",
-        );
-        stderr.writeln(&tip).unwrap_or(());
-    }
-}
-
 fn main() -> Result<()> {
     install_broken_pipe_panic_hook();
     // Broadcast channel for shutdown requests from signal handler or other sources
@@ -1136,9 +1238,6 @@ fn main() -> Result<()> {
     // Set the ordered stages directly
     config.processing.stages = ordered_stages;
     let diagnostics_allowed = !config.processing.silent && !config.processing.suppress_diagnostics;
-
-    // Hint about format selection when user didn't specify -f/--input-format
-    maybe_print_missing_format_tip(&matches, &cli, &config, &mut stderr);
 
     if config.processing.span.is_some()
         && diagnostics_allowed
@@ -1500,6 +1599,7 @@ fn main() -> Result<()> {
 
     let (final_stats, tracking_data) = match result {
         Ok(pipeline_result) => {
+            let auto_detected_non_line = pipeline_result.auto_detected_non_line;
             // Determine if any events were output (to conditionally suppress leading newlines)
             let events_were_output = pipeline_result
                 .stats
@@ -1628,6 +1728,14 @@ fn main() -> Result<()> {
                     }
                 }
             }
+
+            emit_parse_failure_warning(
+                &config,
+                Some(&pipeline_result.tracking_data),
+                auto_detected_non_line,
+                events_were_output,
+                std::io::stderr().is_terminal(),
+            );
             (pipeline_result.stats, Some(pipeline_result.tracking_data))
         }
         Err(e) => {
@@ -2268,7 +2376,7 @@ Quick Examples:
   tail -f app.log | kelora -j -l error,warn
   kelora -f logfmt --levels error examples/simple_logfmt.log
   kelora -j examples/simple_json.jsonl --filter 'e.service == "database"' --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' -k timestamp,message,duration_s
-  kelora -f combined examples/web_access_large.log.gz -s
+  kelora examples/web_access_large.log.gz -s                         # Auto-detects combined
   kelora -j examples/simple_json.jsonl --since 2024-01-15T10:01:00Z --levels warn,error --stats
   kelora -j examples/audit.jsonl -F none --exec 'track_count(e.action)' --metrics
   kelora -j examples/payments_latency.jsonl --parallel --filter 'e.duration_ms > 500' -k order_id,duration_ms,status
@@ -2684,7 +2792,7 @@ json (-j)
   JSON Lines format, one object per line
   Fields: All JSON keys preserved with types
 
-line (default)
+line
   Plain text, one line per event
   Fields: line
 
@@ -2736,7 +2844,7 @@ regex:<pattern>
   Types: (?P<name:int>...), (?P<name:float>...), (?P<name:bool>...)
   Note: Pattern automatically anchored with ^...$
 
-auto
+auto (default)
   Auto-detect format from first non-empty line
   Detection order: json → syslog → cef → combined → logfmt → csv → line
   Note: Detects once and applies to all lines
@@ -2759,4 +2867,79 @@ none      - No output (useful with --stats or --metrics)
 For other help topics: kelora -h
 "#;
     println!("{}", help_text);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ColorMode;
+    use rhai::Dynamic;
+
+    fn base_config() -> KeloraConfig {
+        let mut cfg = KeloraConfig::default();
+        cfg.output.no_emoji = true;
+        cfg.output.color = ColorMode::Never;
+        cfg.processing.quiet_events = false;
+        cfg.processing.silent = false;
+        cfg.processing.suppress_diagnostics = false;
+        cfg
+    }
+
+    #[test]
+    fn detected_format_notice_for_non_line_format() {
+        let cfg = base_config();
+        let detected = DetectedFormat {
+            format: config::InputFormat::Json,
+            had_input: true,
+        };
+
+        let message =
+            format_detected_format_notice(&cfg, &detected, true).expect("expected info notice");
+
+        assert!(
+            message.contains("Auto-detected format: json"),
+            "message was {message}"
+        );
+    }
+
+    #[test]
+    fn parse_failure_warning_triggers_on_heavy_errors() {
+        let cfg = base_config();
+        let mut tracking = TrackingSnapshot::default();
+        tracking.internal.insert(
+            "__kelora_error_count_parse".to_string(),
+            Dynamic::from(10_i64),
+        );
+        tracking.internal.insert(
+            "__kelora_stats_events_created".to_string(),
+            Dynamic::from(0_i64),
+        );
+
+        let message = parse_failure_warning_message(&cfg, Some(&tracking), true, false, true)
+            .expect("expected warning");
+
+        assert!(
+            message.contains("Parsing mostly failed"),
+            "message was {message}"
+        );
+    }
+
+    #[test]
+    fn parse_failure_warning_skips_light_error_rates() {
+        let cfg = base_config();
+        let mut tracking = TrackingSnapshot::default();
+        tracking.internal.insert(
+            "__kelora_error_count_parse".to_string(),
+            Dynamic::from(2_i64),
+        );
+        tracking.internal.insert(
+            "__kelora_stats_events_created".to_string(),
+            Dynamic::from(10_i64),
+        );
+
+        assert!(
+            parse_failure_warning_message(&cfg, Some(&tracking), true, false, true).is_none(),
+            "should not warn on low error rate"
+        );
+    }
 }
