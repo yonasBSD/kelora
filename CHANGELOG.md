@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - `to_json()` function now accepts optional indent parameter for pretty-printing JSON output
+- `meta.parsed_ts` now exposed in Rhai scripts for accessing the parsed timestamp value
 
 ### Changed
 
@@ -19,10 +20,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Help screen organization improved with better categorization of output and config options
 - Emojis removed from help screens (still available in main output unless `--no-emoji` is used)
 - Metrics and stats headers now only shown when using `--with-metrics` or `--with-stats` flags
+- Documentation updated to use method syntax (e.g., `value.to_int_or(default)`) consistently throughout
+- Output suppression documentation reorganized and clarified across `--help-rhai` and `--help-examples`
+- `pluck()` function documentation enhanced with practical examples for window-based calculations and burst detection
+- `track_top()` and `track_bottom()` parameter documentation clarified to distinguish frequency-based vs score-based tracking
 
 ### Fixed
 
 - Documentation improvements across help screens and examples (corrected flag references, removed outdated warnings, improved examples)
+- Filter examples in help text (private IP filter, business hours filter)
+- Time syntax documentation corrections
 
 ## [0.13.1] - 2025-11-30
 
