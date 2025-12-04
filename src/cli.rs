@@ -270,30 +270,6 @@ pub struct Cli {
     #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count, help_heading = "Error Handling")]
     pub verbose: u8,
 
-    /// Suppress events (formatter output). Alternatives: --no-events, -F none
-    #[arg(short = 'q', help_heading = "Error Handling")]
-    pub quiet: bool,
-
-    /// Suppress events (formatter output). Alternatives: -q, -F none
-    #[arg(long = "no-events", help_heading = "Error Handling")]
-    pub no_events: bool,
-
-    /// Suppress diagnostics and error summaries (fatal line still allowed).
-    #[arg(long = "no-diagnostics", help_heading = "Error Handling")]
-    pub no_diagnostics: bool,
-
-    /// Silence pipeline stdout/stderr emitters (events/diagnostics/stats/terminal metrics); script output still allowed. Metrics files still write.
-    #[arg(long = "silent", help_heading = "Error Handling")]
-    pub silent: bool,
-
-    /// Disable a silent default coming from config.
-    #[arg(long = "no-silent", help_heading = "Error Handling")]
-    pub no_silent: bool,
-
-    /// Suppress Rhai print/eprint and side-effect warnings (implied by data-only modes).
-    #[arg(long = "no-script-output", help_heading = "Error Handling")]
-    pub no_script_output: bool,
-
     /// Include only events with these log levels
     #[arg(
         short = 'l',
@@ -397,6 +373,30 @@ pub struct Cli {
     /// Output file for formatted events
     #[arg(short = 'o', long = "output-file", help_heading = "Output Options")]
     pub output_file: Option<String>,
+
+    /// Suppress events (formatter output). Alternatives: --no-events, -F none
+    #[arg(short = 'q', help_heading = "Output Options")]
+    pub quiet: bool,
+
+    /// Suppress events (formatter output). Alternatives: -q, -F none
+    #[arg(long = "no-events", help_heading = "Output Options")]
+    pub no_events: bool,
+
+    /// Suppress diagnostics and error summaries (fatal line still allowed).
+    #[arg(long = "no-diagnostics", help_heading = "Output Options")]
+    pub no_diagnostics: bool,
+
+    /// Silence pipeline stdout/stderr emitters (events/diagnostics/stats/terminal metrics); script output still allowed. Metrics files still write.
+    #[arg(long = "silent", help_heading = "Output Options")]
+    pub silent: bool,
+
+    /// Disable a silent default coming from config.
+    #[arg(long = "no-silent", help_heading = "Output Options")]
+    pub no_silent: bool,
+
+    /// Suppress Rhai print/eprint and side-effect warnings (implied by data-only modes).
+    #[arg(long = "no-script-output", help_heading = "Output Options")]
+    pub no_script_output: bool,
 
     /// Output only field values (default: false).
     #[arg(short = 'b', long = "brief", help_heading = "Default Format Options")]
