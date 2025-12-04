@@ -324,6 +324,11 @@ impl ConfigFile {
         Ok(result)
     }
 
+    /// Check if an alias exists in the config
+    pub fn has_alias(&self, name: &str) -> bool {
+        self.aliases.contains_key(name)
+    }
+
     /// Process command line arguments, expanding aliases and applying defaults
     pub fn process_args(&self, args: Vec<String>) -> Result<Vec<String>> {
         // First, apply defaults if they exist
@@ -364,6 +369,49 @@ impl ConfigFile {
         }
 
         Ok(final_result)
+    }
+
+    /// Resolve all `-a` and `--alias` flags in the given arguments, returning a flattened list
+    /// This is similar to process_args but only handles alias resolution, not defaults
+    pub fn resolve_args_only(&self, args: &[String]) -> Result<Vec<String>> {
+        let mut result = Vec::new();
+        let mut i = 0;
+
+        while i < args.len() {
+            if (args[i] == "-a" || args[i] == "--alias") && i + 1 < args.len() {
+                let name = &args[i + 1];
+                let mut seen = std::collections::HashSet::new();
+                let resolved = self.resolve_alias(name, &mut seen, 0)?;
+                result.extend(resolved);
+                i += 2;
+            } else {
+                result.push(args[i].clone());
+                i += 1;
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Scan arguments for `-a` and `--alias` flags and validate that all referenced aliases exist
+    /// Returns Ok(()) if all aliases exist, or an error with the name of the first missing alias
+    pub fn validate_alias_references(&self, args: &[String]) -> Result<()> {
+        let mut i = 0;
+        while i < args.len() {
+            if (args[i] == "-a" || args[i] == "--alias") && i + 1 < args.len() {
+                let name = &args[i + 1];
+                if !self.has_alias(name) {
+                    return Err(anyhow!(
+                        "Referenced alias '{}' does not exist in config",
+                        name
+                    ));
+                }
+                i += 2;
+            } else {
+                i += 1;
+            }
+        }
+        Ok(())
     }
 
     /// Write config file to specified path

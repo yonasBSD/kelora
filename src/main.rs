@@ -1843,6 +1843,22 @@ fn extract_save_alias_arg(args: &[String]) -> Option<String> {
     None
 }
 
+/// Check if the given alias_name appears in any `-a` or `--alias` reference in the args
+fn should_resolve_alias_references(args: &[String], alias_name: &str) -> bool {
+    let mut i = 0;
+    while i < args.len() {
+        if (args[i] == "-a" || args[i] == "--alias") && i + 1 < args.len() {
+            if args[i + 1] == alias_name {
+                return true;
+            }
+            i += 2;
+        } else {
+            i += 1;
+        }
+    }
+    false
+}
+
 /// Handle --save-alias command
 fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
     use crate::config_file::ConfigFile;
@@ -1877,8 +1893,88 @@ fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
         std::process::exit(2);
     }
 
-    // Join the arguments back into a single string
-    let alias_value = shell_words::join(command_args);
+    // Check if we should resolve alias references (when updating self-referencing alias)
+    let should_resolve = should_resolve_alias_references(&command_args, alias_name);
+
+    // If we need to resolve OR validate, load the config file
+    let alias_value = if command_args
+        .iter()
+        .any(|arg| arg == "-a" || arg == "--alias")
+    {
+        // Command contains alias references - need to load config
+        let config_result = match config_file_path.as_ref() {
+            Some(path) => ConfigFile::load_with_custom_path(Some(path)),
+            None => ConfigFile::load_with_custom_path(None),
+        };
+
+        match config_result {
+            Ok(config) => {
+                if should_resolve {
+                    // Resolution mode: flatten all aliases
+                    match config.resolve_args_only(&command_args) {
+                        Ok(resolved_args) => {
+                            if resolved_args.is_empty() {
+                                let prefix = if no_emoji { "kelora:" } else { "⚠️" };
+                                eprintln!(
+                                    "{} Resolved command is empty for alias '{}'",
+                                    prefix, alias_name
+                                );
+                                std::process::exit(2);
+                            }
+                            shell_words::join(resolved_args)
+                        }
+                        Err(e) => {
+                            let prefix = if no_emoji { "kelora:" } else { "⚠️" };
+                            eprintln!("{} Failed to resolve aliases in command: {}", prefix, e);
+                            std::process::exit(1);
+                        }
+                    }
+                } else {
+                    // Preservation mode: validate references exist but keep them
+                    if let Err(e) = config.validate_alias_references(&command_args) {
+                        let prefix = if no_emoji { "kelora:" } else { "⚠️" };
+                        eprintln!("{} {}", prefix, e);
+                        eprintln!(
+                            "{} Cannot save alias '{}' with reference to non-existent alias",
+                            prefix, alias_name
+                        );
+                        std::process::exit(1);
+                    }
+                    shell_words::join(command_args)
+                }
+            }
+            Err(_) if should_resolve => {
+                // Trying to update non-existent alias
+                let prefix = if no_emoji { "kelora:" } else { "⚠️" };
+                eprintln!(
+                    "{} Cannot update alias '{}' - no config file found",
+                    prefix, alias_name
+                );
+                eprintln!(
+                    "{} To create a new alias, use a command without referencing itself",
+                    prefix
+                );
+                std::process::exit(1);
+            }
+            Err(_) => {
+                // Preservation mode but config doesn't exist - that's an error
+                // because we're referencing other aliases that don't exist
+                let prefix = if no_emoji { "kelora:" } else { "⚠️" };
+                eprintln!(
+                    "{} Cannot save alias '{}' with alias references - no config file found",
+                    prefix, alias_name
+                );
+                eprintln!(
+                    "{} Create the referenced aliases first, or use a command without alias references",
+                    prefix
+                );
+                std::process::exit(1);
+            }
+        }
+    } else {
+        // No alias references - just join and save
+        shell_words::join(command_args)
+    };
 
     // Save the alias to the specified config file or auto-detect
     let target_path = config_file_path.as_ref().map(std::path::Path::new);

@@ -625,3 +625,274 @@ fn test_defaults_and_alias_combination() {
     );
     assert!(!stdout.contains("info"), "Should not show info level");
 }
+
+#[test]
+fn test_save_alias_update_with_self_reference() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join(".kelora.ini");
+
+    // Create initial alias
+    fs::write(&config_path, "[aliases]\nerrors = -l error\n").unwrap();
+
+    // Update it with self-reference + new flag
+    let binary_path = if cfg!(debug_assertions) {
+        std::env::current_dir().unwrap().join("target/debug/kelora")
+    } else {
+        std::env::current_dir()
+            .unwrap()
+            .join("target/release/kelora")
+    };
+
+    let output = Command::new(&binary_path)
+        .args([
+            "--save-alias",
+            "errors",
+            "--config-file",
+            config_path.to_str().unwrap(),
+            "-a",
+            "errors",
+            "--stats",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "kelora should exit successfully, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let config_content = fs::read_to_string(&config_path).unwrap();
+    // Should resolve -a errors to -l error, then add --stats
+    assert!(
+        config_content.contains("errors = -l error --stats"),
+        "Config should contain flattened alias, got: {}",
+        config_content
+    );
+    // Should NOT contain -a reference
+    assert!(
+        !config_content.contains("-a errors") && !config_content.contains("--alias errors"),
+        "Config should not contain alias reference, got: {}",
+        config_content
+    );
+}
+
+#[test]
+fn test_save_alias_compose_with_reference() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join(".kelora.ini");
+
+    // Create base alias
+    fs::write(&config_path, "[aliases]\nerrors = -l error\n").unwrap();
+
+    // Create new alias referencing the base
+    let binary_path = if cfg!(debug_assertions) {
+        std::env::current_dir().unwrap().join("target/debug/kelora")
+    } else {
+        std::env::current_dir()
+            .unwrap()
+            .join("target/release/kelora")
+    };
+
+    let output = Command::new(&binary_path)
+        .args([
+            "--save-alias",
+            "json-errors",
+            "--config-file",
+            config_path.to_str().unwrap(),
+            "-a",
+            "errors",
+            "-f",
+            "json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "kelora should exit successfully, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let config_content = fs::read_to_string(&config_path).unwrap();
+    // Should preserve the -a reference
+    assert!(
+        config_content.contains("json-errors = -a errors -f json"),
+        "Config should preserve alias reference, got: {}",
+        config_content
+    );
+}
+
+#[test]
+fn test_save_alias_error_on_unknown_reference() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join(".kelora.ini");
+
+    // Create config with one alias
+    fs::write(&config_path, "[aliases]\nknown = -l error\n").unwrap();
+
+    // Try to create alias referencing unknown alias
+    let binary_path = if cfg!(debug_assertions) {
+        std::env::current_dir().unwrap().join("target/debug/kelora")
+    } else {
+        std::env::current_dir()
+            .unwrap()
+            .join("target/release/kelora")
+    };
+
+    let output = Command::new(&binary_path)
+        .args([
+            "--save-alias",
+            "new-alias",
+            "--config-file",
+            config_path.to_str().unwrap(),
+            "-a",
+            "unknown",
+            "--stats",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        !output.status.success(),
+        "kelora should fail when referencing unknown alias"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Referenced alias 'unknown' does not exist") || stderr.contains("unknown"),
+        "Error message should mention unknown alias, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_save_alias_nested_resolution_in_update() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join(".kelora.ini");
+
+    // Create nested aliases
+    fs::write(
+        &config_path,
+        "[aliases]\nbase = -f json\nerrors = -a base -l error\n",
+    )
+    .unwrap();
+
+    // Update errors with self-reference (should fully resolve)
+    let binary_path = if cfg!(debug_assertions) {
+        std::env::current_dir().unwrap().join("target/debug/kelora")
+    } else {
+        std::env::current_dir()
+            .unwrap()
+            .join("target/release/kelora")
+    };
+
+    let output = Command::new(&binary_path)
+        .args([
+            "--save-alias",
+            "errors",
+            "--config-file",
+            config_path.to_str().unwrap(),
+            "-a",
+            "errors",
+            "--stats",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "kelora should exit successfully, stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let config_content = fs::read_to_string(&config_path).unwrap();
+    // Should fully resolve: -a errors -> -a base -l error -> -f json -l error
+    // Then add --stats
+    assert!(
+        config_content.contains("errors = -f json -l error --stats"),
+        "Config should contain fully resolved alias, got: {}",
+        config_content
+    );
+    assert!(
+        !config_content.contains("json-errors") || !config_content[config_content.find("errors = ").unwrap()..].contains("-a"),
+        "Errors alias should not contain -a reference, got: {}",
+        config_content
+    );
+}
+
+#[test]
+fn test_save_alias_full_workflow() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join(".kelora.ini");
+
+    let binary_path = if cfg!(debug_assertions) {
+        std::env::current_dir().unwrap().join("target/debug/kelora")
+    } else {
+        std::env::current_dir()
+            .unwrap()
+            .join("target/release/kelora")
+    };
+
+    // Step 1: Create base alias
+    Command::new(&binary_path)
+        .args([
+            "--save-alias",
+            "json",
+            "--config-file",
+            config_path.to_str().unwrap(),
+            "-f",
+            "json",
+        ])
+        .output()
+        .unwrap();
+
+    // Step 2: Compose new alias referencing base
+    Command::new(&binary_path)
+        .args([
+            "--save-alias",
+            "json-errors",
+            "--config-file",
+            config_path.to_str().unwrap(),
+            "-a",
+            "json",
+            "-l",
+            "error",
+        ])
+        .output()
+        .unwrap();
+
+    let content = fs::read_to_string(&config_path).unwrap();
+    assert!(
+        content.contains("json = -f json"),
+        "Should have json alias, got: {}",
+        content
+    );
+    assert!(
+        content.contains("json-errors = -a json -l error"),
+        "Should have json-errors with reference, got: {}",
+        content
+    );
+
+    // Step 3: Update json-errors with self-reference
+    Command::new(&binary_path)
+        .args([
+            "--save-alias",
+            "json-errors",
+            "--config-file",
+            config_path.to_str().unwrap(),
+            "-a",
+            "json-errors",
+            "--stats",
+        ])
+        .output()
+        .unwrap();
+
+    let content = fs::read_to_string(&config_path).unwrap();
+    // Should resolve: -a json-errors -> -a json -l error -> -f json -l error
+    // Then add --stats
+    assert!(
+        content.contains("json-errors = -f json -l error --stats"),
+        "Should have flattened json-errors, got: {}",
+        content
+    );
+}
