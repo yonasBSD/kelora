@@ -81,15 +81,21 @@ fn detect_format_from_peekable_reader<R: std::io::BufRead>(
 
 /// Detect format for parallel mode processing
 /// Returns the detected format
-fn detect_format_for_parallel_mode(files: &[String], no_input: bool) -> Result<DetectedFormat> {
+fn detect_format_for_parallel_mode(
+    files: &[String],
+    no_input: bool,
+) -> Result<(DetectedFormat, Option<Box<dyn BufRead + Send>>)> {
     use std::io;
 
     if no_input {
         // For --no-input mode, default to Line format
-        return Ok(DetectedFormat {
-            format: config::InputFormat::Line,
-            had_input: false,
-        });
+        return Ok((
+            DetectedFormat {
+                format: config::InputFormat::Line,
+                had_input: false,
+            },
+            None,
+        ));
     }
 
     if files.is_empty() {
@@ -99,23 +105,32 @@ fn detect_format_for_parallel_mode(files: &[String], no_input: bool) -> Result<D
         let mut peekable_reader =
             readers::PeekableLineReader::new(io::BufReader::new(processed_stdin));
 
-        detect_format_from_peekable_reader(&mut peekable_reader)
+        let detected = detect_format_from_peekable_reader(&mut peekable_reader)?;
+
+        // Reuse the peekable reader so we don't consume stdin twice
+        Ok((detected, Some(Box::new(peekable_reader))))
     } else {
         // For files, read first line from first file
         let sorted_files = pipeline::builders::sort_files(files, &config::FileOrder::Cli)?;
 
         if sorted_files.is_empty() {
-            return Ok(DetectedFormat {
-                format: config::InputFormat::Line,
-                had_input: false,
-            });
+            return Ok((
+                DetectedFormat {
+                    format: config::InputFormat::Line,
+                    had_input: false,
+                },
+                None,
+            ));
         }
 
         let first_file = &sorted_files[0];
         let decompressed = decompression::DecompressionReader::new(first_file)?;
         let mut peekable_reader = readers::PeekableLineReader::new(decompressed);
 
-        detect_format_from_peekable_reader(&mut peekable_reader)
+        let detected = detect_format_from_peekable_reader(&mut peekable_reader)?;
+
+        // For files we can reopen them later, so we don't need to keep this reader
+        Ok((detected, None))
     }
 }
 
@@ -310,10 +325,10 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     let terminal_output = std::io::stderr().is_terminal();
 
     // Handle auto-detection for parallel mode
-    let (final_config, auto_detected_non_line) =
+    let (final_config, auto_detected_non_line, detected_reader) =
         if matches!(config.input.format, config::InputFormat::Auto) {
             // For parallel mode, we need to detect format first
-            let detected_format =
+            let (detected_format, detected_reader) =
                 detect_format_for_parallel_mode(&config.input.files, config.input.no_input)?;
 
             emit_detected_format_notice(config, &detected_format, terminal_output);
@@ -329,9 +344,9 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
 
             let was_auto_detected_non_line = detected_format.detected_non_line();
 
-            (new_config, was_auto_detected_non_line)
+            (new_config, was_auto_detected_non_line, detected_reader)
         } else {
-            (config.clone(), false)
+            (config.clone(), false, None)
         };
 
     let config = &final_config;
@@ -363,7 +378,11 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     }
 
     // Get reader using pipeline builder
-    let reader = create_input_reader(config)?;
+    let reader: Box<dyn BufRead + Send> = if let Some(reader) = detected_reader {
+        reader
+    } else {
+        create_input_reader(config)?
+    };
 
     // Process stages in parallel
     if preserve_order {
