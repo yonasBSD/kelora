@@ -304,7 +304,7 @@ The `edit_distance()` function calculates Levenshtein distance to find errors wi
       -k host,distance
     ```
 
-## Hash Algorithms
+## Hash Algorithms {#multiple-hash-algorithms}
 
 ### The Problem
 You need to hash data for checksums, deduplication, or correlation with external systems.

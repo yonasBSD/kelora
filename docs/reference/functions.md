@@ -620,7 +620,7 @@ e.doubled = e.numbers.map(|n| n * 2)
 e.names = e.users.map(|u| u.name)
 ```
 
-#### `array.pluck(field)` / `array.pluck_as_nums(field)`
+#### `array.pluck(field)` / `array.pluck_as_nums(field)` {#arraypluckfield--arraypluck_as_numsfield}
 Extract a single field from each element in an array of maps/objects, returning a new array of just those field values.
 
 **`pluck(field)`** - Extract field values as-is, skipping elements where the field is missing or `()`.
