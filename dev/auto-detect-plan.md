@@ -11,7 +11,7 @@ Planned behavior
   - Counters: `__kelora_error_count_parse` and `__kelora_stats_events_created` (fall back to 0 when absent).
   - Condition: compute `seen = events_created + parse_errors` (min 1). Fire once at end of run if either:
     - `parse_errors >= 10` **and** `parse_errors * 3 >= seen` (≥75% failures), or
-    - `events_created == 0` **and** `parse_errors >= 5` (short runs that all failed).
+    - `events_created == 0` **and** `parse_errors >= 3` (short runs that all failed).
   - Message: `Many parsing errors; try -f line or -f <fmt>.` Respect diagnostics/TTY suppressions; emit once.
 
 Edge cases and impact
