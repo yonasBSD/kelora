@@ -191,8 +191,8 @@ kelora -j --filter 'e.level.to_upper() == "ERROR"' app.log
 #### Regex Matching
 
 ```bash
-kelora -j --filter 'e.message.has_matches(r"\d{3}-\d{3}-\d{4}")' app.log
-kelora -j --filter 'e.ip.has_matches(r"^192\.168\.")' app.log
+kelora -j --filter 'e.message.matches(r"\d{3}-\d{3}-\d{4}")' app.log
+kelora -j --filter 'e.ip.matches(r"^192\.168\.")' app.log
 ```
 
 #### Existence Checks

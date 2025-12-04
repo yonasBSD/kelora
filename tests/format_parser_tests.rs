@@ -86,7 +86,7 @@ Oct 11 22:14:19 server01 kernel: CPU0: Core temperature above threshold"#;
 
     let (stdout, _stderr, exit_code) = run_kelora_with_input(&[
         "-f", "syslog",
-        "--filter", "e.msg.has_matches(\"Failed|reject\")",
+        "--filter", "e.msg.matches(\"Failed|reject\")",
         "--exec", "track_count(\"errors\"); track_unique(\"programs\", e.prog);",
         "--end", "print(`Total errors: ${metrics[\"errors\"]}, Programs: ${metrics[\"programs\"].len()}`);"
     ], input);

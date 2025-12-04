@@ -1372,12 +1372,6 @@ pub fn register_functions(engine: &mut Engine) {
         text.contains(pattern)
     });
 
-    engine.register_fn("has_matches", |text: &str, pattern: &str| {
-        regex::Regex::new(pattern)
-            .map(|re| re.is_match(text))
-            .unwrap_or(false)
-    });
-
     engine.register_fn("to_int", |text: &str| -> rhai::Dynamic {
         text.parse::<i64>()
             .map(Dynamic::from)

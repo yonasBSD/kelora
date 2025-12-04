@@ -410,7 +410,7 @@ fn test_alias_with_quoted_args() {
 
     // Create alias with quoted filter expression
     fs::write(&config_path,
-        "[aliases]\ncomplex = --filter \"e.level == \\\"error\\\" && e.msg.has_matches(\\\"critical\\\")\"\n").unwrap();
+        "[aliases]\ncomplex = --filter \"e.level == \\\"error\\\" && e.msg.matches(\\\"critical\\\")\"\n").unwrap();
 
     let log_file = temp_dir.path().join("test.log");
     fs::write(

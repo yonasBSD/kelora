@@ -490,23 +490,13 @@ if e.path.matches(r"^/api/[^/]+/details$") {
 }
 ```
 
-#### `text.has_matches(pattern)`
-Legacy regex helper (invalid patterns return `false`).
-
-```rhai
-if e.code.has_matches(r"^ERR-\d+$") {
-    e.valid_error_code = true
-}
-```
-
-#### `text.matches` vs `text.has_matches`
+#### Text Matching Functions Comparison
 
 | Function | Anchored | Errors on invalid pattern | Case handling | Use case |
 |----------|----------|---------------------------|---------------|----------|
 | `like()` | Yes      | N/A (glob syntax)         | Exact         | Simple wildcard matching |
 | `ilike()`| Yes      | N/A                       | Unicode fold  | Case-insensitive glob |
 | `matches()` | No   | Yes                       | Regex-driven  | Full regex search with caching |
-| `has_matches()` | No | No (returns `false`)    | Regex-driven  | Backwards-compatible regex check |
 
 > ⚠️ Regex performance tips: avoid nested quantifiers like `(.*)*`, prefer anchored patterns when possible, and reuse patterns to benefit from the per-thread cache.
 

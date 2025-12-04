@@ -34,7 +34,6 @@ text.extract_jsons()                 Extract all JSON objects/arrays from text a
 text.extract_re_maps(pattern, field) Extract regex matches as array of maps for fan-out
 text.extract_regex(pattern [,group])    Extract regex match or capture group
 text.extract_url([nth])              Extract URL from text (nth: 1=first, -1=last)
-text.has_matches(pattern)            Regex search (legacy helper; invalid pattern returns false)
 text.matches(pattern)                Regex search (cached; invalid pattern raises error)
 text.hash([algo])                    Hash with algorithm (default: sha256, also: xxh3)
 text.index_of(substring [,start])    Find position of literal substring (-1 if not found) (builtin)
