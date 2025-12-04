@@ -12,7 +12,7 @@ Planned behavior
   - Condition: compute `seen = events_created + parse_errors` (min 1). Fire once at end of run if either:
     - `parse_errors >= 10` **and** `parse_errors * 3 >= seen` (≥75% failures), or
     - `events_created == 0` **and** `parse_errors >= 5` (short runs that all failed).
-  - Message: `Parsing errors detected; retry with -f line or -f <fmt> to override.` Respect diagnostics/TTY suppressions; emit once.
+  - Message: `Many parsing errors; try -f line or -f <fmt>.` Respect diagnostics/TTY suppressions; emit once.
 
 Edge cases and impact
 - False positives (we think it’s JSON/CSV/syslog but it isn’t): parsing may error/produce odd fields; follow-up hint nudges users to force `-f line`.
@@ -22,3 +22,6 @@ Edge cases and impact
 
 Open items
 - Confirm wording for the fallback notice and the post-parse-error hint.
+
+Testing
+- Integration coverage for: auto-detected message on recognized formats; fallback notice on unknown; parse-error hint thresholds; suppression under quiet/silent/no-diagnostics/non-TTY.
