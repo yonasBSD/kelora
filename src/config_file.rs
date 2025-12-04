@@ -194,7 +194,7 @@ impl ConfigFile {
 
         if let Some(path) = config_path {
             // Config found - show file path and full contents
-            println!("Config: {}", path.display());
+            println!("# {}", path.display());
             println!();
 
             match std::fs::read_to_string(path) {
