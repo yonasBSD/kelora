@@ -399,7 +399,7 @@ MULTI-FILE PROCESSING:
 kelora -j logs/*.jsonl --exec 'e.source = meta.filename'
 
 # Count errors per file
-kelora -j logs/*.{log,jsonl} --metrics --exec '
+kelora -f auto logs/*.{log,jsonl} --metrics --exec '
   if e.level == "ERROR" {
     track_count(meta.filename)
   }
