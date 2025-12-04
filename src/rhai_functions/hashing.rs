@@ -184,7 +184,7 @@ fn bucket_impl(value: &str) -> i64 {
 }
 
 /// Apply a named hash algorithm to input
-/// Supported: "sha256" (default), "sha1", "md5", "xxh3", "blake3"
+/// Supported: "sha256" (default), "xxh3"
 fn hash_impl(value: &str, algo: &str) -> Result<String, Box<rhai::EvalAltResult>> {
     let algo_lower = algo.to_lowercase();
     match algo_lower.as_str() {
@@ -193,29 +193,11 @@ fn hash_impl(value: &str, algo: &str) -> Result<String, Box<rhai::EvalAltResult>
             hasher.update(value.as_bytes());
             Ok(hex::encode(hasher.finalize()))
         }
-        "sha1" => {
-            let mut hasher = sha1::Sha1::new();
-            hasher.update(value.as_bytes());
-            Ok(hex::encode(hasher.finalize()))
-        }
-        "md5" => {
-            let mut hasher = md5::Md5::new();
-            hasher.update(value.as_bytes());
-            Ok(hex::encode(hasher.finalize()))
-        }
         "xxh3" => {
             let hash = xxh3_64(value.as_bytes());
             Ok(format!("{:016x}", hash))
         }
-        "blake3" => {
-            let hash = blake3::hash(value.as_bytes());
-            Ok(hash.to_hex().to_string())
-        }
-        _ => Err(format!(
-            "Unknown hash algorithm '{}'. Supported: sha256, sha1, md5, xxh3, blake3",
-            algo
-        )
-        .into()),
+        _ => Err(format!("Unknown hash algorithm '{}'. Supported: sha256, xxh3", algo).into()),
     }
 }
 
@@ -263,32 +245,11 @@ mod tests {
     }
 
     #[test]
-    fn test_hash_sha1() {
-        let result = hash_impl("hello", "sha1").unwrap();
-        assert_eq!(result, "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d");
-    }
-
-    #[test]
-    fn test_hash_md5() {
-        let result = hash_impl("hello", "md5").unwrap();
-        assert_eq!(result, "5d41402abc4b2a76b9719d911017c592");
-    }
-
-    #[test]
     fn test_hash_xxh3() {
         let result = hash_impl("hello", "xxh3").unwrap();
         // xxh3 is deterministic, just verify it's a valid hex string
         assert_eq!(result.len(), 16);
         assert!(result.chars().all(|c| c.is_ascii_hexdigit()));
-    }
-
-    #[test]
-    fn test_hash_blake3() {
-        let result = hash_impl("hello", "blake3").unwrap();
-        assert_eq!(
-            result,
-            "ea8f163db38682925e4491c5e58d4bb3506ef8c14eb78a86e908c5624a67200f"
-        );
     }
 
     #[test]
@@ -369,8 +330,8 @@ mod tests {
         );
 
         // Test hash with algo
-        let result: String = engine.eval(r#"hash("hello", "md5")"#).unwrap();
-        assert_eq!(result, "5d41402abc4b2a76b9719d911017c592");
+        let result: String = engine.eval(r#"hash("hello", "xxh3")"#).unwrap();
+        assert_eq!(result.len(), 16);
 
         // Test pseudonym
         let result: String = engine

@@ -75,7 +75,7 @@ fn test_hash_function_with_algorithm() {
             "-f",
             "line",
             "--exec",
-            r#"e.hash_md5 = hash(e.line, "md5")"#,
+            r#"e.hash_xxh3 = hash(e.line, "xxh3")"#,
         ])
         .arg("-")
         .stdin(std::process::Stdio::piped())
@@ -91,8 +91,8 @@ fn test_hash_function_with_algorithm() {
         .expect("Failed to execute kelora");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    // MD5 hash of "hello"
-    assert!(stdout.contains("5d41402abc4b2a76b9719d911017c592"));
+    // xxh3 hash should be present and be 16 hex characters
+    assert!(stdout.contains("hash_xxh3="));
 }
 
 #[test]

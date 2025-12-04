@@ -59,13 +59,10 @@ unicode-normalization = "0.1"  # Unicode normalization (NFC, NFD, NFKC, NFKD) ex
 
 # Rhai built-in functions - cryptography and hashing
 xxhash-rust = { version = "0.8", features = ["xxh3"] }  # Fast non-cryptographic hashing (XXH3) exposed to Rhai scripts
-blake3 = "1.5"  # BLAKE3 cryptographic hashing exposed to Rhai scripts
-sha2 = "0.10"  # SHA-256/SHA-512 hashing exposed to Rhai scripts
-sha1 = "0.10"  # SHA-1 hashing exposed to Rhai scripts
-md-5 = "0.10"  # MD5 hashing exposed to Rhai scripts
-argon2 = "0.5"  # Argon2 password hashing exposed to Rhai scripts
-hkdf = "0.12"  # HKDF key derivation exposed to Rhai scripts
-hmac = "0.12"  # HMAC message authentication exposed to Rhai scripts
+sha2 = "0.10"  # SHA-256 hashing exposed to Rhai scripts
+argon2 = "0.5"  # Argon2 password hashing for pseudonymization
+hkdf = "0.12"  # HKDF key derivation for pseudonymization
+hmac = "0.12"  # HMAC message authentication for pseudonymization
 
 # Rhai built-in functions - networking
 url = "2.5"  # URL parsing and manipulation exposed to Rhai scripts

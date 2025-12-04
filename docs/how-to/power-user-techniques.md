@@ -304,23 +304,21 @@ The `edit_distance()` function calculates Levenshtein distance to find errors wi
       -k host,distance
     ```
 
-## Multiple Hash Algorithms
+## Hash Algorithms
 
 ### The Problem
-Different systems use different hash algorithms. You might need SHA-256 for one system, MD5 for legacy compatibility, or Blake3 for performance.
+You need to hash data for checksums, deduplication, or correlation with external systems.
 
-### The Solution: Multi-Algorithm Hashing
+### The Solution: Cryptographic and Non-Cryptographic Hashing
 
 === "Command/Output"
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/user-data.jsonl \
       --exec 'e.sha256 = e.email.hash("sha256");
-              e.md5 = e.email.hash("md5");
-              e.blake3 = e.email.hash("blake3");
               e.xxh3 = e.email.hash("xxh3");
               e.email = ()' \
-      -k user_id,sha256,blake3 -F csv
+      -k user_id,sha256,xxh3 -F csv
     ```
 
 === "Log Data"
@@ -331,11 +329,13 @@ Different systems use different hash algorithms. You might need SHA-256 for one 
 
 **Available algorithms:**
 
-- `sha256` - SHA-256 (default, most common)
-- `sha1` - SHA-1 (legacy)
-- `md5` - MD5 (legacy, fast but not secure)
-- `blake3` - BLAKE3 (fastest modern algorithm)
+- `sha256` - SHA-256 (default, cryptographic)
 - `xxh3` - xxHash3 (non-cryptographic, extremely fast)
+
+**When to use which:**
+
+- Use `sha256` for checksums, integrity verification, or when you need cryptographic properties
+- Use `xxh3` for bucketing, sampling, or deduplication where speed matters and cryptographic security isn't needed
 
 ### Use Case: Privacy-Preserving Analytics
 
@@ -770,7 +770,7 @@ kelora -j api-responses.jsonl \
   --exec 'emit_each(e.get_path("data.orders", []))' \
   --exec 'emit_each(e.items)' \
   --exec 'e.error_pattern = e.get("error_msg", "").normalized();
-          e.user_hash = e.user_id.hash("blake3");
+          e.user_hash = e.user_id.hash("xxh3");
           e.sample_group = e.order_id.bucket() % 10;
           e.user_id = ()' \
   --filter 'e.sample_group < 3' \
@@ -798,7 +798,7 @@ All in a single command without temporary files or custom scripts.
 - **Use `bucket()` for sampling before heavy processing** - reduces work by 90% with 10% sample
 - **Apply filters early** - before fan-out or expensive transformations
 - **Chain operations in one `--exec`** when sharing variables (semicolon-separated)
-- **Use `blake3` or `xxh3` hashes** for non-cryptographic use cases (much faster)
+- **Use `xxh3` hash** for non-cryptographic use cases (much faster than `sha256`)
 - **Limit window size** (`--window N`) to minimum needed for sliding calculations
 
 ## Troubleshooting

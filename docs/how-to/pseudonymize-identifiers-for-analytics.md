@@ -64,7 +64,7 @@ kelora -j app.log \
 ```
 
 - `hash("xxh3")` is fast but not secret; use `pseudonym()` whenever anonymity guarantees matter.
-- Cryptographic hashes (`sha256`, `blake3`) avoid collisions but still leak the same input if the attacker knows it. Pseudonyms resist this by requiring the secret.
+- Cryptographic hashes (`sha256`) avoid collisions but still leak the same input if the attacker knows it. Pseudonyms resist this by requiring the secret.
 
 ## Step 5: Validate Consistency
 Confirm that the same inputs produce identical pseudonyms across runs and that expected fields are gone.
