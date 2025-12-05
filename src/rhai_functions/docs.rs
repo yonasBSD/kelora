@@ -325,11 +325,11 @@ kelora -j api_logs.jsonl --exec 'print(e.to_logfmt())' -q
 kelora -f logfmt app.log --exec 'print(e.to_json())' -q
 
 OUTPUT CONTROL (suppressing different streams):
-# Show only stats (automatically suppresses events)
+# Show only stats (automatically suppresses events; no need for -q)
 kelora -j api_logs.jsonl -s
 kelora -f combined web_access.log --filter 'e.status >= 500' --stats
 
-# Show only metrics, suppress events (-m)
+# Show only metrics (automatically suppresses events)
 kelora -j api_logs.jsonl --exec 'track_count(e.level)' -m
 
 # Silent mode: suppress all terminal output, but print() still works & files still write

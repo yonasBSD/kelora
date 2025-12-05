@@ -498,7 +498,7 @@ pub struct Cli {
     #[arg(long = "unordered", help_heading = "Performance Options")]
     pub no_preserve_order: bool,
 
-    /// Show stats only (suppress events). Use -s for default (table), or --stats=FORMAT for explicit format.
+    /// Show stats only (implies -q/--no-events). Use -s for default (table), or --stats=FORMAT for explicit format.
     #[arg(
         short = 's',
         long = "stats",
@@ -508,7 +508,7 @@ pub struct Cli {
         num_args = 0..=1,
         default_missing_value = "table",
         help_heading = "Metrics and Stats",
-        help = "Show stats only (suppress events).\n\nFormats: table, json\n\nExamples:\n  -s              Default table format\n  --stats=json    JSON output"
+        help = "Show stats only (implies -q/--no-events).\n\nFormats: table, json\n\nExamples:\n  -s              Default table format\n  --stats=json    JSON output"
     )]
     pub stats: Option<StatsFormat>,
 
@@ -524,7 +524,7 @@ pub struct Cli {
     #[arg(long = "with-stats", help_heading = "Metrics and Stats")]
     pub with_stats: bool,
 
-    /// Show metrics only (suppress events). Use -m for default (table), or --metrics=FORMAT for explicit format.
+    /// Show metrics only (implies -q/--no-events). Use -m for default (table), or --metrics=FORMAT for explicit format.
     #[arg(
         short = 'm',
         long = "metrics",
@@ -534,7 +534,7 @@ pub struct Cli {
         num_args = 0..=1,
         default_missing_value = "full",
         help_heading = "Metrics and Stats",
-        help = "Show metrics only (suppress events).\n\nFormats: short (first 5), full (default), json\n\nExamples:\n  -m               Full metrics table\n  --metrics=short  Abbreviated (first 5 items)\n  --metrics=json   JSON output"
+        help = "Show metrics only (implies -q/--no-events).\n\nFormats: short (first 5), full (default), json\n\nExamples:\n  -m               Full metrics table\n  --metrics=short  Abbreviated (first 5 items)\n  --metrics=json   JSON output"
     )]
     pub metrics: Option<MetricsFormat>,
 

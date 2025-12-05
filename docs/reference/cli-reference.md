@@ -492,7 +492,8 @@ Suppress formatter output (events). Diagnostics, stats, metrics, and script outp
 
 ```bash
 kelora -q app.log                         # No events, diagnostics still emit
-kelora --no-events -s -m app.log          # Stats + metrics, no events
+kelora -s app.log                         # Stats only (events suppressed automatically)
+kelora -m app.log                         # Metrics only (events suppressed automatically)
 ```
 
 #### `--no-diagnostics`
@@ -877,7 +878,7 @@ kelora -j --parallel --unordered app.log
 
 #### `-s, --stats[=FORMAT]`
 
-Show stats only (suppress events). Use `-s` for default table format, or `--stats=FORMAT` for explicit format.
+Show stats only (implies `-q/--no-events`). Use `-s` for default table format, or `--stats=FORMAT` for explicit format.
 
 Formats: `table`, `json`
 
@@ -902,7 +903,7 @@ Disable processing statistics explicitly (default: off).
 
 #### `-m, --metrics[=FORMAT]`
 
-Show metrics only (suppress events). Use `-m` for default full table format, or `--metrics=FORMAT` for explicit format.
+Show metrics only (implies `-q/--no-events`). Use `-m` for default full table format, or `--metrics=FORMAT` for explicit format.
 
 Formats: `short` (first 5 items), `full` (default), `json`
 

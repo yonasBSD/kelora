@@ -46,8 +46,7 @@ Group errors by pattern rather than exact message to see that many different err
     kelora -j examples/production-errors.jsonl \
       --exec 'e.error_pattern = e.message.normalized()' \
       --metrics \
-      --exec 'track_count(e.error_pattern)' \
-      --no-events
+      --exec 'track_count(e.error_pattern)'
     ```
 
 === "Log Data"
@@ -437,8 +436,7 @@ You want to see the distribution of response times, not just average/max.
       --filter 'e.has("response_time")' \
       --metrics \
       --exec 'let bucket = (e.response_time / 0.5).floor() * 0.5;
-              track_bucket("response_ms", bucket)' \
-      --no-events
+              track_bucket("response_ms", bucket)'
     ```
 
 === "Log Data"
@@ -454,8 +452,7 @@ You want to see the distribution of response times, not just average/max.
     ```bash exec="on" source="above" result="ansi"
     kelora -f combined examples/web_access.log \
       --metrics \
-      --exec 'track_bucket("status", e.status / 100 * 100)' \
-      --no-events
+      --exec 'track_bucket("status", e.status / 100 * 100)'
     ```
 
 === "Log Data"
