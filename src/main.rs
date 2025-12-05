@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{ArgMatches, CommandFactory, FromArgMatches};
 use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
 use std::io::IsTerminal;
@@ -124,7 +124,8 @@ fn detect_format_for_parallel_mode(
         }
 
         let first_file = &sorted_files[0];
-        let decompressed = decompression::DecompressionReader::new(first_file)?;
+        let decompressed = decompression::DecompressionReader::new(first_file)
+            .with_context(|| format!("Failed to open file '{}'", first_file))?;
         let mut peekable_reader = readers::PeekableLineReader::new(decompressed);
 
         let detected = detect_format_from_peekable_reader(&mut peekable_reader)?;
@@ -520,7 +521,8 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
 
         let first_file = &sorted_files[0];
         let detected_format = {
-            let decompressed = decompression::DecompressionReader::new(first_file)?;
+            let decompressed = decompression::DecompressionReader::new(first_file)
+                .with_context(|| format!("Failed to open file '{}'", first_file))?;
             let mut peekable_reader = readers::PeekableLineReader::new(decompressed);
             detect_format_from_peekable_reader(&mut peekable_reader)?
         };

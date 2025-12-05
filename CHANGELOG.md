@@ -38,6 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - File failure tracking now works correctly across threads using atomic counters
 - Error messages no longer have leading blank lines; emoji display now checks stderr TTY instead of stdout
 - Parallel stdin format detection now preserves stats correctly
+- Missing input files now report the offending filename in the pipeline error (covers multi-file invocations)
 - Documentation corrections across help screens (flag references, filter examples, time syntax)
 
 ## [0.13.1] - 2025-11-30

@@ -1,6 +1,7 @@
 mod common;
 use common::*;
 use std::io::Write;
+use std::path::Path;
 use std::process::{Command, Stdio};
 use tempfile::NamedTempFile;
 
@@ -16,6 +17,24 @@ fn test_explicit_stdin_with_dash() {
     assert!(stdout.contains("test1"));
     assert!(stdout.contains("test2"));
     assert!(stdout.contains("test3"));
+}
+
+#[test]
+fn test_missing_file_reports_name() {
+    let missing = "tests/data/file_should_not_exist_12345.log";
+    assert!(
+        !Path::new(missing).exists(),
+        "Test assumes missing file does not exist"
+    );
+
+    let (_stdout, stderr, exit_code) = run_kelora_with_files(&["-f", "json"], &[missing]);
+
+    assert_ne!(exit_code, 0, "Should fail when file is missing");
+    assert!(
+        stderr.contains(missing),
+        "stderr should mention missing filename: {}",
+        stderr
+    );
 }
 
 #[test]
