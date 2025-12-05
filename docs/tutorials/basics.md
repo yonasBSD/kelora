@@ -73,6 +73,8 @@ line            # Plain text (fallback)
 
 To explicitly specify a format, use `-f <format>`. For example: `-f json`, `-f logfmt`, `-f csv`.
 
+For details on each format (including examples and field mappings), see the **[Format Reference](../reference/formats.md)**.
+
 ---
 
 ## Part 2: Understanding the Default Display
