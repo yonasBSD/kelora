@@ -367,7 +367,8 @@ Specify output format with `-F, --output-format <format>`.
 | `tsv` | Tab-separated values with header row |
 | `csvnh` | CSV without header |
 | `tsvnh` | TSV without header |
-| `none` | No output (useful with `--stats` or `--metrics`) |
+
+Use `-q/--no-events` to suppress output (implied by `--stats` and `--metrics`).
 
 **Levelmap Visual Example:**
 

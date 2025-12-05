@@ -130,13 +130,7 @@ fn test_empty_line_handling_consistency_across_formats() {
 
     // Line format should process all lines
     let (stdout_line, _stderr_line, exit_code_line) = run_kelora_with_input(
-        &[
-            "-f",
-            "line",
-            "--exec",
-            "print(\"[\" + line + \"]\")",
-            "-q",
-        ],
+        &["-f", "line", "--exec", "print(\"[\" + line + \"]\")", "-q"],
         input,
     );
     assert_eq!(exit_code_line, 0, "Line format should exit successfully");
