@@ -33,40 +33,28 @@ If you cloned the project, run commands from the repository root.
 
 ## Part 1: Input Formats (`-f`, `-j`)
 
-### Auto-detect by Default
-
-You've seen `-j` in the [Quickstart](../quickstart.md) to read JSON logs. Let's understand what this flag really means and what other formats Kelora supports.
-
-By default, Kelora automatically detects the log format by examining the first line of content. This means you can usually just point Kelora at your logs and it will figure out the format:
+By default, Kelora auto-detects your log format by examining the first line. Just point it at your logs:
 
 ```bash exec="on" source="above" result="ansi"
 kelora examples/basics.jsonl
 ```
 
-Kelora detects this is JSON and parses the fields. If you need to override auto-detection (for example, to treat structured logs as plain text):
+Kelora detects this is JSON and parses the fields automatically.
+
+**For scripts and reproducibility**, specify the format explicitly:
+
+```bash
+kelora -f json examples/basics.jsonl      # Explicit format
+kelora -j examples/basics.jsonl           # Shortcut for -f json
+```
+
+This prevents surprises if auto-detection logic changes in future versions.
+
+**To override auto-detection** and treat structured logs as plain text:
 
 ```bash exec="on" source="above" result="ansi"
 kelora -f line examples/basics.jsonl
 ```
-
-**Three ways to read JSON logs:**
-
-```bash
-kelora examples/basics.jsonl              # Auto-detect (default)
-kelora -f json examples/basics.jsonl      # Explicit format
-kelora -j examples/basics.jsonl           # -j is shortcut for -f json
-```
-
-**Key Points:**
-
-- Auto-detection inspects content, not filenames (a `.log` file might contain JSON)
-- Use `-f <format>` to explicitly specify a format
-- Use `-f line` to force plain-text treatment when you don't want parsing
-- `-j` is a convenient shortcut for `-f json`
-
-**When to be explicit:**
-
-Auto-detection is great for interactive exploration, but use explicit formats (`-f json`, `-f logfmt`, etc.) in scripts and automated workflows. This ensures reproducibility even if new formats are added or detection logic changes in future versions.
 
 ### Common Input Formats
 
