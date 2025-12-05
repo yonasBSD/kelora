@@ -275,7 +275,7 @@ impl MultiFileReader {
                                         e
                                     ))
                                 );
-                                crate::stats::stats_file_open_failed();
+                                crate::stats::stats_file_open_failed("-");
                                 if self.strict {
                                     return Err(io::Error::other(e));
                                 }
@@ -292,7 +292,7 @@ impl MultiFileReader {
                                 e
                             ))
                         );
-                        crate::stats::stats_file_open_failed();
+                        crate::stats::stats_file_open_failed("-");
                         if self.strict {
                             return Err(io::Error::other(e));
                         }
@@ -317,7 +317,7 @@ impl MultiFileReader {
                                 file_path, e
                             ))
                         );
-                        crate::stats::stats_file_open_failed();
+                        crate::stats::stats_file_open_failed(file_path);
                         if self.strict {
                             return Err(io::Error::new(
                                 io::ErrorKind::NotFound,

@@ -1738,7 +1738,9 @@ fn main() -> Result<()> {
                         }
                     } else if diagnostics_allowed_runtime {
                         // Error summary by default when errors occur (unless diagnostics suppressed)
-                        if let Some(error_summary) =
+                        let mut summaries = Vec::new();
+
+                        if let Some(tracking_summary) =
                             crate::rhai_functions::tracking::extract_error_summary_from_tracking(
                                 &pipeline_result.tracking_data,
                                 config.processing.verbose,
@@ -1746,7 +1748,17 @@ fn main() -> Result<()> {
                                 Some(&config),
                             )
                         {
-                            let mut formatted = config.format_error_message(&error_summary);
+                            summaries.push(tracking_summary);
+                        }
+
+                        let stats_summary = s.format_error_summary();
+                        if !stats_summary.is_empty() {
+                            summaries.push(stats_summary);
+                        }
+
+                        if !summaries.is_empty() {
+                            let combined = summaries.join("; ");
+                            let mut formatted = config.format_error_message(&combined);
                             if !events_were_output {
                                 formatted = formatted.trim_start_matches('\n').to_string();
                             }

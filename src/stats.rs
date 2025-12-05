@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Default)]
@@ -25,6 +26,7 @@ pub struct ProcessingStats {
     pub late_events: usize,
     pub files_processed: usize,
     pub files_failed_to_open: usize, // Files that failed to open (I/O errors)
+    pub failed_file_samples: Vec<String>,
     pub script_executions: usize,
     pub errors: usize, // Kept for backward compatibility, but lines_errors is more specific
     pub processing_time: Duration,
@@ -52,6 +54,8 @@ static COLLECT_STATS: AtomicBool = AtomicBool::new(true);
 
 // File open failures use atomic counter since they can happen on any thread (e.g., decompression threads)
 static FILES_FAILED_TO_OPEN: AtomicUsize = AtomicUsize::new(0);
+static FAILED_FILE_SAMPLES: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
+const MAX_FAILED_FILE_SAMPLES: usize = 3;
 
 pub fn set_collect_stats(enabled: bool) {
     COLLECT_STATS.store(enabled, Ordering::Relaxed);
@@ -59,6 +63,22 @@ pub fn set_collect_stats(enabled: bool) {
 
 pub fn stats_enabled() -> bool {
     COLLECT_STATS.load(Ordering::Relaxed)
+}
+
+fn push_failed_file_sample(path: &str) {
+    let samples = FAILED_FILE_SAMPLES.get_or_init(|| Mutex::new(Vec::new()));
+    if let Ok(mut list) = samples.lock() {
+        if list.len() < MAX_FAILED_FILE_SAMPLES && !list.iter().any(|p| p == path) {
+            list.push(path.to_string());
+        }
+    }
+}
+
+fn failed_file_samples() -> Vec<String> {
+    FAILED_FILE_SAMPLES
+        .get()
+        .and_then(|samples| samples.lock().ok().map(|v| v.clone()))
+        .unwrap_or_default()
 }
 
 // Thread-local storage for statistics (following track_count pattern)
@@ -201,16 +221,18 @@ pub fn get_thread_stats() -> ProcessingStats {
         let mut s = stats.borrow().clone();
         // Merge in atomic counter for file failures (can happen on any thread)
         s.files_failed_to_open = FILES_FAILED_TO_OPEN.load(Ordering::Relaxed);
+        s.failed_file_samples = failed_file_samples();
         s
     })
 }
 
-pub fn stats_file_open_failed() {
+pub fn stats_file_open_failed(path: &str) {
     if !stats_enabled() {
         return;
     }
     // Use atomic counter since file opening can happen on any thread (e.g., decompression threads)
     FILES_FAILED_TO_OPEN.fetch_add(1, Ordering::Relaxed);
+    push_failed_file_sample(path);
 }
 
 pub fn stats_record_timestamp_detection(field_name: &str, _raw_value: &str, parsed: bool) {
@@ -706,6 +728,37 @@ impl ProcessingStats {
                 self.events_filtered,
                 if self.events_filtered == 1 { "" } else { "s" }
             ));
+        }
+
+        if self.files_failed_to_open > 0 {
+            let mut message = format!(
+                "{} file{} failed to open",
+                self.files_failed_to_open,
+                if self.files_failed_to_open == 1 {
+                    ""
+                } else {
+                    "s"
+                }
+            );
+
+            if !self.failed_file_samples.is_empty() {
+                let total = self.files_failed_to_open;
+                let sample_joined = self
+                    .failed_file_samples
+                    .iter()
+                    .take(MAX_FAILED_FILE_SAMPLES)
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                if total > self.failed_file_samples.len() {
+                    message.push_str(&format!(" ({}, ...)", sample_joined));
+                } else {
+                    message.push_str(&format!(" ({})", sample_joined));
+                }
+            }
+
+            parts.push(message);
         }
 
         if parts.is_empty() {

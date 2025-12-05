@@ -38,6 +38,35 @@ fn test_missing_file_reports_name() {
 }
 
 #[test]
+fn test_missing_file_is_in_error_summary() {
+    let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
+    writeln!(temp_file, "ok").expect("Failed to write temp file");
+
+    let missing = "tests/data/file_should_not_exist_98765.log";
+    assert!(
+        !Path::new(missing).exists(),
+        "Test assumes missing file does not exist"
+    );
+
+    let (_stdout, stderr, exit_code) = run_kelora_with_files(
+        &["-f", "line"],
+        &[temp_file.path().to_str().unwrap(), missing],
+    );
+
+    assert_ne!(exit_code, 0, "Should fail when file is missing");
+    assert!(
+        stderr.contains("file failed to open"),
+        "Error summary should mention failed file open: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains(missing),
+        "Error summary should include missing filename: {}",
+        stderr
+    );
+}
+
+#[test]
 fn test_stdin_mixed_with_files() {
     // Create a temporary file
     let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
