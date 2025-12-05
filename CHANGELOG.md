@@ -11,7 +11,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `to_json()` function now accepts optional indent parameter for pretty-printing JSON output
 - `meta.parsed_ts` now exposed in Rhai scripts for accessing the parsed timestamp value
 - Log shipper integration guide and quick-reference entry for common pipelines (e.g., Filebeat, Vector, Logstash)
-- Auto-detect now emits detection/fallback notices (TTY-aware) and a parse-failure warning when the auto-chosen format mostly fails, nudging users to set `-f <fmt>` or `-f line`
 
 ### Removed
 
@@ -23,30 +22,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Breaking:** Default input format switched to content-based detection (`-f auto`) instead of raw lines
 - **Breaking:** `--metrics` now defaults to full output instead of abbreviated. Use `--metrics=short` for the old behavior (first 5 items). The `table` format has been renamed to `short` for clarity.
 - **Breaking:** Regex extraction functions renamed for clarity (`extract_pattern` → `extract_regex`, `extract_all_pattern` → `extract_all_regex`)
+- **Breaking:** File I/O failures now exit 1 (processing error) and respect `--strict` mode instead of being silently tracked
+- **Breaking:** Using both `--include` and `--filter` together now exits 2 (usage error) instead of warning
+- Auto-detect now emits detection/fallback notices (TTY-aware) and a parse-failure warning when the auto-chosen format mostly fails
+- Warning messages now use 🔸 (orange diamond) vs ⚠️ (warning sign) for errors
+- Metrics and stats headers now only shown when using `--with-metrics` or `--with-stats` flags
 - `--save-alias` now resolves referenced aliases when updating an alias in place while preserving composition when saving under a new name
 - `--show-config` output now uses `#` as header prefix instead of `Config:`
 - `--mark-gaps` output format humanized for better readability
-- Help screen organization improved with better categorization of output and config options
-- Emojis removed from help screens (still available in main output unless `--no-emoji` is used)
-- Metrics and stats headers now only shown when using `--with-metrics` or `--with-stats` flags
-- **Breaking:** File I/O failures now exit 1 (processing error) and respect `--strict` mode instead of being silently tracked
-- **Breaking:** Using both `--include` and `--filter` together now exits 2 (usage error) instead of warning
-- Warning messages now use 🔸 (orange diamond) vs ⚠️ (warning sign) for errors
-- CLI quick reference examples and options updated for clarity
-- Documentation updated to use method syntax (e.g., `value.to_int_or(default)`) consistently throughout
-- Output suppression documentation reorganized and clarified across `--help-rhai` and `--help-examples`
-- `pluck()` function documentation enhanced with practical examples for window-based calculations and burst detection
-- `track_top()` and `track_bottom()` parameter documentation clarified to distinguish frequency-based vs score-based tracking
+- Help screen organization improved with better categorization of output and config options; emojis removed from help screens (still available in main output unless `--no-emoji` is used)
+- Documentation updated to use method syntax consistently, improved function examples for `pluck()`, `track_top()`, and `track_bottom()`, and clarified output suppression across help screens
 
 ### Fixed
 
 - File failure tracking now works correctly across threads using atomic counters
-- Error messages no longer have leading blank lines
-- Emoji display now checks stderr TTY instead of stdout
+- Error messages no longer have leading blank lines; emoji display now checks stderr TTY instead of stdout
 - Parallel stdin format detection now preserves stats correctly
-- Documentation improvements across help screens and examples (corrected flag references, removed outdated warnings, improved examples)
-- Filter examples in help text (private IP filter, business hours filter)
-- Time syntax documentation corrections
+- Documentation corrections across help screens (flag references, filter examples, time syntax)
 
 ## [0.13.1] - 2025-11-30
 
