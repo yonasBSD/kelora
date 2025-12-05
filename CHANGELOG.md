@@ -14,12 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Removed
 
-- **Breaking:** `-F none` output format removed; use `-q` or `--no-events` instead to suppress event output
+- **Breaking:** `-F none` output format removed; use `-q` or `--quiet` instead to suppress event output
 - **Breaking:** Weak/legacy hash algorithms removed from `hash()`; only `sha256` (default) and `xxh3` remain
 - **Breaking:** Deprecated `has_matches()` helper removed; use `matches()` for regex checks instead
 
 ### Changed
 
+- **Breaking:** `--no-events` renamed to `--quiet` (short flag remains `-q`)
 - **Breaking:** Default input format switched to content-based detection (`-f auto`) instead of raw lines
 - **Breaking:** `--metrics` now defaults to full output instead of abbreviated. Use `--metrics=short` for the old behavior (first 5 items). The `table` format has been renamed to `short` for clarity.
 - **Breaking:** Regex extraction functions renamed for clarity (`extract_pattern` → `extract_regex`, `extract_all_pattern` → `extract_all_regex`)

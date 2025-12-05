@@ -1188,8 +1188,8 @@ fn test_quiet_level_1_suppresses_diagnostics() {
 }
 
 #[test]
-fn test_no_events_and_no_diagnostics_suppress_terminal_output() {
-    // Test that combining --no-events with --no-diagnostics suppresses both streams
+fn test_quiet_and_no_diagnostics_suppress_terminal_output() {
+    // Test that combining --quiet with --no-diagnostics suppresses both streams
     let input = r#"{"level": "info", "message": "test1"}
 {"level": "error", "message": "test2"}"#;
 

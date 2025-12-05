@@ -373,8 +373,8 @@ pub struct Cli {
     #[arg(short = 'o', long = "output-file", help_heading = "Output Options")]
     pub output_file: Option<String>,
 
-    /// Suppress events (formatter output). Alternative: --no-events
-    #[arg(short = 'q', long = "no-events", help_heading = "Output Options")]
+    /// Suppress events (formatter output)
+    #[arg(short = 'q', long = "quiet", help_heading = "Output Options")]
     pub quiet: bool,
 
     /// Suppress diagnostics and error summaries (fatal line still allowed).
@@ -494,7 +494,7 @@ pub struct Cli {
     #[arg(long = "unordered", help_heading = "Performance Options")]
     pub no_preserve_order: bool,
 
-    /// Show stats only (implies -q/--no-events). Use -s for default (table), or --stats=FORMAT for explicit format.
+    /// Show stats only (implies -q/--quiet). Use -s for default (table), or --stats=FORMAT for explicit format.
     #[arg(
         short = 's',
         long = "stats",
@@ -504,7 +504,7 @@ pub struct Cli {
         num_args = 0..=1,
         default_missing_value = "table",
         help_heading = "Metrics and Stats",
-        help = "Show stats only (implies -q/--no-events).\n\nFormats: table, json\n\nExamples:\n  -s              Default table format\n  --stats=json    JSON output"
+        help = "Show stats only (implies -q/--quiet).\n\nFormats: table, json\n\nExamples:\n  -s              Default table format\n  --stats=json    JSON output"
     )]
     pub stats: Option<StatsFormat>,
 
@@ -520,7 +520,7 @@ pub struct Cli {
     #[arg(long = "with-stats", help_heading = "Metrics and Stats")]
     pub with_stats: bool,
 
-    /// Show metrics only (implies -q/--no-events). Use -m for default (table), or --metrics=FORMAT for explicit format.
+    /// Show metrics only (implies -q/--quiet). Use -m for default (table), or --metrics=FORMAT for explicit format.
     #[arg(
         short = 'm',
         long = "metrics",
@@ -530,7 +530,7 @@ pub struct Cli {
         num_args = 0..=1,
         default_missing_value = "full",
         help_heading = "Metrics and Stats",
-        help = "Show metrics only (implies -q/--no-events).\n\nFormats: short (first 5), full (default), json\n\nExamples:\n  -m               Full metrics table\n  --metrics=short  Abbreviated (first 5 items)\n  --metrics=json   JSON output"
+        help = "Show metrics only (implies -q/--quiet).\n\nFormats: short (first 5), full (default), json\n\nExamples:\n  -m               Full metrics table\n  --metrics=short  Abbreviated (first 5 items)\n  --metrics=json   JSON output"
     )]
     pub metrics: Option<MetricsFormat>,
 

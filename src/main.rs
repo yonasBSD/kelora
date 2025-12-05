@@ -2538,7 +2538,7 @@ Common Options:
   -e, --exec <expr>             Transform events or emit metrics (can repeat; run in the order given)
   -k, --keys <fields>           Pick or reorder output fields
   -F, --output-format <FORMAT>  Output format (default/json/logfmt/inspect/levelmap/csv/tsv/csvnh/tsvnh)
-  -q, --no-events               Suppress event output (-s/--stats and -m/--metrics imply this)
+  -q, --quiet                   Suppress event output (-s/--stats and -m/--metrics imply this)
   -n, --take <N>                Limit output to first N events
   -s, --stats                   Show only the statistics, with discovered fields
   -m, --metrics                 Show only the tracked metrics
@@ -3015,7 +3015,7 @@ tsv       - Tab-separated with header row
 csvnh     - CSV without header
 tsvnh     - TSV without header
 
-Use -q/--no-events to suppress output (implied by -s/--stats and -m/--metrics).
+Use -q/--quiet to suppress output (implied by -s/--stats and -m/--metrics).
 
 For other help topics: kelora -h
 "#;
