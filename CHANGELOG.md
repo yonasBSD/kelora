@@ -35,6 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Directory inputs are now treated as errors in non-strict mode with clear messaging, while still continuing; strict mode fails immediately
 - File failure tracking now works correctly across threads using atomic counters
 - Error messages no longer have leading blank lines; emoji display now checks stderr TTY instead of stdout
 - Parallel stdin format detection now preserves stats correctly

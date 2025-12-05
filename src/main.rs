@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::{ArgMatches, CommandFactory, FromArgMatches};
 use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
+use std::fs;
 use std::io::IsTerminal;
 use std::sync::atomic::Ordering;
 
@@ -115,9 +116,23 @@ fn detect_format_for_parallel_mode(
         let sorted_files = pipeline::builders::sort_files(files, &config::FileOrder::Cli)?;
 
         let mut failed_opens: Vec<(String, String)> = Vec::new();
+        let mut failed_dirs: Vec<String> = Vec::new();
         let mut detected: Option<DetectedFormat> = None;
 
         for file_path in &sorted_files {
+            if let Ok(metadata) = fs::metadata(file_path) {
+                if metadata.is_dir() {
+                    if strict {
+                        return Err(anyhow::anyhow!(
+                            "Input path '{}' is a directory; only files are supported",
+                            file_path
+                        ));
+                    }
+                    failed_dirs.push(file_path.clone());
+                    continue;
+                }
+            }
+
             match decompression::DecompressionReader::new(file_path) {
                 Ok(decompressed) => {
                     let mut peekable_reader = readers::PeekableLineReader::new(decompressed);
@@ -140,6 +155,16 @@ fn detect_format_for_parallel_mode(
         let detected = match detected {
             Some(detected) => detected,
             None => {
+                for path in failed_dirs {
+                    eprintln!(
+                        "{}",
+                        crate::config::format_error_message_auto(&format!(
+                            "Input path '{}' is a directory; skipping (input files only)",
+                            path
+                        ))
+                    );
+                    stats::stats_file_open_failed(&path);
+                }
                 for (path, err) in failed_opens {
                     eprintln!(
                         "{}",
@@ -549,8 +574,22 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         }
 
         let mut failed_opens: Vec<(String, String)> = Vec::new();
+        let mut failed_dirs: Vec<String> = Vec::new();
         let mut detected_format: Option<DetectedFormat> = None;
         for file_path in &sorted_files {
+            if let Ok(metadata) = fs::metadata(file_path) {
+                if metadata.is_dir() {
+                    if config.processing.strict {
+                        return Err(anyhow::anyhow!(
+                            "Input path '{}' is a directory; only files are supported",
+                            file_path
+                        ));
+                    }
+                    failed_dirs.push(file_path.clone());
+                    continue;
+                }
+            }
+
             match decompression::DecompressionReader::new(file_path) {
                 Ok(decompressed) => {
                     let mut peekable_reader = readers::PeekableLineReader::new(decompressed);
@@ -574,6 +613,16 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         let detected_format = match detected_format {
             Some(detected) => detected,
             None => {
+                for path in failed_dirs {
+                    eprintln!(
+                        "{}",
+                        crate::config::format_error_message_auto(&format!(
+                            "Input path '{}' is a directory; skipping (input files only)",
+                            path
+                        ))
+                    );
+                    stats::stats_file_open_failed(&path);
+                }
                 for (path, err) in failed_opens {
                     eprintln!(
                         "{}",

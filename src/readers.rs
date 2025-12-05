@@ -1,5 +1,6 @@
 use anyhow::Result;
 use crossbeam_channel::Receiver;
+use std::fs;
 use std::io::{self, BufRead, BufReader, Read};
 use std::thread;
 
@@ -301,6 +302,27 @@ impl MultiFileReader {
                     }
                 }
             } else {
+                if let Ok(metadata) = fs::metadata(file_path) {
+                    if metadata.is_dir() {
+                        eprintln!(
+                            "{}",
+                            crate::config::format_error_message_auto(&format!(
+                                "Input path '{}' is a directory; skipping (input files only)",
+                                file_path
+                            ))
+                        );
+                        crate::stats::stats_file_open_failed(file_path);
+                        if self.strict {
+                            return Err(io::Error::other(format!(
+                                "Input path '{}' is a directory; only files are supported",
+                                file_path
+                            )));
+                        }
+                        self.current_file_idx += 1;
+                        continue;
+                    }
+                }
+
                 match DecompressionReader::new(file_path) {
                     Ok(decompressor) => {
                         self.current_reader = Some(Box::new(BufReader::with_capacity(
