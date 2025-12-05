@@ -667,8 +667,7 @@ fn test_span_count_closes_on_n() {
         &[
             "-f",
             "json",
-            "-F",
-            "none",
+            "-q",
             "--span",
             "2",
             "--span-close",
@@ -693,8 +692,7 @@ fn test_span_metadata_statuses() {
         &[
             "-f",
             "json",
-            "-F",
-            "none",
+            "-q",
             "--span",
             "1m",
             "--exec",
@@ -727,8 +725,7 @@ fn test_span_metrics_track_counts() {
         &[
             "-f",
             "json",
-            "-F",
-            "none",
+            "-q",
             "--span",
             "2",
             "--exec",

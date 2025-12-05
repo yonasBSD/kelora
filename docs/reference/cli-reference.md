@@ -488,7 +488,7 @@ kelora -j --verbose app.log
 
 #### `-q` / `--no-events`
 
-Suppress formatter output (events). Diagnostics, stats, metrics, and script output remain unless further flags are used. Same effect as `-F none`.
+Suppress formatter output (events). Diagnostics, stats, metrics, and script output remain unless further flags are used.
 
 ```bash
 kelora -q app.log                         # No events, diagnostics still emit
@@ -680,12 +680,11 @@ Output format. Default: `default`
 - `tsv` - Tab-separated values with header
 - `csvnh` - CSV without header
 - `tsvnh` - TSV without header
-- `none` - No event output (only metrics/stats)
 
 ```bash
 kelora -j -F json app.log
 kelora -j -F csv app.log
-kelora -j -F none --stats app.log
+kelora -j --stats app.log
 ```
 
 #### `-J`

@@ -143,7 +143,7 @@ defaults = --stats --no-emoji
 
 [aliases]
 myerrors = -j --levels error --exclude-keys password,token
-quickcheck = -j -F none --stats
+quickcheck = -j --stats
 ```
 
 ### Project Configuration (Team Shared)
@@ -220,7 +220,7 @@ You can put full pipelines in aliases:
 analyze-api = -j --filter 'e.service == "api"' \
               --exec 'track_count(e.level)' \
               --exec 'track_sum("total_duration", e.duration_ms)' \
-              --metrics -F none
+              --metrics
 ```
 
 **Tip:** Use backslash `\` for line continuation in INI files.
@@ -677,7 +677,7 @@ defaults = -f combined
 [aliases]
 api-errors = --filter 'e.status >= 400' --keys ip,status,method,path
 slow = --filter 'e.request_time.to_float() > 1.0' --keys ip,request_time,path
-traffic = --exec 'track_count(e.method); track_count(e.status.to_string())' --metrics -F none
+traffic = --exec 'track_count(e.method); track_count(e.status.to_string())' --metrics
 ```
 </details>
 

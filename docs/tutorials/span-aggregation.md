@@ -37,7 +37,7 @@ The simplest span mode: close a span every N events that survive your filters.
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --span 5 \
       --span-close 'print("Span " + span.id + " had " + span.size.to_string() + " events")'
     ```
@@ -46,7 +46,7 @@ The simplest span mode: close a span every N events that survive your filters.
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --span 5 \
       --span-close 'print("Span " + span.id + " had " + span.size.to_string() + " events")'
     ```
@@ -68,7 +68,7 @@ Spans count events that *survive* your filters:
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --filter 'e.level == "ERROR"' \
       --span 2 \
       --span-close 'print("Error batch " + span.id + ": " + span.size.to_string() + " errors")'
@@ -78,7 +78,7 @@ Spans count events that *survive* your filters:
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --filter 'e.level == "ERROR"' \
       --span 2 \
       --span-close 'print("Error batch " + span.id + ": " + span.size.to_string() + " errors")'
@@ -96,7 +96,7 @@ The `span.events` array contains all events that were included in the span:
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --span 5 \
       --span-close '
         print("=== Span " + span.id + " ===");
@@ -110,7 +110,7 @@ The `span.events` array contains all events that were included in the span:
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --span 5 \
       --span-close '
         print("=== Span " + span.id + " ===");
@@ -140,7 +140,7 @@ Inside `--span-close` the important bindings are `span.id`, `span.start`, `span.
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --filter 'e.level == "ERROR" || e.level == "WARN"' \
       --span 3 \
       --span-close '
@@ -153,7 +153,7 @@ Inside `--span-close` the important bindings are `span.id`, `span.start`, `span.
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --filter 'e.level == "ERROR" || e.level == "WARN"' \
       --span 3 \
       --span-close '
@@ -174,7 +174,7 @@ Use durations (`5m`, `1h`, `30s`) to create fixed wall-clock windows:
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --span 1m \
       --span-close 'print("Window: " + span.id + " (" + span.size.to_string() + " events)")'
     ```
@@ -183,7 +183,7 @@ Use durations (`5m`, `1h`, `30s`) to create fixed wall-clock windows:
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --span 1m \
       --span-close 'print("Window: " + span.id + " (" + span.size.to_string() + " events)")'
     ```
@@ -201,7 +201,7 @@ Use durations (`5m`, `1h`, `30s`) to create fixed wall-clock windows:
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --span 2m \
       --span-close '
         print("Window: " + span.id);
@@ -215,7 +215,7 @@ Use durations (`5m`, `1h`, `30s`) to create fixed wall-clock windows:
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --span 2m \
       --span-close '
         print("Window: " + span.id);
@@ -274,7 +274,7 @@ Combine `track_*()` functions in `--exec` with `span.metrics` in `--span-close` 
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --exec '
         track_count("total");
         if e.level == "ERROR" { track_count("errors"); }
@@ -294,7 +294,7 @@ Combine `track_*()` functions in `--exec` with `span.metrics` in `--span-close` 
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --exec '
         track_count("total");
         if e.level == "ERROR" { track_count("errors"); }
@@ -328,7 +328,7 @@ Calculate error rates per 1-minute window:
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --exec '
         track_count("requests");
         if e.level == "ERROR" { track_count("errors"); }
@@ -347,7 +347,7 @@ Calculate error rates per 1-minute window:
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --exec '
         track_count("requests");
         if e.level == "ERROR" { track_count("errors"); }
@@ -377,7 +377,7 @@ This lets you compare per-window activity against overall trends:
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --exec 'track_count("total"); if e.level == "ERROR" { track_count("errors"); }' \
       --span 5 \
       --span-close '
@@ -391,7 +391,7 @@ This lets you compare per-window activity against overall trends:
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --exec 'track_count("total"); if e.level == "ERROR" { track_count("errors"); }' \
       --span 5 \
       --span-close '
@@ -417,7 +417,7 @@ Detect anomalies by comparing span activity to overall rates:
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --exec 'track_count("requests"); if e.level == "ERROR" { track_count("errors"); }' \
       --span 3 \
       --span-close '
@@ -434,7 +434,7 @@ Detect anomalies by comparing span activity to overall rates:
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --exec 'track_count("requests"); if e.level == "ERROR" { track_count("errors"); }' \
       --span 3 \
       --span-close '
@@ -597,7 +597,7 @@ Spans work seamlessly with multi-stage pipelines:
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --exec 'e.is_error = (e.level == "ERROR")' \
       --filter 'e.is_error' \
       --exec 'track_count(e.service)' \
@@ -615,7 +615,7 @@ Spans work seamlessly with multi-stage pipelines:
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
+      -q \
       --exec 'e.is_error = (e.level == "ERROR")' \
       --filter 'e.is_error' \
       --exec 'track_count(e.service)' \

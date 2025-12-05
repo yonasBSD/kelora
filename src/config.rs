@@ -144,7 +144,7 @@ pub struct ProcessingConfig {
     pub span: Option<SpanConfig>,
     /// Show detailed error information (levels: 0-3) - new resiliency model
     pub verbose: u8,
-    /// Suppress formatter/event output (-q/--no-events/-F none, -s, -m)
+    /// Suppress formatter/event output (-q/--no-events, -s, -m)
     pub quiet_events: bool,
     /// Suppress diagnostics and summaries (--no-diagnostics)
     pub suppress_diagnostics: bool,
@@ -240,7 +240,6 @@ pub enum OutputFormat {
     Tsv,
     Csvnh,
     Tsvnh,
-    None,
 }
 
 /// File processing order
@@ -749,7 +748,7 @@ impl KeloraConfig {
             quiet_events = true;
         }
 
-        let mut output_format = if cli.json_output {
+        let output_format = if cli.json_output {
             OutputFormat::Json
         } else {
             cli.output_format.clone().into()
@@ -764,20 +763,8 @@ impl KeloraConfig {
             suppress_script_output = true;
         }
 
-        if matches!(output_format, OutputFormat::None) {
-            quiet_events = true;
-        }
-
-        if quiet_events {
-            output_format = OutputFormat::None;
-        }
-
         if silent {
             quiet_events = true;
-        }
-
-        if quiet_events {
-            output_format = OutputFormat::None;
         }
 
         let metrics_file = cli.metrics_file.clone();
@@ -1294,7 +1281,6 @@ impl From<crate::OutputFormat> for OutputFormat {
             crate::OutputFormat::Tsv => OutputFormat::Tsv,
             crate::OutputFormat::Csvnh => OutputFormat::Csvnh,
             crate::OutputFormat::Tsvnh => OutputFormat::Tsvnh,
-            crate::OutputFormat::None => OutputFormat::None,
         }
     }
 }
@@ -1311,7 +1297,6 @@ impl From<OutputFormat> for crate::OutputFormat {
             OutputFormat::Tsv => crate::OutputFormat::Tsv,
             OutputFormat::Csvnh => crate::OutputFormat::Csvnh,
             OutputFormat::Tsvnh => crate::OutputFormat::Tsvnh,
-            OutputFormat::None => crate::OutputFormat::None,
         }
     }
 }

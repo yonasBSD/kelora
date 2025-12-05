@@ -379,7 +379,7 @@ The `levelmap` format provides a compact visual representation of logs, showing 
 ```bash
 kelora -j app.log -F json                      # Output as JSON
 kelora -j app.log -F csv --keys ts,level,msg   # Output as CSV
-kelora -j app.log -F none --stats              # Only stats
+kelora -j app.log --stats                      # Only stats
 ```
 
 ## See Also

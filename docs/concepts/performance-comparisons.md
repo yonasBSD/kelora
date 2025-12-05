@@ -104,7 +104,7 @@ kelora -f 'cols:timestamp host component level *message' \
   -k timestamp,level,component
 ```
 
-Kelora trails `awk` and angle-grinder by **≈12×** because it parses into typed columns, validates timestamps, and keeps metadata for later stages; klp’s Python regex pipeline is even slower than Kelora here, so reach for it only when you need its advanced templating. Stick with those lighter tools for quick-and-dirty splits, but prefer Kelora when you immediately need type conversion, schema-aware errors, or downstream scripting. You can trim Kelora’s cost by projecting only the fields you need with `-k` and disabling expensive formatters (`-F none`).
+Kelora trails `awk` and angle-grinder by **≈12×** because it parses into typed columns, validates timestamps, and keeps metadata for later stages; klp's Python regex pipeline is even slower than Kelora here, so reach for it only when you need its advanced templating. Stick with those lighter tools for quick-and-dirty splits, but prefer Kelora when you immediately need type conversion, schema-aware errors, or downstream scripting. You can trim Kelora's cost by projecting only the fields you need with `-k` and disabling output with `-q`.
 
 ---
 
@@ -196,7 +196,7 @@ jq -r 'select(.level == "ERROR") | .component' \
 kelora -j benchmarks/bench_100k.jsonl \
   -l error \
   --exec "track_count(e.component)" \
-  --metrics -F none -q
+  --metrics
 
 # angle-grinder - aggregation
 agrind '* | json | where level == "ERROR" | count by component | sort by _count desc' \

@@ -43,20 +43,20 @@ pipelines.
 
     ```bash
     kelora -f combined examples/web_access_large.log.gz \
-      -F none --stats
+      --stats
 
     kelora -f combined examples/web_access_large.log.gz \
-      -F none --stats --parallel
+      --stats --parallel
     ```
 
 === "Output"
 
     ```bash exec="on" source="above" result="ansi"
     kelora -f combined examples/web_access_large.log.gz \
-      -F none --stats
+      --stats
 
     kelora -f combined examples/web_access_large.log.gz \
-      -F none --stats --parallel
+      --stats --parallel
     ```
 
 On this synthetic access log (`1200` lines), parallel mode yields higher

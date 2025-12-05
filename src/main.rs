@@ -832,7 +832,7 @@ fn run_pipeline_sequential_internal<W: Write>(
     let mut shutdown_requested = false;
     let mut immediate_shutdown = false;
     let gap_marker_use_colors = crate::tty::should_use_colors_with_mode(&config.output.color);
-    let mut gap_tracker = if config.output.format == crate::config::OutputFormat::None {
+    let mut gap_tracker = if config.processing.quiet_events {
         // Suppress gap markers when output is suppressed (stats-only, high quiet levels)
         None
     } else {

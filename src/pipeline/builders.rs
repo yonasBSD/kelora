@@ -337,63 +337,66 @@ impl PipelineBuilder {
         // Create formatter
         let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
         let use_emoji = use_colors && !self.config.no_emoji;
-        let formatter: Box<dyn Formatter> = match self.output_format {
-            crate::OutputFormat::Json => Box::new(crate::formatters::JsonFormatter::new()),
-            crate::OutputFormat::Default => {
-                Box::new(crate::formatters::DefaultFormatter::new_with_wrapping(
-                    use_colors,
-                    use_emoji,
-                    self.config.brief,
-                    self.config.timestamp_formatting.clone(),
-                    self.config.wrap,
-                    self.config.pretty,
-                    self.config.quiet_level,
-                ))
-            }
-            crate::OutputFormat::Inspect => Box::new(crate::formatters::InspectFormatter::new(
-                self.config.verbose,
-            )),
-            crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
-            crate::OutputFormat::Levelmap => {
-                Box::new(crate::formatters::LevelmapFormatter::new(use_colors))
-            }
-            crate::OutputFormat::Csv => {
-                if self.keys.is_empty() {
-                    return Err(anyhow::anyhow!(
-                        "CSV output format requires --keys to specify field order"
-                    ));
+        let formatter: Box<dyn Formatter> = if self.config.quiet_events {
+            Box::new(crate::formatters::HideFormatter::new())
+        } else {
+            match self.output_format {
+                crate::OutputFormat::Json => Box::new(crate::formatters::JsonFormatter::new()),
+                crate::OutputFormat::Default => {
+                    Box::new(crate::formatters::DefaultFormatter::new_with_wrapping(
+                        use_colors,
+                        use_emoji,
+                        self.config.brief,
+                        self.config.timestamp_formatting.clone(),
+                        self.config.wrap,
+                        self.config.pretty,
+                        self.config.quiet_level,
+                    ))
                 }
-                Box::new(crate::formatters::CsvFormatter::new(self.keys.clone()))
-            }
-            crate::OutputFormat::Tsv => {
-                if self.keys.is_empty() {
-                    return Err(anyhow::anyhow!(
-                        "TSV output format requires --keys to specify field order"
-                    ));
+                crate::OutputFormat::Inspect => Box::new(crate::formatters::InspectFormatter::new(
+                    self.config.verbose,
+                )),
+                crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
+                crate::OutputFormat::Levelmap => {
+                    Box::new(crate::formatters::LevelmapFormatter::new(use_colors))
                 }
-                Box::new(crate::formatters::CsvFormatter::new_tsv(self.keys.clone()))
-            }
-            crate::OutputFormat::Csvnh => {
-                if self.keys.is_empty() {
-                    return Err(anyhow::anyhow!(
-                        "CSVNH output format requires --keys to specify field order"
-                    ));
+                crate::OutputFormat::Csv => {
+                    if self.keys.is_empty() {
+                        return Err(anyhow::anyhow!(
+                            "CSV output format requires --keys to specify field order"
+                        ));
+                    }
+                    Box::new(crate::formatters::CsvFormatter::new(self.keys.clone()))
                 }
-                Box::new(crate::formatters::CsvFormatter::new_csv_no_header(
-                    self.keys.clone(),
-                ))
-            }
-            crate::OutputFormat::Tsvnh => {
-                if self.keys.is_empty() {
-                    return Err(anyhow::anyhow!(
-                        "TSVNH output format requires --keys to specify field order"
-                    ));
+                crate::OutputFormat::Tsv => {
+                    if self.keys.is_empty() {
+                        return Err(anyhow::anyhow!(
+                            "TSV output format requires --keys to specify field order"
+                        ));
+                    }
+                    Box::new(crate::formatters::CsvFormatter::new_tsv(self.keys.clone()))
                 }
-                Box::new(crate::formatters::CsvFormatter::new_tsv_no_header(
-                    self.keys.clone(),
-                ))
+                crate::OutputFormat::Csvnh => {
+                    if self.keys.is_empty() {
+                        return Err(anyhow::anyhow!(
+                            "CSVNH output format requires --keys to specify field order"
+                        ));
+                    }
+                    Box::new(crate::formatters::CsvFormatter::new_csv_no_header(
+                        self.keys.clone(),
+                    ))
+                }
+                crate::OutputFormat::Tsvnh => {
+                    if self.keys.is_empty() {
+                        return Err(anyhow::anyhow!(
+                            "TSVNH output format requires --keys to specify field order"
+                        ));
+                    }
+                    Box::new(crate::formatters::CsvFormatter::new_tsv_no_header(
+                        self.keys.clone(),
+                    ))
+                }
             }
-            crate::OutputFormat::None => Box::new(crate::formatters::HideFormatter::new()),
         };
 
         // Create script stages with numbering
@@ -778,67 +781,70 @@ impl PipelineBuilder {
         // Create formatter (workers still need formatters for output)
         let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
         let use_emoji = use_colors && !self.config.no_emoji;
-        let formatter: Box<dyn Formatter> = match self.output_format {
-            crate::OutputFormat::Json => Box::new(crate::formatters::JsonFormatter::new()),
-            crate::OutputFormat::Default => {
-                Box::new(crate::formatters::DefaultFormatter::new_with_wrapping(
-                    use_colors,
-                    use_emoji,
-                    self.config.brief,
-                    self.config.timestamp_formatting.clone(),
-                    self.config.wrap,
-                    self.config.pretty,
-                    self.config.quiet_level,
-                ))
-            }
-            crate::OutputFormat::Inspect => Box::new(crate::formatters::InspectFormatter::new(
-                self.config.verbose,
-            )),
-            crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
-            crate::OutputFormat::Levelmap => {
-                Box::new(crate::formatters::LevelmapFormatter::new(use_colors))
-            }
-            crate::OutputFormat::Csv => {
-                if self.keys.is_empty() {
-                    return Err(anyhow::anyhow!(
-                        "CSV output format requires --keys to specify field order"
-                    ));
+        let formatter: Box<dyn Formatter> = if self.config.quiet_events {
+            Box::new(crate::formatters::HideFormatter::new())
+        } else {
+            match self.output_format {
+                crate::OutputFormat::Json => Box::new(crate::formatters::JsonFormatter::new()),
+                crate::OutputFormat::Default => {
+                    Box::new(crate::formatters::DefaultFormatter::new_with_wrapping(
+                        use_colors,
+                        use_emoji,
+                        self.config.brief,
+                        self.config.timestamp_formatting.clone(),
+                        self.config.wrap,
+                        self.config.pretty,
+                        self.config.quiet_level,
+                    ))
                 }
-                Box::new(crate::formatters::CsvFormatter::new_worker(
-                    self.keys.clone(),
-                ))
-            }
-            crate::OutputFormat::Tsv => {
-                if self.keys.is_empty() {
-                    return Err(anyhow::anyhow!(
-                        "TSV output format requires --keys to specify field order"
-                    ));
+                crate::OutputFormat::Inspect => Box::new(crate::formatters::InspectFormatter::new(
+                    self.config.verbose,
+                )),
+                crate::OutputFormat::Logfmt => Box::new(crate::formatters::LogfmtFormatter::new()),
+                crate::OutputFormat::Levelmap => {
+                    Box::new(crate::formatters::LevelmapFormatter::new(use_colors))
                 }
-                Box::new(crate::formatters::CsvFormatter::new_tsv_worker(
-                    self.keys.clone(),
-                ))
-            }
-            crate::OutputFormat::Csvnh => {
-                if self.keys.is_empty() {
-                    return Err(anyhow::anyhow!(
-                        "CSVNH output format requires --keys to specify field order"
-                    ));
+                crate::OutputFormat::Csv => {
+                    if self.keys.is_empty() {
+                        return Err(anyhow::anyhow!(
+                            "CSV output format requires --keys to specify field order"
+                        ));
+                    }
+                    Box::new(crate::formatters::CsvFormatter::new_worker(
+                        self.keys.clone(),
+                    ))
                 }
-                Box::new(crate::formatters::CsvFormatter::new_csv_no_header_worker(
-                    self.keys.clone(),
-                ))
-            }
-            crate::OutputFormat::Tsvnh => {
-                if self.keys.is_empty() {
-                    return Err(anyhow::anyhow!(
-                        "TSVNH output format requires --keys to specify field order"
-                    ));
+                crate::OutputFormat::Tsv => {
+                    if self.keys.is_empty() {
+                        return Err(anyhow::anyhow!(
+                            "TSV output format requires --keys to specify field order"
+                        ));
+                    }
+                    Box::new(crate::formatters::CsvFormatter::new_tsv_worker(
+                        self.keys.clone(),
+                    ))
                 }
-                Box::new(crate::formatters::CsvFormatter::new_tsv_no_header_worker(
-                    self.keys.clone(),
-                ))
+                crate::OutputFormat::Csvnh => {
+                    if self.keys.is_empty() {
+                        return Err(anyhow::anyhow!(
+                            "CSVNH output format requires --keys to specify field order"
+                        ));
+                    }
+                    Box::new(crate::formatters::CsvFormatter::new_csv_no_header_worker(
+                        self.keys.clone(),
+                    ))
+                }
+                crate::OutputFormat::Tsvnh => {
+                    if self.keys.is_empty() {
+                        return Err(anyhow::anyhow!(
+                            "TSVNH output format requires --keys to specify field order"
+                        ));
+                    }
+                    Box::new(crate::formatters::CsvFormatter::new_tsv_no_header_worker(
+                        self.keys.clone(),
+                    ))
+                }
             }
-            crate::OutputFormat::None => Box::new(crate::formatters::HideFormatter::new()),
         };
 
         // Create script stages with numbering

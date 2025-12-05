@@ -394,7 +394,7 @@ benchmark_complex_pipeline() {
 
     # kelora
     echo -n "  Testing kelora... " >&2
-    local time=$(time_command "kelora-pipeline" "$BINARY -j $file -l error --exec 'track_count(e.component)' --metrics -F none -q")
+    local time=$(time_command "kelora-pipeline" "$BINARY -j $file -l error --exec 'track_count(e.component)' --metrics")
     echo "${time}s" >&2
     echo "| kelora | ${time}s | \`kelora -l error --exec 'track_count(...)' --metrics\` |" >> "$results_file"
 

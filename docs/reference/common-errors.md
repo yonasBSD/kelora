@@ -126,9 +126,8 @@ kelora -j app.log \
 **Possible causes:**
 
 1. **All events filtered out** - Level filtering, time ranges, or filters too restrictive
-2. **Quiet mode enabled** - Using `-q` suppresses event output (use `--silent` to suppress diagnostics too)
-3. **Wrong output format** - Using `-F none` by mistake
-4. **Timestamp filtering** - Events outside `--since`/`--until` range
+2. **Quiet mode enabled** - Using `-q` or `--no-events` suppresses event output (use `--silent` to suppress diagnostics too)
+3. **Timestamp filtering** - Events outside `--since`/`--until` range
 
 **Solutions:**
 

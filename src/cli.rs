@@ -36,7 +36,6 @@ pub enum OutputFormat {
     Tsv,
     Csvnh,
     Tsvnh,
-    None,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -374,11 +373,11 @@ pub struct Cli {
     #[arg(short = 'o', long = "output-file", help_heading = "Output Options")]
     pub output_file: Option<String>,
 
-    /// Suppress events (formatter output). Alternatives: --no-events, -F none
+    /// Suppress events (formatter output). Alternative: --no-events
     #[arg(short = 'q', help_heading = "Output Options")]
     pub quiet: bool,
 
-    /// Suppress events (formatter output). Alternatives: -q, -F none
+    /// Suppress events (formatter output). Alternative: -q
     #[arg(long = "no-events", help_heading = "Output Options")]
     pub no_events: bool,
 

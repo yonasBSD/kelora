@@ -37,7 +37,6 @@ Count how many events belong to each service while suppressing event output.
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'track_count(e.service)' \
       --metrics
     ```
@@ -46,7 +45,6 @@ Count how many events belong to each service while suppressing event output.
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'track_count(e.service)' \
       --metrics
     ```
@@ -62,7 +60,6 @@ Pair `--metrics` with `--stats` when you need throughput details as well:
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'track_count(e.service)' \
       -m --stats
     ```
@@ -71,7 +68,6 @@ Pair `--metrics` with `--stats` when you need throughput details as well:
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'track_count(e.service)' \
       -m --stats
     ```
@@ -88,7 +84,6 @@ response sizes and latency as rolling aggregates.
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'if e.has("duration_ms") {
               track_sum("total_duration", e.duration_ms);
               track_count("duration_count");
@@ -102,7 +97,6 @@ response sizes and latency as rolling aggregates.
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'if e.has("duration_ms") { track_sum("total_duration", e.duration_ms); track_count("duration_count"); track_min("min_duration", e.duration_ms); track_max("max_duration", e.duration_ms) }' \
       --metrics
     ```
@@ -128,7 +122,6 @@ Build histograms by grouping values into buckets—perfect for latency distribut
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'if e.has("duration_ms") {
               let bucket = (e.duration_ms / 1000) * 1000;
               track_bucket("latency_histogram", bucket)
@@ -140,7 +133,6 @@ Build histograms by grouping values into buckets—perfect for latency distribut
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'if e.has("duration_ms") { let bucket = (e.duration_ms / 1000) * 1000; track_bucket("latency_histogram", bucket) }' \
       --metrics
     ```
@@ -176,7 +168,6 @@ Track the most/least frequent items:
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'if e.level == "error" { track_top("top_errors", e.message, 5) }' \
       --metrics
     ```
@@ -185,7 +176,6 @@ Track the most/least frequent items:
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'if e.level == "error" { track_top("top_errors", e.message, 5) }' \
       --metrics
     ```
@@ -200,7 +190,6 @@ Track items by custom values like latency, bytes, or CPU time:
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'if e.has("duration_ms") {
               track_top("slowest", e.service, 3, e.duration_ms);
               track_bottom("fastest", e.service, 3, e.duration_ms)
@@ -212,7 +201,6 @@ Track items by custom values like latency, bytes, or CPU time:
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'if e.has("duration_ms") { track_top("slowest", e.service, 3, e.duration_ms); track_bottom("fastest", e.service, 3, e.duration_ms) }' \
       --metrics
     ```
@@ -241,7 +229,6 @@ cardinality analysis.
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'track_unique("services", e.service)' \
       -e 'if e.level == "ERROR" { track_unique("error_messages", e.message) }' \
       --metrics
@@ -251,7 +238,6 @@ cardinality analysis.
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'track_unique("services", e.service)' \
       -e 'if e.level == "ERROR" { track_unique("error_messages", e.message) }' \
       --metrics
@@ -269,7 +255,6 @@ for structured JSON output:
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'track_unique("services", e.service)' \
       -m
     ```
@@ -278,7 +263,6 @@ for structured JSON output:
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'track_unique("services", e.service)' \
       --metrics=short
     ```
@@ -287,7 +271,6 @@ for structured JSON output:
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'track_unique("services", e.service)' \
       --metrics=json
     ```
@@ -362,7 +345,6 @@ call the helper from `--end`.
     RHAI
 
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'track_count(e.service)' \
       -e 'track_count(e.level)' \
       -m \
@@ -386,7 +368,6 @@ call the helper from `--end`.
     RHAI
 
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'track_count(e.service)' \
       -e 'track_count(e.level)' \
       -m \
@@ -407,7 +388,6 @@ Use `--metrics-file` to serialize the metrics map as JSON for other tools.
 
     ```bash
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'track_count(e.service)' \
       -m \
       --metrics-file metrics.json
@@ -420,7 +400,6 @@ Use `--metrics-file` to serialize the metrics map as JSON for other tools.
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/simple_json.jsonl \
-      -F none \
       -e 'track_count(e.service)' \
       -m \
       --metrics-file metrics.json
@@ -442,7 +421,7 @@ This command watches a gzipped access log and surfaces top status classes.
     ```bash
     kelora -f combined examples/web_access_large.log.gz \
       -e 'let klass = ((e.status / 100) * 100).to_string(); track_count(klass)' \
-      -m -F none \
+      -m \
       -n 0
     ```
 
@@ -451,7 +430,7 @@ This command watches a gzipped access log and surfaces top status classes.
     ```bash exec="on" source="above" result="ansi"
     kelora -f combined examples/web_access_large.log.gz \
       -e 'let klass = ((e.status / 100) * 100).to_string(); track_count(klass)' \
-      -m -F none \
+      -m \
       -n 0
     ```
 
@@ -475,7 +454,7 @@ Need full histograms instead of counts? Swap in `track_bucket()`:
             print(bucket.to_string() + ": " + counts.to_string());
         }
       ' \
-      -F none -n 0
+      -n 0
     ```
 
 === "Output"
@@ -492,7 +471,7 @@ Need full histograms instead of counts? Swap in `track_bucket()`:
             print(bucket.to_string() + ": " + counts.to_string());
         }
       ' \
-      -F none -n 0
+      -n 0
     ```
 
 `track_bucket(key, bucket_value)` keeps nested counters so you can emit a

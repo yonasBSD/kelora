@@ -259,13 +259,13 @@ kelora -j examples/basics.jsonl -F inspect
 
 **Use inspect when:** Debugging type mismatches or understanding field types.
 
-### No Output (`-F none`) - Stats Only
+### No Output - Stats Only
 
 ```bash exec="on" source="above" result="ansi"
-kelora -j examples/basics.jsonl -F none --stats
+kelora -j examples/basics.jsonl --stats
 ```
 
-**Use `-F none --stats` when:** You want to analyze log structure without seeing the events.
+**Use `--stats` when:** You want to analyze log structure without seeing the events.
 
 ---
 
@@ -356,7 +356,6 @@ kelora -f line app.log --ts-format "%d/%b/%Y:%H:%M:%S" --ts-field timestamp
 -F csv          # CSV with header
 -F logfmt       # Logfmt key=value
 -F inspect      # Debug with types
--F none         # No output (use with --stats)
 ```
 
 ---
@@ -377,7 +376,7 @@ Kelora processes your options in this order:
 
 - `-l` filters happen **before** `-k` (you can filter on fields you won't see in output)
 - `-b` affects display, not what gets filtered
-- `-F none --stats` still processes everything, just doesn't show events
+- `--stats` still processes everything, just doesn't show events
 
 ---
 
@@ -403,7 +402,7 @@ kelora -j app.log -l warn,error,critical -K password,token
 
 ### Stats-Only Analysis
 ```bash
-kelora -j app.log -F none --stats
+kelora -j app.log --stats
 # No event output → Show processing statistics
 ```
 

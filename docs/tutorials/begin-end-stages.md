@@ -246,7 +246,7 @@ Use `--end` to run code **once** after all events are processed.
         --begin 'print("Starting analysis...")' \
         --exec 'track_count(e.service)' \
         --end 'print("Processed " + metrics.keys().len() + " unique services")' \
-        -F none \
+      -q \
         --metrics
     ```
 
@@ -257,7 +257,7 @@ Use `--end` to run code **once** after all events are processed.
         --begin 'print("Starting analysis...")' \
         --exec 'track_count(e.service)' \
         --end 'print("Processed " + metrics.keys().len() + " unique services")' \
-        -F none \
+      -q \
         --metrics
     ```
 
@@ -283,7 +283,7 @@ Build custom reports using tracked metrics.
         --end 'print("=== Log Summary ===");
                print("Total levels: " + metrics.keys().filter(|k| k != "service").len());
                print("Total services: " + metrics.keys().filter(|k| k == "api" || k == "database" || k == "auth" || k == "cache" || k == "scheduler").len())' \
-        -F none
+        -q
     ```
 
 === "Output"
@@ -293,7 +293,7 @@ Build custom reports using tracked metrics.
         --exec 'track_count(e.level)' \
         --exec 'track_count(e.service)' \
         --end 'print("=== Log Summary ==="); print("Levels tracked: " + metrics.keys().len()); for key in metrics.keys() { print("  " + key + ": " + metrics[key]) }' \
-        -F none
+        -q
     ```
 
 **Pattern:** Use `--end` to generate reports, send notifications, or write summary files.
@@ -328,7 +328,7 @@ Combine all stages for a production-ready alert pipeline.
                        print(owner + ": " + count + " error(s)")
                    }
                }' \
-        -F none
+        -q
     ```
 
 === "Output"
@@ -340,7 +340,7 @@ Combine all stages for a production-ready alert pipeline.
         --filter 'e.criticality == "critical" && (e.level == "ERROR" || e.level == "CRITICAL")' \
         --exec 'track_count(e.owner)' \
         --end 'print("=== Alert Summary ==="); for owner in metrics.keys() { let count = metrics[owner]; if count >= conf.alert_threshold { print("ALERT: " + owner + " has " + count + " critical error(s)") } else { print(owner + ": " + count + " error(s)") } }' \
-        -F none
+        -q
     ```
 
 **Complete pipeline:**
@@ -513,7 +513,7 @@ kelora -j app.log \
 kelora -j app.log \
     --exec 'track_count(e.status)' \
     --end 'print("Total requests: " + metrics.values().sum())' \
-    -F none --metrics
+    --metrics
 ```
 
 ### Pattern 4: Conditional Enrichment
@@ -548,7 +548,7 @@ kelora -j examples/simple_json.jsonl \
                 e.team = conf.services[e.service].team
             }' \
     --exec 'track_count(e.team)' \
-    -F none --metrics
+    --metrics
 ```
 </details>
 
@@ -582,7 +582,7 @@ kelora -j examples/simple_json.jsonl \
            let errors = metrics.get("errors", 0);
            let rate = if total > 0 { (errors.to_float() / total.to_float() * 100.0) } else { 0.0 };
            print("Error rate: " + rate + "%")' \
-    -F none
+        -q
 ```
 </details>
 
@@ -605,7 +605,7 @@ kelora -j app.log \
 kelora -j app.log \
     --exec 'track_count(e.service)' \
     --end 'print("metrics keys: " + metrics.keys()); print("metrics: " + metrics)' \
-    -F none
+        -q
 ```
 
 ### Use --verbose for Errors
