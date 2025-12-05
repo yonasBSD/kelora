@@ -486,7 +486,7 @@ kelora -j --verbose app.log
 
 ### Output/Quiet Controls
 
-#### `-q` / `--no-events`
+#### `-q` / `--quiet`
 
 Suppress formatter output (events). Diagnostics, stats, metrics, and script output remain unless further flags are used.
 
@@ -878,7 +878,7 @@ kelora -j --parallel --unordered app.log
 
 #### `-s, --stats[=FORMAT]`
 
-Show stats only (implies `-q/--no-events`). Use `-s` for default table format, or `--stats=FORMAT` for explicit format.
+Show stats only (implies `-q/--quiet`). Use `-s` for default table format, or `--stats=FORMAT` for explicit format.
 
 Formats: `table`, `json`
 
@@ -903,7 +903,7 @@ Disable processing statistics explicitly (default: off).
 
 #### `-m, --metrics[=FORMAT]`
 
-Show metrics only (implies `-q/--no-events`). Use `-m` for default full table format, or `--metrics=FORMAT` for explicit format.
+Show metrics only (implies `-q/--quiet`). Use `-m` for default full table format, or `--metrics=FORMAT` for explicit format.
 
 Formats: `short` (first 5 items), `full` (default), `json`
 

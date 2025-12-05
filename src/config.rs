@@ -144,7 +144,7 @@ pub struct ProcessingConfig {
     pub span: Option<SpanConfig>,
     /// Show detailed error information (levels: 0-3) - new resiliency model
     pub verbose: u8,
-    /// Suppress formatter/event output (-q/--no-events, -s, -m)
+    /// Suppress formatter/event output (-q/--quiet, -s, -m)
     pub quiet_events: bool,
     /// Suppress diagnostics and summaries (--no-diagnostics)
     pub suppress_diagnostics: bool,

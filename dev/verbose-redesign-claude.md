@@ -418,13 +418,13 @@ kelora --explain large.log
 | `-m` / `--metrics` | ✗ | ✗ | ✓ | ✗ |
 | `-s` / `--stats` | ✗ | ✗ | ✓ | ✗ |
 | `--no-diagnostics` | ✓ | ✓ | ✗ | ✓ |
-| `-q` / `--no-events` | ✓ | ✓ | ✓ | ✓ |
+| `-q` / `--quiet` | ✓ | ✓ | ✓ | ✓ |
 
 **Rationale:**
 - `--silent`: Suppress everything except fatal errors and metrics files
 - `-m`/`-s`: Only show final statistics
 - `--no-diagnostics`: Suppress progress/stats but allow errors and traces
-- `-q` / `--no-events`: Suppress event output but allow diagnostics/errors/traces
+- `-q` / `--quiet`: Suppress event output but allow diagnostics/errors/traces
 
 ### Parallel Mode
 

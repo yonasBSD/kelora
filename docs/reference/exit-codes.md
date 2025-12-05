@@ -142,7 +142,7 @@ echo $?
 
 Exit codes are preserved under all quiet/silent combinations. Use the new toggles to control output without changing exit semantics:
 
-- `-q/--no-events`: suppress events only.
+- `-q/--quiet`: suppress events only.
 - `--no-diagnostics`: suppress diagnostics and summaries (fatal line still emitted).
 - `--silent`: suppress pipeline terminal emitters (events/diagnostics/stats/terminal metrics); script output still allowed; metrics files still write.
 - `-m/--metrics` / `-s/--stats`: data-only modes that already suppress events (no need for `-q`) and script output while emitting the selected channel.

@@ -47,7 +47,7 @@
 - Counters: lines read, events emitted, errors by type, spans open/closed, per-stage drop/error counts (via tracking).
 
 ## Output Rules / Suppression
-- Honor `--silent`/`-m`/`-s`/`--no-events`/`-q` → suppress traces/progress; still allow fatal errors.
+- Honor `--silent`/`-m`/`-s`/`--quiet`/`-q` → suppress traces/progress; still allow fatal errors.
 - Honor `--no-diagnostics` → suppress periodic progress blocks only (traces/errors still print).
 - Honor `--no-emoji`/`NO_EMOJI` in prefixes for all verbose lines.
 

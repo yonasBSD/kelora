@@ -252,12 +252,12 @@ Use the new orthogonal toggles to control output for automation:
 
 | Flag | Effect |
 |------|--------|
-| `-q` / `--no-events` | Suppress events (formatter output) |
+| `-q` / `--quiet` | Suppress events (formatter output) |
 | `--no-diagnostics` | Suppress diagnostics/summaries (fatal line still emitted) |
 | `--silent` | Suppress pipeline terminal output (events/diagnostics/stats/terminal metrics); script output allowed unless combined with `--no-script-output` or data-only modes; emit one fatal line on errors; metrics files still write |
 | `--no-script-output` | Suppress Rhai `print`/`eprint` (implied by data-only modes) |
-| `-s` / `--stats=FORMAT` | Show stats only (implies `-q/--no-events`; also suppresses script output; diagnostics stay on). Format: table, json |
-| `-m` / `--metrics=FORMAT` | Show metrics only (implies `-q/--no-events`; suppresses diagnostics except fatal line, stats, script output). Format: short, full (default), json |
+| `-s` / `--stats=FORMAT` | Show stats only (implies `-q/--quiet`; also suppresses script output; diagnostics stay on). Format: table, json |
+| `-m` / `--metrics=FORMAT` | Show metrics only (implies `-q/--quiet`; suppresses diagnostics except fatal line, stats, script output). Format: short, full (default), json |
 | `--with-stats` | Show stats alongside events (rare case) |
 | `--with-metrics` | Show metrics alongside events (rare case) |
 
