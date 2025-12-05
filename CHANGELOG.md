@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Removed
 
+- **Breaking:** `-F none` output format removed; use `-q` or `--no-events` instead to suppress event output
 - **Breaking:** Weak/legacy hash algorithms removed from `hash()`; only `sha256` (default) and `xxh3` remain
 - **Breaking:** Deprecated `has_matches()` helper removed; use `matches()` for regex checks instead
 
