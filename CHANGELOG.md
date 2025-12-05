@@ -29,6 +29,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Help screen organization improved with better categorization of output and config options
 - Emojis removed from help screens (still available in main output unless `--no-emoji` is used)
 - Metrics and stats headers now only shown when using `--with-metrics` or `--with-stats` flags
+- **Breaking:** File I/O failures now exit 1 (processing error) and respect `--strict` mode instead of being silently tracked
+- **Breaking:** Using both `--include` and `--filter` together now exits 2 (usage error) instead of warning
+- Warning messages now use 🔸 (orange diamond) vs ⚠️ (warning sign) for errors
+- CLI quick reference examples and options updated for clarity
 - Documentation updated to use method syntax (e.g., `value.to_int_or(default)`) consistently throughout
 - Output suppression documentation reorganized and clarified across `--help-rhai` and `--help-examples`
 - `pluck()` function documentation enhanced with practical examples for window-based calculations and burst detection
@@ -36,6 +40,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- File failure tracking now works correctly across threads using atomic counters
+- Error messages no longer have leading blank lines
+- Emoji display now checks stderr TTY instead of stdout
+- Parallel stdin format detection now preserves stats correctly
 - Documentation improvements across help screens and examples (corrected flag references, removed outdated warnings, improved examples)
 - Filter examples in help text (private IP filter, business hours filter)
 - Time syntax documentation corrections
