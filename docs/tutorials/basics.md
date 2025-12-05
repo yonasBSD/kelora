@@ -108,7 +108,7 @@ kelora -j examples/basics.jsonl
 
 ---
 
-## Part 2.5: Understanding Events
+## Part 3: Understanding Events
 
 Before we dive into display options, let's clarify what an **event** is and how you'll work with it in filters and scripts.
 
@@ -153,7 +153,7 @@ You'll encounter `e` throughout the documentation. Remember: `e` = the current e
 
 ---
 
-## Part 3: Display Modifiers (`-b`, `-c`, `-k`, `-K`)
+## Part 4: Display Modifiers (`-b`, `-c`, `-k`, `-K`)
 
 ### Brief Mode (`-b`) - Values Only
 
@@ -197,7 +197,7 @@ kelora -j examples/basics.jsonl -K service,version
 
 ---
 
-## Part 4: Level Filtering (`-l`, `-L`)
+## Part 5: Level Filtering (`-l`, `-L`)
 
 ### Include Levels (`-l`) - Show Only Specific Log Levels
 
@@ -227,7 +227,7 @@ kelora -j examples/basics.jsonl -L debug,info
 
 ---
 
-## Part 5: Output Formats (`-F`, `-J`)
+## Part 6: Output Formats (`-F`, `-J`)
 
 The default `key='value'` format is great for reading, but sometimes you need machine-readable output.
 
@@ -275,7 +275,7 @@ kelora -j examples/basics.jsonl -F none --stats
 
 ---
 
-## Part 6: Practical Combinations
+## Part 7: Practical Combinations
 
 ### Exercise 1: Find Errors, Show Essentials
 
