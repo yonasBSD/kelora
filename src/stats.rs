@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use std::cell::RefCell;
 use std::collections::BTreeSet;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Default)]
@@ -49,6 +49,9 @@ pub struct ProcessingStats {
 
 // Allow disabling stats collection when diagnostics/stats are suppressed
 static COLLECT_STATS: AtomicBool = AtomicBool::new(true);
+
+// File open failures use atomic counter since they can happen on any thread (e.g., decompression threads)
+static FILES_FAILED_TO_OPEN: AtomicUsize = AtomicUsize::new(0);
 
 pub fn set_collect_stats(enabled: bool) {
     COLLECT_STATS.store(enabled, Ordering::Relaxed);
@@ -194,16 +197,20 @@ pub fn stats_finish_processing() {
 }
 
 pub fn get_thread_stats() -> ProcessingStats {
-    THREAD_STATS.with(|stats| stats.borrow().clone())
+    THREAD_STATS.with(|stats| {
+        let mut s = stats.borrow().clone();
+        // Merge in atomic counter for file failures (can happen on any thread)
+        s.files_failed_to_open = FILES_FAILED_TO_OPEN.load(Ordering::Relaxed);
+        s
+    })
 }
 
 pub fn stats_file_open_failed() {
     if !stats_enabled() {
         return;
     }
-    THREAD_STATS.with(|stats| {
-        stats.borrow_mut().files_failed_to_open += 1;
-    });
+    // Use atomic counter since file opening can happen on any thread (e.g., decompression threads)
+    FILES_FAILED_TO_OPEN.fetch_add(1, Ordering::Relaxed);
 }
 
 pub fn stats_record_timestamp_detection(field_name: &str, _raw_value: &str, parsed: bool) {

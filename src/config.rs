@@ -452,9 +452,9 @@ impl KeloraConfig {
         let use_emoji = use_colors && !self.output.no_emoji;
 
         if use_emoji {
-            format!("\n⚠️ {}", message)
+            format!("⚠️ {}", message)
         } else {
-            format!("\nkelora: {}", message)
+            format!("kelora: {}", message)
         }
     }
 
@@ -537,9 +537,9 @@ pub fn format_error_message_auto(message: &str) -> String {
     let use_emoji = use_colors && !no_emoji;
 
     if use_emoji {
-        format!("\n⚠️ {}", message)
+        format!("⚠️ {}", message)
     } else {
-        format!("\nkelora: {}", message)
+        format!("kelora: {}", message)
     }
 }
 
@@ -1430,7 +1430,7 @@ mod tests {
             config.output.no_emoji = false;
 
             let message = config.format_error_message("problem");
-            assert!(message.starts_with("\n⚠️"));
+            assert!(message.starts_with("⚠️"));
             assert!(message.ends_with("problem"));
         });
     }
@@ -1442,7 +1442,7 @@ mod tests {
         config.output.no_emoji = true;
 
         let message = config.format_error_message("issue");
-        assert_eq!(message, "\nkelora: issue");
+        assert_eq!(message, "kelora: issue");
     }
 
     #[test]

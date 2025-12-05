@@ -1831,24 +1831,22 @@ fn main() -> Result<()> {
         .and_then(|stats| stats.timestamp_override_warning.clone());
 
     // Determine exit code based on whether any errors occurred during processing
-    let mut had_errors = if let Some(ref tracking) = tracking_data {
-        // Check tracking data for errors from processing
-        crate::rhai_functions::tracking::has_errors_in_tracking(tracking)
-    } else if let Some(ref stats) = final_stats {
-        // Check stats for errors from parallel processing or termination case
-        stats.has_errors()
-    } else {
-        // No processing results available, assume no errors
-        false
+    let mut had_errors = {
+        let tracking_errors = tracking_data
+            .as_ref()
+            .map(crate::rhai_functions::tracking::has_errors_in_tracking)
+            .unwrap_or(false);
+        let stats_errors = final_stats
+            .as_ref()
+            .map(|s| s.has_errors())
+            .unwrap_or(false);
+        tracking_errors || stats_errors
     };
 
     if config.processing.strict && override_failed {
         if diagnostics_allowed_runtime && config.output.stats.is_none() {
             if let Some(message) = override_message.clone() {
-                let mut formatted = config.format_error_message(&message);
-                if !events_were_output {
-                    formatted = formatted.trim_start_matches('\n').to_string();
-                }
+                let formatted = config.format_error_message(&message);
                 stderr.writeln(&formatted).unwrap_or(());
             }
         }
