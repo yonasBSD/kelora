@@ -11,6 +11,11 @@ pub fn is_stdin_tty() -> bool {
     std::io::stdin().is_terminal()
 }
 
+/// Check if stderr is connected to a TTY
+pub fn is_stderr_tty() -> bool {
+    std::io::stderr().is_terminal()
+}
+
 /// Determine if colors should be used based on CLI color mode and environment
 pub fn should_use_colors_with_mode(color_mode: &ColorMode) -> bool {
     match color_mode {
@@ -32,6 +37,27 @@ fn should_use_colors_auto() -> bool {
 
     // Don't use colors if not on TTY
     if !is_stdout_tty() {
+        return false;
+    }
+
+    // Respect NO_COLOR environment variable (https://no-color.org/)
+    if std::env::var("NO_COLOR").is_ok() {
+        return false;
+    }
+
+    // Default: use colors for TTY
+    true
+}
+
+/// Auto color detection for stderr messages (errors/warnings)
+pub fn should_use_colors_for_stderr() -> bool {
+    // Check FORCE_COLOR first for CI environments that support colors
+    if std::env::var("FORCE_COLOR").is_ok() {
+        return true;
+    }
+
+    // Don't use colors if stderr not on TTY
+    if !is_stderr_tty() {
         return false;
     }
 

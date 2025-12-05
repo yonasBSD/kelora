@@ -1886,7 +1886,7 @@ fn validate_cli_args(cli: &Cli) -> Result<()> {
         ));
     }
 
-    // Check if input files exist (if specified), skip "-" which represents stdin
+    // Check stdin usage
     let mut stdin_count = 0;
     for file_path in &cli.files {
         if file_path == "-" {
@@ -1894,9 +1894,9 @@ fn validate_cli_args(cli: &Cli) -> Result<()> {
             if stdin_count > 1 {
                 return Err(anyhow::anyhow!("stdin (\"-\") can only be specified once"));
             }
-        } else if !std::path::Path::new(file_path).exists() {
-            return Err(anyhow::anyhow!("File not found: {}", file_path));
         }
+        // Note: File existence is checked at runtime during processing (exit 1),
+        // not during CLI validation (exit 2)
     }
 
     // Check if exec files exist (if specified)

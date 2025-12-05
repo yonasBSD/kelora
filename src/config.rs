@@ -530,9 +530,9 @@ impl KeloraConfig {
 }
 
 /// Format an error message with appropriate prefix when config is not available
-/// Uses auto color detection and allows NO_EMOJI environment variable override
+/// Uses auto color detection for stderr and allows NO_EMOJI environment variable override
 pub fn format_error_message_auto(message: &str) -> String {
-    let use_colors = crate::tty::should_use_colors_with_mode(&ColorMode::Auto);
+    let use_colors = crate::tty::should_use_colors_for_stderr();
     let no_emoji = std::env::var("NO_EMOJI").is_ok();
     let use_emoji = use_colors && !no_emoji;
 
@@ -544,9 +544,9 @@ pub fn format_error_message_auto(message: &str) -> String {
 }
 
 /// Format a warning message with appropriate prefix when config is not available
-/// Uses auto color detection and allows NO_EMOJI environment variable override
+/// Uses auto color detection for stderr and allows NO_EMOJI environment variable override
 pub fn format_warning_message_auto(message: &str) -> String {
-    let use_colors = crate::tty::should_use_colors_with_mode(&ColorMode::Auto);
+    let use_colors = crate::tty::should_use_colors_for_stderr();
     let no_emoji = std::env::var("NO_EMOJI").is_ok();
     let use_emoji = use_colors && !no_emoji;
 
