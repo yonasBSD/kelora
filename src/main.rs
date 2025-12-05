@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::{ArgMatches, CommandFactory, FromArgMatches};
 use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
 use std::io::IsTerminal;
@@ -84,6 +84,7 @@ fn detect_format_from_peekable_reader<R: std::io::BufRead>(
 fn detect_format_for_parallel_mode(
     files: &[String],
     no_input: bool,
+    strict: bool,
 ) -> Result<(DetectedFormat, Option<Box<dyn BufRead + Send>>)> {
     use std::io;
 
@@ -113,22 +114,47 @@ fn detect_format_for_parallel_mode(
         // For files, read first line from first file
         let sorted_files = pipeline::builders::sort_files(files, &config::FileOrder::Cli)?;
 
-        if sorted_files.is_empty() {
-            return Ok((
-                DetectedFormat {
-                    format: config::InputFormat::Line,
-                    had_input: false,
-                },
-                None,
-            ));
+        let mut failed_opens: Vec<(String, String)> = Vec::new();
+        let mut detected: Option<DetectedFormat> = None;
+
+        for file_path in &sorted_files {
+            match decompression::DecompressionReader::new(file_path) {
+                Ok(decompressed) => {
+                    let mut peekable_reader = readers::PeekableLineReader::new(decompressed);
+                    detected = Some(detect_format_from_peekable_reader(&mut peekable_reader)?);
+                    break;
+                }
+                Err(e) => {
+                    if strict {
+                        return Err(anyhow::anyhow!(
+                            "Failed to open file '{}': {}",
+                            file_path,
+                            e
+                        ));
+                    }
+                    failed_opens.push((file_path.clone(), e.to_string()));
+                }
+            }
         }
 
-        let first_file = &sorted_files[0];
-        let decompressed = decompression::DecompressionReader::new(first_file)
-            .with_context(|| format!("Failed to open file '{}'", first_file))?;
-        let mut peekable_reader = readers::PeekableLineReader::new(decompressed);
-
-        let detected = detect_format_from_peekable_reader(&mut peekable_reader)?;
+        let detected = match detected {
+            Some(detected) => detected,
+            None => {
+                for (path, err) in failed_opens {
+                    eprintln!(
+                        "{}",
+                        crate::config::format_error_message_auto(&format!(
+                            "Failed to open file '{}': {}",
+                            path, err
+                        ))
+                    );
+                    stats::stats_file_open_failed(&path);
+                }
+                return Err(anyhow::anyhow!(
+                    "Failed to open any input files for detection"
+                ));
+            }
+        };
 
         // For files we can reopen them later, so we don't need to keep this reader
         Ok((detected, None))
@@ -329,8 +355,11 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
     let (final_config, auto_detected_non_line, detected_reader) =
         if matches!(config.input.format, config::InputFormat::Auto) {
             // For parallel mode, we need to detect format first
-            let (detected_format, detected_reader) =
-                detect_format_for_parallel_mode(&config.input.files, config.input.no_input)?;
+            let (detected_format, detected_reader) = detect_format_for_parallel_mode(
+                &config.input.files,
+                config.input.no_input,
+                config.processing.strict,
+            )?;
 
             emit_detected_format_notice(config, &detected_format, terminal_output);
 
@@ -519,12 +548,46 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
             return Ok((config::InputFormat::Line, false));
         }
 
-        let first_file = &sorted_files[0];
-        let detected_format = {
-            let decompressed = decompression::DecompressionReader::new(first_file)
-                .with_context(|| format!("Failed to open file '{}'", first_file))?;
-            let mut peekable_reader = readers::PeekableLineReader::new(decompressed);
-            detect_format_from_peekable_reader(&mut peekable_reader)?
+        let mut failed_opens: Vec<(String, String)> = Vec::new();
+        let mut detected_format: Option<DetectedFormat> = None;
+        for file_path in &sorted_files {
+            match decompression::DecompressionReader::new(file_path) {
+                Ok(decompressed) => {
+                    let mut peekable_reader = readers::PeekableLineReader::new(decompressed);
+                    detected_format =
+                        Some(detect_format_from_peekable_reader(&mut peekable_reader)?);
+                    break;
+                }
+                Err(e) => {
+                    if config.processing.strict {
+                        return Err(anyhow::anyhow!(
+                            "Failed to open file '{}': {}",
+                            file_path,
+                            e
+                        ));
+                    }
+                    failed_opens.push((file_path.clone(), e.to_string()));
+                }
+            }
+        }
+
+        let detected_format = match detected_format {
+            Some(detected) => detected,
+            None => {
+                for (path, err) in failed_opens {
+                    eprintln!(
+                        "{}",
+                        crate::config::format_error_message_auto(&format!(
+                            "Failed to open file '{}': {}",
+                            path, err
+                        ))
+                    );
+                    stats::stats_file_open_failed(&path);
+                }
+                return Err(anyhow::anyhow!(
+                    "Failed to open any input files for detection"
+                ));
+            }
         };
 
         emit_detected_format_notice(config, &detected_format, terminal_output);
