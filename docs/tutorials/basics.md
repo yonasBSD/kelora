@@ -56,18 +56,22 @@ This prevents surprises if auto-detection logic changes in future versions.
 kelora -f line examples/basics.jsonl
 ```
 
-### Common Input Formats
+### Supported Formats
+
+Kelora auto-detects these formats (in priority order):
 
 ```bash
--f auto         # Auto-detect by content (default)
--f json         # JSON lines (or use -j shortcut)
--f logfmt       # key=value format
--f combined     # Apache/Nginx access logs
--f syslog       # Syslog format (RFC3164/RFC5424)
--f csv          # CSV with header
--f tsv          # Tab-separated values
--f line         # Plain text
+json            # JSON objects (or use -j shortcut)
+cef             # Common Event Format (CEF:...)
+syslog          # Syslog RFC3164/RFC5424
+combined        # Apache/Nginx access logs
+logfmt          # key=value pairs
+csv             # Comma-separated values (with header)
+tsv             # Tab-separated values (with header)
+line            # Plain text (fallback)
 ```
+
+To explicitly specify a format, use `-f <format>`. For example: `-f json`, `-f logfmt`, `-f csv`.
 
 ---
 
