@@ -37,15 +37,13 @@ If you cloned the project, run commands from the repository root.
 
 You've seen `-j` in the [Quickstart](../quickstart.md) to read JSON logs. Let's understand what this flag really means and what other formats Kelora supports.
 
-**Important:** Kelora does **NOT** auto-detect format based on filename. The default is `-f auto`, which inspects the first line of content.
-
-Let's see what happens without specifying the format:
+By default, Kelora automatically detects the log format by examining the first line of content. This means you can usually just point Kelora at your logs and it will figure out the format:
 
 ```bash exec="on" source="above" result="ansi"
 kelora examples/basics.jsonl
 ```
 
-Kelora auto-detects JSON and parses the fields. To force plain-text treatment:
+Kelora detects this is JSON and parses the fields. If you need to override auto-detection (for example, to treat structured logs as plain text):
 
 ```bash exec="on" source="above" result="ansi"
 kelora -f line examples/basics.jsonl
@@ -54,17 +52,21 @@ kelora -f line examples/basics.jsonl
 **Three ways to read JSON logs:**
 
 ```bash
-kelora -f json examples/basics.jsonl    # Explicit format
-kelora -j examples/basics.jsonl         # -j is shortcut for -f json
-kelora -f auto examples/basics.jsonl    # Default: auto-detect by examining content
+kelora examples/basics.jsonl              # Auto-detect (default)
+kelora -f json examples/basics.jsonl      # Explicit format
+kelora -j examples/basics.jsonl           # -j is shortcut for -f json
 ```
 
 **Key Points:**
 
-- `-f auto` detects format by **examining the content** (not filename)
-- Kelora does **NOT** look at file extensions (`.jsonl`, `.log`, `.csv`)
-- Use `-f line` to force raw lines when you don't want detection
-- `-j` remains a convenient shortcut for explicit JSON
+- Auto-detection inspects content, not filenames (a `.log` file might contain JSON)
+- Use `-f <format>` to explicitly specify a format
+- Use `-f line` to force plain-text treatment when you don't want parsing
+- `-j` is a convenient shortcut for `-f json`
+
+**When to be explicit:**
+
+Auto-detection is great for interactive exploration, but use explicit formats (`-f json`, `-f logfmt`, etc.) in scripts and automated workflows. This ensures reproducibility even if new formats are added or detection logic changes in future versions.
 
 ### Common Input Formats
 
