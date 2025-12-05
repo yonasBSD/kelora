@@ -695,7 +695,7 @@ impl KeloraConfig {
         };
 
         let default_timezone = determine_default_timezone(cli);
-        let mut quiet_events = cli.quiet || cli.no_events;
+        let mut quiet_events = cli.quiet;
         let mut suppress_diagnostics = cli.no_diagnostics;
         let mut silent = cli.silent;
         if cli.no_silent {

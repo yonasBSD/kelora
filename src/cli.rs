@@ -374,12 +374,8 @@ pub struct Cli {
     pub output_file: Option<String>,
 
     /// Suppress events (formatter output). Alternative: --no-events
-    #[arg(short = 'q', help_heading = "Output Options")]
+    #[arg(short = 'q', long = "no-events", help_heading = "Output Options")]
     pub quiet: bool,
-
-    /// Suppress events (formatter output). Alternative: -q
-    #[arg(long = "no-events", help_heading = "Output Options")]
-    pub no_events: bool,
 
     /// Suppress diagnostics and error summaries (fatal line still allowed).
     #[arg(long = "no-diagnostics", help_heading = "Output Options")]
