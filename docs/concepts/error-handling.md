@@ -277,8 +277,8 @@ Kelora uses standard Unix exit codes:
 | Code | Meaning |
 |------|---------|
 | `0` | Success (no errors) |
-| `1` | Processing errors (parse/filter/exec errors) |
-| `2` | Invalid usage (CLI errors, file not found) |
+| `1` | Processing errors (parse/filter/exec/file errors) |
+| `2` | Invalid usage (CLI errors, incompatible flags) |
 | `130` | Interrupted (Ctrl+C) |
 | `141` | Broken pipe (normal in Unix pipelines) |
 

@@ -995,8 +995,8 @@ Kelora uses standard Unix exit codes to indicate success or failure:
 | Code | Meaning |
 |------|---------|
 | `0` | Success - no errors occurred |
-| `1` | Processing errors (parse/filter/exec errors) |
-| `2` | Usage errors (invalid flags, file not found, config errors) |
+| `1` | Processing errors (parse/filter/exec/file errors) |
+| `2` | Usage errors (invalid flags, incompatible options, config errors) |
 | `130` | Interrupted (Ctrl+C / SIGINT) |
 | `141` | Broken pipe (SIGPIPE - normal in pipelines) |
 | `143` | Terminated (SIGTERM) |

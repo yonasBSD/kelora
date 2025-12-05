@@ -24,6 +24,7 @@ pub struct ProcessingStats {
     pub events_filtered: usize,
     pub late_events: usize,
     pub files_processed: usize,
+    pub files_failed_to_open: usize, // Files that failed to open (I/O errors)
     pub script_executions: usize,
     pub errors: usize, // Kept for backward compatibility, but lines_errors is more specific
     pub processing_time: Duration,
@@ -194,6 +195,15 @@ pub fn stats_finish_processing() {
 
 pub fn get_thread_stats() -> ProcessingStats {
     THREAD_STATS.with(|stats| stats.borrow().clone())
+}
+
+pub fn stats_file_open_failed() {
+    if !stats_enabled() {
+        return;
+    }
+    THREAD_STATS.with(|stats| {
+        stats.borrow_mut().files_failed_to_open += 1;
+    });
 }
 
 pub fn stats_record_timestamp_detection(field_name: &str, _raw_value: &str, parsed: bool) {
@@ -554,19 +564,34 @@ impl ProcessingStats {
             output.push_str(&format!("Warning: {}\n", message));
         }
 
+        if self.files_failed_to_open > 0 {
+            output.push_str(&crate::config::format_error_message_auto(&format!(
+                "Failed to open {} file{}",
+                self.files_failed_to_open,
+                if self.files_failed_to_open == 1 {
+                    ""
+                } else {
+                    "s"
+                }
+            )));
+            output.push('\n');
+        }
+
         if self.yearless_timestamps > 0 {
-            output.push_str(&format!(
-                "Warning: Year-less timestamp format detected ({} parse{})\n",
+            let warning_msg = format!(
+                "Year-less timestamp format detected ({} parse{})\n\
+                 Format lacks year (e.g., \"Dec 31 23:59:59\")\n\
+                 Year inferred using heuristic (±1 year from current date)\n\
+                 Timestamps >18 months old may be incorrect",
                 self.yearless_timestamps,
                 if self.yearless_timestamps == 1 {
                     ""
                 } else {
                     "s"
                 }
-            ));
-            output.push_str("  Format lacks year (e.g., \"Dec 31 23:59:59\")\n");
-            output.push_str("  Year inferred using heuristic (±1 year from current date)\n");
-            output.push_str("  Timestamps >18 months old may be incorrect\n");
+            );
+            output.push_str(&crate::config::format_warning_message_auto(&warning_msg));
+            output.push('\n');
         }
 
         // Time span: show generic label when identical, specific labels when different
@@ -647,7 +672,7 @@ impl ProcessingStats {
 
     /// Check if any errors occurred during processing
     pub fn has_errors(&self) -> bool {
-        self.lines_errors > 0
+        self.lines_errors > 0 || self.files_failed_to_open > 0
     }
 
     /// Format a concise error summary for default output (when errors occur)

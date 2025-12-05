@@ -775,11 +775,15 @@ impl Cli {
                 let script = filter_values[pos].clone();
                 let empty_includes = Vec::new();
                 let includes = include_map.get(&index).unwrap_or(&empty_includes);
-                // For now, filters don't support includes - skip includes for filters
+                // For now, filters don't support includes
                 if !includes.is_empty() {
                     eprintln!(
-                        "Warning: --include is not yet supported with --filter, ignoring includes"
+                        "{}",
+                        crate::config::format_error_message_auto(
+                            "--include is not supported with --filter (filters must be pure expressions)"
+                        )
                     );
+                    std::process::exit(2);
                 }
                 stages_with_indices.push((index, ScriptStageType::Filter(script)));
             }

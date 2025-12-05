@@ -456,7 +456,10 @@ fn run_pipeline_sequential<W: Write>(
     } else {
         let sorted_files =
             pipeline::builders::sort_files(&config.input.files, &config.input.file_order)?;
-        SequentialInput::Files(readers::MultiFileReader::new(sorted_files)?)
+        SequentialInput::Files(readers::MultiFileReader::new(
+            sorted_files,
+            config.processing.strict,
+        )?)
     };
 
     run_pipeline_sequential_internal(config, output, ctrl_rx, input)?;
@@ -532,7 +535,10 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
             stats::stats_set_detected_format(final_config.input.format.to_display_string());
         }
 
-        let input = SequentialInput::Files(readers::MultiFileReader::new(sorted_files)?);
+        let input = SequentialInput::Files(readers::MultiFileReader::new(
+            sorted_files,
+            final_config.processing.strict,
+        )?);
         run_pipeline_sequential_internal(&final_config, output, ctrl_rx, input)?;
 
         Ok((

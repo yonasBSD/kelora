@@ -482,6 +482,18 @@ impl KeloraConfig {
         }
     }
 
+    /// Format a warning message with appropriate prefix (emoji or "kelora warning:")
+    pub fn format_warning_message(&self, message: &str) -> String {
+        let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
+        let use_emoji = use_colors && !self.output.no_emoji;
+
+        if use_emoji {
+            format!("🔸 {}", message)
+        } else {
+            format!("kelora warning: {}", message)
+        }
+    }
+
     /// Format a stats message with appropriate prefix (emoji or "Stats:")
     /// If `with_header` is true, includes the "📈 Stats:" header
     pub fn format_stats_message(&self, message: &str, with_header: bool) -> String {
@@ -528,6 +540,20 @@ pub fn format_error_message_auto(message: &str) -> String {
         format!("\n⚠️ {}", message)
     } else {
         format!("\nkelora: {}", message)
+    }
+}
+
+/// Format a warning message with appropriate prefix when config is not available
+/// Uses auto color detection and allows NO_EMOJI environment variable override
+pub fn format_warning_message_auto(message: &str) -> String {
+    let use_colors = crate::tty::should_use_colors_with_mode(&ColorMode::Auto);
+    let no_emoji = std::env::var("NO_EMOJI").is_ok();
+    let use_emoji = use_colors && !no_emoji;
+
+    if use_emoji {
+        format!("🔸 {}", message)
+    } else {
+        format!("kelora warning: {}", message)
     }
 }
 

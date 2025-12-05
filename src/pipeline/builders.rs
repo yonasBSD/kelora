@@ -1102,7 +1102,10 @@ pub fn create_input_reader(
         Ok(Box::new(BufReader::new(processed_stdin)))
     } else {
         let sorted_files = sort_files(&config.input.files, &config.input.file_order)?;
-        Ok(Box::new(MultiFileReader::new(sorted_files)?))
+        Ok(Box::new(MultiFileReader::new(
+            sorted_files,
+            config.processing.strict,
+        )?))
     }
 }
 
@@ -1118,6 +1121,7 @@ pub fn create_file_aware_input_reader(
         let sorted_files = sort_files(&config.input.files, &config.input.file_order)?;
         Ok(Box::new(crate::readers::FileAwareMultiFileReader::new(
             sorted_files,
+            config.processing.strict,
         )?))
     }
 }

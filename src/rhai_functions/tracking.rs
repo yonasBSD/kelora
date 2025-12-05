@@ -568,18 +568,22 @@ pub fn extract_error_summary_from_tracking(
 
     if let Some(stats) = stats {
         if stats.yearless_timestamps > 0 {
-            summary.push_str(&format!(
-                "\n  Warning: Year-less timestamp format detected ({} parse{})",
+            let warning_msg = format!(
+                "Year-less timestamp format detected ({} parse{})\n\
+                   Format lacks year (e.g., \"Dec 31 23:59:59\")\n\
+                   Year inferred using heuristic (+/- 1 year from current date)\n\
+                   Timestamps >18 months old may be incorrect",
                 stats.yearless_timestamps,
                 if stats.yearless_timestamps == 1 {
                     ""
                 } else {
                     "s"
                 }
-            ));
-            summary.push_str("\n    Format lacks year (e.g., \"Dec 31 23:59:59\")");
-            summary.push_str("\n    Year inferred using heuristic (+/- 1 year from current date)");
-            summary.push_str("\n    Timestamps >18 months old may be incorrect");
+            );
+            summary.push_str("\n  ");
+            summary.push_str(
+                &crate::config::format_warning_message_auto(&warning_msg).replace('\n', "\n  "),
+            );
         }
     }
 

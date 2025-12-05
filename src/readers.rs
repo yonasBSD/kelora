@@ -186,6 +186,7 @@ pub struct MultiFileReader {
     current_file_idx: usize,
     current_reader: Option<Box<dyn BufRead + Send>>,
     buffer_size: usize,
+    strict: bool,
 }
 
 /// A file-aware reader that can provide filename information
@@ -199,9 +200,9 @@ pub struct FileAwareMultiFileReader {
 }
 
 impl FileAwareMultiFileReader {
-    pub fn new(files: Vec<String>) -> Result<Self> {
+    pub fn new(files: Vec<String>, strict: bool) -> Result<Self> {
         Ok(Self {
-            inner: MultiFileReader::new(files)?,
+            inner: MultiFileReader::new(files, strict)?,
         })
     }
 }
@@ -234,17 +235,18 @@ impl FileAwareRead for FileAwareMultiFileReader {
 
 impl MultiFileReader {
     /// Create a new MultiFileReader with default buffer size (256KB for better throughput)
-    pub fn new(files: Vec<String>) -> Result<Self> {
-        Self::with_buffer_size(files, 256 * 1024)
+    pub fn new(files: Vec<String>, strict: bool) -> Result<Self> {
+        Self::with_buffer_size(files, 256 * 1024, strict)
     }
 
     /// Create a new MultiFileReader with custom buffer size
-    pub fn with_buffer_size(files: Vec<String>, buffer_size: usize) -> Result<Self> {
+    pub fn with_buffer_size(files: Vec<String>, buffer_size: usize, strict: bool) -> Result<Self> {
         Ok(Self {
             files,
             current_file_idx: 0,
             current_reader: None,
             buffer_size,
+            strict,
         })
     }
 
@@ -269,10 +271,14 @@ impl MultiFileReader {
                                 eprintln!(
                                     "{}",
                                     crate::config::format_error_message_auto(&format!(
-                                        "Warning: Failed to setup stdin decompression: {}",
+                                        "Failed to setup stdin decompression: {}",
                                         e
                                     ))
                                 );
+                                crate::stats::stats_file_open_failed();
+                                if self.strict {
+                                    return Err(io::Error::other(e));
+                                }
                                 self.current_file_idx += 1;
                                 continue;
                             }
@@ -282,10 +288,14 @@ impl MultiFileReader {
                         eprintln!(
                             "{}",
                             crate::config::format_error_message_auto(&format!(
-                                "Warning: Failed to setup stdin reader: {}",
+                                "Failed to setup stdin reader: {}",
                                 e
                             ))
                         );
+                        crate::stats::stats_file_open_failed();
+                        if self.strict {
+                            return Err(io::Error::other(e));
+                        }
                         self.current_file_idx += 1;
                         continue;
                     }
@@ -303,10 +313,17 @@ impl MultiFileReader {
                         eprintln!(
                             "{}",
                             crate::config::format_error_message_auto(&format!(
-                                "Warning: Failed to open file '{}': {}",
+                                "Failed to open file '{}': {}",
                                 file_path, e
                             ))
                         );
+                        crate::stats::stats_file_open_failed();
+                        if self.strict {
+                            return Err(io::Error::new(
+                                io::ErrorKind::NotFound,
+                                format!("Failed to open file '{}': {}", file_path, e),
+                            ));
+                        }
                         self.current_file_idx += 1;
                         continue;
                     }
@@ -415,7 +432,7 @@ mod tests {
         temp_file.flush()?;
 
         let files = vec![temp_file.path().to_string_lossy().to_string()];
-        let mut reader = MultiFileReader::new(files)?;
+        let mut reader = MultiFileReader::new(files, false)?;
 
         let mut line = String::new();
 
@@ -457,7 +474,7 @@ mod tests {
             temp_file1.path().to_string_lossy().to_string(),
             temp_file2.path().to_string_lossy().to_string(),
         ];
-        let mut reader = MultiFileReader::new(files)?;
+        let mut reader = MultiFileReader::new(files, false)?;
 
         let mut all_content = String::new();
         reader.read_to_string(&mut all_content)?;

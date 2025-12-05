@@ -8,9 +8,9 @@ Kelora uses standard Unix exit codes to indicate success or failure:
 
 | Code | Name | Meaning | Cause |
 |------|------|---------|-------|
-| `0` | Success | No errors occurred | Clean processing, no parse/filter/exec errors |
-| `1` | General Error | Processing errors occurred | Parse errors, filter errors, exec errors |
-| `2` | Usage Error | Invalid command-line usage | Invalid flags, missing files, configuration errors |
+| `0` | Success | No errors occurred | Clean processing, no parse/filter/exec/file errors |
+| `1` | General Error | Processing errors occurred | Parse errors, filter errors, exec errors, file I/O failures |
+| `2` | Usage Error | Invalid command-line usage | Invalid flags, incompatible options, configuration errors |
 
 ## Signal Exit Codes
 
@@ -42,13 +42,14 @@ echo $?
 
 ## Exit Code 1: Processing Errors
 
-Indicates errors occurred during processing. Three types:
+Indicates errors occurred during processing. Four types:
 
 | Error Type | Cause | Example |
 |------------|-------|---------|
 | **Parse errors** | Lines couldn't be parsed in specified format | Invalid JSON/logfmt syntax |
 | **Filter errors** | `--filter` expressions failed during evaluation | Missing field access, type errors |
 | **Exec errors** | `--exec` scripts failed during execution | Runtime errors in Rhai code |
+| **File I/O failures** | Individual files failed to open or decompress | Permission denied, file not readable, decompression failed |
 
 ### Resilient Mode (Default)
 
@@ -67,9 +68,15 @@ Processing aborts immediately on first error with `--strict`:
 
 ```bash
 kelora -j --strict app.log
-# ... aborts on first error ...
+# ... aborts on first parse/filter/exec/file error ...
 echo $?
 1  # Processing aborted
+
+# With multiple files, strict mode aborts on first file failure
+kelora -j --strict good.log missing.log another.log
+⚠️ Failed to open file 'missing.log': No such file or directory
+echo $?
+1  # Aborted immediately, another.log not processed
 ```
 
 ### Examples
@@ -81,6 +88,8 @@ echo '{invalid json}' | kelora -j
 kelora -j app.log --filter 'e.missing_field.to_int()'
 # Exec error
 kelora -j app.log --exec 'e.result = e.invalid.to_int()'
+# File I/O error (some files failed)
+kelora -j good.log missing.log
 # All return exit code 1
 ```
 
@@ -92,15 +101,31 @@ Indicates **command-line usage errors** before processing begins:
 |------------|---------|
 | Invalid flags | `kelora --invalid-flag app.log` |
 | Missing arguments | `kelora --filter` (no expression provided) |
-| File not found | `kelora -j nonexistent.log` |
-| Permission denied | `kelora -j /root/secure.log` (without permission) |
+| Incompatible flags | `kelora -I helper.rhai --filter 'e.level == "ERROR"'` |
 | Invalid configuration | `kelora --config-file invalid.ini app.log` |
+| No input provided | `kelora` (no files + stdin is TTY) |
+
+**Note:** File I/O failures (unable to open files) are **processing errors** (exit 1), not usage errors, regardless of how many files fail. This is consistent with standard Unix tools like `cat`, `tail`, and `head`.
 
 ```bash
+# File I/O failures are always exit 1
 kelora -j nonexistent.log
-kelora: error: failed to open file 'nonexistent.log': No such file or directory
+⚠️ Failed to open file 'nonexistent.log': No such file or directory
 echo $?
-2
+1  # Processing error, not usage error
+
+# Even if all files fail
+kelora -j missing1.log missing2.log
+⚠️ Failed to open file 'missing1.log': No such file or directory
+⚠️ Failed to open file 'missing2.log': No such file or directory
+echo $?
+1  # Still processing error (like parse errors)
+
+# Usage error (incompatible flags)
+kelora -I helper.rhai --filter 'e.level == "ERROR"'
+⚠️ --include is not supported with --filter
+echo $?
+2  # Usage error
 ```
 
 ## Mode Interactions
