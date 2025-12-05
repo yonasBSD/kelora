@@ -58,7 +58,7 @@ kelora -f line examples/basics.jsonl
 
 ### Supported Formats
 
-Kelora auto-detects these formats (in priority order):
+Kelora auto-detects these formats in this order:
 
 ```bash
 json            # JSON objects (or use -j shortcut)
