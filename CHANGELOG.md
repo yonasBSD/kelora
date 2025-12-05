@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Breaking:** File I/O failures now exit 1 (processing error) and respect `--strict` mode instead of being silently tracked
 - **Breaking:** Using both `--include` and `--filter` together now exits 2 (usage error) instead of warning
 - Auto-detect now emits detection/fallback notices (TTY-aware) and a parse-failure warning when the auto-chosen format mostly fails
+- Auto-detection now uses actual parsers for CEF, Syslog, Combined, and Logfmt formats instead of heuristics, improving accuracy and reducing code by ~260 lines
 - Warning messages now use 🔸 (orange diamond) vs ⚠️ (warning sign) for errors
 - Metrics and stats headers now only shown when using `--with-metrics` or `--with-stats` flags
 - `--save-alias` now resolves referenced aliases when updating an alias in place while preserving composition when saving under a new name
