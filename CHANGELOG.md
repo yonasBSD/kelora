@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **New Rhai functions:**
+  - `track_avg()` - Streaming average aggregation with map-reduce support for parallel processing
+  - `parse_url()` now accepts path-only inputs (e.g., "/api/v1/users") without requiring a full URL
 - `to_json()` function now accepts optional indent parameter for pretty-printing JSON output
 - `meta.parsed_ts` now exposed in Rhai scripts for accessing the parsed timestamp value
 - Log shipper integration guide and quick-reference entry for common pipelines (e.g., Filebeat, Vector, Logstash)
@@ -36,6 +39,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `--show-config` output now uses `#` as header prefix instead of `Config:`
 - `--mark-gaps` output format humanized for better readability
 - Help screen organization improved with better categorization of output and config options; emojis removed from help screens (still available in main output unless `--no-emoji` is used)
+- Error messages significantly improved: now concise and actionable with better identification of missing fields, error suggestions in exec summaries, and clearer handling of Unit type errors
 - Documentation updated to use method syntax consistently, improved function examples for `pluck()`, `track_top()`, and `track_bottom()`, and clarified output suppression across help screens
 
 ### Fixed
