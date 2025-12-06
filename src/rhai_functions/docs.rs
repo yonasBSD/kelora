@@ -339,6 +339,9 @@ kelora -j api_logs.jsonl --exec 'track_count(e.error_type)' --silent --metrics-f
 # Custom output format with print() (suppress default formatter with -q)
 kelora -j api_logs.jsonl --exec 'print(`${e.timestamp} | ${e.message}`)' -q
 
+# Custom alerts from live logs (tail -f pattern)
+tail -f basics.jsonl | kelora -j --filter 'e.level == "ERROR"' --exec 'print(`Error: ${e.message}`)' -q
+
 COMPRESSION:
 # Transparent decompression of .gz files
 kelora -f combined web_access_large.log.gz --filter 'e.status >= 400' --stats
