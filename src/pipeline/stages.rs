@@ -436,7 +436,7 @@ impl ScriptStage for ExecStage {
 
                 // Extract suggestion if present
                 // Format is either "  💡 suggestion" (with emoji) or "  Hint: suggestion" (without)
-                let mut suggestion = error_msg
+                let suggestion = error_msg
                     .lines()
                     .find(|line| {
                         let trimmed = line.trim();
@@ -453,10 +453,17 @@ impl ScriptStage for ExecStage {
                     });
 
                 // Try to identify which field is missing from the script
+                let mut custom_message = None;
                 if suggestion
                     .as_ref()
                     .is_some_and(|s| s.contains("Field is missing"))
                 {
+                    // Extract method/function name from the error (e.g., "trim" from "Function not found: trim (())")
+                    let method_name = base_error
+                        .strip_prefix("Function not found: ")
+                        .and_then(|rest| rest.split_whitespace().next())
+                        .and_then(|name| name.split('(').next());
+
                     // Simple pattern match: look for e.fieldname in the script
                     if let Some(field) =
                         self.compiled_exec
@@ -477,12 +484,25 @@ impl ScriptStage for ExecStage {
                                 }
                             })
                     {
-                        suggestion = Some(format!("Field '{}' is missing. Use e.has(\"{}\") or e.get_path(\"{}\", default)", field, field, field));
+                        // Create a cleaner error message that replaces the verbose Rhai error
+                        custom_message = Some(if let Some(method) = method_name {
+                            format!(
+                                "Cannot call {}() - field '{}' is missing for this event. Use e.has(\"{}\") or e.get_path(\"{}\", default)",
+                                method, field, field, field
+                            )
+                        } else {
+                            format!(
+                                "Field '{}' is missing for this event. Use e.has(\"{}\") or e.get_path(\"{}\", default)",
+                                field, field, field
+                            )
+                        });
                     }
                 }
 
-                // Combine error and suggestion for summary with cleaner formatting
-                let error_for_summary = if let Some(hint) = suggestion {
+                // Use custom message if we identified the field, otherwise combine base error with suggestion
+                let error_for_summary = if let Some(msg) = custom_message {
+                    msg
+                } else if let Some(hint) = suggestion {
                     format!("{}. {}", base_error, hint)
                 } else {
                     base_error.to_string()
