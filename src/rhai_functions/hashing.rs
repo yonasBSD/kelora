@@ -16,7 +16,7 @@ type HmacSha256 = Hmac<Sha256>;
 #[derive(Debug, Clone, Default)]
 pub struct HashingRuntimeConfig {
     pub verbose: u8,
-    pub no_emoji: bool,
+    pub use_emoji: bool,
 }
 
 static RUNTIME_CONFIG: Lazy<RwLock<HashingRuntimeConfig>> =
@@ -36,7 +36,7 @@ fn log_pseudonym_init(message: &str) {
         .read()
         .expect("hashing runtime config poisoned");
     if config.verbose >= 2 {
-        let prefix = if config.no_emoji { "kelora:" } else { "🔹" };
+        let prefix = if config.use_emoji { "🔹" } else { "kelora:" };
         eprintln!("{} {}", prefix, message);
     }
 }

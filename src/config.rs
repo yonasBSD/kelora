@@ -48,7 +48,7 @@ pub struct OutputConfig {
     pub wrap: bool,
     pub pretty: bool,
     pub color: ColorMode,
-    pub no_emoji: bool,
+    pub emoji: EmojiMode,
     pub stats: Option<crate::cli::StatsFormat>,
     pub stats_with_events: bool,
     pub metrics: Option<crate::cli::MetricsFormat>,
@@ -258,6 +258,14 @@ pub enum ColorMode {
     Never,
 }
 
+/// Emoji output mode
+#[derive(Clone, Debug)]
+pub enum EmojiMode {
+    Auto,
+    Always,
+    Never,
+}
+
 /// Timestamp filtering configuration
 #[derive(Debug, Clone)]
 pub struct TimestampFilterConfig {
@@ -447,8 +455,8 @@ impl KeloraConfig {
 
     /// Format an error message with appropriate prefix (emoji or "kelora:")
     pub fn format_error_message(&self, message: &str) -> String {
-        let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
-        let use_emoji = use_colors && !self.output.no_emoji;
+        let use_emoji =
+            crate::tty::should_use_emoji_with_mode(&self.output.emoji, &self.output.color);
 
         if use_emoji {
             format!("⚠️ {}", message)
@@ -459,8 +467,8 @@ impl KeloraConfig {
 
     /// Format an informational message with appropriate prefix (emoji or "kelora:")
     pub fn format_info_message(&self, message: &str) -> String {
-        let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
-        let use_emoji = use_colors && !self.output.no_emoji;
+        let use_emoji =
+            crate::tty::should_use_emoji_with_mode(&self.output.emoji, &self.output.color);
 
         if use_emoji {
             format!("🔹 {}", message)
@@ -471,8 +479,8 @@ impl KeloraConfig {
 
     /// Format a hint/tip message with a lightbulb emoji when allowed
     pub fn format_hint_message(&self, message: &str) -> String {
-        let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
-        let use_emoji = use_colors && !self.output.no_emoji;
+        let use_emoji =
+            crate::tty::should_use_emoji_with_mode(&self.output.emoji, &self.output.color);
 
         if use_emoji {
             format!("💡 {}", message)
@@ -483,8 +491,8 @@ impl KeloraConfig {
 
     /// Format a warning message with appropriate prefix (emoji or "kelora warning:")
     pub fn format_warning_message(&self, message: &str) -> String {
-        let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
-        let use_emoji = use_colors && !self.output.no_emoji;
+        let use_emoji =
+            crate::tty::should_use_emoji_with_mode(&self.output.emoji, &self.output.color);
 
         if use_emoji {
             format!("🔸 {}", message)
@@ -496,8 +504,8 @@ impl KeloraConfig {
     /// Format a stats message with appropriate prefix (emoji or "Stats:")
     /// If `with_header` is true, includes the "📈 Stats:" header
     pub fn format_stats_message(&self, message: &str, with_header: bool) -> String {
-        let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
-        let use_emoji = use_colors && !self.output.no_emoji;
+        let use_emoji =
+            crate::tty::should_use_emoji_with_mode(&self.output.emoji, &self.output.color);
 
         if with_header {
             if use_emoji {
@@ -513,8 +521,8 @@ impl KeloraConfig {
     /// Format a metrics message with appropriate prefix (emoji or "Metrics:")
     /// If `with_header` is true, includes the "📊 Tracked metrics:" header
     pub fn format_metrics_message(&self, message: &str, with_header: bool) -> String {
-        let use_colors = crate::tty::should_use_colors_with_mode(&self.output.color);
-        let use_emoji = use_colors && !self.output.no_emoji;
+        let use_emoji =
+            crate::tty::should_use_emoji_with_mode(&self.output.emoji, &self.output.color);
 
         if with_header {
             if use_emoji {
@@ -531,9 +539,7 @@ impl KeloraConfig {
 /// Format an error message with appropriate prefix when config is not available
 /// Uses auto color detection for stderr and allows NO_EMOJI environment variable override
 pub fn format_error_message_auto(message: &str) -> String {
-    let use_colors = crate::tty::should_use_colors_for_stderr();
-    let no_emoji = std::env::var("NO_EMOJI").is_ok();
-    let use_emoji = use_colors && !no_emoji;
+    let use_emoji = crate::tty::should_use_emoji_for_stderr();
 
     if use_emoji {
         format!("⚠️ {}", message)
@@ -545,9 +551,7 @@ pub fn format_error_message_auto(message: &str) -> String {
 /// Format a warning message with appropriate prefix when config is not available
 /// Uses auto color detection for stderr and allows NO_EMOJI environment variable override
 pub fn format_warning_message_auto(message: &str) -> String {
-    let use_colors = crate::tty::should_use_colors_for_stderr();
-    let no_emoji = std::env::var("NO_EMOJI").is_ok();
-    let use_emoji = use_colors && !no_emoji;
+    let use_emoji = crate::tty::should_use_emoji_for_stderr();
 
     if use_emoji {
         format!("🔸 {}", message)
@@ -568,16 +572,12 @@ pub fn format_verbose_error_with_config(
     message: &str,
     config: Option<&KeloraConfig>,
 ) -> String {
-    let use_colors = crate::tty::should_use_colors_with_mode(&ColorMode::Auto);
-
-    // Check emoji settings in order of preference: config flag > NO_EMOJI env var
-    let no_emoji = if let Some(cfg) = config {
-        cfg.output.no_emoji || std::env::var("NO_EMOJI").is_ok()
+    // Determine emoji usage
+    let use_emoji = if let Some(cfg) = config {
+        crate::tty::should_use_emoji_with_mode(&cfg.output.emoji, &cfg.output.color)
     } else {
-        std::env::var("NO_EMOJI").is_ok()
+        crate::tty::should_use_emoji_for_stderr()
     };
-
-    let use_emoji = use_colors && !no_emoji;
     let prefix = if use_emoji { "⚠️ " } else { "kelora: " };
 
     if let Some(line) = line_num {
@@ -633,17 +633,12 @@ pub fn format_verbose_error_with_pipeline_config(
     message: &str,
     config: Option<&crate::pipeline::PipelineConfig>,
 ) -> String {
-    let color_mode = config.map(|c| &c.color_mode).unwrap_or(&ColorMode::Auto);
-    let use_colors = crate::tty::should_use_colors_with_mode(color_mode);
-
-    // Check emoji settings in order of preference: config flag > NO_EMOJI env var
-    let no_emoji = if let Some(cfg) = config {
-        cfg.no_emoji || std::env::var("NO_EMOJI").is_ok()
+    // Determine emoji usage
+    let use_emoji = if let Some(cfg) = config {
+        crate::tty::should_use_emoji_with_mode(&cfg.emoji_mode, &cfg.color_mode)
     } else {
-        std::env::var("NO_EMOJI").is_ok()
+        crate::tty::should_use_emoji_for_stderr()
     };
-
-    let use_emoji = use_colors && !no_emoji;
     let prefix = if use_emoji { "⚠️ " } else { "kelora: " };
 
     if let Some(line) = line_num {
@@ -685,7 +680,7 @@ impl OutputConfig {
 impl KeloraConfig {
     /// Create configuration from CLI arguments
     pub fn from_cli(cli: &crate::Cli) -> anyhow::Result<Self> {
-        // Determine color mode from flags (no-color takes precedence over force-color)
+        // Determine color mode from flags (last one wins via overrides_with)
         let color_mode = if cli.no_color {
             ColorMode::Never
         } else if cli.force_color {
@@ -694,14 +689,37 @@ impl KeloraConfig {
             ColorMode::Auto
         };
 
+        // Determine emoji mode from flags (last one wins via overrides_with)
+        let emoji_mode = if cli.no_emoji {
+            EmojiMode::Never
+        } else if cli.force_emoji {
+            EmojiMode::Always
+        } else {
+            EmojiMode::Auto
+        };
+
         let default_timezone = determine_default_timezone(cli);
         let mut quiet_events = cli.quiet;
-        let mut suppress_diagnostics = cli.no_diagnostics;
+        // Diagnostics: positive flag enables, negative flag disables (last one wins via overrides_with)
+        let mut suppress_diagnostics = if cli.diagnostics {
+            false
+        } else if cli.no_diagnostics {
+            true
+        } else {
+            false // Default: diagnostics enabled
+        };
         let mut silent = cli.silent;
         if cli.no_silent {
             silent = false;
         }
-        let mut suppress_script_output = cli.no_script_output;
+        // Script output: positive flag enables, negative flag disables (last one wins via overrides_with)
+        let mut suppress_script_output = if cli.script_output {
+            false
+        } else if cli.no_script_output {
+            true
+        } else {
+            false // Default: script output enabled
+        };
 
         let flatten_levels = |values: &[String]| -> Vec<String> {
             values
@@ -814,7 +832,7 @@ impl KeloraConfig {
                 wrap: !cli.no_wrap, // Default true, disabled by --no-wrap
                 pretty: cli.expand_nested,
                 color: color_mode,
-                no_emoji: cli.no_emoji,
+                emoji: emoji_mode,
                 stats: stats_format,
                 stats_with_events,
                 metrics: metrics_format,
@@ -910,7 +928,7 @@ impl Default for KeloraConfig {
                 wrap: true, // Default to enabled
                 pretty: false,
                 color: ColorMode::Auto,
-                no_emoji: false,
+                emoji: EmojiMode::Auto,
                 stats: None,
                 stats_with_events: false,
                 metrics: None,
@@ -1412,7 +1430,7 @@ mod tests {
 
             let mut config = KeloraConfig::default();
             config.output.color = ColorMode::Always;
-            config.output.no_emoji = false;
+            config.output.emoji = EmojiMode::Always;
 
             let message = config.format_error_message("problem");
             assert!(message.starts_with("⚠️"));
@@ -1424,7 +1442,7 @@ mod tests {
     fn format_error_message_without_colors_falls_back_to_plain_prefix() {
         let mut config = KeloraConfig::default();
         config.output.color = ColorMode::Never;
-        config.output.no_emoji = true;
+        config.output.emoji = EmojiMode::Never;
 
         let message = config.format_error_message("issue");
         assert_eq!(message, "kelora: issue");

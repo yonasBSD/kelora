@@ -184,16 +184,12 @@ pub fn track_error(
         // Output verbose errors - use ordered capture system for proper interleaving
         if verbose > 0 && quiet_level == 0 {
             // Enhanced format with filename for immediate verbose output
-            let color_mode = config
-                .map(|c| &c.color_mode)
-                .unwrap_or(&crate::config::ColorMode::Auto);
-            let use_colors = crate::tty::should_use_colors_with_mode(color_mode);
-            let no_emoji = if let Some(cfg) = config {
-                cfg.no_emoji || std::env::var("NO_EMOJI").is_ok()
+            // Determine emoji usage
+            let use_emoji = if let Some(cfg) = config {
+                crate::tty::should_use_emoji_with_mode(&cfg.emoji_mode, &cfg.color_mode)
             } else {
-                std::env::var("NO_EMOJI").is_ok()
+                crate::tty::should_use_emoji_for_stderr()
             };
-            let use_emoji = use_colors && !no_emoji;
             let prefix = if use_emoji { "⚠️ " } else { "kelora: " };
 
             let input_files = config.map(|c| c.input_files.as_slice()).unwrap_or(&[]);

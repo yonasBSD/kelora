@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `to_json()` function now accepts optional indent parameter for pretty-printing JSON output
 - `meta.parsed_ts` now exposed in Rhai scripts for accessing the parsed timestamp value
 - Log shipper integration guide and quick-reference entry for common pipelines (e.g., Filebeat, Vector, Logstash)
+- Positive flag variants for config overrides: `--force-emoji`, `--diagnostics`, and `--script-output` allow overriding config file defaults (e.g., override `defaults = --no-emoji` with `--force-emoji` on the command line)
+- "Last one wins" semantics for conflicting flags (`--force-color`/`--no-color`, `--force-emoji`/`--no-emoji`, etc.) enabling flexible config overrides
 
 ### Removed
 

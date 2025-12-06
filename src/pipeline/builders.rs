@@ -98,7 +98,7 @@ impl PipelineBuilder {
                 silent: false,
                 suppress_script_output: false,
                 quiet_level: 0,
-                no_emoji: false,
+                emoji_mode: crate::config::EmojiMode::Auto,
                 input_files: Vec::new(),
                 allow_fs_writes: false,
             },
@@ -140,10 +140,14 @@ impl PipelineBuilder {
         stages: Vec<crate::config::ScriptStageType>,
     ) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
-        rhai_engine.set_use_emoji(!self.config.no_emoji);
+        let use_emoji = crate::tty::should_use_emoji_with_mode(
+            &self.config.emoji_mode,
+            &self.config.color_mode,
+        );
+        rhai_engine.set_use_emoji(use_emoji);
 
         // Set up debugging if enabled
-        let debug_config = DebugConfig::new(self.config.verbose).with_emoji(!self.config.no_emoji);
+        let debug_config = DebugConfig::new(self.config.verbose).with_emoji(use_emoji);
         rhai_engine.setup_debugging(debug_config);
 
         // Set up side effect suppression when script output is disabled
@@ -159,7 +163,7 @@ impl PipelineBuilder {
 
         hashing::set_runtime_config(hashing::HashingRuntimeConfig {
             verbose: self.config.verbose,
-            no_emoji: self.config.no_emoji,
+            use_emoji,
         });
 
         // Create parser
@@ -336,7 +340,10 @@ impl PipelineBuilder {
 
         // Create formatter
         let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
-        let use_emoji = use_colors && !self.config.no_emoji;
+        let use_emoji = crate::tty::should_use_emoji_with_mode(
+            &self.config.emoji_mode,
+            &self.config.color_mode,
+        );
         let formatter: Box<dyn Formatter> = if self.config.quiet_events {
             Box::new(crate::formatters::HideFormatter::new())
         } else {
@@ -587,7 +594,11 @@ impl PipelineBuilder {
         let mut rhai_engine = RhaiEngine::new();
 
         // Set up debugging if enabled
-        let debug_config = DebugConfig::new(self.config.verbose).with_emoji(!self.config.no_emoji);
+        let use_emoji = crate::tty::should_use_emoji_with_mode(
+            &self.config.emoji_mode,
+            &self.config.color_mode,
+        );
+        let debug_config = DebugConfig::new(self.config.verbose).with_emoji(use_emoji);
         rhai_engine.setup_debugging(debug_config);
 
         // Set up side effect suppression when script output is disabled
@@ -603,7 +614,7 @@ impl PipelineBuilder {
 
         hashing::set_runtime_config(hashing::HashingRuntimeConfig {
             verbose: self.config.verbose,
-            no_emoji: self.config.no_emoji,
+            use_emoji,
         });
 
         // Create parser (with pre-processed CSV headers if available)
@@ -780,7 +791,10 @@ impl PipelineBuilder {
 
         // Create formatter (workers still need formatters for output)
         let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
-        let use_emoji = use_colors && !self.config.no_emoji;
+        let use_emoji = crate::tty::should_use_emoji_with_mode(
+            &self.config.emoji_mode,
+            &self.config.color_mode,
+        );
         let formatter: Box<dyn Formatter> = if self.config.quiet_events {
             Box::new(crate::formatters::HideFormatter::new())
         } else {
@@ -1051,7 +1065,7 @@ pub fn create_pipeline_builder_from_config(
         silent: config.processing.silent,
         suppress_script_output: config.processing.suppress_script_output,
         quiet_level: config.processing.quiet_level,
-        no_emoji: config.output.no_emoji,
+        emoji_mode: config.output.emoji.clone(),
         input_files: config.input.files.clone(),
         allow_fs_writes: config.processing.allow_fs_writes,
         format_name: Some(config.input.format.to_display_string()),

@@ -496,13 +496,16 @@ kelora -s app.log                         # Stats only (events suppressed automa
 kelora -m app.log                         # Metrics only (events suppressed automatically)
 ```
 
-#### `--no-diagnostics`
+#### `--diagnostics` / `--no-diagnostics`
 
-Suppress diagnostics and error summaries; a single fatal line is still emitted on errors. Does not affect events.
+Enable or suppress diagnostics and error summaries. By default, diagnostics are enabled. Use `--diagnostics` to override a `--no-diagnostics` setting from your config file.
 
 ```bash
 kelora -q --no-diagnostics app.log        # No events, no diagnostics
+kelora --diagnostics app.log              # Override config default
 ```
+
+**Note:** When both flags are present, the last one wins. A single fatal line is still emitted on errors even with `--no-diagnostics`.
 
 #### `--silent` / `--no-silent`
 
@@ -512,9 +515,16 @@ Suppress pipeline emitters on stdout/stderr (events, diagnostics, stats, termina
 kelora --silent --metrics-file out.json app.log   # Quiet terminal, metrics file written
 ```
 
-#### `--no-script-output`
+#### `--script-output` / `--no-script-output`
 
-Suppress Rhai `print`/`eprint` and side-effect warnings without affecting diagnostics/stats/metrics. Implied by data-only modes (`-s`, `-m` without `--with-*` flags).
+Enable or suppress Rhai `print`/`eprint` and side-effect warnings. By default, script output is enabled. Use `--script-output` to override a `--no-script-output` setting from your config file.
+
+```bash
+kelora --no-script-output app.log         # Suppress script prints
+kelora --script-output app.log            # Override config default
+```
+
+**Note:** When both flags are present, the last one wins. `--no-script-output` is implied by data-only modes (`-s`, `-m` without `--with-*` flags).
 
 ## Filtering Options
 
@@ -779,21 +789,16 @@ kelora -j -Z app.log
 
 ### Colors
 
-#### `--force-color`
+#### `--force-color` / `--no-color`
 
-Force colored output (even when piping to file).
-
-```bash
-kelora -j --force-color app.log > output.txt
-```
-
-#### `--no-color`
-
-Disable colored output.
+Force colored output always, or disable it completely. By default, Kelora auto-detects color support based on TTY status and the `NO_COLOR`/`FORCE_COLOR` environment variables.
 
 ```bash
-kelora -j --no-color app.log
+kelora -j --force-color app.log > output.txt   # Force color even when piping
+kelora -j --no-color app.log                   # Disable colors
 ```
+
+**Note:** When both flags are present, the last one wins. This allows overriding config file defaults.
 
 ### Gap Markers
 
@@ -814,13 +819,16 @@ Gap markers help identify time discontinuities in your logs, making it easier to
 
 ### Emoji
 
-#### `--no-emoji`
+#### `--force-emoji` / `--no-emoji`
 
-Disable emoji prefixes in output.
+Force emoji prefixes always, or disable them completely. By default, Kelora auto-detects emoji support based on color settings and the `NO_EMOJI` environment variable.
 
 ```bash
-kelora -j --no-emoji app.log
+kelora -j --force-emoji app.log    # Force emoji even in NO_EMOJI env
+kelora -j --no-emoji app.log       # Disable emoji
 ```
+
+**Note:** When both flags are present, the last one wins. This allows overriding config file defaults. Emoji requires color to be enabled.
 
 ## Performance Options
 

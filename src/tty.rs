@@ -1,4 +1,4 @@
-use crate::config::ColorMode;
+use crate::config::{ColorMode, EmojiMode};
 use std::io::IsTerminal;
 
 /// Check if stdout is connected to a TTY
@@ -67,6 +67,46 @@ pub fn should_use_colors_for_stderr() -> bool {
     }
 
     // Default: use colors for TTY
+    true
+}
+
+/// Determine if emoji should be used based on emoji mode, color settings, and environment
+pub fn should_use_emoji_with_mode(emoji_mode: &EmojiMode, color_mode: &ColorMode) -> bool {
+    match emoji_mode {
+        EmojiMode::Never => false,
+        EmojiMode::Always => true,
+        EmojiMode::Auto => {
+            // Emoji requires colors to be enabled
+            let use_colors = should_use_colors_with_mode(color_mode);
+            if !use_colors {
+                return false;
+            }
+
+            // Check NO_EMOJI environment variable
+            if std::env::var("NO_EMOJI").is_ok() {
+                return false;
+            }
+
+            // Default: use emoji when colors are enabled
+            true
+        }
+    }
+}
+
+/// Auto emoji detection for stderr messages (based on color detection)
+pub fn should_use_emoji_for_stderr() -> bool {
+    // Emoji requires colors to be enabled
+    let use_colors = should_use_colors_for_stderr();
+    if !use_colors {
+        return false;
+    }
+
+    // Check NO_EMOJI environment variable
+    if std::env::var("NO_EMOJI").is_ok() {
+        return false;
+    }
+
+    // Default: use emoji when colors are enabled
     true
 }
 

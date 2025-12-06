@@ -195,8 +195,8 @@ pub struct PipelineConfig {
     pub suppress_script_output: bool,
     /// Legacy quiet level (derived)
     pub quiet_level: u8,
-    /// Disable emoji in error output
-    pub no_emoji: bool,
+    /// Emoji mode for error output
+    pub emoji_mode: crate::config::EmojiMode,
     /// Input files for smart error message formatting
     pub input_files: Vec<String>,
     /// Allow Rhai scripts to create directories and write files on disk

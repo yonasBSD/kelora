@@ -2117,7 +2117,7 @@ fn should_resolve_alias_references(args: &[String], alias_name: &str) -> bool {
 }
 
 /// Handle --save-alias command
-fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
+fn handle_save_alias(raw_args: &[String], alias_name: &str, use_emoji: bool) {
     use crate::config_file::ConfigFile;
 
     // Extract --config-file if specified
@@ -2145,7 +2145,7 @@ fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
 
     // Check if we have any command left to save
     if command_args.is_empty() {
-        let prefix = if no_emoji { "kelora:" } else { "⚠️" };
+        let prefix = if use_emoji { "⚠️" } else { "kelora:" };
         eprintln!("{} No command to save as alias '{}'", prefix, alias_name);
         std::process::exit(2);
     }
@@ -2171,7 +2171,7 @@ fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
                     match config.resolve_args_only(&command_args) {
                         Ok(resolved_args) => {
                             if resolved_args.is_empty() {
-                                let prefix = if no_emoji { "kelora:" } else { "⚠️" };
+                                let prefix = if use_emoji { "⚠️" } else { "kelora:" };
                                 eprintln!(
                                     "{} Resolved command is empty for alias '{}'",
                                     prefix, alias_name
@@ -2181,7 +2181,7 @@ fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
                             shell_words::join(resolved_args)
                         }
                         Err(e) => {
-                            let prefix = if no_emoji { "kelora:" } else { "⚠️" };
+                            let prefix = if use_emoji { "⚠️" } else { "kelora:" };
                             eprintln!("{} Failed to resolve aliases in command: {}", prefix, e);
                             std::process::exit(1);
                         }
@@ -2189,7 +2189,7 @@ fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
                 } else {
                     // Preservation mode: validate references exist but keep them
                     if let Err(e) = config.validate_alias_references(&command_args) {
-                        let prefix = if no_emoji { "kelora:" } else { "⚠️" };
+                        let prefix = if use_emoji { "⚠️" } else { "kelora:" };
                         eprintln!("{} {}", prefix, e);
                         eprintln!(
                             "{} Cannot save alias '{}' with reference to non-existent alias",
@@ -2202,7 +2202,7 @@ fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
             }
             Err(_) if should_resolve => {
                 // Trying to update non-existent alias
-                let prefix = if no_emoji { "kelora:" } else { "⚠️" };
+                let prefix = if use_emoji { "⚠️" } else { "kelora:" };
                 eprintln!(
                     "{} Cannot update alias '{}' - no config file found",
                     prefix, alias_name
@@ -2216,7 +2216,7 @@ fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
             Err(_) => {
                 // Preservation mode but config doesn't exist - that's an error
                 // because we're referencing other aliases that don't exist
-                let prefix = if no_emoji { "kelora:" } else { "⚠️" };
+                let prefix = if use_emoji { "⚠️" } else { "kelora:" };
                 eprintln!(
                     "{} Cannot save alias '{}' with alias references - no config file found",
                     prefix, alias_name
@@ -2237,7 +2237,7 @@ fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
     let target_path = config_file_path.as_ref().map(std::path::Path::new);
     match ConfigFile::save_alias(alias_name, &alias_value, target_path) {
         Ok((config_path, previous_value)) => {
-            let success_prefix = if no_emoji { "kelora:" } else { "🔹" };
+            let success_prefix = if use_emoji { "🔹" } else { "kelora:" };
             println!(
                 "{} Alias '{}' saved to {}",
                 success_prefix,
@@ -2246,13 +2246,13 @@ fn handle_save_alias(raw_args: &[String], alias_name: &str, no_emoji: bool) {
             );
 
             if let Some(prev) = previous_value {
-                let info_prefix = if no_emoji { "kelora:" } else { "🔹" };
+                let info_prefix = if use_emoji { "🔹" } else { "kelora:" };
                 println!("{} Replaced previous alias:", info_prefix);
                 println!("    {} = {}", alias_name, prev);
             }
         }
         Err(e) => {
-            let error_prefix = if no_emoji { "kelora:" } else { "⚠️" };
+            let error_prefix = if use_emoji { "⚠️" } else { "kelora:" };
             eprintln!(
                 "{} Failed to save alias '{}': {}",
                 error_prefix, alias_name, e
@@ -2351,9 +2351,8 @@ fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
 
     // Check for --save-alias before other processing
     if let Some(alias_name) = extract_save_alias_arg(&raw_args) {
-        let no_emoji =
-            raw_args.iter().any(|arg| arg == "--no-emoji") || std::env::var("NO_EMOJI").is_ok();
-        handle_save_alias(&raw_args, &alias_name, no_emoji);
+        let use_emoji = tty::should_use_emoji_for_stderr();
+        handle_save_alias(&raw_args, &alias_name, use_emoji);
         std::process::exit(0);
     }
 
@@ -3025,12 +3024,12 @@ For other help topics: kelora -h
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::ColorMode;
+    use crate::config::{ColorMode, EmojiMode};
     use rhai::Dynamic;
 
     fn base_config() -> KeloraConfig {
         let mut cfg = KeloraConfig::default();
-        cfg.output.no_emoji = true;
+        cfg.output.emoji = EmojiMode::Never;
         cfg.output.color = ColorMode::Never;
         cfg.processing.quiet_events = false;
         cfg.processing.silent = false;

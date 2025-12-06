@@ -377,8 +377,12 @@ pub struct Cli {
     #[arg(short = 'q', long = "quiet", help_heading = "Output Options")]
     pub quiet: bool,
 
+    /// Enable diagnostics and error summaries
+    #[arg(long = "diagnostics", help_heading = "Output Options", overrides_with_all = ["no_diagnostics", "diagnostics"])]
+    pub diagnostics: bool,
+
     /// Suppress diagnostics and error summaries (fatal line still allowed).
-    #[arg(long = "no-diagnostics", help_heading = "Output Options")]
+    #[arg(long = "no-diagnostics", help_heading = "Output Options", overrides_with_all = ["diagnostics", "no_diagnostics"])]
     pub no_diagnostics: bool,
 
     /// Silence pipeline stdout/stderr emitters (events/diagnostics/stats/terminal metrics); script output still allowed. Metrics files still write.
@@ -389,8 +393,12 @@ pub struct Cli {
     #[arg(long = "no-silent", help_heading = "Output Options")]
     pub no_silent: bool,
 
+    /// Enable Rhai print/eprint output
+    #[arg(long = "script-output", help_heading = "Output Options", overrides_with_all = ["no_script_output", "script_output"])]
+    pub script_output: bool,
+
     /// Suppress Rhai print/eprint and side-effect warnings (implied by data-only modes).
-    #[arg(long = "no-script-output", help_heading = "Output Options")]
+    #[arg(long = "no-script-output", help_heading = "Output Options", overrides_with_all = ["script_output", "no_script_output"])]
     pub no_script_output: bool,
 
     /// Output only field values (default: false).
@@ -437,11 +445,11 @@ pub struct Cli {
     pub format_timestamps_utc: bool,
 
     /// Force colored output
-    #[arg(long = "force-color", help_heading = "Display Options")]
+    #[arg(long = "force-color", help_heading = "Display Options", overrides_with_all = ["no_color", "force_color"])]
     pub force_color: bool,
 
     /// Disable colored output
-    #[arg(long = "no-color", help_heading = "Display Options")]
+    #[arg(long = "no-color", help_heading = "Display Options", overrides_with_all = ["force_color", "no_color"])]
     pub no_color: bool,
 
     /// Insert a centered marker when time gaps grow large.
@@ -453,8 +461,12 @@ pub struct Cli {
     )]
     pub mark_gaps: Option<String>,
 
+    /// Force emoji prefixes (override auto-detection)
+    #[arg(long = "force-emoji", help_heading = "Display Options", overrides_with_all = ["no_emoji", "force_emoji"])]
+    pub force_emoji: bool,
+
     /// Disable emoji prefixes
-    #[arg(long = "no-emoji", help_heading = "Display Options")]
+    #[arg(long = "no-emoji", help_heading = "Display Options", overrides_with_all = ["force_emoji", "no_emoji"])]
     pub no_emoji: bool,
 
     /// Enable parallel processing (default: sequential processing).
