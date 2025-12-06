@@ -91,7 +91,7 @@ Operations performed on raw string lines before parsing into events. Includes li
 Contextual information about log processing available in the `meta` variable. Includes:
 
 - `meta.filename` - Current input file
-- `meta.line_number` - Line number in file
+- `meta.line_num` - Line number in file
 - `meta.parsed_ts` - Parsed UTC timestamp before scripts (or empty when missing)
 - `meta.span_id` - Current span identifier (if using spans)
 
