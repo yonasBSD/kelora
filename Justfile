@@ -27,6 +27,12 @@ test-unit:
 test-integration:
     cargo test -q --tests
 
+# Count tests by category without running them
+test-counts:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    python3 -c "import subprocess, re; out=subprocess.run(['cargo','test','--','--list'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True).stdout.splitlines(); counts={'unit':0,'integration':0,'doc':0}; category=None; code='for line in out:\\n    stripped=line.strip()\\n    if \\'Running unittests \\' in line:\\n        category=\\'unit\\'\\n        continue\\n    if \\'Running tests/\\' in line:\\n        category=\\'integration\\'\\n        continue\\n    if stripped.startswith(\\'Doc-tests \\'):\\n        category=\\'doc\\'\\n        continue\\n    if re.search(r\\': test$\\', stripped):\\n        counts[category or \\'unit\\'] += 1'; exec(code); print('unit:', counts['unit']); print('integration:', counts['integration']); print('doc:', counts['doc']); print('total:', sum(counts.values()))"
+
 # Generate coverage report (requires cargo-llvm-cov + llvm-tools-preview)
 coverage *args:
     #!/usr/bin/env bash
