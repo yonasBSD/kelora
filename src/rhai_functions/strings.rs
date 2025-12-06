@@ -206,17 +206,50 @@ fn hex_value(byte: u8) -> Option<u8> {
     }
 }
 
+fn parse_path_only(input: &str) -> Map {
+    let mut result = Map::new();
+
+    // Split on fragment first
+    let (pre_fragment, fragment) = input.split_once('#').unwrap_or((input, ""));
+
+    // Split on query string
+    let (path, query) = pre_fragment.split_once('?').unwrap_or((pre_fragment, ""));
+
+    result.insert("path".into(), Dynamic::from(path.to_string()));
+
+    if !query.is_empty() {
+        result.insert("query".into(), Dynamic::from(query.to_string()));
+
+        // Parse query params (reuse existing function)
+        let params = parse_query_params_impl(query);
+        if !params.is_empty() {
+            result.insert("query_map".into(), Dynamic::from(params));
+        }
+    }
+
+    if !fragment.is_empty() {
+        result.insert("fragment".into(), Dynamic::from(fragment.to_string()));
+    }
+
+    result
+}
+
 fn parse_url_impl(input: &str) -> Map {
     let trimmed = input.trim();
     if trimmed.is_empty() || trimmed.len() > MAX_PARSE_LEN {
         return Map::new();
     }
 
+    // Try full URL first
     let (url_str, has_scheme) = if trimmed.contains("://") {
         (trimmed.to_string(), true)
     } else if trimmed.starts_with("//") {
         (format!("http:{}", trimmed), false)
     } else {
+        // Fall back to path parsing
+        if trimmed.starts_with('/') || trimmed.contains('?') {
+            return parse_path_only(trimmed);
+        }
         return Map::new();
     };
 
@@ -3058,7 +3091,87 @@ mod tests {
             "1"
         );
 
-        scope.push("invalid", "/just/a/path");
+        // Test path-only input
+        scope.push("path_only", "/just/a/path");
+        let path_only: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_url(path_only)"#)
+            .unwrap();
+        assert_eq!(
+            path_only
+                .get("path")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "/just/a/path"
+        );
+        assert!(!path_only.contains_key("host"));
+
+        // Test path with query string
+        scope.push("path_query", "/api/users?id=123&name=test");
+        let path_query: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_url(path_query)"#)
+            .unwrap();
+        assert_eq!(
+            path_query
+                .get("path")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "/api/users"
+        );
+        assert_eq!(
+            path_query
+                .get("query")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "id=123&name=test"
+        );
+        let path_query_map = path_query
+            .get("query_map")
+            .unwrap()
+            .clone()
+            .try_cast::<rhai::Map>()
+            .unwrap();
+        assert_eq!(
+            path_query_map
+                .get("id")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "123"
+        );
+
+        // Test path with fragment
+        scope.push("path_frag", "/page#section");
+        let path_frag: rhai::Map = engine
+            .eval_with_scope(&mut scope, r#"parse_url(path_frag)"#)
+            .unwrap();
+        assert_eq!(
+            path_frag
+                .get("path")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "/page"
+        );
+        assert_eq!(
+            path_frag
+                .get("fragment")
+                .unwrap()
+                .clone()
+                .into_string()
+                .unwrap(),
+            "section"
+        );
+
+        // Test truly invalid input (no scheme, no host, no path indicators)
+        scope.push("invalid", "just-some-text");
         let invalid: rhai::Map = engine
             .eval_with_scope(&mut scope, r#"parse_url(invalid)"#)
             .unwrap();
