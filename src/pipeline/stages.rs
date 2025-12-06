@@ -413,17 +413,55 @@ impl ScriptStage for ExecStage {
                 let _ = crate::rhai_functions::emit::get_and_clear_pending_emissions();
 
                 let error_msg = format!("{:#}", e);
-                // Extract just the Rhai error message from the full diagnostic for cleaner error summaries
-                let error_for_summary = error_msg
-                    .lines()
-                    .find(|line| line.trim().starts_with("Rhai:"))
-                    .map(|line| line.trim().strip_prefix("Rhai:").unwrap_or(line).trim())
+
+                // Extract the core error message and any suggestions from the enhanced diagnostic
+                let error_lines = error_msg.lines();
+
+                // Look for the "Error:" line (from enhanced error format)
+                let base_error = error_lines
+                    .clone()
+                    .find(|line| line.trim().starts_with("Error:"))
+                    .and_then(|line| line.trim().strip_prefix("Error:"))
+                    .map(|s| s.trim())
+                    // Fallback: look for "Rhai:" prefix (older format)
+                    .or_else(|| {
+                        error_msg
+                            .lines()
+                            .find(|line| line.trim().starts_with("Rhai:"))
+                            .and_then(|line| line.trim().strip_prefix("Rhai:"))
+                            .map(|s| s.trim())
+                    })
+                    // Final fallback: use full message
                     .unwrap_or(&error_msg);
+
+                // Extract suggestion if present
+                // Format is either "  💡 suggestion" (with emoji) or "  Hint: suggestion" (without)
+                let suggestion = error_msg
+                    .lines()
+                    .find(|line| {
+                        let trimmed = line.trim();
+                        trimmed.starts_with("💡") || trimmed.starts_with("Hint:")
+                    })
+                    .map(|line| {
+                        // Strip leading whitespace and prefix
+                        line.trim()
+                            .strip_prefix("💡")
+                            .or_else(|| line.trim().strip_prefix("Hint:"))
+                            .unwrap_or(line.trim())
+                            .trim()
+                    });
+
+                // Combine error and suggestion for summary
+                let error_for_summary = if let Some(hint) = suggestion {
+                    format!("{} ({})", base_error, hint)
+                } else {
+                    base_error.to_string()
+                };
 
                 crate::rhai_functions::tracking::track_error(
                     "exec",
                     ctx.meta.line_num,
-                    error_for_summary,
+                    &error_for_summary,
                     Some(&event.original_line),
                     ctx.meta.filename.as_deref(),
                     ctx.config.verbose,

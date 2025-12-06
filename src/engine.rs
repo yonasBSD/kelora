@@ -1465,7 +1465,6 @@ impl RhaiEngine {
 
         // Basic header
         let mut output = String::new();
-        let _ = use_emoji; // prefixing handled by outer error formatters
         output.push_str(&format!("{} error\n", stage));
 
         // Position + snippet
@@ -1498,6 +1497,20 @@ impl RhaiEngine {
                 output.push_str(&format!("    • {} @ {}\n", func, pos));
             }
         }
+
+        // Generate suggestions even without debug mode (helps users fix errors)
+        if let Some(scope) = scope {
+            let config = DebugConfig::new(0); // Minimal config for suggestion generation
+            let enhancer = ErrorEnhancer::new(config);
+            if let Some(suggestion) = enhancer.generate_suggestions(&err, scope) {
+                if use_emoji {
+                    output.push_str(&format!("  💡 {}\n", suggestion));
+                } else {
+                    output.push_str(&format!("  Hint: {}\n", suggestion));
+                }
+            }
+        }
+
         output
     }
 
