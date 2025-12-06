@@ -1202,6 +1202,18 @@ All tracking functions require the `--metrics` flag.
 
 ### Tracking Functions {#tracking-functions}
 
+#### `track_avg(key, value)`
+Track average of numeric values for key. Automatically computes the average during output. Skips Unit `()` values. Works correctly in parallel mode.
+
+```rhai
+track_avg("avg_latency", e.response_time)
+track_avg(e.endpoint, e.duration_ms)
+
+// Safe with conversions that may fail
+let latency = e.latency_str.to_float()  // Returns () on error
+track_avg("avg_ms", latency)            // Skips () values
+```
+
 #### `track_count(key)`
 Increment counter for key by 1.
 

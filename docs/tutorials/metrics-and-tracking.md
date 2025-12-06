@@ -104,15 +104,20 @@ response sizes and latency as rolling aggregates.
 **Available aggregation functions:**
 
 - `track_sum(key, value)` - Accumulates totals (throughput, volume)
+- `track_avg(key, value)` - Calculates averages automatically (stores sum and count internally)
 - `track_min(key, value)` - Tracks minimum value seen
 - `track_max(key, value)` - Tracks maximum value seen
 - `track_count(key)` - Counts occurrences of key
 - `track_inc(key, amount)` - Increment counter by amount (not shown above)
 
-**Note:** There's no `track_avg()` function. Calculate averages in `--end` stage:
+**Quick example of `track_avg()`:**
 ```rhai
---end 'let avg = metrics.total_duration / metrics.duration_count; print("Average: " + avg)'
+# Track average response time automatically
+kelora -j api_logs.jsonl -m \
+  --exec 'if e.has("duration_ms") { track_avg("avg_latency", e.duration_ms) }'
 ```
+
+The `track_avg()` function internally stores both sum and count, then computes the average during output. This works correctly even in parallel mode.
 
 ## Step 3 – Histograms with track_bucket()
 
@@ -505,21 +510,22 @@ human-readable histogram once processing finishes.
 | `track_count(key)` | Count events by key | `track_count(e.service)` |
 | `track_inc(key, amount)` | Increment by amount | `track_inc("total_bytes", e.size)` |
 | `track_sum(key, value)` | Sum numeric values | `track_sum("bandwidth", e.bytes)` |
+| `track_avg(key, value)` | Average numeric values | `track_avg("avg_latency", e.duration)` |
 | `track_min(key, value)` | Minimum value | `track_min("fastest", e.duration)` |
 | `track_max(key, value)` | Maximum value | `track_max("slowest", e.duration)` |
 | `track_bucket(key, bucket)` | Histogram buckets | `track_bucket("status", (e.status/100)*100)` |
 | `track_unique(key, value)` | Unique values | `track_unique("users", e.user_id)` |
 
-**Note:** Calculate averages using `sum / count` in the `--end` stage.
+**Note:** `track_avg()` automatically computes averages by storing sum and count internally. For manual calculation, you can still use `sum / count` in the `--end` stage.
 
 ## Summary
 
 You've learned:
 
 - ✅ Track counts with `track_count()` and increment with `track_inc()`
-- ✅ Aggregate numbers with `track_sum()`, `track_min()`, `track_max()`
-- ✅ Calculate averages in `--end` stage from sum and count
+- ✅ Aggregate numbers with `track_sum()`, `track_avg()`, `track_min()`, `track_max()`
 - ✅ Build histograms with `track_bucket()`
+- ✅ Rank items with `track_top()` and `track_bottom()`
 - ✅ Count unique values with `track_unique()`
 - ✅ View metrics with `-m`, `--metrics=full`, and `--metrics=json`
 - ✅ Persist metrics with `--metrics-file`
