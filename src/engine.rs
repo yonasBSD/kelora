@@ -417,9 +417,7 @@ impl ErrorEnhancer {
                     | "^"
             ) {
                 return Some(format!(
-                    "Cannot perform operation '{}' with missing field (evaluates to ()). \
-                     () is Rhai's unit type for undefined values. \
-                     Guard optional fields with e.has(\"field_name\") or provide defaults with e.get(\"field_name\", default_value)",
+                    "Field is missing. Use e.has(\"field\") or e.get_path(\"field\", default) before using '{}'",
                     func_name
                 ));
             }
@@ -431,9 +429,7 @@ impl ErrorEnhancer {
                 || func_sig.contains(", ())")
             {
                 return Some(
-                    "Cannot call method/function on missing field (evaluates to ()). \
-                     () is Rhai's unit type for undefined values. \
-                     Guard optional fields with e.has(\"field_name\") before chaining methods"
+                    "Field is missing. Use e.has(\"field\") to check, or e.get_path(\"field\", default) to provide a default"
                         .to_string(),
                 );
             }

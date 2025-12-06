@@ -436,7 +436,7 @@ impl ScriptStage for ExecStage {
 
                 // Extract suggestion if present
                 // Format is either "  💡 suggestion" (with emoji) or "  Hint: suggestion" (without)
-                let suggestion = error_msg
+                let mut suggestion = error_msg
                     .lines()
                     .find(|line| {
                         let trimmed = line.trim();
@@ -449,11 +449,41 @@ impl ScriptStage for ExecStage {
                             .or_else(|| line.trim().strip_prefix("Hint:"))
                             .unwrap_or(line.trim())
                             .trim()
+                            .to_string()
                     });
 
-                // Combine error and suggestion for summary
+                // Try to identify which field is missing from the script
+                if suggestion
+                    .as_ref()
+                    .is_some_and(|s| s.contains("Field is missing"))
+                {
+                    // Simple pattern match: look for e.fieldname in the script
+                    if let Some(field) =
+                        self.compiled_exec
+                            .source()
+                            .split_whitespace()
+                            .find_map(|token| {
+                                if token.starts_with("e.") {
+                                    // Extract field name: e.field -> field, e.field.method() -> field
+                                    token
+                                        .strip_prefix("e.")
+                                        .and_then(|rest| {
+                                            rest.split(|c: char| !c.is_alphanumeric() && c != '_')
+                                                .next()
+                                        })
+                                        .filter(|f| !f.is_empty())
+                                } else {
+                                    None
+                                }
+                            })
+                    {
+                        suggestion = Some(format!("Field '{}' is missing. Use e.has(\"{}\") or e.get_path(\"{}\", default)", field, field, field));
+                    }
+                }
+
+                // Combine error and suggestion for summary with cleaner formatting
                 let error_for_summary = if let Some(hint) = suggestion {
-                    format!("{} ({})", base_error, hint)
+                    format!("{}. {}", base_error, hint)
                 } else {
                     base_error.to_string()
                 };
