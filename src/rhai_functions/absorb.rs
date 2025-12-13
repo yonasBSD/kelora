@@ -1,4 +1,5 @@
 use crate::event::json_to_dynamic;
+use regex::Regex;
 use rhai::{Dynamic, Engine, EvalAltResult, ImmutableString, Map};
 use std::cell::Cell;
 use std::collections::HashSet;
@@ -12,6 +13,8 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("absorb_kv", absorb_kv_with_options);
     engine.register_fn("absorb_json", absorb_json_default);
     engine.register_fn("absorb_json", absorb_json_with_options);
+    engine.register_fn("absorb_regex", absorb_regex_default);
+    engine.register_fn("absorb_regex", absorb_regex_with_options);
 }
 
 pub fn set_absorb_strict(strict: bool) {
@@ -56,6 +59,23 @@ fn absorb_json_with_options(
     options: Map,
 ) -> Result<Map, Box<EvalAltResult>> {
     finalize_result(absorb_json_impl(event, field, Some(&options)))
+}
+
+fn absorb_regex_default(
+    event: &mut Map,
+    field: &str,
+    pattern: &str,
+) -> Result<Map, Box<EvalAltResult>> {
+    finalize_result(absorb_regex_impl(event, field, pattern, None))
+}
+
+fn absorb_regex_with_options(
+    event: &mut Map,
+    field: &str,
+    pattern: &str,
+    options: Map,
+) -> Result<Map, Box<EvalAltResult>> {
+    finalize_result(absorb_regex_impl(event, field, pattern, Some(&options)))
 }
 
 fn absorb_kv_impl(event: &mut Map, field: &str, options: Option<&Map>) -> AbsorbResult {
@@ -227,6 +247,103 @@ fn absorb_json_impl(event: &mut Map, field: &str, options: Option<&Map>) -> Abso
     let mut data_map = Map::new();
     for (key, value) in object {
         data_map.insert(key.into(), json_to_dynamic(&value));
+    }
+
+    let mut result = AbsorbResult::new(AbsorbStatus::Applied);
+    result.data = data_map.clone();
+
+    let preexisting_keys = if opts.overwrite {
+        None
+    } else {
+        Some(
+            event
+                .keys()
+                .map(|key| key.to_string())
+                .collect::<HashSet<String>>(),
+        )
+    };
+
+    for (key, value) in data_map.iter() {
+        if !opts.overwrite {
+            if let Some(existing) = &preexisting_keys {
+                if existing.contains(key.as_str()) {
+                    continue;
+                }
+            }
+        }
+
+        event.insert(key.clone(), value.clone());
+        result.written = true;
+    }
+
+    if !opts.keep_source && event.remove(field).is_some() {
+        result.removed_source = true;
+    }
+
+    result
+}
+
+fn absorb_regex_impl(
+    event: &mut Map,
+    field: &str,
+    pattern: &str,
+    options: Option<&Map>,
+) -> AbsorbResult {
+    let opts = match AbsorbOptions::from_map(options) {
+        Ok(opts) => opts,
+        Err(err) => return AbsorbResult::invalid_option(err),
+    };
+
+    let field_value = match event.get(field) {
+        Some(value) => value.clone(),
+        None => return AbsorbResult::new(AbsorbStatus::MissingField),
+    };
+
+    let immutable = match field_value.try_cast::<ImmutableString>() {
+        Some(value) => value,
+        None => return AbsorbResult::new(AbsorbStatus::NotString),
+    };
+
+    let text = immutable.into_owned();
+
+    // Compile the regex
+    let re = match Regex::new(pattern) {
+        Ok(re) => re,
+        Err(err) => {
+            return AbsorbResult::parse_error(format!("Invalid regex pattern: {}", err));
+        }
+    };
+
+    // Try to match the pattern
+    let caps = match re.captures(&text) {
+        Some(caps) => caps,
+        None => {
+            let mut result = AbsorbResult::new(AbsorbStatus::Empty);
+            if !opts.keep_source && event.remove(field).is_some() {
+                result.removed_source = true;
+            }
+            return result;
+        }
+    };
+
+    // Extract named capture groups
+    let mut data_map = Map::new();
+    let mut extracted_fields = Vec::new();
+
+    for name in re.capture_names().flatten() {
+        if let Some(m) = caps.name(name) {
+            let value = m.as_str().to_string();
+            data_map.insert(name.into(), Dynamic::from(value.clone()));
+            extracted_fields.push((name.to_string(), value));
+        }
+    }
+
+    if extracted_fields.is_empty() {
+        let mut result = AbsorbResult::new(AbsorbStatus::Empty);
+        if !opts.keep_source && event.remove(field).is_some() {
+            result.removed_source = true;
+        }
+        return result;
     }
 
     let mut result = AbsorbResult::new(AbsorbStatus::Applied);
@@ -697,5 +814,140 @@ mod tests {
         assert_eq!(result.status, AbsorbStatus::Empty);
         assert!(result.removed_source);
         assert!(!event.contains_key("payload"));
+    }
+
+    #[test]
+    fn absorb_regex_basic_extraction() {
+        set_absorb_strict(false);
+        let mut event = Map::new();
+        event.insert(
+            "msg".into(),
+            map_string("User alice logged in from 192.168.1.1"),
+        );
+
+        let pattern = r"User (?P<user>\w+) logged in from (?P<ip>[\d.]+)";
+        let result = absorb_regex_impl(&mut event, "msg", pattern, None);
+
+        assert_eq!(result.status, AbsorbStatus::Applied);
+        assert!(result.removed_source);
+        assert_eq!(event.get("user").unwrap().to_string(), "alice");
+        assert_eq!(event.get("ip").unwrap().to_string(), "192.168.1.1");
+        assert_eq!(result.data.get("user").unwrap().to_string(), "alice");
+    }
+
+    #[test]
+    fn absorb_regex_keep_source() {
+        set_absorb_strict(false);
+        let mut event = Map::new();
+        event.insert("msg".into(), map_string("Status: 200 Duration: 45ms"));
+
+        let mut options = Map::new();
+        options.insert("keep_source".into(), Dynamic::from(true));
+
+        let pattern = r"Status: (?P<status>\d+) Duration: (?P<duration>\d+)ms";
+        let result = absorb_regex_impl(&mut event, "msg", pattern, Some(&options));
+
+        assert_eq!(result.status, AbsorbStatus::Applied);
+        assert!(!result.removed_source);
+        assert_eq!(
+            event.get("msg").unwrap().to_string(),
+            "Status: 200 Duration: 45ms"
+        );
+        assert_eq!(event.get("status").unwrap().to_string(), "200");
+        assert_eq!(event.get("duration").unwrap().to_string(), "45");
+    }
+
+    #[test]
+    fn absorb_regex_overwrite_false() {
+        set_absorb_strict(false);
+        let mut event = Map::new();
+        event.insert("status".into(), map_string("existing"));
+        event.insert("msg".into(), map_string("Status: 200"));
+
+        let mut options = Map::new();
+        options.insert("overwrite".into(), Dynamic::from(false));
+
+        let pattern = r"Status: (?P<status>\d+)";
+        let result = absorb_regex_impl(&mut event, "msg", pattern, Some(&options));
+
+        assert_eq!(result.status, AbsorbStatus::Applied);
+        assert!(!result.written);
+        assert_eq!(event.get("status").unwrap().to_string(), "existing");
+        assert_eq!(result.data.get("status").unwrap().to_string(), "200");
+    }
+
+    #[test]
+    fn absorb_regex_no_match() {
+        set_absorb_strict(false);
+        let mut event = Map::new();
+        event.insert("msg".into(), map_string("No pattern here"));
+
+        let pattern = r"User (?P<user>\w+)";
+        let result = absorb_regex_impl(&mut event, "msg", pattern, None);
+
+        assert_eq!(result.status, AbsorbStatus::Empty);
+        assert!(result.removed_source);
+        assert!(!event.contains_key("msg"));
+    }
+
+    #[test]
+    fn absorb_regex_invalid_pattern() {
+        set_absorb_strict(false);
+        let mut event = Map::new();
+        event.insert("msg".into(), map_string("Some text"));
+
+        let pattern = r"Invalid (?P<unclosed";
+        let result = absorb_regex_impl(&mut event, "msg", pattern, None);
+
+        assert_eq!(result.status, AbsorbStatus::ParseError);
+        assert!(result.error.as_ref().unwrap().contains("Invalid regex"));
+        assert!(event.contains_key("msg"));
+    }
+
+    #[test]
+    fn absorb_regex_missing_field() {
+        set_absorb_strict(false);
+        let mut event = Map::new();
+
+        let pattern = r"User (?P<user>\w+)";
+        let result = absorb_regex_impl(&mut event, "msg", pattern, None);
+
+        assert_eq!(result.status, AbsorbStatus::MissingField);
+    }
+
+    #[test]
+    fn absorb_regex_not_string() {
+        set_absorb_strict(false);
+        let mut event = Map::new();
+        event.insert("msg".into(), Dynamic::from(123));
+
+        let pattern = r"User (?P<user>\w+)";
+        let result = absorb_regex_impl(&mut event, "msg", pattern, None);
+
+        assert_eq!(result.status, AbsorbStatus::NotString);
+    }
+
+    #[test]
+    fn absorb_regex_multiple_captures() {
+        set_absorb_strict(false);
+        let mut event = Map::new();
+        event.insert(
+            "msg".into(),
+            map_string("2024-01-15 ERROR main.rs:42 Database connection failed"),
+        );
+
+        let pattern =
+            r"(?P<date>[\d-]+) (?P<level>\w+) (?P<file>[\w.]+):(?P<line>\d+) (?P<message>.+)";
+        let result = absorb_regex_impl(&mut event, "msg", pattern, None);
+
+        assert_eq!(result.status, AbsorbStatus::Applied);
+        assert_eq!(event.get("date").unwrap().to_string(), "2024-01-15");
+        assert_eq!(event.get("level").unwrap().to_string(), "ERROR");
+        assert_eq!(event.get("file").unwrap().to_string(), "main.rs");
+        assert_eq!(event.get("line").unwrap().to_string(), "42");
+        assert_eq!(
+            event.get("message").unwrap().to_string(),
+            "Database connection failed"
+        );
     }
 }

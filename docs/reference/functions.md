@@ -1455,6 +1455,54 @@ Options:
 
 Other absorb options (like `sep`) are accepted for consistency but ignored. JSON parsing is all-or-nothing: invalid JSON or non-object payloads set `status = "parse_error"` and leave the event untouched.
 
+#### `e.absorb_regex(field, pattern [, options])`
+Extract named capture groups from a string field using a regular expression pattern, merge the extracted values into the event, and return a status map (same structure as `absorb_kv()` and `absorb_json()`).
+
+The pattern must use **named capture groups** (`(?P<name>...)`) to define which parts of the text to extract. Only named captures become event fields; numbered groups are ignored.
+
+```rhai
+// Extract user and IP from log message
+let res = e.absorb_regex("msg", r"User (?P<user>\w+) logged in from (?P<ip>[\d.]+)");
+if res.status == "applied" {
+    print(`${e.user} from ${e.ip}`);  // Extracted fields now on event
+}
+
+// Parse structured log line with multiple fields
+let pattern = r"(?P<date>[\d-]+) (?P<level>\w+) (?P<file>[\w.]+):(?P<line>\d+) (?P<message>.+)";
+e.absorb_regex("line", pattern);
+// Now e.date, e.level, e.file, e.line, e.message are all populated
+```
+
+**Options:**
+
+- `keep_source`: bool (default `false`) – preserve the original field instead of removing it after extraction
+- `overwrite`: bool (default `true`) – allow extracted fields to overwrite existing event fields (`false` skips conflicts)
+
+**Status values:**
+
+- `"applied"` – pattern matched and fields were extracted
+- `"empty"` – pattern didn't match (no captures)
+- `"parse_error"` – invalid regex pattern
+- `"missing_field"` – source field doesn't exist
+- `"not_string"` – source field is not a string
+- `"invalid_option"` – unknown option key (aborts in `--strict` mode)
+
+**When to use:**
+
+- **absorb_regex()** – Extract structured data from unstructured text with custom patterns
+- **absorb_kv()** – Parse `key=value` pairs (simpler, faster)
+- **absorb_json()** – Parse JSON objects (type-aware)
+- **Regex input format** (`-f regex`) – Use for whole-log parsing at input time
+
+```rhai
+// Complex example: parse Apache access log format
+let apache_pattern = r#"(?P<ip>\S+) \S+ \S+ \[(?P<timestamp>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+)[^"]*" (?P<status>\d+) (?P<bytes>\d+)"#;
+e.absorb_regex("line", apache_pattern);
+
+// Keep source for debugging
+e.absorb_regex("raw_message", r"ERROR: (?P<error_code>\d+) - (?P<error_msg>.+)",
+               #{ keep_source: true });
+```
 
 ## Span Context – `--span-close` Only
 

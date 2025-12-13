@@ -221,6 +221,7 @@ EVENT MANIPULATION:
 emit_each(array [,base_map])         Fan out array elements as separate events (returns emitted count)
 e.absorb_kv(field [,options])        Parse key=value tokens from field, merge pairs, return status map
 e.absorb_json(field [,options])      Parse JSON object from field, merge keys, return status map
+e.absorb_regex(field, pattern [,opts]) Extract named captures from field using regex, return status map
 e = ()                               Clear entire event (remove all fields)
 e.field = ()                         Remove individual field from event
 e.has("key")                         Check if key exists and value is not ()
@@ -299,6 +300,9 @@ kelora -j fan_out_batches.jsonl --exec 'emit_each(e.items)' --filter 'e.status =
 
 # Parse key=value pairs from unstructured text
 kelora -f line incident_story.log --exec 'e.absorb_kv("line", #{ keep_source: true })'
+
+# Extract fields using regex named captures
+kelora -f line app.log --exec 'e.absorb_regex("line", r"User (?P<user>\w+) from (?P<ip>[\d.]+)")'
 
 OUTPUT FORMATS & CLI OPTIONS:
 # Output as JSON (from any input format)
