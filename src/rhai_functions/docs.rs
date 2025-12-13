@@ -142,6 +142,7 @@ dt.to_utc(), dt.to_local()           Convert timezone
 dt.to_timezone("tz_name")            Convert to named timezone
 dt.timezone_name()                   Get timezone name as string
 dt.ts_nanos()                        Get timestamp as nanoseconds
+dt.round_to("interval")              Round timestamp down to interval (e.g., "5m", "1h", "1d")
 dt + duration, dt - duration         Add/subtract duration from datetime
 dt1 - dt2                            Get duration between datetimes (returns DurationWrapper)
 dt1 == dt2, dt1 != dt2               Compare datetimes for equality
@@ -366,6 +367,12 @@ kelora -j duration_logs.jsonl --exec '
   e.duration_ms = duration.as_milliseconds();
   e.sla_breach = duration.as_seconds() > 5
 ' --filter 'e.sla_breach'
+
+# Group events by time buckets for histogram
+kelora -j api_logs.jsonl --exec '
+  let timestamp = to_datetime(e.timestamp);
+  e.bucket = timestamp.round_to("5m").to_iso()
+' | kelora -j - -m --exec 'track_bucket("time_buckets", e.bucket)'
 
 # Show local timestamps
 kelora -j api_logs.jsonl -z --since yesterday

@@ -946,6 +946,31 @@ Get timezone name as string.
 e.tz = e.timestamp.timezone_name()                    // "UTC"
 ```
 
+### Time Bucketing
+
+#### `dt.round_to("interval")`
+Round timestamp down to the nearest interval. Useful for grouping events into time buckets for histograms and time-series analysis.
+
+Accepts duration strings like `"5m"`, `"1h"`, `"1d"`, etc.
+
+```rhai
+// Group events into 5-minute buckets
+let timestamp = to_datetime(e.timestamp);
+e.bucket = timestamp.round_to("5m").to_iso();
+track_bucket("requests_per_5min", e.bucket);
+
+// Hourly buckets
+e.hour_bucket = to_datetime(e.time).round_to("1h").format("%Y-%m-%d %H:00");
+
+// Daily buckets
+e.day = timestamp.round_to("1d").format("%Y-%m-%d");
+```
+
+**Common intervals:**
+- `"1m"`, `"5m"`, `"15m"` - Minute-level bucketing
+- `"1h"`, `"6h"`, `"12h"` - Hour-level bucketing
+- `"1d"`, `"7d"` - Day/week-level bucketing
+
 ### Arithmetic and Comparison
 
 #### `dt + duration`, `dt - duration`

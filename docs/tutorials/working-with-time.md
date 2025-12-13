@@ -338,7 +338,77 @@ echo '{"timestamp": "2024-01-15T10:00:00Z"}' | \
 - `.as_minutes()`, `.as_hours()`, `.as_days()`
 - `.to_string()` - Human-readable format
 
-## Step 10: Real-World Example - Request Duration Analysis
+## Step 10: Time Bucketing for Aggregation
+
+Group events into time buckets for histograms and time-series analysis using `round_to()`:
+
+```bash
+# Create sample timestamped data
+cat > requests.jsonl <<'EOF'
+{"timestamp": "2024-01-15T10:03:45Z", "status": 200}
+{"timestamp": "2024-01-15T10:07:23Z", "status": 200}
+{"timestamp": "2024-01-15T10:08:12Z", "status": 500}
+{"timestamp": "2024-01-15T10:13:56Z", "status": 200}
+{"timestamp": "2024-01-15T10:17:34Z", "status": 404}
+{"timestamp": "2024-01-15T10:22:01Z", "status": 200}
+EOF
+
+# Group requests into 5-minute buckets
+kelora -j requests.jsonl \
+    -e 'let dt = to_datetime(e.timestamp);
+        e.bucket = dt.round_to("5m").to_iso()' \
+    -m --exec 'track_bucket("requests_per_5min", e.bucket)'
+```
+
+**Output:**
+```
+requests_per_5min:
+  2024-01-15T10:00:00+00:00: 2
+  2024-01-15T10:05:00+00:00: 2
+  2024-01-15T10:10:00+00:00: 1
+  2024-01-15T10:15:00+00:00: 1
+  2024-01-15T10:20:00+00:00: 1
+```
+
+**Different time granularities:**
+
+```bash
+# Hourly buckets for daily patterns
+kelora -j api_logs.jsonl \
+    -e 'let dt = to_datetime(e.timestamp);
+        e.hour = dt.round_to("1h").format("%Y-%m-%d %H:00")' \
+    -m --exec 'track_count(e.hour)'
+
+# Daily buckets for weekly trends
+kelora -j api_logs.jsonl \
+    -e 'e.date = to_datetime(e.timestamp).round_to("1d").format("%Y-%m-%d")' \
+    -m --exec 'track_bucket("requests_per_day", e.date)'
+
+# 15-minute buckets for fine-grained analysis
+kelora -j api_logs.jsonl \
+    -e 'e.bucket = to_datetime(e.timestamp).round_to("15m").to_iso()' \
+    -m --exec 'track_bucket("errors", e.bucket)' \
+    --filter 'e.level == "ERROR"'
+```
+
+**How `round_to()` works:**
+
+```rhai
+// Rounds DOWN to the nearest interval boundary (floor operation)
+let dt = to_datetime("2024-01-15T10:34:56Z");
+
+dt.round_to("5m")   // → 2024-01-15T10:30:00Z
+dt.round_to("1h")   // → 2024-01-15T10:00:00Z
+dt.round_to("1d")   // → 2024-01-15T00:00:00Z
+```
+
+**Common use cases:**
+- **Latency histograms** - Group response times into time windows
+- **Traffic patterns** - Analyze request volume over time
+- **Error trending** - Track error rates by hour/day
+- **Capacity planning** - Identify peak usage periods
+
+## Step 11: Real-World Example - Request Duration Analysis
 
 Analyze API request durations with proper time handling:
 
@@ -361,7 +431,7 @@ kelora -j api_logs.json \
     -k formatted_time,endpoint,duration_human
 ```
 
-## Step 11: Time-Based Filtering with Business Hours
+## Step 12: Time-Based Filtering with Business Hours
 
 Filter logs during business hours across timezones:
 
@@ -381,7 +451,7 @@ kelora -j app.log \
     --filter 'e.is_weekend'
 ```
 
-## Step 12: Comparing Timestamps
+## Step 13: Comparing Timestamps
 
 Use datetime comparison in filters:
 
@@ -409,7 +479,7 @@ kelora -j app.log \
 - `>`, `<` - Greater/less than
 - `>=`, `<=` - Greater/less or equal
 
-## Step 13: Current Time Function
+## Step 14: Current Time Function
 
 Use `now()` for relative time calculations:
 

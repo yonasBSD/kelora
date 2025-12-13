@@ -321,6 +321,49 @@ if dt.hour() >= 9 && dt.hour() < 17 {
 | `.to_timezone(name)` | Convert to named timezone | `dt.to_timezone("America/New_York")` |
 | `.timezone_name()` | Get timezone name | `dt.timezone_name()` → `"UTC"` |
 
+### Time Bucketing
+
+#### `.round_to(interval)`
+
+Round a timestamp down to the nearest interval. Essential for grouping events into time buckets for histograms, time-series analysis, and aggregation.
+
+**Syntax:**
+```rhai
+rounded_dt = dt.round_to("interval")
+```
+
+**Parameters:**
+- `interval` - Duration string (e.g., `"5m"`, `"1h"`, `"1d"`)
+
+**Returns:** DateTimeWrapper rounded down to the interval boundary
+
+**Examples:**
+```rhai
+// Group events into 5-minute buckets
+let timestamp = to_datetime(e.timestamp);
+e.bucket = timestamp.round_to("5m").to_iso();
+track_bucket("requests_per_5min", e.bucket);
+
+// Hourly aggregation
+let hourly = timestamp.round_to("1h");
+e.hour_label = hourly.format("%Y-%m-%d %H:00");
+
+// Daily rollups
+e.date = timestamp.round_to("1d").format("%Y-%m-%d");
+```
+
+**Common intervals:**
+- **Minute-level:** `"1m"`, `"5m"`, `"15m"`, `"30m"`
+- **Hour-level:** `"1h"`, `"6h"`, `"12h"`
+- **Day-level:** `"1d"`, `"7d"`
+
+**How it works:**
+- Rounds **down** to the nearest interval boundary (floor operation)
+- `2024-01-15T12:34:56Z` with `"5m"` → `2024-01-15T12:30:00Z`
+- `2024-01-15T12:34:56Z` with `"1h"` → `2024-01-15T12:00:00Z`
+- `2024-01-15T12:34:56Z` with `"1d"` → `2024-01-15T00:00:00Z`
+- Preserves the original timezone
+
 ### DateTime Comparison
 
 DateTime values support all comparison operators:

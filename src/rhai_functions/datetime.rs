@@ -323,6 +323,36 @@ pub fn to_duration(s: &str) -> Result<DurationWrapper, Box<EvalAltResult>> {
     Ok(DurationWrapper::new(total_duration))
 }
 
+/// Round a datetime down to the nearest interval
+pub fn round_to(
+    dt: &mut DateTimeWrapper,
+    interval: &str,
+) -> Result<DateTimeWrapper, Box<EvalAltResult>> {
+    let duration = to_duration(interval)?;
+    let interval_nanos = duration.inner.num_nanoseconds().ok_or_else(|| {
+        EvalAltResult::ErrorRuntime("Duration out of range".into(), Position::NONE)
+    })?;
+
+    if interval_nanos <= 0 {
+        return Err(Box::new(EvalAltResult::ErrorRuntime(
+            "Interval must be positive".into(),
+            Position::NONE,
+        )));
+    }
+
+    let timestamp_nanos = dt.inner.timestamp_nanos_opt().ok_or_else(|| {
+        EvalAltResult::ErrorRuntime("Timestamp out of range".into(), Position::NONE)
+    })?;
+
+    let rounded_nanos = (timestamp_nanos / interval_nanos) * interval_nanos;
+
+    let rounded_dt = Utc
+        .timestamp_nanos(rounded_nanos)
+        .with_timezone(&dt.inner.timezone());
+
+    Ok(DateTimeWrapper::new(rounded_dt))
+}
+
 /// Register all datetime functions with the Rhai engine
 pub fn register_functions(engine: &mut Engine) {
     // Parsing functions
@@ -421,6 +451,9 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("timezone_name", |dt: &mut DateTimeWrapper| {
         dt.inner.timezone().to_string()
     });
+
+    // Time bucketing
+    engine.register_fn("round_to", round_to);
 
     // Duration methods
     engine.register_fn("as_seconds", |dur: &mut DurationWrapper| {
@@ -1037,5 +1070,124 @@ mod tests {
         assert_eq!(dt.inner.year(), 2024);
         assert_eq!(dt.inner.month(), 12);
         assert_eq!(dt.inner.day(), 30);
+    }
+
+    #[test]
+    fn test_round_to_minutes() {
+        // 2023-07-04 12:34:56 UTC
+        let mut dt = to_datetime("2023-07-04 12:34:56Z", None, None).unwrap();
+
+        // Round to 5 minutes - should go to 12:30:00
+        let rounded = round_to(&mut dt, "5m").unwrap();
+        assert_eq!(rounded.inner.hour(), 12);
+        assert_eq!(rounded.inner.minute(), 30);
+        assert_eq!(rounded.inner.second(), 0);
+
+        // Round to 1 minute - should go to 12:34:00
+        let rounded = round_to(&mut dt, "1m").unwrap();
+        assert_eq!(rounded.inner.hour(), 12);
+        assert_eq!(rounded.inner.minute(), 34);
+        assert_eq!(rounded.inner.second(), 0);
+    }
+
+    #[test]
+    fn test_round_to_hours() {
+        // 2023-07-04 12:34:56 UTC
+        let mut dt = to_datetime("2023-07-04 12:34:56Z", None, None).unwrap();
+
+        // Round to 1 hour - should go to 12:00:00
+        let rounded = round_to(&mut dt, "1h").unwrap();
+        assert_eq!(rounded.inner.hour(), 12);
+        assert_eq!(rounded.inner.minute(), 0);
+        assert_eq!(rounded.inner.second(), 0);
+
+        // Round to 6 hours - should go to 12:00:00
+        let rounded = round_to(&mut dt, "6h").unwrap();
+        assert_eq!(rounded.inner.hour(), 12);
+        assert_eq!(rounded.inner.minute(), 0);
+        assert_eq!(rounded.inner.second(), 0);
+
+        // Test 15:34:56 rounds to 12:00:00 with 6h interval
+        let mut dt2 = to_datetime("2023-07-04 15:34:56Z", None, None).unwrap();
+        let rounded = round_to(&mut dt2, "6h").unwrap();
+        assert_eq!(rounded.inner.hour(), 12);
+    }
+
+    #[test]
+    fn test_round_to_days() {
+        // 2023-07-04 12:34:56 UTC
+        let mut dt = to_datetime("2023-07-04 12:34:56Z", None, None).unwrap();
+
+        // Round to 1 day - should go to 2023-07-04 00:00:00
+        let rounded = round_to(&mut dt, "1d").unwrap();
+        assert_eq!(rounded.inner.year(), 2023);
+        assert_eq!(rounded.inner.month(), 7);
+        assert_eq!(rounded.inner.day(), 4);
+        assert_eq!(rounded.inner.hour(), 0);
+        assert_eq!(rounded.inner.minute(), 0);
+        assert_eq!(rounded.inner.second(), 0);
+    }
+
+    #[test]
+    fn test_round_to_seconds() {
+        // 2023-07-04 12:34:56.789Z
+        let mut dt = to_datetime("2023-07-04T12:34:56.789Z", None, None).unwrap();
+
+        // Round to 10 seconds - should go to 12:34:50.000
+        let rounded = round_to(&mut dt, "10s").unwrap();
+        assert_eq!(rounded.inner.hour(), 12);
+        assert_eq!(rounded.inner.minute(), 34);
+        assert_eq!(rounded.inner.second(), 50);
+
+        // Round to 30 seconds - should go to 12:34:30.000
+        let rounded = round_to(&mut dt, "30s").unwrap();
+        assert_eq!(rounded.inner.hour(), 12);
+        assert_eq!(rounded.inner.minute(), 34);
+        assert_eq!(rounded.inner.second(), 30);
+    }
+
+    #[test]
+    fn test_round_to_preserves_timezone() {
+        // Parse as UTC then convert to America/New_York
+        // This creates 2023-07-04 12:34:56 UTC, which is 08:34:56 EDT
+        let dt_utc = to_datetime("2023-07-04 12:34:56Z", None, None).unwrap();
+        let mut dt = DateTimeWrapper::new(
+            dt_utc
+                .inner
+                .with_timezone(&"America/New_York".parse::<Tz>().unwrap()),
+        );
+
+        let rounded = round_to(&mut dt, "1h").unwrap();
+        assert_eq!(rounded.inner.timezone().to_string(), "America/New_York");
+        // 12:34:56 UTC = 08:34:56 EDT, rounds to 08:00:00 EDT
+        assert_eq!(rounded.inner.hour(), 8);
+        assert_eq!(rounded.inner.minute(), 0);
+    }
+
+    #[test]
+    fn test_round_to_error_cases() {
+        let mut dt = to_datetime("2023-07-04 12:34:56Z", None, None).unwrap();
+
+        // Invalid duration format
+        assert!(round_to(&mut dt, "invalid").is_err());
+
+        // Empty string
+        assert!(round_to(&mut dt, "").is_err());
+    }
+
+    #[test]
+    fn test_round_to_edge_cases() {
+        // Test rounding exactly on the boundary
+        let mut dt = to_datetime("2023-07-04 12:30:00Z", None, None).unwrap();
+        let rounded = round_to(&mut dt, "5m").unwrap();
+        assert_eq!(rounded.inner.hour(), 12);
+        assert_eq!(rounded.inner.minute(), 30);
+        assert_eq!(rounded.inner.second(), 0);
+
+        // Test midnight crossing with days
+        let mut dt2 = to_datetime("2023-07-05 00:00:00Z", None, None).unwrap();
+        let rounded = round_to(&mut dt2, "1d").unwrap();
+        assert_eq!(rounded.inner.day(), 5);
+        assert_eq!(rounded.inner.hour(), 0);
     }
 }
