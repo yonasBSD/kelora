@@ -1,6 +1,6 @@
 ## Rhai Error UX Improvements — Plan
 
-Goal: unify and upgrade Rhai error reporting (compile + runtime across all stages) with actionable hints, without worrying about backward compatibility. Execute in small, verifiable steps.
+Goal: unify and upgrade Rhai error reporting (compile + runtime across all stages) with actionable hints while preserving existing behavior where possible. Execute in small, verifiable steps.
 
 ### Phase 1 — Unified formatter and coverage
 - Introduce a single `RhaiDiagnostic` helper that formats: stage/name, line/col, snippet with caret, raw Rhai message, and optional emoji toggle.

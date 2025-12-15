@@ -71,7 +71,7 @@ just docs-build         # Build locally
 - 1: Parse/runtime errors
 - 2: Invalid CLI usage
 
-**No Backwards Compatibility:** Breaking changes are acceptable. Prioritize correctness and performance.
+**Stability:** Prefer avoiding breaking changes; document and justify any that are necessary.
 
 ## Project Structure
 

@@ -346,7 +346,7 @@ These files are central to the hot paths and will need modification:
 
 ## Notes
 
-- **No backwards compatibility requirement:** Breaking API changes acceptable (though not needed here)
+- **Compatibility-minded:** Aim to keep behavior stable; only accept breaking API changes when justified
 - **Conservative approach selected:** Capacity hints only, no aggressive refactoring
 - **Speculative items clearly marked:** Profile before implementing Phase 5
 - **Incremental validation:** Test after each phase, easy rollback
