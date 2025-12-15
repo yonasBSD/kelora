@@ -1,11 +1,18 @@
 use crate::event::json_to_dynamic;
+use lru::LruCache;
 use regex::Regex;
 use rhai::{Dynamic, Engine, EvalAltResult, ImmutableString, Map};
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
+use std::num::NonZeroUsize;
+
+const REGEX_CACHE_CAPACITY: usize = 100;
 
 thread_local! {
     static ABSORB_STRICT: Cell<bool> = const { Cell::new(false) };
+    static ABSORB_REGEX_CACHE: RefCell<LruCache<String, Regex>> = RefCell::new(LruCache::new(
+        NonZeroUsize::new(REGEX_CACHE_CAPACITY).expect("regex cache capacity must be non-zero")
+    ));
 }
 
 pub fn register_functions(engine: &mut Engine) {
@@ -283,6 +290,23 @@ fn absorb_json_impl(event: &mut Map, field: &str, options: Option<&Map>) -> Abso
     result
 }
 
+fn get_or_compile_regex(pattern: &str) -> Result<Regex, String> {
+    // Check cache first
+    if let Some(regex) = ABSORB_REGEX_CACHE.with(|cache| cache.borrow_mut().get(pattern).cloned()) {
+        return Ok(regex);
+    }
+
+    // Compile new regex
+    let regex = Regex::new(pattern).map_err(|err| format!("Invalid regex pattern: {}", err))?;
+
+    // Store in cache
+    ABSORB_REGEX_CACHE.with(|cache| {
+        cache.borrow_mut().put(pattern.to_string(), regex.clone());
+    });
+
+    Ok(regex)
+}
+
 fn absorb_regex_impl(
     event: &mut Map,
     field: &str,
@@ -306,11 +330,11 @@ fn absorb_regex_impl(
 
     let text = immutable.into_owned();
 
-    // Compile the regex
-    let re = match Regex::new(pattern) {
+    // Get or compile the regex (uses cache)
+    let re = match get_or_compile_regex(pattern) {
         Ok(re) => re,
         Err(err) => {
-            return AbsorbResult::parse_error(format!("Invalid regex pattern: {}", err));
+            return AbsorbResult::parse_error(err);
         }
     };
 
