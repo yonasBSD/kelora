@@ -61,6 +61,7 @@ Kelora is developed using AI-generated code (Claude, GPT-5). Validated through a
 - Functional validation through testing and usage
 - Continuous integration checks on every change
 - Security tooling (audit, deny) integrated into development workflow
+- Resource limits for Rhai execution (DoS protection presets) are not implemented yet; proposals live in `dev/dos-protection.md`
 
 ### CI/CD Pipeline
 
@@ -118,7 +119,7 @@ All other advisories result in build failures.
 
 1. **Rhai script safety:** User-provided scripts execute with the same privileges as the Kelora process. Users should review scripts from untrusted sources.
 
-2. **Resource exhaustion:** Processing very large files or complex scripts can consume significant CPU and memory. Use `--parallel` for large archives and monitor resource usage.
+2. **Resource exhaustion:** There are currently no built-in CPU/time/memory guardrails for Rhai execution. Processing very large files or complex scripts can consume significant resources. Use `--parallel` for large archives and monitor resource usage; apply OS-level limits (`ulimit`, cgroups) when handling untrusted inputs.
 
 3. **Regex complexity:** User-provided regex patterns in scripts could be computationally expensive on crafted input. The regex engine (Rust `regex` crate) has DoS protections, but extremely complex patterns may still be slow.
 
