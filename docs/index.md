@@ -10,7 +10,7 @@ cargo install kelora
 > Or download pre-built binaries for **Windows, macOS, and Linux** from [GitHub Releases](https://github.com/dloss/kelora/releases).
 
 !!! note "Built with AI"
-    Tool generated entirely by AI agents. Validated by a large test suite and Rust security tools; see [Development Approach](#development-approach) and the [Security Policy](https://github.com/dloss/kelora/blob/main/SECURITY.md) before relying on it in production.
+    Generated entirely by AI agents; validated by a large test suite and Rust security tools; see [Development Approach](#development-approach) and the [Security Policy](https://github.com/dloss/kelora/blob/main/SECURITY.md) before production use.
 
 ## When to Use Kelora
 
