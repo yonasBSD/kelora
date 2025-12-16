@@ -144,6 +144,15 @@ jobs:
           ' CHANGELOG.md > release_notes.md
         shell: bash
 
+      - name: Verify release notes were extracted
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          if [ ! -s release_notes.md ]; then
+            echo "No changelog entry found for version ${VERSION} in CHANGELOG.md"
+            exit 1
+          fi
+
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
