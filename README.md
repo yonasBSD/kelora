@@ -67,12 +67,12 @@ For common patterns and usage recipes, run:
 kelora --help-examples
 ```
 
-## Development Status
-
-Tool generated entirely by AI agents. Validated by a large test suite and Rust security tools, but **inspect the code before production use**. See the [Security Policy](https://github.com/dloss/kelora/blob/main/SECURITY.md).
-
-This is a spare-time solo project—responses and updates happen on a best-effort basis.
-
 ## License
 
 Kelora is open source software licensed under the [MIT License](https://github.com/dloss/kelora/blob/main/LICENSE).
+
+## Development Approach
+
+Kelora is an experiment in agentic AI development. Claude Code (Sonnet 4.5) and Codex CLI (gpt-5-codex) generate all implementation and tests; I steer requirements but do not write or review code. Validation relies on the automated test suite plus `cargo audit` and `cargo deny`, so please inspect the code yourself before relying on it in production. 
+
+This is a spare-time, single-developer project, so support and updates are best-effort.

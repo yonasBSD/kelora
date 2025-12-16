@@ -9,7 +9,7 @@ cargo install kelora
 ```
 > Or download pre-built binaries for **Windows, macOS, and Linux** from [GitHub Releases](https://github.com/dloss/kelora/releases).
 
-!!! note "Development Status"
+!!! note "Built with AI"
     Tool generated entirely by AI agents. Validated by a large test suite and Rust security tools; see [Development Approach](#development-approach) and the [Security Policy](https://github.com/dloss/kelora/blob/main/SECURITY.md) before relying on it in production.
 
 ## When to Use Kelora
@@ -129,4 +129,6 @@ Kelora is open source software licensed under the [MIT License](https://github.c
 
 ## Development Approach
 
-Kelora is an experiment in agentic AI development. Claude Code (Sonnet 4.5) and Codex CLI (gpt-5-codex) generate all implementation and tests; I steer requirements but do not write or review code. Validation relies on the automated test suite plus `cargo audit` and `cargo deny`, so please inspect the code yourself before relying on it in production and expect the API to evolve until 1.0. This is a spare-time, single-developer project, so support and updates are best-effort.
+Kelora is an experiment in agentic AI development. Claude Code (Sonnet 4.5) and Codex CLI (gpt-5-codex) generate all implementation and tests; I steer requirements but do not write or review code. Validation relies on the automated test suite plus `cargo audit` and `cargo deny`, so please inspect the code yourself before relying on it in production.
+
+This is a spare-time, single-developer project, so support and updates are best-effort.
