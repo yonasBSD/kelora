@@ -6,15 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2025-12-16
+
 ### Added
 
+- 🎉 **Stable release!** CLI flags, Rhai functions, and exit codes now follow semantic versioning. Breaking changes only in major versions.
 - **New Rhai functions:**
   - `dt.round_to()` - Round timestamps down to interval boundaries for time bucketing and histograms (supports duration strings like "5m", "1h", "1d")
   - `absorb_regex()` - Extract structured data from text fields using regex named capture groups, completing the absorb family alongside `absorb_kv()` and `absorb_json()` (includes LRU cache for compiled patterns to improve performance)
 
 ### Changed
 
-- Documentation: Aligned compatibility stance across developer documentation
+- Documentation: Aligned compatibility stance across developer documentation and added stability guarantees
 
 ## [0.14.0 - 2025-12-06]
 

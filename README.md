@@ -42,6 +42,12 @@ Download from **[GitHub Releases](https://github.com/dloss/kelora/releases)** (m
 cargo install kelora
 ```
 
+## Stability Promise (1.0+)
+
+Starting with v1.0, Kelora follows semantic versioning:
+- **CLI flags, Rhai functions, exit codes**: Stable. Breaking changes only in major versions (2.0, 3.0, etc.)
+- **Deprecations**: Marked for one minor version before removal
+
 ## Documentation
 
 > 📚 **[Read the full documentation at kelora.dev](https://kelora.dev)**
@@ -63,7 +69,7 @@ kelora --help-examples
 
 ## Development Status
 
-⚠️ Pre-1.0 tool generated entirely by AI agents. Validated by a large test suite and Rust security tools, but **inspect the code before production use**. APIs may change before v1.0. See the [Security Policy](https://github.com/dloss/kelora/blob/main/SECURITY.md).
+Tool generated entirely by AI agents. Validated by a large test suite and Rust security tools, but **inspect the code before production use**. See the [Security Policy](https://github.com/dloss/kelora/blob/main/SECURITY.md).
 
 This is a spare-time solo project—responses and updates happen on a best-effort basis.
 
