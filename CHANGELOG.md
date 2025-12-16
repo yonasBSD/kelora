@@ -18,6 +18,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - Documentation: Aligned compatibility stance across developer documentation and added stability guarantees
+- Documentation: Added `meta.parsed_ts` examples to time tutorial showing gap detection and hourly bucketing use cases
+
+### Fixed
+
+- Stack traces removed from user-facing errors (missing include files, configuration errors) - now shows clean, actionable error messages instead of internal Rust backtraces
 
 ## [0.14.0] - 2025-12-06
 
