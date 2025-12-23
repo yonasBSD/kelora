@@ -164,7 +164,7 @@ Common uses: deduplication, session reconstruction, state machines, cross-event 
 See [Script Variables](reference/script-variables.md#state) and `examples/state_examples.rhai`.
 
 ### Statistics
-Auto-collected processing metrics displayed with `--stats`. Includes events parsed, filtered, output; discovered levels and field names; errors; time span. Different from user-defined metrics. See [Processing Architecture](concepts/pipeline-model.md#internal-statistics-stats).
+Auto-collected processing metrics displayed with `--stats`. Includes events parsed, filtered, output; discovered levels and field names (both input and output when they differ); errors; time span. Different from user-defined metrics. See [Processing Architecture](concepts/pipeline-model.md#internal-statistics-stats).
 
 ### Streaming
 Processing mode where events are read, processed, and output one at a time without buffering the entire file in memory. Default mode (sequential). Enables real-time analysis of live logs. See [Performance Model](concepts/performance-model.md).

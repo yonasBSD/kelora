@@ -33,7 +33,7 @@ Kelora parses the custom format into structured fields. The format spec `cols:ts
 kelora examples/quickstart.log -f 'cols:ts(3) level *msg' -l error --stats
 ```
 
-Filter to show only ERROR level events and display statistics. The stats show processing metrics: 11 lines parsed, 4 errors output (7 filtered out), time span covered, and which levels were present in the log.
+Filter to show only ERROR level events and display statistics. The stats show processing metrics: 11 lines parsed, 4 errors output (7 filtered out), time span covered, and which levels and keys were present in both the input and output (when they differ due to filtering or transformations).
 
 ### 3. Extract hidden data
 
