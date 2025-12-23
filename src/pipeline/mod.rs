@@ -133,6 +133,71 @@ fn collect_discovered_levels_and_keys(event: &Event, ctx: &mut PipelineContext) 
     }
 }
 
+/// Helper function to collect output levels and keys for stats (after filtering)
+fn collect_output_levels_and_keys(event: &Event, ctx: &mut PipelineContext) {
+    if !crate::stats::stats_enabled() {
+        return;
+    }
+
+    // Collect output level
+    for level_field_name in crate::event::LEVEL_FIELD_NAMES {
+        if let Some(value) = event.fields.get(*level_field_name) {
+            if let Ok(level_str) = value.clone().into_string() {
+                if !level_str.is_empty() && ctx.discovered_levels_output.insert(level_str.clone()) {
+                    let level_dynamic = Dynamic::from(level_str.clone());
+                    let key = "__kelora_stats_discovered_levels_output".to_string();
+
+                    // Add to ctx.internal_tracker (for parallel)
+                    let current = ctx
+                        .internal_tracker
+                        .get(&key)
+                        .cloned()
+                        .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
+                    if let Ok(mut arr) = current.into_array() {
+                        arr.push(level_dynamic.clone());
+                        ctx.internal_tracker.insert(key.clone(), Dynamic::from(arr));
+                        ctx.internal_tracker
+                            .insert(format!("__op_{}", key), Dynamic::from("unique"));
+                    }
+
+                    // Add to thread-local stats (for sequential)
+                    crate::stats::stats_add_output_level(level_str);
+
+                    break; // Only take the first level field found
+                }
+            }
+        }
+    }
+
+    // Collect output keys
+    let key = "__kelora_stats_discovered_keys_output".to_string();
+    let current = ctx
+        .internal_tracker
+        .get(&key)
+        .cloned()
+        .unwrap_or_else(|| Dynamic::from(rhai::Array::new()));
+
+    if let Ok(mut arr) = current.into_array() {
+        let mut added = false;
+        for field_key in event.fields.keys() {
+            if ctx.discovered_keys_output.insert(field_key.clone()) {
+                arr.push(Dynamic::from(field_key.clone()));
+                added = true;
+
+                // Add to thread-local stats (for sequential)
+                crate::stats::stats_add_output_key(field_key.clone());
+            }
+        }
+
+        if added {
+            ctx.internal_tracker
+                .insert(key.clone(), Dynamic::from(arr.clone()));
+            ctx.internal_tracker
+                .insert(format!("__op_{}", key), Dynamic::from("unique"));
+        }
+    }
+}
+
 /// Core pipeline result types
 #[derive(Debug, Clone)]
 pub enum ScriptResult {
@@ -170,6 +235,8 @@ pub struct PipelineContext {
     pub pending_file_ops: Vec<FileOp>,
     pub discovered_levels: HashSet<String>,
     pub discovered_keys: HashSet<String>,
+    pub discovered_levels_output: HashSet<String>,
+    pub discovered_keys_output: HashSet<String>,
 }
 
 /// Pipeline configuration
@@ -505,6 +572,9 @@ impl Pipeline {
                     } else {
                         crate::stats::stats_add_event_output();
 
+                        // Collect output levels and keys for stats
+                        collect_output_levels_and_keys(&event, ctx);
+
                         // Track result timestamp for time span statistics
                         let mut result_event = event.clone();
                         result_event.parsed_ts = None; // Clear to force re-extraction
@@ -593,6 +663,9 @@ impl Pipeline {
                             }
                         } else {
                             crate::stats::stats_add_event_output();
+
+                            // Collect output levels and keys for stats
+                            collect_output_levels_and_keys(&event, ctx);
 
                             // Track result timestamp for time span statistics
                             let mut result_event = event.clone();

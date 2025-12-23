@@ -33,6 +33,8 @@ pub struct ProcessingStats {
     pub start_time: Option<Instant>,
     pub discovered_levels: BTreeSet<String>,
     pub discovered_keys: BTreeSet<String>,
+    pub discovered_levels_output: BTreeSet<String>,
+    pub discovered_keys_output: BTreeSet<String>,
     pub first_timestamp: Option<DateTime<Utc>>,
     pub last_timestamp: Option<DateTime<Utc>>,
     pub first_result_timestamp: Option<DateTime<Utc>>,
@@ -315,6 +317,24 @@ pub fn stats_update_result_timestamp(timestamp: DateTime<Utc>) {
                 }
             }
         }
+    });
+}
+
+pub fn stats_add_output_level(level: String) {
+    if !stats_enabled() {
+        return;
+    }
+    THREAD_STATS.with(|stats| {
+        stats.borrow_mut().discovered_levels_output.insert(level);
+    });
+}
+
+pub fn stats_add_output_key(key: String) {
+    if !stats_enabled() {
+        return;
+    }
+    THREAD_STATS.with(|stats| {
+        stats.borrow_mut().discovered_keys_output.insert(key);
     });
 }
 
@@ -684,16 +704,39 @@ impl ProcessingStats {
             }
         }
 
-        // Levels seen: (only if we have discovered levels)
+        // Levels seen/output: show output only when different from input
         if !self.discovered_levels.is_empty() {
-            let levels: Vec<String> = self.discovered_levels.iter().cloned().collect();
-            output.push_str(&format!("Levels seen: {}\n", levels.join(",")));
+            let levels_input: Vec<String> = self.discovered_levels.iter().cloned().collect();
+            let levels_output: Vec<String> =
+                self.discovered_levels_output.iter().cloned().collect();
+
+            if self.discovered_levels_output.is_empty()
+                || self.discovered_levels == self.discovered_levels_output
+            {
+                // No changes, show single line
+                output.push_str(&format!("Levels seen: {}\n", levels_input.join(",")));
+            } else {
+                // Changes occurred, show both for comparison
+                output.push_str(&format!("Levels seen: {}\n", levels_input.join(",")));
+                output.push_str(&format!("Levels output: {}\n", levels_output.join(",")));
+            }
         }
 
-        // Keys seen: (only if we have discovered keys)
+        // Keys seen/output: show output only when different from input
         if !self.discovered_keys.is_empty() {
-            let keys: Vec<String> = self.discovered_keys.iter().cloned().collect();
-            output.push_str(&format!("Keys seen: {}\n", keys.join(",")));
+            let keys_input: Vec<String> = self.discovered_keys.iter().cloned().collect();
+            let keys_output: Vec<String> = self.discovered_keys_output.iter().cloned().collect();
+
+            if self.discovered_keys_output.is_empty()
+                || self.discovered_keys == self.discovered_keys_output
+            {
+                // No changes, show single line
+                output.push_str(&format!("Keys seen: {}\n", keys_input.join(",")));
+            } else {
+                // Changes occurred, show both for comparison
+                output.push_str(&format!("Keys seen: {}\n", keys_input.join(",")));
+                output.push_str(&format!("Keys output: {}\n", keys_output.join(",")));
+            }
         }
 
         output.trim_end().to_string()

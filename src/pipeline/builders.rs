@@ -520,6 +520,8 @@ impl PipelineBuilder {
             pending_file_ops: Vec::new(),
             discovered_levels: std::collections::HashSet::new(),
             discovered_keys: std::collections::HashSet::new(),
+            discovered_levels_output: std::collections::HashSet::new(),
+            discovered_keys_output: std::collections::HashSet::new(),
         };
 
         // Create chunker based on multiline configuration
@@ -944,6 +946,8 @@ impl PipelineBuilder {
             pending_file_ops: Vec::new(),
             discovered_levels: std::collections::HashSet::new(),
             discovered_keys: std::collections::HashSet::new(),
+            discovered_levels_output: std::collections::HashSet::new(),
+            discovered_keys_output: std::collections::HashSet::new(),
         };
 
         // Create chunker based on multiline configuration

@@ -285,6 +285,28 @@ impl GlobalTracker {
             }
         }
 
+        // Extract discovered levels output from tracking data
+        if let Some(levels_dynamic) = metrics.get("__kelora_stats_discovered_levels_output") {
+            if let Ok(levels_array) = levels_dynamic.clone().into_array() {
+                for level in levels_array {
+                    if let Ok(level_str) = level.into_string() {
+                        stats.discovered_levels_output.insert(level_str);
+                    }
+                }
+            }
+        }
+
+        // Extract discovered keys output from tracking data
+        if let Some(keys_dynamic) = metrics.get("__kelora_stats_discovered_keys_output") {
+            if let Ok(keys_array) = keys_dynamic.clone().into_array() {
+                for key in keys_array {
+                    if let Ok(key_str) = key.into_string() {
+                        stats.discovered_keys_output.insert(key_str);
+                    }
+                }
+            }
+        }
+
         Ok(())
     }
 
