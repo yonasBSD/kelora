@@ -6,7 +6,7 @@ Group events into non-overlapping spans for periodic rollups, time-series analys
 
 Kelora's span feature groups filtered events into logical blocks during log processing. Events can be grouped by count, time windows, or field changes. The system tracks metadata for each span and allows emission of per-span summaries via a hook script when each span closes.
 
-![Span Aggregation Overview](../screenshots/span-aggregation-overview.png)
+![Span Aggregation Overview](../images/span-aggregation-overview.png)
 
 The diagram above illustrates the complete span aggregation pipeline, showing how events flow through parsing, filtering, and per-event scripts before being grouped into spans. Three span modes are available: count-based (batching N events), time-based (fixed time windows), and field-change based (grouping by field values). The span lifecycle manages event buffering, tracks metadata, and triggers span-close hooks for summaries and analytics.
 
