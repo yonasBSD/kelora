@@ -35,6 +35,15 @@ Multiline increases per-event memory usage. When processing large files, keep an
 eye on chunk size via `--stats` and consider tuning `--batch-size`/`--batch-timeout`
 when using `--parallel`.
 
+## Strategy Overview
+
+The diagram below illustrates how each multiline strategy groups input lines into
+structured events. Each strategy detects event boundaries differently—timestamp
+prefixes, indentation patterns, regex matches, or treating the entire input as one
+block. Choose the approach that matches your log format.
+
+![Kelora multiline strategy comparison showing timestamp, indent, regex, and full-buffer approaches](../screenshots/multiline-strategies-diagram.png)
+
 ## Built-in Strategies
 
 Kelora ships four strategies. Only one can be active at a time.
