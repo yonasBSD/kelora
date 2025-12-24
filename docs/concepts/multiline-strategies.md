@@ -42,7 +42,8 @@ structured events. Each strategy detects event boundaries differently—timestam
 prefixes, indentation patterns, regex matches, or treating the entire input as one
 block. Choose the approach that matches your log format.
 
-![Kelora multiline strategy comparison showing timestamp, indent, regex, and full-buffer approaches](../images/multiline-strategies-diagram.png)
+![Kelora multiline strategy comparison showing timestamp, indent, regex, and full-buffer approaches](../images/multiline-strategies-diagram.png#only-light)
+![Kelora multiline strategy comparison showing timestamp, indent, regex, and full-buffer approaches](../images/multiline-strategies-diagram-dark.png#only-dark)
 
 ## Built-in Strategies
 
