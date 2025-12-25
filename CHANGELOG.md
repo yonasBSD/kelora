@@ -26,10 +26,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `track_percentiles()` - Streaming percentile estimation using t-digest algorithm for memory-efficient, parallel-safe percentile tracking with ~1-2% accuracy (auto-suffixes metric names like "latency_p95", "latency_p99")
   - `to_float(thousands_sep, decimal_sep)`, `to_int(thousands_sep)` - Explicit number format parsing for different locales (US: `"1,234.56".to_float(',', '.')`, EU: `"1.234,56".to_float('.', ',')`, French: `"1 234,56".to_float(' ', ',')`). The `thousands_sep` removes any character in the string for handling messy data, while `decimal_sep` must be single-character or empty
   - `to_float_or(thousands_sep, decimal_sep, default)`, `to_int_or(thousands_sep, default)` - Fallback variants with default values
+- **`--stats` output tracking:** Now displays output levels and keys (after filtering/transformations) in addition to input, showing what the pipeline produces. Output lines only appear when they differ from input.
 
 ### Changed
 
 - Input formats now listed in both `-h` (short help) and `--help` output for easier discovery
+
+### Fixed
+
+- Unsafe unwrap in timestamp parsing that could cause panics
+- Mutex poison handling in parallel processing
+- Panic handling in state.rs replaced with proper error handling
 
 ## [1.0.0] - 2025-12-16
 
