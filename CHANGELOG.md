@@ -4,13 +4,15 @@ All notable changes to Kelora will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [1.2.1] - 2025-12-25
 
 ### Added
 
 - **Interactive mode: Tab completion for files and directories** - Press TAB to complete file and directory names, making it easier to specify log file paths
 
-## [1.2.1] - 2025-12-25
+### Changed
+
+- Improved :help text for interactive mode
 
 ### Fixed
 
