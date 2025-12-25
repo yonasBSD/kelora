@@ -10,7 +10,7 @@ Create a concise operational report from JSON service logs, tracking errors, lat
 ## Before You Start
 - Example commands use `examples/simple_json.jsonl`. Replace it with your application logs.
 - Ensure key fields exist in the payload (e.g., `service`, `level`, `duration_ms`, `memory_percent`, `status`).
-- Rhai metric helpers (`track_count`, `track_sum`, `track_max`, etc.) power the summary; see [Tutorial: Metrics and Tracking](../tutorials/metrics-and-tracking.md) if you need a refresher.
+- Rhai metric helpers (`track_count`, `track_avg`, `track_percentiles`, `track_max`, etc.) power the summary; see [Tutorial: Metrics and Tracking](../tutorials/metrics-and-tracking.md) if you need a refresher.
 
 ## Step 1: Build a Baseline Scoreboard
 Count events by service and severity to frame the rest of the investigation.
@@ -26,15 +26,15 @@ kelora -j examples/simple_json.jsonl \
 - `--stats` reports parse errors and throughput, giving you confidence in the numbers.
 
 ## Step 2: Add Performance Signals
-Track latency and resource metrics with averages and extremes per service.
+Track latency and resource metrics with averages, percentiles, and extremes per service.
 
 ```bash
 kelora -j examples/simple_json.jsonl \
   -e 'let latency = e.get_path("duration_ms");
-      track_sum("latency_total_ms|" + e.service, latency);
-      track_max("latency_p99|" + e.service, latency);
       if latency != () {
-        track_count("latency_samples|" + e.service);
+        track_avg("latency_avg|" + e.service, latency);
+        track_percentiles("latency|" + e.service, latency, [0.95, 0.99]);
+        track_max("latency_max|" + e.service, latency);
       }
       track_max("memory_peak|" + e.service, e.get_path("memory_percent"))' \
   --metrics
@@ -43,7 +43,8 @@ kelora -j examples/simple_json.jsonl \
 Guidance:
 
 - `e.get_path()` returns unit `()` when a field is missing; check for `()` to avoid polluting metrics.
-- Combine totals and sample counts to compute averages (e.g., divide `latency_total_ms|SERVICE` by `latency_samples|SERVICE`) in an `--end` block or downstream tooling.
+- `track_avg()` automatically computes averages without manual sum/count tracking.
+- `track_percentiles()` creates auto-suffixed metrics like `latency|auth_p95` and `latency|auth_p99` for true percentile tracking.
 - Track additional business KPIs (orders, sign-ups) with `track_sum()` or `track_count()` as needed.
 
 ## Step 3: Flag Error Hotspots
@@ -69,18 +70,17 @@ Create a compact report for status updates or documentation.
 kelora -j examples/simple_json.jsonl \
   -e 'track_count(e.service);
       let latency = e.get_path("duration_ms");
-      track_sum("latency_total_ms|" + e.service, latency);
-      track_max("latency_p99|" + e.service, latency);
       if latency != () {
-        track_count("latency_samples|" + e.service);
+        track_avg("latency_avg|" + e.service, latency);
+        track_percentiles("latency|" + e.service, latency, [0.99]);
       }
       track_max("memory_peak|" + e.service, e.get_path("memory_percent"))' \
   -m \
   --end '
     print("=== Service Snapshot ===");
-    let totals = #{};
-    let samples = #{};
-    let p99 = #{};
+    let counts = #{};
+    let avg_latency = #{};
+    let p99_latency = #{};
     let memory = #{};
 
     for key in metrics.keys() {
@@ -92,39 +92,39 @@ kelora -j examples/simple_json.jsonl \
         if parts.len() == 2 {
           let kind = parts[0];
           let service = parts[1];
-          if kind == "latency_total_ms" {
-            totals[service] = value;
-          } else if kind == "latency_samples" {
-            samples[service] = value;
-          } else if kind == "latency_p99" {
-            p99[service] = value;
+          if kind == "latency_avg" {
+            avg_latency[service] = value;
+          } else if name.ends_with("_p99") {
+            // Extract service name before _p99 suffix
+            let base = name.split("_p99")[0];
+            let svc = base.split("|")[1];
+            p99_latency[svc] = value;
           } else if kind == "memory_peak" {
             memory[service] = value;
           }
         }
       } else {
-        print(name + ": " + value.to_string());
+        counts[name] = value;
       }
     }
 
-    for service in totals.keys() {
-      let total = totals[service];
-      let sample_count = if samples.contains(service) { samples[service] } else { 0 };
-      if sample_count != 0 {
-        let avg = total / sample_count;
-        print("latency_avg_" + service + ": " + avg.to_string());
+    for service in counts.keys() {
+      print(service + ": " + counts[service].to_string());
+      if avg_latency.contains(service) {
+        print("  latency_avg: " + avg_latency[service].to_string());
       }
-      if p99.contains(service) {
-        print("latency_p99_" + service + ": " + p99[service].to_string());
+      if p99_latency.contains(service) {
+        print("  latency_p99: " + p99_latency[service].to_string());
       }
       if memory.contains(service) {
-        print("memory_peak_" + service + ": " + memory[service].to_string());
+        print("  memory_peak: " + memory[service].to_string());
       }
     }
   '
 ```
 
 - `-m` (or `--metrics`) keeps the metrics map available in the `--end` block.
+- The `--end` script parses auto-suffixed percentile metrics (e.g., `latency|auth_p99`) to extract service names.
 - Redirect the output to a file (`> reports/service-health.txt`) or pipe it into notification tooling.
 
 ## Step 5: Export Structured Data

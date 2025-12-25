@@ -184,8 +184,12 @@ The process of accumulating metrics across events using `track_*()` functions:
 
 - `track_count(key)` - Count occurrences
 - `track_sum(key, value)` - Sum values
-- `track_unique(key, value)` - Collect unique values
+- `track_avg(key, value)` - Average values
+- `track_percentiles(key, value, [percentiles])` - Streaming percentiles (P90/P95/P99)
 - `track_min/max(key, value)` - Track extremes
+- `track_unique(key, value)` - Collect unique values
+- `track_bucket(key, bucket_value)` - Histogram buckets
+- `track_top/bottom(key, item, n, [score])` - Top/bottom N items
 
 See [Metrics and Tracking Tutorial](tutorials/metrics-and-tracking.md).
 

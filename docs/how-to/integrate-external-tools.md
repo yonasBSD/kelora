@@ -772,7 +772,7 @@ Before reaching for external tools, check if Kelora can handle it natively:
 - Structured field filtering (`--filter 'e.status >= 500'`)
 - Pattern extraction (`extract_re()`, `extract_re_maps()`)
 - Parsing structured formats (`parse_url()`, `parse_kv()`, `parse_json()`, etc.)
-- Aggregation and counting (`track_count()`, `track_sum()`, `track_bucket()`)
+- Aggregation and counting (`track_count()`, `track_sum()`, `track_percentiles()`, `track_bucket()`)
 - Array operations (`sorted()`, `filter()`, `map()`, `percentile()`)
 - Window-based analysis (`--window` with `window.pluck()`)
 - Time-windowed aggregation (`--span` with `--span-close`)

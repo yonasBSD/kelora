@@ -8,7 +8,8 @@ feed into dashboards.
 
 - Track counts, sums, buckets, and unique values with Rhai helpers
 - Combine `--metrics`, `--stats`, `--begin`, and `--end` for structured reports
-- Use sliding windows and percentiles for latency analysis
+- Use `track_percentiles()` for streaming P95/P99 latency analysis
+- Use sliding windows for moving averages and rolling calculations
 - Persist metrics to disk for downstream processing
 
 ## Prerequisites
@@ -285,10 +286,62 @@ for abbreviated output (first 5 items with a hint), or `--metrics=json` for stru
 JSON to stdout. You can also combine `-m` with `--metrics-file` to get both table
 output and a JSON file.
 
-## Step 6 – Sliding Windows and Percentiles
+## Step 6 – Streaming Percentiles with track_percentiles()
 
-Enable the window buffer to examine recent events. The example below tracks a
-five-event moving average and P95 latency for CPU metrics.
+Track percentiles across your entire dataset using the memory-efficient t-digest
+algorithm. Perfect for latency analysis and SLO monitoring.
+
+=== "Command"
+
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+      -e 'if e.has("duration_ms") {
+              track_percentiles("latency", e.duration_ms)
+          }' \
+      --metrics
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/simple_json.jsonl \
+      -e 'if e.has("duration_ms") { track_percentiles("latency", e.duration_ms) }' \
+      --metrics
+    ```
+
+By default, `track_percentiles()` tracks P90, P95, and P99, creating auto-suffixed
+metrics (`latency_p90`, `latency_p95`, `latency_p99`). This uses ~4KB per metric
+regardless of event count, making it suitable for millions of events.
+
+### Custom Percentiles
+
+Specify custom percentiles using an array (0.0-1.0 range):
+
+=== "Command"
+
+    ```bash
+    kelora -j examples/simple_json.jsonl \
+      -e 'if e.has("duration_ms") {
+              track_percentiles("latency", e.duration_ms, [0.50, 0.95, 0.999])
+          }' \
+      --metrics
+    ```
+
+=== "Output"
+
+    ```bash exec="on" source="above" result="ansi"
+    kelora -j examples/simple_json.jsonl \
+      -e 'if e.has("duration_ms") { track_percentiles("latency", e.duration_ms, [0.50, 0.95, 0.999]) }' \
+      --metrics
+    ```
+
+This creates `latency_p50` (median), `latency_p95`, and `latency_p99.9`. The
+percentile accuracy is ~1-2% relative error, suitable for operational monitoring.
+
+### Sliding Windows for Moving Averages
+
+Use `--window` when you need moving averages or percentiles over the most recent
+N events (instead of the entire stream):
 
 === "Command"
 
@@ -326,9 +379,17 @@ five-event moving average and P95 latency for CPU metrics.
       -n 5
     ```
 
-The special `window` variable becomes available once you pass `--window`. Use
+The `window` variable becomes available with `--window N`. Use
 `window.pluck_as_nums("FIELD")` for numeric arrays and `window.pluck("FIELD")`
 for raw values.
+
+**When to use each approach:**
+
+| Use Case | Function | Why |
+|----------|----------|-----|
+| P95/P99 latency across entire dataset | `track_percentiles()` | Memory-efficient, works with millions of events |
+| Moving average of last N events | `--window` + manual calc | Need sliding/rolling calculations |
+| One-shot percentiles at end of stream | `--window` (unbounded) | Simple, exact percentiles on small datasets |
 
 ## Step 7 – Custom Reports with `--end`
 
@@ -513,10 +574,17 @@ human-readable histogram once processing finishes.
 | `track_avg(key, value)` | Average numeric values | `track_avg("avg_latency", e.duration)` |
 | `track_min(key, value)` | Minimum value | `track_min("fastest", e.duration)` |
 | `track_max(key, value)` | Maximum value | `track_max("slowest", e.duration)` |
+| `track_percentiles(key, value, [percentiles])` | Streaming percentiles (P90/P95/P99 default) | `track_percentiles("latency", e.duration_ms)` |
 | `track_bucket(key, bucket)` | Histogram buckets | `track_bucket("status", (e.status/100)*100)` |
+| `track_top(key, item, n)` | Top N most frequent items | `track_top("errors", e.message, 10)` |
+| `track_top(key, item, n, score)` | Top N by highest scores | `track_top("slowest", e.endpoint, 10, e.latency)` |
+| `track_bottom(key, item, n, score)` | Bottom N by lowest scores | `track_bottom("fastest", e.endpoint, 10, e.latency)` |
 | `track_unique(key, value)` | Unique values | `track_unique("users", e.user_id)` |
 
-**Note:** `track_avg()` automatically computes averages by storing sum and count internally. For manual calculation, you can still use `sum / count` in the `--end` stage.
+**Notes:**
+- `track_avg()` automatically computes averages by storing sum and count internally
+- `track_percentiles()` auto-suffixes metrics (e.g., `latency_p95`, `latency_p99`) and is the only `track_*()` function that does this
+- Use percentiles for tail latency (P95, P99) and averages for typical behavior
 
 ## Summary
 
@@ -527,10 +595,11 @@ You've learned:
 - ✅ Build histograms with `track_bucket()`
 - ✅ Rank items with `track_top()` and `track_bottom()`
 - ✅ Count unique values with `track_unique()`
+- ✅ Track streaming percentiles with `track_percentiles()` for P90/P95/P99 analysis
 - ✅ View metrics with `-m`, `--metrics=full`, and `--metrics=json`
 - ✅ Persist metrics with `--metrics-file`
 - ✅ Generate custom reports in `--end` stage
-- ✅ Use sliding windows for percentile analysis
+- ✅ Use sliding windows for moving averages and rolling calculations
 
 ## Next Steps
 
