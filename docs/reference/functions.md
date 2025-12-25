@@ -1408,7 +1408,7 @@ track_bottom("tiny_requests", e.request_id, 5, e.bytes)
 #### `track_percentiles(key, value [, [percentiles]])`
 Track streaming percentiles using the t-digest algorithm for memory-efficient percentile estimation. Automatically creates suffixed metrics for each percentile (e.g., `latency_p50`, `latency_p95`, `latency_p99.9`). **This is the only `track_*()` function that auto-suffixes** because percentiles are inherently multi-valued. Skips Unit `()` values. Works correctly in parallel mode.
 
-**Default percentiles:** `[0.90, 0.95, 0.99]` when no array provided.
+**Default percentiles:** `[0.50, 0.95, 0.99]` when no array provided.
 
 **Percentile notation:** Use 0.0-1.0 range (quantile notation):
 - `0.50` = 50th percentile (median) → creates `key_p50`
@@ -1420,9 +1420,9 @@ Track streaming percentiles using the t-digest algorithm for memory-efficient pe
 **Accuracy:** ~1-2% relative error, suitable for operational monitoring.
 
 ```rhai
-// Default percentiles [0.90, 0.95, 0.99]
+// Default percentiles [0.50, 0.95, 0.99]
 track_percentiles("api_latency", e.response_time)
-// Creates: api_latency_p90, api_latency_p95, api_latency_p99
+// Creates: api_latency_p50, api_latency_p95, api_latency_p99
 
 // Custom percentiles
 track_percentiles("latency", e.duration_ms, [0.50, 0.95, 0.99])

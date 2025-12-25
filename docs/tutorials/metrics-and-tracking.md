@@ -8,7 +8,7 @@ feed into dashboards.
 
 - Track counts, sums, buckets, and unique values with Rhai helpers
 - Combine `--metrics`, `--stats`, `--begin`, and `--end` for structured reports
-- Use `track_percentiles()` for streaming P95/P99 latency analysis
+- Use `track_percentiles()` for streaming P50/P95/P99 latency analysis
 - Use sliding windows for moving averages and rolling calculations
 - Persist metrics to disk for downstream processing
 
@@ -309,8 +309,8 @@ algorithm. Perfect for latency analysis and SLO monitoring.
       --metrics
     ```
 
-By default, `track_percentiles()` tracks P90, P95, and P99, creating auto-suffixed
-metrics (`latency_p90`, `latency_p95`, `latency_p99`). This uses ~4KB per metric
+By default, `track_percentiles()` tracks P50 (median), P95, and P99, creating auto-suffixed
+metrics (`latency_p50`, `latency_p95`, `latency_p99`). This uses ~4KB per metric
 regardless of event count, making it suitable for millions of events.
 
 ### Custom Percentiles
@@ -574,7 +574,7 @@ human-readable histogram once processing finishes.
 | `track_avg(key, value)` | Average numeric values | `track_avg("avg_latency", e.duration)` |
 | `track_min(key, value)` | Minimum value | `track_min("fastest", e.duration)` |
 | `track_max(key, value)` | Maximum value | `track_max("slowest", e.duration)` |
-| `track_percentiles(key, value, [percentiles])` | Streaming percentiles (P90/P95/P99 default) | `track_percentiles("latency", e.duration_ms)` |
+| `track_percentiles(key, value, [percentiles])` | Streaming percentiles (P50/P95/P99 default) | `track_percentiles("latency", e.duration_ms)` |
 | `track_bucket(key, bucket)` | Histogram buckets | `track_bucket("status", (e.status/100)*100)` |
 | `track_top(key, item, n)` | Top N most frequent items | `track_top("errors", e.message, 10)` |
 | `track_top(key, item, n, score)` | Top N by highest scores | `track_top("slowest", e.endpoint, 10, e.latency)` |
@@ -595,7 +595,7 @@ You've learned:
 - ✅ Build histograms with `track_bucket()`
 - ✅ Rank items with `track_top()` and `track_bottom()`
 - ✅ Count unique values with `track_unique()`
-- ✅ Track streaming percentiles with `track_percentiles()` for P90/P95/P99 analysis
+- ✅ Track streaming percentiles with `track_percentiles()` for P50/P95/P99 analysis
 - ✅ View metrics with `-m`, `--metrics=full`, and `--metrics=json`
 - ✅ Persist metrics with `--metrics-file`
 - ✅ Generate custom reports in `--end` stage

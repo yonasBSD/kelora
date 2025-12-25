@@ -1188,10 +1188,10 @@ pub fn register_functions(engine: &mut Engine) {
         },
     );
 
-    // Default percentiles overloads (when no array provided, use [0.90, 0.95, 0.99])
+    // Default percentiles overloads (when no array provided, use [0.50, 0.95, 0.99])
     engine.register_fn("track_percentiles", |key: &str, value: i64| {
         let default_percentiles = vec![
-            Dynamic::from(0.90_f64),
+            Dynamic::from(0.50_f64),
             Dynamic::from(0.95_f64),
             Dynamic::from(0.99_f64),
         ];
@@ -1200,7 +1200,7 @@ pub fn register_functions(engine: &mut Engine) {
 
     engine.register_fn("track_percentiles", |key: &str, value: i32| {
         let default_percentiles = vec![
-            Dynamic::from(0.90_f64),
+            Dynamic::from(0.50_f64),
             Dynamic::from(0.95_f64),
             Dynamic::from(0.99_f64),
         ];
@@ -1209,7 +1209,7 @@ pub fn register_functions(engine: &mut Engine) {
 
     engine.register_fn("track_percentiles", |key: &str, value: f64| {
         let default_percentiles = vec![
-            Dynamic::from(0.90_f64),
+            Dynamic::from(0.50_f64),
             Dynamic::from(0.95_f64),
             Dynamic::from(0.99_f64),
         ];
@@ -1218,7 +1218,7 @@ pub fn register_functions(engine: &mut Engine) {
 
     engine.register_fn("track_percentiles", |key: &str, value: f32| {
         let default_percentiles = vec![
-            Dynamic::from(0.90_f64),
+            Dynamic::from(0.50_f64),
             Dynamic::from(0.95_f64),
             Dynamic::from(0.99_f64),
         ];
@@ -3480,7 +3480,7 @@ mod tests {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
 
-        // Use default percentiles [0.90, 0.95, 0.99]
+        // Use default percentiles [0.50, 0.95, 0.99]
         engine
             .eval::<()>(r#"track_percentiles("latency", 100)"#)
             .unwrap();
@@ -3491,7 +3491,7 @@ mod tests {
         let state = get_thread_tracking_state();
 
         // Check that default percentiles were created
-        assert!(state.contains_key("latency_p90"));
+        assert!(state.contains_key("latency_p50"));
         assert!(state.contains_key("latency_p95"));
         assert!(state.contains_key("latency_p99"));
 
@@ -3534,7 +3534,7 @@ mod tests {
         let state = get_thread_tracking_state();
 
         // No metrics should be created
-        assert!(!state.contains_key("test_p90"));
+        assert!(!state.contains_key("test_p50"));
         assert!(!state.contains_key("test_p95"));
         assert!(!state.contains_key("test_p99"));
 
