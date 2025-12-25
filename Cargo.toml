@@ -62,6 +62,8 @@ fastrand = "2.0"  # Fast random number generation for sampling
 
 # Interactive mode
 rustyline = "17.0"  # Readline implementation for interactive mode
+                    # NOTE: rustyline's transitive dependency 'home' is pinned to 0.5.9 in Cargo.lock
+                    # to maintain compatibility with rustc 1.86.0 on OpenBSD (home@0.5.12 requires rustc 1.88)
 glob = "0.3"  # File pattern expansion for interactive mode
 dirs = "6.0"  # Directory paths for storing interactive history
 
