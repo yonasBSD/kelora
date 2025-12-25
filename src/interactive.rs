@@ -81,21 +81,17 @@ pub fn run_interactive_mode() -> Result<()> {
 
                 if trimmed == ":help" {
                     let eof_key = if cfg!(windows) { "Ctrl-Z" } else { "Ctrl-D" };
-                    println!("Interactive mode help:");
-                    println!("  - Enter kelora commands without the 'kelora' prefix");
-                    println!("  - Example: -j access.log --filter 'e.status >= 500'");
-                    println!("  - Use quotes for arguments with spaces");
-                    println!("  - Press TAB to complete file and directory names");
-                    println!("  - Glob patterns are automatically expanded (*.log, test?.json)");
-                    println!("  - Type '--help' to see all kelora options");
-                    println!(
-                        "  - Type ':exit', ':quit', ':q', or press {} to exit",
-                        eof_key
-                    );
-                    println!("  - Press Ctrl-C to cancel running commands");
-                    println!("\nREPL commands (prefixed with ':'):");
-                    println!("  :help            Show this help message");
-                    println!("  :q, :quit, :exit Exit interactive mode");
+                    println!("Interactive mode - enter kelora commands without 'kelora' prefix");
+                    println!();
+                    println!("  TAB          Complete files/directories");
+                    println!("  *.log        Glob patterns auto-expand");
+                    println!("  'foo bar'    Quote arguments with spaces");
+                    println!("  --help       See all kelora options");
+                    println!();
+                    println!("  :quit        Exit (or :q, :exit, {})", eof_key);
+                    println!("  Ctrl-C       Cancel running command");
+                    println!();
+                    println!("Example: -j access.log --filter 'e.status >= 500'");
                     continue;
                 }
 
