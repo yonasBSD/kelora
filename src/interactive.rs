@@ -19,12 +19,7 @@ pub fn run_interactive_mode() -> Result<()> {
         let _ = rl.load_history(path);
     }
 
-    println!("Kelora Interactive Mode");
-    println!("Type commands as you would on the command line.");
-    println!("  - Type ':exit' or ':quit' to exit, or press Ctrl-D");
-    println!("  - Press Ctrl-C to cancel running commands");
-    println!("  - Use ':help' for interactive help, or '--help' for full kelora options");
-    println!("  - Glob patterns like *.log are automatically expanded\n");
+    println!("Kelora Interactive Mode — :quit to exit, :help for help\n");
 
     loop {
         let readline = rl.readline("kelora> ");
@@ -41,22 +36,26 @@ pub fn run_interactive_mode() -> Result<()> {
                 let _ = rl.add_history_entry(trimmed);
 
                 // Check for REPL commands (colon-prefixed)
-                if trimmed == ":exit" || trimmed == ":quit" {
+                if trimmed == ":exit" || trimmed == ":quit" || trimmed == ":q" {
                     break;
                 }
 
                 if trimmed == ":help" {
+                    let eof_key = if cfg!(windows) { "Ctrl-Z" } else { "Ctrl-D" };
                     println!("Interactive mode help:");
                     println!("  - Enter kelora commands without the 'kelora' prefix");
                     println!("  - Example: -j access.log --filter 'e.status >= 500'");
                     println!("  - Use quotes for arguments with spaces");
                     println!("  - Glob patterns are automatically expanded (*.log, test?.json)");
                     println!("  - Type '--help' to see all kelora options");
-                    println!("  - Type ':exit' or ':quit' to leave interactive mode");
+                    println!(
+                        "  - Type ':exit', ':quit', ':q', or press {} to exit",
+                        eof_key
+                    );
+                    println!("  - Press Ctrl-C to cancel running commands");
                     println!("\nREPL commands (prefixed with ':'):");
-                    println!("  :help   Show this help message");
-                    println!("  :exit   Exit interactive mode");
-                    println!("  :quit   Exit interactive mode");
+                    println!("  :help            Show this help message");
+                    println!("  :q, :quit, :exit Exit interactive mode");
                     continue;
                 }
 

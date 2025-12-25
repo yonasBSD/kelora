@@ -63,12 +63,7 @@ This is especially helpful on Windows where command-line quoting is notoriously 
 
 Example interactive session:
 ```
-Kelora Interactive Mode
-Type commands as you would on the command line.
-  - Type ':exit' or ':quit' to exit, or press Ctrl-D
-  - Press Ctrl-C to cancel running commands
-  - Use ':help' for interactive help, or '--help' for full kelora options
-  - Glob patterns like *.log are automatically expanded
+Kelora Interactive Mode — :quit to exit, :help for help
 
 kelora> -j examples/audit.jsonl -l error
 {"timestamp":"2025-01-15T10:02:30Z","level":"ERROR","user_id":103,"email":"***","ms":45}
