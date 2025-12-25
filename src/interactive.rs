@@ -2,15 +2,54 @@
 // Provides a readline-based REPL for running kelora commands
 
 use anyhow::Result;
+use rustyline::completion::{Completer, FilenameCompleter};
 use rustyline::error::ReadlineError;
-use rustyline::DefaultEditor;
+use rustyline::highlight::Highlighter;
+use rustyline::hint::Hinter;
+use rustyline::validate::Validator;
+use rustyline::{CompletionType, Config, Context, Editor, Helper};
 use std::path::PathBuf;
+
+/// Helper for interactive mode with file completion
+#[derive(Default)]
+struct KeloraHelper {
+    completer: FilenameCompleter,
+}
+
+impl Completer for KeloraHelper {
+    type Candidate = <FilenameCompleter as Completer>::Candidate;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        ctx: &Context<'_>,
+    ) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
+        self.completer.complete(line, pos, ctx)
+    }
+}
+
+impl Hinter for KeloraHelper {
+    type Hint = String;
+}
+
+impl Highlighter for KeloraHelper {}
+
+impl Validator for KeloraHelper {}
+
+impl Helper for KeloraHelper {}
 
 /// Run interactive mode
 /// This provides a readline-based prompt where users can enter kelora commands
 /// without dealing with shell quoting issues (especially helpful on Windows)
 pub fn run_interactive_mode() -> Result<()> {
-    let mut rl = DefaultEditor::new()?;
+    // Configure editor with file completion
+    let config = Config::builder()
+        .completion_type(CompletionType::List)
+        .build();
+    let helper = KeloraHelper::default();
+    let mut rl = Editor::with_config(config)?;
+    rl.set_helper(Some(helper));
 
     // Set up history file
     let history_path = get_history_path();
@@ -46,6 +85,7 @@ pub fn run_interactive_mode() -> Result<()> {
                     println!("  - Enter kelora commands without the 'kelora' prefix");
                     println!("  - Example: -j access.log --filter 'e.status >= 500'");
                     println!("  - Use quotes for arguments with spaces");
+                    println!("  - Press TAB to complete file and directory names");
                     println!("  - Glob patterns are automatically expanded (*.log, test?.json)");
                     println!("  - Type '--help' to see all kelora options");
                     println!(
