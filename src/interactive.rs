@@ -85,11 +85,11 @@ pub fn run_interactive_mode() -> Result<()> {
                     println!();
                     println!("  TAB          Complete files/directories");
                     println!("  *.log        Glob patterns auto-expand");
-                    println!("  'foo bar'    Quote arguments with spaces");
+                    println!("  'foo bar'    Use quotes when args contain spaces");
                     println!("  --help       See all kelora options");
                     println!();
-                    println!("  :quit        Exit (or :q, :exit, {})", eof_key);
                     println!("  Ctrl-C       Cancel running command");
+                    println!("  :quit        Exit (or :q, :exit, {})", eof_key);
                     println!();
                     println!("Example: -j access.log --filter 'e.status >= 500'");
                     continue;
