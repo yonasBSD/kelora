@@ -350,6 +350,9 @@ kelora -f line email_logs.log --head 20 -F inspect
 kelora -j api_logs.jsonl -F tailmap --keys response_time
 kelora -j database_logs.jsonl -F tailmap --keys query_time_ms --filter 'e.query_time_ms > 0'
 
+# Visualize field patterns with keymap (shows first character of field)
+kelora -j api_logs.jsonl -F keymap --keys method
+
 # Select specific fields only (-k)
 kelora -f combined web_access.log -k client_ip,status,path
 
@@ -508,6 +511,9 @@ kelora -j audit_findings.jsonl --exec 'e.email_hash = pseudonym(e.email, "users"
 PERFORMANCE PATTERNS:
 # Quick preview with --head (stops reading early)
 kelora -f line huge.log.gz --head 1000 -F inspect
+
+# Sample every Nth event (fast counter-based, approximate in parallel mode)
+kelora -j api_logs.jsonl --filter 'sample_every(100)'
 
 # Sample 10% of events for analysis (deterministic)
 kelora -j api_logs.jsonl --filter 'e.request_id.bucket() % 10 == 0'
