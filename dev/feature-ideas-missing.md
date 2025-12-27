@@ -10,23 +10,23 @@ This document contains creative, useful features that fit Kelora's design princi
 
 ## Datetime & Time-Based Features
 
-### 1. Time Bucketing/Rounding for Timestamps (`dt.round_to()`)
+### 1. Time Bucketing/Truncation for Timestamps (`dt.floor_to()` / `dt.ceil_to()`)
 
-**What:** Round timestamps to nearest time interval for easy grouping and aggregation.
+**What:** Truncate timestamps down or up to a time interval boundary for easy grouping and aggregation.
 
-**Why useful:** When analyzing logs, you often want to group events by hour, minute, or 5-minute intervals. Currently you'd need manual arithmetic with timestamps. This would be a simple datetime method.
+**Why useful:** For grouping, floor/ceil is more predictable than rounding (bucket boundaries are stable). `round_to()` already exists; this adds the missing "bucket edge" helpers.
 
 **Example:**
 ```rhai
-// Round to nearest hour for grouping
-e.ts = to_datetime(e.timestamp).round_to("1h")
+// Truncate to hour boundary for grouping
+e.ts = to_datetime(e.timestamp).floor_to("1h")
 
-// Round to 5-minute buckets for rate analysis
-bucket_time = to_datetime(e.ts).round_to("5m")
+// Align to 5-minute bucket edges
+bucket_time = to_datetime(e.ts).floor_to("5m")
 track_count(bucket_time.to_string())
 ```
 
-**Implementation:** Simple datetime manipulation using existing Duration types. ~50 lines in `datetime.rs`.
+**Implementation:** Simple datetime manipulation using existing Duration types. ~60 lines in `datetime.rs`.
 
 ---
 
@@ -302,51 +302,44 @@ if errors > 0.05 {
 
 ## Sampling & Filtering
 
-### 4. Simple Counter-Based Sampling (`sample_every()`)
+### 4. Probabilistic Sampling (`sample_prob()`)
 
-**What:** Sample every Nth event - simpler alternative to hash-based bucket sampling for when you just want "every 10th event."
+**What:** Sample events with a probability `p` (0.0-1.0).
 
-**Why useful:** `bucket()` does deterministic sampling (great for consistent sampling across runs), but sometimes you just want "give me 10% of events" or "every 100th line." This complements the existing sampling.
+**Why useful:** `bucket()` is deterministic and `sample_every()` is counter-based. A probabilistic helper makes "sample ~10%" one line without manual `rand()` checks.
 
 **Example:**
 ```rhai
-// Keep only every 100th event for high-volume logs
-if !sample_every(100) { skip() }
+// Keep ~1% of events
+if !sample_prob(0.01) { skip() }
 
-// 1% sampling for metrics
-if sample_every(100) {
+// 10% sampling for metrics
+if sample_prob(0.10) {
     track_count("sampled_errors")
 }
 ```
 
-**Implementation:** Simple counter in state. ~30 lines in `rhai_functions/random.rs`.
+**Implementation:** Wrapper around `rand()`. ~20 lines in `rhai_functions/random.rs`.
 
 ---
 
 ## String & Parsing Functions
 
-### 10. Regex Multi-Field Extraction (`absorb_regex()`)
+### 10. Regex Multi-Field Extraction (All Matches) (`absorb_regexes()`)
 
-**What:** Extract multiple named capture groups from a regex into event fields in one operation.
+**What:** Extract named capture groups from all regex matches into event fields (as arrays).
 
-**Why useful:** Common pattern: parse unstructured text into structured fields. Currently needs multiple `extract_regex()` calls. This does it in one shot. Consistent with existing `absorb_kv()` function.
+**Why useful:** `absorb_regex()` already handles the first match. This adds "all matches" for repeated patterns without manual loops or `extract_regexes()` + `emit_each()` plumbing.
 
 **Example:**
 ```rhai
-// Parse custom log format in one go - modifies event in-place
-e.absorb_regex(
-    r"User (?P<user>\w+) from (?P<ip>[\d.]+) (?P<action>\w+) (?P<resource>.*)"
-)
-// Now e.user, e.ip, e.action, e.resource are all populated
-
-// Parse error messages from a field
-e.msg.absorb_regex(
-    r"Error (?P<code>\d+): (?P<message>.*) at (?P<location>.*)"
-)
-// Extract named groups and add to event: e.code, e.message, e.location
+// Repeated patterns -> arrays per named capture
+e.absorb_regexes("line", r"user=(?P<user>\w+) ip=(?P<ip>[\d.]+)")
+// line: "user=alice ip=1.2.3.4 user=bob ip=5.6.7.8"
+// e.user = ["alice","bob"], e.ip = ["1.2.3.4","5.6.7.8"]
 ```
 
-**Implementation:** Use existing regex infrastructure, ~60 lines in `strings.rs`.
+**Implementation:** Use existing regex infrastructure, ~80 lines in `strings.rs`.
 
 ---
 
@@ -430,11 +423,13 @@ kelora -j app.jsonl --template @my-format.json > output.json
 
 ---
 
-### 17. Simple HTTP Output Sink (`--http-post`)
+### 17. Minimal HTTP Output Sink (Maybe Not) (`--http-post`)
 
-**What:** Send output directly to HTTP endpoint - like `-o file.json` but for URLs. No retries, buffering, or complex delivery guarantees (that's shipper territory).
+**What:** Send output directly to an HTTP endpoint - like `-o file.json` but for URLs. No retries, buffering, auth, or delivery guarantees (that's shipper territory).
 
-**Why useful:** Currently every integration example pipes to curl. A simple HTTP sink reduces boilerplate for basic use cases while keeping Kelora a processor, not a shipper.
+**Why useful:** Currently every integration example pipes to curl. A tiny HTTP sink reduces boilerplate for basic use cases while keeping Kelora a processor, not a shipper.
+
+**Why maybe not:** Even a "dumb" HTTP sink blurs the line between processor and shipper, and it invites pressure for retries/auth/backoff. If we want zero network access in core, this should be omitted or implemented as an external wrapper script instead.
 
 **Example:**
 ```bash
@@ -453,9 +448,9 @@ kelora -j app.jsonl -J --http-post http://aggregator/ingest --http-batch 1000
 
 ---
 
-### 18. Nested JSON Path Extraction (`extract_each()`)
+### 18. Nested JSON Path Extraction (`emit_each_path()`)
 
-**What:** Extract and unwrap nested arrays in one operation - simplifies query response processing.
+**What:** Extract and unwrap nested arrays in one operation, then fan them out as events.
 
 **Why useful:** Querying log aggregators returns nested JSON structures. Currently requires verbose loops with `emit_each()`. A JSONPath-style extractor would be cleaner.
 
@@ -466,20 +461,20 @@ for stream in e.get_path("data.result", []) {
   for value in stream.values { emit_each([value[1]]) }
 }
 
-// With extract_each():
-extract_each("data.result[].values[].[1]")  // JSONPath-style
+// With emit_each_path():
+emit_each_path("data.result[].values[].[1]")  // JSONPath-style
 
 // Extract Graylog messages - currently:
 emit_each(e.get_path("messages", []))
 
-// With extract_each():
-extract_each("messages[]")
+// With emit_each_path():
+emit_each_path("messages[]")
 
 // Elasticsearch hits
-extract_each("hits.hits[]._source")
+emit_each_path("hits.hits[]._source")
 ```
 
-**Implementation:** JSONPath-lite parser + nested extraction, ~120 lines in `json.rs`. Subset of JSONPath (arrays, wildcards, no filters).
+**Implementation:** JSONPath-lite parser + nested extraction, ~120 lines in `maps.rs` or `emit.rs`. Subset of JSONPath (arrays, wildcards, no filters).
 
 ---
 
@@ -492,20 +487,20 @@ extract_each("hits.hits[]._source")
 **Example:**
 ```rhai
 // GELF format builder
-e.to_gelf(host: "myserver")
-// Adds: short_message, full_message, host, timestamp in GELF format
+gelf = e.to_gelf(#{ host: "myserver" })
+// Returns a new map with short_message, full_message, host, timestamp in GELF format
 
 // Loki stream grouping
-e.to_loki_stream(labels: ["service", "level"])
-// Groups by labels, formats for Loki API
+loki_stream = e.to_loki_stream(#{ labels: ["service", "level"] })
+// Returns a new map formatted for Loki API
 
 // OpenTelemetry Logs format
-e.to_otel_log()
-// Maps to OTLP log record structure
+otel_log = e.to_otel_log()
+// Returns a new map in OTLP log record shape
 
 // Elastic Common Schema
-e.to_ecs()
-// Maps fields to ECS naming (e.message → message, e.level → log.level)
+ecs_event = e.to_ecs()
+// Returns a new map mapped to ECS naming (e.message → message, e.level → log.level)
 ```
 
 **Implementation:** Format-specific methods in `conversions.rs`, ~150 lines total. Each helper is 20-30 lines.
@@ -515,13 +510,13 @@ e.to_ecs()
 ## Summary by Category
 
 ### High Priority (Simple + High Impact)
-- **Time Bucketing (`dt.round_to()`)** - Essential for grouping by time intervals
-- **Multi-Field Extraction (`absorb_regex()`)** - Parse unstructured text in one shot
+- **Time Bucketing (`dt.floor_to()` / `dt.ceil_to()`)** - Essential for grouping by time intervals
+- **Multi-Field Extraction (`absorb_regexes()`)** - Capture repeated patterns without manual loops
 - **Streaming Percentiles (`track_percentiles()`)** - Parallel-safe, memory-efficient latency tracking
-- **Counter Sampling (`sample_every()`)** - Complements existing bucket sampling
+- **Probabilistic Sampling (`sample_prob()`)** - Complements bucket and counter sampling
 - **First/Last Tracking** - Common pattern, easy to implement
 - **Output Format Templates (`--template`)** - Eliminate jq dependency for integrations
-- **Nested JSON Extraction (`extract_each()`)** - Simplify query response processing
+- **Nested JSON Extraction (`emit_each_path()`)** - Simplify query response processing
 
 ### Medium Priority (More Complex but Very Useful)
 - **Burst Detection** - Security and monitoring use cases (sequential only)
@@ -529,7 +524,7 @@ e.to_ecs()
 - **Moving Average** - Noise reduction and trend detection
 - **Set Operations** - Collection comparison utilities
 - **Smart Truncation** - Polish for text handling
-- **HTTP Output Sink (`--http-post`)** - Reduce curl boilerplate for integrations
+- **HTTP Output Sink (`--http-post`)** - Reduce curl boilerplate for integrations (maybe not; see integration note)
 - **Format Helpers (`to_gelf()`, etc.)** - Encode integration conventions
 
 ### Sequential-Mode Only (Cannot Work in Parallel)
@@ -540,7 +535,7 @@ e.to_ecs()
 
 ### Advanced Features (Require More Design)
 - **Threshold Tracking** - Heavy hitter detection with auto-pruning
-- **Cardinality Estimation (`track_unique()`)** - HyperLogLog for parallel-safe unique counts
+- **Cardinality Estimation (`track_unique_approx()`)** - HyperLogLog for parallel-safe unique counts
 
 ## Implementation Notes
 
@@ -564,17 +559,17 @@ Features that work only in sequential mode:
 - `track_moving_avg()` (needs ordered sliding window)
 
 Features fully compatible with `--parallel`:
-- `dt.round_to()` (stateless transformation)
-- `absorb_regex()` (stateless parsing)
+- `dt.floor_to()` / `dt.ceil_to()` (stateless transformation)
+- `absorb_regexes()` (stateless parsing)
 - `track_percentiles()` (t-digest merges, fully parallel-safe)
-- `sample_every()` (with thread-local counters)
+- `sample_prob()` (stateless, RNG-based)
 - `truncate_words()` (stateless string operation)
 - Array set operations (stateless)
 - `track_if_above()` (threshold filtering, mergeable)
 - `--template` (stateless output formatting)
-- `extract_each()` (stateless JSON extraction)
+- `emit_each_path()` (stateless JSON extraction + fan-out)
 - Format helpers (`to_gelf()`, etc.) (stateless conversions)
-- `--http-post` (independent output per worker)
+- `--http-post` (independent output per worker, if included)
 
 ## Special Note on Auto-Suffixing
 
