@@ -86,7 +86,7 @@ pub fn run_interactive_mode() -> Result<()> {
                     println!("  TAB          Complete files/directories");
                     println!("  *.log        Glob patterns auto-expand");
                     println!("  'foo bar'    Use quotes when args contain spaces");
-                    println!("  --help       See all kelora options");
+                    println!("  -h           Quick help (or --help for full)");
                     println!();
                     println!("  Ctrl-C       Cancel running command");
                     println!("  :quit        Exit (or :q, :exit, {})", eof_key);
