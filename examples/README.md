@@ -132,6 +132,23 @@ Examples for advanced features from the [Power-User Techniques](https://kelora.d
 - `analytics.jsonl` - Privacy-preserving pseudonymization
 - `user-events.jsonl` - Stateful processing with `state` map
 
+### Performance Monitoring (Tailmap Visualization)
+
+Visualize numeric field distributions over time using tailmap format:
+
+- `api_latency_incident.jsonl` - API performance degradation and recovery
+- `database_queries.jsonl` - Database query performance analysis
+
+```bash
+# Visualize API latency incident timeline
+kelora -j examples/api_latency_incident.jsonl -F tailmap --keys response_time_ms
+
+# Find slow database queries
+kelora -j examples/database_queries.jsonl -F tailmap --keys query_time_ms
+```
+
+Tailmap uses percentile-based symbols: `_` (below p90), `1` (p90-p95), `2` (p95-p99), `3` (above p99)
+
 ### Specialized Formats
 
 - `cols_fixed.log`, `cols_mixed.log` - Fixed-width columns

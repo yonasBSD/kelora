@@ -1,0 +1,500 @@
+{"timestamp": "2025-01-20T09:00:00Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.079929478387394, "rows_affected": 414}
+{"timestamp": "2025-01-20T09:00:02Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 10.749273387868975, "rows_affected": 43}
+{"timestamp": "2025-01-20T09:00:04Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 9.183293643891833, "rows_affected": 92}
+{"timestamp": "2025-01-20T09:00:06Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.237683627224229, "rows_affected": 234}
+{"timestamp": "2025-01-20T09:00:08Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 6.732920798939013, "rows_affected": 17}
+{"timestamp": "2025-01-20T09:00:10Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 12.909746748715966, "rows_affected": 334}
+{"timestamp": "2025-01-20T09:00:12Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.165890647630361, "rows_affected": 6}
+{"timestamp": "2025-01-20T09:00:14Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 17.80074726782343, "rows_affected": 78}
+{"timestamp": "2025-01-20T09:00:16Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 6.323147512146689, "rows_affected": 67}
+{"timestamp": "2025-01-20T09:00:18Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 12.993343470491451, "rows_affected": 642}
+{"timestamp": "2025-01-20T09:00:20Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 7.542915189463928, "rows_affected": 46}
+{"timestamp": "2025-01-20T09:00:22Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 53.69735962379393, "rows_affected": 573}
+{"timestamp": "2025-01-20T09:00:24Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 42.68752043336972, "rows_affected": 524}
+{"timestamp": "2025-01-20T09:00:26Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 8.01738899213698, "rows_affected": 252}
+{"timestamp": "2025-01-20T09:00:28Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 13.79552299263094, "rows_affected": 71}
+{"timestamp": "2025-01-20T09:00:30Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 15.044710844727913, "rows_affected": 456}
+{"timestamp": "2025-01-20T09:00:32Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 56.48890805946658, "rows_affected": 770}
+{"timestamp": "2025-01-20T09:00:34Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 6.469243237160058, "rows_affected": 80}
+{"timestamp": "2025-01-20T09:00:36Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.446003046416924, "rows_affected": 675}
+{"timestamp": "2025-01-20T09:00:38Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 12.1636744566914, "rows_affected": 190}
+{"timestamp": "2025-01-20T09:00:40Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 10.221692762221933, "rows_affected": 922}
+{"timestamp": "2025-01-20T09:00:42Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.416356150521469, "rows_affected": 154}
+{"timestamp": "2025-01-20T09:00:44Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 57.41130322534062, "rows_affected": 7}
+{"timestamp": "2025-01-20T09:00:46Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 10.717935913325968, "rows_affected": 63}
+{"timestamp": "2025-01-20T09:00:48Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 31.510760597729757, "rows_affected": 57}
+{"timestamp": "2025-01-20T09:00:50Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.833715323555524, "rows_affected": 745}
+{"timestamp": "2025-01-20T09:00:52Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 4.396009576109262, "rows_affected": 25}
+{"timestamp": "2025-01-20T09:00:54Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 46.3812950920062, "rows_affected": 435}
+{"timestamp": "2025-01-20T09:00:56Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.488372860902064, "rows_affected": 133}
+{"timestamp": "2025-01-20T09:00:58Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 10.875949026691542, "rows_affected": 24}
+{"timestamp": "2025-01-20T09:01:00Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 8.266080245270345, "rows_affected": 310}
+{"timestamp": "2025-01-20T09:01:02Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 64.18778637901549, "rows_affected": 773}
+{"timestamp": "2025-01-20T09:01:04Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 77.28381474240228, "rows_affected": 226}
+{"timestamp": "2025-01-20T09:01:06Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.659454217603822, "rows_affected": 435}
+{"timestamp": "2025-01-20T09:01:08Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 14.477645793881981, "rows_affected": 54}
+{"timestamp": "2025-01-20T09:01:10Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.467380157270921, "rows_affected": 239}
+{"timestamp": "2025-01-20T09:01:12Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 45.06225764195054, "rows_affected": 723}
+{"timestamp": "2025-01-20T09:01:14Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.902202153611552, "rows_affected": 554}
+{"timestamp": "2025-01-20T09:01:16Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 18.120571384625137, "rows_affected": 56}
+{"timestamp": "2025-01-20T09:01:18Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.190282678429063, "rows_affected": 989}
+{"timestamp": "2025-01-20T09:01:20Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 13.369461278500301, "rows_affected": 96}
+{"timestamp": "2025-01-20T09:01:22Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.580645174511638, "rows_affected": 709}
+{"timestamp": "2025-01-20T09:01:24Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 12.613792968099835, "rows_affected": 31}
+{"timestamp": "2025-01-20T09:01:26Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 11.973126502461318, "rows_affected": 881}
+{"timestamp": "2025-01-20T09:01:28Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 10.044412519872798, "rows_affected": 581}
+{"timestamp": "2025-01-20T09:01:30Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 45.00779491815125, "rows_affected": 821}
+{"timestamp": "2025-01-20T09:01:32Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.033142105868546, "rows_affected": 93}
+{"timestamp": "2025-01-20T09:01:34Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 1150.9228638572022, "rows_affected": 69}
+{"timestamp": "2025-01-20T09:01:36Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 41.62244127195692, "rows_affected": 191}
+{"timestamp": "2025-01-20T09:01:38Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 7.023482473184181, "rows_affected": 15}
+{"timestamp": "2025-01-20T09:01:40Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 7.97410417569926, "rows_affected": 825}
+{"timestamp": "2025-01-20T09:01:42Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 38.31067610291217, "rows_affected": 620}
+{"timestamp": "2025-01-20T09:01:44Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 9.650030751145549, "rows_affected": 90}
+{"timestamp": "2025-01-20T09:01:46Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 6.881869804232932, "rows_affected": 55}
+{"timestamp": "2025-01-20T09:01:48Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 36.467457403310206, "rows_affected": 15}
+{"timestamp": "2025-01-20T09:01:50Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 1.8982813426228624, "rows_affected": 796}
+{"timestamp": "2025-01-20T09:01:52Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.7102523116297212, "rows_affected": 688}
+{"timestamp": "2025-01-20T09:01:54Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 12.750321752721476, "rows_affected": 16}
+{"timestamp": "2025-01-20T09:01:56Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 12.865407522121917, "rows_affected": 99}
+{"timestamp": "2025-01-20T09:01:58Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.333583429830855, "rows_affected": 453}
+{"timestamp": "2025-01-20T09:02:00Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 11.585390789943677, "rows_affected": 86}
+{"timestamp": "2025-01-20T09:02:02Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 25.919965229429597, "rows_affected": 247}
+{"timestamp": "2025-01-20T09:02:04Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 42.11264493070249, "rows_affected": 960}
+{"timestamp": "2025-01-20T09:02:06Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 17.319098815072905, "rows_affected": 88}
+{"timestamp": "2025-01-20T09:02:08Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 34.50695787020837, "rows_affected": 613}
+{"timestamp": "2025-01-20T09:02:10Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 36.97978251882026, "rows_affected": 518}
+{"timestamp": "2025-01-20T09:02:12Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 5.466519300255779, "rows_affected": 971}
+{"timestamp": "2025-01-20T09:02:14Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 6.281921326156019, "rows_affected": 24}
+{"timestamp": "2025-01-20T09:02:16Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.002617937222475, "rows_affected": 668}
+{"timestamp": "2025-01-20T09:02:18Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.437237836711888, "rows_affected": 245}
+{"timestamp": "2025-01-20T09:02:20Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 10.003132307588402, "rows_affected": 43}
+{"timestamp": "2025-01-20T09:02:22Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.0409921257412, "rows_affected": 385}
+{"timestamp": "2025-01-20T09:02:24Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 6.064937448641111, "rows_affected": 42}
+{"timestamp": "2025-01-20T09:02:26Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 10.365675139520553, "rows_affected": 2}
+{"timestamp": "2025-01-20T09:02:28Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 10.781520765229207, "rows_affected": 88}
+{"timestamp": "2025-01-20T09:02:30Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 14.618125403215764, "rows_affected": 8}
+{"timestamp": "2025-01-20T09:02:32Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 1304.23124908925, "rows_affected": 858}
+{"timestamp": "2025-01-20T09:02:34Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.433376303742665, "rows_affected": 522}
+{"timestamp": "2025-01-20T09:02:36Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 49.06007297385395, "rows_affected": 916}
+{"timestamp": "2025-01-20T09:02:38Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.543209762121842, "rows_affected": 85}
+{"timestamp": "2025-01-20T09:02:40Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.411480197974763, "rows_affected": 80}
+{"timestamp": "2025-01-20T09:02:42Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.429359304194205, "rows_affected": 726}
+{"timestamp": "2025-01-20T09:02:44Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 41.694647412251925, "rows_affected": 151}
+{"timestamp": "2025-01-20T09:02:46Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 10.076806889465068, "rows_affected": 791}
+{"timestamp": "2025-01-20T09:02:48Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.03823706790465, "rows_affected": 570}
+{"timestamp": "2025-01-20T09:02:50Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 14.969952639034886, "rows_affected": 31}
+{"timestamp": "2025-01-20T09:02:52Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 14.996201736216499, "rows_affected": 77}
+{"timestamp": "2025-01-20T09:02:54Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.969687324951787, "rows_affected": 43}
+{"timestamp": "2025-01-20T09:02:56Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.689486054353316, "rows_affected": 806}
+{"timestamp": "2025-01-20T09:02:58Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 12.549682738470192, "rows_affected": 249}
+{"timestamp": "2025-01-20T09:03:00Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 9.9109011887554, "rows_affected": 20}
+{"timestamp": "2025-01-20T09:03:02Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 68.93353853819474, "rows_affected": 745}
+{"timestamp": "2025-01-20T09:03:04Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 25.822546634586654, "rows_affected": 883}
+{"timestamp": "2025-01-20T09:03:06Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.767022839742435, "rows_affected": 36}
+{"timestamp": "2025-01-20T09:03:08Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 52.76529746327646, "rows_affected": 982}
+{"timestamp": "2025-01-20T09:03:10Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 44.71150131486889, "rows_affected": 567}
+{"timestamp": "2025-01-20T09:03:12Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 36.453080988118096, "rows_affected": 75}
+{"timestamp": "2025-01-20T09:03:14Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.85204735044748, "rows_affected": 592}
+{"timestamp": "2025-01-20T09:03:16Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 12.254443049410536, "rows_affected": 366}
+{"timestamp": "2025-01-20T09:03:18Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 41.686911446785615, "rows_affected": 523}
+{"timestamp": "2025-01-20T09:03:20Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 52.1791672132635, "rows_affected": 919}
+{"timestamp": "2025-01-20T09:03:22Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 14.075579874967755, "rows_affected": 80}
+{"timestamp": "2025-01-20T09:03:24Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 5.76353205895944, "rows_affected": 40}
+{"timestamp": "2025-01-20T09:03:26Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.30726066008678, "rows_affected": 515}
+{"timestamp": "2025-01-20T09:03:28Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 11.706845051809289, "rows_affected": 883}
+{"timestamp": "2025-01-20T09:03:30Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 7.2271457875136065, "rows_affected": 88}
+{"timestamp": "2025-01-20T09:03:32Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 7.863646541126781, "rows_affected": 93}
+{"timestamp": "2025-01-20T09:03:34Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 11.64249895750527, "rows_affected": 81}
+{"timestamp": "2025-01-20T09:03:36Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.073621939899605, "rows_affected": 662}
+{"timestamp": "2025-01-20T09:03:38Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 5.491180908310357, "rows_affected": 94}
+{"timestamp": "2025-01-20T09:03:40Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.284547667741002, "rows_affected": 84}
+{"timestamp": "2025-01-20T09:03:42Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.748099378648228, "rows_affected": 435}
+{"timestamp": "2025-01-20T09:03:44Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 4.041391112676991, "rows_affected": 65}
+{"timestamp": "2025-01-20T09:03:46Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 9.456752112338119, "rows_affected": 779}
+{"timestamp": "2025-01-20T09:03:48Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 7.793761322430896, "rows_affected": 0}
+{"timestamp": "2025-01-20T09:03:50Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 271.21611110359225, "rows_affected": 198}
+{"timestamp": "2025-01-20T09:03:52Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.617912845001904, "rows_affected": 972}
+{"timestamp": "2025-01-20T09:03:54Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 7.965069382245811, "rows_affected": 99}
+{"timestamp": "2025-01-20T09:03:56Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.843631539013482, "rows_affected": 138}
+{"timestamp": "2025-01-20T09:03:58Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.9950087410262185, "rows_affected": 12}
+{"timestamp": "2025-01-20T09:04:00Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.212338029251694, "rows_affected": 371}
+{"timestamp": "2025-01-20T09:04:02Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 10.652425294249108, "rows_affected": 712}
+{"timestamp": "2025-01-20T09:04:04Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.3370502423008706, "rows_affected": 947}
+{"timestamp": "2025-01-20T09:04:06Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 11.448707763231464, "rows_affected": 6}
+{"timestamp": "2025-01-20T09:04:08Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.641174128155159, "rows_affected": 14}
+{"timestamp": "2025-01-20T09:04:10Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.663390689857103, "rows_affected": 92}
+{"timestamp": "2025-01-20T09:04:12Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 15.487083534748033, "rows_affected": 68}
+{"timestamp": "2025-01-20T09:04:14Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 41.41950673466253, "rows_affected": 787}
+{"timestamp": "2025-01-20T09:04:16Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 11.066226329706346, "rows_affected": 883}
+{"timestamp": "2025-01-20T09:04:18Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 10.506783315492674, "rows_affected": 76}
+{"timestamp": "2025-01-20T09:04:20Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 7.332761174674083, "rows_affected": 88}
+{"timestamp": "2025-01-20T09:04:22Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 4.844723189095255, "rows_affected": 37}
+{"timestamp": "2025-01-20T09:04:24Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 35.22607311328031, "rows_affected": 594}
+{"timestamp": "2025-01-20T09:04:26Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 618.3089221610813, "rows_affected": 818}
+{"timestamp": "2025-01-20T09:04:28Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 39.24475230365286, "rows_affected": 307}
+{"timestamp": "2025-01-20T09:04:30Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 15.292409347235527, "rows_affected": 14}
+{"timestamp": "2025-01-20T09:04:32Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 2.589429886235707, "rows_affected": 59}
+{"timestamp": "2025-01-20T09:04:34Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.557252273691151, "rows_affected": 412}
+{"timestamp": "2025-01-20T09:04:36Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.696105767008282, "rows_affected": 494}
+{"timestamp": "2025-01-20T09:04:38Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.091585304687874, "rows_affected": 984}
+{"timestamp": "2025-01-20T09:04:40Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 64.17191901831839, "rows_affected": 758}
+{"timestamp": "2025-01-20T09:04:42Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 201.4872494393986, "rows_affected": 94}
+{"timestamp": "2025-01-20T09:04:44Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 45.82399598248176, "rows_affected": 482}
+{"timestamp": "2025-01-20T09:04:46Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.471327461093412, "rows_affected": 860}
+{"timestamp": "2025-01-20T09:04:48Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 18.11540795633226, "rows_affected": 38}
+{"timestamp": "2025-01-20T09:04:50Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 9.89088163993914, "rows_affected": 12}
+{"timestamp": "2025-01-20T09:04:52Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 26.530135355036837, "rows_affected": 931}
+{"timestamp": "2025-01-20T09:04:54Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 38.03312059057063, "rows_affected": 979}
+{"timestamp": "2025-01-20T09:04:56Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 10.659661565279714, "rows_affected": 828}
+{"timestamp": "2025-01-20T09:04:58Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 14.271763885337252, "rows_affected": 688}
+{"timestamp": "2025-01-20T09:05:00Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 5.506889846440673, "rows_affected": 98}
+{"timestamp": "2025-01-20T09:05:02Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 15.076408559330282, "rows_affected": 89}
+{"timestamp": "2025-01-20T09:05:04Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 47.918714852288524, "rows_affected": 386}
+{"timestamp": "2025-01-20T09:05:06Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.376442669781742, "rows_affected": 651}
+{"timestamp": "2025-01-20T09:05:08Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.54643534683902, "rows_affected": 98}
+{"timestamp": "2025-01-20T09:05:10Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 11.92726318769557, "rows_affected": 103}
+{"timestamp": "2025-01-20T09:05:12Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 56.331769111524935, "rows_affected": 565}
+{"timestamp": "2025-01-20T09:05:14Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 78.17064250329481, "rows_affected": 180}
+{"timestamp": "2025-01-20T09:05:16Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 13.751149107492676, "rows_affected": 94}
+{"timestamp": "2025-01-20T09:05:18Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 10.339831030510634, "rows_affected": 619}
+{"timestamp": "2025-01-20T09:05:20Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 51.54942863313412, "rows_affected": 578}
+{"timestamp": "2025-01-20T09:05:22Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 7.781134160553899, "rows_affected": 513}
+{"timestamp": "2025-01-20T09:05:24Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 13.16270459568404, "rows_affected": 8}
+{"timestamp": "2025-01-20T09:05:26Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.694645567677071, "rows_affected": 78}
+{"timestamp": "2025-01-20T09:05:28Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 15.35220860158148, "rows_affected": 415}
+{"timestamp": "2025-01-20T09:05:30Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 6.183871003445259, "rows_affected": 97}
+{"timestamp": "2025-01-20T09:05:32Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 6.55290208206646, "rows_affected": 36}
+{"timestamp": "2025-01-20T09:05:34Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.06406726702231, "rows_affected": 159}
+{"timestamp": "2025-01-20T09:05:36Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.542889301276444, "rows_affected": 466}
+{"timestamp": "2025-01-20T09:05:38Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 46.17642081804823, "rows_affected": 773}
+{"timestamp": "2025-01-20T09:05:40Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.7940662845539705, "rows_affected": 159}
+{"timestamp": "2025-01-20T09:05:42Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 10.413680777842302, "rows_affected": 10}
+{"timestamp": "2025-01-20T09:05:44Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 12.432678915553957, "rows_affected": 221}
+{"timestamp": "2025-01-20T09:05:46Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 41.33479747913138, "rows_affected": 970}
+{"timestamp": "2025-01-20T09:05:48Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 14.639696895827855, "rows_affected": 35}
+{"timestamp": "2025-01-20T09:05:50Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 8.197844805906737, "rows_affected": 97}
+{"timestamp": "2025-01-20T09:05:52Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 14.11960865752833, "rows_affected": 33}
+{"timestamp": "2025-01-20T09:05:54Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 49.4960058771308, "rows_affected": 214}
+{"timestamp": "2025-01-20T09:05:56Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 10.0717917751985, "rows_affected": 767}
+{"timestamp": "2025-01-20T09:05:58Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 20.105005896294646, "rows_affected": 57}
+{"timestamp": "2025-01-20T09:06:00Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 15.534317412452985, "rows_affected": 6}
+{"timestamp": "2025-01-20T09:06:02Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 41.46647056799925, "rows_affected": 383}
+{"timestamp": "2025-01-20T09:06:04Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 6.958334726228849, "rows_affected": 46}
+{"timestamp": "2025-01-20T09:06:06Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 63.23693858575486, "rows_affected": 678}
+{"timestamp": "2025-01-20T09:06:08Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 13.268385964568889, "rows_affected": 20}
+{"timestamp": "2025-01-20T09:06:10Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.635759937959434, "rows_affected": 287}
+{"timestamp": "2025-01-20T09:06:12Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 11.461507622049522, "rows_affected": 181}
+{"timestamp": "2025-01-20T09:06:14Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 56.48542286240352, "rows_affected": 348}
+{"timestamp": "2025-01-20T09:06:16Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.754562502991478, "rows_affected": 323}
+{"timestamp": "2025-01-20T09:06:18Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 5.422119425451337, "rows_affected": 80}
+{"timestamp": "2025-01-20T09:06:20Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 10.622919446683325, "rows_affected": 60}
+{"timestamp": "2025-01-20T09:06:22Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 9.546833775360792, "rows_affected": 80}
+{"timestamp": "2025-01-20T09:06:24Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 10.200025412567623, "rows_affected": 30}
+{"timestamp": "2025-01-20T09:06:26Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 7.689853470965252, "rows_affected": 87}
+{"timestamp": "2025-01-20T09:06:28Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 54.139412645107825, "rows_affected": 687}
+{"timestamp": "2025-01-20T09:06:30Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 48.647956519323856, "rows_affected": 642}
+{"timestamp": "2025-01-20T09:06:32Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 7.84434126286773, "rows_affected": 391}
+{"timestamp": "2025-01-20T09:06:34Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 10.142481367127324, "rows_affected": 63}
+{"timestamp": "2025-01-20T09:06:36Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 7.252723530679057, "rows_affected": 56}
+{"timestamp": "2025-01-20T09:06:38Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 7.6589849197948165, "rows_affected": 31}
+{"timestamp": "2025-01-20T09:06:40Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 49.911681533039854, "rows_affected": 655}
+{"timestamp": "2025-01-20T09:06:42Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 12.802460426278277, "rows_affected": 214}
+{"timestamp": "2025-01-20T09:06:44Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.644864783844634, "rows_affected": 56}
+{"timestamp": "2025-01-20T09:06:46Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 8.408609941208399, "rows_affected": 850}
+{"timestamp": "2025-01-20T09:06:48Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 9.85327669275932, "rows_affected": 23}
+{"timestamp": "2025-01-20T09:06:50Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.344695290837118, "rows_affected": 92}
+{"timestamp": "2025-01-20T09:06:52Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 8.403971245947986, "rows_affected": 331}
+{"timestamp": "2025-01-20T09:06:54Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 30.251079751783134, "rows_affected": 125}
+{"timestamp": "2025-01-20T09:06:56Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 6.978999517671441, "rows_affected": 95}
+{"timestamp": "2025-01-20T09:06:58Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 47.367393079396294, "rows_affected": 446}
+{"timestamp": "2025-01-20T09:07:00Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 7.236150409784287, "rows_affected": 79}
+{"timestamp": "2025-01-20T09:07:02Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 7.9976300526609645, "rows_affected": 744}
+{"timestamp": "2025-01-20T09:07:04Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.678179314161283, "rows_affected": 885}
+{"timestamp": "2025-01-20T09:07:06Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 101.89837001309206, "rows_affected": 36}
+{"timestamp": "2025-01-20T09:07:08Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 40.261702092210044, "rows_affected": 829}
+{"timestamp": "2025-01-20T09:07:10Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 5.0200040875297685, "rows_affected": 57}
+{"timestamp": "2025-01-20T09:07:12Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 47.84530401600757, "rows_affected": 174}
+{"timestamp": "2025-01-20T09:07:14Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 52.416727124346856, "rows_affected": 774}
+{"timestamp": "2025-01-20T09:07:16Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 12.497686192235836, "rows_affected": 37}
+{"timestamp": "2025-01-20T09:07:18Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 13.002267728116845, "rows_affected": 623}
+{"timestamp": "2025-01-20T09:07:20Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 13.308966253467894, "rows_affected": 16}
+{"timestamp": "2025-01-20T09:07:22Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 43.49044713499057, "rows_affected": 40}
+{"timestamp": "2025-01-20T09:07:24Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 11.276165181885698, "rows_affected": 38}
+{"timestamp": "2025-01-20T09:07:26Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 11.244108915911397, "rows_affected": 787}
+{"timestamp": "2025-01-20T09:07:28Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 11.61573425833227, "rows_affected": 93}
+{"timestamp": "2025-01-20T09:07:30Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 12.094033702944929, "rows_affected": 775}
+{"timestamp": "2025-01-20T09:07:32Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 65.77887928546383, "rows_affected": 32}
+{"timestamp": "2025-01-20T09:07:34Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 17.26695304472458, "rows_affected": 84}
+{"timestamp": "2025-01-20T09:07:36Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.034077725507213, "rows_affected": 970}
+{"timestamp": "2025-01-20T09:07:38Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.157926881907115, "rows_affected": 154}
+{"timestamp": "2025-01-20T09:07:40Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 9.855976869228666, "rows_affected": 75}
+{"timestamp": "2025-01-20T09:07:42Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 44.99466474016873, "rows_affected": 653}
+{"timestamp": "2025-01-20T09:07:44Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 10.070633194646309, "rows_affected": 646}
+{"timestamp": "2025-01-20T09:07:46Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 12.201463354314843, "rows_affected": 83}
+{"timestamp": "2025-01-20T09:07:48Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.188648880630254, "rows_affected": 705}
+{"timestamp": "2025-01-20T09:07:50Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.1996430588905738, "rows_affected": 212}
+{"timestamp": "2025-01-20T09:07:52Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 22.44231602575921, "rows_affected": 69}
+{"timestamp": "2025-01-20T09:07:54Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 12.539741784817524, "rows_affected": 81}
+{"timestamp": "2025-01-20T09:07:56Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 16.253121205663533, "rows_affected": 801}
+{"timestamp": "2025-01-20T09:07:58Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 16.761406961303777, "rows_affected": 19}
+{"timestamp": "2025-01-20T09:08:00Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 11.75563035538605, "rows_affected": 76}
+{"timestamp": "2025-01-20T09:08:02Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 57.59748573731965, "rows_affected": 817}
+{"timestamp": "2025-01-20T09:08:04Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 17.551666775832288, "rows_affected": 22}
+{"timestamp": "2025-01-20T09:08:06Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.285830358115878, "rows_affected": 922}
+{"timestamp": "2025-01-20T09:08:08Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 37.68373867610908, "rows_affected": 335}
+{"timestamp": "2025-01-20T09:08:10Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.761103657864829, "rows_affected": 475}
+{"timestamp": "2025-01-20T09:08:12Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 30.341667004987542, "rows_affected": 815}
+{"timestamp": "2025-01-20T09:08:14Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.493841335317901, "rows_affected": 66}
+{"timestamp": "2025-01-20T09:08:16Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 102.99993319761903, "rows_affected": 23}
+{"timestamp": "2025-01-20T09:08:18Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 11.319765971792982, "rows_affected": 98}
+{"timestamp": "2025-01-20T09:08:20Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 133.10689279071008, "rows_affected": 22}
+{"timestamp": "2025-01-20T09:08:22Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 56.91682289592711, "rows_affected": 292}
+{"timestamp": "2025-01-20T09:08:24Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 9.432198998588317, "rows_affected": 38}
+{"timestamp": "2025-01-20T09:08:26Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 11.643126788801474, "rows_affected": 585}
+{"timestamp": "2025-01-20T09:08:28Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 58.03628477137805, "rows_affected": 915}
+{"timestamp": "2025-01-20T09:08:30Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.495302473826698, "rows_affected": 497}
+{"timestamp": "2025-01-20T09:08:32Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.319668155978519, "rows_affected": 471}
+{"timestamp": "2025-01-20T09:08:34Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 7.327988030058306, "rows_affected": 100}
+{"timestamp": "2025-01-20T09:08:36Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 54.98880359094944, "rows_affected": 70}
+{"timestamp": "2025-01-20T09:08:38Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 59.60672369653643, "rows_affected": 549}
+{"timestamp": "2025-01-20T09:08:40Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 35.67811475936297, "rows_affected": 824}
+{"timestamp": "2025-01-20T09:08:42Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.651290871874257, "rows_affected": 777}
+{"timestamp": "2025-01-20T09:08:44Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 9.33363830213669, "rows_affected": 64}
+{"timestamp": "2025-01-20T09:08:46Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 5.190523720890357, "rows_affected": 6}
+{"timestamp": "2025-01-20T09:08:48Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.835618345394016, "rows_affected": 461}
+{"timestamp": "2025-01-20T09:08:50Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 12.365498253482652, "rows_affected": 59}
+{"timestamp": "2025-01-20T09:08:52Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 61.437817044613226, "rows_affected": 544}
+{"timestamp": "2025-01-20T09:08:54Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 2.766226318256189, "rows_affected": 83}
+{"timestamp": "2025-01-20T09:08:56Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 15.40975143973487, "rows_affected": 40}
+{"timestamp": "2025-01-20T09:08:58Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.1758994806121095, "rows_affected": 485}
+{"timestamp": "2025-01-20T09:09:00Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 13.43111205980527, "rows_affected": 62}
+{"timestamp": "2025-01-20T09:09:02Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 6.639366565092279, "rows_affected": 81}
+{"timestamp": "2025-01-20T09:09:04Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.225488283707739, "rows_affected": 20}
+{"timestamp": "2025-01-20T09:09:06Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 9.549949581791079, "rows_affected": 16}
+{"timestamp": "2025-01-20T09:09:08Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 15.948077601168922, "rows_affected": 270}
+{"timestamp": "2025-01-20T09:09:10Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 9.06232808487114, "rows_affected": 2}
+{"timestamp": "2025-01-20T09:09:12Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 9.29603413397467, "rows_affected": 97}
+{"timestamp": "2025-01-20T09:09:14Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 12.913400564466038, "rows_affected": 71}
+{"timestamp": "2025-01-20T09:09:16Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 8.882746781317854, "rows_affected": 486}
+{"timestamp": "2025-01-20T09:09:18Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 9.33054055224904, "rows_affected": 92}
+{"timestamp": "2025-01-20T09:09:20Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 48.02495351666643, "rows_affected": 132}
+{"timestamp": "2025-01-20T09:09:22Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 11.87893896127409, "rows_affected": 0}
+{"timestamp": "2025-01-20T09:09:24Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 38.35556949904824, "rows_affected": 272}
+{"timestamp": "2025-01-20T09:09:26Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 8.24488054375518, "rows_affected": 319}
+{"timestamp": "2025-01-20T09:09:28Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 7.929808889854128, "rows_affected": 87}
+{"timestamp": "2025-01-20T09:09:30Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 8.20715036842845, "rows_affected": 411}
+{"timestamp": "2025-01-20T09:09:32Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.240567625530083, "rows_affected": 596}
+{"timestamp": "2025-01-20T09:09:34Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 35.8777312513782, "rows_affected": 198}
+{"timestamp": "2025-01-20T09:09:36Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 11.36973157180578, "rows_affected": 10}
+{"timestamp": "2025-01-20T09:09:38Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 54.40434282396133, "rows_affected": 881}
+{"timestamp": "2025-01-20T09:09:40Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.667120380777262, "rows_affected": 795}
+{"timestamp": "2025-01-20T09:09:42Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.61779430713051, "rows_affected": 988}
+{"timestamp": "2025-01-20T09:09:44Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 9.327052578170868, "rows_affected": 64}
+{"timestamp": "2025-01-20T09:09:46Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 243.08199898488, "rows_affected": 301}
+{"timestamp": "2025-01-20T09:09:48Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 30.70004477606897, "rows_affected": 695}
+{"timestamp": "2025-01-20T09:09:50Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.173318959396168, "rows_affected": 732}
+{"timestamp": "2025-01-20T09:09:52Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.559118421422612, "rows_affected": 419}
+{"timestamp": "2025-01-20T09:09:54Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 13.68060765130772, "rows_affected": 12}
+{"timestamp": "2025-01-20T09:09:56Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 12.211326930911804, "rows_affected": 667}
+{"timestamp": "2025-01-20T09:09:58Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.872970372032757, "rows_affected": 636}
+{"timestamp": "2025-01-20T09:10:00Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 8.118938116243667, "rows_affected": 224}
+{"timestamp": "2025-01-20T09:10:02Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 16.59353525118734, "rows_affected": 99}
+{"timestamp": "2025-01-20T09:10:04Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 54.1580254870059, "rows_affected": 643}
+{"timestamp": "2025-01-20T09:10:06Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 23.92865682340308, "rows_affected": 84}
+{"timestamp": "2025-01-20T09:10:08Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.733172738385305, "rows_affected": 987}
+{"timestamp": "2025-01-20T09:10:10Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 9.328019449471167, "rows_affected": 37}
+{"timestamp": "2025-01-20T09:10:12Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 2.5747236622861123, "rows_affected": 153}
+{"timestamp": "2025-01-20T09:10:14Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 10.266603182820347, "rows_affected": 509}
+{"timestamp": "2025-01-20T09:10:16Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 7.589512752895256, "rows_affected": 252}
+{"timestamp": "2025-01-20T09:10:18Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.8424276047672494, "rows_affected": 620}
+{"timestamp": "2025-01-20T09:10:20Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 12.953987078054329, "rows_affected": 43}
+{"timestamp": "2025-01-20T09:10:22Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 11.520774512422653, "rows_affected": 768}
+{"timestamp": "2025-01-20T09:10:24Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 8.718353856010394, "rows_affected": 99}
+{"timestamp": "2025-01-20T09:10:26Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.446155601071084, "rows_affected": 134}
+{"timestamp": "2025-01-20T09:10:28Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 4.759170010668571, "rows_affected": 28}
+{"timestamp": "2025-01-20T09:10:30Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 47.972804102387535, "rows_affected": 287}
+{"timestamp": "2025-01-20T09:10:32Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 7.035166242626615, "rows_affected": 60}
+{"timestamp": "2025-01-20T09:10:34Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 7.432973181858368, "rows_affected": 421}
+{"timestamp": "2025-01-20T09:10:36Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 8.29461486827751, "rows_affected": 902}
+{"timestamp": "2025-01-20T09:10:38Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 13.402071841709475, "rows_affected": 78}
+{"timestamp": "2025-01-20T09:10:40Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.5416488427153805, "rows_affected": 874}
+{"timestamp": "2025-01-20T09:10:42Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 11.857446947221245, "rows_affected": 8}
+{"timestamp": "2025-01-20T09:10:44Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.4268489300791645, "rows_affected": 40}
+{"timestamp": "2025-01-20T09:10:46Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.06800148768388, "rows_affected": 58}
+{"timestamp": "2025-01-20T09:10:48Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 11.64144339741059, "rows_affected": 769}
+{"timestamp": "2025-01-20T09:10:50Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.6179508101018567, "rows_affected": 33}
+{"timestamp": "2025-01-20T09:10:52Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 38.22569546827411, "rows_affected": 273}
+{"timestamp": "2025-01-20T09:10:54Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 6.620380638341668, "rows_affected": 16}
+{"timestamp": "2025-01-20T09:10:56Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.564752849668569, "rows_affected": 14}
+{"timestamp": "2025-01-20T09:10:58Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.6088577677568816, "rows_affected": 713}
+{"timestamp": "2025-01-20T09:11:00Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.378240552893452, "rows_affected": 405}
+{"timestamp": "2025-01-20T09:11:02Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 7.047907131278944, "rows_affected": 235}
+{"timestamp": "2025-01-20T09:11:04Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 3.7221828159558203, "rows_affected": 32}
+{"timestamp": "2025-01-20T09:11:06Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 10.991236060482006, "rows_affected": 509}
+{"timestamp": "2025-01-20T09:11:08Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 2.311711819404074, "rows_affected": 24}
+{"timestamp": "2025-01-20T09:11:10Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.357439774402199, "rows_affected": 137}
+{"timestamp": "2025-01-20T09:11:12Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 48.95310083557284, "rows_affected": 262}
+{"timestamp": "2025-01-20T09:11:14Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 9.212504622779942, "rows_affected": 71}
+{"timestamp": "2025-01-20T09:11:16Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 12.286941320580356, "rows_affected": 71}
+{"timestamp": "2025-01-20T09:11:18Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 53.13218769891935, "rows_affected": 851}
+{"timestamp": "2025-01-20T09:11:20Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.2317933249316555, "rows_affected": 518}
+{"timestamp": "2025-01-20T09:11:22Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 98.82973933976258, "rows_affected": 980}
+{"timestamp": "2025-01-20T09:11:24Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 8.347773477344596, "rows_affected": 70}
+{"timestamp": "2025-01-20T09:11:26Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 9.074823486272189, "rows_affected": 318}
+{"timestamp": "2025-01-20T09:11:28Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 13.912284449711246, "rows_affected": 16}
+{"timestamp": "2025-01-20T09:11:30Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 13.333159407575057, "rows_affected": 935}
+{"timestamp": "2025-01-20T09:11:32Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 12.264057789525914, "rows_affected": 43}
+{"timestamp": "2025-01-20T09:11:34Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 17.429310390771757, "rows_affected": 48}
+{"timestamp": "2025-01-20T09:11:36Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 41.870483962232086, "rows_affected": 944}
+{"timestamp": "2025-01-20T09:11:38Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 9.196473671097378, "rows_affected": 99}
+{"timestamp": "2025-01-20T09:11:40Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 7.800033083189235, "rows_affected": 68}
+{"timestamp": "2025-01-20T09:11:42Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.876904283687748, "rows_affected": 573}
+{"timestamp": "2025-01-20T09:11:44Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.814771721933365, "rows_affected": 476}
+{"timestamp": "2025-01-20T09:11:46Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 32.93908267525951, "rows_affected": 162}
+{"timestamp": "2025-01-20T09:11:48Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 36.261587534077336, "rows_affected": 772}
+{"timestamp": "2025-01-20T09:11:50Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 8.426478778044622, "rows_affected": 11}
+{"timestamp": "2025-01-20T09:11:52Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 10.253543064330463, "rows_affected": 80}
+{"timestamp": "2025-01-20T09:11:54Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 10.431499627183683, "rows_affected": 728}
+{"timestamp": "2025-01-20T09:11:56Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 32.49367094498305, "rows_affected": 23}
+{"timestamp": "2025-01-20T09:11:58Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 858.341087167132, "rows_affected": 49}
+{"timestamp": "2025-01-20T09:12:00Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 8.808376667766753, "rows_affected": 26}
+{"timestamp": "2025-01-20T09:12:02Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 36.312494158254346, "rows_affected": 634}
+{"timestamp": "2025-01-20T09:12:04Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.167946742535365, "rows_affected": 963}
+{"timestamp": "2025-01-20T09:12:06Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 5.94886387094766, "rows_affected": 87}
+{"timestamp": "2025-01-20T09:12:08Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 31.161177519069355, "rows_affected": 310}
+{"timestamp": "2025-01-20T09:12:10Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 16.263490125670888, "rows_affected": 56}
+{"timestamp": "2025-01-20T09:12:12Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 9.311097632118283, "rows_affected": 63}
+{"timestamp": "2025-01-20T09:12:14Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.26683148012643, "rows_affected": 967}
+{"timestamp": "2025-01-20T09:12:16Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 7.322512375572792, "rows_affected": 68}
+{"timestamp": "2025-01-20T09:12:18Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 12.95174247379915, "rows_affected": 576}
+{"timestamp": "2025-01-20T09:12:20Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 9.959944705484606, "rows_affected": 28}
+{"timestamp": "2025-01-20T09:12:22Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.29559562389726, "rows_affected": 700}
+{"timestamp": "2025-01-20T09:12:24Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 6.3624039381833475, "rows_affected": 46}
+{"timestamp": "2025-01-20T09:12:26Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.4159969603247955, "rows_affected": 149}
+{"timestamp": "2025-01-20T09:12:28Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 147.1816920018281, "rows_affected": 16}
+{"timestamp": "2025-01-20T09:12:30Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 30.82436989037096, "rows_affected": 591}
+{"timestamp": "2025-01-20T09:12:32Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 15.583541823941584, "rows_affected": 80}
+{"timestamp": "2025-01-20T09:12:34Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 8.946019597442579, "rows_affected": 38}
+{"timestamp": "2025-01-20T09:12:36Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 10.96085847783459, "rows_affected": 72}
+{"timestamp": "2025-01-20T09:12:38Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 48.13205760823713, "rows_affected": 6}
+{"timestamp": "2025-01-20T09:12:40Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 15.109164766654562, "rows_affected": 53}
+{"timestamp": "2025-01-20T09:12:42Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 13.79399125139296, "rows_affected": 94}
+{"timestamp": "2025-01-20T09:12:44Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 9.399211121886427, "rows_affected": 24}
+{"timestamp": "2025-01-20T09:12:46Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.169109963650503, "rows_affected": 562}
+{"timestamp": "2025-01-20T09:12:48Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.045570958703678, "rows_affected": 737}
+{"timestamp": "2025-01-20T09:12:50Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 17.269391716671716, "rows_affected": 9}
+{"timestamp": "2025-01-20T09:12:52Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 10.35331322109899, "rows_affected": 233}
+{"timestamp": "2025-01-20T09:12:54Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.05139647106781, "rows_affected": 117}
+{"timestamp": "2025-01-20T09:12:56Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 4.360268789913615, "rows_affected": 32}
+{"timestamp": "2025-01-20T09:12:58Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.892944576106177, "rows_affected": 211}
+{"timestamp": "2025-01-20T09:13:00Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.931577277699653, "rows_affected": 698}
+{"timestamp": "2025-01-20T09:13:02Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 53.541697837196516, "rows_affected": 493}
+{"timestamp": "2025-01-20T09:13:04Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.039121320919978, "rows_affected": 19}
+{"timestamp": "2025-01-20T09:13:06Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 10.562457038479408, "rows_affected": 336}
+{"timestamp": "2025-01-20T09:13:08Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 10.73554371388551, "rows_affected": 415}
+{"timestamp": "2025-01-20T09:13:10Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.77552123822431, "rows_affected": 874}
+{"timestamp": "2025-01-20T09:13:12Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 15.844975270482086, "rows_affected": 26}
+{"timestamp": "2025-01-20T09:13:14Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 8.77534320020922, "rows_affected": 900}
+{"timestamp": "2025-01-20T09:13:16Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 47.7127745110815, "rows_affected": 290}
+{"timestamp": "2025-01-20T09:13:18Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 75.93686816143713, "rows_affected": 261}
+{"timestamp": "2025-01-20T09:13:20Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.693052080662521, "rows_affected": 998}
+{"timestamp": "2025-01-20T09:13:22Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 4.801584235855296, "rows_affected": 249}
+{"timestamp": "2025-01-20T09:13:24Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 42.26654856110786, "rows_affected": 335}
+{"timestamp": "2025-01-20T09:13:26Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 8.273467719875025, "rows_affected": 101}
+{"timestamp": "2025-01-20T09:13:28Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.557952360461498, "rows_affected": 406}
+{"timestamp": "2025-01-20T09:13:30Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.999405074735611, "rows_affected": 138}
+{"timestamp": "2025-01-20T09:13:32Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.357296082044363, "rows_affected": 935}
+{"timestamp": "2025-01-20T09:13:34Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 54.73481118516422, "rows_affected": 741}
+{"timestamp": "2025-01-20T09:13:36Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.489561616192033, "rows_affected": 403}
+{"timestamp": "2025-01-20T09:13:38Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 52.41325130468151, "rows_affected": 301}
+{"timestamp": "2025-01-20T09:13:40Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.440510688640184, "rows_affected": 825}
+{"timestamp": "2025-01-20T09:13:42Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.855215209647743, "rows_affected": 526}
+{"timestamp": "2025-01-20T09:13:44Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 49.098445240895444, "rows_affected": 100}
+{"timestamp": "2025-01-20T09:13:46Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 13.996531317528497, "rows_affected": 446}
+{"timestamp": "2025-01-20T09:13:48Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 9.692727973992914, "rows_affected": 38}
+{"timestamp": "2025-01-20T09:13:50Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 51.85209001976027, "rows_affected": 299}
+{"timestamp": "2025-01-20T09:13:52Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 68.57650094214087, "rows_affected": 734}
+{"timestamp": "2025-01-20T09:13:54Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 38.27077918039276, "rows_affected": 439}
+{"timestamp": "2025-01-20T09:13:56Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 9.368637644871576, "rows_affected": 6}
+{"timestamp": "2025-01-20T09:13:58Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 7.056936980411628, "rows_affected": 949}
+{"timestamp": "2025-01-20T09:14:00Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 4.181688783945835, "rows_affected": 664}
+{"timestamp": "2025-01-20T09:14:02Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 12.713543301503332, "rows_affected": 97}
+{"timestamp": "2025-01-20T09:14:04Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 9.650243975299361, "rows_affected": 825}
+{"timestamp": "2025-01-20T09:14:06Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 8.612015274463191, "rows_affected": 760}
+{"timestamp": "2025-01-20T09:14:08Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 37.65723218327587, "rows_affected": 990}
+{"timestamp": "2025-01-20T09:14:10Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.263063266247874, "rows_affected": 19}
+{"timestamp": "2025-01-20T09:14:12Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 14.885983051436902, "rows_affected": 82}
+{"timestamp": "2025-01-20T09:14:14Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 12.398791157979566, "rows_affected": 387}
+{"timestamp": "2025-01-20T09:14:16Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 42.38510770314597, "rows_affected": 760}
+{"timestamp": "2025-01-20T09:14:18Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 80.0166693769098, "rows_affected": 249}
+{"timestamp": "2025-01-20T09:14:20Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 10.683273826050675, "rows_affected": 45}
+{"timestamp": "2025-01-20T09:14:22Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 10.507616871095374, "rows_affected": 11}
+{"timestamp": "2025-01-20T09:14:24Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 9.25895882906956, "rows_affected": 1}
+{"timestamp": "2025-01-20T09:14:26Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 2.963036835568565, "rows_affected": 878}
+{"timestamp": "2025-01-20T09:14:28Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 7.377843828570798, "rows_affected": 789}
+{"timestamp": "2025-01-20T09:14:30Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 5.966097006082951, "rows_affected": 88}
+{"timestamp": "2025-01-20T09:14:32Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 9.265459192949402, "rows_affected": 9}
+{"timestamp": "2025-01-20T09:14:34Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 7.782596244122024, "rows_affected": 698}
+{"timestamp": "2025-01-20T09:14:36Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 74.17529599383471, "rows_affected": 20}
+{"timestamp": "2025-01-20T09:14:38Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 4.351920377129606, "rows_affected": 9}
+{"timestamp": "2025-01-20T09:14:40Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 7.827871370103903, "rows_affected": 766}
+{"timestamp": "2025-01-20T09:14:42Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.010812203356918, "rows_affected": 33}
+{"timestamp": "2025-01-20T09:14:44Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 9.173580332712195, "rows_affected": 2}
+{"timestamp": "2025-01-20T09:14:46Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 20.543235340125193, "rows_affected": 912}
+{"timestamp": "2025-01-20T09:14:48Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.08415653984664, "rows_affected": 238}
+{"timestamp": "2025-01-20T09:14:50Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 11.202414554504356, "rows_affected": 17}
+{"timestamp": "2025-01-20T09:14:52Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 11.939564527851525, "rows_affected": 98}
+{"timestamp": "2025-01-20T09:14:54Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 43.76368153020513, "rows_affected": 433}
+{"timestamp": "2025-01-20T09:14:56Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 11.811612732572518, "rows_affected": 12}
+{"timestamp": "2025-01-20T09:14:58Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 9.902320571193936, "rows_affected": 69}
+{"timestamp": "2025-01-20T09:15:00Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 8.220376212598016, "rows_affected": 53}
+{"timestamp": "2025-01-20T09:15:02Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.8354810609500465, "rows_affected": 649}
+{"timestamp": "2025-01-20T09:15:04Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 7.290239316781979, "rows_affected": 83}
+{"timestamp": "2025-01-20T09:15:06Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 9.468677655211664, "rows_affected": 34}
+{"timestamp": "2025-01-20T09:15:08Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 63.329366256545484, "rows_affected": 121}
+{"timestamp": "2025-01-20T09:15:10Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 130.60160387397534, "rows_affected": 398}
+{"timestamp": "2025-01-20T09:15:12Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 171.85582577553959, "rows_affected": 74}
+{"timestamp": "2025-01-20T09:15:14Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 6.654136256042728, "rows_affected": 15}
+{"timestamp": "2025-01-20T09:15:16Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 44.34087476134041, "rows_affected": 976}
+{"timestamp": "2025-01-20T09:15:18Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 7.28871582526687, "rows_affected": 282}
+{"timestamp": "2025-01-20T09:15:20Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 5.497132433543342, "rows_affected": 45}
+{"timestamp": "2025-01-20T09:15:22Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 9.056065411620118, "rows_affected": 1}
+{"timestamp": "2025-01-20T09:15:24Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.412559759562914, "rows_affected": 28}
+{"timestamp": "2025-01-20T09:15:26Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 4.424914014279456, "rows_affected": 46}
+{"timestamp": "2025-01-20T09:15:28Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 29.442075093507945, "rows_affected": 869}
+{"timestamp": "2025-01-20T09:15:30Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 6.09728062504776, "rows_affected": 332}
+{"timestamp": "2025-01-20T09:15:32Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 6.808584476206049, "rows_affected": 489}
+{"timestamp": "2025-01-20T09:15:34Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 1373.6277598041818, "rows_affected": 715}
+{"timestamp": "2025-01-20T09:15:36Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 9.514082816515758, "rows_affected": 634}
+{"timestamp": "2025-01-20T09:15:38Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 6.452508497051404, "rows_affected": 87}
+{"timestamp": "2025-01-20T09:15:40Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 12.103120861749687, "rows_affected": 33}
+{"timestamp": "2025-01-20T09:15:42Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 7.40185925092142, "rows_affected": 38}
+{"timestamp": "2025-01-20T09:15:44Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 3.0338552633172915, "rows_affected": 597}
+{"timestamp": "2025-01-20T09:15:46Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 11.33764428300199, "rows_affected": 156}
+{"timestamp": "2025-01-20T09:15:48Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 10.38670107802461, "rows_affected": 736}
+{"timestamp": "2025-01-20T09:15:50Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 9.239697554310046, "rows_affected": 739}
+{"timestamp": "2025-01-20T09:15:52Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 48.41419105396105, "rows_affected": 624}
+{"timestamp": "2025-01-20T09:15:54Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 12.555970545794828, "rows_affected": 16}
+{"timestamp": "2025-01-20T09:15:56Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 46.22215178323177, "rows_affected": 243}
+{"timestamp": "2025-01-20T09:15:58Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 8.142264543139216, "rows_affected": 74}
+{"timestamp": "2025-01-20T09:16:00Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.84435585978031, "rows_affected": 434}
+{"timestamp": "2025-01-20T09:16:02Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 14.485571263236707, "rows_affected": 41}
+{"timestamp": "2025-01-20T09:16:04Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 15.403970521040032, "rows_affected": 23}
+{"timestamp": "2025-01-20T09:16:06Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 8.261471107512728, "rows_affected": 50}
+{"timestamp": "2025-01-20T09:16:08Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 7.139590553056735, "rows_affected": 48}
+{"timestamp": "2025-01-20T09:16:10Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.9198068299687385, "rows_affected": 134}
+{"timestamp": "2025-01-20T09:16:12Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 19.36276467235744, "rows_affected": 12}
+{"timestamp": "2025-01-20T09:16:14Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 12.818558121165221, "rows_affected": 15}
+{"timestamp": "2025-01-20T09:16:16Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 41.71497986583375, "rows_affected": 314}
+{"timestamp": "2025-01-20T09:16:18Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 76.19126106551354, "rows_affected": 38}
+{"timestamp": "2025-01-20T09:16:20Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.260882297249826, "rows_affected": 892}
+{"timestamp": "2025-01-20T09:16:22Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 34.222698778983336, "rows_affected": 328}
+{"timestamp": "2025-01-20T09:16:24Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 6.948471773651556, "rows_affected": 2}
+{"timestamp": "2025-01-20T09:16:26Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 41.4629920273796, "rows_affected": 135}
+{"timestamp": "2025-01-20T09:16:28Z", "level": "DEBUG", "query": "SELECT * FROM orders WHERE user_id = ?", "query_time_ms": 18.753160103198304, "rows_affected": 814}
+{"timestamp": "2025-01-20T09:16:30Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 7.7481260222527055, "rows_affected": 18}
+{"timestamp": "2025-01-20T09:16:32Z", "level": "DEBUG", "query": "SELECT * FROM users WHERE id = ?", "query_time_ms": 5.5548078323240535, "rows_affected": 650}
+{"timestamp": "2025-01-20T09:16:34Z", "level": "DEBUG", "query": "UPDATE users SET last_login = ? WHERE id = ?", "query_time_ms": 16.239862443916014, "rows_affected": 5}
+{"timestamp": "2025-01-20T09:16:36Z", "level": "DEBUG", "query": "INSERT INTO audit_log (user_id, action, timestamp) VALUES (?, ?, ?)", "query_time_ms": 70.8623470380345, "rows_affected": 29}
+{"timestamp": "2025-01-20T09:16:38Z", "level": "DEBUG", "query": "SELECT COUNT(*) FROM transactions WHERE date >= ?", "query_time_ms": 37.97608140575584, "rows_affected": 307}

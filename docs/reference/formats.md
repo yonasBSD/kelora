@@ -364,6 +364,7 @@ Specify output format with `-F, --output-format <format>`.
 | `inspect` | Debug format with type information |
 | `levelmap` | Events grouped by log level |
 | `keymap` | Shows first character of specified field (requires `--keys` with exactly one field) |
+| `tailmap` | Visualizes numeric field distributions with percentile thresholds (requires `--keys` with exactly one numeric field) |
 | `csv` | CSV with header row |
 | `tsv` | Tab-separated values with header row |
 | `csvnh` | CSV without header |
@@ -387,12 +388,30 @@ The `keymap` format works similarly to `levelmap` but displays the first charact
 - Groups events by timestamp like `levelmap`
 - Not compatible with `--parallel` mode
 
+**Tailmap Format:**
+
+The `tailmap` format visualizes numeric field distributions over time using tail-focused percentile thresholds (p90, p95, p99). This is ideal for performance monitoring, latency analysis, and identifying outliers.
+
+- Requires `--keys` (or `-k`) with exactly one numeric field name
+- Uses symbols: `_` (below p90), `1` (p90-p95), `2` (p95-p99), `3` (above p99), `.` (missing)
+- Shows a summary with field statistics and percentile thresholds
+- Groups events by timestamp for timeline visualization
+- Not compatible with `--parallel` mode
+
+**Use cases:**
+- API response time analysis
+- Database query performance monitoring
+- Request latency tracking
+- Any time-series numeric data where tail latencies matter
+
 **Examples:**
 ```bash
 kelora -j app.log -F json                      # Output as JSON
 kelora -j app.log -F csv --keys ts,level,msg   # Output as CSV
 kelora -F keymap -k method access.log          # Show HTTP method patterns
 kelora -F keymap --keys status api.log         # Show status field patterns
+kelora -F tailmap -k response_time api.log     # Visualize response time distribution
+kelora -F tailmap --keys query_time_ms db.log  # Show database query performance
 kelora -j app.log --stats                      # Only stats
 ```
 

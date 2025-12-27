@@ -1851,10 +1851,24 @@ impl pipeline::Formatter for TailmapFormatter {
         }
 
         if output.is_empty() {
-            None
-        } else {
-            Some(output)
+            return None;
         }
+
+        // Add legend with percentile thresholds
+        let p90 = digest.estimate_quantile(0.90);
+        let p95 = digest.estimate_quantile(0.95);
+        let p99 = digest.estimate_quantile(0.99);
+        let min = digest.estimate_quantile(0.0);
+        let max = digest.estimate_quantile(1.0);
+
+        let valid_count = state.entries.iter().filter(|e| e.value.is_some()).count();
+
+        output.push_str(&format!(
+            "\n\n{}: {} events, range {:.1} to {:.1}, p90={:.1}, p95={:.1}, p99={:.1}\n_ = below p90 | 1 = p90-p95 | 2 = p95-p99 | 3 = above p99 | . = missing",
+            self.field_name, valid_count, min, max, p90, p95, p99
+        ));
+
+        Some(output)
     }
 }
 
@@ -2726,11 +2740,14 @@ mod tests {
         let output = formatter.finish().expect("should have output");
         assert!(output.contains("1970-01-01T00:00:00.000Z"));
 
-        // Collect all characters from all lines
+        // Collect all characters from data lines only (skip legend)
         let mut all_chars = String::new();
         for line in output.lines() {
-            if let Some(chars) = line.split_whitespace().nth(1) {
-                all_chars.push_str(chars);
+            // Only process lines that contain timestamp (data lines)
+            if line.contains("1970-01-01") {
+                if let Some(chars) = line.split_whitespace().nth(1) {
+                    all_chars.push_str(chars);
+                }
             }
         }
 
@@ -2814,7 +2831,12 @@ mod tests {
         // Tailmap outputs all at once in finish()
         let output = formatter.finish().expect("should have output");
         assert!(output.contains("1970-01-01T00:00:00.000Z"));
-        assert_eq!(output.lines().count(), 1);
+        // Should have 1 data line + 2 legend lines (with blank line separator)
+        let data_lines: Vec<_> = output
+            .lines()
+            .filter(|line| line.contains("1970-01-01"))
+            .collect();
+        assert_eq!(data_lines.len(), 1);
     }
 
     #[test]
@@ -2836,8 +2858,10 @@ mod tests {
         }
 
         let output = formatter.finish().expect("should have output");
+        // Only collect characters from data lines (skip legend)
         let all_chars: String = output
             .lines()
+            .filter(|line| line.contains("1970-01-01"))
             .filter_map(|line| line.split_whitespace().nth(1))
             .collect();
 

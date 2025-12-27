@@ -346,6 +346,10 @@ kelora -j api_logs.jsonl -F csv
 # Inspect format shows structure (useful for debugging)
 kelora -f line email_logs.log --head 20 -F inspect
 
+# Visualize numeric field distributions with tailmap (percentile-based)
+kelora -j api_logs.jsonl -F tailmap --keys response_time
+kelora -j database_logs.jsonl -F tailmap --keys query_time_ms --filter 'e.query_time_ms > 0'
+
 # Select specific fields only (-k)
 kelora -f combined web_access.log -k client_ip,status,path
 

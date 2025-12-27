@@ -688,6 +688,7 @@ Output format. Default: `default`
 - `inspect` - Debug format with type information
 - `levelmap` - Grouped by log level
 - `keymap` - Shows first character of specified field (requires `--keys` with exactly one field)
+- `tailmap` - Visualizes numeric field distribution with percentile thresholds (requires `--keys` with exactly one numeric field)
 - `csv` - CSV with header
 - `tsv` - Tab-separated values with header
 - `csvnh` - CSV without header
@@ -697,6 +698,7 @@ Output format. Default: `default`
 kelora -j -F json app.log
 kelora -j -F csv app.log
 kelora -F keymap -k status app.log
+kelora -F tailmap -k response_time api.log
 kelora -j --stats app.log
 ```
 
