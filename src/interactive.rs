@@ -60,10 +60,15 @@ pub fn run_interactive_mode() -> Result<()> {
 
     println!("Kelora Interactive Mode — :quit to exit, :help for help\n");
 
+    let mut consecutive_interrupts = 0;
+
     loop {
         let readline = rl.readline("kelora> ");
         match readline {
             Ok(line) => {
+                // Reset interrupt counter on successful input
+                consecutive_interrupts = 0;
+
                 let trimmed = line.trim();
 
                 // Skip empty lines
@@ -88,7 +93,7 @@ pub fn run_interactive_mode() -> Result<()> {
                     println!("  'foo bar'    Use quotes when args contain spaces");
                     println!("  -h           Quick help (or --help for full)");
                     println!();
-                    println!("  Ctrl-C       Cancel running command");
+                    println!("  Ctrl-C       Cancel running command (press twice to exit)");
                     println!("  :quit        Exit (or :q, :exit, {})", eof_key);
                     println!();
                     println!("Example: -j mylog.json --filter 'e.status >= 500'");
@@ -106,8 +111,15 @@ pub fn run_interactive_mode() -> Result<()> {
                 }
             }
             Err(ReadlineError::Interrupted) => {
-                // Ctrl-C at the prompt - just show a new prompt
-                continue;
+                // Ctrl-C at the prompt - Node.js style two-press-to-quit
+                consecutive_interrupts += 1;
+                if consecutive_interrupts >= 2 {
+                    println!("\nExiting...");
+                    break;
+                } else {
+                    println!("(To exit, press Ctrl-C again or type :quit)");
+                    continue;
+                }
             }
             Err(ReadlineError::Eof) => {
                 // Ctrl-D - exit
