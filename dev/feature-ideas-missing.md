@@ -403,6 +403,115 @@ if added.len() > 0 {
 
 ---
 
+## Integration & Output Features
+
+### 16. Output Format Templates (`--template`)
+
+**What:** Built-in templates for common log aggregation formats (Loki streams, GELF, etc.) - converts Kelora JSON to destination-specific formats.
+
+**Why useful:** Integration with centralized logging systems currently requires piping through jq or manual field mapping. Templates eliminate this friction and showcase Kelora's format conversion strengths.
+
+**Example:**
+```bash
+# Convert to Loki stream format with labels
+kelora -j app.jsonl --template loki:labels=service,level > loki.json
+
+# Output GELF format for Graylog
+kelora -j app.jsonl --template gelf:host=myserver > gelf.json
+
+# VictoriaLogs (already compatible, but explicit)
+kelora -j app.jsonl --template victorialogs > vl.jsonl
+
+# Custom templates via file
+kelora -j app.jsonl --template @my-format.json > output.json
+```
+
+**Implementation:** Template system in output module, ~150 lines. Ships with built-in templates for Loki, GELF, Elastic Common Schema, OpenTelemetry logs.
+
+---
+
+### 17. Simple HTTP Output Sink (`--http-post`)
+
+**What:** Send output directly to HTTP endpoint - like `-o file.json` but for URLs. No retries, buffering, or complex delivery guarantees (that's shipper territory).
+
+**Why useful:** Currently every integration example pipes to curl. A simple HTTP sink reduces boilerplate for basic use cases while keeping Kelora a processor, not a shipper.
+
+**Example:**
+```bash
+# Post JSON lines to VictoriaLogs
+kelora -j app.jsonl -J --http-post http://victorialogs:9428/insert/jsonl
+
+# Send to custom endpoint
+kelora -j app.jsonl --template gelf \
+  --http-post http://graylog:12201/gelf
+
+# Batch mode - buffer N events before POST
+kelora -j app.jsonl -J --http-post http://aggregator/ingest --http-batch 1000
+```
+
+**Implementation:** Simple HTTP client in output module, ~100 lines. Only basic POST, no auth/retry/queue (use proper shippers for production).
+
+---
+
+### 18. Nested JSON Path Extraction (`extract_each()`)
+
+**What:** Extract and unwrap nested arrays in one operation - simplifies query response processing.
+
+**Why useful:** Querying log aggregators returns nested JSON structures. Currently requires verbose loops with `emit_each()`. A JSONPath-style extractor would be cleaner.
+
+**Example:**
+```rhai
+// Extract Loki query results - currently verbose:
+for stream in e.get_path("data.result", []) {
+  for value in stream.values { emit_each([value[1]]) }
+}
+
+// With extract_each():
+extract_each("data.result[].values[].[1]")  // JSONPath-style
+
+// Extract Graylog messages - currently:
+emit_each(e.get_path("messages", []))
+
+// With extract_each():
+extract_each("messages[]")
+
+// Elasticsearch hits
+extract_each("hits.hits[]._source")
+```
+
+**Implementation:** JSONPath-lite parser + nested extraction, ~120 lines in `json.rs`. Subset of JSONPath (arrays, wildcards, no filters).
+
+---
+
+### 19. Format-Specific Helper Functions
+
+**What:** Helper methods for common log aggregation formats - reduce boilerplate when preparing data for ingestion.
+
+**Why useful:** Integrations require specific field mappings (GELF needs `short_message`, Loki needs stream labels). Helpers encode these conventions.
+
+**Example:**
+```rhai
+// GELF format builder
+e.to_gelf(host: "myserver")
+// Adds: short_message, full_message, host, timestamp in GELF format
+
+// Loki stream grouping
+e.to_loki_stream(labels: ["service", "level"])
+// Groups by labels, formats for Loki API
+
+// OpenTelemetry Logs format
+e.to_otel_log()
+// Maps to OTLP log record structure
+
+// Elastic Common Schema
+e.to_ecs()
+// Maps fields to ECS naming (e.message → message, e.level → log.level)
+```
+
+**Implementation:** Format-specific methods in `conversions.rs`, ~150 lines total. Each helper is 20-30 lines.
+
+---
+
 ## Summary by Category
 
 ### High Priority (Simple + High Impact)
@@ -411,6 +520,8 @@ if added.len() > 0 {
 - **Streaming Percentiles (`track_percentiles()`)** - Parallel-safe, memory-efficient latency tracking
 - **Counter Sampling (`sample_every()`)** - Complements existing bucket sampling
 - **First/Last Tracking** - Common pattern, easy to implement
+- **Output Format Templates (`--template`)** - Eliminate jq dependency for integrations
+- **Nested JSON Extraction (`extract_each()`)** - Simplify query response processing
 
 ### Medium Priority (More Complex but Very Useful)
 - **Burst Detection** - Security and monitoring use cases (sequential only)
@@ -418,6 +529,8 @@ if added.len() > 0 {
 - **Moving Average** - Noise reduction and trend detection
 - **Set Operations** - Collection comparison utilities
 - **Smart Truncation** - Polish for text handling
+- **HTTP Output Sink (`--http-post`)** - Reduce curl boilerplate for integrations
+- **Format Helpers (`to_gelf()`, etc.)** - Encode integration conventions
 
 ### Sequential-Mode Only (Cannot Work in Parallel)
 - **Deduplication (`track_seen()`)** - Requires global state lookup
@@ -458,6 +571,10 @@ Features fully compatible with `--parallel`:
 - `truncate_words()` (stateless string operation)
 - Array set operations (stateless)
 - `track_if_above()` (threshold filtering, mergeable)
+- `--template` (stateless output formatting)
+- `extract_each()` (stateless JSON extraction)
+- Format helpers (`to_gelf()`, etc.) (stateless conversions)
+- `--http-post` (independent output per worker)
 
 ## Special Note on Auto-Suffixing
 
