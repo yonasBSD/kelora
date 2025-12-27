@@ -1676,6 +1676,8 @@ pub struct TailmapFormatter {
     terminal_width: usize,
     buffer_width_override: Option<usize>,
     field_name: String,
+    emoji_mode: crate::config::EmojiMode,
+    color_mode: crate::config::ColorMode,
 }
 
 struct TailmapState {
@@ -1695,7 +1697,11 @@ impl TailmapState {
 impl TailmapFormatter {
     const FALLBACK_TERMINAL_WIDTH: usize = 80;
 
-    pub fn new(field_name: Option<String>) -> Self {
+    pub fn new(
+        field_name: Option<String>,
+        emoji_mode: crate::config::EmojiMode,
+        color_mode: crate::config::ColorMode,
+    ) -> Self {
         let detected_width = crate::tty::get_terminal_width();
         let terminal_width = if detected_width == 0 {
             Self::FALLBACK_TERMINAL_WIDTH
@@ -1708,6 +1714,8 @@ impl TailmapFormatter {
             terminal_width,
             buffer_width_override: None,
             field_name: field_name.unwrap_or_else(|| "value".to_string()),
+            emoji_mode,
+            color_mode,
         }
     }
 
@@ -1718,6 +1726,8 @@ impl TailmapFormatter {
             terminal_width: 80,
             buffer_width_override: Some(width),
             field_name: field_name.unwrap_or_else(|| "value".to_string()),
+            emoji_mode: crate::config::EmojiMode::Never,
+            color_mode: crate::config::ColorMode::Never,
         }
     }
 
@@ -1863,9 +1873,13 @@ impl pipeline::Formatter for TailmapFormatter {
 
         let valid_count = state.entries.iter().filter(|e| e.value.is_some()).count();
 
+        // Add emoji prefix if enabled
+        let use_emoji = crate::tty::should_use_emoji_with_mode(&self.emoji_mode, &self.color_mode);
+        let prefix = if use_emoji { "🔹 " } else { "" };
+
         output.push_str(&format!(
-            "\n\n{}: {} events, range {:.1} to {:.1}, p90={:.1}, p95={:.1}, p99={:.1}\n_ = below p90 | 1 = p90-p95 | 2 = p95-p99 | 3 = above p99 | . = missing",
-            self.field_name, valid_count, min, max, p90, p95, p99
+            "\n\n{}{}: {} events, range {:.1} to {:.1}, p90={:.1}, p95={:.1}, p99={:.1}\n_ = below p90 | 1 = p90-p95 | 2 = p95-p99 | 3 = above p99 | . = missing",
+            prefix, self.field_name, valid_count, min, max, p90, p95, p99
         ));
 
         Some(output)

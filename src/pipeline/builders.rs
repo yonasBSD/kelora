@@ -383,9 +383,11 @@ impl PipelineBuilder {
                             "tailmap output format requires --keys to specify exactly one field"
                         ));
                     }
-                    Box::new(crate::formatters::TailmapFormatter::new(Some(
-                        self.keys[0].clone(),
-                    )))
+                    Box::new(crate::formatters::TailmapFormatter::new(
+                        Some(self.keys[0].clone()),
+                        self.config.emoji_mode.clone(),
+                        self.config.color_mode.clone(),
+                    ))
                 }
                 crate::OutputFormat::Csv => {
                     if self.keys.is_empty() {
@@ -856,9 +858,11 @@ impl PipelineBuilder {
                             "tailmap output format requires --keys to specify exactly one field"
                         ));
                     }
-                    Box::new(crate::formatters::TailmapFormatter::new(Some(
-                        self.keys[0].clone(),
-                    )))
+                    Box::new(crate::formatters::TailmapFormatter::new(
+                        Some(self.keys[0].clone()),
+                        self.config.emoji_mode.clone(),
+                        self.config.color_mode.clone(),
+                    ))
                 }
                 crate::OutputFormat::Csv => {
                     if self.keys.is_empty() {
