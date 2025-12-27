@@ -38,6 +38,7 @@ Tools that process data **from** Kelora:
 |------|----------|---------|---------------|
 | **jq** | JSON query | Advanced JSON transformations | `-J` |
 | **SQLite/DuckDB** | Database | SQL queries, aggregations, storage | `-F csv`, `-J` |
+| **VictoriaLogs/Loki/Graylog** | Log aggregation | Long-term storage, centralized logging | `-J` |
 | **pirkle** | PRQL query | SQL-style queries with pipeline syntax | `-F csv` |
 | **sort** | Sorting | Order by timestamp, level, or other fields | `-F tsv`, `-F csv` |
 | **column** | Formatter | Pretty-print TSV as aligned tables | `-F tsv` |
@@ -641,38 +642,125 @@ kelora -j logs/app.jsonl -k timestamp,level,service,message -F tsv | \
 
 ## Destinations (Storage & Aggregation)
 
-For production log aggregation and long-term storage, Kelora's JSON output (`-J`) integrates well with centralized logging systems:
+### Grafana Loki — Horizontally-Scalable Log Aggregation
 
-- **VictoriaLogs** — Fast, resource-efficient log database with LogsQL querying and Unix tool integration
-- **Grafana Loki** — Horizontally-scalable, multi-tenant log aggregation
-- **Graylog** — Free and open log management platform
-- **OpenObserve** — Cloud-native observability for logs, metrics, and traces at petabyte scale
-- **qryn** — Polyglot observability platform
+Multi-tenant log aggregation system inspired by Prometheus. Use Kelora to parse, filter, and normalize logs before pushing to Loki. Query Loki and pipe results to Kelora for ad-hoc analysis or format conversion.
 
-**Typical integration pattern:**
+**Sending to Loki:**
 
 ```bash
-# Stream Kelora output to aggregation system via HTTP
+# Stream with labels - Loki requires stream labels
 kelora -j logs/app.jsonl -J | \
-  while IFS= read -r line; do
-    curl -X POST http://loki:3100/loki/api/v1/push \
-      -H "Content-Type: application/json" \
-      -d "$line"
-  done
+  jq -c '{streams: [{stream: {service: .service, level: .level}, values: [[(.timestamp | tostring), (.message | tostring)]]}]}' | \
+  curl -X POST http://loki:3100/loki/api/v1/push \
+    -H "Content-Type: application/json" -d @-
+
+# Use log shippers (Promtail, Fluentd, Vector) for production
+kelora -j logs/app.jsonl -J > /tmp/normalized.jsonl
+# Point Promtail at /tmp/normalized.jsonl for reliable delivery
 ```
 
-**Or batch upload with span aggregation:**
+**Querying from Loki:**
 
 ```bash
-# Process logs and upload to object storage for ingestion
-kelora -j logs/*.jsonl.gz --parallel --unordered -J -o processed.json
-rclone copy processed.json remote:logs/$(date +%Y-%m-%d)/
+# Query Loki, extract log lines, and analyze with Kelora
+curl -G "http://loki:3100/loki/api/v1/query_range" \
+  --data-urlencode 'query={service="api"} |= "error"' | \
+  kelora -j \
+    -e 'for stream in e.get_path("data.result", []) {
+          for value in stream.values { emit_each([value[1]]) }
+        }' \
+    -e 'e.parse_json("message"); track_count(e.error_code)' -m
+```
 
-# Pre-aggregate with spans before uploading
+[Loki documentation](https://grafana.com/docs/loki/)
+
+---
+
+### Graylog — Open Log Management Platform
+
+Established open-source log management with GELF (Graylog Extended Log Format) support. Use Kelora to enrich and structure logs before sending to Graylog. Query Graylog and pipe results to Kelora for further analysis.
+
+**Sending to Graylog:**
+
+```bash
+# Send to Graylog GELF HTTP input
+kelora -j logs/app.jsonl \
+  -e 'e.host = "myserver"; e.short_message = e.message; e.full_message = e.to_json()' -J | \
+  curl -X POST http://graylog:12201/gelf \
+    -H "Content-Type: application/json" -d @-
+
+# Batch upload via Graylog REST API
+kelora -j logs/*.jsonl.gz --parallel -J -o /tmp/processed.jsonl
+split -l 1000 /tmp/processed.jsonl /tmp/batch_
+for file in /tmp/batch_*; do
+  curl -X POST http://graylog:9000/api/system/inputs/RAW_INPUT_ID/messages \
+    -H "Content-Type: application/json" -d @"$file"
+done
+```
+
+**Querying from Graylog:**
+
+```bash
+# Export search results from Graylog and analyze with Kelora
+curl -u admin:password "http://graylog:9000/api/search/universal/relative?query=level:error&range=3600" | \
+  kelora -j -e 'emit_each(e.get_path("messages", []))' \
+    -e 'track_count(e.get_path("message.service", "")); track_percentiles("duration", e.get_path("message.duration", 0))' -m
+```
+
+[Graylog documentation](https://go2docs.graylog.org/)
+
+---
+
+### VictoriaLogs — High-Performance Log Database
+
+Fast, resource-efficient log database (15x less disk, 30x less RAM than Elasticsearch) with LogsQL query language. Excellent for high-cardinality fields and large-scale deployments. Use bidirectionally: send processed logs to VictoriaLogs, or query it and analyze results with Kelora.
+
+**Sending to VictoriaLogs:**
+
+```bash
+# Direct JSON Lines ingestion
+kelora -j logs/app.jsonl \
+  -e 'e.absorb_json("payload"); e.user_id = e.user_id.hash("sha256")' -J | \
+  curl -X POST http://victorialogs:9428/insert/jsonl \
+    -H "Content-Type: application/x-ndjson" --data-binary @-
+
+# Pre-aggregate before upload to reduce ingestion costs
 kelora -j logs/*.jsonl.gz --span 5m \
   --span-close 'print(span.metrics.to_json())' \
-  -e 'track_count("events"); track_sum("bytes", e.size)' -q > metrics.jsonl
-curl -X POST http://victorialogs:9428/insert/jsonl -d @metrics.jsonl
+  -e 'track_count("events"); track_sum("bytes", e.size)' -q | \
+  curl -X POST http://victorialogs:9428/insert/jsonl --data-binary @-
+```
+
+**Querying from VictoriaLogs:**
+
+```bash
+# Query VictoriaLogs with LogsQL and post-process with Kelora
+curl "http://victorialogs:9428/select/logsql/query?query=level:error" | \
+  kelora -j -e 'track_count(e.service); track_percentiles("latency", e.response_time)' -m
+
+# Export high-cardinality data and convert to CSV
+curl "http://victorialogs:9428/select/logsql/query?query=_time:5m | fields timestamp,trace_id,user_id,duration" | \
+  kelora -j -k timestamp,trace_id,user_id,duration -F csv
+```
+
+[VictoriaLogs documentation](https://docs.victoriametrics.com/victorialogs/)
+
+---
+
+### Other Log Aggregation Systems
+
+**OpenObserve** — Cloud-native observability platform for logs, metrics, and traces at petabyte scale. Supports OpenTelemetry and standard JSON ingestion.
+
+**qryn** — Polyglot observability platform compatible with Loki, Prometheus, and Tempo APIs. Use Loki-compatible ingestion patterns.
+
+**Generic pattern for JSON-based ingestion:**
+
+```bash
+# Process and upload to any JSON-compatible aggregator
+kelora -j logs/app.jsonl -J | \
+  curl -X POST http://aggregator:8080/ingest \
+    -H "Content-Type: application/json" --data-binary @-
 ```
 
 ---
