@@ -23,9 +23,7 @@ For critical vulnerabilities requiring immediate action, please clearly mark the
 
 ## Supported Versions
 
-Kelora is currently in active development. Security updates are provided for the latest release only.
-
-As a 0.x release, Kelora does not guarantee backports to older versions. Users should stay up to date with the latest release.
+Kelora is currently in active development. Security updates and bug fixes are applied to the latest release only. Kelora does not provide backports to older versions.
 
 ## Security Measures
 
