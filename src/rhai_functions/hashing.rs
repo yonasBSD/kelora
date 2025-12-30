@@ -1,3 +1,7 @@
+//! Hashing and pseudonymization helpers for Rhai scripts.
+//!
+//! Includes fast hashes, cryptographic digests, and salted pseudonyms.
+
 use argon2::password_hash::{Salt, SaltString};
 use argon2::{Argon2, PasswordHasher};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};

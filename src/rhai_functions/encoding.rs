@@ -1,3 +1,7 @@
+//! Encoding and escaping helpers for Rhai scripts.
+//!
+//! Includes base64/hex, URL encoding/decoding, and HTML escaping.
+
 use rhai::Engine;
 use serde::Serialize;
 

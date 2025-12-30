@@ -1,3 +1,7 @@
+//! Networking helpers for Rhai scripts.
+//!
+//! Includes IP validation, CIDR matching, and private range checks.
+
 use ipnet::IpNet;
 use rhai::{Engine, EvalAltResult, ImmutableString};
 use std::net::IpAddr;
