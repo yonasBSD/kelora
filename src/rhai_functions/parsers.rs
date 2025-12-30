@@ -1,20 +1,50 @@
 //! Parsing functions for various text formats.
 //!
 //! Provides functions for parsing URLs, emails, user agents, media types,
-//! content disposition headers, key-value pairs, and JWT tokens.
+//! content disposition headers, key-value pairs, JWT tokens, and log formats.
 
 use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
 use base64::Engine as _;
+use once_cell::sync::Lazy;
 use rhai::{Array, Dynamic, Engine, Map};
 use std::path::Path;
 use url::Url;
 
+use crate::event::Event;
+use crate::parsers::{CefParser, CombinedParser, LogfmtParser, SyslogParser};
+use crate::pipeline::EventParser;
+
 /// Maximum length for parsed inputs (1MB)
 const MAX_PARSE_LEN: usize = 1_048_576;
+
+static LOGFMT_PARSER: Lazy<LogfmtParser> = Lazy::new(LogfmtParser::new);
+static SYSLOG_PARSER: Lazy<SyslogParser> =
+    Lazy::new(|| SyslogParser::new().expect("failed to initialize syslog parser"));
+static CEF_PARSER: Lazy<CefParser> = Lazy::new(CefParser::new);
+static COMBINED_PARSER: Lazy<CombinedParser> =
+    Lazy::new(|| CombinedParser::new().expect("failed to initialize combined parser"));
 
 // ============================================================================
 // Helper functions
 // ============================================================================
+
+fn event_to_map(event: Event) -> Map {
+    let mut map = Map::new();
+    for (key, value) in event.fields {
+        map.insert(key.into(), value);
+    }
+    map
+}
+
+fn parse_event_with<P>(parser: &P, line: &str) -> Map
+where
+    P: EventParser,
+{
+    parser
+        .parse(line)
+        .map(event_to_map)
+        .unwrap_or_else(|_| Map::new())
+}
 
 fn split_semicolon_params(section: &str) -> Vec<String> {
     let mut parts = Vec::new();
@@ -805,6 +835,26 @@ fn parse_content_disposition_impl(input: &str) -> Map {
 }
 
 // ============================================================================
+// Log format parsing
+// ============================================================================
+
+fn parse_syslog_impl(line: &str) -> Map {
+    parse_event_with(&*SYSLOG_PARSER, line)
+}
+
+fn parse_cef_impl(line: &str) -> Map {
+    parse_event_with(&*CEF_PARSER, line)
+}
+
+fn parse_logfmt_impl(line: &str) -> Map {
+    parse_event_with(&*LOGFMT_PARSER, line)
+}
+
+fn parse_combined_impl(line: &str) -> Map {
+    parse_event_with(&*COMBINED_PARSER, line)
+}
+
+// ============================================================================
 // Key-Value Parsing
 // ============================================================================
 
@@ -949,6 +999,10 @@ pub fn register_functions(engine: &mut Engine) {
     engine.register_fn("parse_user_agent", parse_user_agent_impl);
     engine.register_fn("parse_media_type", parse_media_type_impl);
     engine.register_fn("parse_content_disposition", parse_content_disposition_impl);
+    engine.register_fn("parse_syslog", parse_syslog_impl);
+    engine.register_fn("parse_cef", parse_cef_impl);
+    engine.register_fn("parse_logfmt", parse_logfmt_impl);
+    engine.register_fn("parse_combined", parse_combined_impl);
     engine.register_fn("parse_jwt", parse_jwt_impl);
 
     // Parse key-value pairs from a string
