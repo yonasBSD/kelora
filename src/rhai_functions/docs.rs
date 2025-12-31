@@ -249,8 +249,8 @@ state += map                         Merge map into state (operator form)
 
 TRACKING/METRICS FUNCTIONS (requires --metrics):
 track_avg(key, value)                Track average of numeric values for key (skips () values)
-track_bottom(key, item, n)           Track bottom N least frequent items (counts occurrences)
-track_bottom(key, item, n, score)    Track bottom N items by lowest scores (ranks by numeric value)
+track_bottom(key, item, n)           Track bottom N least frequent items (counts occurrences; skips () items)
+track_bottom(key, item, n, score)    Track bottom N items by lowest scores (ranks by numeric value; skips () items/values)
 track_bucket(key, bucket)            Track values in buckets for histograms (skips () values)
 track_count(key)                     Increment counter for key by 1 (string key; use to_string() for numbers)
 track_max(key, value)                Track maximum value for key (skips () values)
@@ -258,8 +258,8 @@ track_min(key, value)                Track minimum value for key (skips () value
 track_percentiles(key, value [,[p]]) Track streaming percentiles using t-digest (default [0.50,0.95,0.99]; auto-suffixes)
 track_stats(key, value [,[p]])       Track comprehensive stats: min, max, avg, count, sum, percentiles (auto-suffixes)
 track_sum(key, value)                Accumulate numeric values for key (skips () values)
-track_top(key, item, n)              Track top N most frequent items (counts occurrences)
-track_top(key, item, n, score)       Track top N items by highest scores (ranks by numeric value)
+track_top(key, item, n)              Track top N most frequent items (counts occurrences; skips () items)
+track_top(key, item, n, score)       Track top N items by highest scores (ranks by numeric value; skips () items/values)
 track_unique(key, value)             Track unique values for key (skips () values)
 
 FILE OUTPUT (requires --allow-fs-writes):

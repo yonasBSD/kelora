@@ -422,7 +422,7 @@ impl ErrorEnhancer {
         while i < bytes.len() {
             if bytes[i] == b'r' {
                 let prev = if i == 0 { None } else { Some(bytes[i - 1]) };
-                let starts_token = prev.map_or(true, |c| !Self::is_ident_char(c));
+                let starts_token = prev.is_none_or(|c| !Self::is_ident_char(c));
                 if starts_token {
                     let mut j = i + 1;
                     while j < bytes.len() && bytes[j] == b'#' {

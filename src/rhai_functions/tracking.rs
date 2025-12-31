@@ -1793,6 +1793,12 @@ pub fn register_functions(engine: &mut Engine) {
         },
     );
 
+    // Unit overload - no-op for missing/empty item keys
+    engine.register_fn(
+        "track_top",
+        |_key: &str, _item_key: (), _n: i64| -> Result<(), Box<rhai::EvalAltResult>> { Ok(()) },
+    );
+
     // track_top - Weighted mode: Highest values
     engine.register_fn(
         "track_top",
@@ -1838,6 +1844,32 @@ pub fn register_functions(engine: &mut Engine) {
         },
     );
 
+    // Unit overload - no-op for missing/empty item keys (weighted mode)
+    engine.register_fn(
+        "track_top",
+        |_key: &str, _item_key: (), _n: i64, _value: i64| -> Result<(), Box<rhai::EvalAltResult>> {
+            Ok(())
+        },
+    );
+    engine.register_fn(
+        "track_top",
+        |_key: &str, _item_key: (), _n: i64, _value: i32| -> Result<(), Box<rhai::EvalAltResult>> {
+            Ok(())
+        },
+    );
+    engine.register_fn(
+        "track_top",
+        |_key: &str, _item_key: (), _n: i64, _value: f64| -> Result<(), Box<rhai::EvalAltResult>> {
+            Ok(())
+        },
+    );
+    engine.register_fn(
+        "track_top",
+        |_key: &str, _item_key: (), _n: i64, _value: f32| -> Result<(), Box<rhai::EvalAltResult>> {
+            Ok(())
+        },
+    );
+
     // Unit overload - no-op for missing/empty values
     engine.register_fn(
         "track_top",
@@ -1846,6 +1878,12 @@ pub fn register_functions(engine: &mut Engine) {
          _n: i64,
          _value: ()|
          -> Result<(), Box<rhai::EvalAltResult>> { Ok(()) },
+    );
+    engine.register_fn(
+        "track_top",
+        |_key: &str, _item_key: (), _n: i64, _value: ()| -> Result<(), Box<rhai::EvalAltResult>> {
+            Ok(())
+        },
     );
 
     // track_bottom - Count mode: Least frequent items
@@ -1944,6 +1982,12 @@ pub fn register_functions(engine: &mut Engine) {
         },
     );
 
+    // Unit overload - no-op for missing/empty item keys
+    engine.register_fn(
+        "track_bottom",
+        |_key: &str, _item_key: (), _n: i64| -> Result<(), Box<rhai::EvalAltResult>> { Ok(()) },
+    );
+
     // track_bottom - Weighted mode: Lowest values
     engine.register_fn(
         "track_bottom",
@@ -1989,6 +2033,32 @@ pub fn register_functions(engine: &mut Engine) {
         },
     );
 
+    // Unit overload - no-op for missing/empty item keys (weighted mode)
+    engine.register_fn(
+        "track_bottom",
+        |_key: &str, _item_key: (), _n: i64, _value: i64| -> Result<(), Box<rhai::EvalAltResult>> {
+            Ok(())
+        },
+    );
+    engine.register_fn(
+        "track_bottom",
+        |_key: &str, _item_key: (), _n: i64, _value: i32| -> Result<(), Box<rhai::EvalAltResult>> {
+            Ok(())
+        },
+    );
+    engine.register_fn(
+        "track_bottom",
+        |_key: &str, _item_key: (), _n: i64, _value: f64| -> Result<(), Box<rhai::EvalAltResult>> {
+            Ok(())
+        },
+    );
+    engine.register_fn(
+        "track_bottom",
+        |_key: &str, _item_key: (), _n: i64, _value: f32| -> Result<(), Box<rhai::EvalAltResult>> {
+            Ok(())
+        },
+    );
+
     // Unit overload - no-op for missing/empty values
     engine.register_fn(
         "track_bottom",
@@ -1997,6 +2067,12 @@ pub fn register_functions(engine: &mut Engine) {
          _n: i64,
          _value: ()|
          -> Result<(), Box<rhai::EvalAltResult>> { Ok(()) },
+    );
+    engine.register_fn(
+        "track_bottom",
+        |_key: &str, _item_key: (), _n: i64, _value: ()| -> Result<(), Box<rhai::EvalAltResult>> {
+            Ok(())
+        },
     );
 }
 
@@ -3449,6 +3525,35 @@ mod tests {
     }
 
     #[test]
+    fn test_track_bottom_unit_item() {
+        clear_tracking_state();
+
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Unit item keys should be silently ignored
+        engine.eval::<()>(r#"track_bottom("test", (), 3)"#).unwrap();
+        engine
+            .eval::<()>(r#"track_bottom("test", (), 3, 10)"#)
+            .unwrap();
+
+        let state = get_thread_tracking_state();
+        // Should not have created any entry or should be empty
+        assert!(
+            !state.contains_key("test")
+                || state
+                    .get("test")
+                    .unwrap()
+                    .clone()
+                    .into_array()
+                    .unwrap()
+                    .is_empty()
+        );
+
+        clear_tracking_state();
+    }
+
+    #[test]
     fn test_track_top_invalid_n() {
         let mut engine = rhai::Engine::new();
         register_functions(&mut engine);
@@ -3471,6 +3576,35 @@ mod tests {
         // Unit values should be silently ignored
         engine
             .eval::<()>(r#"track_top("test", "apple", 3, ())"#)
+            .unwrap();
+
+        let state = get_thread_tracking_state();
+        // Should not have created any entry or should be empty
+        assert!(
+            !state.contains_key("test")
+                || state
+                    .get("test")
+                    .unwrap()
+                    .clone()
+                    .into_array()
+                    .unwrap()
+                    .is_empty()
+        );
+
+        clear_tracking_state();
+    }
+
+    #[test]
+    fn test_track_top_unit_item() {
+        clear_tracking_state();
+
+        let mut engine = rhai::Engine::new();
+        register_functions(&mut engine);
+
+        // Unit item keys should be silently ignored
+        engine.eval::<()>(r#"track_top("test", (), 3)"#).unwrap();
+        engine
+            .eval::<()>(r#"track_top("test", (), 3, 10)"#)
             .unwrap();
 
         let state = get_thread_tracking_state();
