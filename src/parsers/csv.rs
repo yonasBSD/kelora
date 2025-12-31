@@ -450,8 +450,14 @@ mod tests {
 
         let data_result = parser.parse("Alice,200,1234").unwrap();
         assert_eq!(data_result.fields.get("name").unwrap().to_string(), "Alice");
-        assert_eq!(data_result.fields.get("status").unwrap().as_int().unwrap(), 200);
-        assert_eq!(data_result.fields.get("bytes").unwrap().as_int().unwrap(), 1234);
+        assert_eq!(
+            data_result.fields.get("status").unwrap().as_int().unwrap(),
+            200
+        );
+        assert_eq!(
+            data_result.fields.get("bytes").unwrap().as_int().unwrap(),
+            1234
+        );
         assert!(data_result.fields.get("status:int").is_none());
     }
 }

@@ -8,11 +8,11 @@ use std::time::{Duration, Instant};
 
 use crate::platform::Ctrl;
 
-use crate::parsers::type_conversion::TypeMap;
 use super::tracker::GlobalTracker;
 use super::types::{
     Batch, BatcherThreadConfig, FileAwareLineContext, LineMessage, PlainLineContext,
 };
+use crate::parsers::type_conversion::TypeMap;
 
 /// Plain IO reader thread - reads from stdin or a single reader
 pub(crate) fn plain_io_reader_thread<R: std::io::BufRead>(

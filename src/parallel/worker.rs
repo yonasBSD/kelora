@@ -530,8 +530,7 @@ fn worker_process_event_batch(
     current_csv_type_map: &mut Option<TypeMap>,
 ) -> Result<bool> {
     if (event_batch.csv_headers.is_some() && event_batch.csv_headers != *current_csv_headers)
-        || (event_batch.csv_type_map.is_some()
-            && event_batch.csv_type_map != *current_csv_type_map)
+        || (event_batch.csv_type_map.is_some() && event_batch.csv_type_map != *current_csv_type_map)
     {
         if event_batch.csv_headers.is_some() {
             *current_csv_headers = event_batch.csv_headers.clone();
