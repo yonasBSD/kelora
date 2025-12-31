@@ -125,6 +125,17 @@ impl CsvParser {
         self.headers.clone()
     }
 
+    /// Get the type map (for extracting initialized types)
+    pub fn get_type_map(&self) -> TypeMap {
+        self.type_map.clone()
+    }
+
+    /// Apply a pre-initialized type map
+    pub fn with_type_map(mut self, type_map: TypeMap) -> Self {
+        self.type_map = type_map;
+        self
+    }
+
     /// Parse a field spec string and populate the type map
     /// Field spec format: "field1:int field2:float field3:bool field4"
     pub fn with_field_spec(mut self, field_spec: &str) -> Result<Self> {

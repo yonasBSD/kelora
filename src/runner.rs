@@ -16,6 +16,7 @@ use crate::detection::{self, DetectedFormat};
 use crate::engine::RhaiEngine;
 use crate::parallel::{ParallelConfig, ParallelProcessor};
 use crate::parsers;
+use crate::parsers::type_conversion::TypeMap;
 use crate::pipeline::{
     self, create_input_reader, create_pipeline_builder_from_config, create_pipeline_from_config,
     DEFAULT_MULTILINE_FLUSH_TIMEOUT_MS,
@@ -561,6 +562,7 @@ fn run_pipeline_sequential_internal<W: Write>(
         .map(|_| Duration::from_millis(DEFAULT_MULTILINE_FLUSH_TIMEOUT_MS));
 
     let mut current_csv_headers: Option<Vec<String>> = None;
+    let mut current_csv_type_map: Option<TypeMap> = None;
     let mut last_filename: Option<String> = None;
     let mut line_num = 0usize;
     let mut skipped_lines = 0usize;
@@ -654,6 +656,7 @@ fn run_pipeline_sequential_internal<W: Write>(
                                     skipped_lines: &mut skipped_lines,
                                     section_selector: &mut section_selector,
                                     current_csv_headers: &mut current_csv_headers,
+                                    current_csv_type_map: &mut current_csv_type_map,
                                     last_filename: &mut last_filename,
                                     gap_tracker: &mut gap_tracker,
                                 },
@@ -722,6 +725,7 @@ fn run_pipeline_sequential_internal<W: Write>(
                                     skipped_lines: &mut skipped_lines,
                                     section_selector: &mut section_selector,
                                     current_csv_headers: &mut current_csv_headers,
+                                    current_csv_type_map: &mut current_csv_type_map,
                                     last_filename: &mut last_filename,
                                     gap_tracker: &mut gap_tracker,
                                 },
@@ -787,6 +791,7 @@ struct ReaderContext<'a, W: Write> {
     skipped_lines: &'a mut usize,
     section_selector: &'a mut Option<pipeline::SectionSelector>,
     current_csv_headers: &'a mut Option<Vec<String>>,
+    current_csv_type_map: &'a mut Option<TypeMap>,
     last_filename: &'a mut Option<String>,
     gap_tracker: &'a mut Option<crate::formatters::GapTracker>,
 }
@@ -804,6 +809,7 @@ fn handle_reader_message<W: Write>(
         skipped_lines,
         section_selector,
         current_csv_headers,
+        current_csv_type_map,
         last_filename,
         gap_tracker,
     } = ctx;
@@ -820,6 +826,7 @@ fn handle_reader_message<W: Write>(
                 output,
                 filename,
                 current_csv_headers,
+                current_csv_type_map,
                 last_filename,
                 gap_tracker,
             )? {
@@ -839,6 +846,7 @@ fn handle_reader_message<W: Write>(
                 output,
                 filename,
                 current_csv_headers,
+                current_csv_type_map,
                 last_filename,
                 gap_tracker,
             )? {
@@ -870,6 +878,7 @@ fn process_line_sequential<W: Write>(
     output: &mut W,
     current_filename: Option<String>,
     current_csv_headers: &mut Option<Vec<String>>,
+    current_csv_type_map: &mut Option<TypeMap>,
     last_filename: &mut Option<String>,
     gap_tracker: &mut Option<crate::formatters::GapTracker>,
 ) -> Result<ProcessingResult> {
@@ -979,12 +988,21 @@ fn process_line_sequential<W: Write>(
 
         // Get the initialized headers
         let headers = temp_parser.get_headers();
+        let type_map = temp_parser.get_type_map();
         *current_csv_headers = Some(headers.clone());
+        *current_csv_type_map = if type_map.is_empty() {
+            None
+        } else {
+            Some(type_map)
+        };
         *last_filename = current_filename.clone();
 
         // Rebuild the pipeline with new headers
         let mut pipeline_builder = create_pipeline_builder_from_config(config);
         pipeline_builder = pipeline_builder.with_csv_headers(headers);
+        if let Some(type_map) = current_csv_type_map.clone() {
+            pipeline_builder = pipeline_builder.with_csv_type_map(type_map);
+        }
 
         // Note: We rebuild the entire pipeline including begin/end stages, but only use
         // the pipeline and context. The begin stage was already executed at session start

@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use crate::event::Event;
+use crate::parsers::type_conversion::TypeMap;
 use crate::pipeline::{self, PipelineBuilder};
 use crate::platform::Ctrl;
 use crate::rhai_functions::tracking;
@@ -33,6 +34,7 @@ pub(crate) fn worker_thread(
     let (mut pipeline, mut ctx) = pipeline_builder.clone().build_worker(stages.clone())?;
 
     let mut current_csv_headers: Option<Vec<String>> = None;
+    let mut current_csv_type_map: Option<TypeMap> = None;
     let mut immediate_shutdown = false;
 
     let ctrl_rx = ctrl_rx;
@@ -75,6 +77,7 @@ pub(crate) fn worker_thread(
                                         &stages,
                                         &result_sender,
                                         &mut current_csv_headers,
+                                        &mut current_csv_type_map,
                                     )?
                                 }
                                 WorkMessage::EventBatch(event_batch) => {
@@ -86,6 +89,7 @@ pub(crate) fn worker_thread(
                                         &stages,
                                         &result_sender,
                                         &mut current_csv_headers,
+                                        &mut current_csv_type_map,
                                     )?
                                 }
                             };
@@ -131,6 +135,7 @@ pub(crate) fn worker_thread(
                                         &stages,
                                         &result_sender,
                                         &mut current_csv_headers,
+                                        &mut current_csv_type_map,
                                     )?
                                 }
                                 WorkMessage::EventBatch(event_batch) => {
@@ -142,6 +147,7 @@ pub(crate) fn worker_thread(
                                         &stages,
                                         &result_sender,
                                         &mut current_csv_headers,
+                                        &mut current_csv_type_map,
                                     )?
                                 }
                             };
@@ -302,13 +308,25 @@ fn worker_process_batch(
     stages: &[crate::config::ScriptStageType],
     result_sender: &Sender<BatchResult>,
     current_csv_headers: &mut Option<Vec<String>>,
+    current_csv_type_map: &mut Option<TypeMap>,
 ) -> Result<bool> {
-    if batch.csv_headers.is_some() && batch.csv_headers != *current_csv_headers {
-        *current_csv_headers = batch.csv_headers.clone();
+    if (batch.csv_headers.is_some() && batch.csv_headers != *current_csv_headers)
+        || (batch.csv_type_map.is_some() && batch.csv_type_map != *current_csv_type_map)
+    {
+        if batch.csv_headers.is_some() {
+            *current_csv_headers = batch.csv_headers.clone();
+        }
+        if batch.csv_type_map.is_some() {
+            *current_csv_type_map = batch.csv_type_map.clone();
+        }
 
-        let new_pipeline_builder = pipeline_builder
-            .clone()
-            .with_csv_headers(current_csv_headers.clone().unwrap());
+        let mut new_pipeline_builder = pipeline_builder.clone();
+        if let Some(ref headers) = current_csv_headers {
+            new_pipeline_builder = new_pipeline_builder.with_csv_headers(headers.clone());
+        }
+        if let Some(ref type_map) = current_csv_type_map {
+            new_pipeline_builder = new_pipeline_builder.with_csv_type_map(type_map.clone());
+        }
         let (new_pipeline, new_ctx) = new_pipeline_builder.build_worker(stages.to_vec())?;
         *pipeline = new_pipeline;
         ctx.rhai = new_ctx.rhai;
@@ -509,13 +527,26 @@ fn worker_process_event_batch(
     stages: &[crate::config::ScriptStageType],
     result_sender: &Sender<BatchResult>,
     current_csv_headers: &mut Option<Vec<String>>,
+    current_csv_type_map: &mut Option<TypeMap>,
 ) -> Result<bool> {
-    if event_batch.csv_headers.is_some() && event_batch.csv_headers != *current_csv_headers {
-        *current_csv_headers = event_batch.csv_headers.clone();
+    if (event_batch.csv_headers.is_some() && event_batch.csv_headers != *current_csv_headers)
+        || (event_batch.csv_type_map.is_some()
+            && event_batch.csv_type_map != *current_csv_type_map)
+    {
+        if event_batch.csv_headers.is_some() {
+            *current_csv_headers = event_batch.csv_headers.clone();
+        }
+        if event_batch.csv_type_map.is_some() {
+            *current_csv_type_map = event_batch.csv_type_map.clone();
+        }
 
-        let new_pipeline_builder = pipeline_builder
-            .clone()
-            .with_csv_headers(current_csv_headers.clone().unwrap());
+        let mut new_pipeline_builder = pipeline_builder.clone();
+        if let Some(ref headers) = current_csv_headers {
+            new_pipeline_builder = new_pipeline_builder.with_csv_headers(headers.clone());
+        }
+        if let Some(ref type_map) = current_csv_type_map {
+            new_pipeline_builder = new_pipeline_builder.with_csv_type_map(type_map.clone());
+        }
         let (new_pipeline, new_ctx) = new_pipeline_builder.build_worker(stages.to_vec())?;
         *pipeline = new_pipeline;
         ctx.rhai = new_ctx.rhai;
@@ -716,6 +747,7 @@ pub(crate) fn chunker_thread(
     let mut next_event_batch_id = 0u64;
     let mut last_start_line_num: usize = 0;
     let mut last_csv_headers: Option<Vec<String>> = None;
+    let mut last_csv_type_map: Option<TypeMap> = None;
 
     while let Ok(batch) = line_batch_receiver.recv() {
         // Check for shutdown
@@ -726,6 +758,9 @@ pub(crate) fn chunker_thread(
         last_start_line_num = batch.start_line_num;
         if batch.csv_headers.is_some() {
             last_csv_headers = batch.csv_headers.clone();
+        }
+        if batch.csv_type_map.is_some() {
+            last_csv_type_map = batch.csv_type_map.clone();
         }
 
         let mut events = Vec::new();
@@ -761,6 +796,7 @@ pub(crate) fn chunker_thread(
                 start_line_num: batch.start_line_num,
                 filenames: event_filenames,
                 csv_headers: batch.csv_headers,
+                csv_type_map: batch.csv_type_map,
             };
 
             next_event_batch_id = next_event_batch_id.wrapping_add(1);
@@ -785,6 +821,7 @@ pub(crate) fn chunker_thread(
                 start_line_num: last_start_line_num,
                 filenames: vec![flushed_filename],
                 csv_headers: last_csv_headers,
+                csv_type_map: last_csv_type_map,
             };
 
             let _ = event_batch_sender.send(WorkMessage::EventBatch(event_batch));

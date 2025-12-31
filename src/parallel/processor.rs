@@ -560,9 +560,13 @@ impl ParallelProcessor {
 
         // Get the initialized headers
         let headers = temp_parser.get_headers();
+        let type_map = temp_parser.get_type_map();
 
         // Add headers to pipeline builder
         pipeline_builder = pipeline_builder.with_csv_headers(headers);
+        if !type_map.is_empty() {
+            pipeline_builder = pipeline_builder.with_csv_type_map(type_map);
+        }
 
         // Create a new reader that includes the first line if it should be processed as data
         let final_reader: Box<dyn std::io::BufRead + Send> = if was_consumed {

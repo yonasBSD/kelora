@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
 
+use crate::parsers::type_conversion::TypeMap;
 use crate::stats::stats_set_timestamp_override;
 
 /// Wrapper parser that applies timestamp configuration after parsing
@@ -83,6 +84,7 @@ pub struct PipelineBuilder {
     span: Option<crate::config::SpanConfig>,
     strict: bool,
     state_available: bool,
+    csv_type_map: Option<TypeMap>,
 }
 
 impl PipelineBuilder {
@@ -133,6 +135,7 @@ impl PipelineBuilder {
             span: None,
             strict: false,
             state_available: true,
+            csv_type_map: None,
         }
     }
 
@@ -217,11 +220,15 @@ impl PipelineBuilder {
                 }
             }
             crate::config::InputFormat::Csv(ref field_spec) => {
-                let parser = if let Some(ref headers) = self.csv_headers {
+                let mut parser = if let Some(ref headers) = self.csv_headers {
                     crate::parsers::CsvParser::new_csv_with_headers(headers.clone())
                 } else {
                     crate::parsers::CsvParser::new_csv()
                 };
+
+                if let Some(ref type_map) = self.csv_type_map {
+                    parser = parser.with_type_map(type_map.clone());
+                }
 
                 // Apply field spec if provided
                 let parser = if let Some(ref spec) = field_spec {
@@ -238,11 +245,15 @@ impl PipelineBuilder {
                 Box::new(parser)
             }
             crate::config::InputFormat::Tsv(ref field_spec) => {
-                let parser = if let Some(ref headers) = self.csv_headers {
+                let mut parser = if let Some(ref headers) = self.csv_headers {
                     crate::parsers::CsvParser::new_tsv_with_headers(headers.clone())
                 } else {
                     crate::parsers::CsvParser::new_tsv()
                 };
+
+                if let Some(ref type_map) = self.csv_type_map {
+                    parser = parser.with_type_map(type_map.clone());
+                }
 
                 // Apply field spec if provided
                 let parser = if let Some(ref spec) = field_spec {
@@ -711,11 +722,15 @@ impl PipelineBuilder {
                 }
             }
             crate::config::InputFormat::Csv(ref field_spec) => {
-                let parser = if let Some(ref headers) = self.csv_headers {
+                let mut parser = if let Some(ref headers) = self.csv_headers {
                     crate::parsers::CsvParser::new_csv_with_headers(headers.clone())
                 } else {
                     crate::parsers::CsvParser::new_csv()
                 };
+
+                if let Some(ref type_map) = self.csv_type_map {
+                    parser = parser.with_type_map(type_map.clone());
+                }
 
                 // Apply field spec if provided
                 let parser = if let Some(ref spec) = field_spec {
@@ -732,11 +747,15 @@ impl PipelineBuilder {
                 Box::new(parser)
             }
             crate::config::InputFormat::Tsv(ref field_spec) => {
-                let parser = if let Some(ref headers) = self.csv_headers {
+                let mut parser = if let Some(ref headers) = self.csv_headers {
                     crate::parsers::CsvParser::new_tsv_with_headers(headers.clone())
                 } else {
                     crate::parsers::CsvParser::new_tsv()
                 };
+
+                if let Some(ref type_map) = self.csv_type_map {
+                    parser = parser.with_type_map(type_map.clone());
+                }
 
                 // Apply field spec if provided
                 let parser = if let Some(ref spec) = field_spec {
@@ -1062,6 +1081,11 @@ impl PipelineBuilder {
 
     pub fn with_csv_headers(mut self, headers: Vec<String>) -> Self {
         self.csv_headers = Some(headers);
+        self
+    }
+
+    pub fn with_csv_type_map(mut self, type_map: TypeMap) -> Self {
+        self.csv_type_map = Some(type_map);
         self
     }
 

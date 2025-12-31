@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 
 use crate::platform::Ctrl;
 
+use crate::parsers::type_conversion::TypeMap;
 use super::tracker::GlobalTracker;
 use super::types::{
     Batch, BatcherThreadConfig, FileAwareLineContext, LineMessage, PlainLineContext,
@@ -404,6 +405,7 @@ pub(crate) fn file_aware_batcher_thread(
     let mut filtered_lines = 0usize;
     let mut last_filename: Option<String> = None;
     let mut current_headers: Option<Vec<String>> = None;
+    let mut current_type_map: Option<TypeMap> = None;
     let mut section_selector = section_config.map(crate::pipeline::SectionSelector::new);
 
     let ctrl_rx = ctrl_rx;
@@ -420,6 +422,7 @@ pub(crate) fn file_aware_batcher_thread(
                         batch_id,
                         batch_start_line,
                         current_headers.clone(),
+                        current_type_map.clone(),
                     )?;
                     batch_id += 1;
                     batch_start_line = line_num + 1;
@@ -442,6 +445,7 @@ pub(crate) fn file_aware_batcher_thread(
                                     batch_id,
                                     batch_start_line,
                                     current_headers.clone(),
+                                    current_type_map.clone(),
                                 )?;
                             }
                             break 'outer;
@@ -458,6 +462,7 @@ pub(crate) fn file_aware_batcher_thread(
                                     batch_id,
                                     batch_start_line,
                                     current_headers.clone(),
+                                    current_type_map.clone(),
                                 )?;
                             }
                             break 'outer;
@@ -487,6 +492,7 @@ pub(crate) fn file_aware_batcher_thread(
                                 keep_lines: &keep_lines,
                                 pending_deadline: &mut pending_deadline,
                                 current_headers: &mut current_headers,
+                                current_type_map: &mut current_type_map,
                                 last_filename: &mut last_filename,
                             };
                             handle_file_aware_line(line, filename, ctx)?;
@@ -503,6 +509,7 @@ pub(crate) fn file_aware_batcher_thread(
                                             batch_id,
                                             batch_start_line,
                                             current_headers.clone(),
+                                            current_type_map.clone(),
                                         )?;
                                     }
                                     break 'outer;
@@ -525,6 +532,7 @@ pub(crate) fn file_aware_batcher_thread(
                                     batch_id,
                                     batch_start_line,
                                     current_headers.clone(),
+                                    current_type_map.clone(),
                                 )?;
                             }
                             break 'outer;
@@ -538,6 +546,7 @@ pub(crate) fn file_aware_batcher_thread(
                                     batch_id,
                                     batch_start_line,
                                     current_headers.clone(),
+                                    current_type_map.clone(),
                                 )?;
                             }
                             break 'outer;
@@ -553,6 +562,7 @@ pub(crate) fn file_aware_batcher_thread(
                             batch_id,
                             batch_start_line,
                             current_headers.clone(),
+                            current_type_map.clone(),
                         )?;
                         batch_id += 1;
                         batch_start_line = line_num + 1;
@@ -573,6 +583,7 @@ pub(crate) fn file_aware_batcher_thread(
                                     batch_id,
                                     batch_start_line,
                                     current_headers.clone(),
+                                    current_type_map.clone(),
                                 )?;
                             }
                             break 'outer;
@@ -589,6 +600,7 @@ pub(crate) fn file_aware_batcher_thread(
                                     batch_id,
                                     batch_start_line,
                                     current_headers.clone(),
+                                    current_type_map.clone(),
                                 )?;
                             }
                             break 'outer;
@@ -618,6 +630,7 @@ pub(crate) fn file_aware_batcher_thread(
                                 keep_lines: &keep_lines,
                                 pending_deadline: &mut pending_deadline,
                                 current_headers: &mut current_headers,
+                                current_type_map: &mut current_type_map,
                                 last_filename: &mut last_filename,
                             };
                             handle_file_aware_line(line, filename, ctx)?;
@@ -634,6 +647,7 @@ pub(crate) fn file_aware_batcher_thread(
                                             batch_id,
                                             batch_start_line,
                                             current_headers.clone(),
+                                            current_type_map.clone(),
                                         )?;
                                     }
                                     break 'outer;
@@ -656,6 +670,7 @@ pub(crate) fn file_aware_batcher_thread(
                                     batch_id,
                                     batch_start_line,
                                     current_headers.clone(),
+                                    current_type_map.clone(),
                                 )?;
                             }
                             break 'outer;
@@ -669,6 +684,7 @@ pub(crate) fn file_aware_batcher_thread(
                                     batch_id,
                                     batch_start_line,
                                     current_headers.clone(),
+                                    current_type_map.clone(),
                                 )?;
                             }
                             break 'outer;
@@ -819,14 +835,25 @@ pub(crate) fn handle_file_aware_line(
                 *ctx.batch_id,
                 *ctx.batch_start_line,
                 ctx.current_headers.clone(),
+                ctx.current_type_map.clone(),
             )?;
             *ctx.batch_id += 1;
             *ctx.batch_start_line = *ctx.line_num + 1;
             *ctx.pending_deadline = None;
         }
 
-        *ctx.current_headers = create_csv_parser_for_file(ctx.input_format, &line, ctx.strict)
-            .map(|parser| parser.get_headers());
+        if let Some(parser) = create_csv_parser_for_file(ctx.input_format, &line, ctx.strict) {
+            *ctx.current_headers = Some(parser.get_headers());
+            let type_map = parser.get_type_map();
+            *ctx.current_type_map = if type_map.is_empty() {
+                None
+            } else {
+                Some(type_map)
+            };
+        } else {
+            *ctx.current_headers = None;
+            *ctx.current_type_map = None;
+        }
         *ctx.last_filename = filename.clone();
 
         if matches!(
@@ -850,6 +877,7 @@ pub(crate) fn handle_file_aware_line(
             *ctx.batch_id,
             *ctx.batch_start_line,
             ctx.current_headers.clone(),
+            ctx.current_type_map.clone(),
         )?;
         *ctx.batch_id += 1;
         *ctx.batch_start_line = *ctx.line_num + 1;
@@ -914,6 +942,7 @@ pub(crate) fn send_batch(
         start_line_num: batch_start_line,
         filenames: vec![None; batch_len], // No filename tracking for regular batches
         csv_headers: None,                // No CSV headers for regular batches
+        csv_type_map: None,
     };
 
     if batch_sender.send(batch).is_err() {
@@ -931,6 +960,7 @@ pub(crate) fn send_batch_with_filenames_and_headers(
     batch_id: u64,
     batch_start_line: usize,
     csv_headers: Option<Vec<String>>,
+    csv_type_map: Option<TypeMap>,
 ) -> Result<()> {
     if current_batch.is_empty() {
         return Ok(());
@@ -942,6 +972,7 @@ pub(crate) fn send_batch_with_filenames_and_headers(
         start_line_num: batch_start_line,
         filenames: std::mem::take(current_filenames),
         csv_headers,
+        csv_type_map,
     };
 
     if batch_sender.send(batch).is_err() {

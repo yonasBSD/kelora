@@ -8,6 +8,7 @@ use rhai::Dynamic;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
+use crate::parsers::type_conversion::TypeMap;
 use crate::rhai_functions::file_ops::FileOp;
 use crate::stats::ProcessingStats;
 
@@ -52,6 +53,7 @@ pub(crate) struct FileAwareLineContext<'a> {
     pub keep_lines: &'a Option<regex::Regex>,
     pub pending_deadline: &'a mut Option<Instant>,
     pub current_headers: &'a mut Option<Vec<String>>,
+    pub current_type_map: &'a mut Option<TypeMap>,
     pub last_filename: &'a mut Option<String>,
 }
 
@@ -101,6 +103,7 @@ pub struct Batch {
     pub start_line_num: usize,
     pub filenames: Vec<Option<String>>,   // Filename for each line
     pub csv_headers: Option<Vec<String>>, // CSV headers for this batch (if applicable)
+    pub csv_type_map: Option<TypeMap>,    // CSV type map for this batch (if applicable)
 }
 
 /// A batch of pre-chunked events (for multiline processing)
@@ -111,6 +114,7 @@ pub struct EventBatch {
     pub start_line_num: usize,
     pub filenames: Vec<Option<String>>, // Filename for each event
     pub csv_headers: Option<Vec<String>>,
+    pub csv_type_map: Option<TypeMap>,
 }
 
 /// Message type for distributing work to workers
