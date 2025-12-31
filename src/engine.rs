@@ -259,7 +259,7 @@ impl ErrorEnhancer {
         }
 
         // Suggestions and stage tips should be shown even without verbose mode
-        if let Some(suggestions) = self.generate_suggestions(error, scope) {
+        if let Some(suggestions) = self.generate_suggestions(error, scope, Some(script)) {
             output.push_str(&format!("   💡 {}\n", suggestions));
         }
 
@@ -288,8 +288,13 @@ impl ErrorEnhancer {
         output
     }
 
-    fn generate_suggestions(&self, error: &EvalAltResult, scope: &Scope) -> Option<String> {
-        match error {
+    fn generate_suggestions(
+        &self,
+        error: &EvalAltResult,
+        scope: &Scope,
+        script: Option<&str>,
+    ) -> Option<String> {
+        let base = match error {
             EvalAltResult::ErrorVariableNotFound(var_name, _) => {
                 let similar = self.find_similar_variables(var_name, scope);
                 if !similar.is_empty() {
@@ -389,7 +394,52 @@ impl ErrorEnhancer {
                 }
             }
             _ => None,
+        };
+
+        let raw_string_hint = script.and_then(|script| Self::raw_string_hint(error, script));
+
+        match (base, raw_string_hint) {
+            (Some(base), Some(hint)) => Some(format!("{} {}", base, hint)),
+            (Some(base), None) => Some(base),
+            (None, Some(hint)) => Some(hint),
+            (None, None) => None,
         }
+    }
+
+    pub(crate) fn raw_string_hint(error: &EvalAltResult, script: &str) -> Option<String> {
+        match error {
+            EvalAltResult::ErrorParsing(_, _) if Self::contains_rust_raw_string(script) => Some(
+                "It looks like a Rust raw string (r\"...\"). Rhai raw strings use #\"...\"# (or ##\"...\"## for embedded quotes)."
+                    .to_string(),
+            ),
+            _ => None,
+        }
+    }
+
+    fn contains_rust_raw_string(script: &str) -> bool {
+        let bytes = script.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i] == b'r' {
+                let prev = if i == 0 { None } else { Some(bytes[i - 1]) };
+                let starts_token = prev.map_or(true, |c| !Self::is_ident_char(c));
+                if starts_token {
+                    let mut j = i + 1;
+                    while j < bytes.len() && bytes[j] == b'#' {
+                        j += 1;
+                    }
+                    if j < bytes.len() && bytes[j] == b'"' {
+                        return true;
+                    }
+                }
+            }
+            i += 1;
+        }
+        false
+    }
+
+    fn is_ident_char(byte: u8) -> bool {
+        byte.is_ascii_alphanumeric() || byte == b'_'
     }
 
     fn suggest_function_alternatives(&self, func_sig: &str) -> Option<String> {
@@ -1495,15 +1545,18 @@ impl RhaiEngine {
         }
 
         // Generate suggestions even without debug mode (helps users fix errors)
-        if let Some(scope) = scope {
-            let config = DebugConfig::new(0); // Minimal config for suggestion generation
-            let enhancer = ErrorEnhancer::new(config);
-            if let Some(suggestion) = enhancer.generate_suggestions(&err, scope) {
-                if use_emoji {
-                    output.push_str(&format!("  💡 {}\n", suggestion));
-                } else {
-                    output.push_str(&format!("  Hint: {}\n", suggestion));
-                }
+        let config = DebugConfig::new(0); // Minimal config for suggestion generation
+        let enhancer = ErrorEnhancer::new(config);
+        let suggestion = if let Some(scope) = scope {
+            enhancer.generate_suggestions(&err, scope, Some(script_text))
+        } else {
+            ErrorEnhancer::raw_string_hint(&err, script_text)
+        };
+        if let Some(suggestion) = suggestion {
+            if use_emoji {
+                output.push_str(&format!("  💡 {}\n", suggestion));
+            } else {
+                output.push_str(&format!("  Hint: {}\n", suggestion));
             }
         }
 
@@ -3037,6 +3090,20 @@ mod tests {
         let caret_line = snippet.lines().nth(1).unwrap_or_default();
         assert!(caret_line.ends_with("^"));
         assert!(caret_line.contains("|        ^"));
+    }
+
+    #[test]
+    fn parse_error_suggests_rhai_raw_string_syntax() {
+        let mut engine = RhaiEngine::new();
+        let err = engine
+            .compile_exec("e.line.extract_regex(r\"User (\\\\d+)\")")
+            .err()
+            .expect("r\"...\" should be invalid in Rhai");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("Rhai raw strings use #\"...\"#"),
+            "raw string hint should mention Rhai syntax; got: {msg}"
+        );
     }
 
     #[test]
