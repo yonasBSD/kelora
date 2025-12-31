@@ -1,5 +1,7 @@
 use crate::event::Event;
-use crate::parsers::type_conversion::{convert_value_to_type, parse_field_with_type, TypeMap};
+use crate::parsers::type_conversion::{
+    convert_value_to_type, parse_field_with_type, FieldType, TypeMap,
+};
 use crate::pipeline::EventParser;
 use anyhow::{Context, Result};
 use csv::ReaderBuilder;
@@ -167,7 +169,7 @@ impl CsvParser {
     }
 
     /// Parse the header line and extract column names
-    fn parse_header_line(&self, line: &str) -> Result<Vec<String>> {
+    fn parse_header_line(&mut self, line: &str) -> Result<Vec<String>> {
         let mut reader = ReaderBuilder::new()
             .delimiter(self.delimiter)
             .has_headers(false)
@@ -176,7 +178,26 @@ impl CsvParser {
 
         if let Some(result) = reader.records().next() {
             let record = result.context("Failed to parse CSV header line")?;
-            let headers: Vec<String> = record.iter().map(|s| s.trim().to_string()).collect();
+            let headers: Vec<String> = record
+                .iter()
+                .map(|s| {
+                    let raw = s.trim();
+                    let mut parts = raw.splitn(2, ':');
+                    let field_name = parts.next().unwrap_or("").trim();
+                    let field_type = parts.next().map(str::trim);
+
+                    if let Some(type_str) = field_type {
+                        if let Some(ftype) = FieldType::from_str(type_str) {
+                            if !self.type_map.contains_key(field_name) {
+                                self.type_map.insert(field_name.to_string(), ftype);
+                            }
+                            return field_name.to_string();
+                        }
+                    }
+
+                    raw.to_string()
+                })
+                .collect();
             Ok(headers)
         } else {
             Err(anyhow::anyhow!("Empty CSV header line"))
@@ -406,5 +427,20 @@ mod tests {
         assert_eq!(data_result2.fields.get("c2").unwrap().to_string(), "30");
         // c3 won't exist because headers were set by first line
         assert!(data_result2.fields.get("c3").is_none());
+    }
+
+    #[test]
+    fn test_csv_header_type_annotations() {
+        let mut parser = CsvParser::new_csv();
+
+        let header_line = "name,status:int,bytes:int";
+        let was_consumed = parser.initialize_headers_from_line(header_line).unwrap();
+        assert!(was_consumed);
+
+        let data_result = parser.parse("Alice,200,1234").unwrap();
+        assert_eq!(data_result.fields.get("name").unwrap().to_string(), "Alice");
+        assert_eq!(data_result.fields.get("status").unwrap().as_int().unwrap(), 200);
+        assert_eq!(data_result.fields.get("bytes").unwrap().as_int().unwrap(), 1234);
+        assert!(data_result.fields.get("status:int").is_none());
     }
 }
