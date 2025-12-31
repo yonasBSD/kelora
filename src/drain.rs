@@ -1,7 +1,6 @@
+use drain_rs::DrainTree;
 use std::cell::RefCell;
-use std::collections::HashMap;
-
-const WILDCARD_TOKEN: &str = "<*>";
+use std::convert::TryFrom;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DrainConfig {
@@ -47,65 +46,42 @@ pub struct DrainResult {
 }
 
 #[derive(Debug)]
-struct Cluster {
-    template_tokens: Vec<String>,
-    count: usize,
-}
-
-#[derive(Debug, Default)]
-struct Node {
-    children: HashMap<String, Node>,
-    cluster_ids: Vec<usize>,
-}
-
-#[derive(Debug)]
-struct Drain {
+struct DrainState {
     config: DrainConfig,
-    roots: HashMap<usize, Node>,
-    clusters: Vec<Cluster>,
+    tree: DrainTree,
 }
 
-impl Drain {
+impl DrainState {
     fn new(config: DrainConfig) -> Self {
-        Self {
-            config: config.sanitized(),
-            roots: HashMap::new(),
-            clusters: Vec::new(),
-        }
+        let config = config.sanitized();
+        let tree = DrainTree::new()
+            .max_depth(to_u16(config.depth))
+            .max_children(to_u16(config.max_children))
+            .min_similarity(config.similarity as f32);
+        Self { config, tree }
     }
 
-    fn ingest(&mut self, text: &str) -> DrainResult {
-        let tokens: Vec<String> = text
-            .split_whitespace()
-            .map(|token| token.to_string())
-            .collect();
-        let token_count = tokens.len();
-        let depth = self.config.depth.min(token_count.max(1));
-        let config = &self.config;
-
-        let root = self.roots.entry(token_count).or_default();
-        let leaf = descend_to_leaf(root, &tokens, depth, config);
-        let (cluster_id, is_new) =
-            find_or_create_cluster(leaf, &tokens, &mut self.clusters, config);
-
-        let cluster = &mut self.clusters[cluster_id];
-        let template = cluster.template_tokens.join(" ");
-        cluster.count += 1;
-
-        DrainResult {
-            template,
-            count: cluster.count,
-            is_new,
-        }
+    fn ingest(&mut self, text: &str) -> Result<DrainResult, String> {
+        let cluster = self
+            .tree
+            .add_log_line(text)
+            .ok_or_else(|| "Drain failed to match or create a cluster".to_string())?;
+        let count = usize::try_from(cluster.num_matched()).unwrap_or(usize::MAX);
+        Ok(DrainResult {
+            template: cluster.as_string(),
+            count,
+            is_new: count == 1,
+        })
     }
 
     fn templates(&self) -> Vec<DrainTemplate> {
         let mut templates: Vec<DrainTemplate> = self
-            .clusters
-            .iter()
+            .tree
+            .log_groups()
+            .into_iter()
             .map(|cluster| DrainTemplate {
-                template: cluster.template_tokens.join(" "),
-                count: cluster.count,
+                template: cluster.as_string(),
+                count: usize::try_from(cluster.num_matched()).unwrap_or(usize::MAX),
             })
             .collect();
 
@@ -119,117 +95,12 @@ impl Drain {
     }
 }
 
-fn descend_to_leaf<'a>(
-    root: &'a mut Node,
-    tokens: &[String],
-    depth: usize,
-    config: &DrainConfig,
-) -> &'a mut Node {
-    let mut node = root;
-    for token in tokens.iter().take(depth.saturating_sub(1)) {
-        let mut key = if is_variable_token(token) {
-            WILDCARD_TOKEN
-        } else {
-            token.as_str()
-        };
-
-        if !node.children.contains_key(key) {
-            if node.children.len() >= config.max_children && key != WILDCARD_TOKEN {
-                key = WILDCARD_TOKEN;
-            }
-            node.children.entry(key.to_string()).or_default();
-        }
-
-        node = node.children.get_mut(key).expect("child node exists");
-    }
-
-    node
-}
-
-fn find_or_create_cluster(
-    leaf: &mut Node,
-    tokens: &[String],
-    clusters: &mut Vec<Cluster>,
-    config: &DrainConfig,
-) -> (usize, bool) {
-    if leaf.cluster_ids.is_empty() {
-        let cluster_id = create_cluster(tokens, clusters);
-        leaf.cluster_ids.push(cluster_id);
-        return (cluster_id, true);
-    }
-
-    let mut best_id = None;
-    let mut best_similarity = 0.0;
-    let mut best_non_wildcards = 0usize;
-
-    for &cluster_id in &leaf.cluster_ids {
-        let cluster = &clusters[cluster_id];
-        let (similarity, non_wildcards) = template_similarity(&cluster.template_tokens, tokens);
-        if similarity > best_similarity
-            || (similarity == best_similarity && non_wildcards > best_non_wildcards)
-        {
-            best_similarity = similarity;
-            best_non_wildcards = non_wildcards;
-            best_id = Some(cluster_id);
-        }
-    }
-
-    if let Some(cluster_id) = best_id {
-        if best_similarity >= config.similarity {
-            update_template(cluster_id, tokens, clusters);
-            return (cluster_id, false);
-        }
-    }
-
-    let cluster_id = create_cluster(tokens, clusters);
-    leaf.cluster_ids.push(cluster_id);
-    (cluster_id, true)
-}
-
-fn create_cluster(tokens: &[String], clusters: &mut Vec<Cluster>) -> usize {
-    let cluster = Cluster {
-        template_tokens: tokens.to_vec(),
-        count: 0,
-    };
-    clusters.push(cluster);
-    clusters.len() - 1
-}
-
-fn update_template(cluster_id: usize, tokens: &[String], clusters: &mut [Cluster]) {
-    let cluster = &mut clusters[cluster_id];
-    for (idx, token) in tokens.iter().enumerate() {
-        if let Some(existing) = cluster.template_tokens.get_mut(idx) {
-            if existing != token {
-                *existing = WILDCARD_TOKEN.to_string();
-            }
-        }
-    }
-}
-
-fn is_variable_token(token: &str) -> bool {
-    token.chars().any(|ch| ch.is_ascii_digit())
-}
-
-fn template_similarity(template: &[String], tokens: &[String]) -> (f64, usize) {
-    let mut matches = 0usize;
-    let mut non_wildcards = 0usize;
-
-    for (templ, token) in template.iter().zip(tokens.iter()) {
-        if templ == WILDCARD_TOKEN {
-            continue;
-        }
-        non_wildcards += 1;
-        if templ == token {
-            matches += 1;
-        }
-    }
-
-    let denom = template.len().max(1) as f64;
-    (matches as f64 / denom, non_wildcards)
+fn to_u16(value: usize) -> u16 {
+    value.min(u16::MAX as usize) as u16
 }
 
 thread_local! {
-    static DRAIN_STATE: RefCell<Option<Drain>> = const { RefCell::new(None) };
+    static DRAIN_STATE: RefCell<Option<DrainState>> = const { RefCell::new(None) };
 }
 
 pub fn reset() {
@@ -243,10 +114,10 @@ pub fn drain_template(text: &str, config: Option<DrainConfig>) -> Result<DrainRe
         let mut state = state.borrow_mut();
         match (state.as_ref(), &config) {
             (None, Some(cfg)) => {
-                *state = Some(Drain::new(cfg.clone()));
+                *state = Some(DrainState::new(cfg.clone()));
             }
             (None, None) => {
-                *state = Some(Drain::new(DrainConfig::default()));
+                *state = Some(DrainState::new(DrainConfig::default()));
             }
             (Some(existing), Some(cfg)) => {
                 let sanitized = cfg.sanitized();
@@ -260,7 +131,7 @@ pub fn drain_template(text: &str, config: Option<DrainConfig>) -> Result<DrainRe
         let drain = state
             .as_mut()
             .ok_or_else(|| "Drain state not initialized".to_string())?;
-        Ok(drain.ingest(text))
+        drain.ingest(text)
     })
 }
 
@@ -297,9 +168,13 @@ mod tests {
 
     #[test]
     fn clusters_similar_lines() {
-        let mut drain = Drain::new(DrainConfig::default());
-        let a = drain.ingest("failed to connect to 10.0.0.1");
-        let b = drain.ingest("failed to connect to 10.0.0.2");
+        let mut drain = DrainState::new(DrainConfig::default());
+        let a = drain
+            .ingest("failed to connect to 10.0.0.1")
+            .expect("first ingest");
+        let b = drain
+            .ingest("failed to connect to 10.0.0.2")
+            .expect("second ingest");
 
         assert_eq!(a.template, "failed to connect to 10.0.0.1");
         assert_eq!(b.template, "failed to connect to <*>");
