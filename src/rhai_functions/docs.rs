@@ -385,6 +385,12 @@ kelora -j api_logs.jsonl -F keymap --keys method
 # Select specific fields only (-k)
 kelora -f combined web_access.log -k client_ip,status,path
 
+# Template mining summary (Drain)
+kelora -j api_logs.jsonl --drain -k message
+
+# Template mining with custom filters (Rhai)
+kelora -j api_logs.jsonl --exec 'e.template = drain_template(e.message, #{ filters: "%{IPV4:ip},%{UUID:uuid}" }).template' -k template
+
 # Brief output: field values only, no labels (-b)
 kelora -j api_logs.jsonl -b -k timestamp,level,message
 
