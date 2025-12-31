@@ -683,8 +683,8 @@ fn parse_count(value: &str, kind: &str) -> Result<usize, Box<rhai::EvalAltResult
     }
 
     let count = value.parse::<usize>().unwrap_or(0);
-    if count < 2 {
-        return Err(format!("parse_cols: {} count must be >= 2 (got {})", kind, count).into());
+    if count < 1 {
+        return Err(format!("parse_cols: {} count must be >= 1 (got {})", kind, count).into());
     }
     Ok(count)
 }
@@ -908,7 +908,7 @@ mod parse_cols_tests {
     #[test]
     fn parse_cols_rejects_invalid_counts() {
         set_parse_cols_strict(false);
-        let err = parse_cols_whitespace("hello", "field(1)").unwrap_err();
+        let err = parse_cols_whitespace("hello", "field(0)").unwrap_err();
         assert!(err.to_string().contains("count"));
     }
 }
