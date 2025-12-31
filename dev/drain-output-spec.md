@@ -5,10 +5,10 @@ Provide a simple, zero-scripting way to discover common log message templates
 across all events using a dedicated summary flag.
 
 ## CLI Surface
-- `--templates` (summary output, post-run)
+- `--drain` (summary output, post-run)
 - Requires `--keys` with exactly one field (same rule as `keymap`)
-  - Example: `kelora -j app.log --templates -k message`
-  - Example: `kelora -f line app.log --templates -k line`
+  - Example: `kelora -j app.log --drain -k message`
+  - Example: `kelora -f line app.log --drain -k line`
 
 ## Output Behavior
 - Templates-only output; no per-event output.
