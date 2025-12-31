@@ -13,6 +13,7 @@ mod config;
 mod config_file;
 mod decompression;
 mod detection;
+mod drain;
 mod engine;
 mod event;
 mod formatters;
@@ -600,6 +601,14 @@ fn handle_pipeline_success(
                     }
                 }
             }
+        }
+    }
+
+    if config.output.drain && terminal_allowed && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+        let templates = crate::drain::drain_templates();
+        let output = crate::drain::format_templates_output(&templates);
+        if !output.is_empty() && output != "No templates found" {
+            stdout.writeln(&output).unwrap_or(());
         }
     }
 

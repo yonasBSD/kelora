@@ -972,6 +972,16 @@ Persist metrics map to disk as JSON.
 kelora -j --exec 'track_count(e.service)' --metrics-file metrics.json app.log
 ```
 
+#### `--drain`
+
+Summarize log templates using Drain (summary-only). Requires `--keys` with exactly one field.
+Sequential mode only (not supported with `--parallel`).
+
+```bash
+kelora -j app.log --drain -k message
+kelora -f line app.log --drain -k line
+```
+
 ## Configuration Options
 
 ### Configuration File

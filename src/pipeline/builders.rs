@@ -40,10 +40,11 @@ impl EventParser for TimestampConfiguredParser {
 }
 
 use super::{
-    create_multiline_chunker, BeginStage, EndStage, EventLimiter, EventParser, ExecStage,
-    FilterStage, Formatter, KeyFilterStage, LevelFilterStage, MetaData, Pipeline, PipelineConfig,
-    PipelineContext, ScriptStage, SimpleChunker, SimpleWindowManager, SlidingWindowManager,
-    StdoutWriter, TakeNLimiter, TimestampConversionStage, TimestampFilterStage,
+    create_multiline_chunker, BeginStage, DrainStage, EndStage, EventLimiter, EventParser,
+    ExecStage, FilterStage, Formatter, KeyFilterStage, LevelFilterStage, MetaData, Pipeline,
+    PipelineConfig, PipelineContext, ScriptStage, SimpleChunker, SimpleWindowManager,
+    SlidingWindowManager, StdoutWriter, TakeNLimiter, TimestampConversionStage,
+    TimestampFilterStage,
 };
 use crate::engine::{DebugConfig, RhaiEngine};
 use crate::readers::MultiFileReader;
@@ -69,6 +70,8 @@ pub struct PipelineBuilder {
     csv_headers: Option<Vec<String>>, // Pre-processed CSV headers for parallel mode
     timestamp_filter: Option<crate::config::TimestampFilterConfig>,
     normalize_timestamps: bool,
+    drain_enabled: bool,
+    drain_field: Option<String>,
     ts_field: Option<String>,
     ts_format: Option<String>,
     default_timezone: Option<String>,
@@ -116,6 +119,8 @@ impl PipelineBuilder {
             csv_headers: None,
             timestamp_filter: None,
             normalize_timestamps: false,
+            drain_enabled: false,
+            drain_field: None,
             ts_field: None,
             ts_format: None,
             default_timezone: None,
@@ -498,6 +503,13 @@ impl PipelineBuilder {
             script_stages.push(Box::new(conversion_stage));
         }
 
+        if self.drain_enabled {
+            let field = self.drain_field.clone().ok_or_else(|| {
+                anyhow::anyhow!("--drain requires --keys to specify exactly one field")
+            })?;
+            script_stages.push(Box::new(DrainStage::new(field)));
+        }
+
         // Add key filtering stage (runs after level filtering, before context processing)
         let key_filter_stage = KeyFilterStage::new(self.keys.clone(), self.exclude_keys.clone());
         if key_filter_stage.is_active() {
@@ -605,6 +617,12 @@ impl PipelineBuilder {
         self
     }
 
+    pub fn with_drain(mut self, enabled: bool, field: Option<String>) -> Self {
+        self.drain_enabled = enabled;
+        self.drain_field = field;
+        self
+    }
+
     pub fn with_take_limit(mut self, limit: Option<usize>) -> Self {
         self.take_limit = limit;
         self
@@ -615,6 +633,11 @@ impl PipelineBuilder {
         self,
         stages: Vec<crate::config::ScriptStageType>,
     ) -> Result<(Pipeline, PipelineContext)> {
+        if self.drain_enabled {
+            return Err(anyhow::anyhow!(
+                "--drain summary is not supported with --parallel"
+            ));
+        }
         let mut rhai_engine = RhaiEngine::new();
 
         // Set up debugging if enabled
@@ -1128,12 +1151,19 @@ pub fn create_pipeline_builder_from_config(
         other => (other.clone(), None),
     };
 
+    let drain_field = if config.output.drain && config.output.keys.len() == 1 {
+        Some(config.output.keys[0].clone())
+    } else {
+        None
+    };
+
     let mut builder = PipelineBuilder::new()
         .with_config(pipeline_config)
         .with_begin(config.processing.begin.clone())
         .with_end(config.processing.end.clone())
         .with_input_format(input_format)
         .with_output_format(config.output.format.clone().into())
+        .with_drain(config.output.drain, drain_field)
         .with_cols_spec(cols_spec)
         .with_cols_sep(config.input.cols_sep.clone());
     builder.keys = config.output.get_effective_keys();

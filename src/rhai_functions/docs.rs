@@ -223,6 +223,10 @@ type_of(value)                       Get type name as string (builtin)
 window.pluck(field)                  Extract field values from window array (requires --window)
 window.pluck_as_nums(field)          Extract numeric field values from window array (requires --window)
 
+DRAIN TEMPLATE MINING (sequential mode only; errors in --parallel mode):
+drain_template(text [,options])      Add line to Drain model; returns {template, count, is_new}
+drain_templates()                    Return array of {template, count} for current Drain model
+
 STATE MANAGEMENT (sequential mode only; errors in --parallel mode):
 state["key"]                         Get/set state value via indexer (state["count"] = 0)
 state.get(key)                       Get value from state (returns () if not found)

@@ -579,6 +579,14 @@ pub struct Cli {
     )]
     pub metrics_file: Option<String>,
 
+    /// Summarize log templates using Drain (summary-only, requires --keys with exactly one field).
+    #[arg(
+        long = "drain",
+        help_heading = "Metrics and Stats",
+        help = "Summarize log templates using Drain (summary-only; requires --keys with exactly one field; sequential mode only)."
+    )]
+    pub drain: bool,
+
     /// Specify custom configuration file path
     #[arg(long = "config-file", help_heading = "Configuration Options")]
     pub config_file: Option<String>,

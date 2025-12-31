@@ -7,6 +7,7 @@ pub mod columns;
 pub mod conf;
 pub mod datetime;
 pub mod docs;
+pub mod drain;
 pub mod emit;
 pub mod encoding;
 pub mod environment;
@@ -43,6 +44,7 @@ pub fn register_all_functions(engine: &mut Engine) {
     process::register_functions(engine);
     random::register_functions(engine);
     datetime::register_functions(engine);
+    drain::register_functions(engine);
     window::register_functions(engine);
     safety::register_functions(engine);
     conf::register_functions(engine);

@@ -5,6 +5,7 @@ pub mod colors;
 pub mod config;
 pub mod config_file;
 pub mod decompression;
+pub mod drain;
 pub mod engine;
 pub mod event;
 pub mod formatters;

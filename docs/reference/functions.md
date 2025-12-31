@@ -1267,6 +1267,27 @@ e.config = read_file("config.json")
 e.lines = read_lines("data.txt")
 ```
 
+#### `drain_template(text [, options])`
+Add a line to the Drain template model and return `{template, count, is_new}`. Sequential mode only.
+
+```rhai
+let r = drain_template(e.message);
+e.template = r.template;
+```
+
+Optional `options` map keys:
+
+- `depth` (int)
+- `max_children` (int)
+- `similarity` (float)
+
+#### `drain_templates()`
+Return array of `{template, count}` from the current Drain model. Sequential mode only.
+
+```rhai
+let templates = drain_templates();
+```
+
 #### `print(message)` / `eprint(message)`
 Print to stdout/stderr (suppressed with `--no-script-output` or data-only modes).
 

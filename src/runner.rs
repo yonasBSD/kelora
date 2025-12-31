@@ -47,6 +47,8 @@ pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
     output: W,
     ctrl_rx: &Receiver<Ctrl>,
 ) -> Result<PipelineResult> {
+    crate::drain::reset();
+
     // Enable/disable stats collection up front to avoid per-event overhead when diagnostics are off
     let collect_stats = config.output.stats.is_some()
         || (!config.processing.silent && !config.processing.suppress_diagnostics);
@@ -60,6 +62,12 @@ pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
     }
 
     let use_parallel = config.should_use_parallel();
+
+    if use_parallel && config.output.drain {
+        return Err(anyhow::anyhow!(
+            "--drain summary is not supported with --parallel or thread overrides"
+        ));
+    }
 
     if use_parallel && matches!(config.output.format, config::OutputFormat::Levelmap) {
         return Err(anyhow::anyhow!(

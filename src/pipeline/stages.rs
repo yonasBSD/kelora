@@ -886,6 +886,37 @@ impl ScriptStage for KeyFilterStage {
     }
 }
 
+/// Drain template mining stage (sequential-only, summary-driven)
+pub struct DrainStage {
+    field_name: String,
+}
+
+impl DrainStage {
+    pub fn new(field_name: String) -> Self {
+        Self { field_name }
+    }
+}
+
+impl ScriptStage for DrainStage {
+    fn apply(&mut self, event: Event, _ctx: &mut PipelineContext) -> ScriptResult {
+        if let Some(value) = event.fields.get(&self.field_name) {
+            let text = if value.is_string() {
+                value.clone().into_string().unwrap_or_default()
+            } else {
+                value.to_string()
+            };
+
+            if !text.is_empty() {
+                if let Err(err) = crate::drain::drain_template(&text, None) {
+                    return ScriptResult::Error(err);
+                }
+            }
+        }
+
+        ScriptResult::Emit(event)
+    }
+}
+
 /// Timestamp filter stage for --since and --until filtering
 pub struct TimestampFilterStage {
     config: TimestampFilterConfig,
