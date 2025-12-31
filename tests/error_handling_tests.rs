@@ -156,7 +156,7 @@ not json at all
     let stats = extract_stats_lines(&stderr);
     assert_eq!(
         stats_line(&stats, "Lines processed:"),
-        "Lines processed: 5 total, 0 filtered (0.0%), 0 errors (0.0%)"
+        "Lines processed: 5 total, 0 filtered (0.0%), 2 errors (40.0%)"
     );
     assert_eq!(
         stats_line(&stats, "Events created:"),
@@ -184,8 +184,8 @@ not json at all
         input,
     );
     assert_eq!(
-        exit_code, 0,
-        "Parallel mode should continue despite parse errors and report success"
+        exit_code, 1,
+        "Parallel mode should continue despite parse errors and report failure status"
     );
 
     let lines: Vec<&str> = stdout.trim().lines().collect();
@@ -194,7 +194,7 @@ not json at all
     let stats = extract_stats_lines(&stderr);
     assert_eq!(
         stats_line(&stats, "Lines processed:"),
-        "Lines processed: 5 total, 0 filtered (0.0%), 0 errors (0.0%)"
+        "Lines processed: 5 total, 0 filtered (0.0%), 2 errors (40.0%)"
     );
     assert_eq!(
         stats_line(&stats, "Events created:"),
@@ -215,8 +215,8 @@ not json at all
         input,
     );
     assert_eq!(
-        exit_code, 0,
-        "Filtering to valid events should still succeed despite parse errors"
+        exit_code, 1,
+        "Filtering to valid events should still report errors in exit status"
     );
 
     let lines: Vec<&str> = stdout.trim().lines().collect();
@@ -225,7 +225,7 @@ not json at all
     let stats = extract_stats_lines(&stderr);
     assert_eq!(
         stats_line(&stats, "Lines processed:"),
-        "Lines processed: 5 total, 0 filtered (0.0%), 0 errors (0.0%)"
+        "Lines processed: 5 total, 0 filtered (0.0%), 2 errors (40.0%)"
     );
     assert_eq!(
         stats_line(&stats, "Events created:"),
@@ -256,7 +256,7 @@ fn test_error_stats_with_ignore_lines() {
     let stats = extract_stats_lines(&stderr);
     assert_eq!(
         stats_line(&stats, "Lines processed:"),
-        "Lines processed: 5 total, 2 filtered (40.0%), 0 errors (0.0%)"
+        "Lines processed: 5 total, 2 filtered (40.0%), 1 errors (20.0%)"
     );
     assert_eq!(
         stats_line(&stats, "Events created:"),
@@ -322,8 +322,8 @@ invalid json again"#;
         "Sequential mode should propagate parse errors via exit status"
     );
     assert_eq!(
-        exit_code_par, 0,
-        "Parallel mode should complete successfully in resilient mode"
+        exit_code_par, 1,
+        "Parallel mode should report errors in resilient mode"
     );
 
     let seq_lines: Vec<&str> = stdout_seq.trim().lines().collect();
@@ -346,7 +346,7 @@ invalid json again"#;
     );
     assert_eq!(
         stats_line(&stats_seq, "Lines processed:"),
-        "Lines processed: 6 total, 0 filtered (0.0%), 0 errors (0.0%)"
+        "Lines processed: 6 total, 0 filtered (0.0%), 3 errors (50.0%)"
     );
     assert_eq!(
         stats_line(&stats_seq, "Events created:"),
@@ -371,7 +371,7 @@ fn test_error_stats_multiline_mode() {
     let stats = extract_stats_lines(&stderr);
     assert_eq!(
         stats_line(&stats, "Lines processed:"),
-        "Lines processed: 3 total, 0 filtered (0.0%), 0 errors (0.0%)"
+        "Lines processed: 3 total, 0 filtered (0.0%), 1 errors (33.3%)"
     );
     assert_eq!(
         stats_line(&stats, "Events created:"),
@@ -389,7 +389,7 @@ fn test_error_stats_multiline_mode() {
     let stats_multi = extract_stats_lines(&stderr_multi);
     assert_eq!(
         stats_line(&stats_multi, "Lines processed:"),
-        "Lines processed: 3 total, 0 filtered (0.0%), 0 errors (0.0%)"
+        "Lines processed: 3 total, 0 filtered (0.0%), 1 errors (33.3%)"
     );
     assert_eq!(
         stats_line(&stats_multi, "Events created:"),
