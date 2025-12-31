@@ -82,6 +82,7 @@ pub struct PipelineBuilder {
     context_config: crate::config::ContextConfig,
     span: Option<crate::config::SpanConfig>,
     strict: bool,
+    state_available: bool,
 }
 
 impl PipelineBuilder {
@@ -131,6 +132,7 @@ impl PipelineBuilder {
             context_config: crate::config::ContextConfig::disabled(),
             span: None,
             strict: false,
+            state_available: true,
         }
     }
 
@@ -145,6 +147,7 @@ impl PipelineBuilder {
         stages: Vec<crate::config::ScriptStageType>,
     ) -> Result<(Pipeline, BeginStage, EndStage, PipelineContext)> {
         let mut rhai_engine = RhaiEngine::new();
+        rhai_engine.set_state_available(self.state_available);
         let use_emoji = crate::tty::should_use_emoji_with_mode(
             &self.config.emoji_mode,
             &self.config.color_mode,
@@ -639,6 +642,7 @@ impl PipelineBuilder {
             ));
         }
         let mut rhai_engine = RhaiEngine::new();
+        rhai_engine.set_state_available(self.state_available);
 
         // Set up debugging if enabled
         let use_emoji = crate::tty::should_use_emoji_with_mode(
@@ -1183,6 +1187,7 @@ pub fn create_pipeline_builder_from_config(
     builder.span = config.processing.span.clone();
     builder.context_config = config.processing.context.clone();
     builder.strict = config.processing.strict;
+    builder.state_available = !config.should_use_parallel();
     builder
 }
 

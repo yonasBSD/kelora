@@ -1440,6 +1440,7 @@ pub struct RhaiEngine {
     suppress_side_effects: bool,
     conf_map: Option<rhai::Map>,
     state_map: Option<crate::rhai_functions::state::StateMap>,
+    state_available: bool,
     debug_tracker: Option<DebugTracker>,
     execution_tracer: Option<ExecutionTracer>,
     use_emoji: bool,
@@ -1480,6 +1481,7 @@ impl Clone for RhaiEngine {
             suppress_side_effects,
             conf_map: self.conf_map.clone(),
             state_map: self.state_map.clone(),
+            state_available: self.state_available,
             debug_tracker: self.debug_tracker.clone(),
             execution_tracer: self.execution_tracer.clone(),
             use_emoji: self.use_emoji,
@@ -1957,6 +1959,7 @@ impl RhaiEngine {
             suppress_side_effects: false,
             conf_map: None,
             state_map: Some(crate::rhai_functions::state::StateMap::new()),
+            state_available: true,
             debug_tracker: None,
             execution_tracer: None,
             use_emoji: true,
@@ -1969,6 +1972,18 @@ impl RhaiEngine {
 
     pub fn get_execution_tracer(&self) -> &Option<ExecutionTracer> {
         &self.execution_tracer
+    }
+
+    pub fn set_state_available(&mut self, available: bool) {
+        self.state_available = available;
+    }
+
+    fn push_state_to_scope(&self, scope: &mut Scope) {
+        if !self.state_available || crate::rhai_functions::strings::is_parallel_mode() {
+            scope.push("state", crate::rhai_functions::state::StateNotAvailable);
+        } else if let Some(ref state_map) = self.state_map {
+            scope.push("state", state_map.clone());
+        }
     }
 
     /// Set up debugging with the provided configuration
@@ -2425,12 +2440,7 @@ impl RhaiEngine {
 
         let mut scope = self.scope_template.clone();
 
-        // Add state map (sequential mode) or dummy object (parallel mode)
-        if crate::rhai_functions::strings::is_parallel_mode() {
-            scope.push("state", crate::rhai_functions::state::StateNotAvailable);
-        } else if let Some(ref state_map) = self.state_map {
-            scope.push("state", state_map.clone());
-        }
+        self.push_state_to_scope(&mut scope);
 
         let _ = self
             .engine
@@ -2485,12 +2495,7 @@ impl RhaiEngine {
             scope.set_value("conf", conf_map.clone());
         }
 
-        // Add state map (sequential mode) or dummy object (parallel mode)
-        if crate::rhai_functions::strings::is_parallel_mode() {
-            scope.push("state", crate::rhai_functions::state::StateNotAvailable);
-        } else if let Some(ref state_map) = self.state_map {
-            scope.push("state", state_map.clone());
-        }
+        self.push_state_to_scope(&mut scope);
 
         let _ = self
             .engine
@@ -2537,12 +2542,7 @@ impl RhaiEngine {
             scope.set_value("conf", conf_map.clone());
         }
 
-        // Add state map (sequential mode) or dummy object (parallel mode)
-        if crate::rhai_functions::strings::is_parallel_mode() {
-            scope.push("state", crate::rhai_functions::state::StateNotAvailable);
-        } else if let Some(ref state_map) = self.state_map {
-            scope.push("state", state_map.clone());
-        }
+        self.push_state_to_scope(&mut scope);
 
         crate::rhai_functions::file_ops::clear_pending_ops();
 
@@ -2840,12 +2840,7 @@ impl RhaiEngine {
             scope.set_value("conf", conf_map.clone());
         }
 
-        // Add state map (sequential mode) or dummy object (parallel mode)
-        if crate::rhai_functions::strings::is_parallel_mode() {
-            scope.push("state", crate::rhai_functions::state::StateNotAvailable);
-        } else if let Some(ref state_map) = self.state_map {
-            scope.push("state", state_map.clone());
-        }
+        self.push_state_to_scope(&mut scope);
 
         scope
     }
