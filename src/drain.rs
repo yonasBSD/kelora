@@ -8,6 +8,7 @@ pub struct DrainConfig {
     pub depth: usize,
     pub max_children: usize,
     pub similarity: f64,
+    pub filters: Vec<String>,
 }
 
 impl Default for DrainConfig {
@@ -16,6 +17,7 @@ impl Default for DrainConfig {
             depth: 4,
             max_children: 100,
             similarity: 0.4,
+            filters: Vec::new(),
         }
     }
 }
@@ -29,6 +31,7 @@ impl DrainConfig {
             depth,
             max_children,
             similarity,
+            filters: self.filters.clone(),
         }
     }
 }
@@ -56,11 +59,16 @@ impl DrainState {
     fn new(config: DrainConfig) -> Self {
         let config = config.sanitized();
         let mut grok = build_grok();
+        let filter_patterns = if config.filters.is_empty() {
+            default_filter_patterns()
+        } else {
+            config.filters.iter().map(|s| s.as_str()).collect()
+        };
         let tree = DrainTree::new()
             .max_depth(to_u16(config.depth))
             .max_children(to_u16(config.max_children))
             .min_similarity(config.similarity as f32)
-            .filter_patterns(default_filter_patterns())
+            .filter_patterns(filter_patterns)
             .build_patterns(&mut grok);
         Self { config, tree }
     }

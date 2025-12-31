@@ -63,6 +63,9 @@ fn parse_drain_config(options: Map) -> Result<DrainConfig, Box<EvalAltResult>> {
                 };
                 config.similarity = similarity;
             }
+            "filters" => {
+                config.filters = parse_filters(value)?;
+            }
             _ => {
                 return Err(EvalAltResult::ErrorRuntime(
                     format!("drain_template unknown option '{}'", key).into(),
@@ -74,6 +77,46 @@ fn parse_drain_config(options: Map) -> Result<DrainConfig, Box<EvalAltResult>> {
     }
 
     Ok(config)
+}
+
+fn parse_filters(value: Dynamic) -> Result<Vec<String>, Box<EvalAltResult>> {
+    if value.is_string() {
+        let s = value.into_string().map_err(|_| {
+            EvalAltResult::ErrorRuntime(
+                "drain_template filters must be a string or array".into(),
+                Position::NONE,
+            )
+        })?;
+        Ok(s.split(',')
+            .map(|p| p.trim())
+            .filter(|p| !p.is_empty())
+            .map(|p| p.to_string())
+            .collect())
+    } else if value.is_array() {
+        let arr = value.into_array().map_err(|_| {
+            EvalAltResult::ErrorRuntime(
+                "drain_template filters must be a string or array".into(),
+                Position::NONE,
+            )
+        })?;
+        arr.into_iter()
+            .map(|item| {
+                item.into_string().map_err(|_| {
+                    EvalAltResult::ErrorRuntime(
+                        "drain_template filters array must contain strings".into(),
+                        Position::NONE,
+                    )
+                    .into()
+                })
+            })
+            .collect()
+    } else {
+        Err(EvalAltResult::ErrorRuntime(
+            "drain_template filters must be a string or array".into(),
+            Position::NONE,
+        )
+        .into())
+    }
 }
 
 fn drain_template_simple(text: &str) -> Result<Map, Box<EvalAltResult>> {

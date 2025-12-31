@@ -229,6 +229,7 @@ drain_templates()                    Return array of {template, count} for curre
                                      Default filters: ipv4_port, ipv4, ipv6, email, url, fqdn, uuid,
                                      mac, md5, sha1, sha256, path, oauth, function, hexcolor, version,
                                      hexnum, duration, num
+                                     Options: depth, max_children, similarity, filters
 
 STATE MANAGEMENT (sequential mode only; errors in --parallel mode):
 state["key"]                         Get/set state value via indexer (state["count"] = 0)

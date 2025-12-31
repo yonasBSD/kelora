@@ -1283,6 +1283,7 @@ Optional `options` map keys:
 - `depth` (int)
 - `max_children` (int)
 - `similarity` (float)
+- `filters` (string CSV or array of grok patterns)
 
 #### `drain_templates()`
 Return array of `{template, count}` from the current Drain model. Sequential mode only.
