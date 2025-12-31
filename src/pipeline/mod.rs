@@ -400,6 +400,8 @@ impl Pipeline {
                     e
                 }
                 Err(err) => {
+                    crate::stats::stats_add_line_error();
+
                     // Use unified error tracking system
                     crate::rhai_functions::tracking::track_error(
                         "parse",
@@ -411,6 +413,15 @@ impl Pipeline {
                         ctx.config.quiet_level,
                         Some(&ctx.config),
                         ctx.config.format_name.as_deref(),
+                    );
+
+                    ctx.internal_tracker
+                        .entry("__kelora_stats_lines_errors".to_string())
+                        .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                        .or_insert(rhai::Dynamic::from(1i64));
+                    ctx.internal_tracker.insert(
+                        "__op___kelora_stats_lines_errors".to_string(),
+                        rhai::Dynamic::from("count"),
                     );
 
                     // New resiliency model: skip unparseable lines by default,
@@ -824,6 +835,8 @@ impl Pipeline {
                 e
             }
             Err(err) => {
+                crate::stats::stats_add_line_error();
+
                 // Use unified error tracking system
                 crate::rhai_functions::tracking::track_error(
                     "parse",
@@ -835,6 +848,15 @@ impl Pipeline {
                     ctx.config.quiet_level,
                     Some(&ctx.config),
                     ctx.config.format_name.as_deref(),
+                );
+
+                ctx.internal_tracker
+                    .entry("__kelora_stats_lines_errors".to_string())
+                    .and_modify(|v| *v = rhai::Dynamic::from(v.as_int().unwrap_or(0) + 1))
+                    .or_insert(rhai::Dynamic::from(1i64));
+                ctx.internal_tracker.insert(
+                    "__op___kelora_stats_lines_errors".to_string(),
+                    rhai::Dynamic::from("count"),
                 );
 
                 // New resiliency model: skip unparseable lines by default,

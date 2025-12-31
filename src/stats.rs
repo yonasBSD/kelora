@@ -193,6 +193,17 @@ pub fn stats_add_error() {
     });
 }
 
+pub fn stats_add_line_error() {
+    if !stats_enabled() {
+        return;
+    }
+    THREAD_STATS.with(|stats| {
+        let mut stats = stats.borrow_mut();
+        stats.lines_errors += 1;
+        stats.errors += 1; // Backward compatibility: errors tracked parse failures.
+    });
+}
+
 pub fn stats_start_timer() {
     if !stats_enabled() {
         return;
