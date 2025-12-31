@@ -55,7 +55,7 @@ struct DrainState {
 impl DrainState {
     fn new(config: DrainConfig) -> Self {
         let config = config.sanitized();
-        let mut grok = Grok::with_patterns();
+        let mut grok = build_grok();
         let tree = DrainTree::new()
             .max_depth(to_u16(config.depth))
             .max_children(to_u16(config.max_children))
@@ -103,12 +103,56 @@ fn to_u16(value: usize) -> u16 {
     value.min(u16::MAX as usize) as u16
 }
 
+fn build_grok() -> Grok {
+    let mut grok = Grok::with_patterns();
+    for (name, pattern) in custom_grok_definitions() {
+        grok.insert_definition(name, pattern);
+    }
+    grok
+}
+
+fn custom_grok_definitions() -> Vec<(&'static str, &'static str)> {
+    vec![
+        ("KELORA_IPV4_PORT", r"(?:\d{1,3}\.){3}\d{1,3}:\d{1,5}"),
+        (
+            "KELORA_FQDN",
+            r"(?:[a-z](?:[a-z0-9-]{0,63}[a-z0-9])?\.){2,}[a-z0-9][a-z0-9-]{0,8}",
+        ),
+        ("KELORA_MD5", r"[a-fA-F0-9]{32}"),
+        ("KELORA_SHA1", r"[a-fA-F0-9]{40}"),
+        ("KELORA_SHA256", r"[a-fA-F0-9]{64}"),
+        ("KELORA_PATH", r"(?:/[A-Za-z0-9._-]+)+"),
+        ("KELORA_OAUTH", r"ya29\.[0-9A-Za-z_-]+"),
+        ("KELORA_FUNCTION", r"[A-Za-z0-9_.]+\([^)]*\)"),
+        ("KELORA_HEXCOLOR", r"#[0-9A-Fa-f]{6}"),
+        ("KELORA_VERSION", r"[vV]?\d+\.\d+(?:\.\d+)?(?:-[A-Za-z0-9]+)?"),
+        ("KELORA_HEXNUM", r"0x[0-9A-Fa-f]+"),
+        ("KELORA_DURATION", r"\d+(?:\.\d+)?(?:us|ms|[smhd])"),
+        ("KELORA_NUM", r"[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?"),
+    ]
+}
+
 fn default_filter_patterns() -> Vec<&'static str> {
     vec![
-        "%{IPV4:ip}",
-        "%{IPV6:ip6}",
+        "%{KELORA_IPV4_PORT:ipv4_port}",
+        "%{IPV4:ipv4}",
+        "%{IPV6:ipv6}",
+        "%{EMAILADDRESS:email}",
+        "%{URI:url}",
+        "%{KELORA_FQDN:fqdn}",
         "%{UUID:uuid}",
-        "%{NUMBER:num}",
+        "%{MAC:mac}",
+        "%{KELORA_MD5:md5}",
+        "%{KELORA_SHA1:sha1}",
+        "%{KELORA_SHA256:sha256}",
+        "%{KELORA_PATH:path}",
+        "%{KELORA_OAUTH:oauth}",
+        "%{KELORA_FUNCTION:function}",
+        "%{KELORA_HEXCOLOR:hexcolor}",
+        "%{KELORA_VERSION:version}",
+        "%{KELORA_HEXNUM:hexnum}",
+        "%{KELORA_DURATION:duration}",
+        "%{KELORA_NUM:num}",
     ]
 }
 
@@ -189,8 +233,8 @@ mod tests {
             .ingest("failed to connect to 10.0.0.2")
             .expect("second ingest");
 
-        assert_eq!(a.template, "failed to connect to <ip>");
-        assert_eq!(b.template, "failed to connect to <ip>");
+        assert_eq!(a.template, "failed to connect to <ipv4>");
+        assert_eq!(b.template, "failed to connect to <ipv4>");
         assert_eq!(b.count, 2);
     }
 
