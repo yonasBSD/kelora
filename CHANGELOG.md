@@ -8,20 +8,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Drain template mining** (`--drain`) - Automatic log pattern extraction and clustering using the drain-rs algorithm. Identifies recurring log templates by mining message patterns, helpful for discovering log structure in large datasets.
+  - `drain_summary()` Rhai function - Returns template mining summary with pattern counts
+  - `drain_template_id()` Rhai function - Get the template ID for the current event
+  - `drain_template()` Rhai function - Get the template pattern for the current event
+  - `drain_filters()` Rhai function - Get drain preprocessing filters (Grok-style patterns for token extraction)
+  - `-F drain` output format - Shows template patterns with frequency counts
+- **Shell completion generation** (`--completions`) - Generate shell completion scripts for bash, zsh, fish, powershell, and elvish
+- **Multiline join option** (`--multiline-join`) - Join multiline log entries into single events using configurable patterns
 - **New Rhai functions:**
   - `track_stats()` - Comprehensive statistics tracking combining min, max, avg, count, sum, and percentiles in a single call. Auto-suffixes metrics (e.g., `response_time_min`, `response_time_max`, `response_time_avg`, `response_time_count`, `response_time_sum`, `response_time_p50`, `response_time_p95`, `response_time_p99`). Supports custom percentiles (defaults to [0.50, 0.95, 0.99]).
   - `sample_every(n)` - Counter-based sampling that returns true every Nth call. Fast alternative to `bucket() % n` for approximate sampling in parallel processing. Example: `--filter 'sample_every(100)'` keeps every 100th event.
 - **Tailmap output format** (`-F tailmap`) - Visualizes numeric field distributions using SRE-focused tail latency percentiles (p90, p95, p99). Shows `_` (< p90), `1` (p90-p95), `2` (p95-p99), `3` (>= p99), `.` (missing). Uses t-digest for memory-efficient streaming percentile estimation.
 - **Keymap output format** (`-F keymap`) - Compact visual format showing the first character of a specified field (requires `-k/--keys` with exactly one field). Shows `.` for empty/missing fields. Similar to levelmap but works with any field.
 - **SLSA build provenance attestation** - GitHub releases now include cryptographically signed build provenance for improved supply chain security
+- **Incident response playbooks** - Comprehensive how-to guide with 8 ready-to-use playbooks for production incident investigation (API latency spikes, error rate analysis, authentication failures, database performance, resource exhaustion, deployment correlation, rate limits, distributed tracing)
+- **Column count flexibility** - `--cols` now accepts count=1 for single-column output
 
 ### Changed
 
 - **Interactive mode: CTRL-C to exit** - Double-tap CTRL-C to quickly exit (Node.js REPL style). First press shows hint, second press exits. Counter resets on any input to prevent accidental exits.
 - **Interactive mode: `:help` now suggests `-h`** - Points users to quick reference (`-h`) instead of full help (`--help`) for a less overwhelming first experience.
+- **Rhai error messages** - Improved raw string syntax error hints
 - **Internal refactoring** - Improved codebase organization with modular structure for formatters, pipeline processing, parallel execution, format detection, help text, and Rhai functions
 - **Documentation improvements** - Added documentation for previously undocumented Rhai functions and cleaned up developer documentation
 - **README** - Updated with docs logo
+- **Dependencies** - Updated to latest versions
+
+### Fixed
+
+- Stats parse error counts now correctly tracked
+- CSV header type hints now properly applied in pipeline
+- End-stage window availability documentation corrected
+- State unavailability now properly enforced in parallel mode
+- `track_*` functions now handle unit types correctly
+- Error handling test expectations updated for consistency
 
 ## [1.2.1] - 2025-12-25
 
