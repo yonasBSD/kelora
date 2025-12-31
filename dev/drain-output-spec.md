@@ -43,3 +43,11 @@ templates (N items):
 ## Notes
 - Drain is stateful and order-dependent. Templates can generalize as more
   events are ingested, but the final output reflects the end-of-run state.
+
+## Optional Rhai API (sequential-only)
+- `drain_template(text [, options]) -> map`
+  - Returns `{template, count, is_new}`.
+  - Raises an error under `--parallel`.
+- `drain_templates() -> array`
+  - Returns array of `{template, count}` for end-of-run reporting.
+  - Raises an error under `--parallel`.
