@@ -393,7 +393,8 @@ fn main() -> Result<()> {
     // Parse multiline configuration if provided
     if let Some(multiline_str) = &cli.multiline {
         match MultilineConfig::parse(multiline_str) {
-            Ok(multiline_config) => {
+            Ok(mut multiline_config) => {
+                multiline_config.join = cli.multiline_join;
                 config.input.multiline = Some(multiline_config);
             }
             Err(e) => {

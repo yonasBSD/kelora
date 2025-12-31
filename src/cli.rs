@@ -1,7 +1,7 @@
 // CLI-specific types and structures
 // This module contains the command-line interface definitions and parsing logic
 
-use crate::config::ScriptStageType;
+use crate::config::{MultilineJoin, ScriptStageType};
 use anyhow::Result;
 use clap::{ArgMatches, Parser};
 
@@ -188,6 +188,15 @@ pub struct Cli {
     /// `regex:match=^START:end=^END$`. See `kelora --help-multiline` for details.
     #[arg(short = 'M', long = "multiline", help_heading = "Input Options")]
     pub multiline: Option<String>,
+
+    /// Join multiline lines with: space (default), newline, or empty
+    #[arg(
+        long = "multiline-join",
+        value_enum,
+        default_value_t = MultilineJoin::Space,
+        help_heading = "Input Options"
+    )]
+    pub multiline_join: MultilineJoin,
 
     /// Extract text before separator to specified field (runs before parsing)
     #[arg(long = "extract-prefix", help_heading = "Input Options")]

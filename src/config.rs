@@ -295,6 +295,7 @@ pub struct TimestampFormatConfig {
 #[derive(Debug, Clone)]
 pub struct MultilineConfig {
     pub strategy: MultilineStrategy,
+    pub join: MultilineJoin,
 }
 
 /// Multi-line event detection strategies
@@ -308,6 +309,15 @@ pub enum MultilineStrategy {
     Regex { start: String, end: Option<String> },
     /// Read entire input as a single event
     All,
+}
+
+/// How multiline events join buffered lines
+#[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq)]
+pub enum MultilineJoin {
+    #[default]
+    Space,
+    Newline,
+    Empty,
 }
 
 /// Section selection configuration
@@ -417,7 +427,10 @@ impl MultilineConfig {
             }
         };
 
-        Ok(MultilineConfig { strategy })
+        Ok(MultilineConfig {
+            strategy,
+            join: MultilineJoin::Space,
+        })
     }
 }
 
@@ -427,6 +440,7 @@ impl Default for MultilineConfig {
             strategy: MultilineStrategy::Timestamp {
                 chrono_format: None,
             },
+            join: MultilineJoin::Space,
         }
     }
 }

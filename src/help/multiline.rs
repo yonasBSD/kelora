@@ -27,6 +27,7 @@ all
 
 NOTES:
 - Multiline stays off unless you set -M/--multiline.
+- Control line joining with --multiline-join=space|newline|empty (default: space).
 - Detection runs before parsing; pick -f raw/json/etc. as needed.
 - Buffering continues until the next detected start or end arrives.
 - With --parallel, tune --batch-size/--batch-timeout to keep memory bounded.

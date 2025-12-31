@@ -317,6 +317,20 @@ kelora -M 'regex:match=^\\d{4}-' app.log         # Start pattern only
 kelora -M 'regex:match=^START:end=^END$' app.log # Start + end patterns
 ```
 
+#### `--multiline-join <MODE>`
+
+Join multiline lines with the specified separator. Default: `space`.
+
+**Values:**
+
+- `space` - Replace line breaks with spaces (legacy behavior)
+- `newline` - Preserve line breaks between lines
+- `empty` - Concatenate lines directly
+
+```bash
+kelora -M indent --multiline-join newline app.log
+```
+
 ### Prefix Extraction
 
 #### `--extract-prefix <FIELD>`

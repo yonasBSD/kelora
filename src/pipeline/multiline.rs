@@ -1,5 +1,5 @@
 use super::Chunker;
-use crate::config::{InputFormat, MultilineConfig, MultilineStrategy};
+use crate::config::{InputFormat, MultilineConfig, MultilineJoin, MultilineStrategy};
 use crate::timestamp::AdaptiveTsParser;
 use regex::Regex;
 
@@ -89,17 +89,33 @@ impl MultilineChunker {
             return None;
         }
 
-        let joined = match self.config.strategy {
-            MultilineStrategy::All => self.buffer.join("\n"),
-            _ => self.buffer.join(""),
-        };
+        let content = if self.config.join == MultilineJoin::Space {
+            let joined = match self.config.strategy {
+                MultilineStrategy::All => self.buffer.join("\n"),
+                _ => self.buffer.join(""),
+            };
 
-        let content = match self.config.strategy {
-            MultilineStrategy::All => joined,
-            _ => match self.input_format {
-                InputFormat::Raw => joined,
-                _ => joined.replace('\n', " ").replace('\r', ""),
-            },
+            match self.config.strategy {
+                MultilineStrategy::All => joined,
+                _ => match self.input_format {
+                    InputFormat::Raw => joined,
+                    _ => joined.replace('\n', " ").replace('\r', ""),
+                },
+            }
+        } else {
+            let joiner = match self.config.join {
+                MultilineJoin::Newline => "\n",
+                MultilineJoin::Empty => "",
+                MultilineJoin::Space => " ",
+            };
+            let mut joined = String::new();
+            for (idx, line) in self.buffer.iter().enumerate() {
+                if idx > 0 {
+                    joined.push_str(joiner);
+                }
+                joined.push_str(line.trim_end_matches(['\n', '\r']));
+            }
+            joined
         };
 
         self.buffer.clear();
@@ -340,6 +356,7 @@ mod tests {
             strategy: MultilineStrategy::Timestamp {
                 chrono_format: Some("%b %e %H:%M:%S".to_string()),
             },
+            join: MultilineJoin::Space,
         };
 
         let mut chunker =
@@ -362,6 +379,7 @@ mod tests {
     fn test_indent_strategy_basic() {
         let config = MultilineConfig {
             strategy: MultilineStrategy::Indent,
+            join: MultilineJoin::Space,
         };
 
         let mut chunker = MultilineChunker::new(config, InputFormat::Raw).unwrap();
@@ -394,6 +412,7 @@ mod tests {
                 start: r"^\d{4}-\d{2}-\d{2}".to_string(),
                 end: None,
             },
+            join: MultilineJoin::Space,
         };
 
         let mut chunker = MultilineChunker::new(config, InputFormat::Raw).unwrap();
@@ -419,6 +438,7 @@ mod tests {
                 start: r"^START".to_string(),
                 end: Some(r"^END".to_string()),
             },
+            join: MultilineJoin::Space,
         };
 
         let mut chunker = MultilineChunker::new(config, InputFormat::Raw).unwrap();
@@ -436,6 +456,7 @@ mod tests {
     fn test_all_strategy_joins_with_newlines() {
         let config = MultilineConfig {
             strategy: MultilineStrategy::All,
+            join: MultilineJoin::Space,
         };
 
         let mut chunker = MultilineChunker::new(config, InputFormat::Raw).unwrap();
@@ -456,6 +477,7 @@ mod tests {
     fn test_flush_empty_buffer() {
         let config = MultilineConfig {
             strategy: MultilineStrategy::Indent,
+            join: MultilineJoin::Space,
         };
 
         let mut chunker = MultilineChunker::new(config, InputFormat::Raw).unwrap();
@@ -466,6 +488,7 @@ mod tests {
     fn test_has_pending() {
         let config = MultilineConfig {
             strategy: MultilineStrategy::Indent,
+            join: MultilineJoin::Space,
         };
 
         let mut chunker = MultilineChunker::new(config, InputFormat::Raw).unwrap();
@@ -482,6 +505,7 @@ mod tests {
     fn test_empty_line_handling_indent() {
         let config = MultilineConfig {
             strategy: MultilineStrategy::Indent,
+            join: MultilineJoin::Space,
         };
 
         let mut chunker = MultilineChunker::new(config, InputFormat::Raw).unwrap();
@@ -497,6 +521,7 @@ mod tests {
     fn test_very_large_multiline_event() {
         let config = MultilineConfig {
             strategy: MultilineStrategy::Indent,
+            join: MultilineJoin::Space,
         };
 
         let mut chunker = MultilineChunker::new(config, InputFormat::Raw).unwrap();
@@ -521,6 +546,7 @@ mod tests {
             strategy: MultilineStrategy::Timestamp {
                 chrono_format: None,
             },
+            join: MultilineJoin::Space,
         };
 
         let mut chunker = MultilineChunker::new(config, InputFormat::Raw).unwrap();
@@ -605,6 +631,7 @@ mod tests {
                 start: r"[invalid(".to_string(),
                 end: None,
             },
+            join: MultilineJoin::Space,
         };
 
         let result = MultilineChunker::new(config, InputFormat::Raw);
@@ -618,6 +645,7 @@ mod tests {
                 start: r"^START".to_string(),
                 end: Some(r"[invalid(".to_string()),
             },
+            join: MultilineJoin::Space,
         };
 
         let result = MultilineChunker::new(config, InputFormat::Raw);
@@ -649,6 +677,7 @@ mod tests {
         // This happens with the timestamp/indent strategies when a new header arrives
         let config = MultilineConfig {
             strategy: MultilineStrategy::Indent,
+            join: MultilineJoin::Space,
         };
 
         let mut chunker = MultilineChunker::new(config, InputFormat::Raw).unwrap();
@@ -672,6 +701,7 @@ mod tests {
     fn test_multiline_with_raw_format_preserves_newlines_in_all_strategy() {
         let config = MultilineConfig {
             strategy: MultilineStrategy::All,
+            join: MultilineJoin::Space,
         };
 
         let mut chunker = MultilineChunker::new(config, InputFormat::Raw).unwrap();
@@ -690,6 +720,7 @@ mod tests {
     fn test_multiline_with_json_format_removes_newlines() {
         let config = MultilineConfig {
             strategy: MultilineStrategy::Indent,
+            join: MultilineJoin::Space,
         };
 
         let mut chunker = MultilineChunker::new(config, InputFormat::Json).unwrap();
@@ -706,9 +737,29 @@ mod tests {
     }
 
     #[test]
+    fn test_multiline_join_empty_removes_line_breaks() {
+        let config = MultilineConfig {
+            strategy: MultilineStrategy::Indent,
+            join: MultilineJoin::Empty,
+        };
+
+        let mut chunker = MultilineChunker::new(config, InputFormat::Json).unwrap();
+
+        chunker.feed_line("Header\n".to_string());
+        chunker.feed_line("  continuation\n".to_string());
+
+        let event = chunker.flush();
+        assert!(event.is_some());
+        let content = event.unwrap();
+        assert!(!content.contains('\n'));
+        assert_eq!(content, "Header  continuation");
+    }
+
+    #[test]
     fn test_create_multiline_chunker_function() {
         let config = MultilineConfig {
             strategy: MultilineStrategy::Indent,
+            join: MultilineJoin::Space,
         };
 
         let result = create_multiline_chunker(&config, InputFormat::Raw);
@@ -719,6 +770,7 @@ mod tests {
     fn test_multiple_flush_on_empty_buffer() {
         let config = MultilineConfig {
             strategy: MultilineStrategy::Indent,
+            join: MultilineJoin::Space,
         };
 
         let mut chunker = MultilineChunker::new(config, InputFormat::Raw).unwrap();

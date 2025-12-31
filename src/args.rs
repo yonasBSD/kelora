@@ -7,6 +7,7 @@ use anyhow::Result;
 use clap::{ArgMatches, CommandFactory, FromArgMatches};
 
 use crate::cli::{Cli, OutputFormat, ShellCompletion};
+use crate::config::MultilineJoin;
 use crate::config_file::ConfigFile;
 use crate::help;
 use crate::platform::{ExitCode, SafeStderr};
@@ -56,6 +57,12 @@ pub fn validate_cli_args(cli: &Cli) -> Result<()> {
     if cli.span_close.is_some() && cli.span.is_none() && cli.span_idle.is_none() {
         return Err(anyhow::anyhow!(
             "--span-close requires --span or --span-idle to be specified"
+        ));
+    }
+
+    if cli.multiline.is_none() && cli.multiline_join != MultilineJoin::Space {
+        return Err(anyhow::anyhow!(
+            "--multiline-join requires --multiline to be set"
         ));
     }
 
