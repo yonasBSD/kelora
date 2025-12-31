@@ -118,7 +118,7 @@ VARIABLE SCOPE BETWEEN STAGES:
   WRONG:  kelora -e 'let ctx = e.id' -e 'e.context = ctx'     # ERROR: ctx undefined!
   RIGHT:  kelora -e 'let ctx = e.id; e.context = ctx'         # Use semicolons for shared vars
 
-  What persists:   e.field modifications, conf, metrics, window
+  What persists:   e.field modifications, conf, metrics
   What doesn't:    let variables, function definitions (unless from --include)
 
 RESILIENT MODE SNAPSHOTTING:

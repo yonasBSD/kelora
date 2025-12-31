@@ -509,10 +509,10 @@ kelora -f combined access.log --metrics \
 kelora -j db.log --metrics \
   --exec 'track_bottom("fastest", e.query_id, 5, e.cpu_time)'
 
-# Custom calculations with print() for complex output (requires --window)
-kelora -f combined web_access.log --window 1000 --metrics \
-  --exec 'track_unique("users", e.user)' \
-  --end 'let times = window.pluck_as_nums("response_time"); print("p95: " + times.percentile(95))'
+# Custom calculations with print() for complex output (requires --metrics)
+kelora -f combined web_access.log --metrics \
+  --exec 'track_unique("users", e.user); track_stats("response_time", e.response_time)' \
+  --end 'print("p95: " + metrics["response_time_p95"])'
 
 MULTI-FILE PROCESSING:
 # Add source filename to each event
