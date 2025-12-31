@@ -125,7 +125,10 @@ fn custom_grok_definitions() -> Vec<(&'static str, &'static str)> {
         ("KELORA_OAUTH", r"ya29\.[0-9A-Za-z_-]+"),
         ("KELORA_FUNCTION", r"[A-Za-z0-9_.]+\([^)]*\)"),
         ("KELORA_HEXCOLOR", r"#[0-9A-Fa-f]{6}"),
-        ("KELORA_VERSION", r"[vV]?\d+\.\d+(?:\.\d+)?(?:-[A-Za-z0-9]+)?"),
+        (
+            "KELORA_VERSION",
+            r"[vV]?\d+\.\d+(?:\.\d+)?(?:-[A-Za-z0-9]+)?",
+        ),
         ("KELORA_HEXNUM", r"0x[0-9A-Fa-f]+"),
         ("KELORA_DURATION", r"\d+(?:\.\d+)?(?:us|ms|[smhd])"),
         ("KELORA_NUM", r"[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?"),

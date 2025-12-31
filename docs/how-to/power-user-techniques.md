@@ -59,6 +59,9 @@ kelora -j examples/production-errors.jsonl --drain -k message
 
 This emits a ranked list of discovered templates (summary-only, sequential mode).
 
+**Default Drain filters** normalize: ipv4_port, ipv4, ipv6, email, url, fqdn, uuid, mac,
+md5, sha1, sha256, path, oauth, function, hexcolor, version, hexnum, duration, num.
+
 === "Log Data"
 
     ```bash exec="on" result="ansi"
