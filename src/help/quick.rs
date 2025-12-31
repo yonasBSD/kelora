@@ -14,6 +14,7 @@ Quick Examples:
   kelora simple_json.jsonl --filter 'e.service == "database"' --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' -k timestamp,message,duration_s
   kelora simple_json.jsonl --since 2024-01-15T10:01:00Z --until levels warn,error --stats
   kelora audit.jsonl --exec 'track_count(e.action)' --metrics
+  kelora app.jsonl --drain -k message
   kelora payments_latency.jsonl --parallel --filter 'e.duration_ms > 500' -k order_id,duration_ms,status
   tail -f app.log | kelora -j -l error,warn
 
@@ -29,6 +30,7 @@ Common Options:
   -n, --take <N>                Limit output to first N events
   -s, --stats                   Show only the statistics, with discovered fields
   -m, --metrics                 Show only the tracked metrics
+  --drain                       Summarize log templates (requires -k/--keys, sequential only)
 
 Interactive Mode:
   kelora                     Run without arguments to enter interactive mode
