@@ -89,6 +89,7 @@ tdigests = "1.0"  # T-digest algorithm for streaming percentile estimation expos
 url = "2.5"  # URL parsing and manipulation exposed to Rhai scripts
 ipnet = "2.9"  # IP address and network parsing/matching exposed to Rhai scripts
 drain-rs = "0.3.0"
+grok = "1.2"
 
 [dev-dependencies]
 criterion = { version = "0.7", features = ["html_reports"] }  # Benchmarking framework with statistical analysis

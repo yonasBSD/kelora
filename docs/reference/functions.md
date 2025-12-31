@@ -1275,6 +1275,8 @@ let r = drain_template(e.message);
 e.template = r.template;
 ```
 
+Default token filters normalize IPv4/IPv6, UUIDs, and numbers into placeholders.
+
 Optional `options` map keys:
 
 - `depth` (int)

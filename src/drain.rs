@@ -1,4 +1,5 @@
 use drain_rs::DrainTree;
+use grok::Grok;
 use std::cell::RefCell;
 use std::convert::TryFrom;
 
@@ -54,10 +55,13 @@ struct DrainState {
 impl DrainState {
     fn new(config: DrainConfig) -> Self {
         let config = config.sanitized();
+        let mut grok = Grok::with_patterns();
         let tree = DrainTree::new()
             .max_depth(to_u16(config.depth))
             .max_children(to_u16(config.max_children))
-            .min_similarity(config.similarity as f32);
+            .min_similarity(config.similarity as f32)
+            .filter_patterns(default_filter_patterns())
+            .build_patterns(&mut grok);
         Self { config, tree }
     }
 
@@ -97,6 +101,15 @@ impl DrainState {
 
 fn to_u16(value: usize) -> u16 {
     value.min(u16::MAX as usize) as u16
+}
+
+fn default_filter_patterns() -> Vec<&'static str> {
+    vec![
+        "%{IPV4:ip}",
+        "%{IPV6:ip6}",
+        "%{UUID:uuid}",
+        "%{NUMBER:num}",
+    ]
 }
 
 thread_local! {
@@ -176,8 +189,8 @@ mod tests {
             .ingest("failed to connect to 10.0.0.2")
             .expect("second ingest");
 
-        assert_eq!(a.template, "failed to connect to 10.0.0.1");
-        assert_eq!(b.template, "failed to connect to <*>");
+        assert_eq!(a.template, "failed to connect to <ip>");
+        assert_eq!(b.template, "failed to connect to <ip>");
         assert_eq!(b.count, 2);
     }
 
