@@ -113,6 +113,7 @@ nav:
       - Configuration System: concepts/configuration-system.md
   - Reference:
       - Overview: reference/index.md
+      - FAQ: faq.md
       - Glossary: glossary.md
       - Common Errors: reference/common-errors.md
       - CLI Reference: reference/cli-reference.md
