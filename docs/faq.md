@@ -4,7 +4,7 @@ Quick answers to common questions, with pointers to deeper docs.
 
 ## When should I use Kelora instead of grep, awk, or jq?
 
-Use Kelora when logs are messy, you need stateful transforms, or you want to combine parsing, filtering, and analysis in one streaming pipeline. For simple text search use `grep`, and for pure JSON querying use `jq`. The [Quickstart](quickstart.md) shows where Kelora shines.
+Use Kelora when logs are messy, you need stateful transforms, or you want to combine parsing, filtering, and analysis in one streaming pipeline. For simple text search use `grep`, and for pure JSON querying use `jq`. The [Quickstart](quickstart.md) shows where Kelora shines, and [When to Use Kelora vs External Tools](how-to/integrate-external-tools.md#when-to-use-kelora-vs-external-tools) goes deeper.
 
 ## How do I choose the right input format?
 
@@ -46,13 +46,13 @@ Use `-F` to pick an output format, `-q/--quiet` to suppress events, and `-s/--st
 
 Prefer native flags like `--levels` over Rhai filters, prune with `--keep-lines` early, and use `--parallel` for big files. Disable diagnostics with `--silent` or `--no-diagnostics` when you only need output files. See the [Performance Model](concepts/performance-model.md).
 
-## Can I disable emoji output?
+## Can I disable emoji output or colors?
 
-Yes. Use `--no-emoji` to switch to plain text output.
+Yes. Use `--no-emoji` to switch to plain text output and `--no-color` (or the `NO_COLOR` environment variable) to disable colors. See the [CLI Reference](reference/cli-reference.md).
 
-## Can I disable colors?
+## Was Kelora built with AI?
 
-Yes. Use `--no-color`, or set the `NO_COLOR` environment variable. See the [CLI Reference](reference/cli-reference.md).
+Yes. Kelora is an experiment in agentic AI development: AI agents generate the implementation and tests, and human oversight focuses on requirements and validation. See the [Development Approach](index.md#development-approach) and the [Security Policy](https://github.com/dloss/kelora/blob/main/SECURITY.md) before production use.
 
 ## How does configuration precedence work?
 
