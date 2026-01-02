@@ -96,6 +96,9 @@ criterion = { version = "0.7", features = ["html_reports"] }  # Benchmarking fra
 tempfile = "3.8"  # Temporary file/directory creation for integration tests
 proptest = "1.5"  # Property-based testing for fuzzing parser edge cases
 
+[patch.crates-io]
+grok = { path = "vendor/grok" }
+
 [[bench]]
 name = "micro_search"
 path = "benchmarks/bench_micro_search.rs"
