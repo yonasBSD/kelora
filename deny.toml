@@ -94,6 +94,7 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "Zlib",
+    "ISC",
     "Unlicense",
     "CC0-1.0",
     "MPL-2.0",
