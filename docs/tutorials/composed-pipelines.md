@@ -14,10 +14,8 @@ Most production incidents require more than a single command. You need to:
 
 This tutorial shows how to compose these capabilities into complete workflows that answer complex questions.
 
-![Composed Pipeline Overview](../images/composed-pipeline-overview.png#only-light)
-![Composed Pipeline Overview](../images/composed-pipeline-overview-dark.png#only-dark)
-
 ## What You'll Learn
+
 
 - Isolate log sections by time, service, or severity
 - Reconstruct multi-line stack traces and payloads
@@ -28,6 +26,7 @@ This tutorial shows how to compose these capabilities into complete workflows th
 
 ## Prerequisites
 
+
 - [Basics: Input, Display & Filtering](basics.md) - Essential CLI usage
 - [Introduction to Rhai Scripting](intro-to-rhai.md) - Rhai fundamentals
 - [Metrics and Tracking](metrics-and-tracking.md) - Understanding `track_*()` functions
@@ -37,6 +36,7 @@ This tutorial shows how to compose these capabilities into complete workflows th
 ## Sample Data
 
 This tutorial uses:
+
 
 - `examples/multiline_stacktrace.log` - Application logs with stack traces
 - `examples/api_logs.jsonl` - API gateway structured logs
@@ -71,6 +71,7 @@ First, narrow down to the relevant time window:
     ```
 
 **What to look for:**
+
 - Event count in the window
 - Time span confirmation
 - Field availability
@@ -102,6 +103,7 @@ Now parse the format and filter to errors:
     ```
 
 **Pipeline flow:**
+
 1. `--since`/`--until`: Isolate time window
 2. `--exec`: Parse key=value pairs from the line first
 3. `--filter`: Then keep only ERROR level (can access parsed fields)
@@ -172,6 +174,7 @@ Use multiline joining to reconstruct complete stack traces:
     ```
 
 **What's happening:**
+
 - `--multiline`: Lines not matching the timestamp pattern are joined to the previous event
 - `--multiline-join=newline`: Preserves line breaks in the grouped stack trace
 - Stack traces become part of the error event's `line` field with formatting intact
@@ -188,14 +191,13 @@ Parse the timestamp and level from the reconstructed line, then extract error ty
       --multiline 'regex:match=^[0-9]{4}-[0-9]{2}-[0-9]{2}' --multiline-join=newline \
       --filter 'e.line.contains("ERROR")' \
       --exec '
-        // Extract timestamp and level from first line
-        let parts = e.line.substring(0, 25).split(" ");
-        e.timestamp = parts[0] + " " + parts[1];
-        e.level = parts[2];
+        // Extract timestamp/level from the first line only
+        let header = e.line.split("\n")[0];
+        e.timestamp = header.col("0:2"); // date + time
+        e.level = header.col("2");
 
-        // Extract error type from stack trace
-        let lines = e.line.split("\n");
-        e.error_summary = parts.len() > 3 ? parts[3] : "Unknown";
+        // Extract error message from the first line
+        e.error_summary = header.col("3:");
       ' \
       -k timestamp,level,error_summary \
       --take 3
@@ -208,14 +210,13 @@ Parse the timestamp and level from the reconstructed line, then extract error ty
       --multiline 'regex:match=^[0-9]{4}-[0-9]{2}-[0-9]{2}' --multiline-join=newline \
       --filter 'e.line.contains("ERROR")' \
       --exec '
-        // Extract timestamp and level from first line
-        let parts = e.line.substring(0, 25).split(" ");
-        e.timestamp = parts[0] + " " + parts[1];
-        e.level = parts[2];
+        // Extract timestamp/level from the first line only
+        let header = e.line.split("\n")[0];
+        e.timestamp = header.col("0:2"); // date + time
+        e.level = header.col("2");
 
-        // Extract error type from stack trace
-        let lines = e.line.split("\n");
-        e.error_summary = parts.len() > 3 ? parts[3] : "Unknown";
+        // Extract error message from the first line
+        e.error_summary = header.col("3:");
       ' \
       -k timestamp,level,error_summary \
       --take 3
@@ -244,6 +245,7 @@ Use drain to find common error patterns in the reconstructed stack traces:
     ```
 
 **Complete workflow:**
+
 1. Reconstruct multi-line stack traces with preserved line breaks
 2. Filter to ERROR events
 3. Extract error message from reconstructed multiline block
@@ -346,6 +348,7 @@ Now add time-based spans for per-minute summaries:
     ```
 
 **Composed pipeline:**
+
 1. Filter to specific service and level
 2. Track error metrics per event
 3. Group into 1-minute windows
@@ -468,6 +471,7 @@ Add another filter for critical cases and track:
     ```
 
 **Multi-stage approach:**
+
 1. First filter: Identify slow requests (>1s)
 2. First exec: Classify into latency buckets
 3. Second filter: Narrow to critical cases
@@ -538,19 +542,7 @@ This brings together everything we've learned:
       --since "2025-01-15T10:24:00Z" \
       --until "2025-01-15T10:30:00Z" \
       --filter 'e.level == "ERROR" || e.get_path("response_time", 0.0) > 2.0' \
-      --exec '
-        // Classify issue type
-        e.issue_type = if e.level == "ERROR" {
-          "error"
-        } else {
-          "latency"
-        };
-
-        // Track by type and service
-        track_count(e.issue_type);
-        track_top("service_issue", e.service + ":" + e.issue_type, 10);
-        track_stats("response_time", e.get_path("response_time", 0.0));
-      ' \
+      --exec-file examples/incident_workflow_exec.rhai \
       --span 2m \
       --span-close '
         let m = span.metrics;
@@ -570,19 +562,7 @@ This brings together everything we've learned:
       --since "2025-01-15T10:24:00Z" \
       --until "2025-01-15T10:30:00Z" \
       --filter 'e.level == "ERROR" || e.get_path("response_time", 0.0) > 2.0' \
-      --exec '
-        // Classify issue type
-        e.issue_type = if e.level == "ERROR" {
-          "error"
-        } else {
-          "latency"
-        };
-
-        // Track by type and service
-        track_count(e.issue_type);
-        track_top("service_issue", e.service + ":" + e.issue_type, 10);
-        track_stats("response_time", e.get_path("response_time", 0.0));
-      ' \
+      --exec-file examples/incident_workflow_exec.rhai \
       --span 2m \
       --span-close '
         let m = span.metrics;
@@ -596,6 +576,7 @@ This brings together everything we've learned:
     ```
 
 **Complete pipeline stages:**
+
 1. **Isolation**: Time window (--since/--until)
 2. **Filtering**: Errors or slow requests
 3. **Classification**: Compute issue types
@@ -649,6 +630,7 @@ kelora -j examples/api_logs.jsonl \
 ```
 
 **Use cases:**
+
 - Forward events to external systems (Elasticsearch, S3)
 - Save metrics for trending/dashboards
 - Share analysis results with team
@@ -722,6 +704,7 @@ sort -t'"' -k4 unsorted.log | kelora -j --since "2024-01-15T10:00:00Z"
 
 ### Pipeline Design Principles
 
+
 1. **Filter early, transform late**: Reduce data volume as soon as possible
 2. **Use progressive refinement**: Multiple simple filters beat one complex filter
 3. **Safe field access**: Always use `.get_path(field, default)` for optional fields
@@ -767,6 +750,7 @@ kelora app.log \
 
 ### Performance Optimization
 
+
 1. **Filter before expensive operations**: Parsing, transformations, tracking
 2. **Use format-specific options**: `-j` for JSON, `-f logfmt` for key=value
 3. **Leverage parallel mode**: For large files without spans: `--parallel`
@@ -798,38 +782,22 @@ kelora app.log --take 1 -F inspect
 
 ### Reusability
 
-Save common pipelines as shell functions:
-
-```bash
-# In ~/.bashrc or ~/.zshrc
-kelora-errors() {
-  kelora "$@" \
-    --filter 'e.level == "ERROR"' \
-    --exec 'track_count("total"); track_top("service", e.service, 10)' \
-    --metrics
-}
-
-# Usage
-kelora-errors app.log
-```
-
-Or use Kelora's configuration system:
+Use Kelora's alias system for reusable pipelines:
 
 ```ini
 # In .kelora.ini
-[alias.errors]
-filter = e.level == "ERROR"
-exec = track_count("total"); track_top("service", e.service, 10)
-metrics = true
+[aliases]
+errors = --filter 'e.level == "ERROR"' --exec 'track_count("total"); track_top("service", e.service, 10)' --metrics
 ```
 
-Then run: `kelora +errors app.log`
+Then run: `kelora -a errors app.log`
 
 ---
 
 ## Summary
 
 You've learned to compose powerful log analysis pipelines:
+
 
 - ✅ **Section isolation** with time filters and service/level filtering
 - ✅ **Multiline reconstruction** for stack traces and context
@@ -854,12 +822,14 @@ You've learned to compose powerful log analysis pipelines:
 
 Now that you understand pipeline composition, explore advanced topics:
 
+
 - **[Configuration and Reusability](configuration-and-reusability.md)** - Save pipelines as reusable aliases
 - **[How-To: Incident Response Playbooks](../how-to/incident-response-playbooks.md)** - Real-world incident patterns
 - **[How-To: Power-User Techniques](../how-to/power-user-techniques.md)** - Advanced Rhai functions
 - **[Concepts: Pipeline Model](../concepts/pipeline-model.md)** - Deep dive into execution model
 
 **Related guides:**
+
 
 - [Multiline Strategies](../concepts/multiline-strategies.md) - All multiline handling approaches
 - [Script Variables](../reference/script-variables.md) - Complete variable reference

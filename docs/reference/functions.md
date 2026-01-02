@@ -150,28 +150,28 @@ e.middle = e.code.slice("2:5")                        // "ABCDEF" → "CDE"
 ### Column Extraction
 
 #### `text.col(spec [, separator])`
-Extract columns by index/range/list (e.g., '1', '1,3,5', '1:4').
+Extract columns by index/range/list (e.g., '0', '0,2,4', '1:4'). Indices are 0-based.
 
 ```rhai
-e.first = e.line.col("1")                             // First column (1-indexed)
-e.cols = e.line.col("1,3,5")                          // Columns 1, 3, 5
-e.range = e.line.col("2:5", "\t")                     // Columns 2-5, tab-separated
+e.first = e.line.col("0")                             // First column (0-indexed)
+e.cols = e.line.col("0,2,4")                          // Columns 0, 2, 4
+e.range = e.line.col("1:4", "\t")                     // Columns 1-3, tab-separated
 ```
 
 #### `text.cols(col1, col2 [, col3, ...] [, separator])`
-Extract multiple columns as an array. Supports up to 6 column indices (1-indexed). Returns an array of column values.
+Extract multiple columns as an array. Supports up to 6 column indices (0-indexed). Returns an array of column values.
 
 ```rhai
-// Extract columns 1, 3, 5 as array
-let values = e.line.cols(1, 3, 5)                     // ["value1", "value3", "value5"]
+// Extract columns 0, 2, 4 as array
+let values = e.line.cols(0, 2, 4)                     // ["value0", "value2", "value4"]
 e.user = values[0]
 e.action = values[1]
 
 // With custom separator
-let data = e.line.cols(2, 4, "\t")                    // Tab-separated columns
+let data = e.line.cols(1, 3, "\t")                    // Tab-separated columns
 
 // Practical example: Apache log parsing
-let parts = e.log.cols(1, 4, 7, 9)                    // IP, timestamp, path, status
+let parts = e.log.cols(0, 3, 6, 8)                    // IP, timestamp, path, status
 e.ip = parts[0]
 e.timestamp = parts[1]
 e.path = parts[2]
