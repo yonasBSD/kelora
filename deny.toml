@@ -94,12 +94,12 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "Zlib",
-    "ISC",
     "Unlicense",
     "CC0-1.0",
     "MPL-2.0",
     "Unicode-3.0",
     "BSL-1.0",  # Boost Software License (used by xxhash-rust, compatible with MIT)
+#    "ISC",  # not used currently
 ]
 # The confidence threshold for detecting a license from license text.
 # The higher the value, the more closely the license text must be to the
