@@ -103,3 +103,8 @@ grok = { path = "vendor/grok" }
 name = "micro_search"
 path = "benchmarks/bench_micro_search.rs"
 harness = false
+
+[[bench]]
+name = "rhai_startup"
+path = "benchmarks/bench_rhai_startup.rs"
+harness = false
