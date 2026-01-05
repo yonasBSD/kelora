@@ -1,4 +1,5 @@
 .vscode
+.claude/
 target/
 .cargo/
 .cargo-deny/
