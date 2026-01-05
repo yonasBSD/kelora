@@ -4,6 +4,21 @@ All notable changes to Kelora will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.2] - 2026-01-05
+
+### Added
+
+- New drain output modes: `--drain=full` (line ranges, samples, template IDs) and `--drain=json` for automation
+- Stable, versioned drain template IDs (`v1:` prefix) with whitespace normalization for long-term comparisons
+- Regex-named aliases for Rhai helpers (`extract_regex`, `extract_regexes`, `extract_regex_maps`, `split_regex`, `replace_regex`)
+- Linux ARM64/ARM32 release builds added to CI
+
+### Changed
+
+- `--drain` now defaults to a clean count+template table; details are opt-in via `--drain=full`
+- Filter evaluation now avoids unused `meta/conf/line` scope variables and runs string method predicates natively
+- Single-field error messages now hint to use `-s` for available keys
+
 ## [1.3.1] - 2026-01-03
 
 ### Fixed
