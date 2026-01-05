@@ -67,6 +67,16 @@ kelora -j examples/app_monitoring.jsonl --drain=id -k message
 kelora -j examples/app_monitoring.jsonl --drain=json -k message
 ```
 
+If your data has org-specific IDs that fragment templates, pre-normalize the field before Drain:
+
+```bash
+kelora -j examples/app_monitoring.jsonl \
+  --exec 'e.message = e.message.replace_re("Cache (hit|miss) for key [^ ]+", "Cache $1 for key <cache_key>")' \
+  --drain -k message
+```
+
+`replace_re` supports `$1`, `$2`, ... capture groups from the regex.
+
 **Output formats:**
 
 - `--drain` or `--drain=table` - Clean list: count + template
