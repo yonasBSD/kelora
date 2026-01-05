@@ -60,6 +60,9 @@ kelora -j examples/app_monitoring.jsonl --drain -k message
 # With line numbers and samples for each pattern
 kelora -j examples/app_monitoring.jsonl --drain=full -k message
 
+# Stable ID list for diffs
+kelora -j examples/app_monitoring.jsonl --drain=id -k message
+
 # Export as JSON for further analysis
 kelora -j examples/app_monitoring.jsonl --drain=json -k message
 ```
@@ -67,7 +70,8 @@ kelora -j examples/app_monitoring.jsonl --drain=json -k message
 **Output formats:**
 
 - `--drain` or `--drain=table` - Clean list: count + template
-- `--drain=full` - Adds line ranges and sample messages
+- `--drain=full` - Adds line ranges, template IDs, and sample messages
+- `--drain=id` - Stable output: template_id + template (sorted by ID)
 - `--drain=json` - Complete metadata for programmatic use
 
 **Example output (table format):**
@@ -81,6 +85,7 @@ templates (18 items):
 **Full format adds context:**
 ```
   6: Connection timeout to database host <fqdn>
+     id: v1:5f3c7a9b1d2e4f6a
      lines: 1-36
      sample: "Connection timeout to database host db-primary-01.prod.internal:5432"
 ```

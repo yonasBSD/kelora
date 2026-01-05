@@ -994,7 +994,8 @@ Sequential mode only (not supported with `--parallel`).
 **Formats:**
 
 - `table` (default) - Clean output: count + template
-- `full` - Adds line ranges and sample messages
+- `full` - Adds line ranges, template IDs, and sample messages
+- `id` - Stable output: template_id + template (sorted by ID)
 - `json` - Complete metadata for programmatic use
 
 Default token filters normalize: ipv4_port, ipv4, ipv6, email, url, fqdn, uuid, mac,
@@ -1007,6 +1008,9 @@ kelora -j app.log --drain -k message
 
 # With line numbers and samples
 kelora -j app.log --drain=full -k message
+
+# Stable ID list for diffs
+kelora -j app.log --drain=id -k message
 
 # JSON output
 kelora -j app.log --drain=json -k message
