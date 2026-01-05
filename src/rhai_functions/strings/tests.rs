@@ -1846,6 +1846,14 @@ fn test_extract_re_maps_function() {
         .unwrap();
     assert_eq!(result.len(), 2);
 
+    let alias_result: rhai::Array = engine
+        .eval_with_scope(
+            &mut scope,
+            r##"text.extract_regex_maps("\\w+@\\w+\\.\\w+", "email")"##,
+        )
+        .unwrap();
+    assert_eq!(alias_result.len(), 2);
+
     // Check first email map
     let first_map = result[0].clone().try_cast::<Map>().unwrap();
     assert_eq!(
@@ -1986,6 +1994,11 @@ fn test_split_re_function() {
     assert_eq!(result[2].clone().into_string().unwrap(), "three");
     assert_eq!(result[3].clone().into_string().unwrap(), "four");
 
+    let alias_result: rhai::Array = engine
+        .eval_with_scope(&mut scope, r##"text.split_regex("[,;:]")"##)
+        .unwrap();
+    assert_eq!(alias_result.len(), 4);
+
     // Split by whitespace
     scope.push("spaced", "hello    world\ttab\nnewline");
     let result: rhai::Array = engine
@@ -2019,6 +2032,11 @@ fn test_replace_re_function() {
         .eval_with_scope(&mut scope, r##"text.replace_re("\\d{4}", "YEAR")"##)
         .unwrap();
     assert_eq!(result, "The year YEAR and YEAR are here");
+
+    let alias_result: String = engine
+        .eval_with_scope(&mut scope, r##"text.replace_regex("\\d{4}", "YEAR")"##)
+        .unwrap();
+    assert_eq!(alias_result, "The year YEAR and YEAR are here");
 
     // Replace with capture groups
     scope.push("emails", "Contact alice@example.com or bob@test.org");

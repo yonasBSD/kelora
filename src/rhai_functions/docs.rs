@@ -34,7 +34,8 @@ text.extract_ip([nth])               Extract IP address from text (nth: 1=first,
 text.extract_ips()                   Extract all IP addresses as array
 text.extract_json([nth])             Extract JSON object/array from text (nth: 0=first, 1=second, etc.)
 text.extract_jsons()                 Extract all JSON objects/arrays from text as array of strings
-text.extract_re_maps(pattern, field) Extract regex matches as array of maps for fan-out
+text.extract_regex_maps(pattern, field) Extract regex matches as array of maps for fan-out
+text.extract_re_maps(pattern, field)    Deprecated alias for extract_regex_maps
 text.extract_regex(pattern [,group])    Extract regex match or capture group
 text.extract_url([nth])              Extract URL from text (nth: 1=first, -1=last)
 text.matches(pattern)                Regex search (cached; invalid pattern raises error)
@@ -68,9 +69,12 @@ text.parse_url()                     Parse URL into structured components
 text.parse_user_agent()              Parse common user-agent strings into components
 text.rclip()                         Remove trailing non-alphanumeric characters (right side only)
 text.replace(pattern, replacement)   Replace all occurrences of pattern (builtin)
+text.replace_regex(pattern, replacement) Replace all regex matches
+text.replace_re(pattern, replacement)    Deprecated alias for replace_regex
 text.rstrip([chars])                 Remove trailing whitespace or specified characters
 text.slice(spec)                     Slice text using Python notation (e.g., "1:5", ":3", "-2:")
-text.split_re(pattern)               Split text by regex pattern
+text.split_regex(pattern)            Split text by regex pattern
+text.split_re(pattern)               Deprecated alias for split_regex
 text.split(separator)                Split string into array by delimiter (builtin)
 text.starting_with(prefix [,nth])    Return substring from prefix to end (nth: 1=first, -1=last)
 text.strip([chars])                  Remove whitespace or specified characters

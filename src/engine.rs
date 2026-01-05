@@ -532,7 +532,7 @@ impl ErrorEnhancer {
                     .to_string(),
             ),
             name if name.ends_with("_re") => Some(
-                "Regex functions: extract_regex(), extract_regexes(), split_re(), replace_re()"
+                "Regex functions: extract_regex(), extract_regexes(), extract_regex_maps(), split_regex(), replace_regex()"
                     .to_string(),
             ),
             _ => None,
@@ -1911,8 +1911,11 @@ impl RhaiEngine {
         match func_name {
             "extract_regex" => "string, regex_pattern, optional_group_index".to_string(),
             "extract_regexes" => "string, regex_pattern, optional_group_index".to_string(),
-            "split_re" => "string, regex_pattern".to_string(),
-            "replace_re" => "string, regex_pattern, replacement".to_string(),
+            "extract_regex_maps" | "extract_re_maps" => {
+                "string, regex_pattern, field".to_string()
+            }
+            "split_regex" | "split_re" => "string, regex_pattern".to_string(),
+            "replace_regex" | "replace_re" => "string, regex_pattern, replacement".to_string(),
             "before" | "after" => "string, delimiter".to_string(),
             "between" => "string, start_delimiter, end_delimiter".to_string(),
             "starting_with" | "ending_with" => "string, prefix_or_suffix".to_string(),
@@ -1958,7 +1961,11 @@ impl RhaiEngine {
             // Our custom string functions
             "extract_regex".to_string(),
             "extract_regexes".to_string(),
+            "extract_regex_maps".to_string(),
+            "extract_re_maps".to_string(),
+            "split_regex".to_string(),
             "split_re".to_string(),
+            "replace_regex".to_string(),
             "replace_re".to_string(),
             "count".to_string(),
             "strip".to_string(),
