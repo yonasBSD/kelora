@@ -125,8 +125,17 @@ kelora examples/api_latency_incident.jsonl \
 Use drain to find common error patterns:
 
 ```bash
+# Clean pattern list
 kelora app.jsonl --filter 'e.level == "ERROR"' --drain -k message
+
+# With line numbers and samples for context
+kelora app.jsonl --filter 'e.level == "ERROR"' --drain=full -k message
 ```
+
+**Output formats:**
+- `--drain` - Clean list showing counts and patterns
+- `--drain=full` - Adds line ranges and sample messages for each pattern
+- `--drain=json` - Export for further analysis
 
 **What to look for:**
 - Template #1 with high count = root cause candidate

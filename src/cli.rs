@@ -64,6 +64,7 @@ pub enum StatsFormat {
 pub enum DrainFormat {
     #[default]
     Table,
+    Full,
     Json,
 }
 
@@ -604,7 +605,7 @@ pub struct Cli {
         num_args = 0..=1,
         default_missing_value = "table",
         help_heading = "Metrics and Stats",
-        help = "Summarize log templates using Drain (summary-only; requires --keys with exactly one field; sequential mode only).\n\nFormats: table (default), json\n\nExamples:\n  --drain          Default table format\n  --drain=json     JSON output for scripting"
+        help = "Summarize log templates using Drain (summary-only; requires --keys with exactly one field; sequential mode only).\n\nFormats:\n  table (default)  Clean output: count + template\n  full             Detailed: adds line ranges + sample\n  json             JSON with all metadata\n\nExamples:\n  --drain          Clean table (count + template)\n  --drain=full     With line numbers and samples\n  --drain=json     JSON output for scripting"
     )]
     pub drain: Option<DrainFormat>,
 

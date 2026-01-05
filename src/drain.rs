@@ -309,8 +309,13 @@ pub fn drain_templates() -> Vec<DrainTemplate> {
 }
 
 /// Format templates for table output
-/// When verbose > 0, includes sample lines for each template
-pub fn format_templates_output(templates: &[DrainTemplate], verbose: u8) -> String {
+/// Format determines output detail level:
+/// - Table: clean output with count + template only
+/// - Full: adds indented line ranges and samples below each template
+pub fn format_templates_output(
+    templates: &[DrainTemplate],
+    format: crate::cli::DrainFormat,
+) -> String {
     if templates.is_empty() {
         return "No templates found".to_string();
     }
@@ -326,33 +331,33 @@ pub fn format_templates_output(templates: &[DrainTemplate], verbose: u8) -> Stri
         .unwrap_or(1);
 
     for template in templates {
-        // Format line range if available
-        let line_info = match (template.first_line, template.last_line) {
-            (Some(first), Some(last)) if first == last => format!(" L{}", first),
-            (Some(first), Some(last)) => format!(" L{}-{}", first, last),
-            (Some(first), None) => format!(" L{}", first),
-            (None, Some(last)) => format!(" L{}", last),
-            (None, None) => String::new(),
-        };
-
+        // Table format: just count + template (clean)
         output.push_str(&format!(
-            "  {:>width$}: [{}]{} {}\n",
+            "  {:>width$}: {}\n",
             template.count,
-            template.template_id,
-            line_info,
             template.template,
             width = max_count_width
         ));
 
-        // Add sample on next line when verbose
-        if verbose > 0 && !template.sample.is_empty() {
-            let sample = truncate_sample(&template.sample, 80);
-            output.push_str(&format!(
-                "  {:>width$}  e.g. \"{}\"\n",
-                "",
-                sample,
-                width = max_count_width
-            ));
+        // Full format: add metadata on indented lines below
+        if matches!(format, crate::cli::DrainFormat::Full) {
+            // Add line range
+            let line_range = match (template.first_line, template.last_line) {
+                (Some(first), Some(last)) if first == last => format!("{}", first),
+                (Some(first), Some(last)) => format!("{}-{}", first, last),
+                (Some(first), None) => format!("{}", first),
+                (None, Some(last)) => format!("{}", last),
+                (None, None) => String::new(),
+            };
+            if !line_range.is_empty() {
+                output.push_str(&format!("     lines: {}\n", line_range));
+            }
+
+            // Add sample
+            if !template.sample.is_empty() {
+                let sample = truncate_sample(&template.sample, 80);
+                output.push_str(&format!("     sample: \"{}\"\n", sample));
+            }
         }
     }
 
@@ -487,7 +492,7 @@ mod tests {
     }
 
     #[test]
-    fn formats_templates_output_default() {
+    fn formats_templates_output_table() {
         let template1_id = generate_template_id("a <*> b");
         let template2_id = generate_template_id("x y z");
         let templates = vec![
@@ -508,17 +513,19 @@ mod tests {
                 last_line: Some(50),
             },
         ];
-        // Default (verbose=0): no samples shown
-        let output = format_templates_output(&templates, 0);
+        // Table format: clean output, no IDs, no line numbers, no samples
+        let output = format_templates_output(&templates, crate::cli::DrainFormat::Table);
         assert!(output.starts_with("templates (2 items):"));
-        assert!(output.contains(&format!("[{}]", template1_id)));
-        assert!(output.contains("L1-100")); // Line range for first template
-        assert!(output.contains("L50")); // Single line for second template
-        assert!(!output.contains("e.g.")); // No samples in default mode
+        assert!(output.contains("a <*> b"));
+        assert!(output.contains("x y z"));
+        assert!(!output.contains(&template1_id)); // No IDs in table format
+        assert!(!output.contains(&template2_id));
+        assert!(!output.contains("lines:")); // No line numbers
+        assert!(!output.contains("sample:")); // No samples
     }
 
     #[test]
-    fn formats_templates_output_verbose() {
+    fn formats_templates_output_full() {
         let template1_id = generate_template_id("a <*> b");
         let templates = vec![DrainTemplate {
             template: "a <*> b".to_string(),
@@ -528,9 +535,12 @@ mod tests {
             first_line: Some(1),
             last_line: Some(100),
         }];
-        // Verbose mode: samples shown
-        let output = format_templates_output(&templates, 1);
-        assert!(output.contains("e.g. \"a 123 b\""));
+        // Full format: adds line ranges and samples
+        let output = format_templates_output(&templates, crate::cli::DrainFormat::Full);
+        assert!(output.contains("a <*> b"));
+        assert!(output.contains("lines: 1-100"));
+        assert!(output.contains("sample: \"a 123 b\""));
+        assert!(!output.contains(&template1_id)); // Still no IDs in full format
     }
 
     #[test]

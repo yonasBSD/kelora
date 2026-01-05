@@ -605,12 +605,12 @@ fn handle_pipeline_success(
         }
     }
 
-    if let Some(ref drain_format) = config.output.drain {
+    if let Some(drain_format) = config.output.drain.clone() {
         if terminal_allowed && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
             let templates = crate::drain::drain_templates();
             let output = match drain_format {
-                crate::cli::DrainFormat::Table => {
-                    crate::drain::format_templates_output(&templates, config.processing.verbose)
+                crate::cli::DrainFormat::Table | crate::cli::DrainFormat::Full => {
+                    crate::drain::format_templates_output(&templates, drain_format)
                 }
                 crate::cli::DrainFormat::Json => crate::drain::format_templates_json(&templates),
             };

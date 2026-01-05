@@ -54,10 +54,36 @@ kelora -j examples/production-errors.jsonl \
 When you want automatic template discovery without maintaining normalization patterns, use the Drain summary:
 
 ```bash
-kelora -j examples/production-errors.jsonl --drain -k message
+# Clean pattern discovery (default)
+kelora -j examples/app_monitoring.jsonl --drain -k message
+
+# With line numbers and samples for each pattern
+kelora -j examples/app_monitoring.jsonl --drain=full -k message
+
+# Export as JSON for further analysis
+kelora -j examples/app_monitoring.jsonl --drain=json -k message
 ```
 
-This emits a ranked list of discovered templates (summary-only, sequential mode).
+**Output formats:**
+
+- `--drain` or `--drain=table` - Clean list: count + template
+- `--drain=full` - Adds line ranges and sample messages
+- `--drain=json` - Complete metadata for programmatic use
+
+**Example output (table format):**
+```
+templates (18 items):
+  6: Connection timeout to database host <fqdn>
+  4: GET <path> completed in <duration> with status <num>
+  3: Cache hit for key <num>
+```
+
+**Full format adds context:**
+```
+  6: Connection timeout to database host <fqdn>
+     lines: 1-36
+     sample: "Connection timeout to database host db-primary-01.prod.internal:5432"
+```
 
 **Default Drain filters** normalize: ipv4_port, ipv4, ipv6, email, url, fqdn, uuid, mac,
 md5, sha1, sha256, path, oauth, function, hexcolor, version, hexnum, duration,

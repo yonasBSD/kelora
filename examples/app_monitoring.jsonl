@@ -1,0 +1,41 @@
+{"timestamp":"2025-01-15T10:00:01Z","level":"ERROR","service":"database","message":"Connection timeout to database host db-primary-01.prod.internal:5432","connection_id":"conn-1a2b3c","retry_count":3}
+{"timestamp":"2025-01-15T10:00:15Z","level":"INFO","service":"cache","message":"Cache hit for key user:1523:profile","latency_ms":2.1}
+{"timestamp":"2025-01-15T10:00:23Z","level":"WARN","service":"auth","message":"Failed login attempt for user alice from 192.168.1.45","attempt_count":1}
+{"timestamp":"2025-01-15T10:00:34Z","level":"ERROR","service":"database","message":"Connection timeout to database host db-primary-01.prod.internal:5432","connection_id":"conn-4d5e6f","retry_count":3}
+{"timestamp":"2025-01-15T10:00:47Z","level":"INFO","service":"cache","message":"Cache miss for key product:8734:details","latency_ms":15.3}
+{"timestamp":"2025-01-15T10:01:02Z","level":"INFO","service":"api","message":"GET /api/v1/users/1523 completed in 45ms with status 200","request_id":"req-9a8b7c"}
+{"timestamp":"2025-01-15T10:01:18Z","level":"WARN","service":"auth","message":"Failed login attempt for user bob from 10.0.5.123","attempt_count":2}
+{"timestamp":"2025-01-15T10:01:29Z","level":"ERROR","service":"payment","message":"Payment gateway returned error code 503: Service Unavailable","transaction_id":"txn-abc123","amount":49.99}
+{"timestamp":"2025-01-15T10:01:41Z","level":"INFO","service":"cache","message":"Cache hit for key session:a1b2c3d4:data","latency_ms":1.8}
+{"timestamp":"2025-01-15T10:01:55Z","level":"ERROR","service":"database","message":"Connection timeout to database host db-replica-02.prod.internal:5432","connection_id":"conn-7g8h9i","retry_count":2}
+{"timestamp":"2025-01-15T10:02:08Z","level":"INFO","service":"api","message":"POST /api/v1/orders completed in 234ms with status 201","request_id":"req-1x2y3z"}
+{"timestamp":"2025-01-15T10:02:22Z","level":"WARN","service":"ratelimit","message":"Rate limit exceeded for API key sk_live_a1b2c3 on endpoint /api/v1/search","limit":1000,"window":"1h"}
+{"timestamp":"2025-01-15T10:02:35Z","level":"INFO","service":"cache","message":"Cache miss for key user:8921:preferences","latency_ms":12.7}
+{"timestamp":"2025-01-15T10:02:49Z","level":"ERROR","service":"storage","message":"Failed to upload file invoice-2025-01.pdf to S3 bucket prod-documents: timeout after 30s","file_size":"2.3MB"}
+{"timestamp":"2025-01-15T10:03:03Z","level":"INFO","service":"api","message":"GET /api/v1/products/8734 completed in 67ms with status 200","request_id":"req-4a5b6c"}
+{"timestamp":"2025-01-15T10:03:17Z","level":"WARN","service":"auth","message":"Failed login attempt for user alice from 192.168.1.45","attempt_count":2}
+{"timestamp":"2025-01-15T10:03:30Z","level":"ERROR","service":"payment","message":"Payment gateway returned error code 429: Too Many Requests","transaction_id":"txn-def456","amount":125.50}
+{"timestamp":"2025-01-15T10:03:44Z","level":"INFO","service":"cache","message":"Cache hit for key config:feature-flags:production","latency_ms":3.2}
+{"timestamp":"2025-01-15T10:03:58Z","level":"ERROR","service":"database","message":"Connection timeout to database host db-primary-01.prod.internal:5432","connection_id":"conn-0j1k2l","retry_count":3}
+{"timestamp":"2025-01-15T10:04:12Z","level":"WARN","service":"ratelimit","message":"Rate limit exceeded for API key sk_test_x9y8z7 on endpoint /api/v1/users","limit":500,"window":"1h"}
+{"timestamp":"2025-01-15T10:04:26Z","level":"INFO","service":"api","message":"DELETE /api/v1/sessions/a1b2c3d4 completed in 12ms with status 204","request_id":"req-7d8e9f"}
+{"timestamp":"2025-01-15T10:04:40Z","level":"ERROR","service":"storage","message":"Failed to upload file receipt-2025-15.pdf to S3 bucket prod-documents: timeout after 30s","file_size":"1.8MB"}
+{"timestamp":"2025-01-15T10:04:54Z","level":"INFO","service":"cache","message":"Cache miss for key analytics:daily:2025-01-15","latency_ms":8.9}
+{"timestamp":"2025-01-15T10:05:08Z","level":"WARN","service":"auth","message":"Failed login attempt for user charlie from 172.16.88.77","attempt_count":1}
+{"timestamp":"2025-01-15T10:05:22Z","level":"ERROR","service":"payment","message":"Payment gateway returned error code 503: Service Unavailable","transaction_id":"txn-ghi789","amount":299.00}
+{"timestamp":"2025-01-15T10:05:36Z","level":"INFO","service":"api","message":"PUT /api/v1/users/1523/profile completed in 89ms with status 200","request_id":"req-0g1h2i"}
+{"timestamp":"2025-01-15T10:05:50Z","level":"ERROR","service":"database","message":"Connection timeout to database host db-replica-02.prod.internal:5432","connection_id":"conn-3j4k5l","retry_count":1}
+{"timestamp":"2025-01-15T10:06:04Z","level":"INFO","service":"cache","message":"Cache hit for key user:1523:profile","latency_ms":2.3}
+{"timestamp":"2025-01-15T10:06:18Z","level":"WARN","service":"ratelimit","message":"Rate limit exceeded for API key sk_live_a1b2c3 on endpoint /api/v1/search","limit":1000,"window":"1h"}
+{"timestamp":"2025-01-15T10:06:32Z","level":"ERROR","service":"storage","message":"Failed to upload file report-q4-2024.pdf to S3 bucket prod-documents: timeout after 30s","file_size":"5.1MB"}
+{"timestamp":"2025-01-15T10:06:46Z","level":"INFO","service":"api","message":"GET /api/v1/analytics/dashboard completed in 156ms with status 200","request_id":"req-6m7n8o"}
+{"timestamp":"2025-01-15T10:07:00Z","level":"WARN","service":"auth","message":"Failed login attempt for user alice from 192.168.1.45","attempt_count":3}
+{"timestamp":"2025-01-15T10:07:14Z","level":"INFO","service":"cache","message":"Cache miss for key search:results:electronics","latency_ms":11.4}
+{"timestamp":"2025-01-15T10:07:28Z","level":"ERROR","service":"payment","message":"Payment gateway returned error code 401: Unauthorized","transaction_id":"txn-jkl012","amount":75.25}
+{"timestamp":"2025-01-15T10:07:42Z","level":"INFO","service":"api","message":"POST /api/v1/reviews completed in 78ms with status 201","request_id":"req-9p0q1r"}
+{"timestamp":"2025-01-15T10:07:56Z","level":"ERROR","service":"database","message":"Connection timeout to database host db-primary-01.prod.internal:5432","connection_id":"conn-2s3t4u","retry_count":3}
+{"timestamp":"2025-01-15T10:08:10Z","level":"INFO","service":"cache","message":"Cache hit for key product:8734:details","latency_ms":2.7}
+{"timestamp":"2025-01-15T10:08:24Z","level":"WARN","service":"ratelimit","message":"Rate limit exceeded for API key sk_test_x9y8z7 on endpoint /api/v1/users","limit":500,"window":"1h"}
+{"timestamp":"2025-01-15T10:08:38Z","level":"ERROR","service":"storage","message":"Failed to upload file backup-db.tar.gz to S3 bucket prod-documents: timeout after 30s","file_size":"45.7MB"}
+{"timestamp":"2025-01-15T10:08:52Z","level":"INFO","service":"api","message":"GET /api/v1/orders/ord-123456 completed in 92ms with status 200","request_id":"req-5v6w7x"}
+{"timestamp":"2025-01-15T10:09:06Z","level":"WARN","service":"auth","message":"Failed login attempt for user david from 203.0.113.88","attempt_count":1}

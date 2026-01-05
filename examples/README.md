@@ -25,6 +25,40 @@ kelora --include examples/helpers.rhai examples/api_logs.jsonl \
 
 Then run `kelora --help-examples` for common patterns and usage recipes.
 
+## Pattern Discovery with Drain
+
+Automatically discover log message templates using the `--drain` flag:
+
+```bash
+# Find common patterns (clean output)
+kelora examples/app_monitoring.jsonl --drain -k message
+
+# Show line numbers and samples for each pattern
+kelora examples/app_monitoring.jsonl --drain=full -k message
+
+# Export as JSON for analysis
+kelora examples/app_monitoring.jsonl --drain=json -k message
+```
+
+**Example output:**
+```
+templates (18 items):
+  6: Connection timeout to database host <fqdn>
+  6: Failed login attempt for user alice from <ipv4>
+  4: GET <path> completed in <duration> with status <num>
+  4: Rate limit exceeded for API key <num> on endpoint <path>
+  ...
+```
+
+The `--drain=full` format adds context:
+```
+  6: Connection timeout to database host <fqdn>
+     lines: 1-36
+     sample: "Connection timeout to database host db-primary-01.prod.internal:5432"
+```
+
+Use drain to quickly understand log patterns before writing filters or building dashboards.
+
 ## Filter Patterns (Boolean Logic)
 
 ```bash
@@ -109,6 +143,7 @@ See `kelora --help-multiline` for detailed multiline strategies.
 Production-like log files for testing realistic use cases:
 
 - `api_logs.jsonl` - API gateway requests with nested metadata
+- `app_monitoring.jsonl` - Application monitoring logs with repeated patterns (great for `--drain`)
 - `web_access.log` - Web server access logs
 - `security_audit.jsonl` - Security audit events
 - `k8s_security.jsonl` - Kubernetes security logs

@@ -986,17 +986,30 @@ Persist metrics map to disk as JSON.
 kelora -j --exec 'track_count(e.service)' --metrics-file metrics.json app.log
 ```
 
-#### `--drain`
+#### `--drain[=FORMAT]`
 
 Summarize log templates using Drain (summary-only). Requires `--keys` with exactly one field.
 Sequential mode only (not supported with `--parallel`).
+
+**Formats:**
+
+- `table` (default) - Clean output: count + template
+- `full` - Adds line ranges and sample messages
+- `json` - Complete metadata for programmatic use
+
 Default token filters normalize: ipv4_port, ipv4, ipv6, email, url, fqdn, uuid, mac,
 md5, sha1, sha256, path, oauth, function, hexcolor, version, hexnum, duration,
 timestamp, date, time, num.
 
 ```bash
+# Default table format
 kelora -j app.log --drain -k message
-kelora -f line app.log --drain -k line
+
+# With line numbers and samples
+kelora -j app.log --drain=full -k message
+
+# JSON output
+kelora -j app.log --drain=json -k message
 ```
 
 ## Configuration Options
