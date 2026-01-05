@@ -609,7 +609,9 @@ fn handle_pipeline_success(
         if terminal_allowed && !SHOULD_TERMINATE.load(Ordering::Relaxed) {
             let templates = crate::drain::drain_templates();
             let output = match drain_format {
-                crate::cli::DrainFormat::Table | crate::cli::DrainFormat::Full => {
+                crate::cli::DrainFormat::Table
+                | crate::cli::DrainFormat::Full
+                | crate::cli::DrainFormat::Id => {
                     crate::drain::format_templates_output(&templates, drain_format)
                 }
                 crate::cli::DrainFormat::Json => crate::drain::format_templates_json(&templates),

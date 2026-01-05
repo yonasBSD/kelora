@@ -33,8 +33,11 @@ Automatically discover log message templates using the `--drain` flag:
 # Find common patterns (clean output)
 kelora examples/app_monitoring.jsonl --drain -k message
 
-# Show line numbers and samples for each pattern
+# Show line numbers, samples, and IDs for each pattern
 kelora examples/app_monitoring.jsonl --drain=full -k message
+
+# Show stable ID list for diffs
+kelora examples/app_monitoring.jsonl --drain=id -k message
 
 # Export as JSON for analysis
 kelora examples/app_monitoring.jsonl --drain=json -k message
@@ -53,6 +56,7 @@ templates (18 items):
 The `--drain=full` format adds context:
 ```
   6: Connection timeout to database host <fqdn>
+     id: v1:5f3c7a9b1d2e4f6a
      lines: 1-36
      sample: "Connection timeout to database host db-primary-01.prod.internal:5432"
 ```

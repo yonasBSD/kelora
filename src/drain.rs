@@ -320,6 +320,10 @@ pub fn format_templates_output(
         return "No templates found".to_string();
     }
 
+    if matches!(format, crate::cli::DrainFormat::Id) {
+        return format_templates_id_output(templates);
+    }
+
     let mut output = String::new();
     output.push_str(&format!("templates ({} items):\n", templates.len()));
 
@@ -341,16 +345,9 @@ pub fn format_templates_output(
 
         // Full format: add metadata on indented lines below
         if matches!(format, crate::cli::DrainFormat::Full) {
-            // Add line range
-            let line_range = match (template.first_line, template.last_line) {
-                (Some(first), Some(last)) if first == last => format!("{}", first),
-                (Some(first), Some(last)) => format!("{}-{}", first, last),
-                (Some(first), None) => format!("{}", first),
-                (None, Some(last)) => format!("{}", last),
-                (None, None) => String::new(),
-            };
-            if !line_range.is_empty() {
-                output.push_str(&format!("     lines: {}\n", line_range));
+            output.push_str(&format!("     id: {}\n", template.template_id));
+            if let Some(line_summary) = format_line_summary(template.first_line, template.last_line) {
+                output.push_str(&format!("     {}\n", line_summary));
             }
 
             // Add sample
@@ -358,6 +355,8 @@ pub fn format_templates_output(
                 let sample = truncate_sample(&template.sample, 80);
                 output.push_str(&format!("     sample: \"{}\"\n", sample));
             }
+
+            output.push('\n');
         }
     }
 
@@ -395,6 +394,27 @@ fn truncate_sample(s: &str, max_len: usize) -> String {
     } else {
         format!("{}...", &s[..max_len.saturating_sub(3)])
     }
+}
+
+fn format_line_summary(first: Option<usize>, last: Option<usize>) -> Option<String> {
+    match (first, last) {
+        (Some(start), Some(end)) if start == end => Some(format!("line: {}", start)),
+        (Some(start), Some(end)) => Some(format!("lines: {}-{}", start, end)),
+        (Some(start), None) => Some(format!("line: {}", start)),
+        (None, Some(end)) => Some(format!("last line: {}", end)),
+        (None, None) => None,
+    }
+}
+
+fn format_templates_id_output(templates: &[DrainTemplate]) -> String {
+    let mut sorted: Vec<&DrainTemplate> = templates.iter().collect();
+    sorted.sort_by(|a, b| a.template_id.cmp(&b.template_id));
+
+    let mut output = String::new();
+    for template in sorted {
+        output.push_str(&format!("{}: {}\n", template.template_id, template.template));
+    }
+    output.trim_end().to_string()
 }
 
 #[cfg(test)]
@@ -538,9 +558,40 @@ mod tests {
         // Full format: adds line ranges and samples
         let output = format_templates_output(&templates, crate::cli::DrainFormat::Full);
         assert!(output.contains("a <*> b"));
+        assert!(output.contains(&format!("id: {}", template1_id)));
         assert!(output.contains("lines: 1-100"));
         assert!(output.contains("sample: \"a 123 b\""));
-        assert!(!output.contains(&template1_id)); // Still no IDs in full format
+    }
+
+    #[test]
+    fn formats_templates_output_id() {
+        let template1_id = generate_template_id("a <*> b");
+        let template2_id = generate_template_id("x y z");
+        let templates = vec![
+            DrainTemplate {
+                template: "a <*> b".to_string(),
+                template_id: template1_id.clone(),
+                count: 3,
+                sample: "a 123 b".to_string(),
+                first_line: Some(1),
+                last_line: Some(100),
+            },
+            DrainTemplate {
+                template: "x y z".to_string(),
+                template_id: template2_id.clone(),
+                count: 1,
+                sample: "x y z".to_string(),
+                first_line: Some(50),
+                last_line: Some(50),
+            },
+        ];
+        let output = format_templates_output(&templates, crate::cli::DrainFormat::Id);
+        assert!(output.contains(&format!("{}: a <*> b", template1_id)));
+        assert!(output.contains(&format!("{}: x y z", template2_id)));
+        let mut ids = vec![template1_id.clone(), template2_id.clone()];
+        ids.sort();
+        let first_line = output.lines().next().expect("first line");
+        assert!(first_line.starts_with(&format!("{}:", ids[0])));
     }
 
     #[test]
