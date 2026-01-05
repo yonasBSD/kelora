@@ -346,7 +346,8 @@ pub fn format_templates_output(
         // Full format: add metadata on indented lines below
         if matches!(format, crate::cli::DrainFormat::Full) {
             output.push_str(&format!("     id: {}\n", template.template_id));
-            if let Some(line_summary) = format_line_summary(template.first_line, template.last_line) {
+            if let Some(line_summary) = format_line_summary(template.first_line, template.last_line)
+            {
                 output.push_str(&format!("     {}\n", line_summary));
             }
 
@@ -412,7 +413,10 @@ fn format_templates_id_output(templates: &[DrainTemplate]) -> String {
 
     let mut output = String::new();
     for template in sorted {
-        output.push_str(&format!("{}: {}\n", template.template_id, template.template));
+        output.push_str(&format!(
+            "{}: {}\n",
+            template.template_id, template.template
+        ));
     }
     output.trim_end().to_string()
 }

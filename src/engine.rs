@@ -1911,9 +1911,7 @@ impl RhaiEngine {
         match func_name {
             "extract_regex" => "string, regex_pattern, optional_group_index".to_string(),
             "extract_regexes" => "string, regex_pattern, optional_group_index".to_string(),
-            "extract_regex_maps" | "extract_re_maps" => {
-                "string, regex_pattern, field".to_string()
-            }
+            "extract_regex_maps" | "extract_re_maps" => "string, regex_pattern, field".to_string(),
             "split_regex" | "split_re" => "string, regex_pattern".to_string(),
             "replace_regex" | "replace_re" => "string, regex_pattern, replacement".to_string(),
             "before" | "after" => "string, delimiter".to_string(),
