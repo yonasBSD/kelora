@@ -588,7 +588,7 @@ mod tests {
         let output = format_templates_output(&templates, crate::cli::DrainFormat::Id);
         assert!(output.contains(&format!("{}: a <*> b", template1_id)));
         assert!(output.contains(&format!("{}: x y z", template2_id)));
-        let mut ids = vec![template1_id.clone(), template2_id.clone()];
+        let mut ids = [template1_id.clone(), template2_id.clone()];
         ids.sort();
         let first_line = output.lines().next().expect("first line");
         assert!(first_line.starts_with(&format!("{}:", ids[0])));
