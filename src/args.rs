@@ -97,7 +97,7 @@ pub fn validate_cli_args(cli: &Cli) -> Result<()> {
 
     if cli.drain.is_some() && cli.keys.len() != 1 {
         return Err(anyhow::anyhow!(
-            "--drain requires --keys to specify exactly one field"
+            "--drain requires --keys to specify exactly one field (use -s to view available keys)"
         ));
     }
 

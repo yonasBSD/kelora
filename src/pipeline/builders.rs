@@ -389,7 +389,7 @@ impl PipelineBuilder {
                 crate::OutputFormat::Keymap => {
                     if self.keys.len() != 1 {
                         return Err(anyhow::anyhow!(
-                            "keymap output format requires --keys to specify exactly one field"
+                            "keymap output format requires --keys to specify exactly one field (use -s to view available keys)"
                         ));
                     }
                     Box::new(crate::formatters::KeymapFormatter::new(Some(
@@ -399,7 +399,7 @@ impl PipelineBuilder {
                 crate::OutputFormat::Tailmap => {
                     if self.keys.len() != 1 {
                         return Err(anyhow::anyhow!(
-                            "tailmap output format requires --keys to specify exactly one field"
+                            "tailmap output format requires --keys to specify exactly one field (use -s to view available keys)"
                         ));
                     }
                     Box::new(crate::formatters::TailmapFormatter::new(
@@ -519,7 +519,7 @@ impl PipelineBuilder {
 
         if self.drain_enabled {
             let field = self.drain_field.clone().ok_or_else(|| {
-                anyhow::anyhow!("--drain requires --keys to specify exactly one field")
+                anyhow::anyhow!("--drain requires --keys to specify exactly one field (use -s to view available keys)")
             })?;
             script_stages.push(Box::new(DrainStage::new(field)));
         }
@@ -891,7 +891,7 @@ impl PipelineBuilder {
                 crate::OutputFormat::Keymap => {
                     if self.keys.len() != 1 {
                         return Err(anyhow::anyhow!(
-                            "keymap output format requires --keys to specify exactly one field"
+                            "keymap output format requires --keys to specify exactly one field (use -s to view available keys)"
                         ));
                     }
                     Box::new(crate::formatters::KeymapFormatter::new(Some(
@@ -901,7 +901,7 @@ impl PipelineBuilder {
                 crate::OutputFormat::Tailmap => {
                     if self.keys.len() != 1 {
                         return Err(anyhow::anyhow!(
-                            "tailmap output format requires --keys to specify exactly one field"
+                            "tailmap output format requires --keys to specify exactly one field (use -s to view available keys)"
                         ));
                     }
                     Box::new(crate::formatters::TailmapFormatter::new(
