@@ -52,6 +52,7 @@ kelora -j examples/production-errors.jsonl \
 ### Template Mining with `--drain`
 
 When you want automatic template discovery without maintaining normalization patterns, use the Drain summary:
+If you only need lightweight grouping, `normalized()` plus `track_count()` can be enough.
 
 ```bash
 # Clean pattern discovery (default)

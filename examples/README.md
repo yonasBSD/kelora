@@ -28,6 +28,7 @@ Then run `kelora --help-examples` for common patterns and usage recipes.
 ## Pattern Discovery with Drain
 
 Automatically discover log message templates using the `--drain` flag:
+For lightweight bucketing without Drain, you can pre-normalize a field with `normalized()` in `--exec`.
 
 ```bash
 # Find common patterns (clean output)

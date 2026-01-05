@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - `--drain` now defaults to a clean count+template table; details are opt-in via `--drain=full`
+- Documentation: split `--drain` into a dedicated Template Discovery section and note `normalized()` as a related option
 - Filter evaluation now avoids unused `meta/conf/line` scope variables and runs string method predicates natively
 - Single-field error messages now hint to use `-s` for available keys
 

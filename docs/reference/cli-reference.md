@@ -986,10 +986,13 @@ Persist metrics map to disk as JSON.
 kelora -j --exec 'track_count(e.service)' --metrics-file metrics.json app.log
 ```
 
+### Template Discovery
+
 #### `--drain[=FORMAT]`
 
 Summarize log templates using Drain (summary-only). Requires `--keys` with exactly one field.
 Sequential mode only (not supported with `--parallel`).
+For manual or lightweight bucketing, `normalized()` can pre-normalize a field in Rhai before output or tracking.
 
 **Formats:**
 

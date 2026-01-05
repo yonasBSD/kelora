@@ -605,7 +605,7 @@ pub struct Cli {
         require_equals = true,
         num_args = 0..=1,
         default_missing_value = "table",
-        help_heading = "Metrics and Stats",
+        help_heading = "Template Discovery",
         help = "Summarize log templates using Drain (summary-only; requires --keys with exactly one field; sequential mode only).\n\nFormats:\n  table (default)  Clean output: count + template\n  full             Detailed: adds line ranges + sample + template ID\n  id               Stable output: template_id + template (sorted by ID)\n  json             JSON with all metadata\n\nExamples:\n  --drain          Clean table (count + template)\n  --drain=full     With line numbers, samples, and IDs\n  --drain=id       Stable ID list for diffs\n  --drain=json     JSON output for scripting"
     )]
     pub drain: Option<DrainFormat>,
