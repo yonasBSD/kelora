@@ -6,6 +6,7 @@ use std::sync::atomic::Ordering;
 #[cfg(unix)]
 use signal_hook::consts::{SIGINT, SIGTERM};
 
+mod analysis;
 mod args;
 mod cli;
 mod colors;
@@ -438,6 +439,46 @@ fn main() -> Result<()> {
                     )))
                     .unwrap_or(());
                 ExitCode::InvalidUsage.exit();
+            }
+        }
+    }
+
+    // Handle --analyze mode: analyze log structure and exit
+    if cli.analyze {
+        if config.input.files.is_empty() {
+            stderr
+                .writeln(&config.format_error_message("--analyze requires input files"))
+                .unwrap_or(());
+            ExitCode::InvalidUsage.exit();
+        }
+
+        let paths: Vec<std::path::PathBuf> = config
+            .input
+            .files
+            .iter()
+            .map(std::path::PathBuf::from)
+            .collect();
+        let path_refs: Vec<&std::path::Path> = paths.iter().map(|p| p.as_path()).collect();
+
+        let analyze_config = analysis::AnalyzeConfig {
+            format: if cli.format != "auto" {
+                Some(cli.format.clone())
+            } else {
+                None
+            },
+            ..Default::default()
+        };
+
+        match analysis::analyze(&path_refs, &analyze_config) {
+            Ok(report) => {
+                stdout.writeln(&report.format()).unwrap_or(());
+                std::process::exit(0);
+            }
+            Err(e) => {
+                stderr
+                    .writeln(&config.format_error_message(&format!("Analysis failed: {}", e)))
+                    .unwrap_or(());
+                ExitCode::GeneralError.exit();
             }
         }
     }
