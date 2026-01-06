@@ -192,9 +192,9 @@ fn to_u16(value: usize) -> u16 {
 }
 
 fn build_grok() -> Grok {
-    let mut grok = Grok::with_patterns();
+    let mut grok = Grok::with_default_patterns();
     for (name, pattern) in custom_grok_definitions() {
-        grok.insert_definition(name, pattern);
+        grok.add_pattern(name, pattern);
     }
     grok
 }

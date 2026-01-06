@@ -21,45 +21,45 @@ exclude = [
 
 [dependencies]
 # CLI and configuration
-clap = { version = "4.0", features = ["derive"] }  # Command-line argument parsing and help generation
+clap = { version = "4.5", features = ["derive"] }  # Command-line argument parsing and help generation
 clap_complete = "4.5"  # Shell completion script generation
 
 # Core functionality
-rhai = { version = "1.23", features = ["sync", "debugging", "internals"] }  # Embedded scripting engine for log filtering and transformation
+rhai = { git = "https://github.com/yonasBSD/rhai", features = ["sync", "debugging", "internals"] }  # Embedded scripting engine for log filtering and transformation
 anyhow = "1.0"  # Error handling and propagation
 
 # Serialization and parsing
 serde = { version = "1.0", features = ["derive"] }  # Serialization framework foundation
 serde_json = { version = "1.0", features = ["preserve_order"] }  # JSON log format parsing and output (preserve_order for deterministic field order)
 nom = "8"  # Parser combinator library for logfmt and other text formats
-csv = "1.3"  # CSV format parsing and output
-regex = "1.10"  # Pattern matching for filters and field extraction
+csv = "1.4"  # CSV format parsing and output
+regex = "1.12"  # Pattern matching for filters and field extraction
 
 # Time handling
 chrono = { version = "0.4", features = ["serde"] }  # Timestamp parsing, manipulation, and formatting
 chrono-tz = "0.10"  # Timezone database for timestamp conversion
-humantime = "2.1"  # Human-readable duration parsing (e.g., "5m", "1h30s")
+humantime = "2.3"  # Human-readable duration parsing (e.g., "5m", "1h30s")
 
 # Multi-threading and concurrency
 crossbeam-channel = "0.5"  # Lock-free channels for streaming pipeline communication between threads
-num_cpus = "1.16"  # Auto-detection of CPU count for parallel processing
+num_cpus = "1.17"  # Auto-detection of CPU count for parallel processing
 
 # Terminal and I/O
 is-terminal = "0.4"  # Detect terminal vs pipe for intelligent output formatting
 terminal_size = "0.4.3"  # Get terminal dimensions for formatted output
-signal-hook = { version = "0.3", features = ["iterator"] }  # Graceful shutdown on SIGINT/SIGTERM
+signal-hook = { version = "0.4", features = ["iterator"] }  # Graceful shutdown on SIGINT/SIGTERM
 
 # Compression
-flate2 = "1.0"  # Gzip/deflate decompression for reading compressed log files
+flate2 = "1.1"  # Gzip/deflate decompression for reading compressed log files
 zstd = "0.13"  # Zstandard decompression for reading .zst log files
 
 # Data structures and utilities
-indexmap = "2.0"  # Order-preserving hash maps for JSON objects and logfmt key-value pairs
+indexmap = "2.12"  # Order-preserving hash maps for JSON objects and logfmt key-value pairs
 shell-words = "1.1"  # Parsing shell-like command strings in config files
-once_cell = "1.19"  # Lazy static initialization for global resources
-lazy_static = "1.4"  # Static initialization for compiled regexes and constants
+once_cell = "1.21"  # Lazy static initialization for global resources
+lazy_static = "1.5"  # Static initialization for compiled regexes and constants
 lru = "0.16"  # LRU cache for optimizing repeated operations
-fastrand = "2.0"  # Fast random number generation for sampling
+fastrand = "2.3"  # Fast random number generation for sampling
 
 # Interactive mode
 rustyline = "17.0"  # Readline implementation for interactive mode
@@ -87,17 +87,14 @@ tdigests = "1.0"  # T-digest algorithm for streaming percentile estimation expos
 
 # Rhai built-in functions - networking
 url = "2.5"  # URL parsing and manipulation exposed to Rhai scripts
-ipnet = "2.9"  # IP address and network parsing/matching exposed to Rhai scripts
-drain-rs = "0.3.0"
-grok = "1.2"
+ipnet = "2.11"  # IP address and network parsing/matching exposed to Rhai scripts
+drain-rs = { git = "https://github.com/yonasBSD/drain-rs", branch = "yonasBSD" }
+grok = "2.4"
 
 [dev-dependencies]
-criterion = { version = "0.7", features = ["html_reports"] }  # Benchmarking framework with statistical analysis
-tempfile = "3.8"  # Temporary file/directory creation for integration tests
-proptest = "1.5"  # Property-based testing for fuzzing parser edge cases
-
-[patch.crates-io]
-grok = { path = "vendor/grok" }
+criterion = { version = "0.8", features = ["html_reports"] }  # Benchmarking framework with statistical analysis
+tempfile = "3.24"  # Temporary file/directory creation for integration tests
+proptest = "1.9"  # Property-based testing for fuzzing parser edge cases
 
 [[bench]]
 name = "micro_search"
