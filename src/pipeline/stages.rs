@@ -538,6 +538,188 @@ impl ScriptStage for ExecStage {
     }
 }
 
+/// Assert stage for --assert expressions
+/// Validates events against boolean expressions, reporting violations to stderr
+pub struct AssertStage {
+    compiled_assertion: crate::engine::CompiledExpression,
+    expression: String, // Store original expression for error reporting
+    stage_number: usize,
+}
+
+impl AssertStage {
+    pub fn new(assertion: String, engine: &mut RhaiEngine) -> Result<Self> {
+        // Compile as filter expression (same semantics - boolean Rhai)
+        let compiled_assertion = engine.compile_filter(&assertion)?;
+        Ok(Self {
+            compiled_assertion,
+            expression: assertion,
+            stage_number: 0,
+        })
+    }
+
+    pub fn with_stage_number(mut self, stage_number: usize) -> Self {
+        self.stage_number = stage_number;
+        self
+    }
+
+    fn evaluate_assertion(&mut self, event: &Event, ctx: &mut PipelineContext) -> Result<bool> {
+        // Same pattern as FilterStage::evaluate_filter
+        columns::set_parse_cols_strict(ctx.config.strict);
+        absorb::set_absorb_strict(ctx.config.strict);
+
+        file_ops::clear_pending_ops();
+
+        let eval_result = if ctx.window.is_empty() {
+            ctx.rhai.execute_compiled_filter(
+                &self.compiled_assertion,
+                event,
+                &mut ctx.tracker,
+                &mut ctx.internal_tracker,
+            )
+        } else {
+            ctx.rhai.execute_compiled_filter_with_window(
+                &self.compiled_assertion,
+                event,
+                &ctx.window,
+                &mut ctx.tracker,
+                &mut ctx.internal_tracker,
+            )
+        };
+
+        match eval_result {
+            Ok(value) => {
+                let ops = file_ops::take_pending_ops();
+                if !ops.is_empty() {
+                    ctx.pending_file_ops.extend(ops);
+                }
+                Ok(value)
+            }
+            Err(err) => {
+                file_ops::clear_pending_ops();
+                Err(err)
+            }
+        }
+    }
+
+    fn report_violation(&self, event: &Event, ctx: &PipelineContext) {
+        // Format: "assert failed: <expression>\n  line <N>: <event>"
+        let line_num = ctx.meta.line_num.unwrap_or(0);
+
+        // Format the event in logfmt style (key=value pairs)
+        let event_str = self.format_event_logfmt(event);
+
+        // Build error message
+        let error_msg = format!(
+            "assert failed: {}\n  line {}: {}",
+            self.expression, line_num, event_str
+        );
+
+        // Use stderr directly
+        eprintln!("{}", error_msg);
+
+        // Track the assertion failure in stats
+        crate::stats::stats_add_assertion_failure(&self.expression);
+    }
+
+    /// Format event as logfmt-style key=value pairs
+    fn format_event_logfmt(&self, event: &Event) -> String {
+        let mut output = String::with_capacity(event.fields.len() * 32);
+        let mut first = true;
+
+        for (key, value) in crate::event::ordered_fields(event) {
+            if !first {
+                output.push(' ');
+            }
+            first = false;
+
+            // Add key=value
+            output.push_str(key);
+            output.push('=');
+
+            // Format value with quoting if needed
+            if value.is_string() {
+                if let Ok(s) = value.clone().into_string() {
+                    // Quote strings
+                    output.push('\'');
+                    // Escape single quotes in the string
+                    for ch in s.chars() {
+                        if ch == '\'' {
+                            output.push_str("\\'");
+                        } else {
+                            output.push(ch);
+                        }
+                    }
+                    output.push('\'');
+                } else {
+                    output.push_str(&value.to_string());
+                }
+            } else {
+                // Numbers, booleans, etc. - no quotes needed
+                output.push_str(&value.to_string());
+            }
+        }
+
+        output
+    }
+}
+
+impl ScriptStage for AssertStage {
+    fn apply(&mut self, event: Event, ctx: &mut PipelineContext) -> ScriptResult {
+        // Add stage-specific tracing (same as FilterStage)
+        if let Some(ref tracer) = ctx.rhai.get_execution_tracer() {
+            tracer.trace_stage_execution(self.stage_number, "assert");
+        }
+
+        // Evaluate the assertion
+        let result = self.evaluate_assertion(&event, ctx);
+
+        match result {
+            Ok(passed) => {
+                if !passed {
+                    // Assertion failed - report violation
+                    self.report_violation(&event, ctx);
+
+                    // In strict mode, stop processing immediately
+                    if ctx.config.strict {
+                        return ScriptResult::Error(format!(
+                            "Assertion failed: {}",
+                            self.expression
+                        ));
+                    }
+                }
+
+                // Always emit the event (assertions don't filter)
+                ScriptResult::Emit(event)
+            }
+            Err(e) => {
+                // Expression error - treat as violation
+                self.report_violation(&event, ctx);
+
+                // Track error via tracking system
+                crate::rhai_functions::tracking::track_error(
+                    "assert",
+                    ctx.meta.line_num,
+                    &format!("Assertion error: {}", e),
+                    Some(&event.original_line),
+                    ctx.meta.filename.as_deref(),
+                    ctx.config.verbose,
+                    ctx.config.quiet_level,
+                    Some(&ctx.config),
+                    None,
+                );
+
+                // In strict mode, propagate error
+                if ctx.config.strict {
+                    ScriptResult::Error(format!("Assertion error: {}", e))
+                } else {
+                    // Continue processing, emit event
+                    ScriptResult::Emit(event)
+                }
+            }
+        }
+    }
+}
+
 /// Begin stage for --begin expressions
 pub struct BeginStage {
     compiled_begin: Option<crate::engine::CompiledExpression>,

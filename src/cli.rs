@@ -242,6 +242,11 @@ pub struct Cli {
     /// Execute script from file (contents run in the exec stage).
     #[arg(short = 'E', long = "exec-file", help_heading = "Processing Options")]
     pub exec_files: Vec<String>,
+
+    /// Assertion expressions that must evaluate to true. Violations are reported to stderr;
+    /// processing continues unless --strict is enabled. See --help-rhai for expression syntax.
+    #[arg(long = "assert", help_heading = "Processing Options")]
+    pub asserts: Vec<String>,
     /// Include Rhai files before script stages
     #[arg(short = 'I', long = "include", help_heading = "Processing Options")]
     pub includes: Vec<String>,
@@ -803,6 +808,9 @@ impl Cli {
             if let Some(filter_indices) = matches.indices_of("filters") {
                 script_positions.extend(filter_indices);
             }
+            if let Some(assert_indices) = matches.indices_of("asserts") {
+                script_positions.extend(assert_indices);
+            }
             if let Some(exec_indices) = matches.indices_of("execs") {
                 script_positions.extend(exec_indices);
             }
@@ -849,6 +857,28 @@ impl Cli {
                     std::process::exit(2);
                 }
                 stages_with_indices.push((index, ScriptStageType::Filter(script)));
+            }
+        }
+
+        // Get assert stages with their indices
+        if let Some(assert_indices) = matches.indices_of("asserts") {
+            let assert_values: Vec<&String> =
+                matches.get_many::<String>("asserts").unwrap().collect();
+            for (pos, index) in assert_indices.enumerate() {
+                let script = assert_values[pos].clone();
+                let empty_includes = Vec::new();
+                let includes = include_map.get(&index).unwrap_or(&empty_includes);
+                // Assertions don't support includes (same as filters)
+                if !includes.is_empty() {
+                    eprintln!(
+                        "{}",
+                        crate::config::format_error_message_auto(
+                            "--include is not supported with --assert (assertions must be pure expressions)"
+                        )
+                    );
+                    std::process::exit(2);
+                }
+                stages_with_indices.push((index, ScriptStageType::Assert(script)));
             }
         }
 

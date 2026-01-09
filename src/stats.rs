@@ -2,7 +2,7 @@ use crate::rhai_functions::datetime::DurationWrapper;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use std::cell::RefCell;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -49,6 +49,8 @@ pub struct ProcessingStats {
     pub timestamp_override_warning: Option<String>,
     pub yearless_timestamps: usize, // Count of timestamps parsed with year inference
     pub detected_format: Option<String>, // Format detected for this processing session
+    pub assertion_failures: usize,  // Total assertion failures
+    pub assertion_failures_by_expr: HashMap<String, usize>, // Per-assertion tracking
 }
 
 // Allow disabling stats collection when diagnostics/stats are suppressed
@@ -201,6 +203,20 @@ pub fn stats_add_line_error() {
         let mut stats = stats.borrow_mut();
         stats.lines_errors += 1;
         stats.errors += 1; // Backward compatibility: errors tracked parse failures.
+    });
+}
+
+pub fn stats_add_assertion_failure(expression: &str) {
+    if !stats_enabled() {
+        return;
+    }
+    THREAD_STATS.with(|stats| {
+        let mut stats = stats.borrow_mut();
+        stats.assertion_failures += 1;
+        *stats
+            .assertion_failures_by_expr
+            .entry(expression.to_string())
+            .or_insert(0) += 1;
     });
 }
 
@@ -755,7 +771,7 @@ impl ProcessingStats {
 
     /// Check if any errors occurred during processing
     pub fn has_errors(&self) -> bool {
-        self.lines_errors > 0 || self.files_failed_to_open > 0
+        self.lines_errors > 0 || self.files_failed_to_open > 0 || self.assertion_failures > 0
     }
 
     /// Format a concise error summary for default output (when errors occur)
@@ -813,6 +829,19 @@ impl ProcessingStats {
             }
 
             parts.push(message);
+        }
+
+        // Show assertion failures
+        if self.assertion_failures > 0 {
+            parts.push(format!(
+                "{} assertion failure{}",
+                self.assertion_failures,
+                if self.assertion_failures == 1 {
+                    ""
+                } else {
+                    "s"
+                }
+            ));
         }
 
         if parts.is_empty() {

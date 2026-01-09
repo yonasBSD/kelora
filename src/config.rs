@@ -65,6 +65,7 @@ pub struct OutputConfig {
 pub enum ScriptStageType {
     Filter(String),
     Exec(String),
+    Assert(String),
     LevelFilter {
         include: Vec<String>,
         exclude: Vec<String>,
@@ -577,6 +578,16 @@ pub fn format_warning_message_auto(message: &str) -> String {
     }
 }
 
+pub fn format_hint_message_auto(message: &str) -> String {
+    let use_emoji = crate::tty::should_use_emoji_for_stderr();
+
+    if use_emoji {
+        format!("💡 {}", message)
+    } else {
+        format!("kelora hint: {}", message)
+    }
+}
+
 /// Format a verbose error message with line number and error type
 pub fn format_verbose_error(line_num: Option<usize>, error_type: &str, message: &str) -> String {
     format_verbose_error_with_config(line_num, error_type, message, None)
@@ -1002,7 +1013,7 @@ fn parse_input_format_from_cli(cli: &crate::Cli) -> anyhow::Result<InputFormat> 
 }
 
 /// Parse input format specification string (e.g., "cols:ts(2) level - *msg")
-fn parse_input_format_spec(spec: &str) -> anyhow::Result<InputFormat> {
+pub(crate) fn parse_input_format_spec(spec: &str) -> anyhow::Result<InputFormat> {
     // Helper to parse field spec after format name
     let parse_field_spec = |_prefix: &str, name: &str| -> Option<String> {
         // Handle both "csv:" and "csv " (optional colon)

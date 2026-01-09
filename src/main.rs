@@ -576,6 +576,18 @@ fn main() -> Result<()> {
         emit_fatal_line(&mut stderr, &config, &fatal_message);
     }
 
+    // Print assertion failure summary if any occurred
+    if let Some(ref stats) = final_stats {
+        if stats.assertion_failures > 0 {
+            let failure_text = if stats.assertion_failures == 1 {
+                "1 assertion failure".to_string()
+            } else {
+                format!("{} assertion failures", stats.assertion_failures)
+            };
+            eprintln!("kelora: {}", failure_text);
+        }
+    }
+
     if had_errors {
         ExitCode::GeneralError.exit();
     } else {
