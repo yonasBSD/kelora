@@ -310,7 +310,7 @@ pub struct Cli {
         short = 'l',
         long = "levels",
         help_heading = "Filtering Options",
-        help = "Include only events with these log levels (comma-separated, case-insensitive)."
+        help = "Include only events with these log levels (comma-separated, case-insensitive).\n\nUse comma-separated values for OR logic: --levels ERROR,WARN\nMultiple flags create sequential AND filters (advanced)."
     )]
     pub levels: Vec<String>,
 
@@ -949,6 +949,33 @@ impl Cli {
 
         // Sort by original command line position
         stages_with_indices.sort_by_key(|(index, _)| *index);
+
+        // Detect consecutive --levels flags (likely user mistake)
+        let mut prev_was_level_include = false;
+        for (_, stage) in &stages_with_indices {
+            match stage {
+                ScriptStageType::LevelFilter { include, exclude } => {
+                    if !include.is_empty() {
+                        if prev_was_level_include {
+                            // Found consecutive --levels flags
+                            let hint = crate::config::format_hint_message_auto(
+                                "Multiple --levels flags create sequential filters (AND). Use comma-separated for OR: --levels ERROR,WARN"
+                            );
+                            eprintln!("{}", hint);
+                            break; // Only show hint once
+                        }
+                        prev_was_level_include = true;
+                    } else {
+                        // This is an exclude-only stage, reset the flag
+                        prev_was_level_include = false;
+                    }
+                }
+                _ => {
+                    // Non-level stage, reset the flag
+                    prev_was_level_include = false;
+                }
+            }
+        }
 
         // Extract just the stages
         Ok(stages_with_indices
