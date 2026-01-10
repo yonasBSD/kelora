@@ -1,15 +1,15 @@
 # Scripting Stages
 
-Deep dive into Kelora's Rhai scripting stages: `--begin`, `--filter`, `--exec`, and `--end`.
+Deep dive into Kelora's Rhai scripting stages: `--begin`, `--filter`, `--exec`, `--assert`, and `--end`.
 
 ## Overview
 
-Kelora provides four scripting stages for transforming log data with Rhai scripts:
+Kelora provides five scripting stages for transforming log data with Rhai scripts:
 
 ```
 --begin  →  [Process Events]  →  --end
               ↓
-           --filter + --exec (per event, in CLI order)
+           --filter + --exec + --assert (per event, in CLI order)
 ```
 
 | Stage | Runs | Purpose | Access |
@@ -17,9 +17,10 @@ Kelora provides four scripting stages for transforming log data with Rhai script
 | `--begin` | Once before processing | Initialize state, load data | `conf` map, file helpers |
 | `--filter` | Once per event | Select events to keep/skip | `e` (event), `conf`, `meta` |
 | `--exec` | Once per event | Transform events | `e` (event), `conf`, `meta`, tracking |
+| `--assert` | Once per event | Validate events (non-filtering) | `e` (event), `conf`, `meta` |
 | `--end` | Once after processing | Summarize, report | `metrics`, `conf` |
 
-**Note:** `--filter` and `--exec` can be specified multiple times and execute in exact CLI order.
+**Note:** `--filter`, `--exec`, and `--assert` can be specified multiple times and execute in exact CLI order.
 
 ## Begin Stage
 
@@ -557,6 +558,83 @@ kelora -j \
     --exec 'if e.message.contains("CUSTOM:") { e.custom = meta.line.after("CUSTOM:").parse_json() }' \
     app.log
 ```
+
+## Assert Stage
+
+### Purpose
+
+The `--assert` stage runs **once per event** to validate data quality. Use it to:
+
+- Check required fields exist
+- Verify data invariants
+- Validate transformations
+- Enforce schema constraints
+
+**Key difference from `--filter`:** Events always pass through to output. Violations are reported to stderr.
+
+### Behavior
+
+```bash
+kelora -j app.log --assert 'e.has("user_id")'
+```
+
+- **Events pass through:** Unlike `--filter`, all events are emitted regardless of assertion result
+- **Violations reported:** Failed assertions print to stderr immediately
+- **Exit code 1:** If any assertions fail (check stats for counts)
+- **Strict mode:** Use `--strict` to abort on first assertion failure
+
+### Examples
+
+#### Validate Required Fields
+
+```bash
+kelora -j app.log --assert 'e.has("user_id")' --assert 'e.has("timestamp")'
+```
+
+#### Check Data Quality After Transformation
+
+```bash
+kelora -j data.log \
+    --exec 'e.name = e.name.lower()' \
+    --assert 'e.name == e.name.lower()' \
+    --assert 'e.name.len() > 0'
+```
+
+#### Verify Invariants
+
+```bash
+kelora -j api_logs.jsonl \
+    --assert 'e.status >= 0 && e.status < 1000' \
+    --assert 'e.response_time >= 0'
+```
+
+#### Multiple Assertions (All Checked)
+
+```bash
+kelora -j app.log \
+    --assert 'e.has("timestamp")' \
+    --assert 'e.level.is_string()' \
+    --assert 'e.status >= 0' \
+    --stats
+```
+
+#### CI/CD Validation Pipeline
+
+```bash
+# Validate and fail fast on first violation
+kelora -j --strict app.log \
+    --assert 'e.has("user_id") && e.user_id != ""' \
+    --assert 'e.level in ["DEBUG","INFO","WARN","ERROR"]'
+```
+
+### Use Cases
+
+| Use Case | Example |
+|----------|---------|
+| Schema validation | `--assert 'e.has("user_id") && e.has("timestamp")'` |
+| Range checking | `--assert 'e.status >= 0 && e.status < 600'` |
+| Transformation verification | `--exec 'e.x = e.x.lower()' --assert 'e.x == e.x.lower()'` |
+| CI/CD quality gates | `--strict --assert 'e.has("required_field")'` |
 
 ## End Stage
 

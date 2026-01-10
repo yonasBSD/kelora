@@ -402,6 +402,50 @@ Execute Rhai script from file (runs in exec stage).
 kelora -j -E transform.rhai app.log
 ```
 
+#### `--assert <EXPRESSION>`
+
+Validate events against boolean expressions. Events are always emitted (unlike `--filter` which drops non-matching events), but violations are reported to stderr. Multiple assertions can be specified and all are checked. Exit code 1 if any assertions fail.
+
+**Use Cases:**
+
+- Validate required fields exist
+- Enforce data quality rules
+- Check invariants during processing
+- Verify transformations are correct
+
+```bash
+# Ensure all events have user_id
+kelora -j app.log --assert 'e.has("user_id")'
+
+# Validate field after transformation
+kelora -j data.log \
+    --exec 'e.x = e.x.lower()' \
+    --assert 'e.x == e.x.lower()'
+
+# Multiple assertions (all checked)
+kelora -j app.log \
+    --assert 'e.has("timestamp")' \
+    --assert 'e.level.is_string()' \
+    --assert 'e.status >= 0'
+```
+
+**Behavior:**
+
+- Events always pass through to output (assertions don't filter)
+- Violations reported immediately to stderr: `assert failed: <expr>`
+- Processing continues unless `--strict` is enabled
+- Exit code 1 if any assertions fail
+- Per-expression failure counts shown in `--stats`
+
+**With --strict:**
+
+```bash
+# Abort on first assertion failure
+kelora -j --strict app.log --assert 'e.has("user_id")'
+```
+
+**Note:** Like `--filter`, assertions must be pure boolean expressions (no includes supported).
+
 #### `-I, --include <FILE>`
 
 Include Rhai files before script stages (library imports).
@@ -1081,7 +1125,7 @@ Kelora uses standard Unix exit codes to indicate success or failure:
 | Code | Meaning |
 |------|---------|
 | `0` | Success - no errors occurred |
-| `1` | Processing errors (parse/filter/exec/file errors) |
+| `1` | Processing errors (parse/filter/exec/assertion/file errors) |
 | `2` | Usage errors (invalid flags, incompatible options, config errors) |
 | `130` | Interrupted (Ctrl+C / SIGINT) |
 | `141` | Broken pipe (SIGPIPE - normal in pipelines) |

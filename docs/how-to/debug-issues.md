@@ -11,6 +11,7 @@ When something isn't working, follow this process:
 3. **Check statistics** - Use `--stats` to see how many events were filtered/errored
 4. **Test with small sample** - Use `--take 10` for fast iteration
 5. **Use strict mode** - Use `--strict` to fail-fast on errors during debugging
+6. **Validate data quality** - Use `--assert` to check for required fields or invariants
 
 **Example debugging session:**
 
@@ -141,6 +142,42 @@ kelora -j --strict app.log
 
 ---
 
+### `--assert` - Data Validation
+
+Validate events against boolean expressions. Events still pass through (unlike `--filter`), but violations are reported to stderr:
+
+```bash
+# Check all events have required field
+kelora -j app.log --assert 'e.has("user_id")'
+
+# Validate transformations
+kelora -j data.log \
+    --exec 'e.name = e.name.lower()' \
+    --assert 'e.name == e.name.lower()'
+
+# Multiple validation rules
+kelora -j app.log \
+    --assert 'e.has("timestamp")' \
+    --assert 'e.status >= 0'
+```
+
+**Use when:**
+
+- Validating log data quality
+- Checking required fields exist
+- Verifying transformations are correct
+- Testing data pipelines
+
+**Behavior:**
+
+- Events always pass through to output
+- Violations reported immediately to stderr
+- Exit code 1 if any assertions fail
+- Use with `--stats` to see failure counts
+- Combine with `--strict` for fail-fast validation
+
+---
+
 ### `--keep-lines` / `--ignore-lines` - Pre-filter
 
 Filter at line level before parsing (faster than post-parse filtering):
@@ -224,6 +261,7 @@ Actual: Error on type comparison
 2. `kelora -j app.log --verbose --stats` - See errors and statistics
 3. `kelora -j app.log --take 10` - Test with small sample
 4. `kelora -j --strict app.log` - Fail-fast mode for debugging
+5. `kelora -j app.log --assert 'e.has("field")' --stats` - Validate data quality
 
 **Common fixes:**
 

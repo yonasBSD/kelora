@@ -349,6 +349,25 @@ kelora -j api_logs.jsonl \
   --filter 'e.service == "auth-service" || e.get_path("metadata.subscription.tier") == "premium"' \
   --filter 'e.get_path("response_time", 0.0) > 0.2'
 
+DATA VALIDATION:
+# Validate required fields exist (events still pass through, violations reported)
+kelora -j api_logs.jsonl --assert 'e.has("user_id")'
+
+# Validate field after transformation
+kelora -j data.log --exec 'e.name = e.name.lower()' --assert 'e.name == e.name.lower()'
+
+# Multiple validation rules (all checked)
+kelora -j api_logs.jsonl \
+  --assert 'e.has("timestamp")' \
+  --assert 'e.level.is_string()' \
+  --assert 'e.status >= 0'
+
+# Strict validation: abort on first failure
+kelora -j --strict app.log --assert 'e.has("user_id") && e.user_id != ""'
+
+# Check stats for assertion failure counts
+kelora -j app.log --assert 'e.status < 600' --stats
+
 PARSING & TRANSFORMATION:
 # Parse nested JSON strings from a field
 kelora -j api_logs.jsonl --exec 'e.metadata = e.json_payload.parse_json()' \
