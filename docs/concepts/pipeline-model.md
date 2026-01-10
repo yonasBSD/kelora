@@ -207,12 +207,12 @@ Parsers: `json`, `logfmt`, `syslog`, `combined`, `csv`, `tsv`, `cols`, etc.
 **User-controlled stages execute exactly where you place them on the CLI:**
 
 - `--filter <EXPR>` – Boolean filter (true = keep, false = skip)
-- `--levels/-l <LIST>` – Include log levels (case-insensitive, repeatable)
-- `--exclude-levels/-L <LIST>` – Exclude log levels (case-insensitive, repeatable)
+- `--levels/-l <LIST>` – Include log levels (comma-separated for OR; use separate flags for progressive filtering)
+- `--exclude-levels/-L <LIST>` – Exclude log levels (comma-separated)
 - `--exec <SCRIPT>` – Transform/process event
 - `--exec-file <PATH>` – Execute script from file (alias: `-E`)
 
-You can mix and repeat these flags; each stage sees the output of the previous one.
+You can mix and repeat these flags; each stage sees the output of the previous one. For level filtering, use comma-separated values for OR logic (`--levels error,warn`). Consecutive `--levels` flags create AND filters (advanced).
 
 Inside `--exec`, call `skip()` to drop the current event immediately; later stages and output are skipped, and the event is counted as filtered.
 

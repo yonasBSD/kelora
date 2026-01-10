@@ -247,7 +247,23 @@ kelora -j app.log --filter 'e.level in ["ERROR", "WARN"]'
 
 However, `--filter` provides more flexibility for complex conditions.
 
-Level flags behave like script stages: you can place `--levels` or `--exclude-levels` anywhere in the CLI sequence, and Kelora runs them immediately at that point. Repeat the flag when you want different level rules before and after a transformation (for example, derive a level in `--exec`, then add another `--levels` to act on the new field).
+**Using Multiple Level Filters:**
+
+Use comma-separated values for OR logic (most common):
+```bash
+kelora -j app.log --levels error,warn   # Show ERROR or WARN
+```
+
+Level flags behave like script stages: you can place `--levels` or `--exclude-levels` anywhere in the CLI sequence. For advanced progressive filtering, separate `--levels` flags with other stages (like `--exec`) to apply different level rules before and after transformations:
+
+```bash
+# Derive level, then filter on it
+kelora -j app.log \
+    --exec 'if e.status >= 500 { e.level = "ERROR" }' \
+    --levels error
+```
+
+**Note:** Consecutive `--levels` flags create sequential AND filters (not OR). Use comma-separated values instead.
 
 ### Filter Output
 
