@@ -1,6 +1,8 @@
 #![allow(dead_code)] // Error-reporting helpers and legacy config paths are kept for planned CLI surfacing
 use clap::ValueEnum;
 
+use crate::config_file::ConfigExpansionInfo;
+
 /// Main configuration struct for Kelora
 #[derive(Debug, Clone)]
 pub struct KeloraConfig {
@@ -550,6 +552,54 @@ impl KeloraConfig {
             }
         } else {
             format!("\n{}", message)
+        }
+    }
+
+    /// Display config expansion information at startup (if diagnostics enabled)
+    pub fn display_config_expansion(
+        info: &ConfigExpansionInfo,
+        config: &KeloraConfig,
+        stderr: &mut crate::platform::SafeStderr,
+    ) {
+        // Check if diagnostics are suppressed
+        if config.processing.suppress_diagnostics || config.processing.silent {
+            return;
+        }
+
+        // Check if there's anything to display
+        let has_content = info.loaded_config_path.is_some()
+            || info.applied_defaults.is_some()
+            || !info.expanded_aliases.is_empty();
+
+        if !has_content {
+            return;
+        }
+
+        // Build output lines
+        let mut lines = Vec::new();
+
+        // Config file loaded
+        if let Some(path) = &info.loaded_config_path {
+            let msg = config.format_info_message(&format!("Config: {}", path.display()));
+            lines.push(msg);
+        }
+
+        // Defaults applied (use info message with indentation)
+        if let Some(defaults) = &info.applied_defaults {
+            let msg = config.format_info_message(&format!("  Defaults: {}", defaults));
+            lines.push(msg);
+        }
+
+        // Aliases expanded (use info message with indentation)
+        for (alias_name, expansion) in &info.expanded_aliases {
+            let msg =
+                config.format_info_message(&format!("  Alias: -a {} → {}", alias_name, expansion));
+            lines.push(msg);
+        }
+
+        // Write all lines
+        for line in lines {
+            stderr.writeln(&line).unwrap_or(());
         }
     }
 }

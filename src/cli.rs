@@ -954,7 +954,10 @@ impl Cli {
         let mut prev_was_level_include = false;
         for (_, stage) in &stages_with_indices {
             match stage {
-                ScriptStageType::LevelFilter { include, exclude } => {
+                ScriptStageType::LevelFilter {
+                    include,
+                    exclude: _,
+                } => {
                     if !include.is_empty() {
                         if prev_was_level_include {
                             // Found consecutive --levels flags

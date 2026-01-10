@@ -68,7 +68,7 @@ fn main() -> Result<()> {
     let mut stdout = SafeStdout::new();
 
     // Process command line arguments with config file support
-    let (matches, cli) = process_args_with_config(&mut stderr);
+    let (matches, cli, config_expansion_info) = process_args_with_config(&mut stderr);
 
     // Validate CLI argument combinations
     if let Err(e) = validate_cli_args(&cli) {
@@ -97,6 +97,10 @@ fn main() -> Result<()> {
             std::process::exit(ExitCode::InvalidUsage as i32);
         }
     };
+
+    // Display config expansion info (if diagnostics enabled)
+    KeloraConfig::display_config_expansion(&config_expansion_info, &config, &mut stderr);
+
     // Set the ordered stages directly
     config.processing.stages = ordered_stages;
     let diagnostics_allowed = !config.processing.silent && !config.processing.suppress_diagnostics;

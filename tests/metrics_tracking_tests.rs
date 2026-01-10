@@ -1387,6 +1387,7 @@ fn test_quiet_level_3_suppresses_script_output() {
         &[
             "-f",
             "json",
+            "--ignore-config",
             "--exec",
             "print(\"this should not appear\");",
             "--no-script-output",
