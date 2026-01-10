@@ -359,14 +359,17 @@ kelora -j data.log --exec 'e.name = e.name.lower()' --assert 'e.name == e.name.l
 # Multiple validation rules (all checked)
 kelora -j api_logs.jsonl \
   --assert 'e.has("timestamp")' \
-  --assert 'e.level.is_string()' \
-  --assert 'e.status >= 0'
+  --assert 'e.has("level")' \
+  --assert 'e.has("service")'
+
+# Validate data ranges (only check events with status field)
+kelora -j api_logs.jsonl --filter 'e.has("status")' --assert 'e.status >= 0 && e.status < 600'
 
 # Strict validation: abort on first failure
-kelora -j --strict app.log --assert 'e.has("user_id") && e.user_id != ""'
+kelora -j --strict api_logs.jsonl --assert 'e.has("user_id")'
 
 # Check stats for assertion failure counts
-kelora -j app.log --assert 'e.status < 600' --stats
+kelora -j api_logs.jsonl --assert 'e.has("user_id")' --stats
 
 PARSING & TRANSFORMATION:
 # Parse nested JSON strings from a field
