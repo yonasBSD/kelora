@@ -8,11 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+
+## [1.4.0] - 2026-01-10
+
+### Added
+- **Event validation** (`--assert`) - Validate log events against user-defined conditions. Helps ensure data quality and catch unexpected patterns during log analysis. Fails with exit code 1 if any event violates the assertion.
+
 - **`track_cardinality()` function** - Probabilistic cardinality estimation using the HyperLogLog algorithm. Estimates unique counts with ~1% standard error using only ~12KB of memory, regardless of cardinality. Ideal for high-cardinality data (millions of unique IPs, sessions, etc.) where `track_unique()` would consume too much memory.
   - `track_cardinality(key, value)` - Track with default ~1% error rate
   - `track_cardinality(key, value, error_rate)` - Track with custom error rate (0.001-0.26)
   - Output uses `≈` prefix to indicate approximate values
   - Works correctly in parallel mode with proper merge support
+
+### Changed
+
+- Config expansion information now displayed at startup for better visibility into which config files are loaded
+- Documentation: Clarified that `--levels` accepts comma-separated values vs multiple flag invocations, with runtime hint for consecutive flags
+
+### Fixed
+
+- Removed truncation of Drain sample output for more complete template samples
+- Dependencies: Updated `lru` to 0.16.3
+
 
 ## [1.3.2] - 2026-01-05
 
