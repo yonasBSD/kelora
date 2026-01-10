@@ -615,14 +615,6 @@ pub struct Cli {
     )]
     pub drain: Option<DrainFormat>,
 
-    /// Analyze log structure and suggest CLI options (sampling-based, exits after analysis)
-    #[arg(
-        long = "analyze",
-        help_heading = "Analysis",
-        help = "Analyze log structure by sampling and suggest CLI options.\n\nSamples lines from input files to profile:\n  - Field types (string, numeric, boolean)\n  - Value distributions and cardinality\n  - Time range and level distribution\n\nGenerates suggestions for filtering, grouping, and analysis.\n\nExample:\n  kelora --analyze access.log"
-    )]
-    pub analyze: bool,
-
     /// Specify custom configuration file path
     #[arg(long = "config-file", help_heading = "Configuration Options")]
     pub config_file: Option<String>,

@@ -1,6 +1,5 @@
 #![allow(clippy::new_without_default, clippy::should_implement_trait)]
 
-pub mod analysis;
 pub mod cli;
 pub mod colors;
 pub mod config;

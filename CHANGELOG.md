@@ -4,6 +4,22 @@ All notable changes to Kelora will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.3] - 2026-01-10
+
+### Added
+
+- **Event validation** (`--assert`) - Validate log events against user-defined conditions. Helps ensure data quality and catch unexpected patterns during log analysis. Fails with exit code 1 if any event violates the assertion.
+
+### Changed
+
+- Config expansion information now displayed at startup for better visibility into which config files are loaded
+- Documentation: Clarified that `--levels` accepts comma-separated values vs multiple flag invocations, with runtime hint for consecutive flags
+
+### Fixed
+
+- Removed truncation of Drain sample output for more complete template samples
+- Dependencies: Updated `lru` to 0.16.3
+
 ## [1.3.2] - 2026-01-05
 
 ### Added
