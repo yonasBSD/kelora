@@ -547,7 +547,7 @@ fn main() -> Result<()> {
             } else {
                 format!("{} assertion failures", stats.assertion_failures)
             };
-            eprintln!("kelora: {}", failure_text);
+            eprintln!("{}", config.format_error_message(&failure_text));
         }
     }
 

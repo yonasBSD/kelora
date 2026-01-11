@@ -608,14 +608,14 @@ impl AssertStage {
         // Format the event in logfmt style (key=value pairs)
         let event_str = self.format_event_logfmt(event);
 
-        // Build error message
+        // Build error message with proper emoji/prefix
         let error_msg = format!(
             "assert failed: {}\n  line {}: {}",
             self.expression, line_num, event_str
         );
 
-        // Use stderr directly
-        eprintln!("{}", error_msg);
+        // Use format_error_message_auto to respect --no-emoji flag
+        eprintln!("{}", crate::config::format_error_message_auto(&error_msg));
 
         // Track the assertion failure in stats
         crate::stats::stats_add_assertion_failure(&self.expression);
