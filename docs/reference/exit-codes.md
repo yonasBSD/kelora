@@ -42,13 +42,14 @@ echo $?
 
 ## Exit Code 1: Processing Errors
 
-Indicates errors occurred during processing. Four types:
+Indicates errors occurred during processing. Five types:
 
 | Error Type | Cause | Example |
 |------------|-------|---------|
 | **Parse errors** | Lines couldn't be parsed in specified format | Invalid JSON/logfmt syntax |
 | **Filter errors** | `--filter` expressions failed during evaluation | Missing field access, type errors |
 | **Exec errors** | `--exec` scripts failed during execution | Runtime errors in Rhai code |
+| **Assertion failures** | `--assert` expressions evaluated to false | Data quality violations, missing required fields |
 | **File I/O failures** | Individual files failed to open or decompress | Permission denied, file not readable, decompression failed |
 
 ### Resilient Mode (Default)
@@ -88,6 +89,8 @@ echo '{invalid json}' | kelora -j
 kelora -j app.log --filter 'e.missing_field.to_int()'
 # Exec error
 kelora -j app.log --exec 'e.result = e.invalid.to_int()'
+# Assertion failure
+kelora -j app.log --assert 'e.has("user_id")'
 # File I/O error (some files failed)
 kelora -j good.log missing.log
 # All return exit code 1

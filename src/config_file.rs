@@ -11,6 +11,17 @@ pub struct ConfigFile {
     pub aliases: HashMap<String, String>,
 }
 
+/// Information about config file loading and expansion
+#[derive(Debug, Clone, Default)]
+pub struct ConfigExpansionInfo {
+    /// Path to the config file that was loaded (if any)
+    pub loaded_config_path: Option<PathBuf>,
+    /// Defaults that were applied (raw string from config)
+    pub applied_defaults: Option<String>,
+    /// Aliases that were expanded: (alias_name, final_expansion)
+    pub expanded_aliases: Vec<(String, String)>,
+}
+
 impl ConfigFile {
     /// Find project-level .kelora.ini by walking up directory tree
     pub fn find_project_config() -> Option<PathBuf> {
@@ -75,14 +86,17 @@ impl ConfigFile {
     }
 
     /// Load configuration with proper precedence: project > user > defaults
-    pub fn load() -> Result<Self> {
+    /// Returns the config and the path of the highest-precedence config file loaded
+    pub fn load() -> Result<(Self, Option<PathBuf>)> {
         let mut config = Self::default();
+        let mut loaded_path: Option<PathBuf> = None;
 
         // First, load user config files (lowest precedence)
         for path in Self::get_user_config_paths() {
             if path.exists() {
                 let user_config = Self::load_from_path(&path)?;
                 config = Self::merge_configs(config, user_config);
+                loaded_path = Some(path);
                 break; // Use first existing user config file
             }
         }
@@ -91,17 +105,20 @@ impl ConfigFile {
         if let Some(project_path) = Self::find_project_config() {
             let project_config = Self::load_from_path(&project_path)?;
             config = Self::merge_configs(config, project_config);
+            loaded_path = Some(project_path); // Project config takes precedence
         }
 
-        Ok(config)
+        Ok((config, loaded_path))
     }
 
     /// Load configuration with optional custom config file path
-    pub fn load_with_custom_path(custom_path: Option<&str>) -> Result<Self> {
+    /// Returns the config and the path of the config file that was loaded
+    pub fn load_with_custom_path(custom_path: Option<&str>) -> Result<(Self, Option<PathBuf>)> {
         if let Some(path) = custom_path {
             // Use custom path
             let path_buf = std::path::PathBuf::from(path);
-            Self::load_from_path(&path_buf)
+            let config = Self::load_from_path(&path_buf)?;
+            Ok((config, Some(path_buf)))
         } else {
             // Use default loading logic
             Self::load()
@@ -330,12 +347,17 @@ impl ConfigFile {
     }
 
     /// Process command line arguments, expanding aliases and applying defaults
-    pub fn process_args(&self, args: Vec<String>) -> Result<Vec<String>> {
+    /// Returns the processed args and information about what was expanded
+    pub fn process_args(&self, args: Vec<String>) -> Result<(Vec<String>, ConfigExpansionInfo)> {
+        let mut info = ConfigExpansionInfo::default();
+
         // First, apply defaults if they exist
         let mut result = Vec::new();
 
         // Add defaults at the beginning, but preserve the program name
         if let Some(defaults) = &self.defaults {
+            info.applied_defaults = Some(defaults.clone());
+
             if !args.is_empty() {
                 result.push(args[0].clone()); // Keep program name
             }
@@ -357,9 +379,14 @@ impl ConfigFile {
 
         while i < result.len() {
             if (result[i] == "-a" || result[i] == "--alias") && i + 1 < result.len() {
-                let name = &result[i + 1];
+                let name = result[i + 1].clone();
                 let mut seen = std::collections::HashSet::new();
-                let resolved = self.resolve_alias(name, &mut seen, 0)?;
+                let resolved = self.resolve_alias(&name, &mut seen, 0)?;
+
+                // Track the expansion for display
+                let expansion = resolved.join(" ");
+                info.expanded_aliases.push((name, expansion));
+
                 final_result.extend(resolved);
                 i += 2;
             } else {
@@ -368,7 +395,7 @@ impl ConfigFile {
             }
         }
 
-        Ok(final_result)
+        Ok((final_result, info))
     }
 
     /// Resolve all `-a` and `--alias` flags in the given arguments, returning a flattened list
@@ -695,7 +722,7 @@ mod tests {
             "json".to_string(),
         ];
 
-        let processed = config.process_args(args).unwrap();
+        let (processed, _info) = config.process_args(args).unwrap();
 
         assert_eq!(
             processed,
@@ -717,7 +744,7 @@ mod tests {
             "input.log".to_string(),
         ];
 
-        let processed = config.process_args(args).unwrap();
+        let (processed, _info) = config.process_args(args).unwrap();
 
         assert_eq!(
             processed,
@@ -743,7 +770,7 @@ mod tests {
             "json".to_string(),
         ];
 
-        let processed = config.process_args(args).unwrap();
+        let (processed, _info) = config.process_args(args).unwrap();
 
         assert_eq!(
             processed,

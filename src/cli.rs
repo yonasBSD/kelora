@@ -242,6 +242,11 @@ pub struct Cli {
     /// Execute script from file (contents run in the exec stage).
     #[arg(short = 'E', long = "exec-file", help_heading = "Processing Options")]
     pub exec_files: Vec<String>,
+
+    /// Assertion expressions that must evaluate to true. Violations are reported to stderr;
+    /// processing continues unless --strict is enabled. See --help-rhai for expression syntax.
+    #[arg(long = "assert", help_heading = "Processing Options")]
+    pub asserts: Vec<String>,
     /// Include Rhai files before script stages
     #[arg(short = 'I', long = "include", help_heading = "Processing Options")]
     pub includes: Vec<String>,
@@ -305,7 +310,7 @@ pub struct Cli {
         short = 'l',
         long = "levels",
         help_heading = "Filtering Options",
-        help = "Include only events with these log levels (comma-separated, case-insensitive)."
+        help = "Include only events with these log levels (comma-separated, case-insensitive).\n\nUse comma-separated values for OR logic: --levels ERROR,WARN\nMultiple flags create sequential AND filters (advanced)."
     )]
     pub levels: Vec<String>,
 
@@ -795,6 +800,9 @@ impl Cli {
             if let Some(filter_indices) = matches.indices_of("filters") {
                 script_positions.extend(filter_indices);
             }
+            if let Some(assert_indices) = matches.indices_of("asserts") {
+                script_positions.extend(assert_indices);
+            }
             if let Some(exec_indices) = matches.indices_of("execs") {
                 script_positions.extend(exec_indices);
             }
@@ -841,6 +849,28 @@ impl Cli {
                     std::process::exit(2);
                 }
                 stages_with_indices.push((index, ScriptStageType::Filter(script)));
+            }
+        }
+
+        // Get assert stages with their indices
+        if let Some(assert_indices) = matches.indices_of("asserts") {
+            let assert_values: Vec<&String> =
+                matches.get_many::<String>("asserts").unwrap().collect();
+            for (pos, index) in assert_indices.enumerate() {
+                let script = assert_values[pos].clone();
+                let empty_includes = Vec::new();
+                let includes = include_map.get(&index).unwrap_or(&empty_includes);
+                // Assertions don't support includes (same as filters)
+                if !includes.is_empty() {
+                    eprintln!(
+                        "{}",
+                        crate::config::format_error_message_auto(
+                            "--include is not supported with --assert (assertions must be pure expressions)"
+                        )
+                    );
+                    std::process::exit(2);
+                }
+                stages_with_indices.push((index, ScriptStageType::Assert(script)));
             }
         }
 
@@ -911,6 +941,36 @@ impl Cli {
 
         // Sort by original command line position
         stages_with_indices.sort_by_key(|(index, _)| *index);
+
+        // Detect consecutive --levels flags (likely user mistake)
+        let mut prev_was_level_include = false;
+        for (_, stage) in &stages_with_indices {
+            match stage {
+                ScriptStageType::LevelFilter {
+                    include,
+                    exclude: _,
+                } => {
+                    if !include.is_empty() {
+                        if prev_was_level_include {
+                            // Found consecutive --levels flags
+                            let hint = crate::config::format_hint_message_auto(
+                                "Multiple --levels flags create sequential filters (AND). Use comma-separated for OR: --levels ERROR,WARN"
+                            );
+                            eprintln!("{}", hint);
+                            break; // Only show hint once
+                        }
+                        prev_was_level_include = true;
+                    } else {
+                        // This is an exclude-only stage, reset the flag
+                        prev_was_level_include = false;
+                    }
+                }
+                _ => {
+                    // Non-level stage, reset the flag
+                    prev_was_level_include = false;
+                }
+            }
+        }
 
         // Extract just the stages
         Ok(stages_with_indices

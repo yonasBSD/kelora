@@ -1,6 +1,8 @@
 #![allow(dead_code)] // Error-reporting helpers and legacy config paths are kept for planned CLI surfacing
 use clap::ValueEnum;
 
+use crate::config_file::ConfigExpansionInfo;
+
 /// Main configuration struct for Kelora
 #[derive(Debug, Clone)]
 pub struct KeloraConfig {
@@ -65,6 +67,7 @@ pub struct OutputConfig {
 pub enum ScriptStageType {
     Filter(String),
     Exec(String),
+    Assert(String),
     LevelFilter {
         include: Vec<String>,
         exclude: Vec<String>,
@@ -551,6 +554,54 @@ impl KeloraConfig {
             format!("\n{}", message)
         }
     }
+
+    /// Display config expansion information at startup (if diagnostics enabled)
+    pub fn display_config_expansion(
+        info: &ConfigExpansionInfo,
+        config: &KeloraConfig,
+        stderr: &mut crate::platform::SafeStderr,
+    ) {
+        // Check if diagnostics are suppressed
+        if config.processing.suppress_diagnostics || config.processing.silent {
+            return;
+        }
+
+        // Check if there's anything to display
+        let has_content = info.loaded_config_path.is_some()
+            || info.applied_defaults.is_some()
+            || !info.expanded_aliases.is_empty();
+
+        if !has_content {
+            return;
+        }
+
+        // Build output lines
+        let mut lines = Vec::new();
+
+        // Config file loaded
+        if let Some(path) = &info.loaded_config_path {
+            let msg = config.format_info_message(&format!("Config: {}", path.display()));
+            lines.push(msg);
+        }
+
+        // Defaults applied (use info message with indentation)
+        if let Some(defaults) = &info.applied_defaults {
+            let msg = config.format_info_message(&format!("  Defaults: {}", defaults));
+            lines.push(msg);
+        }
+
+        // Aliases expanded (use info message with indentation)
+        for (alias_name, expansion) in &info.expanded_aliases {
+            let msg =
+                config.format_info_message(&format!("  Alias: -a {} → {}", alias_name, expansion));
+            lines.push(msg);
+        }
+
+        // Write all lines
+        for line in lines {
+            stderr.writeln(&line).unwrap_or(());
+        }
+    }
 }
 
 /// Format an error message with appropriate prefix when config is not available
@@ -574,6 +625,16 @@ pub fn format_warning_message_auto(message: &str) -> String {
         format!("🔸 {}", message)
     } else {
         format!("kelora warning: {}", message)
+    }
+}
+
+pub fn format_hint_message_auto(message: &str) -> String {
+    let use_emoji = crate::tty::should_use_emoji_for_stderr();
+
+    if use_emoji {
+        format!("💡 {}", message)
+    } else {
+        format!("kelora hint: {}", message)
     }
 }
 
@@ -1002,7 +1063,7 @@ fn parse_input_format_from_cli(cli: &crate::Cli) -> anyhow::Result<InputFormat> 
 }
 
 /// Parse input format specification string (e.g., "cols:ts(2) level - *msg")
-fn parse_input_format_spec(spec: &str) -> anyhow::Result<InputFormat> {
+pub(crate) fn parse_input_format_spec(spec: &str) -> anyhow::Result<InputFormat> {
     // Helper to parse field spec after format name
     let parse_field_spec = |_prefix: &str, name: &str| -> Option<String> {
         // Handle both "csv:" and "csv " (optional colon)

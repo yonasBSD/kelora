@@ -147,6 +147,14 @@ impl GlobalTracker {
         // Merge error counts (needed for --stats display and termination case)
         global_stats.lines_errors += worker_stats.lines_errors;
         global_stats.errors += worker_stats.errors;
+        global_stats.assertion_failures += worker_stats.assertion_failures;
+        // Merge per-expression assertion failures
+        for (expr, count) in &worker_stats.assertion_failures_by_expr {
+            *global_stats
+                .assertion_failures_by_expr
+                .entry(expr.clone())
+                .or_insert(0) += count;
+        }
         // Merge other worker stats
         global_stats.files_processed += worker_stats.files_processed;
         global_stats.script_executions += worker_stats.script_executions;
@@ -213,6 +221,10 @@ impl GlobalTracker {
             .get("__kelora_stats_events_filtered")
             .and_then(|v| v.as_int().ok())
             .unwrap_or(0) as usize;
+        let assertion_failures = metrics
+            .get("__kelora_stats_assertion_failures")
+            .and_then(|v| v.as_int().ok())
+            .unwrap_or(0) as usize;
 
         stats.lines_output = output;
         stats.lines_errors = lines_errors;
@@ -220,6 +232,7 @@ impl GlobalTracker {
         stats.events_created = events_created;
         stats.events_output = events_output;
         stats.events_filtered = events_filtered;
+        stats.assertion_failures = assertion_failures;
 
         // Extract discovered levels from tracking data
         if let Some(levels_dynamic) = metrics.get("__kelora_stats_discovered_levels") {

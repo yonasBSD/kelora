@@ -41,9 +41,9 @@ impl EventParser for TimestampConfiguredParser {
 }
 
 use super::{
-    create_multiline_chunker, BeginStage, DrainStage, EndStage, EventLimiter, EventParser,
-    ExecStage, FilterStage, Formatter, KeyFilterStage, LevelFilterStage, MetaData, Pipeline,
-    PipelineConfig, PipelineContext, ScriptStage, SimpleChunker, SimpleWindowManager,
+    create_multiline_chunker, AssertStage, BeginStage, DrainStage, EndStage, EventLimiter,
+    EventParser, ExecStage, FilterStage, Formatter, KeyFilterStage, LevelFilterStage, MetaData,
+    Pipeline, PipelineConfig, PipelineContext, ScriptStage, SimpleChunker, SimpleWindowManager,
     SlidingWindowManager, StdoutWriter, TakeNLimiter, TimestampConversionStage,
     TimestampFilterStage,
 };
@@ -476,6 +476,12 @@ impl PipelineBuilder {
                     let exec_stage =
                         ExecStage::new(exec, &mut rhai_engine)?.with_stage_number(stage_number);
                     script_stages.push(Box::new(exec_stage));
+                    stage_number += 1;
+                }
+                crate::config::ScriptStageType::Assert(assertion) => {
+                    let assert_stage = AssertStage::new(assertion, &mut rhai_engine)?
+                        .with_stage_number(stage_number);
+                    script_stages.push(Box::new(assert_stage));
                     stage_number += 1;
                 }
                 crate::config::ScriptStageType::LevelFilter { include, exclude } => {
@@ -982,6 +988,12 @@ impl PipelineBuilder {
                     let exec_stage =
                         ExecStage::new(exec, &mut rhai_engine)?.with_stage_number(stage_number);
                     script_stages.push(Box::new(exec_stage));
+                    stage_number += 1;
+                }
+                crate::config::ScriptStageType::Assert(assertion) => {
+                    let assert_stage = AssertStage::new(assertion, &mut rhai_engine)?
+                        .with_stage_number(stage_number);
+                    script_stages.push(Box::new(assert_stage));
                     stage_number += 1;
                 }
                 crate::config::ScriptStageType::LevelFilter { include, exclude } => {

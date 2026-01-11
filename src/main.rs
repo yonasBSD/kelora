@@ -67,7 +67,7 @@ fn main() -> Result<()> {
     let mut stdout = SafeStdout::new();
 
     // Process command line arguments with config file support
-    let (matches, cli) = process_args_with_config(&mut stderr);
+    let (matches, cli, config_expansion_info) = process_args_with_config(&mut stderr);
 
     // Validate CLI argument combinations
     if let Err(e) = validate_cli_args(&cli) {
@@ -96,6 +96,10 @@ fn main() -> Result<()> {
             std::process::exit(ExitCode::InvalidUsage as i32);
         }
     };
+
+    // Display config expansion info (if diagnostics enabled)
+    KeloraConfig::display_config_expansion(&config_expansion_info, &config, &mut stderr);
+
     // Set the ordered stages directly
     config.processing.stages = ordered_stages;
     let diagnostics_allowed = !config.processing.silent && !config.processing.suppress_diagnostics;
@@ -533,6 +537,18 @@ fn main() -> Result<()> {
             "fatal error encountered".to_string()
         };
         emit_fatal_line(&mut stderr, &config, &fatal_message);
+    }
+
+    // Print assertion failure summary if any occurred
+    if let Some(ref stats) = final_stats {
+        if stats.assertion_failures > 0 {
+            let failure_text = if stats.assertion_failures == 1 {
+                "1 assertion failure".to_string()
+            } else {
+                format!("{} assertion failures", stats.assertion_failures)
+            };
+            eprintln!("kelora: {}", failure_text);
+        }
     }
 
     if had_errors {

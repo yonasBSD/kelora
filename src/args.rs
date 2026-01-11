@@ -8,7 +8,7 @@ use clap::{ArgMatches, CommandFactory, FromArgMatches};
 
 use crate::cli::{Cli, OutputFormat, ShellCompletion};
 use crate::config::MultilineJoin;
-use crate::config_file::ConfigFile;
+use crate::config_file::{ConfigExpansionInfo, ConfigFile};
 use crate::help;
 use crate::platform::{ExitCode, SafeStderr};
 use crate::tty;
@@ -243,7 +243,7 @@ pub fn handle_save_alias(raw_args: &[String], alias_name: &str, use_emoji: bool)
         };
 
         match config_result {
-            Ok(config) => {
+            Ok((config, _path)) => {
                 if should_resolve {
                     // Resolution mode: flatten all aliases
                     match config.resolve_args_only(&command_args) {
@@ -341,7 +341,7 @@ pub fn handle_save_alias(raw_args: &[String], alias_name: &str, use_emoji: bool)
 }
 
 /// Process command line arguments with config file support
-pub fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
+pub fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli, ConfigExpansionInfo) {
     // Get raw command line arguments
     let raw_args: Vec<String> = std::env::args().collect();
 
@@ -443,14 +443,17 @@ pub fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
     // Check for --ignore-config
     let ignore_config = has_ignore_config;
 
-    let processed_args = if ignore_config {
+    let (processed_args, expansion_info) = if ignore_config {
         // Skip config file processing
-        raw_args
+        (raw_args, ConfigExpansionInfo::default())
     } else {
         // Load config file and process aliases
         match ConfigFile::load_with_custom_path(config_file_path.as_deref()) {
-            Ok(config_file) => match config_file.process_args(raw_args) {
-                Ok(processed) => processed,
+            Ok((config_file, loaded_path)) => match config_file.process_args(raw_args) {
+                Ok((processed, mut info)) => {
+                    info.loaded_config_path = loaded_path;
+                    (processed, info)
+                }
                 Err(e) => {
                     stderr
                         .writeln(&format!("kelora: Config error: {}", e))
@@ -510,5 +513,5 @@ pub fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli) {
         std::process::exit(2);
     }
 
-    (matches, cli)
+    (matches, cli, expansion_info)
 }
