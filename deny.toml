@@ -70,7 +70,6 @@ feature-depth = 1
 # A list of advisory IDs to ignore. Note that ignored advisories will still
 # output a note when they are encountered.
 ignore = [
-    { id = "RUSTSEC-2024-0384", reason = "instant is unmaintained; acceptable for now" },
     #"a-crate-that-is-yanked@0.1.1", # you can also ignore yanked crate versions if you wish
     #{ crate = "a-crate-that-is-yanked@0.1.1", reason = "you can specify why you are ignoring the yanked crate" },
 ]
@@ -206,16 +205,33 @@ deny = [
 
 # Certain crates/versions that will be skipped when doing duplicate detection.
 skip = [
-    #"ansi_term@0.11.0",
-    #{ crate = "ansi_term@0.11.0", reason = "you can specify a reason why it can't be updated/removed" },
+    # getrandom 0.2.x is required by const-random-macro (via ahash/rhai) and redox_users (via dirs)
+    # getrandom 0.3.x is the new version used by rand, tempfile, jobserver, etc.
+    # Ecosystem is migrating from 0.2 to 0.3; duplicates are unavoidable during transition
+    { crate = "getrandom@0.2", reason = "transitive dep via const-random-macro and redox_users; ecosystem migrating to 0.3" },
+
+    # rand_core 0.6.x is required by password-hash (via argon2)
+    # rand_core 0.9.x is the new version used by rand 0.9
+    # argon2 0.6 (which updates password-hash) is still pre-release
+    { crate = "rand_core@0.6", reason = "required by argon2's password-hash; argon2 0.6 still in pre-release" },
+
+    # windows-sys/windows-targets have multiple versions due to different transitive deps:
+    # - 0.52.x: home (pinned for OpenBSD compatibility)
+    # - 0.59.x: fd-lock (via rustyline)
+    # - 0.60.x: rustyline, terminal_size
+    # - 0.61.x: newer crates (anstream, dirs-sys, errno, etc.)
+    { crate = "windows-sys@0.52", reason = "required by home (pinned for OpenBSD compatibility)" },
+    { crate = "windows-sys@0.59", reason = "required by fd-lock via rustyline" },
+    { crate = "windows-sys@0.60", reason = "required by rustyline and terminal_size" },
 ]
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive
 # dependencies starting at the specified crate, up to a certain depth, which is
 # by default infinite.
 skip-tree = [
-    #"ansi_term@0.11.0", # will be skipped along with _all_ of its direct and transitive dependencies
-    #{ crate = "ansi_term@0.11.0", depth = 20 },
+    # windows-targets 0.52.x and its platform crates (windows_*_gnullvm, windows_*_msvc, etc.)
+    # are required by windows-sys 0.52.x and 0.59.x (via home and fd-lock)
+    { crate = "windows-targets@0.52", reason = "required by windows-sys 0.52.x/0.59.x; includes platform crates" },
 ]
 
 # This section is considered when running `cargo deny check sources`.
