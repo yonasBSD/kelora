@@ -4,9 +4,7 @@ All notable changes to Kelora will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
-
-## [1.4.1]
+## [1.4.1 - 2026-01-19]
 
 ### Added
 
@@ -15,11 +13,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `mean()` - Calculate arithmetic mean of numeric array elements
   - `variance()` - Calculate variance of numeric array elements
   - `stddev()` - Calculate standard deviation of numeric array elements
+- **`resolve_fields.rhai` example script** - Semantic field resolution for cross-format log analysis. Resolves common log concepts (duration, user, client_ip, error, request_id, status) regardless of field naming convention. Enables queries that work across different log formats without hardcoding field names.
 - **Log-analysis skill** - Agent assistance skill for analyzing logs and identifying patterns
 
 ### Changed
 
 - **Zero unsafe code:** Removed manual `Send` implementations from `DecompressionReader` and `PeekableLineReader`. The compiler now derives `Send` automatically since all contained types are `Send`. This eliminates the last 2 `unsafe` blocks from the codebase.
+- **Documentation:** Added direct download links for common platforms (macOS Apple Silicon/Intel, Linux), highlighted Drain template mining on landing page, added quick-start guidance to high-traffic documentation pages, fixed broken anchor links
 
 ### Fixed
 
