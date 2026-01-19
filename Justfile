@@ -214,6 +214,20 @@ release-prepare:
         exit 1
     fi
 
+    # Validate CHANGELOG.md entry exists and has correct format
+    # Keep a Changelog format: ## [x.y.z] - YYYY-MM-DD (date outside brackets)
+    if ! grep -qE "^## \[${VERSION}\] - [0-9]{4}-[0-9]{2}-[0-9]{2}" CHANGELOG.md; then
+        if grep -qE "^## \[${VERSION} - " CHANGELOG.md; then
+            echo "error: CHANGELOG.md has malformed header for v${VERSION}." >&2
+            echo "       Found: ## [${VERSION} - DATE]" >&2
+            echo "       Expected: ## [${VERSION}] - DATE (date must be outside brackets)" >&2
+        else
+            echo "error: CHANGELOG.md is missing entry for version ${VERSION}." >&2
+            echo "       Expected header: ## [${VERSION}] - YYYY-MM-DD" >&2
+        fi
+        exit 1
+    fi
+
     CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
     TARGET_BRANCH="${RELEASE_BRANCH:-$CURRENT_BRANCH}"
     REMOTE="${RELEASE_REMOTE:-origin}"
