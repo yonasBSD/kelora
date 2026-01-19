@@ -43,13 +43,13 @@ Group errors by pattern rather than exact message to see that many different err
 === "Command/Output"
 
     ```bash exec="on" source="above" result="ansi"
-kelora -j examples/production-errors.jsonl \
-  --exec 'e.error_pattern = e.message.normalized()' \
-  --metrics \
-  --exec 'track_count(e.error_pattern)'
-```
+    kelora -j examples/production-errors.jsonl \
+      --exec 'e.error_pattern = e.message.normalized()' \
+      --metrics \
+      --exec 'track_count(e.error_pattern)'
+    ```
 
-### Template Mining with `--drain`
+### Template Mining with --drain {#template-mining-with-drain}
 
 When you want automatic template discovery without maintaining normalization patterns, use the Drain summary:
 If you only need lightweight grouping, `normalized()` plus `track_count()` can be enough.

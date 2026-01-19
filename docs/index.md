@@ -5,6 +5,7 @@
 Kelora is a scriptable log processor for the command line. Parse structured or semi-structured logs (one format per file/stream), filter with complex logic, and analyze streams using embedded [Rhai](https://rhai.rs) scripting—all in a single binary. It can also extract logfmt/JSON blobs embedded inside a single event.
 
 **Download:** [Windows](https://github.com/dloss/kelora/releases/latest/download/kelora-x86_64-pc-windows-msvc.zip) | [macOS (Apple Silicon)](https://github.com/dloss/kelora/releases/latest/download/kelora-aarch64-apple-darwin.tar.gz) | [macOS (Intel)](https://github.com/dloss/kelora/releases/latest/download/kelora-x86_64-apple-darwin.tar.gz) | [Linux (x86_64)](https://github.com/dloss/kelora/releases/latest/download/kelora-x86_64-unknown-linux-musl.tar.gz) | [Other platforms](https://github.com/dloss/kelora/releases)
+{: #installation}
 
 **Or install via Cargo:**
 
@@ -105,7 +106,7 @@ Beyond basic filtering and conversion, Kelora includes specialized functions tha
 
 - **[Deep flattening](how-to/power-user-techniques.md#deep-structure-flattening)** - Fan out nested JSON arrays to flat records (`emit_each()`)
 - **[Extract JSON from text](how-to/power-user-techniques.md#extract-json-from-unstructured-text)** - Pull structured data from unstructured log lines
-- **[Template mining](how-to/power-user-techniques.md#template-mining-with---drain)** - Automatic log pattern discovery and clustering using Drain algorithm
+- **[Template mining](how-to/power-user-techniques.md#template-mining-with-drain)** - Automatic log pattern discovery and clustering using Drain algorithm
 - **[JWT parsing](how-to/power-user-techniques.md#jwt-parsing-without-verification)** - Extract claims without signature verification for debugging
 - **[Cryptographic pseudonymization](how-to/power-user-techniques.md#multiple-hash-algorithms)** - Privacy-preserving anonymization with Argon2id + HKDF + HMAC
 - **[Pattern normalization](how-to/power-user-techniques.md#pattern-normalization)** - Group error messages by replacing IPs, UUIDs, emails with placeholders
