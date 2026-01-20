@@ -23,6 +23,8 @@ Kelora handles log analysis that grep/awk/jq struggle with: extracting embedded 
 - **You're chaining tools** - Replace `grep | awk | jq | custom-script.py` with one command
 - **You need stateful logic** - Count errors per service, tracking sessions, windowed metrics
 
+**Keep in mind:** Kelora prioritizes flexibility over raw speed—it's typically 10-50× slower than specialized tools. It works well for exploratory analysis on small to medium datasets (tens of thousands to hundreds of thousands of lines), but for large files or high-throughput pipelines, use `jq`, `ripgrep`, or `qsv` first. See [Performance Comparisons](concepts/performance-comparisons.md).
+
 ---
 
 ## Live Examples
@@ -84,28 +86,25 @@ The Drain algorithm clusters similar messages and replaces variable parts with p
 
 Beyond basic filtering and conversion, Kelora includes specialized functions that solve problems you'd otherwise need multiple tools or custom scripts for:
 
-- **[Pattern normalization](how-to/power-user-techniques.md#pattern-normalization)** - Group errors by replacing IPs, UUIDs, emails with placeholders
-  `e.error_pattern = e.message.normalized()`
-
-- **[Deterministic sampling](how-to/power-user-techniques.md#deterministic-sampling-with-bucket)** - Consistent sampling across log rotations
-  `--filter 'e.request_id.bucket() % 10 == 0'`
-
-- **[Cryptographic pseudonymization](how-to/power-user-techniques.md#multiple-hash-algorithms)** - Privacy-preserving anonymization with HMAC
-  `e.anon_user = pseudonym(e.email, "users")`
-
-- **[JWT parsing](how-to/power-user-techniques.md#jwt-parsing-without-verification)** - Extract claims without verification
-  `e.token.parse_jwt().claims.sub`
-
 - **[Extract JSON from text](how-to/power-user-techniques.md#extract-json-from-unstructured-text)** - Pull structured data from unstructured lines
   `e.data = e.line.extract_json()`
 
 - **[Deep flattening](how-to/power-user-techniques.md#deep-structure-flattening)** - Fan out nested arrays to flat records
   `emit_each(e.get_path("data.orders", []))`
 
-See **[Power-User Techniques](how-to/power-user-techniques.md)** for real-world examples. For performance characteristics and when to use specialized tools instead, see [Performance Comparisons](concepts/performance-comparisons.md).
+- **[Pattern normalization](how-to/power-user-techniques.md#pattern-normalization)** - Group errors by replacing IPs, UUIDs, emails with placeholders
+  `e.error_pattern = e.message.normalized()`
 
-!!! tip "On-call?"
-    Jump to **[Incident Response Playbooks](how-to/incident-response-playbooks.md)** for copy-paste commands covering latency spikes, error surges, auth failures, and more.
+- **[Deterministic sampling](how-to/power-user-techniques.md#deterministic-sampling-with-bucket)** - Consistent sampling across log rotations
+  `--filter 'e.request_id.bucket() % 10 == 0'`
+
+- **[JWT parsing](how-to/power-user-techniques.md#jwt-parsing-without-verification)** - Extract claims without verification
+  `e.token.parse_jwt().claims.sub`
+
+- **[Cryptographic pseudonymization](how-to/power-user-techniques.md#multiple-hash-algorithms)** - Privacy-preserving anonymization with HMAC
+  `e.anon_user = pseudonym(e.email, "users")`
+
+See **[Power-User Techniques](how-to/power-user-techniques.md)** for real-world examples.
 
 ---
 
@@ -118,6 +117,9 @@ See **[Power-User Techniques](how-to/power-user-techniques.md)** for real-world 
 **[→ How-To Guides](how-to/index.md)** - Solve specific problems (including [debugging](how-to/debug-issues.md))
 
 For deeper understanding, see [Concepts](concepts/index.md). For complete reference, see [Glossary](glossary.md), [Functions](reference/functions.md), [Formats](reference/formats.md), and [CLI options](reference/cli-reference.md).
+
+!!! tip "On-call?"
+    Jump to **[Incident Response Playbooks](how-to/incident-response-playbooks.md)** for copy-paste commands covering latency spikes, error surges, auth failures, and more.
 
 ---
 
