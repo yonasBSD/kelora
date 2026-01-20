@@ -74,29 +74,22 @@ Kelora reads from files or stdin and outputs JSON, CSV, or Logfmt. Combine it wi
     cat examples/audit.jsonl
     ```
 
-### 3. Contextual Analysis (Pipeline Order)
-*Scenario: An error occurred. We want to see the error, but enrich it with context from the **previous** log line (even if that line wasn't an error).*
-
-!!! tip "Sequential Pipeline"
-    Kelora processes flags in order. We run `--exec` **before** `--filter` so the sliding window can see the normal events before they are discarded.
+### 3. Pattern Discovery (Template Mining)
+*Scenario: You have thousands of error messages that differ only in IPs, emails, and UUIDs. Find the underlying patterns automatically.*
 
 === "Command/Output"
 
     ```bash exec="on" source="above" result="ansi"
-    kelora -j examples/api_errors.jsonl \
-      --window 2 \
-      --exec 'if e.level == "ERROR" && window.len() > 1 {
-          e.prev_ctx = window[1].endpoint;
-      }' \
-      --filter 'e.level == "ERROR"' \
-      -F logfmt
+    kelora -j examples/production-errors.jsonl --drain -k message
     ```
 
 === "Input Data"
 
     ```bash exec="on" result="ansi"
-    cat examples/api_errors.jsonl
+    cat examples/production-errors.jsonl
     ```
+
+The Drain algorithm clusters similar messages and replaces variable parts with placeholders like `<ipv4>`, `<email>`, `<uuid>`. No regex required.
 
 ---
 
@@ -104,15 +97,28 @@ Kelora reads from files or stdin and outputs JSON, CSV, or Logfmt. Combine it wi
 
 Beyond basic filtering and conversion, Kelora includes specialized functions that solve problems you'd otherwise need multiple tools or custom scripts for:
 
-- **[Deep flattening](how-to/power-user-techniques.md#deep-structure-flattening)** - Fan out nested JSON arrays to flat records (`emit_each()`)
-- **[Extract JSON from text](how-to/power-user-techniques.md#extract-json-from-unstructured-text)** - Pull structured data from unstructured log lines
-- **[Template mining](how-to/power-user-techniques.md#template-mining-with-drain)** - Automatic log pattern discovery and clustering using Drain algorithm
-- **[JWT parsing](how-to/power-user-techniques.md#jwt-parsing-without-verification)** - Extract claims without signature verification for debugging
-- **[Cryptographic pseudonymization](how-to/power-user-techniques.md#multiple-hash-algorithms)** - Privacy-preserving anonymization with Argon2id + HKDF + HMAC
-- **[Pattern normalization](how-to/power-user-techniques.md#pattern-normalization)** - Group error messages by replacing IPs, UUIDs, emails with placeholders
-- **[Deterministic sampling](how-to/power-user-techniques.md#deterministic-sampling-with-bucket)** - Hash-based sampling that's consistent across log rotations and distributed systems
+- **[Pattern normalization](how-to/power-user-techniques.md#pattern-normalization)** - Group errors by replacing IPs, UUIDs, emails with placeholders
+  `e.error_pattern = e.message.normalized()`
+
+- **[Deterministic sampling](how-to/power-user-techniques.md#deterministic-sampling-with-bucket)** - Consistent sampling across log rotations
+  `--filter 'e.request_id.bucket() % 10 == 0'`
+
+- **[Cryptographic pseudonymization](how-to/power-user-techniques.md#multiple-hash-algorithms)** - Privacy-preserving anonymization with HMAC
+  `e.anon_user = pseudonym(e.email, "users")`
+
+- **[JWT parsing](how-to/power-user-techniques.md#jwt-parsing-without-verification)** - Extract claims without verification
+  `e.token.parse_jwt().claims.sub`
+
+- **[Extract JSON from text](how-to/power-user-techniques.md#extract-json-from-unstructured-text)** - Pull structured data from unstructured lines
+  `e.data = e.line.extract_json()`
+
+- **[Deep flattening](how-to/power-user-techniques.md#deep-structure-flattening)** - Fan out nested arrays to flat records
+  `emit_each(e.get_path("data.orders", []))`
 
 See **[Power-User Techniques](how-to/power-user-techniques.md)** for real-world examples. For performance characteristics and when to use specialized tools instead, see [Performance Comparisons](concepts/performance-comparisons.md).
+
+!!! tip "On-call?"
+    Jump to **[Incident Response Playbooks](how-to/incident-response-playbooks.md)** for copy-paste commands covering latency spikes, error surges, auth failures, and more.
 
 ---
 
