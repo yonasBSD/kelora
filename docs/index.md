@@ -25,7 +25,7 @@ Kelora prioritizes flexibility over [raw speed](concepts/performance-comparisons
 
 ---
 
-## Live Examples
+## Examples
 
 ### 1. Filter & Convert (The Basics)
 *Scenario: Filter a Logfmt file for slow requests and output clean JSON.*
