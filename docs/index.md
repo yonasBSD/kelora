@@ -18,23 +18,15 @@ cargo install kelora
 
 ## When to Use Kelora
 
-Kelora trades speed for programmability. It's slower than grep, awk, and jq, but adds stateful scripting for complex multi-stage transformations.
+Kelora handles log analysis that grep/awk/jq struggle with: extracting embedded JSON, parsing custom formats, and keeping state across events.
 
 **Reach for Kelora when:**
 
-- Your logs are **messy** - One format per file/stream, with embedded JSON/logfmt fields you want to pull out
-- You're **chaining tools** - Replacing `grep | awk | jq | custom-script.py` with one command
-- You need **stateful logic** - Counting errors per service, windowed metrics, lookup tables
-- You want **embedded scripting** - Complex transformations without leaving your shell
-
-**Use specialized tools for:**
-
-- **Fast search**: `grep`/`rg` (50-100× faster) - Finding text patterns in logs
-- **Simple splitting**: `awk` (faster, ubiquitous) - Field extraction and simple statistics
-- **JSON queries**: `jq` (faster, everywhere) - Querying structured JSON documents
-- **Interactive exploration**: `lnav` (TUI with SQL) - Browsing logs with a visual interface
-
-Kelora reads from files or stdin and outputs JSON, CSV, or Logfmt. Combine it with [lnav, jq, qsv, and other tools](how-to/integrate-external-tools.md) for visualization, analytics, and storage.
+- **Logs have embedded structure** - JSON or key-value pairs buried in text lines that need extraction
+- **You're parsing custom formats** - Simple one-liners for non-standard logs, no regex required, output clean JSON
+- **Fields are inconsistent** - Some events have fields others don't; Kelora handles missing data gracefully
+- **You're chaining tools** - Replacing `grep | awk | jq | custom-script.py` with one command
+- **You need stateful logic** - Counting errors per service, tracking sessions, windowed metrics
 
 ---
 
