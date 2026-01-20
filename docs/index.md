@@ -17,13 +17,13 @@ Kelora handles log analysis that grep/awk/jq struggle with: extracting embedded 
 
 **Reach for Kelora when:**
 
-- **Logs have embedded structure** - Extract JSON or key-value pairs buried in text lines that need extraction
-- **You're parsing custom formats** - Use simple one-liners for non-standard logs, no regex required, output clean JSON
-- **Fields are inconsistent** - Let missing data or errors be handled gracefully, with summary reports at the end  
 - **You're chaining tools** - Replace `grep | awk | jq | custom-script.py` with one command
+- **You're parsing custom formats** - Use simple one-liners for non-standard logs (no regex required!) and output clean JSON
+- **Logs have embedded structure** - Extract JSON or key-value pairs buried in text lines
 - **You need stateful logic** - Count errors per service, tracking sessions, windowed metrics
+- **Fields are inconsistent** - Let missing data or errors be handled gracefully, with summary reports at the end
 
-**Keep in mind:** Kelora prioritizes flexibility over raw speed—it's typically 10-50× slower than specialized tools. It works well for exploratory analysis on small to medium datasets (tens of thousands to hundreds of thousands of lines), but for large files or high-throughput pipelines, use `jq`, `ripgrep`, or `qsv` first. See [Performance Comparisons](concepts/performance-comparisons.md).
+Kelora prioritizes flexibility over [raw speed](concepts/performance-comparisons.md). It shines for exploratory analysis on **small to medium** log files. For larger files, pre-filter with `jq`, `ripgrep`, or `qsv`—Kelora [plays well](how-to/integrate-external-tools.md) with all of them.
 
 ---
 
