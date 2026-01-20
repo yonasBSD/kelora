@@ -59,11 +59,7 @@ Extract the archive and add the `kelora` binary to your PATH.
 cargo install kelora
 ```
 
-## Stability Promise (1.0+)
-
-Starting with v1.0, Kelora follows semantic versioning:
-- **CLI flags, Rhai functions, exit codes**: Stable. Breaking changes only in major versions (2.0, 3.0, etc.)
-- **Deprecations**: Marked for one minor version before removal
+Kelora follows semver starting with v1.0—CLI flags and Rhai functions are stable.
 
 ## Documentation
 
