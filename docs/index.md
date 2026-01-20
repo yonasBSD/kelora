@@ -2,7 +2,7 @@
 
 **Turn messy logs into structured data.**
 
-Kelora is a scriptable log processor for the command line. Parse structured or semi-structured logs (one format per file/stream), filter with complex logic, and analyze streams using embedded [Rhai](https://rhai.rs) scripting—all in a single binary.
+Kelora is a scriptable log processor for the command line. Parse structured or semi-structured logs, filter with complex logic, and analyze streams using embedded [Rhai](https://rhai.rs) scripting—all in a single binary.
 
 !!! tip "Installation"
     [Windows](https://github.com/dloss/kelora/releases/latest/download/kelora-x86_64-pc-windows-msvc.zip) | [macOS (Apple Silicon)](https://github.com/dloss/kelora/releases/latest/download/kelora-aarch64-apple-darwin.tar.gz) | [macOS (Intel)](https://github.com/dloss/kelora/releases/latest/download/kelora-x86_64-apple-darwin.tar.gz) | [Linux (x86_64)](https://github.com/dloss/kelora/releases/latest/download/kelora-x86_64-unknown-linux-musl.tar.gz) | [Other platforms](https://github.com/dloss/kelora/releases)
@@ -13,9 +13,7 @@ Kelora is a scriptable log processor for the command line. Parse structured or s
 
 ## When to Use Kelora
 
-Kelora handles log analysis that grep/awk/jq struggle with: extracting embedded JSON, parsing custom formats, and keeping state across events.
-
-**Reach for Kelora when:**
+Reach for Kelora when:
 
 - **You're chaining tools** - Replace `grep | awk | jq | custom-script.py` with one command
 - **You're parsing custom formats** - Use simple one-liners for non-standard logs (no regex required!) and output clean JSON
@@ -23,7 +21,7 @@ Kelora handles log analysis that grep/awk/jq struggle with: extracting embedded 
 - **You need stateful logic** - Count errors per service, tracking sessions, windowed metrics
 - **Fields are inconsistent** - Let missing data or errors be handled gracefully, with summary reports at the end
 
-Kelora prioritizes flexibility over [raw speed](concepts/performance-comparisons.md). It shines for exploratory analysis on **small to medium** log files. For larger files, pre-filter with `jq`, `ripgrep`, or `qsv`—Kelora [plays well](how-to/integrate-external-tools.md) with all of them.
+Kelora prioritizes flexibility over [raw speed](concepts/performance-comparisons.md). It shines for exploratory analysis on **small to medium** log files. For larger files, pre-filter with `jq`, `ripgrep`, or `qsv` -- Kelora [plays well](how-to/integrate-external-tools.md) with all of them.
 
 ---
 
