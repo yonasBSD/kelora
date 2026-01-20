@@ -2,7 +2,7 @@
 
 **Turn messy logs into structured data.**
 
-Kelora is a scriptable log processor for the command line. Parse structured or semi-structured logs (one format per file/stream), filter with complex logic, and analyze streams using embedded [Rhai](https://rhai.rs) scripting—all in a single binary. It can also extract logfmt/JSON blobs embedded inside a single event.
+Kelora is a scriptable log processor for the command line. Parse structured or semi-structured logs (one format per file/stream), filter with complex logic, and analyze streams using embedded [Rhai](https://rhai.rs) scripting—all in a single binary.
 
 **Download:** [Windows](https://github.com/dloss/kelora/releases/latest/download/kelora-x86_64-pc-windows-msvc.zip) | [macOS (Apple Silicon)](https://github.com/dloss/kelora/releases/latest/download/kelora-aarch64-apple-darwin.tar.gz) | [macOS (Intel)](https://github.com/dloss/kelora/releases/latest/download/kelora-x86_64-apple-darwin.tar.gz) | [Linux (x86_64)](https://github.com/dloss/kelora/releases/latest/download/kelora-x86_64-unknown-linux-musl.tar.gz) | [Other platforms](https://github.com/dloss/kelora/releases)
 {: #installation}
@@ -22,11 +22,11 @@ Kelora handles log analysis that grep/awk/jq struggle with: extracting embedded 
 
 **Reach for Kelora when:**
 
-- **Logs have embedded structure** - JSON or key-value pairs buried in text lines that need extraction
-- **You're parsing custom formats** - Simple one-liners for non-standard logs, no regex required, output clean JSON
-- **Fields are inconsistent** - Some events have fields others don't; Kelora handles missing data gracefully
-- **You're chaining tools** - Replacing `grep | awk | jq | custom-script.py` with one command
-- **You need stateful logic** - Counting errors per service, tracking sessions, windowed metrics
+- **Logs have embedded structure** - Extract JSON or key-value pairs buried in text lines that need extraction
+- **You're parsing custom formats** - Use simple one-liners for non-standard logs, no regex required, output clean JSON
+- **Fields are inconsistent** - Let missing data or errors be handled gracefully, with summary reports at the end  
+- **You're chaining tools** - Replace `grep | awk | jq | custom-script.py` with one command
+- **You need stateful logic** - Count errors per service, tracking sessions, windowed metrics
 
 ---
 
