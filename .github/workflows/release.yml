@@ -301,3 +301,86 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish --token "$CARGO_REGISTRY_TOKEN"
+
+  update-homebrew-tap:
+    needs: [audit, build]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc')
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Download macOS ARM64 binary
+        run: |
+          curl -LO https://github.com/dloss/kelora/releases/download/v${{ steps.version.outputs.VERSION }}/kelora-aarch64-apple-darwin.tar.gz
+
+      - name: Download macOS x86_64 binary
+        run: |
+          curl -LO https://github.com/dloss/kelora/releases/download/v${{ steps.version.outputs.VERSION }}/kelora-x86_64-apple-darwin.tar.gz
+
+      - name: Calculate SHA256 checksums
+        id: checksums
+        run: |
+          ARM64_SHA256=$(shasum -a 256 kelora-aarch64-apple-darwin.tar.gz | awk '{print $1}')
+          X86_64_SHA256=$(shasum -a 256 kelora-x86_64-apple-darwin.tar.gz | awk '{print $1}')
+          echo "ARM64_SHA256=$ARM64_SHA256" >> $GITHUB_OUTPUT
+          echo "X86_64_SHA256=$X86_64_SHA256" >> $GITHUB_OUTPUT
+
+      - name: Checkout homebrew-kelora tap
+        uses: actions/checkout@v4
+        with:
+          repository: dloss/homebrew-kelora
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-kelora
+
+      - name: Update Homebrew formula
+        run: |
+          cd homebrew-kelora
+          cat > Formula/kelora.rb << 'EOF'
+          # Homebrew Formula for Kelora
+          # This file is automatically updated by the release workflow
+          # Do not edit manually - changes will be overwritten
+
+          class Kelora < Formula
+            desc "Command-line log analysis tool with embedded Rhai scripting"
+            homepage "https://github.com/dloss/kelora"
+            version "${{ steps.version.outputs.VERSION }}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/dloss/kelora/releases/download/v${{ steps.version.outputs.VERSION }}/kelora-aarch64-apple-darwin.tar.gz"
+                sha256 "${{ steps.checksums.outputs.ARM64_SHA256 }}"
+              else
+                url "https://github.com/dloss/kelora/releases/download/v${{ steps.version.outputs.VERSION }}/kelora-x86_64-apple-darwin.tar.gz"
+                sha256 "${{ steps.checksums.outputs.X86_64_SHA256 }}"
+              end
+            end
+
+            def install
+              bin.install "kelora"
+            end
+
+            test do
+              # Test basic functionality
+              assert_match "kelora ${{ steps.version.outputs.VERSION }}", shell_output("#{bin}/kelora --version")
+
+              # Test help output
+              assert_match "Command-line log analysis", shell_output("#{bin}/kelora -h")
+
+              # Test with a simple echo pipe
+              output = pipe_output("#{bin}/kelora -f json --filter 'true'", '{"level":"info","msg":"test"}')
+              assert_match "test", output
+            end
+          end
+          EOF
+
+      - name: Commit and push formula update
+        run: |
+          cd homebrew-kelora
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/kelora.rb
+          git commit -m "Update Kelora to v${{ steps.version.outputs.VERSION }}"
+          git push

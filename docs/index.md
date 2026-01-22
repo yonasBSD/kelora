@@ -5,9 +5,11 @@
 Kelora is a scriptable log processor for the command line. Parse structured or semi-structured logs, filter with complex logic, and analyze streams using embedded [Rhai](https://rhai.rs) scripting—all in a single binary.
 
 !!! tip "Installation"
-    [Windows](https://github.com/dloss/kelora/releases/latest/download/kelora-x86_64-pc-windows-msvc.zip) | [macOS (Apple Silicon)](https://github.com/dloss/kelora/releases/latest/download/kelora-aarch64-apple-darwin.tar.gz) | [macOS (Intel)](https://github.com/dloss/kelora/releases/latest/download/kelora-x86_64-apple-darwin.tar.gz) | [Linux (x86_64)](https://github.com/dloss/kelora/releases/latest/download/kelora-x86_64-unknown-linux-musl.tar.gz) | [Other platforms](https://github.com/dloss/kelora/releases)
+    **macOS:** `brew tap dloss/kelora && brew install kelora`
 
-    Or install via Cargo: `cargo install kelora`
+    **Pre-built binaries:** [Windows](https://github.com/dloss/kelora/releases/latest/download/kelora-x86_64-pc-windows-msvc.zip) | [macOS (Apple Silicon)](https://github.com/dloss/kelora/releases/latest/download/kelora-aarch64-apple-darwin.tar.gz) | [macOS (Intel)](https://github.com/dloss/kelora/releases/latest/download/kelora-x86_64-apple-darwin.tar.gz) | [Linux (x86_64)](https://github.com/dloss/kelora/releases/latest/download/kelora-x86_64-unknown-linux-musl.tar.gz) | [Other platforms](https://github.com/dloss/kelora/releases)
+
+    **Cargo:** `cargo install kelora`
 
 *Kelora is AI-generated; see [Development Approach](#development-approach).*
 

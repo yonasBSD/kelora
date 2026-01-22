@@ -40,6 +40,13 @@ See [Power-User Techniques](https://kelora.dev/latest/how-to/power-user-techniqu
 
 ## Installation
 
+**macOS (Homebrew):**
+
+```bash
+brew tap dloss/kelora
+brew install kelora
+```
+
 **Download pre-built binaries:**
 
 | Platform | Download |
