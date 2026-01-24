@@ -120,3 +120,6 @@ filtering, transformation, and aggregation capabilities."""
 section = "utils"
 priority = "optional"
 assets = [["target/release/kelora", "usr/bin/", "755"]]
+
+[package.metadata.generate-rpm]
+assets = [{ source = "target/release/kelora", dest = "/usr/bin/kelora", mode = "755" }]
