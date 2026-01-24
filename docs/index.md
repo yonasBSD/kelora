@@ -4,6 +4,7 @@
 
 Kelora is a scriptable log processor for the command line. Parse structured or semi-structured logs, filter with complex logic, and analyze streams using embedded [Rhai](https://rhai.rs) scripting—all in a single binary.
 
+<a id="installation"></a>
 !!! tip "Installation"
     **macOS:** `brew tap dloss/kelora && brew install kelora`
 
