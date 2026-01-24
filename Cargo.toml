@@ -123,4 +123,4 @@ depends = ""  # Statically linked (musl), no shared library dependencies
 assets = [["target/release/kelora", "usr/bin/", "755"]]
 
 [package.metadata.generate-rpm]
-assets = [{ source = "kelora", dest = "/usr/bin/kelora", mode = "755" }]
+assets = [{ source = "target/release/kelora", dest = "/usr/bin/kelora", mode = "755" }]
