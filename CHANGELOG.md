@@ -4,6 +4,18 @@ All notable changes to Kelora will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.4.3] - 2026-01-24
+
+### Added
+
+- **Homebrew tap support** - Install via `brew install dloss/tap/kelora`
+- **Debian package builds** - `.deb` packages now included in GitHub releases
+- **RPM package builds** - `.rpm` packages now included in GitHub releases
+
+### Fixed
+
+- **Documentation:** Fixed broken installation anchor link
+
 ## [1.4.2] - 2026-01-20
 
 ### Changed
@@ -617,6 +629,7 @@ _Initial release (yanked)._
 
 ---
 
+[1.4.3]: https://github.com/dloss/kelora/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/dloss/kelora/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/dloss/kelora/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/dloss/kelora/compare/v1.3.2...v1.4.0
