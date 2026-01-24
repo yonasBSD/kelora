@@ -109,3 +109,14 @@ harness = false
 name = "rhai_startup"
 path = "benchmarks/bench_rhai_startup.rs"
 harness = false
+
+[package.metadata.deb]
+maintainer = "Dirk Loss <mail@dirk-loss.de>"
+copyright = "2024-2026, Dirk Loss"
+extended-description = """\
+Kelora is a command-line log analysis tool with embedded Rhai scripting. \
+It supports JSON, logfmt, CSV, and other log formats with powerful \
+filtering, transformation, and aggregation capabilities."""
+section = "utils"
+priority = "optional"
+assets = [["target/release/kelora", "usr/bin/", "755"]]
