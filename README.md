@@ -58,6 +58,8 @@ brew install kelora
 | **Linux** (ARM64) | [kelora-aarch64-unknown-linux-musl.tar.gz](https://github.com/dloss/kelora/releases/latest/download/kelora-aarch64-unknown-linux-musl.tar.gz) |
 | **Other platforms** | [All releases](https://github.com/dloss/kelora/releases) (ARMv7, FreeBSD, OpenBSD) |
 
+**Linux packages:** [.deb and .rpm](https://github.com/dloss/kelora/releases/latest) also available.
+
 Extract the archive and add the `kelora` binary to your PATH.
 
 **Or install via Cargo:**
