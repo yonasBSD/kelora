@@ -4,6 +4,12 @@ All notable changes to Kelora will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.4.5] - 2026-01-24
+
+### Fixed
+
+- Fix more Debian and RPM package issues
+
 ## [1.4.4] - 2026-01-24
 
 ### Fixed
