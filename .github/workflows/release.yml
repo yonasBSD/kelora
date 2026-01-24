@@ -123,7 +123,7 @@ jobs:
           cargo install cargo-generate-rpm
           cargo generate-rpm --target ${{ matrix.target }} \
             --set-metadata="release=1" \
-            --set-metadata="arch=${{ matrix.rpm_arch }}" \
+            --set-metadata="arch=\"${{ matrix.rpm_arch }}\"" \
             --output target/${{ matrix.target }}/release/kelora-${{ matrix.rpm_arch }}.rpm
 
       # Build provenance attestation (SLSA)
