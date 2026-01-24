@@ -102,12 +102,11 @@ jobs:
         if: matrix.use_cross == true
         run: cross build --locked --release --target ${{ matrix.target }}
 
-      - name: Strip binary (if available)
+      - name: Strip binary (native builds only)
+        if: matrix.use_cross != true && matrix.os != 'windows-latest'
         run: |
-          STRIP=$(which strip || true)
-          if [ -n "$STRIP" ] && [ -f target/${{ matrix.target }}/release/kelora${{ matrix.ext }} ]; then
-            $STRIP target/${{ matrix.target }}/release/kelora${{ matrix.ext }} || true
-          fi
+          # Skip cross-compiled builds - host strip can't process foreign architectures
+          strip target/${{ matrix.target }}/release/kelora${{ matrix.ext }} || true
         shell: bash
 
       - name: Build Debian package

@@ -119,7 +119,8 @@ It supports JSON, logfmt, CSV, and other log formats with powerful \
 filtering, transformation, and aggregation capabilities."""
 section = "utils"
 priority = "optional"
+depends = ""  # Statically linked (musl), no shared library dependencies
 assets = [["target/release/kelora", "usr/bin/", "755"]]
 
 [package.metadata.generate-rpm]
-assets = [{ source = "target/release/kelora", dest = "/usr/bin/kelora", mode = "755" }]
+assets = [{ source = "kelora", dest = "/usr/bin/kelora", mode = "755" }]
