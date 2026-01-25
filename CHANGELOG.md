@@ -4,11 +4,17 @@ All notable changes to Kelora will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.4.9] - 2026-01-25
+
+### Fixed
+
+- Again fix CI issue with Homebrew token
+
 ## [1.4.8] - 2026-01-24
 
 ### Fixed
 
-- Fix more CI issue with Homebrew token
+- Fix CI issue with Homebrew token
 
 ## [1.4.7] - 2026-01-24
 

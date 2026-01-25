@@ -960,7 +960,7 @@ dependencies = [
 
 [[package]]
 name = "kelora"
-version = "1.4.8"
+version = "1.4.9"
 dependencies = [
  "anyhow",
  "argon2",
