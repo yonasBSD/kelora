@@ -4,6 +4,23 @@ All notable changes to Kelora will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.4.10] - 2026-03-09
+
+### Added
+
+- **IPv6 support for network helpers** - Rhai network helper functions now support IPv6 addresses in addition to IPv4
+- **Numeric timestamp field support** - `--since`/`--until` timestamp field extraction now works with numeric Rhai values, including JSON logs with integer or floating-point timestamps
+- **Unix epoch timestamps with fractional seconds** - Timestamp parsing now accepts float-based Unix epoch values such as `1735566123.456`
+
+### Changed
+
+- **Timestamp parsing performance** - Optimized the timestamp parsing hot path to reduce overhead during log processing
+- **Rhai startup performance** - Reduced Rhai scope setup overhead to improve script startup efficiency
+
+### Fixed
+
+- **Quick help output** - Corrected quick help drift so the shortcut help text stays aligned with current behavior
+
 ## [1.4.9] - 2026-01-25
 
 ### Fixed
