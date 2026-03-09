@@ -20,6 +20,24 @@ fn test_help_flag() {
 }
 
 #[test]
+fn test_quick_help_flag() {
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-h"], "");
+    assert_eq!(exit_code, 0, "kelora -h should exit successfully");
+    assert!(
+        stdout.contains("Quick Examples:"),
+        "Quick help should include example commands"
+    );
+    assert!(
+        stdout.contains("--until now -l warn,error --stats"),
+        "Quick help should include the fixed time-range example"
+    );
+    assert!(
+        stdout.contains("levelmap/keymap/tailmap"),
+        "Quick help should list tailmap in output formats"
+    );
+}
+
+#[test]
 fn test_basic_json_parsing() {
     let input = r#"{"level": "INFO", "message": "Hello world", "status": 200}
 {"level": "ERROR", "message": "Something failed", "status": 500}"#;
