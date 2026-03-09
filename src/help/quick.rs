@@ -12,7 +12,7 @@ Quick Examples:
   kelora -f logfmt -l error simple_logfmt.log
   kelora web_access_large.log.gz --stats
   kelora simple_json.jsonl --filter 'e.service == "database"' --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' -k timestamp,message,duration_s
-  kelora simple_json.jsonl --since 2024-01-15T10:01:00Z --until levels warn,error --stats
+  kelora simple_json.jsonl --since 2024-01-15T10:01:00Z --until now -l warn,error --stats
   kelora audit.jsonl --exec 'track_count(e.action)' --metrics
   kelora app.jsonl --drain -k message
   kelora payments_latency.jsonl --parallel --filter 'e.duration_ms > 500' -k order_id,duration_ms,status
@@ -25,7 +25,7 @@ Common Options:
   -l, --levels <levels>         Keep only these log levels (comma-separated)
   -e, --exec <expr>             Transform events or emit metrics (can repeat; run in the order given)
   -k, --keys <fields>           Pick or reorder output fields
-  -F, --output-format <FORMAT>  Output format (default/json/logfmt/inspect/levelmap/keymap/csv/tsv/csvnh/tsvnh)
+  -F, --output-format <FORMAT>  Output format (default/json/logfmt/inspect/levelmap/keymap/tailmap/csv/tsv/csvnh/tsvnh)
   -q, --quiet                   Suppress event output (-s/--stats and -m/--metrics imply this)
   -n, --take <N>                Limit output to first N events
   -s, --stats                   Show only the statistics, with discovered fields

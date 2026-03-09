@@ -325,8 +325,7 @@ impl ParallelProcessor {
                 | crate::config::InputFormat::Csvnh
                 | crate::config::InputFormat::Tsvnh
         ) {
-            // For now, we'll let the file-aware reader handle CSV initialization
-            // This will be improved when we implement proper per-file schema detection
+            // File-aware batching attaches per-file CSV headers and type maps for workers.
             pipeline_builder
         } else {
             pipeline_builder
