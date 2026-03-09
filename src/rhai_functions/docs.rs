@@ -45,12 +45,12 @@ text.is_digit()                      Check if text contains only digits
 text.is_in_cidr(cidr)                Check if IP address is in CIDR network (e.g., "10.0.0.0/8")
 text.is_ipv4()                       Check if text is a valid IPv4 address
 text.is_ipv6()                       Check if text is a valid IPv6 address
-text.is_private_ip()                 Check if IP is in private ranges
+text.is_private_ip()                 Check if IP is in private/internal ranges
 text.lclip()                         Remove leading non-alphanumeric characters (left side only)
 text.len                             Get string length (builtin)
 text.lower()                         Convert text to lowercase
 text.lstrip([chars])                 Remove leading whitespace or specified characters
-text.mask_ip([octets])               Mask IP address (default: last octet)
+text.mask_ip([octets])               Mask IP address by zeroing the suffix (IPv4/IPv6)
 text.normalized([patterns])          Replace variable patterns with placeholders (e.g., <ipv4>, <email>)
 text.parse_cef()                     Parse Common Event Format line into fields
 text.parse_cols(spec [,sep])         Parse columns according to spec

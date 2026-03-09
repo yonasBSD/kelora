@@ -266,3 +266,67 @@ fn test_network_functions_with_combined_format() {
     assert!(stdout.contains("10.0.0.50"));
     assert!(stdout.contains("is_private=true"));
 }
+
+#[test]
+fn test_mask_ip_ipv6() {
+    let input = r#"{"ip": "2001:db8:1:2:3:4:5:6"}
+{"ip": "fd12:3456:789a::1"}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "e.masked = e.ip.mask_ip(2);",
+            "-F",
+            "json",
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(lines.len(), 2, "Should output 2 lines");
+
+    let line1: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+    assert_eq!(line1["masked"], "2001:db8:1:2:3:4::");
+
+    let line2: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
+    assert_eq!(line2["masked"], "fd12:3456:789a::");
+}
+
+#[test]
+fn test_is_private_ip_ipv6() {
+    let input = r#"{"ip": "fd12:3456:789a::1"}
+{"ip": "fe80::1234"}
+{"ip": "::1"}
+{"ip": "2001:4860:4860::8888"}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(
+        &[
+            "-f",
+            "json",
+            "--exec",
+            "e.internal = e.ip.is_private_ip();",
+            "-F",
+            "json",
+        ],
+        input,
+    );
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+
+    let lines: Vec<&str> = stdout.trim().split('\n').collect();
+    assert_eq!(lines.len(), 4, "Should output 4 lines");
+
+    let line1: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+    assert_eq!(line1["internal"], true);
+
+    let line2: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
+    assert_eq!(line2["internal"], true);
+
+    let line3: serde_json::Value = serde_json::from_str(lines[2]).unwrap();
+    assert_eq!(line3["internal"], true);
+
+    let line4: serde_json::Value = serde_json::from_str(lines[3]).unwrap();
+    assert_eq!(line4["internal"], false);
+}

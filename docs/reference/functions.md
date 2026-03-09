@@ -371,7 +371,9 @@ if e.addr.is_ipv4() {
 ```
 
 #### `text.is_private_ip()`
-Check if IP is in private ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16).
+Check if IP is in private/internal ranges.
+
+Includes RFC1918 IPv4, IPv6 unique local (`fc00::/7`), IPv6 link-local (`fe80::/10`), and loopback addresses.
 
 ```rhai
 if e.ip.is_private_ip() {
@@ -389,11 +391,12 @@ if e.ip.is_in_cidr("10.0.0.0/8") {
 ```
 
 #### `text.mask_ip([octets])`
-Mask IP address (default: last octet).
+Mask the host portion of an IP address while preserving the network prefix.
 
 ```rhai
 e.masked_ip = e.client_ip.mask_ip()                   // "192.168.1.100" → "192.168.1.0"
-e.partial = e.ip.mask_ip(2)                           // Mask last 2 octets
+e.partial = e.ip.mask_ip(2)                           // "192.168.1.100" → "192.168.0.0"
+e.ipv6_masked = e.ip.mask_ip(2)                       // "2001:db8:1:2:3:4:5:6" → "2001:db8:1:2:3:4::"
 ```
 
 ### Pattern Normalization

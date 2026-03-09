@@ -51,7 +51,7 @@ kelora -j examples/security_audit.jsonl \
   -F json
 ```
 
-- `mask_ip()` anonymises IPv4 and IPv6 addresses while preserving network information.
+- `mask_ip()` anonymises IPv4 and IPv6 addresses by zeroing the masked suffix while preserving network information.
 - Extract domains or other aggregates before dropping the original field if analysts still need grouped statistics.
 
 ## Step 4: Scrub Free-Form Text

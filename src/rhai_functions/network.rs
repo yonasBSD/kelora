@@ -4,7 +4,7 @@
 
 use ipnet::IpNet;
 use rhai::{Engine, EvalAltResult, ImmutableString};
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
 
 // ============================================================================
@@ -65,57 +65,41 @@ pub fn is_in_cidr(ip: ImmutableString, cidr: ImmutableString) -> Result<bool, Bo
 // IP Masking
 // ============================================================================
 
-/// Mask IP address for privacy (replace last N octets with 'X')
+/// Mask IP address for privacy while preserving the network prefix.
 fn mask_ip_impl(ip: &str, octets_to_mask: usize) -> String {
-    // IPv4 pattern validation
-    let parts: Vec<&str> = ip.split('.').collect();
-    if parts.len() != 4 {
-        return ip.to_string(); // Return unchanged if not valid IPv4
+    match IpAddr::from_str(ip) {
+        Ok(IpAddr::V4(addr)) => mask_ipv4(addr, octets_to_mask).to_string(),
+        Ok(IpAddr::V6(addr)) => mask_ipv6(addr, octets_to_mask).to_string(),
+        Err(_) => ip.to_string(),
     }
-
-    // Validate each octet is numeric
-    for part in &parts {
-        if part.parse::<u8>().is_err() {
-            return ip.to_string(); // Return unchanged if not numeric
-        }
-    }
-
-    let mut result = parts.clone();
-    let mask_count = octets_to_mask.clamp(1, 4);
-
-    // Replace last N octets with 'X'
-    for item in result.iter_mut().skip(4 - mask_count) {
-        *item = "X";
-    }
-
-    result.join(".")
 }
 
-// ============================================================================
-// Private IP Detection
-// ============================================================================
-
-/// Check if IP address is in private range
-fn is_private_ip_impl(ip: &str) -> bool {
-    let parts: Vec<&str> = ip.split('.').collect();
-    if parts.len() != 4 {
-        return false; // Not valid IPv4
+fn mask_ipv4(addr: Ipv4Addr, octets_to_mask: usize) -> Ipv4Addr {
+    let mut octets = addr.octets();
+    let mask_count = octets_to_mask.clamp(1, 4);
+    for item in octets.iter_mut().skip(4 - mask_count) {
+        *item = 0;
     }
+    Ipv4Addr::from(octets)
+}
 
-    // Parse octets
-    let octets: Result<Vec<u8>, _> = parts.iter().map(|s| s.parse::<u8>()).collect();
-    let octets = match octets {
-        Ok(o) => o,
-        Err(_) => return false,
-    };
+fn mask_ipv6(addr: Ipv6Addr, hextets_to_mask: usize) -> Ipv6Addr {
+    let mut segments = addr.segments();
+    let mask_count = hextets_to_mask.clamp(1, 8);
+    for item in segments.iter_mut().skip(8 - mask_count) {
+        *item = 0;
+    }
+    Ipv6Addr::from(segments)
+}
 
-    // Check private ranges
-    match octets[0] {
-        10 => true,                                // 10.0.0.0/8
-        172 => octets[1] >= 16 && octets[1] <= 31, // 172.16.0.0/12
-        192 => octets[1] == 168,                   // 192.168.0.0/16
-        127 => true,                               // 127.0.0.0/8 (loopback)
-        _ => false,
+/// Check if IP address is in a private/internal range.
+fn is_private_ip_impl(ip: &str) -> bool {
+    match IpAddr::from_str(ip) {
+        Ok(IpAddr::V4(addr)) => addr.is_private() || addr.is_loopback(),
+        Ok(IpAddr::V6(addr)) => {
+            addr.is_unique_local() || addr.is_unicast_link_local() || addr.is_loopback()
+        }
+        Err(_) => false,
     }
 }
 
@@ -145,7 +129,7 @@ pub fn register_functions(engine: &mut Engine) {
     });
 
     engine.register_fn("mask_ip", |ip: &str, octets: i64| -> String {
-        mask_ip_impl(ip, octets.clamp(1, 4) as usize) // Clamp between 1-4
+        mask_ip_impl(ip, octets.max(1) as usize)
     });
 
     // Private IP detection
@@ -244,22 +228,22 @@ mod tests {
         let result: String = engine
             .eval_with_scope(&mut scope, r##"ip.mask_ip()"##)
             .unwrap();
-        assert_eq!(result, "192.168.1.X");
+        assert_eq!(result, "192.168.1.0");
 
         let result: String = engine
             .eval_with_scope(&mut scope, r##"ip.mask_ip(2)"##)
             .unwrap();
-        assert_eq!(result, "192.168.X.X");
+        assert_eq!(result, "192.168.0.0");
 
         let result: String = engine
             .eval_with_scope(&mut scope, r##"ip.mask_ip(3)"##)
             .unwrap();
-        assert_eq!(result, "192.X.X.X");
+        assert_eq!(result, "192.0.0.0");
 
         let result: String = engine
             .eval_with_scope(&mut scope, r##"ip.mask_ip(4)"##)
             .unwrap();
-        assert_eq!(result, "X.X.X.X");
+        assert_eq!(result, "0.0.0.0");
 
         // Invalid IP should return unchanged
         let result: String = engine
@@ -271,12 +255,38 @@ mod tests {
         let result: String = engine
             .eval_with_scope(&mut scope, r##"ip.mask_ip(0)"##)
             .unwrap();
-        assert_eq!(result, "192.168.1.X");
+        assert_eq!(result, "192.168.1.0");
         // Edge case: more than 4 should clamp to 4
         let result: String = engine
             .eval_with_scope(&mut scope, r##"ip.mask_ip(10)"##)
             .unwrap();
-        assert_eq!(result, "X.X.X.X");
+        assert_eq!(result, "0.0.0.0");
+    }
+
+    #[test]
+    fn test_mask_ipv6_function() {
+        use rhai::Scope;
+
+        let mut engine = Engine::new();
+        register_functions(&mut engine);
+
+        let mut scope = Scope::new();
+        scope.push("ip", "2001:db8:1:2:3:4:5:6");
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"ip.mask_ip()"##)
+            .unwrap();
+        assert_eq!(result, "2001:db8:1:2:3:4:5:0");
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"ip.mask_ip(2)"##)
+            .unwrap();
+        assert_eq!(result, "2001:db8:1:2:3:4::");
+
+        let result: String = engine
+            .eval_with_scope(&mut scope, r##"ip.mask_ip(8)"##)
+            .unwrap();
+        assert_eq!(result, "::");
     }
 
     #[test]
@@ -291,8 +301,12 @@ mod tests {
         scope.push("private2", "172.16.0.1");
         scope.push("private3", "192.168.1.1");
         scope.push("loopback", "127.0.0.1");
+        scope.push("private_v6", "fd12:3456:789a::1");
+        scope.push("link_local_v6", "fe80::1234");
+        scope.push("loopback_v6", "::1");
         scope.push("public1", "8.8.8.8");
         scope.push("public2", "1.1.1.1");
+        scope.push("public_v6", "2001:4860:4860::8888");
         scope.push("edge1", "172.15.0.1"); // Not private (172.15 is outside 172.16-31)
         scope.push("edge2", "172.32.0.1"); // Not private (172.32 is outside 172.16-31)
         scope.push("invalid", "not-an-ip");
@@ -317,6 +331,21 @@ mod tests {
             .unwrap();
         assert!(result);
 
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r##"private_v6.is_private_ip()"##)
+            .unwrap();
+        assert!(result);
+
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r##"link_local_v6.is_private_ip()"##)
+            .unwrap();
+        assert!(result);
+
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r##"loopback_v6.is_private_ip()"##)
+            .unwrap();
+        assert!(result);
+
         // Public IPs
         let result: bool = engine
             .eval_with_scope(&mut scope, r##"public1.is_private_ip()"##)
@@ -325,6 +354,11 @@ mod tests {
 
         let result: bool = engine
             .eval_with_scope(&mut scope, r##"public2.is_private_ip()"##)
+            .unwrap();
+        assert!(!result);
+
+        let result: bool = engine
+            .eval_with_scope(&mut scope, r##"public_v6.is_private_ip()"##)
             .unwrap();
         assert!(!result);
 
