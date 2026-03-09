@@ -3100,39 +3100,51 @@ impl RhaiEngine {
         // Update metadata - only if needed
         if meta_usage.populate_all || meta_usage.any() {
             let mut meta_map = rhai::Map::new();
-            if (meta_usage.populate_all || meta_usage.line_num) && event.line_num.is_some() {
-                let line_num = event.line_num.unwrap();
+            if let Some(line_num) =
+                (meta_usage.populate_all || meta_usage.line_num).then_some(event.line_num).flatten()
+            {
                 meta_map.insert("line_num".into(), Dynamic::from(line_num as i64));
             }
-            if (meta_usage.populate_all || meta_usage.filename) && event.filename.is_some() {
-                let filename = event.filename.as_ref().unwrap();
+            if let Some(filename) = (meta_usage.populate_all || meta_usage.filename)
+                .then_some(event.filename.as_ref())
+                .flatten()
+            {
                 meta_map.insert("filename".into(), Dynamic::from(filename.clone()));
             }
-            if (meta_usage.populate_all || meta_usage.span_status) && event.span.status.is_some() {
-                let status = event.span.status.unwrap();
+            if let Some(status) = (meta_usage.populate_all || meta_usage.span_status)
+                .then_some(event.span.status)
+                .flatten()
+            {
                 meta_map.insert("span_status".into(), Dynamic::from(status.as_str()));
             }
-            if (meta_usage.populate_all || meta_usage.span_id) && event.span.span_id.is_some() {
-                let span_id = event.span.span_id.as_ref().unwrap();
+            if let Some(span_id) = (meta_usage.populate_all || meta_usage.span_id)
+                .then_some(event.span.span_id.as_ref())
+                .flatten()
+            {
                 meta_map.insert("span_id".into(), Dynamic::from(span_id.clone()));
             }
-            if (meta_usage.populate_all || meta_usage.span_start) && event.span.span_start.is_some()
+            if let Some(span_start) = (meta_usage.populate_all || meta_usage.span_start)
+                .then_some(event.span.span_start)
+                .flatten()
             {
-                let span_start = event.span.span_start.unwrap();
                 meta_map.insert(
                     "span_start".into(),
                     Dynamic::from(DateTimeWrapper::from_utc(span_start)),
                 );
             }
-            if (meta_usage.populate_all || meta_usage.span_end) && event.span.span_end.is_some() {
-                let span_end = event.span.span_end.unwrap();
+            if let Some(span_end) = (meta_usage.populate_all || meta_usage.span_end)
+                .then_some(event.span.span_end)
+                .flatten()
+            {
                 meta_map.insert(
                     "span_end".into(),
                     Dynamic::from(DateTimeWrapper::from_utc(span_end)),
                 );
             }
-            if (meta_usage.populate_all || meta_usage.parsed_ts) && event.parsed_ts.is_some() {
-                let parsed_ts = event.parsed_ts.unwrap();
+            if let Some(parsed_ts) = (meta_usage.populate_all || meta_usage.parsed_ts)
+                .then_some(event.parsed_ts)
+                .flatten()
+            {
                 meta_map.insert(
                     "parsed_ts".into(),
                     Dynamic::from(DateTimeWrapper::from_utc(parsed_ts)),
