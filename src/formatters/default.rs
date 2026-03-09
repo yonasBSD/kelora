@@ -243,10 +243,9 @@ impl DefaultFormatter {
         // Try to parse numeric timestamps (Unix timestamps)
         if let Ok(timestamp_num) = value.as_int() {
             let timestamp_str = timestamp_num.to_string();
-            let mut parser = crate::timestamp::AdaptiveTsParser::new();
-            if let Some(parsed_dt) =
+            if let Some(parsed_dt) = crate::timestamp::with_thread_local_parser(|parser| {
                 parser.parse_ts_with_config(&timestamp_str, format_hint, timezone_hint)
-            {
+            }) {
                 return Some(self.format_timestamp_output(parsed_dt));
             }
         }
@@ -288,10 +287,9 @@ impl DefaultFormatter {
 
         // Otherwise, try to parse it as a string timestamp
         if let Ok(ts_str) = value.clone().into_string() {
-            let mut parser = crate::timestamp::AdaptiveTsParser::new();
-            if let Some(parsed_dt) =
+            if let Some(parsed_dt) = crate::timestamp::with_thread_local_parser(|parser| {
                 parser.parse_ts_with_config(&ts_str, format_hint, timezone_hint)
-            {
+            }) {
                 return Some(self.format_timestamp_output(parsed_dt));
             }
         }

@@ -505,13 +505,13 @@ impl Event {
                         ts_config.default_timezone.as_deref(),
                     )
                 } else {
-                    // Use the enhanced adaptive parser as default
-                    let mut default_parser = crate::timestamp::AdaptiveTsParser::new();
-                    default_parser.parse_ts_with_config(
-                        &ts_str,
-                        ts_config.custom_format.as_deref(),
-                        ts_config.default_timezone.as_deref(),
-                    )
+                    crate::timestamp::with_thread_local_parser(|default_parser| {
+                        default_parser.parse_ts_with_config(
+                            &ts_str,
+                            ts_config.custom_format.as_deref(),
+                            ts_config.default_timezone.as_deref(),
+                        )
+                    })
                 };
 
                 if let Some(ts) = parsed_ts {

@@ -1,4 +1,5 @@
 use chrono::{DateTime, Datelike, Local, TimeZone, Utc};
+use std::cell::RefCell;
 
 /// Adaptive timestamp parser that dynamically reorders formats based on success
 /// Each thread should have its own instance to avoid contention
@@ -109,6 +110,17 @@ impl AdaptiveTsParser {
 
         None
     }
+}
+
+thread_local! {
+    static THREAD_TS_PARSER: RefCell<AdaptiveTsParser> =
+        RefCell::new(AdaptiveTsParser::new());
+}
+
+/// Reuse one adaptive timestamp parser per thread to avoid rebuilding the
+/// format table on every event.
+pub fn with_thread_local_parser<R>(f: impl FnOnce(&mut AdaptiveTsParser) -> R) -> R {
+    THREAD_TS_PARSER.with(|parser| f(&mut parser.borrow_mut()))
 }
 
 #[cfg(test)]

@@ -586,11 +586,11 @@ impl Pipeline {
                         // Collect output levels and keys for stats
                         collect_output_levels_and_keys(&event, ctx);
 
-                        // Track result timestamp for time span statistics
-                        let mut result_event = event.clone();
-                        result_event.parsed_ts = None; // Clear to force re-extraction
-                        result_event.extract_timestamp_with_config(None, &self.ts_config);
-                        if let Some(result_ts) = result_event.parsed_ts {
+                        // Refresh parsed_ts after script stages so stats and output both see the
+                        // final timestamp value without cloning the whole event.
+                        event.parsed_ts = None;
+                        event.extract_timestamp_with_config(None, &self.ts_config);
+                        if let Some(result_ts) = event.parsed_ts {
                             crate::stats::stats_update_result_timestamp(result_ts);
                         }
 
@@ -678,11 +678,11 @@ impl Pipeline {
                             // Collect output levels and keys for stats
                             collect_output_levels_and_keys(&event, ctx);
 
-                            // Track result timestamp for time span statistics
-                            let mut result_event = event.clone();
-                            result_event.parsed_ts = None; // Clear to force re-extraction
-                            result_event.extract_timestamp_with_config(None, &self.ts_config);
-                            if let Some(result_ts) = result_event.parsed_ts {
+                            // Refresh parsed_ts after script stages so stats and output both see
+                            // the final timestamp value without cloning the whole event.
+                            event.parsed_ts = None;
+                            event.extract_timestamp_with_config(None, &self.ts_config);
+                            if let Some(result_ts) = event.parsed_ts {
                                 crate::stats::stats_update_result_timestamp(result_ts);
                             }
 
