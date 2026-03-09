@@ -6,6 +6,7 @@ default:
 
 # Extract package version from Cargo.toml (used by release workflow)
 RELEASE_VERSION := `rg --max-count 1 --replace '$1' '^version\s*=\s*"([^"]+)"' Cargo.toml | tr -d '\r\n'`
+DOCS_UVX := "uvx --with 'mkdocs<2' --with mkdocs-material --with mike --with markdown-exec[ansi]"
 
 # Format code
 fmt:
@@ -107,7 +108,7 @@ docs-serve:
     UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
     UV_DATA_DIR={{justfile_directory()}}/.uv/data \
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
-    uvx --with mkdocs-material --with mike --with markdown-exec[ansi] mkdocs serve --watch docs --watch mkdocs.yml --livereload
+    {{DOCS_UVX}} mkdocs serve --watch docs --watch mkdocs.yml --livereload
 
 # Build documentation (for local testing)
 docs-build:
@@ -119,7 +120,7 @@ docs-build:
     UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
     UV_DATA_DIR={{justfile_directory()}}/.uv/data \
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
-    uvx --with mkdocs-material --with mike --with markdown-exec[ansi] mkdocs build
+    {{DOCS_UVX}} mkdocs build
 
 # List published documentation versions (from gh-pages via mike)
 docs-list-versions:
@@ -127,7 +128,7 @@ docs-list-versions:
     UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
     UV_DATA_DIR={{justfile_directory()}}/.uv/data \
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
-    uvx --with mkdocs-material --with mike --with markdown-exec[ansi] mike list
+    {{DOCS_UVX}} mike list
 
 # Delete one or more published documentation versions
 docs-delete-version *versions:
@@ -142,7 +143,7 @@ docs-delete-version *versions:
     UV_CACHE_DIR="{{justfile_directory()}}/.uv/cache" \
     UV_DATA_DIR="{{justfile_directory()}}/.uv/data" \
     UV_TOOL_DIR="{{justfile_directory()}}/.uv/tools" \
-    uvx --with mkdocs-material --with mike --with markdown-exec[ansi] mike delete --push "${versions[@]}"
+    {{DOCS_UVX}} mike delete --push "${versions[@]}"
 
 # Run JSON parser fuzzing locally (requires cargo-fuzz + nightly toolchain)
 fuzz-json *args:
