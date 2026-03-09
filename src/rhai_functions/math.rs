@@ -286,6 +286,17 @@ fn clamp_f64(value: f64, min: f64, max: f64) -> f64 {
 mod tests {
     use super::*;
     use rhai::Dynamic;
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    fn panic_message(err: Box<dyn std::any::Any + Send>) -> String {
+        if let Some(msg) = err.downcast_ref::<String>() {
+            msg.clone()
+        } else if let Some(msg) = err.downcast_ref::<&str>() {
+            (*msg).to_string()
+        } else {
+            String::new()
+        }
+    }
 
     #[test]
     fn test_clamp_i64_within_range() {
@@ -317,10 +328,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "assertion failed: min <= max")]
     fn test_clamp_i64_inverted_range() {
-        // When min > max, clamp panics (Rust's behavior)
-        clamp_i64(5, 10, 0);
+        let err = catch_unwind(AssertUnwindSafe(|| clamp_i64(5, 10, 0)))
+            .expect_err("clamp_i64 should panic when min > max");
+        let msg = panic_message(err);
+        assert!(
+            msg.contains("assertion failed: min <= max") || msg.contains("min > max"),
+            "unexpected panic message: {msg}"
+        );
     }
 
     #[test]
@@ -353,10 +368,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "min > max")]
     fn test_clamp_f64_inverted_range() {
-        // When min > max, clamp panics (Rust's behavior)
-        clamp_f64(5.0, 10.0, 0.0);
+        let err = catch_unwind(AssertUnwindSafe(|| clamp_f64(5.0, 10.0, 0.0)))
+            .expect_err("clamp_f64 should panic when min > max");
+        let msg = panic_message(err);
+        assert!(
+            msg.contains("assertion failed: min <= max") || msg.contains("min > max"),
+            "unexpected panic message: {msg}"
+        );
     }
 
     #[test]
