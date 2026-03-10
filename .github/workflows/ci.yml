@@ -44,6 +44,35 @@ jobs:
       - name: Run tests
         run: cargo test --all-features
 
+  release-helper-tools:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust for release helper tools
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-release-helpers-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-release-helpers-
+
+      - name: Verify pinned release helper tool installs
+        run: |
+          cargo install --locked --version 0.2.5 cross
+          cargo install --locked --version 3.6.3 cargo-deb
+          cargo install --locked --version 0.20.0 cargo-generate-rpm
+          cross --version
+          cargo deb --version
+          cargo generate-rpm --version
+
   clippy-stable:
     runs-on: ubuntu-latest
     continue-on-error: true
