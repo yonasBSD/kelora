@@ -3100,8 +3100,9 @@ impl RhaiEngine {
         // Update metadata - only if needed
         if meta_usage.populate_all || meta_usage.any() {
             let mut meta_map = rhai::Map::new();
-            if let Some(line_num) =
-                (meta_usage.populate_all || meta_usage.line_num).then_some(event.line_num).flatten()
+            if let Some(line_num) = (meta_usage.populate_all || meta_usage.line_num)
+                .then_some(event.line_num)
+                .flatten()
             {
                 meta_map.insert("line_num".into(), Dynamic::from(line_num as i64));
             }
