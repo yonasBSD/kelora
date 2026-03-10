@@ -24,7 +24,7 @@ jobs:
         with:
           rust-version: stable
           command: check
-          arguments: all
+          command-arguments: all
 
   build:
     needs: audit
