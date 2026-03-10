@@ -253,4 +253,4 @@ release-prepare:
     echo "  git push ${REMOTE} ${TAG}"
 
 install:
-    cargo install --path .
+    cargo install --path . --locked
