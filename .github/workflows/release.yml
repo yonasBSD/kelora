@@ -90,11 +90,16 @@ jobs:
 
       - name: Install stable Rust for helper tools
         id: stable
+        # These Linux-host helper tools have their own MSRV cadence. Keep them
+        # off Kelora's pinned build toolchain so CI helper churn does not break
+        # the release pipeline for the product itself.
         if: matrix.os == 'ubuntu-latest' && (matrix.use_cross == true || matrix.deb_arch != '' || matrix.rpm_arch != '')
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cross for ARM builds
         if: matrix.use_cross == true
+        # Pin helper versions explicitly so CI behavior stays reproducible even
+        # as upstream tools advance their MSRV independently of Kelora.
         run: cargo +${{ steps.stable.outputs.name }} install --locked --version 0.2.5 cross
 
       - name: Build release binary (native)
@@ -103,7 +108,9 @@ jobs:
 
       - name: Build release binary (cross)
         if: matrix.use_cross == true
-        run: cargo +${{ steps.msrv.outputs.name }} cross build --locked --release --target ${{ matrix.target }}
+        # cross builds inside its target container, so the Rust toolchain used
+        # there is controlled by cross images rather than the host rustup state.
+        run: cross build --locked --release --target ${{ matrix.target }}
 
       - name: Strip binary (native builds only)
         if: matrix.use_cross != true && matrix.os != 'windows-latest'
@@ -114,6 +121,7 @@ jobs:
 
       - name: Build Debian package
         if: matrix.deb_arch != ''
+        # Keep packaging helpers pinned for the same reason as cross above.
         run: cargo +${{ steps.stable.outputs.name }} install --locked --version 3.6.3 cargo-deb
 
       - name: Run cargo-deb
@@ -125,6 +133,7 @@ jobs:
 
       - name: Build RPM package
         if: matrix.rpm_arch != ''
+        # Keep packaging helpers pinned for the same reason as cross above.
         run: cargo +${{ steps.stable.outputs.name }} install --locked --version 0.20.0 cargo-generate-rpm
 
       - name: Run cargo-generate-rpm
