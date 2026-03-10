@@ -16,19 +16,21 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.86.0
+      - name: Install Rust toolchain for security tooling
+        # Keep security tools on current stable so cargo-audit/cargo-deny MSRV
+        # bumps do not break the project-wide 1.86.0 pin used for OpenBSD builds.
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-audit and cargo-deny
         run: |
-          cargo install cargo-audit --locked
-          cargo install cargo-deny --locked
+          cargo +stable install cargo-audit --locked
+          cargo +stable install cargo-deny --locked
 
       - name: Run security audit
-        run: cargo audit
+        run: cargo +stable audit
 
       - name: Run cargo deny checks
-        run: cargo deny check all
+        run: cargo +stable deny check all
 
   build:
     needs: audit
