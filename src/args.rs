@@ -442,9 +442,35 @@ pub fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli, Co
 
     // Check for --ignore-config
     let ignore_config = has_ignore_config;
+    let disable_auto_config = std::env::var_os("KELORA_IGNORE_CONFIG").is_some();
 
     let (processed_args, expansion_info) = if ignore_config {
-        // Skip config file processing
+        // Skip all config file processing
+        (raw_args, ConfigExpansionInfo::default())
+    } else if let Some(path) = config_file_path.as_deref() {
+        // Explicit config files still load even when automatic config discovery is disabled.
+        match ConfigFile::load_with_custom_path(Some(path)) {
+            Ok((config_file, loaded_path)) => match config_file.process_args(raw_args) {
+                Ok((processed, mut info)) => {
+                    info.loaded_config_path = loaded_path;
+                    (processed, info)
+                }
+                Err(e) => {
+                    stderr
+                        .writeln(&format!("kelora: Config error: {}", e))
+                        .unwrap_or(());
+                    std::process::exit(1);
+                }
+            },
+            Err(e) => {
+                stderr
+                    .writeln(&format!("kelora: Config file error: {}", e))
+                    .unwrap_or(());
+                std::process::exit(1);
+            }
+        }
+    } else if disable_auto_config {
+        // Skip automatic project/user config discovery.
         (raw_args, ConfigExpansionInfo::default())
     } else {
         // Load config file and process aliases

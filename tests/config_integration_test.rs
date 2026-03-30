@@ -40,6 +40,51 @@ fn run_kelora_in_dir(dir: &std::path::Path, args: &[&str], input: &str) -> (Stri
     )
 }
 
+fn run_kelora_in_dir_with_env(
+    dir: &std::path::Path,
+    args: &[&str],
+    input: &str,
+    envs: &[(&str, &str)],
+) -> (String, String, i32) {
+    let binary_path = if cfg!(debug_assertions) {
+        std::env::current_dir().unwrap().join("target/debug/kelora")
+    } else {
+        std::env::current_dir()
+            .unwrap()
+            .join("target/release/kelora")
+    };
+
+    let mut cmd = Command::new(&binary_path);
+    cmd.current_dir(dir)
+        .env("HOME", dir)
+        .env("XDG_CONFIG_HOME", dir.join(".config"))
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    for (key, value) in envs {
+        cmd.env(key, value);
+    }
+
+    let mut child = cmd.spawn().expect("Failed to start kelora");
+
+    if let Some(stdin) = child.stdin.as_mut() {
+        use std::io::Write;
+        stdin
+            .write_all(input.as_bytes())
+            .expect("Failed to write to stdin");
+    }
+
+    let output = child.wait_with_output().expect("Failed to read output");
+
+    (
+        String::from_utf8_lossy(&output.stdout).to_string(),
+        String::from_utf8_lossy(&output.stderr).to_string(),
+        output.status.code().unwrap_or(-1),
+    )
+}
+
 #[test]
 fn test_config_file_with_defaults() {
     let temp_dir = TempDir::new().unwrap();
@@ -148,6 +193,76 @@ fn test_ignore_config_flag() {
     assert!(
         !stderr.contains("Events processed") && !stderr.contains("Events created"),
         "Should not show stats when config ignored, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_ignore_config_env_skips_ambient_project_and_user_config() {
+    let temp_dir = TempDir::new().unwrap();
+    let project_config = temp_dir.path().join(".kelora.ini");
+    let user_config_dir = temp_dir.path().join(".config").join("kelora");
+    let user_config = user_config_dir.join("kelora.ini");
+
+    fs::write(&project_config, "defaults = --with-stats\n").unwrap();
+    fs::create_dir_all(&user_config_dir).unwrap();
+    fs::write(&user_config, "defaults = --with-stats\n").unwrap();
+
+    let log_file = temp_dir.path().join("test.log");
+    fs::write(&log_file, "test log line\n").unwrap();
+
+    let (_stdout, stderr, exit_code) = run_kelora_in_dir_with_env(
+        temp_dir.path(),
+        &[log_file.to_str().unwrap()],
+        "",
+        &[("KELORA_IGNORE_CONFIG", "1")],
+    );
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    assert!(
+        !stderr.contains("Config:"),
+        "Should not show config expansion info, got: {}",
+        stderr
+    );
+    assert!(
+        !stderr.contains("Events processed") && !stderr.contains("Events created"),
+        "Should not apply ambient config defaults, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_ignore_config_env_still_allows_explicit_config_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let ambient_project_config = temp_dir.path().join(".kelora.ini");
+    let explicit_config = temp_dir.path().join("explicit.ini");
+
+    fs::write(&ambient_project_config, "defaults = -q\n").unwrap();
+    fs::write(&explicit_config, "defaults = --with-stats\n").unwrap();
+
+    let log_file = temp_dir.path().join("test.log");
+    fs::write(&log_file, "test log line\n").unwrap();
+
+    let (_stdout, stderr, exit_code) = run_kelora_in_dir_with_env(
+        temp_dir.path(),
+        &[
+            "--config-file",
+            explicit_config.to_str().unwrap(),
+            log_file.to_str().unwrap(),
+        ],
+        "",
+        &[("KELORA_IGNORE_CONFIG", "1")],
+    );
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    assert!(
+        stderr.contains("Config:"),
+        "Expected explicit config file to load, got: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("Events") || stderr.contains("processed"),
+        "Expected explicit config defaults to apply, got: {}",
         stderr
     );
 }
