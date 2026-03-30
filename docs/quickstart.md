@@ -52,30 +52,32 @@ Extract key-value pairs from error messages into structured JSON fields. Notice 
 
 ## Interactive Mode
 
-Run `kelora` without any arguments to enter **interactive mode**—a readline-based REPL where you can type commands without worrying about shell quoting:
+Run `kelora` without any arguments to enter **interactive mode**. This is useful when shell quoting is annoying, especially on Windows. It supports history, glob expansion, and built-in `:help`.
 
 ```bash
 kelora
 ```
 
-This is especially helpful on Windows where command-line quoting is notoriously difficult. Features include:
+Try one of these:
 
-- **Shell-like parsing** - Handles quotes properly without shell escaping issues
-- **Automatic glob expansion** - `*.log` and `test?.json` patterns work automatically
-- **Command history** - Press Up/Down arrows to recall previous commands
-- **Easy cancellation** - Ctrl-C returns to the prompt instead of exiting
-- **Built-in help** - Type `:help` for a quick reference
-- **REPL commands** - Commands like `:help`, `:exit`, `:quit` are prefixed with `:` to avoid conflicts with filenames
+- `-j examples/audit.jsonl --stats`
+- `examples/quickstart.log -f 'cols:ts(3) level *msg' --take 5`
 
-Example interactive session:
-```
-Kelora Interactive Mode — :quit to exit, :help for help
+## Why Did I Get No Output?
 
-kelora> -j examples/audit.jsonl -l error
-{"timestamp":"2025-01-15T10:02:30Z","level":"ERROR","user_id":103,"email":"***","ms":45}
-kelora> -f logfmt examples/*.log --stats
-...
-kelora> :exit
+Most first-run problems come from one of these cases:
+
+- **Wrong parser**: Try `-j`, `-f logfmt`, `-f combined`, or `-f 'cols:...'` explicitly instead of relying on auto-detection.
+- **Wrong field name**: Run with `--stats` first to see discovered keys, then update your filter to match.
+- **Filter too strict**: Remove filters and re-add them one at a time.
+- **Mixed-format file**: If your file mixes JSON lines and plain text, process them separately. See [Integrate Kelora with External Tools](how-to/integrate-external-tools.md).
+- **Nothing matches your level/timestamp assumptions**: Prefer explicit filters like `e.level == "ERROR"` and confirm timestamp field names with `--stats`.
+
+When in doubt, start here:
+
+```bash
+kelora your.log --stats
+kelora your.log --take 5
 ```
 
 ## Get Help
@@ -92,7 +94,7 @@ kelora --help-time         # Timestamp format reference
 
 ## Next Steps
 
-You've seen Kelora in action. Now **learn how it actually works**:
+You've seen Kelora in action. Next, learn how it works:
 
 ### Recommended Learning Path
 
