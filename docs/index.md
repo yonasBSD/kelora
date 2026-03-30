@@ -4,6 +4,8 @@
 
 Kelora is a scriptable log processor for the command line. Parse structured or semi-structured logs, filter with complex logic, and analyze streams using embedded [Rhai](https://rhai.rs) scripting—all in a single binary.
 
+Watch Hack the Clown's [**5-minute introduction video**](https://www.youtube.com/watch?v=IwkicmS3RYo) to see Kelora in action.
+
 Kelora is AI-generated; see [Development Approach](#development-approach).
 
 <a id="installation"></a>
