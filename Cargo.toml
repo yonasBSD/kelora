@@ -25,7 +25,7 @@ clap = { version = "4.0", features = ["derive"] }  # Command-line argument parsi
 clap_complete = "4.5"  # Shell completion script generation
 
 # Core functionality
-rhai = { version = "1.23", features = ["sync", "debugging", "internals"] }  # Embedded scripting engine for log filtering and transformation
+rhai = { version = "1.24", features = ["sync", "debugging", "internals"] }  # Embedded scripting engine for log filtering and transformation
 anyhow = "1.0"  # Error handling and propagation
 
 # Serialization and parsing
