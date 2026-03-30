@@ -81,19 +81,23 @@ Generate shell completion script for tab-completion of flags and options.
 
 ```bash
 # Bash
+mkdir -p ~/.local/share/bash-completion/completions
 kelora --completions bash > ~/.local/share/bash-completion/completions/kelora
 
-# Zsh (add ~/.zfunc to fpath in .zshrc first)
+# Zsh
+mkdir -p ~/.zfunc
 kelora --completions zsh > ~/.zfunc/_kelora
+# Add ~/.zfunc to fpath in ~/.zshrc, then run: autoload -Uz compinit && compinit
 
 # Fish
+mkdir -p ~/.config/fish/completions
 kelora --completions fish > ~/.config/fish/completions/kelora.fish
 
 # PowerShell (add to $PROFILE)
 kelora --completions powershell >> $PROFILE
 ```
 
-After installation, restart your shell or source the completion file. Tab completion will work for all flags and enum values (formats, shells, etc.).
+After installation, restart your shell or reload its completion configuration. Tab completion will work for all flags and enum values (formats, shells, etc.).
 
 ## Input Options
 
