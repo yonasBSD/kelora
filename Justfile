@@ -101,10 +101,11 @@ bench-all: bench bench-compare
 # Serve documentation locally with auto-reload
 docs-serve:
     cargo build --release
-    mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools
+    mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools {{justfile_directory()}}/.docs-config
     PATH="{{justfile_directory()}}/target/release:${PATH}" \
     FORCE_COLOR=1 \
     COLUMNS=80 \
+    XDG_CONFIG_HOME={{justfile_directory()}}/.docs-config \
     UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
     UV_DATA_DIR={{justfile_directory()}}/.uv/data \
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
@@ -113,10 +114,11 @@ docs-serve:
 # Build documentation (for local testing)
 docs-build:
     cargo build --release
-    mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools
+    mkdir -p {{justfile_directory()}}/.uv/cache {{justfile_directory()}}/.uv/data {{justfile_directory()}}/.uv/tools {{justfile_directory()}}/.docs-config
     PATH="{{justfile_directory()}}/target/release:${PATH}" \
     FORCE_COLOR=1 \
     COLUMNS=80 \
+    XDG_CONFIG_HOME={{justfile_directory()}}/.docs-config \
     UV_CACHE_DIR={{justfile_directory()}}/.uv/cache \
     UV_DATA_DIR={{justfile_directory()}}/.uv/data \
     UV_TOOL_DIR={{justfile_directory()}}/.uv/tools \
