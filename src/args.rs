@@ -18,7 +18,7 @@ pub fn validate_cli_args(cli: &Cli) -> Result<()> {
     // Validate --no-input conflicts
     if cli.no_input && !cli.files.is_empty() {
         return Err(anyhow::anyhow!(
-            "--no-input cannot be used with input files"
+            "--no-input cannot be used with input files. Remove --no-input to read files, or remove file arguments to run script-only stages."
         ));
     }
 
@@ -56,13 +56,13 @@ pub fn validate_cli_args(cli: &Cli) -> Result<()> {
 
     if cli.span_close.is_some() && cli.span.is_none() && cli.span_idle.is_none() {
         return Err(anyhow::anyhow!(
-            "--span-close requires --span or --span-idle to be specified"
+            "--span-close requires --span or --span-idle. Use --span N for fixed-size spans or --span-idle 30s for inactivity-based spans."
         ));
     }
 
     if cli.multiline.is_none() && cli.multiline_join != MultilineJoin::Space {
         return Err(anyhow::anyhow!(
-            "--multiline-join requires --multiline to be set"
+            "--multiline-join requires --multiline. Start with --multiline indent, --multiline blank, or see --help-multiline for regex/timestamp strategies."
         ));
     }
 
@@ -71,22 +71,22 @@ pub fn validate_cli_args(cli: &Cli) -> Result<()> {
         match cli.output_format {
             OutputFormat::Csv => {
                 return Err(anyhow::anyhow!(
-                    "csv output format does not support --core flag. Use --keys to specify field names"
+                    "csv output format does not support --core. Use --keys to define column order, e.g. --keys ts,level,msg."
                 ));
             }
             OutputFormat::Tsv => {
                 return Err(anyhow::anyhow!(
-                    "tsv output format does not support --core flag. Use --keys to specify field names"
+                    "tsv output format does not support --core. Use --keys to define column order, e.g. --keys ts,level,msg."
                 ));
             }
             OutputFormat::Csvnh => {
                 return Err(anyhow::anyhow!(
-                    "csvnh output format does not support --core flag. Use --keys to specify field names"
+                    "csvnh output format does not support --core. Use --keys to define column order, e.g. --keys ts,level,msg."
                 ));
             }
             OutputFormat::Tsvnh => {
                 return Err(anyhow::anyhow!(
-                    "tsvnh output format does not support --core flag. Use --keys to specify field names"
+                    "tsvnh output format does not support --core. Use --keys to define column order, e.g. --keys ts,level,msg."
                 ));
             }
             _ => {
@@ -106,7 +106,7 @@ pub fn validate_cli_args(cli: &Cli) -> Result<()> {
 
         if effective_keys.len() != 1 {
             return Err(anyhow::anyhow!(
-                "--drain requires --keys to specify exactly one field after exclusions (use -s to view available keys)"
+                "--drain requires exactly one effective field in --keys after exclusions, e.g. --keys msg. Use -s to inspect available fields."
             ));
         }
     }
@@ -535,7 +535,10 @@ pub fn process_args_with_config(stderr: &mut SafeStderr) -> (ArgMatches, Cli, Co
         eprintln!();
         eprintln!("{}", Cli::command().render_usage());
         eprintln!();
-        eprintln!("For more information, try '-h'.");
+        eprintln!(
+            "Pass one or more files, pipe input on stdin, or run plain 'kelora' to enter interactive mode."
+        );
+        eprintln!("For a quick reference, try '-h'.");
         std::process::exit(2);
     }
 

@@ -5,7 +5,8 @@ use rhai::{Dynamic, Engine, EvalAltResult, Map, Position};
 fn ensure_sequential() -> Result<(), Box<EvalAltResult>> {
     if is_parallel_mode() {
         return Err(EvalAltResult::ErrorRuntime(
-            "'drain' is not available in --parallel mode (requires sequential processing)".into(),
+            "'drain' is not available in --parallel mode. Rerun without --parallel; Drain template mining is sequential-only."
+                .into(),
             Position::NONE,
         )
         .into());

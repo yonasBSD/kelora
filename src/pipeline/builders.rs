@@ -389,7 +389,7 @@ impl PipelineBuilder {
                 crate::OutputFormat::Keymap => {
                     if self.keys.len() != 1 {
                         return Err(anyhow::anyhow!(
-                            "keymap output format requires --keys to specify exactly one field (use -s to view available keys)"
+                            "keymap output requires exactly one field via --keys, e.g. --keys level. Use -s to inspect available fields."
                         ));
                     }
                     Box::new(crate::formatters::KeymapFormatter::new(Some(
@@ -399,7 +399,7 @@ impl PipelineBuilder {
                 crate::OutputFormat::Tailmap => {
                     if self.keys.len() != 1 {
                         return Err(anyhow::anyhow!(
-                            "tailmap output format requires --keys to specify exactly one field (use -s to view available keys)"
+                            "tailmap output requires exactly one numeric field via --keys, e.g. --keys latency_ms. Use -s to inspect available fields."
                         ));
                     }
                     Box::new(crate::formatters::TailmapFormatter::new(
@@ -411,7 +411,7 @@ impl PipelineBuilder {
                 crate::OutputFormat::Csv => {
                     if self.keys.is_empty() {
                         return Err(anyhow::anyhow!(
-                            "CSV output format requires --keys to specify field order"
+                            "CSV output requires --keys to define column order, e.g. --keys ts,level,msg. Use -s to inspect available fields."
                         ));
                     }
                     Box::new(crate::formatters::CsvFormatter::new(self.keys.clone()))
@@ -419,7 +419,7 @@ impl PipelineBuilder {
                 crate::OutputFormat::Tsv => {
                     if self.keys.is_empty() {
                         return Err(anyhow::anyhow!(
-                            "TSV output format requires --keys to specify field order"
+                            "TSV output requires --keys to define column order, e.g. --keys ts,level,msg. Use -s to inspect available fields."
                         ));
                     }
                     Box::new(crate::formatters::CsvFormatter::new_tsv(self.keys.clone()))
@@ -427,7 +427,7 @@ impl PipelineBuilder {
                 crate::OutputFormat::Csvnh => {
                     if self.keys.is_empty() {
                         return Err(anyhow::anyhow!(
-                            "CSVNH output format requires --keys to specify field order"
+                            "CSVNH output requires --keys to define column order, e.g. --keys ts,level,msg. Use -s to inspect available fields."
                         ));
                     }
                     Box::new(crate::formatters::CsvFormatter::new_csv_no_header(
@@ -437,7 +437,7 @@ impl PipelineBuilder {
                 crate::OutputFormat::Tsvnh => {
                     if self.keys.is_empty() {
                         return Err(anyhow::anyhow!(
-                            "TSVNH output format requires --keys to specify field order"
+                            "TSVNH output requires --keys to define column order, e.g. --keys ts,level,msg. Use -s to inspect available fields."
                         ));
                     }
                     Box::new(crate::formatters::CsvFormatter::new_tsv_no_header(
@@ -525,7 +525,9 @@ impl PipelineBuilder {
 
         if self.drain_enabled {
             let field = self.drain_field.clone().ok_or_else(|| {
-                anyhow::anyhow!("--drain requires --keys to specify exactly one field (use -s to view available keys)")
+                anyhow::anyhow!(
+                    "--drain requires exactly one effective field in --keys after exclusions, e.g. --keys msg. Use -s to inspect available fields."
+                )
             })?;
             script_stages.push(Box::new(DrainStage::new(field)));
         }
@@ -655,7 +657,7 @@ impl PipelineBuilder {
     ) -> Result<(Pipeline, PipelineContext)> {
         if self.drain_enabled {
             return Err(anyhow::anyhow!(
-                "--drain summary is not supported with --parallel"
+                "--drain summary is not supported with --parallel. Rerun without --parallel to use Drain template mining."
             ));
         }
         let mut rhai_engine = RhaiEngine::new();
@@ -897,7 +899,7 @@ impl PipelineBuilder {
                 crate::OutputFormat::Keymap => {
                     if self.keys.len() != 1 {
                         return Err(anyhow::anyhow!(
-                            "keymap output format requires --keys to specify exactly one field (use -s to view available keys)"
+                            "keymap output requires exactly one field via --keys, e.g. --keys level. Use -s to inspect available fields."
                         ));
                     }
                     Box::new(crate::formatters::KeymapFormatter::new(Some(
@@ -907,7 +909,7 @@ impl PipelineBuilder {
                 crate::OutputFormat::Tailmap => {
                     if self.keys.len() != 1 {
                         return Err(anyhow::anyhow!(
-                            "tailmap output format requires --keys to specify exactly one field (use -s to view available keys)"
+                            "tailmap output requires exactly one numeric field via --keys, e.g. --keys latency_ms. Use -s to inspect available fields."
                         ));
                     }
                     Box::new(crate::formatters::TailmapFormatter::new(
@@ -919,7 +921,7 @@ impl PipelineBuilder {
                 crate::OutputFormat::Csv => {
                     if self.keys.is_empty() {
                         return Err(anyhow::anyhow!(
-                            "CSV output format requires --keys to specify field order"
+                            "CSV output requires --keys to define column order, e.g. --keys ts,level,msg. Use -s to inspect available fields."
                         ));
                     }
                     Box::new(crate::formatters::CsvFormatter::new_worker(
@@ -929,7 +931,7 @@ impl PipelineBuilder {
                 crate::OutputFormat::Tsv => {
                     if self.keys.is_empty() {
                         return Err(anyhow::anyhow!(
-                            "TSV output format requires --keys to specify field order"
+                            "TSV output requires --keys to define column order, e.g. --keys ts,level,msg. Use -s to inspect available fields."
                         ));
                     }
                     Box::new(crate::formatters::CsvFormatter::new_tsv_worker(
@@ -939,7 +941,7 @@ impl PipelineBuilder {
                 crate::OutputFormat::Csvnh => {
                     if self.keys.is_empty() {
                         return Err(anyhow::anyhow!(
-                            "CSVNH output format requires --keys to specify field order"
+                            "CSVNH output requires --keys to define column order, e.g. --keys ts,level,msg. Use -s to inspect available fields."
                         ));
                     }
                     Box::new(crate::formatters::CsvFormatter::new_csv_no_header_worker(
@@ -949,7 +951,7 @@ impl PipelineBuilder {
                 crate::OutputFormat::Tsvnh => {
                     if self.keys.is_empty() {
                         return Err(anyhow::anyhow!(
-                            "TSVNH output format requires --keys to specify field order"
+                            "TSVNH output requires --keys to define column order, e.g. --keys ts,level,msg. Use -s to inspect available fields."
                         ));
                     }
                     Box::new(crate::formatters::CsvFormatter::new_tsv_no_header_worker(

@@ -368,6 +368,11 @@ fn test_no_input_conflicts_with_files() {
         "Should show conflict error: {}",
         stderr
     );
+    assert!(
+        stderr.contains("Remove --no-input to read files"),
+        "Should explain how to resolve the conflict: {}",
+        stderr
+    );
     assert!(stdout.is_empty());
 }
 

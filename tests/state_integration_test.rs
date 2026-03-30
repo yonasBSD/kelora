@@ -317,6 +317,11 @@ fn test_state_not_available_in_parallel_mode() {
         "Error message should mention state and parallel mode. stderr: {}",
         stderr
     );
+    assert!(
+        stderr.contains("Rerun without --parallel") && stderr.contains("track_*"),
+        "Error message should suggest sequential mode or parallel-safe aggregation. stderr: {}",
+        stderr
+    );
 }
 
 #[test]

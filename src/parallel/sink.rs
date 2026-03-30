@@ -26,7 +26,7 @@ pub(crate) fn write_csv_header_if_needed<W: std::io::Write>(
             let keys = config.output.get_effective_keys();
             if keys.is_empty() {
                 return Err(anyhow::anyhow!(
-                    "CSV output format requires --keys to specify field order"
+                    "CSV output requires --keys to define column order, e.g. --keys ts,level,msg. Use -s to inspect available fields."
                 ));
             }
 

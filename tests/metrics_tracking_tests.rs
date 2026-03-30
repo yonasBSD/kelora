@@ -916,6 +916,11 @@ fn test_span_close_requires_span() {
         stderr.contains("--span-close requires --span"),
         "error message should explain dependency"
     );
+    assert!(
+        stderr.contains("--span N") && stderr.contains("--span-idle 30s"),
+        "error message should suggest fixed-size and idle span forms: {}",
+        stderr
+    );
 }
 
 #[test]

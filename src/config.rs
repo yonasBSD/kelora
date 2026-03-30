@@ -1180,7 +1180,7 @@ fn create_context_config(cli: &crate::Cli) -> anyhow::Result<ContextConfig> {
 
     if (before_context > 0 || after_context > 0) && !has_filtering {
         return Err(anyhow::anyhow!(
-            "Context options (-A, -B, -C) require active filtering (use --filter, --levels, --since, --until, etc.)"
+            "Context options (-A, -B, -C) require active filtering because context is shown around matches. Add --filter, --levels, --since, or --until."
         ));
     }
 
@@ -1225,7 +1225,7 @@ fn parse_span_config(cli: &crate::Cli) -> anyhow::Result<Option<SpanConfig>> {
     if span_spec.is_none() && idle_spec.is_none() {
         if cli.span_close.is_some() {
             return Err(anyhow::anyhow!(
-                "--span-close requires --span or --span-idle to be specified"
+                "--span-close requires --span or --span-idle. Use --span N for fixed-size spans or --span-idle 30s for inactivity-based spans."
             ));
         }
         return Ok(None);
@@ -1233,7 +1233,7 @@ fn parse_span_config(cli: &crate::Cli) -> anyhow::Result<Option<SpanConfig>> {
 
     if span_spec.is_some() && idle_spec.is_some() {
         return Err(anyhow::anyhow!(
-            "--span and --span-idle cannot be used together"
+            "--span and --span-idle cannot be used together. Use --span N for fixed-size spans or --span-idle 30s for inactivity-based spans."
         ));
     }
 

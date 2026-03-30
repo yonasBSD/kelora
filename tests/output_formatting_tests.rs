@@ -602,6 +602,106 @@ fn test_conflicting_color_flags() {
 }
 
 #[test]
+fn test_csv_without_keys_suggests_column_order_example() {
+    let input = r#"{"ts": "2024-01-01T10:00:00Z", "level": "info", "msg": "hello"}"#;
+
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "-F", "csv"], input);
+
+    assert_ne!(exit_code, 0, "csv without keys should fail");
+    assert!(
+        stderr.contains("CSV output requires --keys to define column order"),
+        "stderr should explain the missing keys requirement: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("--keys ts,level,msg") && stderr.contains("Use -s"),
+        "stderr should include an example and field discovery hint: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_keymap_without_single_key_suggests_example() {
+    let input = r#"{"level": "info", "msg": "hello"}"#;
+
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "-F", "keymap"], input);
+
+    assert_ne!(exit_code, 0, "keymap without a single key should fail");
+    assert!(
+        stderr.contains("keymap output requires exactly one field via --keys"),
+        "stderr should explain the single-field requirement: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("--keys level"),
+        "stderr should include a concrete example: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_tailmap_without_single_key_suggests_numeric_example() {
+    let input = r#"{"latency_ms": 123, "msg": "hello"}"#;
+
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "-F", "tailmap"], input);
+
+    assert_ne!(exit_code, 0, "tailmap without a single key should fail");
+    assert!(
+        stderr.contains("tailmap output requires exactly one numeric field via --keys"),
+        "stderr should explain the single numeric field requirement: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("--keys latency_ms"),
+        "stderr should include a numeric-field example: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_drain_without_keys_suggests_single_field_example() {
+    let input = r#"{"msg": "hello world"}"#;
+
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--drain"], input);
+
+    assert_ne!(exit_code, 0, "drain without keys should fail");
+    assert!(
+        stderr.contains("--drain requires exactly one effective field in --keys"),
+        "stderr should explain the drain field requirement: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("--keys msg") && stderr.contains("Use -s"),
+        "stderr should include an example and discovery hint: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_drain_parallel_suggests_sequential_rerun() {
+    let input = r#"{"msg": "hello world"}"#;
+
+    let (_stdout, stderr, exit_code) = run_kelora_with_input(
+        &["-f", "json", "--parallel", "--drain", "--keys", "msg"],
+        input,
+    );
+
+    assert_ne!(exit_code, 0, "drain with parallel mode should fail");
+    assert!(
+        stderr.contains("--drain summary is not supported with --parallel"),
+        "stderr should explain the mode conflict: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("Rerun without --parallel"),
+        "stderr should suggest the sequential rerun: {}",
+        stderr
+    );
+}
+
+#[test]
 fn test_wrap_with_different_formatters() {
     // Test wrap behavior with different output formatters
     let long_message = "x".repeat(150);

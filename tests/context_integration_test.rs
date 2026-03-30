@@ -81,6 +81,11 @@ fn test_context_requires_filtering() {
         stderr.contains("Context options (-A, -B, -C) require active filtering"),
         "Should show context validation error message"
     );
+    assert!(
+        stderr.contains("shown around matches") && stderr.contains("--filter"),
+        "Should explain why context needs filtering and how to add it: {}",
+        stderr
+    );
     assert_eq!(
         stdout.trim(),
         "",
@@ -98,6 +103,11 @@ fn test_context_before_requires_filtering() {
         stderr.contains("Context options (-A, -B, -C) require active filtering"),
         "Should show context validation error message"
     );
+    assert!(
+        stderr.contains("shown around matches"),
+        "Should explain why context needs filtering: {}",
+        stderr
+    );
 }
 
 #[test]
@@ -112,6 +122,11 @@ fn test_context_combined_requires_filtering() {
     assert!(
         stderr.contains("Context options (-A, -B, -C) require active filtering"),
         "Should show context validation error message"
+    );
+    assert!(
+        stderr.contains("--levels") && stderr.contains("--since"),
+        "Should suggest common filtering flags: {}",
+        stderr
     );
 }
 

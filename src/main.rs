@@ -111,7 +111,7 @@ fn main() -> Result<()> {
             || config.performance.batch_size.is_some())
     {
         let warning = config.format_error_message(
-            "span aggregation requires sequential mode; ignoring --parallel settings",
+            "span aggregation requires sequential mode; ignoring --parallel settings. Rerun without --parallel if you need span aggregation.",
         );
         stderr.writeln(&warning).unwrap_or(());
     }

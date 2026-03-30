@@ -66,7 +66,7 @@ pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
 
     if use_parallel && config.output.drain.is_some() {
         return Err(anyhow::anyhow!(
-            "--drain summary is not supported with --parallel or thread overrides"
+            "--drain summary is not supported with --parallel or thread overrides. Rerun without --parallel to use Drain template mining."
         ));
     }
 

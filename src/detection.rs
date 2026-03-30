@@ -190,8 +190,9 @@ pub fn format_detected_format_notice(
         let message = config.format_info_message(&format!("Auto-detected format: {}", format_name));
         Some(message)
     } else if detected.fell_back_to_line() {
-        let message = config
-            .format_hint_message("No input format detected; using line. Override with -f <fmt>.");
+        let message = config.format_hint_message(
+            "No input format detected; using line. If your input is structured, try -j for JSON or specify -f <fmt>. See --help-formats for supported parsers.",
+        );
         Some(message)
     } else {
         None
@@ -249,8 +250,9 @@ pub fn parse_failure_warning_message(
         || (events_created == 0 && parse_errors >= 3);
 
     if should_warn {
-        let mut message = config
-            .format_error_message("Parsing mostly failed; rerun with -f line or specify -f <fmt>.");
+        let mut message = config.format_error_message(
+            "Parsing mostly failed. The input may use the wrong format, contain mixed formats, or require multiline parsing. Try -f line, specify -f <fmt>, or see --help-formats / --help-multiline.",
+        );
         if !events_were_output {
             message = message.trim_start_matches('\n').to_string();
         }
@@ -331,6 +333,10 @@ mod tests {
         assert!(
             message.contains("Parsing mostly failed"),
             "message was {message}"
+        );
+        assert!(
+            message.contains("--help-multiline"),
+            "message should point to multiline help: {message}"
         );
     }
 

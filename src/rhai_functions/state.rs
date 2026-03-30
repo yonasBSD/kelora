@@ -145,7 +145,7 @@ pub fn register(engine: &mut Engine) {
         .register_indexer_get(
             |_state: &mut StateNotAvailable, _key: &str| -> Result<Dynamic, Box<EvalAltResult>> {
                 Err(EvalAltResult::ErrorRuntime(
-                    "'state' is not available in --parallel mode (requires sequential processing)"
+                    "'state' is not available in --parallel mode. Rerun without --parallel if you need shared mutable state; use track_* helpers for parallel-safe aggregation."
                         .into(),
                     Position::NONE,
                 )
@@ -158,7 +158,7 @@ pub fn register(engine: &mut Engine) {
              _value: Dynamic|
              -> Result<(), Box<EvalAltResult>> {
                 Err(EvalAltResult::ErrorRuntime(
-                    "'state' is not available in --parallel mode (requires sequential processing)"
+                    "'state' is not available in --parallel mode. Rerun without --parallel if you need shared mutable state; use track_* helpers for parallel-safe aggregation."
                         .into(),
                     Position::NONE,
                 )
@@ -169,7 +169,7 @@ pub fn register(engine: &mut Engine) {
             "contains",
             |_state: &mut StateNotAvailable, _key: &str| -> Result<bool, Box<EvalAltResult>> {
                 Err(EvalAltResult::ErrorRuntime(
-                    "'state' is not available in --parallel mode (requires sequential processing)"
+                    "'state' is not available in --parallel mode. Rerun without --parallel if you need shared mutable state; use track_* helpers for parallel-safe aggregation."
                         .into(),
                     Position::NONE,
                 )
@@ -180,7 +180,7 @@ pub fn register(engine: &mut Engine) {
             "len",
             |_state: &mut StateNotAvailable| -> Result<i64, Box<EvalAltResult>> {
                 Err(EvalAltResult::ErrorRuntime(
-                    "'state' is not available in --parallel mode (requires sequential processing)"
+                    "'state' is not available in --parallel mode. Rerun without --parallel if you need shared mutable state; use track_* helpers for parallel-safe aggregation."
                         .into(),
                     Position::NONE,
                 )
@@ -191,7 +191,7 @@ pub fn register(engine: &mut Engine) {
             "is_empty",
             |_state: &mut StateNotAvailable| -> Result<bool, Box<EvalAltResult>> {
                 Err(EvalAltResult::ErrorRuntime(
-                    "'state' is not available in --parallel mode (requires sequential processing)"
+                    "'state' is not available in --parallel mode. Rerun without --parallel if you need shared mutable state; use track_* helpers for parallel-safe aggregation."
                         .into(),
                     Position::NONE,
                 )
@@ -202,7 +202,7 @@ pub fn register(engine: &mut Engine) {
             "keys",
             |_state: &mut StateNotAvailable| -> Result<Vec<Dynamic>, Box<EvalAltResult>> {
                 Err(EvalAltResult::ErrorRuntime(
-                    "'state' is not available in --parallel mode (requires sequential processing)"
+                    "'state' is not available in --parallel mode. Rerun without --parallel if you need shared mutable state; use track_* helpers for parallel-safe aggregation."
                         .into(),
                     Position::NONE,
                 )
@@ -213,7 +213,7 @@ pub fn register(engine: &mut Engine) {
             "clear",
             |_state: &mut StateNotAvailable| -> Result<(), Box<EvalAltResult>> {
                 Err(EvalAltResult::ErrorRuntime(
-                    "'state' is not available in --parallel mode (requires sequential processing)"
+                    "'state' is not available in --parallel mode. Rerun without --parallel if you need shared mutable state; use track_* helpers for parallel-safe aggregation."
                         .into(),
                     Position::NONE,
                 )
@@ -224,7 +224,7 @@ pub fn register(engine: &mut Engine) {
             "get",
             |_state: &mut StateNotAvailable, _key: &str| -> Result<Dynamic, Box<EvalAltResult>> {
                 Err(EvalAltResult::ErrorRuntime(
-                    "'state' is not available in --parallel mode (requires sequential processing)"
+                    "'state' is not available in --parallel mode. Rerun without --parallel if you need shared mutable state; use track_* helpers for parallel-safe aggregation."
                         .into(),
                     Position::NONE,
                 )
@@ -238,7 +238,7 @@ pub fn register(engine: &mut Engine) {
              _value: Dynamic|
              -> Result<(), Box<EvalAltResult>> {
                 Err(EvalAltResult::ErrorRuntime(
-                    "'state' is not available in --parallel mode (requires sequential processing)"
+                    "'state' is not available in --parallel mode. Rerun without --parallel if you need shared mutable state; use track_* helpers for parallel-safe aggregation."
                         .into(),
                     Position::NONE,
                 )
