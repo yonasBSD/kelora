@@ -58,6 +58,10 @@ Yes. Kelora is an experiment in agentic AI development: AI agents generate the i
 
 No. Kelora is a local-only tool and does not include any built-in networking or telemetry features. The repository also includes `just check-no-networking`, a small CI-enforced check that Kelora stays free of common networking and telemetry dependencies.
 
+## Why does Kelora have so much code for a CLI tool?
+
+Kelora is not a tiny CLI. It combines multiple parsers, multiline handling, time parsing, streaming state, parallel execution, output formatting, and an embedded Rhai runtime with a large built-in function set. A substantial part of the repository is also tests, examples, and documentation for real-world log edge cases. The codebase is large because the feature surface is large, not because it is padded with filler.
+
 ## How does configuration precedence work?
 
 CLI flags override `.kelora.ini`, which overrides `~/.config/kelora/kelora.ini`, which overrides defaults. The [Configuration System](concepts/configuration-system.md) explains precedence and aliases.
