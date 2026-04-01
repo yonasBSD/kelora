@@ -54,6 +54,10 @@ Yes. Use `--no-emoji` to switch to plain text output and `--no-color` (or the `N
 
 Yes. Kelora is an experiment in agentic AI development: AI agents generate the implementation and tests, and human oversight focuses on requirements and validation. See the [Development Approach](index.md#development-approach) and the [Security Policy](https://github.com/dloss/kelora/blob/main/SECURITY.md) before production use.
 
+## Does Kelora phone home or send telemetry?
+
+No. Kelora is a local-only tool and does not include any built-in networking or telemetry features. The repository also includes `just check-no-networking`, a small CI-enforced check that Kelora stays free of common networking and telemetry dependencies.
+
 ## How does configuration precedence work?
 
 CLI flags override `.kelora.ini`, which overrides `~/.config/kelora/kelora.ini`, which overrides defaults. The [Configuration System](concepts/configuration-system.md) explains precedence and aliases.

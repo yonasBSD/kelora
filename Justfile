@@ -72,8 +72,12 @@ deny:
     CARGO_DENY_HOME={{justfile_directory()}}/.cargo-deny \
     cargo deny check --disable-fetch --metadata-path target/cargo-deny-metadata.json
 
+# Check the no-networking policy for the shipped product
+check-no-networking:
+    bash dev/check-no-networking.sh
+
 # Run all checks (fmt, lint, audit, deny, test)
-check: fmt lint audit deny test
+check: fmt lint audit deny check-no-networking test
 
 # Run benchmark suite
 bench:

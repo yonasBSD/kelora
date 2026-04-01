@@ -26,6 +26,9 @@ jobs:
           command: check
           command-arguments: all
 
+      - name: Check no-networking policy
+        run: bash dev/check-no-networking.sh
+
   build:
     needs: audit
     runs-on: ${{ matrix.os }}

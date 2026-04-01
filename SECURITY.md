@@ -43,6 +43,10 @@ Kelora implements multiple layers of security controls to ensure safe operation:
   - Advisory checking against RustSec database
   - Duplicate dependency detection
   - Source verification (crates.io only)
+- **No-networking policy check** runs via `just check-no-networking`:
+  - Rejects common HTTP, websocket, TLS, and telemetry crates in the shipped dependency graph
+  - Rejects obvious socket/client API usage in `src/`
+  - Runs in CI and release workflows so built-in network support cannot be added silently
 
 ### Code Safety
 
@@ -63,7 +67,18 @@ Kelora is developed using AI-generated code (Claude, GPT-5). Validated through a
 Every commit and pull request must pass:
 - `cargo fmt --all --check` (code formatting)
 - `cargo clippy --all-targets --all-features -- -D warnings` (static analysis)
+- `bash dev/check-no-networking.sh` (enforce the no-networking policy)
 - `cargo test --all-features` (all tests must pass)
+
+## No-Networking Policy
+
+Kelora is designed to process data locally. The repo includes a small policy check:
+
+```bash
+just check-no-networking
+```
+
+It checks for common networking and telemetry crates in the production dependency graph, obvious socket/client APIs in `src/`, and obvious spawned network tools such as `curl` or `wget`. CI and release automation run the same script. This is a narrow policy guardrail, not a security audit or proof against malicious behavior.
 
 ## Verifying Release Binaries
 
