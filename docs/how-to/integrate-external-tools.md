@@ -146,7 +146,7 @@ See [Process Archives at Scale](batch-process-archives.md) for parallel processi
 
 ### tail / journalctl — Live Streaming
 
-Stream live log data into Kelora for real-time monitoring and alerting during deployments or incidents. Use `tail -F` (capital F) to survive log rotation. Combine with Kelora's `-q` to suppress event output while keeping diagnostics and metrics visible.
+Stream live log data into Kelora for real-time monitoring and alerting during deployments or incidents. Use `tail -F` (capital F) to survive log rotation. Combine with Kelora's `-q` to suppress event output while keeping diagnostics and metrics visible. The same pattern works over SSH when the remote host can produce a continuous stream on stdout.
 
 ```bash
 # Monitor live logs for critical errors
@@ -155,6 +155,14 @@ tail -F /var/log/app.log | kelora -j -l critical -q
 # Stream systemd journal logs for a specific service
 journalctl -u myapp.service -f --output=json | \
   kelora -j --filter 'e.priority <= 3' -F json
+
+# Stream a remote file over SSH
+ssh loghost.example.net 'tail -F /var/log/app.jsonl' | \
+  kelora -j -l error,warn
+
+# Stream a remote systemd unit over SSH
+ssh ops@example.net 'journalctl -u myapp.service -f -o json' | \
+  kelora -j --filter 'e.PRIORITY <= 3'
 ```
 
 See [Design Streaming Alerts](build-streaming-alerts.md) for complete alert workflows.
