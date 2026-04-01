@@ -155,6 +155,16 @@ docs-delete-version *versions:
     UV_TOOL_DIR="{{justfile_directory()}}/.uv/tools" \
     {{DOCS_UVX}} mike delete --push "${versions[@]}"
 
+# Prune published documentation versions using the retention policy
+docs-prune *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p "{{justfile_directory()}}/.uv/cache" "{{justfile_directory()}}/.uv/data" "{{justfile_directory()}}/.uv/tools"
+    UV_CACHE_DIR="{{justfile_directory()}}/.uv/cache" \
+    UV_DATA_DIR="{{justfile_directory()}}/.uv/data" \
+    UV_TOOL_DIR="{{justfile_directory()}}/.uv/tools" \
+    bash dev/prune-doc-versions.sh "$@"
+
 # Run JSON parser fuzzing locally (requires cargo-fuzz + nightly toolchain)
 fuzz-json *args:
     #!/usr/bin/env bash

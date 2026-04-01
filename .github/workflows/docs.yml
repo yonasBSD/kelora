@@ -51,3 +51,7 @@ jobs:
           PATH="${GITHUB_WORKSPACE}/target/release:${PATH}" \
           KELORA_IGNORE_CONFIG=1 \
           uvx --with 'mkdocs<2' --with mkdocs-material --with mike --with markdown-exec[ansi] mike set-default --push latest
+
+      - name: Prune superseded docs versions
+        run: |
+          bash dev/prune-doc-versions.sh
