@@ -44,6 +44,9 @@ jobs:
       - name: Check no-networking policy
         run: bash dev/check-no-networking.sh
 
+      - name: Check subprocess usage
+        run: bash dev/check-subprocess-usage.sh
+
       - name: Run tests
         run: cargo test --all-features
 

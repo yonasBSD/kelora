@@ -76,8 +76,12 @@ deny:
 check-no-networking:
     bash dev/check-no-networking.sh
 
+# Check that subprocess execution in src/ stays limited to approved call sites
+check-subprocess-usage:
+    bash dev/check-subprocess-usage.sh
+
 # Run all checks (fmt, lint, audit, deny, test)
-check: fmt lint audit deny check-no-networking test
+check: fmt lint audit deny check-no-networking check-subprocess-usage test
 
 # Run benchmark suite
 bench:

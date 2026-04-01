@@ -47,6 +47,8 @@ Kelora implements multiple layers of security controls to ensure safe operation:
   - Rejects common HTTP, websocket, TLS, and telemetry crates in the shipped dependency graph
   - Rejects obvious socket/client API usage in `src/`
   - Runs in CI and release workflows so built-in network support cannot be added silently
+- **Subprocess usage check** runs via `just check-subprocess-usage`:
+  - Fails if new `Command::new(...)` call sites appear in `src/` without being explicitly reviewed and allowlisted
 
 ### Code Safety
 
@@ -68,6 +70,7 @@ Every commit and pull request must pass:
 - `cargo fmt --all --check` (code formatting)
 - `cargo clippy --all-targets --all-features -- -D warnings` (static analysis)
 - `bash dev/check-no-networking.sh` (enforce the no-networking policy)
+- `bash dev/check-subprocess-usage.sh` (flag new subprocess execution in `src/`)
 - `cargo test --all-features` (all tests must pass)
 
 ## No-Networking Policy
