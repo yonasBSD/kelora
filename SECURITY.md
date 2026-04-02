@@ -138,7 +138,7 @@ All other advisories result in build failures.
 - No privilege escalation
 - No persistent daemons or background processes
 - No telemetry or data collection
-- No modification of input files (read-only)
+- No modification of input files unless you explicitly enable filesystem write functions with `--allow-fs-writes`
 
 ### Security Boundaries
 
@@ -153,7 +153,7 @@ All other advisories result in build failures.
 **Protections:**
 - Log data is parsed and processed but cannot execute code
 - Rhai scripts run in a sandboxed environment with no filesystem write access by default
-  - File writes require explicit `--allow-fs-write` flag (enables `append_file()` function)
+  - File writes require explicit `--allow-fs-writes` flag (enables functions such as `append_file()`, `truncate_file()`, and `mkdir()`)
   - Standard output redirection (`>`, `>>`) is controlled by the shell, not Kelora
 - Malformed log entries are skipped with diagnostics (default resilient mode)
 
