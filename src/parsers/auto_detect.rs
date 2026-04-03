@@ -68,7 +68,8 @@ fn detect_json(line: &str) -> bool {
 
 /// Detect CEF format using actual parser for 100% accuracy
 fn detect_cef(line: &str) -> bool {
-    let parser = CefParser::new_without_auto_timestamp();
+    // Use strict mode for detection - we only want true positives
+    let parser = CefParser::new_without_auto_timestamp().with_strict(true);
     parser.parse(line).is_ok()
 }
 

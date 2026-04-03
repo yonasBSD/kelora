@@ -191,9 +191,12 @@ impl PipelineBuilder {
             }
             crate::config::InputFormat::Json => {
                 if custom_ts_config {
-                    Box::new(crate::parsers::JsonlParser::new_without_auto_timestamp())
+                    Box::new(
+                        crate::parsers::JsonlParser::new_without_auto_timestamp()
+                            .with_strict(self.strict),
+                    )
                 } else {
-                    Box::new(crate::parsers::JsonlParser::new())
+                    Box::new(crate::parsers::JsonlParser::new().with_strict(self.strict))
                 }
             }
             crate::config::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
@@ -214,9 +217,12 @@ impl PipelineBuilder {
             }
             crate::config::InputFormat::Cef => {
                 if custom_ts_config {
-                    Box::new(crate::parsers::CefParser::new_without_auto_timestamp())
+                    Box::new(
+                        crate::parsers::CefParser::new_without_auto_timestamp()
+                            .with_strict(self.strict),
+                    )
                 } else {
-                    Box::new(crate::parsers::CefParser::new())
+                    Box::new(crate::parsers::CefParser::new().with_strict(self.strict))
                 }
             }
             crate::config::InputFormat::Csv(ref field_spec) => {
@@ -272,7 +278,8 @@ impl PipelineBuilder {
             crate::config::InputFormat::Csvnh => {
                 if let Some(ref headers) = self.csv_headers {
                     let parser =
-                        crate::parsers::CsvParser::new_csv_no_headers_with_columns(headers.clone());
+                        crate::parsers::CsvParser::new_csv_no_headers_with_columns(headers.clone())
+                            .with_strict(self.strict);
                     let parser = if custom_ts_config {
                         parser.with_auto_timestamp(false)
                     } else {
@@ -280,7 +287,8 @@ impl PipelineBuilder {
                     };
                     Box::new(parser)
                 } else {
-                    let parser = crate::parsers::CsvParser::new_csv_no_headers();
+                    let parser =
+                        crate::parsers::CsvParser::new_csv_no_headers().with_strict(self.strict);
                     let parser = if custom_ts_config {
                         parser.with_auto_timestamp(false)
                     } else {
@@ -292,7 +300,8 @@ impl PipelineBuilder {
             crate::config::InputFormat::Tsvnh => {
                 if let Some(ref headers) = self.csv_headers {
                     let parser =
-                        crate::parsers::CsvParser::new_tsv_no_headers_with_columns(headers.clone());
+                        crate::parsers::CsvParser::new_tsv_no_headers_with_columns(headers.clone())
+                            .with_strict(self.strict);
                     let parser = if custom_ts_config {
                         parser.with_auto_timestamp(false)
                     } else {
@@ -300,7 +309,8 @@ impl PipelineBuilder {
                     };
                     Box::new(parser)
                 } else {
-                    let parser = crate::parsers::CsvParser::new_tsv_no_headers();
+                    let parser =
+                        crate::parsers::CsvParser::new_tsv_no_headers().with_strict(self.strict);
                     let parser = if custom_ts_config {
                         parser.with_auto_timestamp(false)
                     } else {
@@ -701,9 +711,12 @@ impl PipelineBuilder {
             }
             crate::config::InputFormat::Json => {
                 if custom_ts_config {
-                    Box::new(crate::parsers::JsonlParser::new_without_auto_timestamp())
+                    Box::new(
+                        crate::parsers::JsonlParser::new_without_auto_timestamp()
+                            .with_strict(self.strict),
+                    )
                 } else {
-                    Box::new(crate::parsers::JsonlParser::new())
+                    Box::new(crate::parsers::JsonlParser::new().with_strict(self.strict))
                 }
             }
             crate::config::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
@@ -724,9 +737,12 @@ impl PipelineBuilder {
             }
             crate::config::InputFormat::Cef => {
                 if custom_ts_config {
-                    Box::new(crate::parsers::CefParser::new_without_auto_timestamp())
+                    Box::new(
+                        crate::parsers::CefParser::new_without_auto_timestamp()
+                            .with_strict(self.strict),
+                    )
                 } else {
-                    Box::new(crate::parsers::CefParser::new())
+                    Box::new(crate::parsers::CefParser::new().with_strict(self.strict))
                 }
             }
             crate::config::InputFormat::Csv(ref field_spec) => {
@@ -782,7 +798,8 @@ impl PipelineBuilder {
             crate::config::InputFormat::Csvnh => {
                 if let Some(ref headers) = self.csv_headers {
                     let parser =
-                        crate::parsers::CsvParser::new_csv_no_headers_with_columns(headers.clone());
+                        crate::parsers::CsvParser::new_csv_no_headers_with_columns(headers.clone())
+                            .with_strict(self.strict);
                     let parser = if custom_ts_config {
                         parser.with_auto_timestamp(false)
                     } else {
@@ -790,7 +807,8 @@ impl PipelineBuilder {
                     };
                     Box::new(parser)
                 } else {
-                    let parser = crate::parsers::CsvParser::new_csv_no_headers();
+                    let parser =
+                        crate::parsers::CsvParser::new_csv_no_headers().with_strict(self.strict);
                     let parser = if custom_ts_config {
                         parser.with_auto_timestamp(false)
                     } else {
@@ -802,7 +820,8 @@ impl PipelineBuilder {
             crate::config::InputFormat::Tsvnh => {
                 if let Some(ref headers) = self.csv_headers {
                     let parser =
-                        crate::parsers::CsvParser::new_tsv_no_headers_with_columns(headers.clone());
+                        crate::parsers::CsvParser::new_tsv_no_headers_with_columns(headers.clone())
+                            .with_strict(self.strict);
                     let parser = if custom_ts_config {
                         parser.with_auto_timestamp(false)
                     } else {
@@ -810,7 +829,8 @@ impl PipelineBuilder {
                     };
                     Box::new(parser)
                 } else {
-                    let parser = crate::parsers::CsvParser::new_tsv_no_headers();
+                    let parser =
+                        crate::parsers::CsvParser::new_tsv_no_headers().with_strict(self.strict);
                     let parser = if custom_ts_config {
                         parser.with_auto_timestamp(false)
                     } else {

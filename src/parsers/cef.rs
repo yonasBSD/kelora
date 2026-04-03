@@ -15,19 +15,27 @@ use std::collections::HashMap;
 
 pub struct CefParser {
     auto_timestamp: bool,
+    strict: bool,
 }
 
 impl CefParser {
     pub fn new() -> Self {
         Self {
             auto_timestamp: true,
+            strict: false,
         }
     }
 
     pub fn new_without_auto_timestamp() -> Self {
         Self {
             auto_timestamp: false,
+            strict: false,
         }
+    }
+
+    pub fn with_strict(mut self, strict: bool) -> Self {
+        self.strict = strict;
+        self
     }
 
     /// Parse syslog prefix before CEF: (optional timestamp and hostname)
@@ -182,9 +190,12 @@ impl EventParser for CefParser {
             if extension_text.is_empty() {
                 HashMap::new()
             } else {
-                let (_, pairs) = Self::parse_cef_extension(extension_text)
-                    .map_err(|e| anyhow::anyhow!("Invalid CEF extension: {}", e))?;
-                pairs
+                match Self::parse_cef_extension(extension_text) {
+                    Ok((_, pairs)) => pairs,
+                    Err(e) => {
+                        return Err(anyhow::anyhow!("Invalid CEF extension: {}", e));
+                    }
+                }
             }
         };
 
