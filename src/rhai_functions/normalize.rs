@@ -4,7 +4,6 @@ use rhai::{Dynamic, Engine, Map};
 use std::collections::HashMap;
 
 /// Luhn algorithm validation for credit card numbers
-#[allow(clippy::manual_is_multiple_of)]
 fn is_valid_luhn(digits: &str) -> bool {
     let digits: Vec<u32> = digits
         .chars()
