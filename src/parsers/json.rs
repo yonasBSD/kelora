@@ -4,26 +4,36 @@ use anyhow::Result;
 
 pub struct JsonlParser {
     auto_timestamp: bool,
+    strict: bool,
 }
 
 impl JsonlParser {
     pub fn new() -> Self {
         Self {
             auto_timestamp: true,
+            strict: false,
         }
     }
 
     pub fn new_without_auto_timestamp() -> Self {
         Self {
             auto_timestamp: false,
+            strict: false,
         }
+    }
+
+    pub fn with_strict(mut self, strict: bool) -> Self {
+        self.strict = strict;
+        self
     }
 }
 
 impl EventParser for JsonlParser {
     fn parse(&self, line: &str) -> Result<Event> {
         let line = line.trim_end_matches('\n').trim_end_matches('\r');
-        let json_value: serde_json::Value = serde_json::from_str(line)?;
+
+        let json_value: serde_json::Value =
+            serde_json::from_str(line).map_err(|e| anyhow::anyhow!("Invalid JSON: {}", e))?;
 
         if let serde_json::Value::Object(map) = json_value {
             // Pre-allocate HashMap with capacity based on JSON object size
