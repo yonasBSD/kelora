@@ -384,11 +384,10 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
                 }
                 Err(e) => {
                     if config.processing.strict {
-                        return Err(anyhow::anyhow!(
-                            "Failed to open file '{}': {}",
+                        return Err(anyhow::anyhow!(config::format_input_open_error(
                             file_path,
-                            e
-                        ));
+                            &e.to_string()
+                        )));
                     }
                     failed_opens.push((file_path.clone(), e.to_string()));
                 }
@@ -411,10 +410,9 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
                 for (path, err) in failed_opens {
                     eprintln!(
                         "{}",
-                        crate::config::format_error_message_auto(&format!(
-                            "Failed to open file '{}': {}",
-                            path, err
-                        ))
+                        crate::config::format_error_message_auto(&config::format_input_open_error(
+                            &path, &err
+                        ),)
                     );
                     stats::stats_file_open_failed(&path);
                 }

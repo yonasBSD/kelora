@@ -18,6 +18,17 @@ fn test_help_formats_topic() {
 }
 
 #[test]
+fn test_main_help_describes_non_obvious_output_formats() {
+    let (stdout, _stderr, exit_code) = run_kelora(&["--help"]);
+    assert_eq!(exit_code, 0, "--help should exit successfully");
+    assert!(stdout.contains("levelmap  Compact level timeline"));
+    assert!(stdout.contains("keymap    First-character map for one selected field"));
+    assert!(stdout.contains("tailmap   Percentile map for one numeric field"));
+    assert!(stdout.contains("csv       Comma-separated with header row"));
+    assert!(stdout.contains("tsvnh     TSV without header row"));
+}
+
+#[test]
 fn test_help_regex_topic() {
     let (stdout, _stderr, exit_code) = run_kelora(&["--help-regex"]);
     assert_eq!(exit_code, 0, "--help-regex should exit successfully");

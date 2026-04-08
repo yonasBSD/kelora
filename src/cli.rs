@@ -410,6 +410,7 @@ pub struct Cli {
         long = "output-format",
         value_enum,
         default_value = "default",
+        help = "Output format.\n\nFormats:\n  default   Colored key-value output\n  json      JSON Lines (one object per line)\n  logfmt    Key=value pairs on one line\n  inspect   Debug view with type information\n  levelmap  Compact level timeline\n  keymap    First-character map for one selected field\n  tailmap   Percentile map for one numeric field\n  csv       Comma-separated with header row\n  tsv       Tab-separated with header row\n  csvnh     CSV without header row\n  tsvnh     TSV without header row\n\nSee --help-formats for requirements, extracted fields, and examples.",
         help_heading = "Output Options"
     )]
     pub output_format: OutputFormat,

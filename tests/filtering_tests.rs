@@ -225,6 +225,47 @@ fn test_keep_lines_functionality() {
 }
 
 #[test]
+fn test_zero_results_with_unseen_filter_field_emits_hint() {
+    let input = r#"{"level": "INFO", "message": "ok"}"#;
+
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "--filter", r#"e.levle == "INFO""#], input);
+
+    assert_eq!(
+        exit_code, 0,
+        "missing filter fields should remain non-fatal in resilient mode"
+    );
+    assert!(
+        stderr.contains("0 events matched"),
+        "stderr should explain empty results: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("levle"),
+        "stderr should include the unseen field name: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_zero_results_with_existing_filter_field_does_not_emit_typo_hint() {
+    let input = r#"{"level": "INFO", "message": "ok"}"#;
+
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "--filter", r#"e.level == "ERROR""#], input);
+
+    assert_eq!(
+        exit_code, 0,
+        "non-matching filters should remain successful"
+    );
+    assert!(
+        !stderr.contains("0 events matched"),
+        "stderr should not suggest a typo for a legitimate filter miss: {}",
+        stderr
+    );
+}
+
+#[test]
 fn test_keep_lines_with_specific_pattern() {
     let input = r#"{"level": "INFO", "message": "User login successful"}
 {"level": "DEBUG", "message": "systemd startup complete"}

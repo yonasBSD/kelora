@@ -612,9 +612,14 @@ impl KeloraConfig {
         }
 
         // Check if there's anything to display
-        let has_content = info.loaded_config_path.is_some()
-            || info.applied_defaults.is_some()
-            || !info.expanded_aliases.is_empty();
+        let show_verbose_details = config.processing.verbose > 0 || info.explicit_config_path;
+        let show_loaded_path = show_verbose_details;
+        let show_defaults = show_verbose_details;
+        let show_aliases = show_verbose_details || !info.expanded_aliases.is_empty();
+
+        let has_content = (show_loaded_path && info.loaded_config_path.is_some())
+            || (show_defaults && info.applied_defaults.is_some())
+            || (show_aliases && !info.expanded_aliases.is_empty());
 
         if !has_content {
             return;
@@ -624,22 +629,28 @@ impl KeloraConfig {
         let mut lines = Vec::new();
 
         // Config file loaded
-        if let Some(path) = &info.loaded_config_path {
-            let msg = config.format_info_message(&format!("Config: {}", path.display()));
-            lines.push(msg);
+        if show_loaded_path {
+            if let Some(path) = &info.loaded_config_path {
+                let msg = config.format_info_message(&format!("Config: {}", path.display()));
+                lines.push(msg);
+            }
         }
 
         // Defaults applied (use info message with indentation)
-        if let Some(defaults) = &info.applied_defaults {
-            let msg = config.format_info_message(&format!("  Defaults: {}", defaults));
-            lines.push(msg);
+        if show_defaults {
+            if let Some(defaults) = &info.applied_defaults {
+                let msg = config.format_info_message(&format!("  Defaults: {}", defaults));
+                lines.push(msg);
+            }
         }
 
         // Aliases expanded (use info message with indentation)
-        for (alias_name, expansion) in &info.expanded_aliases {
-            let msg =
-                config.format_info_message(&format!("  Alias: -a {} → {}", alias_name, expansion));
-            lines.push(msg);
+        if show_aliases {
+            for (alias_name, expansion) in &info.expanded_aliases {
+                let msg = config
+                    .format_info_message(&format!("  Alias: -a {} → {}", alias_name, expansion));
+                lines.push(msg);
+            }
         }
 
         // Write all lines
@@ -681,6 +692,24 @@ pub fn format_hint_message_auto(message: &str) -> String {
     } else {
         format!("kelora hint: {}", message)
     }
+}
+
+/// Format an input-open error and add a shell-glob hint when the path looks unexpanded.
+pub fn format_input_open_error(path: &str, err: &str) -> String {
+    let mut message = format!("Failed to open file '{}': {}", path, err);
+
+    let looks_like_glob = path.contains('*') || path.contains('?') || path.contains('[');
+    let missing_file = err.contains("No such file")
+        || err.contains("not found")
+        || err.contains("cannot find the path");
+
+    if looks_like_glob && missing_file {
+        message.push_str(
+            ". Shell glob patterns must be expanded by the shell; remove the quotes or use interactive mode for glob expansion",
+        );
+    }
+
+    message
 }
 
 /// Format a verbose error message with line number and error type

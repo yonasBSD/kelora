@@ -331,16 +331,15 @@ impl MultiFileReader {
                     Err(e) => {
                         eprintln!(
                             "{}",
-                            crate::config::format_error_message_auto(&format!(
-                                "Failed to open file '{}': {}",
-                                file_path, e
-                            ))
+                            crate::config::format_error_message_auto(
+                                &crate::config::format_input_open_error(file_path, &e.to_string()),
+                            )
                         );
                         crate::stats::stats_file_open_failed(file_path);
                         if self.strict {
                             return Err(io::Error::new(
                                 io::ErrorKind::NotFound,
-                                format!("Failed to open file '{}': {}", file_path, e),
+                                crate::config::format_input_open_error(file_path, &e.to_string()),
                             ));
                         }
                         self.current_file_idx += 1;

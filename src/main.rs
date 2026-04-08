@@ -1,5 +1,6 @@
 use anyhow::Result;
 use crossbeam_channel::unbounded;
+use std::collections::BTreeSet;
 use std::io::IsTerminal;
 use std::sync::atomic::Ordering;
 
@@ -38,7 +39,8 @@ use crate::rhai_functions::tracking::TrackingSnapshot;
 use args::{process_args_with_config, validate_cli_args};
 use cli::Cli;
 use config::{
-    KeloraConfig, MultilineConfig, SectionEnd, SectionStart, SpanMode, TimestampFilterConfig,
+    KeloraConfig, MultilineConfig, ScriptStageType, SectionEnd, SectionStart, SpanMode,
+    TimestampFilterConfig,
 };
 use platform::{
     install_broken_pipe_panic_hook, Ctrl, ExitCode, ProcessCleanup, SafeFileOut, SafeStderr,
@@ -559,6 +561,55 @@ fn main() -> Result<()> {
     }
 }
 
+fn collect_filter_field_references(config: &KeloraConfig) -> BTreeSet<String> {
+    let mut fields = BTreeSet::new();
+    let re = regex::Regex::new(r"\be\.([A-Za-z_][A-Za-z0-9_]*)").expect("valid filter regex");
+
+    for stage in &config.processing.stages {
+        if let ScriptStageType::Filter { script, .. } = stage {
+            for captures in re.captures_iter(script) {
+                if let Some(field) = captures.get(1) {
+                    fields.insert(field.as_str().to_string());
+                }
+            }
+        }
+    }
+
+    fields
+}
+
+fn maybe_print_zero_results_hint(
+    config: &KeloraConfig,
+    stats: &stats::ProcessingStats,
+    stderr: &mut SafeStderr,
+) {
+    if stats.events_created == 0 || stats.events_output > 0 || stats.has_errors() {
+        return;
+    }
+
+    let referenced_fields = collect_filter_field_references(config);
+    if referenced_fields.is_empty() {
+        return;
+    }
+
+    let unseen_fields: Vec<String> = referenced_fields
+        .into_iter()
+        .filter(|field| !stats.discovered_keys.contains(field))
+        .collect();
+
+    if unseen_fields.is_empty() {
+        return;
+    }
+
+    let mut hint = config.format_hint_message(&format!(
+        "0 events matched. Filter referenced unseen field{}: {}. This may be a typo; rerun with -s to inspect discovered keys.",
+        if unseen_fields.len() == 1 { "" } else { "s" },
+        unseen_fields.join(", ")
+    ));
+    hint = hint.trim_start_matches('\n').to_string();
+    stderr.writeln(&hint).unwrap_or(());
+}
+
 /// Handle successful pipeline execution - process metrics, stats, and warnings
 fn handle_pipeline_success(
     config: &KeloraConfig,
@@ -592,7 +643,7 @@ fn handle_pipeline_success(
                         &pipeline_result.tracking_data.user,
                         metrics_level,
                     );
-                    if !metrics_output.is_empty() && metrics_output != "No metrics tracked" {
+                    if !metrics_output.is_empty() {
                         let mut formatted = config.format_metrics_message(
                             &metrics_output,
                             config.output.metrics_with_events, // Show header only for --with-metrics
@@ -684,6 +735,17 @@ fn handle_pipeline_success(
 
     // Print output based on configuration (only if not terminated)
     if !SHOULD_TERMINATE.load(Ordering::Relaxed) {
+        let tracking_summary = if diagnostics_allowed_runtime {
+            crate::rhai_functions::tracking::extract_error_summary_from_tracking(
+                &pipeline_result.tracking_data,
+                config.processing.verbose,
+                pipeline_result.stats.as_ref(),
+                Some(config),
+            )
+        } else {
+            None
+        };
+
         if let Some(ref s) = pipeline_result.stats {
             if config.output.stats.is_some() && terminal_allowed {
                 // Full stats when --stats flag is used (unless suppressed)
@@ -705,14 +767,7 @@ fn handle_pipeline_success(
                 // Error summary by default when errors occur (unless diagnostics suppressed)
                 let mut summaries = Vec::new();
 
-                if let Some(tracking_summary) =
-                    crate::rhai_functions::tracking::extract_error_summary_from_tracking(
-                        &pipeline_result.tracking_data,
-                        config.processing.verbose,
-                        pipeline_result.stats.as_ref(),
-                        Some(config),
-                    )
-                {
+                if let Some(tracking_summary) = tracking_summary.clone() {
                     summaries.push(tracking_summary);
                 }
 
@@ -729,6 +784,17 @@ fn handle_pipeline_success(
                     }
                     stderr.writeln(&formatted).unwrap_or(());
                 }
+            }
+
+            if diagnostics_allowed_runtime && terminal_allowed {
+                maybe_print_zero_results_hint(config, s, stderr);
+            }
+        } else if diagnostics_allowed_runtime {
+            if let Some(tracking_summary) = tracking_summary {
+                let formatted = config.format_error_message(&tracking_summary);
+                stderr
+                    .writeln(formatted.trim_start_matches('\n'))
+                    .unwrap_or(());
             }
         }
     }

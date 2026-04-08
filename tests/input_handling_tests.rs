@@ -38,6 +38,22 @@ fn test_missing_file_reports_name() {
 }
 
 #[test]
+fn test_quoted_glob_reports_shell_expansion_hint() {
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_files(&["-f", "json"], &["examples/*.jsonl"]);
+
+    assert_ne!(
+        exit_code, 0,
+        "quoted glob should fail as a literal missing file"
+    );
+    assert!(
+        stderr.contains("Shell glob patterns must be expanded by the shell"),
+        "stderr should explain quoted glob behavior: {}",
+        stderr
+    );
+}
+
+#[test]
 fn test_missing_file_is_in_error_summary() {
     let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
     writeln!(temp_file, "ok").expect("Failed to write temp file");

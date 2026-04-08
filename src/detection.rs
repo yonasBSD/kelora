@@ -117,11 +117,10 @@ pub fn detect_format_for_parallel_mode(
                 }
                 Err(e) => {
                     if strict {
-                        return Err(anyhow::anyhow!(
-                            "Failed to open file '{}': {}",
+                        return Err(anyhow::anyhow!(config::format_input_open_error(
                             file_path,
-                            e
-                        ));
+                            &e.to_string()
+                        )));
                     }
                     failed_opens.push((file_path.clone(), e.to_string()));
                 }
@@ -144,9 +143,8 @@ pub fn detect_format_for_parallel_mode(
                 for (path, err) in failed_opens {
                     eprintln!(
                         "{}",
-                        config::format_error_message_auto(&format!(
-                            "Failed to open file '{}': {}",
-                            path, err
+                        config::format_error_message_auto(&config::format_input_open_error(
+                            &path, &err
                         ))
                     );
                     stats::stats_file_open_failed(&path);

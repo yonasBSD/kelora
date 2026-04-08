@@ -69,6 +69,23 @@ fn test_metrics_output_has_no_leading_newline_when_events_suppressed() {
 }
 
 #[test]
+fn test_metrics_command_reports_when_nothing_was_tracked() {
+    let input = r#"{"level": "INFO"}"#;
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_input(&["-f", "json", "--metrics"], input);
+
+    assert_eq!(
+        exit_code, 0,
+        "kelora should exit successfully with --metrics"
+    );
+    assert!(
+        stdout.contains("No metrics tracked"),
+        "explicit metrics output should say when nothing was tracked: {}",
+        stdout
+    );
+}
+
+#[test]
 fn test_global_tracking() {
     let input = r#"{"level": "INFO", "status": 200}
 {"level": "ERROR", "status": 500}

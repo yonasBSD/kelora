@@ -117,6 +117,58 @@ fn test_config_file_with_defaults() {
 }
 
 #[test]
+fn test_default_config_path_is_not_printed_on_normal_runs() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join(".kelora.ini");
+    fs::write(&config_path, "defaults = -f line\n").unwrap();
+
+    let log_file = temp_dir.path().join("test.log");
+    fs::write(&log_file, "hello\n").unwrap();
+
+    let (_stdout, stderr, exit_code) =
+        run_kelora_in_dir(temp_dir.path(), &[log_file.to_str().unwrap()], "");
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    assert!(
+        !stderr.contains("Config:"),
+        "default config path should be suppressed on normal runs: {}",
+        stderr
+    );
+    assert!(
+        !stderr.contains("Defaults:"),
+        "default config expansion details should be suppressed on normal runs: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_explicit_config_file_path_is_still_printed() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("custom.ini");
+    fs::write(&config_path, "defaults = -f line\n").unwrap();
+
+    let log_file = temp_dir.path().join("test.log");
+    fs::write(&log_file, "hello\n").unwrap();
+
+    let (_stdout, stderr, exit_code) = run_kelora_in_dir(
+        temp_dir.path(),
+        &[
+            "--config-file",
+            config_path.to_str().unwrap(),
+            log_file.to_str().unwrap(),
+        ],
+        "",
+    );
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully");
+    assert!(
+        stderr.contains("Config:"),
+        "explicit config file path should still be shown: {}",
+        stderr
+    );
+}
+
+#[test]
 fn test_config_file_with_alias() {
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join(".kelora.ini");
