@@ -72,7 +72,9 @@ pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
     if collect_stats {
         stats_start_timer();
         // Set the initial format in stats (may be updated if auto-detected later)
-        stats::stats_set_detected_format(config.input.format.to_display_string());
+        if !matches!(config.input.format, config::InputFormat::AutoPerFile) {
+            stats::stats_set_detected_format(config.input.format.to_display_string());
+        }
     }
 
     let use_parallel = config.should_use_parallel();
@@ -275,7 +277,7 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
 
 enum SequentialInput {
     Stdin(Box<dyn BufRead + Send>),
-    Files(readers::MultiFileReader),
+    Files(Vec<String>),
     MergedFiles(MergedFileReader),
 }
 
@@ -315,6 +317,9 @@ enum MergeTimestampResult {
 }
 
 enum ReaderMessage {
+    FormatDetected {
+        detected: DetectedFormat,
+    },
     Line {
         line: String,
         filename: Option<String>,
@@ -337,6 +342,13 @@ fn run_pipeline_sequential<W: Write>(
 ) -> Result<(config::InputFormat, bool)> {
     if matches!(config.input.format, config::InputFormat::Auto) {
         return run_pipeline_sequential_with_auto_detection(config, output, ctrl_rx);
+    }
+    if matches!(config.input.format, config::InputFormat::AutoPerFile)
+        && (config.input.no_input || config.input.files.is_empty())
+    {
+        let mut auto_config = config.clone();
+        auto_config.input.format = config::InputFormat::Auto;
+        return run_pipeline_sequential_with_auto_detection(&auto_config, output, ctrl_rx);
     }
 
     let input = if config.input.no_input {
@@ -362,10 +374,7 @@ fn run_pipeline_sequential<W: Write>(
                 default_timezone: config.input.default_timezone.clone(),
             })
         } else {
-            SequentialInput::Files(readers::MultiFileReader::new(
-                sorted_files,
-                config.processing.strict,
-            )?)
+            SequentialInput::Files(sorted_files)
         }
     };
 
@@ -513,10 +522,7 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
                 default_timezone: final_config.input.default_timezone.clone(),
             })
         } else {
-            SequentialInput::Files(readers::MultiFileReader::new(
-                sorted_files,
-                final_config.processing.strict,
-            )?)
+            SequentialInput::Files(sorted_files)
         };
         run_pipeline_sequential_internal(&final_config, output, ctrl_rx, input)?;
 
@@ -634,6 +640,94 @@ fn spawn_file_reader(
                 }
             }
         }
+        Ok(())
+    })
+}
+
+fn spawn_file_reader_auto_per_file(
+    files: Vec<String>,
+    strict: bool,
+    config: KeloraConfig,
+    sender: Sender<ReaderMessage>,
+    ctrl_rx: Receiver<Ctrl>,
+) -> thread::JoinHandle<Result<()>> {
+    thread::spawn(move || {
+        let terminal_output = std::io::stderr().is_terminal();
+        for file_path in files {
+            match ctrl_rx.try_recv() {
+                Ok(Ctrl::Shutdown { immediate }) => {
+                    let _ = sender.send(ReaderMessage::Eof);
+                    if immediate {
+                        return Ok(());
+                    }
+                    break;
+                }
+                Ok(Ctrl::PrintStats) | Err(_) => {}
+            }
+
+            let Some(reader) = readers::open_input_reader(&file_path, 256 * 1024, strict)? else {
+                continue;
+            };
+
+            let mut peekable_reader = readers::PeekableLineReader::new(reader);
+            let detected = detection::detect_format_from_peekable_reader(&mut peekable_reader)?;
+
+            detection::emit_detected_format_notice(&config, &detected, terminal_output);
+
+            if sender
+                .send(ReaderMessage::FormatDetected {
+                    detected: detected.clone(),
+                })
+                .is_err()
+            {
+                return Ok(());
+            }
+
+            let mut buffer = String::new();
+            loop {
+                match ctrl_rx.try_recv() {
+                    Ok(Ctrl::Shutdown { immediate }) => {
+                        let _ = sender.send(ReaderMessage::Eof);
+                        if immediate {
+                            return Ok(());
+                        }
+                        break;
+                    }
+                    Ok(Ctrl::PrintStats) | Err(_) => {}
+                }
+
+                buffer.clear();
+                match peekable_reader.read_line(&mut buffer) {
+                    Ok(0) => break,
+                    Ok(_) => {
+                        let line = buffer.trim_end_matches(&['\n', '\r'][..]).to_string();
+                        if sender
+                            .send(ReaderMessage::Line {
+                                line,
+                                filename: Some(file_path.clone()),
+                            })
+                            .is_err()
+                        {
+                            return Ok(());
+                        }
+                    }
+                    Err(error) => {
+                        if sender
+                            .send(ReaderMessage::Error {
+                                error,
+                                filename: Some(file_path.clone()),
+                            })
+                            .is_err()
+                        {
+                            return Ok(());
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        let _ = sender.send(ReaderMessage::Eof);
         Ok(())
     })
 }
@@ -953,7 +1047,20 @@ fn run_pipeline_sequential_internal<W: Write>(
     let reader_ctrl = ctrl_rx.clone();
     let reader_handle = match input {
         SequentialInput::Stdin(reader) => spawn_stdin_reader(reader, line_tx, reader_ctrl),
-        SequentialInput::Files(reader) => spawn_file_reader(reader, line_tx, reader_ctrl),
+        SequentialInput::Files(files) => {
+            if matches!(config.input.format, config::InputFormat::AutoPerFile) {
+                spawn_file_reader_auto_per_file(
+                    files,
+                    config.processing.strict,
+                    config.clone(),
+                    line_tx,
+                    reader_ctrl,
+                )
+            } else {
+                let reader = readers::MultiFileReader::new(files, config.processing.strict)?;
+                spawn_file_reader(reader, line_tx, reader_ctrl)
+            }
+        }
         SequentialInput::MergedFiles(reader) => {
             spawn_merged_file_reader(reader, line_tx, reader_ctrl)
         }
@@ -968,8 +1075,7 @@ fn run_pipeline_sequential_internal<W: Write>(
     let mut current_csv_headers: Option<Vec<String>> = None;
     let mut current_csv_type_map: Option<TypeMap> = None;
     let mut last_filename: Option<String> = None;
-    let mut last_auto_format_filename: Option<String> = None;
-    let mut current_auto_format: Option<config::InputFormat> = None;
+    let mut current_input_format = config.input.format.clone();
     let mut line_num = 0usize;
     let mut skipped_lines = 0usize;
     let mut section_selector = config
@@ -1065,8 +1171,7 @@ fn run_pipeline_sequential_internal<W: Write>(
                                     current_csv_headers: &mut current_csv_headers,
                                     current_csv_type_map: &mut current_csv_type_map,
                                     last_filename: &mut last_filename,
-                                    last_auto_format_filename: &mut last_auto_format_filename,
-                                    current_auto_format: &mut current_auto_format,
+                                    current_input_format: &mut current_input_format,
                                     gap_tracker: &mut gap_tracker,
                                 },
                             )? {
@@ -1136,8 +1241,7 @@ fn run_pipeline_sequential_internal<W: Write>(
                                     current_csv_headers: &mut current_csv_headers,
                                     current_csv_type_map: &mut current_csv_type_map,
                                     last_filename: &mut last_filename,
-                                    last_auto_format_filename: &mut last_auto_format_filename,
-                                    current_auto_format: &mut current_auto_format,
+                                    current_input_format: &mut current_input_format,
                                     gap_tracker: &mut gap_tracker,
                                 },
                             )? {
@@ -1204,8 +1308,7 @@ struct ReaderContext<'a, W: Write> {
     current_csv_headers: &'a mut Option<Vec<String>>,
     current_csv_type_map: &'a mut Option<TypeMap>,
     last_filename: &'a mut Option<String>,
-    last_auto_format_filename: &'a mut Option<String>,
-    current_auto_format: &'a mut Option<config::InputFormat>,
+    current_input_format: &'a mut config::InputFormat,
     gap_tracker: &'a mut Option<crate::formatters::GapTracker>,
 }
 
@@ -1224,11 +1327,29 @@ fn handle_reader_message<W: Write>(
         current_csv_headers,
         current_csv_type_map,
         last_filename,
-        last_auto_format_filename,
-        current_auto_format,
+        current_input_format,
         gap_tracker,
     } = ctx;
     match message {
+        ReaderMessage::FormatDetected { detected } => {
+            let results = pipeline.flush(pipeline_ctx)?;
+            for formatted in results {
+                write_formatted_output(formatted, output, gap_tracker)?;
+            }
+
+            *current_csv_headers = None;
+            *current_csv_type_map = None;
+            *last_filename = None;
+            *current_input_format = detected.format.clone();
+
+            if config.output.stats.is_some() {
+                stats::stats_add_detected_format_hit(&detected.format.to_display_string());
+            }
+
+            replace_pipeline_parser(pipeline, pipeline_ctx, config, &detected.format, None, None)?;
+
+            Ok(false)
+        }
         ReaderMessage::Line { line, filename } => {
             match process_line_sequential(
                 Ok(line),
@@ -1243,8 +1364,7 @@ fn handle_reader_message<W: Write>(
                 current_csv_headers,
                 current_csv_type_map,
                 last_filename,
-                last_auto_format_filename,
-                current_auto_format,
+                current_input_format,
                 gap_tracker,
             )? {
                 ProcessingResult::Continue => Ok(false),
@@ -1265,8 +1385,7 @@ fn handle_reader_message<W: Write>(
                 current_csv_headers,
                 current_csv_type_map,
                 last_filename,
-                last_auto_format_filename,
-                current_auto_format,
+                current_input_format,
                 gap_tracker,
             )? {
                 ProcessingResult::Continue => Ok(false),
@@ -1330,8 +1449,7 @@ fn process_line_sequential<W: Write>(
     current_csv_headers: &mut Option<Vec<String>>,
     current_csv_type_map: &mut Option<TypeMap>,
     last_filename: &mut Option<String>,
-    last_auto_format_filename: &mut Option<String>,
-    current_auto_format: &mut Option<config::InputFormat>,
+    current_input_format: &mut config::InputFormat,
     gap_tracker: &mut Option<crate::formatters::GapTracker>,
 ) -> Result<ProcessingResult> {
     let line = line_result?;
@@ -1392,70 +1510,9 @@ fn process_line_sequential<W: Write>(
         }
     }
 
-    if matches!(config.input.format, config::InputFormat::AutoPerFile) {
-        let file_changed = current_filename != *last_auto_format_filename
-            || (current_filename.is_none() && current_auto_format.is_none());
-
-        if file_changed {
-            if current_auto_format.is_some() && current_filename != *last_auto_format_filename {
-                let results = pipeline.flush(ctx)?;
-                for formatted in results {
-                    write_formatted_output(formatted, output, gap_tracker)?;
-                }
-            }
-
-            *current_auto_format = None;
-            *current_csv_headers = None;
-            *current_csv_type_map = None;
-            *last_filename = None;
-        }
-
-        if file_changed && !line.trim().is_empty() {
-            let trimmed_line = line.trim_end_matches(&['\r', '\n'][..]);
-            let detected_format = parsers::detect_format(trimmed_line)?;
-            *current_auto_format = Some(detected_format.clone());
-            *last_auto_format_filename = current_filename.clone();
-
-            let terminal_output = std::io::stderr().is_terminal();
-            detection::emit_detected_format_notice(
-                config,
-                &DetectedFormat {
-                    format: detected_format.clone(),
-                    had_input: true,
-                },
-                terminal_output,
-            );
-
-            let mut detected_config = config.clone();
-            detected_config.input.format = detected_format.clone();
-
-            if config.output.stats.is_some() {
-                stats::stats_set_detected_format(detected_format.to_display_string());
-            }
-
-            replace_pipeline_parser(
-                pipeline,
-                ctx,
-                &detected_config,
-                &detected_format,
-                None,
-                None,
-            )?;
-        }
-    }
-
-    let effective_input_format = current_auto_format
-        .as_ref()
-        .unwrap_or(&config.input.format)
-        .clone();
+    let effective_input_format = current_input_format.clone();
 
     if line.trim().is_empty() {
-        if matches!(config.input.format, config::InputFormat::AutoPerFile)
-            && current_auto_format.is_none()
-        {
-            return Ok(ProcessingResult::Continue);
-        }
-
         // Only skip empty lines for structured formats, not for line format
         if !matches!(effective_input_format, config::InputFormat::Line) {
             return Ok(ProcessingResult::Continue);

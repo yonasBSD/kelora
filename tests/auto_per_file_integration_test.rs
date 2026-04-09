@@ -140,6 +140,68 @@ fn test_auto_per_file_preserves_state_across_files() {
 }
 
 #[test]
+fn test_auto_per_file_preserves_leading_blank_lines_for_line_files() {
+    let mut line_file = NamedTempFile::new().expect("create temp line file");
+    writeln!(line_file).expect("write blank line");
+    writeln!(line_file).expect("write blank line");
+    writeln!(line_file, "hello").expect("write line");
+    writeln!(line_file, "world").expect("write line");
+
+    let line_path = line_file
+        .path()
+        .to_str()
+        .expect("line path utf-8")
+        .to_string();
+
+    let (stdout, stderr, exit_code) = run_kelora_with_files(
+        &["-f", "auto-per-file", "-F", "json"],
+        &[line_path.as_str()],
+    );
+
+    assert_eq!(exit_code, 0, "auto-per-file should succeed: {}", stderr);
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(lines.len(), 4, "expected four output events: {}", stdout);
+    assert_eq!(lines[0], r#"{"line":""}"#);
+    assert_eq!(lines[1], r#"{"line":""}"#);
+    assert_eq!(lines[2], r#"{"line":"hello"}"#);
+    assert_eq!(lines[3], r#"{"line":"world"}"#);
+}
+
+#[test]
+fn test_auto_per_file_stats_report_per_file_distribution() {
+    let mut json_file = NamedTempFile::new().expect("create temp json file");
+    writeln!(json_file, r#"{{"msg":"json-one"}}"#).expect("write json line");
+
+    let mut logfmt_file = NamedTempFile::new().expect("create temp logfmt file");
+    writeln!(logfmt_file, "msg=logfmt-one level=info").expect("write logfmt line");
+
+    let json_path = json_file
+        .path()
+        .to_str()
+        .expect("json path utf-8")
+        .to_string();
+    let logfmt_path = logfmt_file
+        .path()
+        .to_str()
+        .expect("logfmt path utf-8")
+        .to_string();
+
+    let files = vec![json_path.as_str(), logfmt_path.as_str()];
+    let (stdout, stderr, exit_code) =
+        run_kelora_with_files(&["-f", "auto-per-file", "--stats"], &files);
+
+    assert_eq!(exit_code, 0, "auto-per-file should succeed: {}", stderr);
+    assert!(
+        stdout.contains("Detected formats:")
+            && stdout.contains("json=1 file")
+            && stdout.contains("logfmt=1 file"),
+        "stats should report per-file format counts. stdout: {} stderr: {}",
+        stdout,
+        stderr
+    );
+}
+
+#[test]
 fn test_auto_per_file_rejected_in_parallel_mode() {
     let (_stdout, stderr, exit_code) =
         run_kelora_with_input(&["-f", "auto-per-file", "--parallel"], r#"{"msg":"hello"}"#);

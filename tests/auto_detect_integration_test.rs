@@ -354,3 +354,17 @@ fn test_auto_detect_format_string() {
     assert_eq!(exit_code, 0, "kelora -f auto should work");
     assert!(!stdout.is_empty(), "Should produce output");
 }
+
+#[test]
+fn test_auto_detect_uses_first_non_empty_line() {
+    let input = "\n\n{\"msg\":\"json-after-blanks\"}\n";
+
+    let (stdout, stderr, exit_code) = run_kelora_with_input(&["-f", "auto", "-F", "json"], input);
+
+    assert_eq!(exit_code, 0, "kelora should exit successfully: {}", stderr);
+    assert_eq!(
+        stdout.trim(),
+        r#"{"msg":"json-after-blanks"}"#,
+        "auto detection should skip leading blanks for detection and still parse JSON"
+    );
+}

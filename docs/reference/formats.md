@@ -10,7 +10,7 @@ Specify input format with `-f, --input-format <format>`.
 
 | Format | Description |
 |--------|----------|
-| `auto` | Auto-detect from first line (default) |
+| `auto` | Auto-detect from first non-empty line (default) |
 | `json` | Application logs, structured data (shorthand: `-j`) |
 | `line` | Unstructured logs, raw text |
 | `logfmt` | Heroku-style logs, simple structured logs |

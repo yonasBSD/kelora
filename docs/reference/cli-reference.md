@@ -109,7 +109,7 @@ Specify input format. Supports standard formats, column parsing, and CSV with ty
 
 **Standard Formats:**
 
-- `auto` - Auto-detect format from the first line (default)
+- `auto` - Auto-detect format from the first non-empty line (default)
 - `json` - JSON lines (one JSON object per line)
 - `line` - Plain text (one line per event)
 - `csv` - CSV with header row

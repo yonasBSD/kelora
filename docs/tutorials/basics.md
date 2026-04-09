@@ -33,7 +33,7 @@ If you cloned the project, run commands from the repository root.
 
 ## Part 1: Input Formats (`-f`, `-j`)
 
-By default, Kelora auto-detects your log format by examining the first line. Just point it at your logs:
+By default, Kelora auto-detects your log format by examining the first non-empty line. Just point it at your logs:
 
 ```bash exec="on" source="above" result="ansi"
 kelora examples/basics.jsonl

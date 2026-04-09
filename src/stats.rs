@@ -50,6 +50,7 @@ pub struct ProcessingStats {
     pub timestamp_override_warning: Option<String>,
     pub yearless_timestamps: usize, // Count of timestamps parsed with year inference
     pub detected_format: Option<String>, // Format detected for this processing session
+    pub detected_format_counts: IndexMap<String, usize>, // Per-file detected format counts
     /// Per-format event counts when running in cascade mode. Empty otherwise.
     /// Keyed by the short format name used in `_format` (e.g. "json", "line").
     pub cascade_format_counts: IndexMap<String, usize>,
@@ -201,6 +202,19 @@ pub fn stats_set_detected_format(format: String) {
     }
     THREAD_STATS.with(|stats| {
         stats.borrow_mut().detected_format = Some(format);
+    });
+}
+
+pub fn stats_add_detected_format_hit(format: &str) {
+    if !stats_enabled() {
+        return;
+    }
+    THREAD_STATS.with(|stats| {
+        let mut stats = stats.borrow_mut();
+        *stats
+            .detected_format_counts
+            .entry(format.to_string())
+            .or_insert(0) += 1;
     });
 }
 
@@ -607,8 +621,17 @@ impl ProcessingStats {
     fn format_stats_internal(&self, _multiline_enabled: bool, skip_line_counts: bool) -> String {
         let mut output = String::new();
 
-        // Show detected format if available
-        if let Some(ref format) = self.detected_format {
+        if !self.detected_format_counts.is_empty() {
+            let parts: Vec<String> = self
+                .detected_format_counts
+                .iter()
+                .map(|(name, count)| {
+                    let suffix = if *count == 1 { "file" } else { "files" };
+                    format!("{}={} {}", name, count, suffix)
+                })
+                .collect();
+            output.push_str(&format!("Detected formats: {}\n", parts.join(", ")));
+        } else if let Some(ref format) = self.detected_format {
             output.push_str(&format!("Detected format: {}\n", format));
         }
 

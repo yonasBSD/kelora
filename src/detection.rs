@@ -39,10 +39,10 @@ impl DetectedFormat {
 pub fn detect_format_from_peekable_reader<R: std::io::BufRead>(
     reader: &mut readers::PeekableLineReader<R>,
 ) -> Result<DetectedFormat> {
-    match reader.peek_first_line()? {
+    match reader.peek_first_non_empty_line()? {
         None => Ok(DetectedFormat {
             format: config::InputFormat::Line,
-            had_input: false,
+            had_input: reader.saw_any_input(),
         }),
         Some(line) => {
             // Remove newline for detection
