@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Per-file auto-detection** - Added `-f auto-per-file` for batches where each file is internally consistent but different files use different formats.
 - **`--include` now works with `--filter`** - Helper functions defined in an include file (`-I`) can be called from `--filter` expressions. Include files used with `--filter` must contain only function definitions; top-level statements are rejected with a clear error.
 - **Schema discovery mode** - Added `--discover[=table|json]` for stream schema profiling, plus `--discover-scope` to inspect either parsed input fields or post-filter/post-transform output fields. Discovery includes nested field flattening, reservoir-sampled examples, and cap warnings for high-cardinality streams.
 - **Cascade format mode** - Added cascade parsing mode for mixed-format streams.
@@ -28,7 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
-- **Auto-detection semantics** - `-f auto` and `-f auto-per-file` now detect from the first non-empty line, matching the built-in help and format reference; this fixes inconsistent behavior and stale wording that still said "first line" in some docs.
+- **Auto-detection behavior** - `-f auto` and `-f auto-per-file` now consistently detect from the first non-empty line, matching the built-in help and format reference. `-f auto-per-file` also now preserves sequential state across files and reports detected formats per file in `--stats`.
 - **Parser strict mode behavior** - JSON and CEF parsers now correctly respect the strict parsing flag.
 - **Pre-epoch rounding** - Fixed `round_to`/`ceil_to` behavior for timestamps before Unix epoch.
 
