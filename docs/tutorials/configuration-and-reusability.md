@@ -272,11 +272,11 @@ We've created `examples/helpers.rhai` with useful functions:
 **How it works:**
 
 1. `-I examples/helpers.rhai` loads the function definitions
-2. Functions become available in `--exec`, `--exec-file`, `--begin`, and `--end` stages
+2. Functions become available in `--exec`, `--exec-file`, `--begin`, `--end`, and `--filter`
 3. Call them like any built-in function
 
-!!! note "Filter Limitations"
-    `--include` does not work with `--filter` because filters must be pure expressions. Use `--exec` instead for filtering with custom functions.
+!!! note "Using Includes With Filters"
+    `--include` can be used with `--filter` for helper functions, but the included file must contain only function definitions. Top-level statements are rejected for filter-stage includes.
 
 ### Multiple Include Files
 

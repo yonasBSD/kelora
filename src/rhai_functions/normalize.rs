@@ -36,7 +36,8 @@ fn is_valid_ssn(matched: &str) -> bool {
     true
 }
 
-/// Phone number validation using NANP rules for US/CA numbers.
+/// Phone number validation using NANP rules for US/CA numbers, with permissive
+/// acceptance for other international numbers.
 /// For US numbers: area code and exchange must start with 2-9; rejects fictional 555-01xx range.
 fn is_valid_phone(matched: &str) -> bool {
     // Strip all non-digit characters, and any leading country code

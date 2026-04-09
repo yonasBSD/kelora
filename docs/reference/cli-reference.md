@@ -439,9 +439,14 @@ kelora -j --begin 'conf.users = read_json("users.json")' app.log
 
 Boolean filter expression. Events where expression returns `true` are kept. Multiple filters are combined with AND logic.
 
+Can be combined with `--include` to call helper functions defined in a Rhai
+library. When `--include` is used with `--filter`, the included file must
+contain only function definitions; top-level statements are rejected.
+
 ```bash
 kelora -j --filter 'e.status >= 400' app.log
 kelora -j -l error --filter 'e.service == "api"' app.log   # Use -l for level filtering (faster than Rhai)
+kelora -j -I helpers.rhai --filter 'is_error(e.level)' app.log
 ```
 
 #### `-e, --exec <SCRIPT>`
@@ -509,8 +514,18 @@ kelora -j --strict app.log --assert 'e.has("user_id")'
 
 Include Rhai files before script stages (library imports).
 
+Placement on the command line determines which stage the file applies to:
+
+- Before `--exec` / `-e` - loaded into that exec stage
+- Before `--filter` - loaded into that filter stage
+- Before all script stages - loaded into the begin stage
+
+When used with `--filter`, the included file must contain only function
+definitions; top-level statements are rejected.
+
 ```bash
 kelora -j -I helpers.rhai --exec 'e.custom = my_helper(e)' app.log
+kelora -j -I helpers.rhai --filter 'is_error(e.level)' app.log
 ```
 
 #### `--end <SCRIPT>`

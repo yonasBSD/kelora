@@ -423,7 +423,13 @@ e.custom = e.message.normalized(["uuid", "sha256", "url"])
 `ipv4_port`, `ipv4`, `ipv6`, `email`, `url`, `fqdn`, `uuid`, `mac`, `md5`, `sha1`, `sha256`, `path`, `oauth`, `function`, `hexcolor`, `version`
 
 **Available patterns** (opt-in):
-`hexnum`, `duration`, `num`
+`hexnum`, `duration`, `num`, `credit_card`, `ssn`, `phone`
+
+PII-oriented patterns are opt-in on purpose:
+
+- `credit_card` - Luhn-validated payment card numbers
+- `ssn` - SSA-aware US Social Security number validation
+- `phone` - NANP-aware validation for US/CA numbers, with permissive support for other international numbers
 
 **Common use case** - Pattern discovery:
 ```bash
@@ -1356,6 +1362,38 @@ Color and style helpers are chainable — they compose by stacking SGR codes:
 ```rhai
 "CRITICAL".bold().red()                               // bold red
 "meta".dim().cyan()                                   // dim cyan
+```
+
+### Charts & Sparklines
+
+#### `bar(value, max, width)`
+Render a fixed-width Unicode bar showing `value / max`.
+
+- Uses eighth-block characters for sub-cell resolution
+- Clamps values outside `0..max`
+- Returns spaces when `max <= 0`
+
+```rhai
+bar(7, 10, 10)                                        // "███████   "
+bar(3, 8, 4)                                          // "█▌  "
+```
+
+#### `bar(ratio, width)`
+Render a bar from a pre-normalized ratio in `0..1`.
+
+```rhai
+bar(0.42, 10)                                         // "████▏     "
+```
+
+#### `sparkline(array)`
+Render an array of numbers as a single-line sparkline using `▁▂▃▄▅▆▇█`.
+
+- Scales values from `0..max(array)`
+- Negative and non-numeric values render as spaces
+- Empty arrays return `""`
+
+```rhai
+sparkline([1, 4, 2, 8, 5, 7])                         // "▁▄▂█▅▇"
 ```
 
 ---

@@ -124,9 +124,9 @@ kelora -j missing1.log missing2.log
 echo $?
 1  # Still processing error (like parse errors)
 
-# Usage error (incompatible flags)
-kelora -I helper.rhai --filter 'e.level == "ERROR"'
-⚠️ --include is not supported with --filter
+# Usage error (invalid filter-stage include file)
+kelora -I helper.rhai --filter 'is_error(e.level)' app.log
+⚠️ --include file 'helper.rhai' cannot contain statements when used with --filter; only function definitions are allowed
 echo $?
 2  # Usage error
 ```
