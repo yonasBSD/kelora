@@ -175,6 +175,43 @@ Control file processing order.
 kelora --file-order mtime logs/*.log
 ```
 
+#### `--merge-ts` {#merge-ts}
+
+Merge multiple timestamp-sorted input files into one chronological stream.
+
+Kelora does this as a streaming k-way merge: it keeps one pending event per
+input file and emits the earliest timestamp currently visible. This is fast and
+memory-bounded, but it is **not** a full global sort.
+
+Use `--merge-ts` when:
+
+- Each input file is already in chronological order on its own
+- You want one merged timeline across rotated shards, hosts, or services
+- The dataset is too large to sort as a separate pre-processing step
+
+Do **not** expect `--merge-ts` to repair disorder within a file. If one file
+contains `10:04` followed later by `10:01`, Kelora will only discover `10:01`
+after `10:04` has already been emitted.
+
+```bash
+kelora -j api-1.jsonl api-2.jsonl api-3.jsonl --merge-ts -J
+```
+
+Practical examples:
+
+- Merge per-host files collected over the same time range
+- Reconstruct one timeline from hourly or daily shards that were written in order
+- Combine app, proxy, and worker logs when each source is already ordered
+
+Current constraints:
+
+- Requires a concrete input format after auto-detection; use `-j` or `-f logfmt` when needed
+- Not supported with `--parallel` or manual thread overrides
+- Not yet supported for CSV/TSV inputs
+
+See [Merge Timestamp-Sorted Files](../how-to/merge-timestamp-sorted-files.md)
+for a full walkthrough and tradeoff discussion.
+
 ### Line Filtering
 
 #### `--skip-lines <N>`
