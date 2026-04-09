@@ -244,6 +244,10 @@ Reusable Rhai functions that you can include in your pipelines with `--include`:
 Common utility functions for log analysis:
 
 ```bash
+# Filter with reusable helper functions
+kelora --include examples/helpers.rhai examples/api_logs.jsonl \
+  --filter 'is_problem(e)'
+
 # Enrich events with computed severity
 kelora --include examples/helpers.rhai examples/api_logs.jsonl \
   --exec 'e.severity = classify_severity(e.level, e.get_path("response_time", 0.0))'
@@ -260,6 +264,7 @@ Functions:
 - `mask_sensitive(value)` - Mask sensitive data
 
 **Note:** For filtering, prefer `--filter` with inline expressions. Use `e = ()` in `--exec` only when you need helper functions for complex logic that can't be expressed inline.
+Included scripts used with `--filter` should define functions only; call those helpers from the filter expression.
 
 ### `enrich_events.rhai`
 
