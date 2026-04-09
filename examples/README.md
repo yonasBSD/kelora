@@ -138,6 +138,14 @@ Cascade accepts any combination of `json`, `line`, `raw`, `logfmt`, `syslog`,
 `cef`, `combined`. Schema-based formats (`csv`/`tsv`, `cols:`, `regex:`) and
 `auto` are not allowed in the cascade list.
 
+If each file uses one format but formats differ across files, use
+`auto-per-file` instead of cascade:
+
+```bash
+# Parse each file with its own detected format
+kelora -f auto-per-file -J services/*/*.log
+```
+
 For more advanced splitting you can still **preprocess logs** with standard
 Unix tools:
 

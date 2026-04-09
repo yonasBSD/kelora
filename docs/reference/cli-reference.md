@@ -109,7 +109,8 @@ Specify input format. Supports standard formats, column parsing, and CSV with ty
 
 **Standard Formats:**
 
-- `auto` - Auto-detect format from the first line (default)
+- `auto` - Auto-detect format from the first non-empty line (default)
+- `auto-per-file` - Auto-detect once per file; useful when different files use different formats
 - `json` - JSON lines (one JSON object per line)
 - `line` - Plain text (one line per event)
 - `csv` - CSV with header row
@@ -145,6 +146,7 @@ details.
 **Examples:**
 ```bash
 kelora -f json app.log
+kelora -f auto-per-file -J logs/*.log         # detect each file independently
 kelora -f combined nginx.log
 kelora -f json,line noisy.log                  # cascade: JSON with text fallback
 kelora -f 'cols:ts(2) level *msg' custom.log   # `ts` is auto-detected as a timestamp

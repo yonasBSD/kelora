@@ -68,6 +68,12 @@ auto (default)
   Detection order: json → syslog → cef → combined → logfmt → csv → line
   Note: Detects once and applies to all lines
 
+auto-per-file
+  Auto-detect format separately for each input file
+  Detection order: json → syslog → cef → combined → logfmt → csv → line
+  Note: Detects once per file and applies to that file's lines
+  stdin: behaves like 'auto' (single input stream)
+
 <fmt1>,<fmt2>[,...]   (cascade mode)
   Try each format in order, first success wins (per line)
   Examples: -f json,line          (noisy JSON with plain-text fallback)

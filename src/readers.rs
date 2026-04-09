@@ -1,5 +1,6 @@
 use anyhow::Result;
 use crossbeam_channel::Receiver;
+use std::collections::VecDeque;
 use std::fs;
 use std::io::{self, BufRead, BufReader, Read};
 use std::thread;
@@ -10,34 +11,50 @@ use crate::decompression::DecompressionReader;
 /// Used for format auto-detection on streams
 pub struct PeekableLineReader<R: BufRead> {
     inner: R,
-    peeked_line: Option<String>,
-    first_line_consumed: bool,
+    buffered_prefix: VecDeque<String>,
+    detected_line: Option<Option<String>>,
+    saw_any_input: bool,
 }
 
 impl<R: BufRead> PeekableLineReader<R> {
     pub fn new(reader: R) -> Self {
         Self {
             inner: reader,
-            peeked_line: None,
-            first_line_consumed: false,
+            buffered_prefix: VecDeque::new(),
+            detected_line: None,
+            saw_any_input: false,
         }
     }
 
-    /// Peek at the first line without consuming it
-    pub fn peek_first_line(&mut self) -> io::Result<Option<String>> {
-        if self.peeked_line.is_some() {
-            return Ok(self.peeked_line.clone());
+    /// Peek at the first non-empty line without consuming already-read lines.
+    /// Blank lines encountered before detection are replayed later by `read_line`.
+    pub fn peek_first_non_empty_line(&mut self) -> io::Result<Option<String>> {
+        if let Some(cached) = &self.detected_line {
+            return Ok(cached.clone());
         }
 
-        let mut line = String::new();
-        match self.inner.read_line(&mut line) {
-            Ok(0) => Ok(None), // EOF
-            Ok(_) => {
-                self.peeked_line = Some(line.clone());
-                Ok(Some(line))
+        loop {
+            let mut line = String::new();
+            match self.inner.read_line(&mut line) {
+                Ok(0) => {
+                    self.detected_line = Some(None);
+                    return Ok(None);
+                }
+                Ok(_) => {
+                    self.saw_any_input = true;
+                    self.buffered_prefix.push_back(line.clone());
+                    if !line.trim().is_empty() {
+                        self.detected_line = Some(Some(line.clone()));
+                        return Ok(Some(line));
+                    }
+                }
+                Err(e) => return Err(e),
             }
-            Err(e) => Err(e),
         }
+    }
+
+    pub fn saw_any_input(&self) -> bool {
+        self.saw_any_input
     }
 }
 
@@ -51,16 +68,11 @@ impl<R: BufRead> BufRead for PeekableLineReader<R> {
     }
 
     fn read_line(&mut self, buf: &mut String) -> io::Result<usize> {
-        // If we have a peeked line and it hasn't been consumed yet, return it
-        if let Some(peeked) = &self.peeked_line {
-            if !self.first_line_consumed {
-                buf.push_str(peeked);
-                self.first_line_consumed = true;
-                return Ok(peeked.len());
-            }
+        if let Some(line) = self.buffered_prefix.pop_front() {
+            buf.push_str(&line);
+            return Ok(line.len());
         }
 
-        // Otherwise, read from the inner reader
         self.inner.read_line(buf)
     }
 }
@@ -187,6 +199,97 @@ pub struct MultiFileReader {
     strict: bool,
 }
 
+pub fn open_input_reader(
+    file_path: &str,
+    buffer_size: usize,
+    strict: bool,
+) -> io::Result<Option<Box<dyn BufRead + Send>>> {
+    if file_path == "-" {
+        match ChannelStdinReader::new() {
+            Ok(stdin_reader) => match crate::decompression::maybe_decompress(stdin_reader) {
+                Ok(processed_reader) => Ok(Some(Box::new(BufReader::with_capacity(
+                    buffer_size,
+                    processed_reader,
+                )))),
+                Err(e) => {
+                    eprintln!(
+                        "{}",
+                        crate::config::format_error_message_auto(&format!(
+                            "Failed to setup stdin decompression: {}",
+                            e
+                        ))
+                    );
+                    crate::stats::stats_file_open_failed("-");
+                    if strict {
+                        Err(io::Error::other(e))
+                    } else {
+                        Ok(None)
+                    }
+                }
+            },
+            Err(e) => {
+                eprintln!(
+                    "{}",
+                    crate::config::format_error_message_auto(&format!(
+                        "Failed to setup stdin reader: {}",
+                        e
+                    ))
+                );
+                crate::stats::stats_file_open_failed("-");
+                if strict {
+                    Err(io::Error::other(e))
+                } else {
+                    Ok(None)
+                }
+            }
+        }
+    } else {
+        if let Ok(metadata) = fs::metadata(file_path) {
+            if metadata.is_dir() {
+                eprintln!(
+                    "{}",
+                    crate::config::format_error_message_auto(&format!(
+                        "Input path '{}' is a directory; skipping (input files only)",
+                        file_path
+                    ))
+                );
+                crate::stats::stats_file_open_failed(file_path);
+                if strict {
+                    return Err(io::Error::other(format!(
+                        "Input path '{}' is a directory; only files are supported",
+                        file_path
+                    )));
+                }
+                return Ok(None);
+            }
+        }
+
+        match DecompressionReader::new(file_path) {
+            Ok(decompressor) => Ok(Some(Box::new(BufReader::with_capacity(
+                buffer_size,
+                decompressor,
+            )))),
+            Err(e) => {
+                eprintln!(
+                    "{}",
+                    crate::config::format_error_message_auto(
+                        &crate::config::format_input_open_error(file_path, &e.to_string()),
+                    )
+                );
+                crate::stats::stats_file_open_failed(file_path);
+                if strict {
+                    Err(io::Error::new(
+                        io::ErrorKind::NotFound,
+                        crate::config::format_input_open_error(file_path, &e.to_string()),
+                    ))
+                } else {
+                    Ok(None)
+                }
+            }
+        }
+    }
+}
+
 /// A file-aware reader that can provide filename information
 pub trait FileAwareRead: BufRead + Send {
     fn current_filename(&self) -> Option<&str>;
@@ -251,100 +354,14 @@ impl MultiFileReader {
     fn ensure_current_reader(&mut self) -> io::Result<bool> {
         while self.current_reader.is_none() && self.current_file_idx < self.files.len() {
             let file_path = &self.files[self.current_file_idx];
-
-            if file_path == "-" {
-                // Handle stdin with gzip detection
-                match ChannelStdinReader::new() {
-                    Ok(stdin_reader) => {
-                        // Apply magic bytes detection to stdin reader
-                        match crate::decompression::maybe_decompress(stdin_reader) {
-                            Ok(processed_reader) => {
-                                self.current_reader = Some(Box::new(BufReader::with_capacity(
-                                    self.buffer_size,
-                                    processed_reader,
-                                )));
-                                return Ok(true);
-                            }
-                            Err(e) => {
-                                eprintln!(
-                                    "{}",
-                                    crate::config::format_error_message_auto(&format!(
-                                        "Failed to setup stdin decompression: {}",
-                                        e
-                                    ))
-                                );
-                                crate::stats::stats_file_open_failed("-");
-                                if self.strict {
-                                    return Err(io::Error::other(e));
-                                }
-                                self.current_file_idx += 1;
-                                continue;
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!(
-                            "{}",
-                            crate::config::format_error_message_auto(&format!(
-                                "Failed to setup stdin reader: {}",
-                                e
-                            ))
-                        );
-                        crate::stats::stats_file_open_failed("-");
-                        if self.strict {
-                            return Err(io::Error::other(e));
-                        }
-                        self.current_file_idx += 1;
-                        continue;
-                    }
+            match open_input_reader(file_path, self.buffer_size, self.strict)? {
+                Some(reader) => {
+                    self.current_reader = Some(reader);
+                    return Ok(true);
                 }
-            } else {
-                if let Ok(metadata) = fs::metadata(file_path) {
-                    if metadata.is_dir() {
-                        eprintln!(
-                            "{}",
-                            crate::config::format_error_message_auto(&format!(
-                                "Input path '{}' is a directory; skipping (input files only)",
-                                file_path
-                            ))
-                        );
-                        crate::stats::stats_file_open_failed(file_path);
-                        if self.strict {
-                            return Err(io::Error::other(format!(
-                                "Input path '{}' is a directory; only files are supported",
-                                file_path
-                            )));
-                        }
-                        self.current_file_idx += 1;
-                        continue;
-                    }
-                }
-
-                match DecompressionReader::new(file_path) {
-                    Ok(decompressor) => {
-                        self.current_reader = Some(Box::new(BufReader::with_capacity(
-                            self.buffer_size,
-                            decompressor,
-                        )));
-                        return Ok(true);
-                    }
-                    Err(e) => {
-                        eprintln!(
-                            "{}",
-                            crate::config::format_error_message_auto(
-                                &crate::config::format_input_open_error(file_path, &e.to_string()),
-                            )
-                        );
-                        crate::stats::stats_file_open_failed(file_path);
-                        if self.strict {
-                            return Err(io::Error::new(
-                                io::ErrorKind::NotFound,
-                                crate::config::format_input_open_error(file_path, &e.to_string()),
-                            ));
-                        }
-                        self.current_file_idx += 1;
-                        continue;
-                    }
+                None => {
+                    self.current_file_idx += 1;
+                    continue;
                 }
             }
         }

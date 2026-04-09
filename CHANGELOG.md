@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Auto-detection semantics** - `-f auto` and `-f auto-per-file` now detect from the first non-empty line, matching the built-in help and format reference; this fixes inconsistent behavior and stale wording that still said "first line" in some docs.
 - **Parser strict mode behavior** - JSON and CEF parsers now correctly respect the strict parsing flag.
 - **Pre-epoch rounding** - Fixed `round_to`/`ceil_to` behavior for timestamps before Unix epoch.
 
