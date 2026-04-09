@@ -269,6 +269,7 @@ impl PipelineBuilder {
                     "Auto format should be resolved before pipeline creation"
                 ));
             }
+            crate::config::InputFormat::AutoPerFile => Box::new(crate::parsers::LineParser::new()),
             crate::config::InputFormat::Json => {
                 if custom_ts_config {
                     Box::new(
@@ -792,6 +793,7 @@ impl PipelineBuilder {
                     "Auto format should be resolved before pipeline creation"
                 ));
             }
+            crate::config::InputFormat::AutoPerFile => Box::new(crate::parsers::LineParser::new()),
             crate::config::InputFormat::Json => {
                 if custom_ts_config {
                     Box::new(

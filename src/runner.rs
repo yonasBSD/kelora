@@ -113,6 +113,12 @@ pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
         ));
     }
 
+    if use_parallel && matches!(config.input.format, config::InputFormat::AutoPerFile) {
+        return Err(anyhow::anyhow!(
+            "-f auto-per-file is not supported with --parallel or thread overrides. Rerun without --parallel."
+        ));
+    }
+
     if use_parallel {
         run_pipeline_parallel(config, output, ctrl_rx)
     } else {
@@ -666,6 +672,11 @@ fn build_simple_merge_parser(
                 "--merge-ts requires a concrete input format after auto-detection"
             ));
         }
+        config::InputFormat::AutoPerFile => {
+            return Err(anyhow::anyhow!(
+                "--merge-ts is not supported with -f auto-per-file"
+            ));
+        }
         config::InputFormat::Csv(_)
         | config::InputFormat::Tsv(_)
         | config::InputFormat::Csvnh
@@ -957,6 +968,8 @@ fn run_pipeline_sequential_internal<W: Write>(
     let mut current_csv_headers: Option<Vec<String>> = None;
     let mut current_csv_type_map: Option<TypeMap> = None;
     let mut last_filename: Option<String> = None;
+    let mut last_auto_format_filename: Option<String> = None;
+    let mut current_auto_format: Option<config::InputFormat> = None;
     let mut line_num = 0usize;
     let mut skipped_lines = 0usize;
     let mut section_selector = config
@@ -1052,6 +1065,8 @@ fn run_pipeline_sequential_internal<W: Write>(
                                     current_csv_headers: &mut current_csv_headers,
                                     current_csv_type_map: &mut current_csv_type_map,
                                     last_filename: &mut last_filename,
+                                    last_auto_format_filename: &mut last_auto_format_filename,
+                                    current_auto_format: &mut current_auto_format,
                                     gap_tracker: &mut gap_tracker,
                                 },
                             )? {
@@ -1121,6 +1136,8 @@ fn run_pipeline_sequential_internal<W: Write>(
                                     current_csv_headers: &mut current_csv_headers,
                                     current_csv_type_map: &mut current_csv_type_map,
                                     last_filename: &mut last_filename,
+                                    last_auto_format_filename: &mut last_auto_format_filename,
+                                    current_auto_format: &mut current_auto_format,
                                     gap_tracker: &mut gap_tracker,
                                 },
                             )? {
@@ -1187,6 +1204,8 @@ struct ReaderContext<'a, W: Write> {
     current_csv_headers: &'a mut Option<Vec<String>>,
     current_csv_type_map: &'a mut Option<TypeMap>,
     last_filename: &'a mut Option<String>,
+    last_auto_format_filename: &'a mut Option<String>,
+    current_auto_format: &'a mut Option<config::InputFormat>,
     gap_tracker: &'a mut Option<crate::formatters::GapTracker>,
 }
 
@@ -1205,6 +1224,8 @@ fn handle_reader_message<W: Write>(
         current_csv_headers,
         current_csv_type_map,
         last_filename,
+        last_auto_format_filename,
+        current_auto_format,
         gap_tracker,
     } = ctx;
     match message {
@@ -1222,6 +1243,8 @@ fn handle_reader_message<W: Write>(
                 current_csv_headers,
                 current_csv_type_map,
                 last_filename,
+                last_auto_format_filename,
+                current_auto_format,
                 gap_tracker,
             )? {
                 ProcessingResult::Continue => Ok(false),
@@ -1242,6 +1265,8 @@ fn handle_reader_message<W: Write>(
                 current_csv_headers,
                 current_csv_type_map,
                 last_filename,
+                last_auto_format_filename,
+                current_auto_format,
                 gap_tracker,
             )? {
                 ProcessingResult::Continue => Ok(false),
@@ -1283,6 +1308,8 @@ fn process_line_sequential<W: Write>(
     current_csv_headers: &mut Option<Vec<String>>,
     current_csv_type_map: &mut Option<TypeMap>,
     last_filename: &mut Option<String>,
+    last_auto_format_filename: &mut Option<String>,
+    current_auto_format: &mut Option<config::InputFormat>,
     gap_tracker: &mut Option<crate::formatters::GapTracker>,
 ) -> Result<ProcessingResult> {
     let line = line_result?;
@@ -1343,9 +1370,47 @@ fn process_line_sequential<W: Write>(
         }
     }
 
+    if matches!(config.input.format, config::InputFormat::AutoPerFile) {
+        let file_changed = current_filename != *last_auto_format_filename
+            || (current_filename.is_none() && current_auto_format.is_none());
+
+        if file_changed && !line.trim().is_empty() {
+            let trimmed_line = line.trim_end_matches(&['\r', '\n'][..]);
+            let detected_format = parsers::detect_format(trimmed_line)?;
+            *current_auto_format = Some(detected_format.clone());
+            *last_auto_format_filename = current_filename.clone();
+
+            let terminal_output = std::io::stderr().is_terminal();
+            detection::emit_detected_format_notice(
+                config,
+                &DetectedFormat {
+                    format: detected_format.clone(),
+                    had_input: true,
+                },
+                terminal_output,
+            );
+
+            let mut detected_config = config.clone();
+            detected_config.input.format = detected_format.clone();
+
+            if config.output.stats.is_some() {
+                stats::stats_set_detected_format(detected_format.to_display_string());
+            }
+
+            let pipeline_builder = create_pipeline_builder_from_config(&detected_config);
+            let (new_pipeline, _unused_begin_stage, _unused_end_stage, new_ctx) =
+                pipeline_builder.build(config.processing.stages.clone())?;
+
+            *pipeline = new_pipeline;
+            ctx.rhai = new_ctx.rhai;
+            ctx.config.format_name = Some(detected_format.to_display_string());
+        }
+    }
+
     if line.trim().is_empty() {
         // Only skip empty lines for structured formats, not for line format
-        if !matches!(config.input.format, config::InputFormat::Line) {
+        let effective_input_format = current_auto_format.as_ref().unwrap_or(&config.input.format);
+        if !matches!(effective_input_format, config::InputFormat::Line) {
             return Ok(ProcessingResult::Continue);
         }
         // For line format, continue processing the empty line

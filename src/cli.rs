@@ -9,6 +9,7 @@ use clap::{ArgMatches, Parser};
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum InputFormat {
     Auto,
+    AutoPerFile,
     Json,
     Line,
     Raw,
@@ -110,7 +111,7 @@ pub struct Cli {
     #[arg(long = "no-input", help_heading = "Input Options")]
     pub no_input: bool,
 
-    /// Input format. Available formats: auto (default), json, line, raw, logfmt, syslog, cef, csv, tsv, csvnh, tsvnh, combined, cols:<spec>, regex:<pattern>.
+    /// Input format. Available formats: auto (default), auto-per-file, json, line, raw, logfmt, syslog, cef, csv, tsv, csvnh, tsvnh, combined, cols:<spec>, regex:<pattern>.
     /// Use cols:<spec> for column parsing, regex:<pattern> for regex parsing with named groups, and csv/tsv with optional type annotations.
     /// Cascade mode: pass a comma-separated list (e.g. 'json,logfmt,line') to try each parser in order; the first success wins, so put 'line' last as a fallback. Adds an '_format' field to each event.
     /// Examples: -f json, -f json,line, -f 'regex:(?P<code:int>\\d+) (?P<msg>.*)', -f 'cols:ts level *msg', -f 'csv status:int bytes:int'
@@ -1127,13 +1128,13 @@ Allowed in cascade: json, line, raw, logfmt, syslog, cef, combined",
 
     // Check if it's a standard format
     match s.to_lowercase().as_str() {
-        "auto" | "json" | "line" | "raw" | "logfmt" | "syslog" | "cef"
+        "auto" | "auto-per-file" | "json" | "line" | "raw" | "logfmt" | "syslog" | "cef"
         | "csv" | "tsv" | "csvnh" | "tsvnh" | "combined" | "cols" => {
             Ok(s.to_string())
         }
         _ => {
             Err(format!(
-                "Unknown format '{}'. Supported formats: auto, json, line, raw, logfmt, syslog, cef, csv, tsv, csvnh, tsvnh, combined, cols, csv:<spec>, tsv:<spec>, cols:<spec>, or regex:<pattern>",
+                "Unknown format '{}'. Supported formats: auto, auto-per-file, json, line, raw, logfmt, syslog, cef, csv, tsv, csvnh, tsvnh, combined, cols, csv:<spec>, tsv:<spec>, cols:<spec>, or regex:<pattern>",
                 s
             ))
         }

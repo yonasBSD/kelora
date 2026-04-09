@@ -206,6 +206,7 @@ pub struct SpanConfig {
 #[derive(Clone, Debug, PartialEq)]
 pub enum InputFormat {
     Auto,
+    AutoPerFile,
     Json,
     Line,
     Raw,
@@ -229,6 +230,7 @@ impl InputFormat {
     pub fn to_display_string(&self) -> String {
         match self {
             InputFormat::Auto => "auto".to_string(),
+            InputFormat::AutoPerFile => "auto-per-file".to_string(),
             InputFormat::Json => "json".to_string(),
             InputFormat::Line => "line".to_string(),
             InputFormat::Raw => "raw".to_string(),
@@ -259,6 +261,7 @@ impl InputFormat {
     pub fn cascade_name(&self) -> &'static str {
         match self {
             InputFormat::Auto => "auto",
+            InputFormat::AutoPerFile => "auto-per-file",
             InputFormat::Json => "json",
             InputFormat::Line => "line",
             InputFormat::Raw => "raw",
@@ -1211,6 +1214,7 @@ pub(crate) fn parse_input_format_spec(spec: &str) -> anyhow::Result<InputFormat>
     // Parse standard formats (no field specs)
     match spec.to_lowercase().as_str() {
         "auto" => Ok(InputFormat::Auto),
+        "auto-per-file" => Ok(InputFormat::AutoPerFile),
         "json" => Ok(InputFormat::Json),
         "line" => Ok(InputFormat::Line),
         "raw" => Ok(InputFormat::Raw),
@@ -1222,7 +1226,7 @@ pub(crate) fn parse_input_format_spec(spec: &str) -> anyhow::Result<InputFormat>
         "csvnh" => Ok(InputFormat::Csvnh),
         "tsvnh" => Ok(InputFormat::Tsvnh),
         "combined" => Ok(InputFormat::Combined),
-        _ => Err(anyhow::anyhow!("Unknown input format: '{}'. Supported formats: json, line, csv, syslog, cef, logfmt, raw, tsv, csvnh, tsvnh, combined, auto, cols:<spec>, and regex:<pattern>", spec)),
+        _ => Err(anyhow::anyhow!("Unknown input format: '{}'. Supported formats: json, line, csv, syslog, cef, logfmt, raw, tsv, csvnh, tsvnh, combined, auto, auto-per-file, cols:<spec>, and regex:<pattern>", spec)),
     }
 }
 
@@ -1255,6 +1259,11 @@ fn parse_cascade_spec(spec: &str) -> anyhow::Result<InputFormat> {
             "auto" => {
                 return Err(anyhow::anyhow!(
                     "'auto' is not allowed inside a cascade list; list the formats explicitly"
+                ));
+            }
+            "auto-per-file" => {
+                return Err(anyhow::anyhow!(
+                    "'auto-per-file' is not allowed inside a cascade list; list the formats explicitly"
                 ));
             }
             "csv" | "tsv" | "csvnh" | "tsvnh" => {
@@ -1493,6 +1502,7 @@ impl From<crate::InputFormat> for InputFormat {
     fn from(format: crate::InputFormat) -> Self {
         match format {
             crate::InputFormat::Auto => InputFormat::Auto,
+            crate::InputFormat::AutoPerFile => InputFormat::AutoPerFile,
             crate::InputFormat::Json => InputFormat::Json,
             crate::InputFormat::Line => InputFormat::Line,
             crate::InputFormat::Raw => InputFormat::Raw,
@@ -1522,6 +1532,7 @@ impl From<InputFormat> for crate::InputFormat {
     fn from(format: InputFormat) -> Self {
         match format {
             InputFormat::Auto => crate::InputFormat::Auto,
+            InputFormat::AutoPerFile => crate::InputFormat::AutoPerFile,
             InputFormat::Json => crate::InputFormat::Json,
             InputFormat::Line => crate::InputFormat::Line,
             InputFormat::Raw => crate::InputFormat::Raw,
