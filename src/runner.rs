@@ -1293,6 +1293,28 @@ enum ProcessingResult {
     Stop,
 }
 
+fn replace_pipeline_parser(
+    pipeline: &mut pipeline::Pipeline,
+    ctx: &mut pipeline::PipelineContext,
+    config: &KeloraConfig,
+    input_format: &config::InputFormat,
+    csv_headers: Option<Vec<String>>,
+    csv_type_map: Option<TypeMap>,
+) -> Result<()> {
+    let mut pipeline_builder =
+        create_pipeline_builder_from_config(config).with_input_format(input_format.clone());
+    if let Some(headers) = csv_headers {
+        pipeline_builder = pipeline_builder.with_csv_headers(headers);
+    }
+    if let Some(type_map) = csv_type_map {
+        pipeline_builder = pipeline_builder.with_csv_type_map(type_map);
+    }
+
+    pipeline.parser = pipeline_builder.build_parser()?;
+    ctx.config.format_name = Some(input_format.to_display_string());
+    Ok(())
+}
+
 /// Process a single line in sequential mode with filename tracking and CSV schema detection
 #[allow(clippy::too_many_arguments)]
 fn process_line_sequential<W: Write>(
@@ -1374,6 +1396,20 @@ fn process_line_sequential<W: Write>(
         let file_changed = current_filename != *last_auto_format_filename
             || (current_filename.is_none() && current_auto_format.is_none());
 
+        if file_changed {
+            if current_auto_format.is_some() && current_filename != *last_auto_format_filename {
+                let results = pipeline.flush(ctx)?;
+                for formatted in results {
+                    write_formatted_output(formatted, output, gap_tracker)?;
+                }
+            }
+
+            *current_auto_format = None;
+            *current_csv_headers = None;
+            *current_csv_type_map = None;
+            *last_filename = None;
+        }
+
         if file_changed && !line.trim().is_empty() {
             let trimmed_line = line.trim_end_matches(&['\r', '\n'][..]);
             let detected_format = parsers::detect_format(trimmed_line)?;
@@ -1397,19 +1433,30 @@ fn process_line_sequential<W: Write>(
                 stats::stats_set_detected_format(detected_format.to_display_string());
             }
 
-            let pipeline_builder = create_pipeline_builder_from_config(&detected_config);
-            let (new_pipeline, _unused_begin_stage, _unused_end_stage, new_ctx) =
-                pipeline_builder.build(config.processing.stages.clone())?;
-
-            *pipeline = new_pipeline;
-            ctx.rhai = new_ctx.rhai;
-            ctx.config.format_name = Some(detected_format.to_display_string());
+            replace_pipeline_parser(
+                pipeline,
+                ctx,
+                &detected_config,
+                &detected_format,
+                None,
+                None,
+            )?;
         }
     }
 
+    let effective_input_format = current_auto_format
+        .as_ref()
+        .unwrap_or(&config.input.format)
+        .clone();
+
     if line.trim().is_empty() {
+        if matches!(config.input.format, config::InputFormat::AutoPerFile)
+            && current_auto_format.is_none()
+        {
+            return Ok(ProcessingResult::Continue);
+        }
+
         // Only skip empty lines for structured formats, not for line format
-        let effective_input_format = current_auto_format.as_ref().unwrap_or(&config.input.format);
         if !matches!(effective_input_format, config::InputFormat::Line) {
             return Ok(ProcessingResult::Continue);
         }
@@ -1418,7 +1465,7 @@ fn process_line_sequential<W: Write>(
 
     // For CSV formats, detect file changes and reinitialize parser, or handle first line for stdin
     if matches!(
-        config.input.format,
+        effective_input_format,
         config::InputFormat::Csv(_)
             | config::InputFormat::Tsv(_)
             | config::InputFormat::Csvnh
@@ -1427,7 +1474,7 @@ fn process_line_sequential<W: Write>(
         || (current_filename.is_none() && current_csv_headers.is_none()))
     {
         // File changed, reinitialize CSV parser for this file
-        let mut temp_parser = match &config.input.format {
+        let mut temp_parser = match &effective_input_format {
             config::InputFormat::Csv(ref field_spec) => {
                 let p = parsers::CsvParser::new_csv();
                 if let Some(ref spec) = field_spec {
@@ -1465,22 +1512,14 @@ fn process_line_sequential<W: Write>(
         };
         *last_filename = current_filename.clone();
 
-        // Rebuild the pipeline with new headers
-        let mut pipeline_builder = create_pipeline_builder_from_config(config);
-        pipeline_builder = pipeline_builder.with_csv_headers(headers);
-        if let Some(type_map) = current_csv_type_map.clone() {
-            pipeline_builder = pipeline_builder.with_csv_type_map(type_map);
-        }
-
-        // Note: We rebuild the entire pipeline including begin/end stages, but only use
-        // the pipeline and context. The begin stage was already executed at session start
-        // and the end stage will be executed when the original session completes.
-        let (new_pipeline, _unused_begin_stage, _unused_end_stage, new_ctx) =
-            pipeline_builder.build(config.processing.stages.clone())?;
-
-        *pipeline = new_pipeline;
-        // Keep the existing context's tracking state but update the Rhai engine
-        ctx.rhai = new_ctx.rhai;
+        replace_pipeline_parser(
+            pipeline,
+            ctx,
+            config,
+            &effective_input_format,
+            Some(headers),
+            current_csv_type_map.clone(),
+        )?;
 
         // If the first line was consumed as a header, don't process it as data
         if was_consumed {

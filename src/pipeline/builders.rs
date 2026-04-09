@@ -168,6 +168,202 @@ pub struct PipelineBuilder {
 }
 
 impl PipelineBuilder {
+    fn build_parser_internal(&self) -> Result<Box<dyn EventParser>> {
+        let custom_ts_config =
+            self.ts_field.is_some() || self.ts_format.is_some() || self.default_timezone.is_some();
+
+        let base_parser: Box<dyn EventParser> = match self.input_format {
+            crate::config::InputFormat::Auto => {
+                return Err(anyhow::anyhow!(
+                    "Auto format should be resolved before pipeline creation"
+                ));
+            }
+            crate::config::InputFormat::AutoPerFile => Box::new(crate::parsers::LineParser::new()),
+            crate::config::InputFormat::Json => {
+                if custom_ts_config {
+                    Box::new(
+                        crate::parsers::JsonlParser::new_without_auto_timestamp()
+                            .with_strict(self.strict),
+                    )
+                } else {
+                    Box::new(crate::parsers::JsonlParser::new().with_strict(self.strict))
+                }
+            }
+            crate::config::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
+            crate::config::InputFormat::Raw => Box::new(crate::parsers::RawParser::new()),
+            crate::config::InputFormat::Logfmt => {
+                if custom_ts_config {
+                    Box::new(crate::parsers::LogfmtParser::new_without_auto_timestamp())
+                } else {
+                    Box::new(crate::parsers::LogfmtParser::new())
+                }
+            }
+            crate::config::InputFormat::Syslog => {
+                if custom_ts_config {
+                    Box::new(crate::parsers::SyslogParser::new_without_auto_timestamp()?)
+                } else {
+                    Box::new(crate::parsers::SyslogParser::new()?)
+                }
+            }
+            crate::config::InputFormat::Cef => {
+                if custom_ts_config {
+                    Box::new(
+                        crate::parsers::CefParser::new_without_auto_timestamp()
+                            .with_strict(self.strict),
+                    )
+                } else {
+                    Box::new(crate::parsers::CefParser::new().with_strict(self.strict))
+                }
+            }
+            crate::config::InputFormat::Csv(ref field_spec) => {
+                let mut parser = if let Some(ref headers) = self.csv_headers {
+                    crate::parsers::CsvParser::new_csv_with_headers(headers.clone())
+                } else {
+                    crate::parsers::CsvParser::new_csv()
+                };
+
+                if let Some(ref type_map) = self.csv_type_map {
+                    parser = parser.with_type_map(type_map.clone());
+                }
+
+                let parser = if let Some(ref spec) = field_spec {
+                    parser
+                        .with_field_spec(spec)?
+                        .with_strict(self.strict)
+                        .with_auto_timestamp(!custom_ts_config)
+                } else if custom_ts_config {
+                    parser.with_auto_timestamp(false)
+                } else {
+                    parser
+                };
+
+                Box::new(parser)
+            }
+            crate::config::InputFormat::Tsv(ref field_spec) => {
+                let mut parser = if let Some(ref headers) = self.csv_headers {
+                    crate::parsers::CsvParser::new_tsv_with_headers(headers.clone())
+                } else {
+                    crate::parsers::CsvParser::new_tsv()
+                };
+
+                if let Some(ref type_map) = self.csv_type_map {
+                    parser = parser.with_type_map(type_map.clone());
+                }
+
+                let parser = if let Some(ref spec) = field_spec {
+                    parser
+                        .with_field_spec(spec)?
+                        .with_strict(self.strict)
+                        .with_auto_timestamp(!custom_ts_config)
+                } else if custom_ts_config {
+                    parser.with_auto_timestamp(false)
+                } else {
+                    parser
+                };
+
+                Box::new(parser)
+            }
+            crate::config::InputFormat::Csvnh => {
+                if let Some(ref headers) = self.csv_headers {
+                    let parser =
+                        crate::parsers::CsvParser::new_csv_no_headers_with_columns(headers.clone())
+                            .with_strict(self.strict);
+                    let parser = if custom_ts_config {
+                        parser.with_auto_timestamp(false)
+                    } else {
+                        parser
+                    };
+                    Box::new(parser)
+                } else {
+                    let parser =
+                        crate::parsers::CsvParser::new_csv_no_headers().with_strict(self.strict);
+                    let parser = if custom_ts_config {
+                        parser.with_auto_timestamp(false)
+                    } else {
+                        parser
+                    };
+                    Box::new(parser)
+                }
+            }
+            crate::config::InputFormat::Tsvnh => {
+                if let Some(ref headers) = self.csv_headers {
+                    let parser =
+                        crate::parsers::CsvParser::new_tsv_no_headers_with_columns(headers.clone())
+                            .with_strict(self.strict);
+                    let parser = if custom_ts_config {
+                        parser.with_auto_timestamp(false)
+                    } else {
+                        parser
+                    };
+                    Box::new(parser)
+                } else {
+                    let parser =
+                        crate::parsers::CsvParser::new_tsv_no_headers().with_strict(self.strict);
+                    let parser = if custom_ts_config {
+                        parser.with_auto_timestamp(false)
+                    } else {
+                        parser
+                    };
+                    Box::new(parser)
+                }
+            }
+            crate::config::InputFormat::Combined => {
+                if custom_ts_config {
+                    Box::new(crate::parsers::CombinedParser::new_without_auto_timestamp()?)
+                } else {
+                    Box::new(crate::parsers::CombinedParser::new()?)
+                }
+            }
+            crate::config::InputFormat::Cols(_) => {
+                if let Some(ref spec) = self.cols_spec {
+                    Box::new(
+                        crate::parsers::ColsParser::new(spec.clone(), self.cols_sep.clone())
+                            .with_strict(self.strict),
+                    )
+                } else {
+                    return Err(anyhow::anyhow!("Cols format requires a specification"));
+                }
+            }
+            crate::config::InputFormat::Regex(ref pattern) => {
+                Box::new(crate::parsers::RegexParser::new(pattern)?.with_strict(self.strict))
+            }
+            crate::config::InputFormat::Cascade(ref formats) => {
+                build_cascading_parser(formats, custom_ts_config, self.strict)?
+            }
+        };
+
+        let parser_with_prefix: Box<dyn EventParser> = if self.extract_prefix.is_some() {
+            let prefix_extractor = super::PrefixExtractor::new(
+                self.extract_prefix.clone().unwrap(),
+                self.prefix_sep.clone(),
+            );
+            Box::new(super::PrefixExtractingParser::new(
+                base_parser,
+                Some(prefix_extractor),
+            ))
+        } else {
+            base_parser
+        };
+
+        let parser: Box<dyn EventParser> = if custom_ts_config {
+            Box::new(TimestampConfiguredParser::new(
+                parser_with_prefix,
+                self.ts_field.clone(),
+                self.ts_format.clone(),
+                self.default_timezone.clone(),
+            ))
+        } else {
+            parser_with_prefix
+        };
+
+        Ok(parser)
+    }
+
+    pub fn build_parser(&self) -> Result<Box<dyn EventParser>> {
+        stats_set_timestamp_override(self.ts_field.clone(), self.ts_format.clone());
+        self.build_parser_internal()
+    }
+
     pub fn new() -> Self {
         Self {
             config: PipelineConfig {
@@ -257,199 +453,8 @@ impl PipelineBuilder {
             use_emoji,
         });
 
-        // Create parser
-        let custom_ts_config =
-            self.ts_field.is_some() || self.ts_format.is_some() || self.default_timezone.is_some();
-
         stats_set_timestamp_override(self.ts_field.clone(), self.ts_format.clone());
-
-        let base_parser: Box<dyn EventParser> = match self.input_format {
-            crate::config::InputFormat::Auto => {
-                return Err(anyhow::anyhow!(
-                    "Auto format should be resolved before pipeline creation"
-                ));
-            }
-            crate::config::InputFormat::AutoPerFile => Box::new(crate::parsers::LineParser::new()),
-            crate::config::InputFormat::Json => {
-                if custom_ts_config {
-                    Box::new(
-                        crate::parsers::JsonlParser::new_without_auto_timestamp()
-                            .with_strict(self.strict),
-                    )
-                } else {
-                    Box::new(crate::parsers::JsonlParser::new().with_strict(self.strict))
-                }
-            }
-            crate::config::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
-            crate::config::InputFormat::Raw => Box::new(crate::parsers::RawParser::new()),
-            crate::config::InputFormat::Logfmt => {
-                if custom_ts_config {
-                    Box::new(crate::parsers::LogfmtParser::new_without_auto_timestamp())
-                } else {
-                    Box::new(crate::parsers::LogfmtParser::new())
-                }
-            }
-            crate::config::InputFormat::Syslog => {
-                if custom_ts_config {
-                    Box::new(crate::parsers::SyslogParser::new_without_auto_timestamp()?)
-                } else {
-                    Box::new(crate::parsers::SyslogParser::new()?)
-                }
-            }
-            crate::config::InputFormat::Cef => {
-                if custom_ts_config {
-                    Box::new(
-                        crate::parsers::CefParser::new_without_auto_timestamp()
-                            .with_strict(self.strict),
-                    )
-                } else {
-                    Box::new(crate::parsers::CefParser::new().with_strict(self.strict))
-                }
-            }
-            crate::config::InputFormat::Csv(ref field_spec) => {
-                let mut parser = if let Some(ref headers) = self.csv_headers {
-                    crate::parsers::CsvParser::new_csv_with_headers(headers.clone())
-                } else {
-                    crate::parsers::CsvParser::new_csv()
-                };
-
-                if let Some(ref type_map) = self.csv_type_map {
-                    parser = parser.with_type_map(type_map.clone());
-                }
-
-                // Apply field spec if provided
-                let parser = if let Some(ref spec) = field_spec {
-                    parser
-                        .with_field_spec(spec)?
-                        .with_strict(self.strict)
-                        .with_auto_timestamp(!custom_ts_config)
-                } else if custom_ts_config {
-                    parser.with_auto_timestamp(false)
-                } else {
-                    parser
-                };
-
-                Box::new(parser)
-            }
-            crate::config::InputFormat::Tsv(ref field_spec) => {
-                let mut parser = if let Some(ref headers) = self.csv_headers {
-                    crate::parsers::CsvParser::new_tsv_with_headers(headers.clone())
-                } else {
-                    crate::parsers::CsvParser::new_tsv()
-                };
-
-                if let Some(ref type_map) = self.csv_type_map {
-                    parser = parser.with_type_map(type_map.clone());
-                }
-
-                // Apply field spec if provided
-                let parser = if let Some(ref spec) = field_spec {
-                    parser
-                        .with_field_spec(spec)?
-                        .with_strict(self.strict)
-                        .with_auto_timestamp(!custom_ts_config)
-                } else if custom_ts_config {
-                    parser.with_auto_timestamp(false)
-                } else {
-                    parser
-                };
-
-                Box::new(parser)
-            }
-            crate::config::InputFormat::Csvnh => {
-                if let Some(ref headers) = self.csv_headers {
-                    let parser =
-                        crate::parsers::CsvParser::new_csv_no_headers_with_columns(headers.clone())
-                            .with_strict(self.strict);
-                    let parser = if custom_ts_config {
-                        parser.with_auto_timestamp(false)
-                    } else {
-                        parser
-                    };
-                    Box::new(parser)
-                } else {
-                    let parser =
-                        crate::parsers::CsvParser::new_csv_no_headers().with_strict(self.strict);
-                    let parser = if custom_ts_config {
-                        parser.with_auto_timestamp(false)
-                    } else {
-                        parser
-                    };
-                    Box::new(parser)
-                }
-            }
-            crate::config::InputFormat::Tsvnh => {
-                if let Some(ref headers) = self.csv_headers {
-                    let parser =
-                        crate::parsers::CsvParser::new_tsv_no_headers_with_columns(headers.clone())
-                            .with_strict(self.strict);
-                    let parser = if custom_ts_config {
-                        parser.with_auto_timestamp(false)
-                    } else {
-                        parser
-                    };
-                    Box::new(parser)
-                } else {
-                    let parser =
-                        crate::parsers::CsvParser::new_tsv_no_headers().with_strict(self.strict);
-                    let parser = if custom_ts_config {
-                        parser.with_auto_timestamp(false)
-                    } else {
-                        parser
-                    };
-                    Box::new(parser)
-                }
-            }
-            crate::config::InputFormat::Combined => {
-                if custom_ts_config {
-                    Box::new(crate::parsers::CombinedParser::new_without_auto_timestamp()?)
-                } else {
-                    Box::new(crate::parsers::CombinedParser::new()?)
-                }
-            }
-            crate::config::InputFormat::Cols(_) => {
-                if let Some(ref spec) = self.cols_spec {
-                    Box::new(
-                        crate::parsers::ColsParser::new(spec.clone(), self.cols_sep.clone())
-                            .with_strict(self.strict),
-                    )
-                } else {
-                    return Err(anyhow::anyhow!("Cols format requires a specification"));
-                }
-            }
-            crate::config::InputFormat::Regex(ref pattern) => {
-                Box::new(crate::parsers::RegexParser::new(pattern)?.with_strict(self.strict))
-            }
-            crate::config::InputFormat::Cascade(ref formats) => {
-                build_cascading_parser(formats, custom_ts_config, self.strict)?
-            }
-        };
-
-        // Wrap parser with prefix extraction if needed
-        let parser_with_prefix: Box<dyn EventParser> = if self.extract_prefix.is_some() {
-            let prefix_extractor = super::PrefixExtractor::new(
-                self.extract_prefix.clone().unwrap(),
-                self.prefix_sep.clone(),
-            );
-            Box::new(super::PrefixExtractingParser::new(
-                base_parser,
-                Some(prefix_extractor),
-            ))
-        } else {
-            base_parser
-        };
-
-        // Wrap parser with timestamp configuration if needed
-        let parser: Box<dyn EventParser> = if custom_ts_config {
-            Box::new(TimestampConfiguredParser::new(
-                parser_with_prefix,
-                self.ts_field.clone(),
-                self.ts_format.clone(),
-                self.default_timezone.clone(),
-            ))
-        } else {
-            parser_with_prefix
-        };
+        let parser = self.build_parser_internal()?;
 
         // Create formatter
         let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
@@ -781,199 +786,8 @@ impl PipelineBuilder {
             use_emoji,
         });
 
-        // Create parser (with pre-processed CSV headers if available)
-        let custom_ts_config =
-            self.ts_field.is_some() || self.ts_format.is_some() || self.default_timezone.is_some();
-
         stats_set_timestamp_override(self.ts_field.clone(), self.ts_format.clone());
-
-        let base_parser: Box<dyn EventParser> = match self.input_format {
-            crate::config::InputFormat::Auto => {
-                return Err(anyhow::anyhow!(
-                    "Auto format should be resolved before pipeline creation"
-                ));
-            }
-            crate::config::InputFormat::AutoPerFile => Box::new(crate::parsers::LineParser::new()),
-            crate::config::InputFormat::Json => {
-                if custom_ts_config {
-                    Box::new(
-                        crate::parsers::JsonlParser::new_without_auto_timestamp()
-                            .with_strict(self.strict),
-                    )
-                } else {
-                    Box::new(crate::parsers::JsonlParser::new().with_strict(self.strict))
-                }
-            }
-            crate::config::InputFormat::Line => Box::new(crate::parsers::LineParser::new()),
-            crate::config::InputFormat::Raw => Box::new(crate::parsers::RawParser::new()),
-            crate::config::InputFormat::Logfmt => {
-                if custom_ts_config {
-                    Box::new(crate::parsers::LogfmtParser::new_without_auto_timestamp())
-                } else {
-                    Box::new(crate::parsers::LogfmtParser::new())
-                }
-            }
-            crate::config::InputFormat::Syslog => {
-                if custom_ts_config {
-                    Box::new(crate::parsers::SyslogParser::new_without_auto_timestamp()?)
-                } else {
-                    Box::new(crate::parsers::SyslogParser::new()?)
-                }
-            }
-            crate::config::InputFormat::Cef => {
-                if custom_ts_config {
-                    Box::new(
-                        crate::parsers::CefParser::new_without_auto_timestamp()
-                            .with_strict(self.strict),
-                    )
-                } else {
-                    Box::new(crate::parsers::CefParser::new().with_strict(self.strict))
-                }
-            }
-            crate::config::InputFormat::Csv(ref field_spec) => {
-                let mut parser = if let Some(ref headers) = self.csv_headers {
-                    crate::parsers::CsvParser::new_csv_with_headers(headers.clone())
-                } else {
-                    crate::parsers::CsvParser::new_csv()
-                };
-
-                if let Some(ref type_map) = self.csv_type_map {
-                    parser = parser.with_type_map(type_map.clone());
-                }
-
-                // Apply field spec if provided
-                let parser = if let Some(ref spec) = field_spec {
-                    parser
-                        .with_field_spec(spec)?
-                        .with_strict(self.strict)
-                        .with_auto_timestamp(!custom_ts_config)
-                } else if custom_ts_config {
-                    parser.with_auto_timestamp(false)
-                } else {
-                    parser
-                };
-
-                Box::new(parser)
-            }
-            crate::config::InputFormat::Tsv(ref field_spec) => {
-                let mut parser = if let Some(ref headers) = self.csv_headers {
-                    crate::parsers::CsvParser::new_tsv_with_headers(headers.clone())
-                } else {
-                    crate::parsers::CsvParser::new_tsv()
-                };
-
-                if let Some(ref type_map) = self.csv_type_map {
-                    parser = parser.with_type_map(type_map.clone());
-                }
-
-                // Apply field spec if provided
-                let parser = if let Some(ref spec) = field_spec {
-                    parser
-                        .with_field_spec(spec)?
-                        .with_strict(self.strict)
-                        .with_auto_timestamp(!custom_ts_config)
-                } else if custom_ts_config {
-                    parser.with_auto_timestamp(false)
-                } else {
-                    parser
-                };
-
-                Box::new(parser)
-            }
-            crate::config::InputFormat::Csvnh => {
-                if let Some(ref headers) = self.csv_headers {
-                    let parser =
-                        crate::parsers::CsvParser::new_csv_no_headers_with_columns(headers.clone())
-                            .with_strict(self.strict);
-                    let parser = if custom_ts_config {
-                        parser.with_auto_timestamp(false)
-                    } else {
-                        parser
-                    };
-                    Box::new(parser)
-                } else {
-                    let parser =
-                        crate::parsers::CsvParser::new_csv_no_headers().with_strict(self.strict);
-                    let parser = if custom_ts_config {
-                        parser.with_auto_timestamp(false)
-                    } else {
-                        parser
-                    };
-                    Box::new(parser)
-                }
-            }
-            crate::config::InputFormat::Tsvnh => {
-                if let Some(ref headers) = self.csv_headers {
-                    let parser =
-                        crate::parsers::CsvParser::new_tsv_no_headers_with_columns(headers.clone())
-                            .with_strict(self.strict);
-                    let parser = if custom_ts_config {
-                        parser.with_auto_timestamp(false)
-                    } else {
-                        parser
-                    };
-                    Box::new(parser)
-                } else {
-                    let parser =
-                        crate::parsers::CsvParser::new_tsv_no_headers().with_strict(self.strict);
-                    let parser = if custom_ts_config {
-                        parser.with_auto_timestamp(false)
-                    } else {
-                        parser
-                    };
-                    Box::new(parser)
-                }
-            }
-            crate::config::InputFormat::Combined => {
-                if custom_ts_config {
-                    Box::new(crate::parsers::CombinedParser::new_without_auto_timestamp()?)
-                } else {
-                    Box::new(crate::parsers::CombinedParser::new()?)
-                }
-            }
-            crate::config::InputFormat::Cols(_) => {
-                if let Some(ref spec) = self.cols_spec {
-                    Box::new(
-                        crate::parsers::ColsParser::new(spec.clone(), self.cols_sep.clone())
-                            .with_strict(self.strict),
-                    )
-                } else {
-                    return Err(anyhow::anyhow!("Cols format requires a specification"));
-                }
-            }
-            crate::config::InputFormat::Regex(ref pattern) => {
-                Box::new(crate::parsers::RegexParser::new(pattern)?.with_strict(self.strict))
-            }
-            crate::config::InputFormat::Cascade(ref formats) => {
-                build_cascading_parser(formats, custom_ts_config, self.strict)?
-            }
-        };
-
-        // Wrap parser with prefix extraction if needed
-        let parser_with_prefix: Box<dyn EventParser> = if self.extract_prefix.is_some() {
-            let prefix_extractor = super::PrefixExtractor::new(
-                self.extract_prefix.clone().unwrap(),
-                self.prefix_sep.clone(),
-            );
-            Box::new(super::PrefixExtractingParser::new(
-                base_parser,
-                Some(prefix_extractor),
-            ))
-        } else {
-            base_parser
-        };
-
-        // Wrap parser with timestamp configuration if needed
-        let parser: Box<dyn EventParser> = if custom_ts_config {
-            Box::new(TimestampConfiguredParser::new(
-                parser_with_prefix,
-                self.ts_field.clone(),
-                self.ts_format.clone(),
-                self.default_timezone.clone(),
-            ))
-        } else {
-            parser_with_prefix
-        };
+        let parser = self.build_parser_internal()?;
 
         // Create formatter (workers still need formatters for output)
         let use_colors = crate::tty::should_use_colors_with_mode(&self.config.color_mode);
