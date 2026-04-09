@@ -262,6 +262,8 @@ pub struct FieldDiscovery {
     pub total_events: usize,
     /// Whether we've hit the field cap.
     capped: bool,
+    /// Whether nested field flattening stopped at the maximum depth.
+    flatten_depth_capped: bool,
 }
 
 impl FieldDiscovery {
@@ -270,6 +272,7 @@ impl FieldDiscovery {
             fields: IndexMap::new(),
             total_events: 0,
             capped: false,
+            flatten_depth_capped: false,
         }
     }
 
@@ -292,6 +295,9 @@ impl FieldDiscovery {
         self.record(path, value);
 
         if depth >= MAX_FLATTEN_DEPTH {
+            if value.is_map() || value.is_array() {
+                self.flatten_depth_capped = true;
+            }
             return;
         }
 
@@ -436,6 +442,12 @@ impl FieldDiscovery {
                 MAX_TRACKED_FIELDS
             ));
         }
+        if self.flatten_depth_capped {
+            output.push_str(&format!(
+                "\n(Nested field flattening stopped at depth {}; deeper children are not shown.)\n",
+                MAX_FLATTEN_DEPTH
+            ));
+        }
 
         output
     }
@@ -484,6 +496,8 @@ impl FieldDiscovery {
             "total_events": self.total_events,
             "fields": fields_json,
             "truncated": self.capped,
+            "flatten_depth_limit": MAX_FLATTEN_DEPTH,
+            "flatten_depth_capped": self.flatten_depth_capped,
         });
 
         serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string())
@@ -992,6 +1006,17 @@ mod tests {
         assert!(discovery.fields.contains_key("a.b.c"));
         assert!(!discovery.fields.contains_key("a.b.c.d"));
         assert!(!discovery.fields.contains_key("a.b.c.d.e"));
+
+        let table = discovery.format_table();
+        assert!(
+            table.contains("Nested field flattening stopped at depth 3"),
+            "table should make depth cap explicit: {table}"
+        );
+
+        let json = discovery.format_json();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["flatten_depth_limit"], 3);
+        assert_eq!(parsed["flatten_depth_capped"], true);
     }
 
     #[test]
@@ -1015,5 +1040,7 @@ mod tests {
         let json = discovery.format_json();
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed["truncated"], false);
+        assert_eq!(parsed["flatten_depth_limit"], 3);
+        assert_eq!(parsed["flatten_depth_capped"], false);
     }
 }
