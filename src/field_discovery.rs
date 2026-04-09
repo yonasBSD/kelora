@@ -13,6 +13,7 @@ use rhai::Dynamic;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use unicode_width::UnicodeWidthStr;
 
 /// Threshold at which we graduate from exact tracking to HLL estimation.
 const EXACT_CARDINALITY_THRESHOLD: usize = 256;
@@ -342,98 +343,139 @@ impl FieldDiscovery {
 
     /// Format the discovery results as a human-readable table.
     pub fn format_table(&self) -> std::string::String {
+        self.format_table_for_width(crate::tty::get_terminal_width())
+    }
+
+    fn format_table_for_width(&self, terminal_width: usize) -> std::string::String {
         if self.fields.is_empty() {
-            return format!(
-                "Field Discovery ({} events scanned): no fields found\n",
-                self.total_events
-            );
+            return format!("Scanned {} events: no fields found\n", self.total_events);
         }
 
         let mut output = std::string::String::new();
-        output.push_str(&format!(
-            "Field Discovery ({} events scanned):\n\n",
-            self.total_events
-        ));
+        output.push_str(&format!("Scanned {} events\n\n", self.total_events));
 
-        // Compute column widths
-        let name_width = self
+        let terminal_width = terminal_width.max(36);
+        let max_name_width = self
             .fields
             .keys()
-            .map(|k| k.len())
+            .map(|k| display_width(k))
             .max()
             .unwrap_or(5)
             .clamp(5, 40);
-        let seen_width = 6; // "Seen" column
-        let miss_width = 5; // "Miss%" column
-        let types_width = self
+        let max_types_width = self
             .fields
             .values()
-            .map(|p| format_types(p).len())
+            .map(|p| display_width(&format_types(p)))
             .max()
             .unwrap_or(5)
             .clamp(5, 30);
-        let unique_width = 8; // "Unique" column
 
-        // Header
-        output.push_str(&format!(
-            "{:<name_w$}  {:>seen_w$}  {:>miss_w$}  {:<types_w$}  {:>unique_w$}  Examples\n",
-            "Field",
-            "Seen",
-            "Miss%",
-            "Types",
-            "Unique",
-            name_w = name_width,
-            seen_w = seen_width,
-            miss_w = miss_width,
-            types_w = types_width,
-            unique_w = unique_width,
-        ));
-
-        // Separator
-        let total_width =
-            name_width + seen_width + miss_width + types_width + unique_width + 12 + 20;
-        output.push_str(&"\u{2500}".repeat(total_width.min(120)));
-        output.push('\n');
-
-        // Rows — sort by seen_count descending for relevance
         let mut entries: Vec<_> = self.fields.iter().collect();
         entries.sort_by(|a, b| b.1.seen_count.cmp(&a.1.seen_count));
 
-        for (name, profile) in &entries {
-            // Flattened array-element fields (`key[]`) can have seen_count > total_events
-            // because each element counts as an observation; saturating_sub avoids underflow.
-            let missing = self.total_events.saturating_sub(profile.seen_count);
-            let miss_pct = if self.total_events > 0 {
-                (missing as f64 / self.total_events as f64) * 100.0
-            } else {
-                0.0
-            };
+        if let Some(widths) =
+            TableWidths::for_full_table(terminal_width, max_name_width, max_types_width)
+        {
+            output.push_str(&pad_right_display("Field", widths.name));
+            output.push_str("  ");
+            output.push_str(&pad_left_display("Seen", widths.seen));
+            output.push_str("  ");
+            output.push_str(&pad_left_display("Miss%", widths.miss));
+            output.push_str("  ");
+            output.push_str(&pad_right_display("Types", widths.types));
+            output.push_str("  ");
+            output.push_str(&pad_left_display("Unique", widths.unique));
+            output.push_str("  Examples\n");
 
-            let types_str = format_types(profile);
-            let unique_str = format_cardinality(profile);
-            let examples_str = format_examples(profile);
+            for (name, profile) in &entries {
+                let row = DiscoveryRow::from_profile(self.total_events, name, profile);
+                output.push_str(&pad_right_display(
+                    &truncate_for_display(&row.name, widths.name),
+                    widths.name,
+                ));
+                output.push_str("  ");
+                output.push_str(&pad_left_display(&row.seen_count.to_string(), widths.seen));
+                output.push_str("  ");
+                output.push_str(&pad_left_display(&format!("{:.0}%", row.miss_pct), widths.miss));
+                output.push_str("  ");
+                output.push_str(&pad_right_display(
+                    &truncate_for_display(&row.types, widths.types),
+                    widths.types,
+                ));
+                output.push_str("  ");
+                output.push_str(&pad_left_display(&row.unique, widths.unique));
+                output.push_str("  ");
+                output.push_str(&truncate_for_display(&row.examples, widths.examples));
+                output.push('\n');
+            }
+        } else if let Some(widths) =
+            TableWidths::for_compact_table(terminal_width, max_name_width, max_types_width)
+        {
+            output.push_str(&pad_right_display("Field", widths.name));
+            output.push_str("  ");
+            output.push_str(&pad_left_display("Seen", widths.seen));
+            output.push_str("  ");
+            output.push_str(&pad_left_display("Miss%", widths.miss));
+            output.push_str("  ");
+            output.push_str(&pad_right_display("Types", widths.types));
+            output.push_str("  ");
+            output.push_str(&pad_left_display("Unique", widths.unique));
+            output.push('\n');
 
-            // Truncate long field names
-            let display_name = if name.chars().count() > name_width {
-                truncate_for_display(name, name_width)
-            } else {
-                name.to_string()
-            };
-
-            output.push_str(&format!(
-                "{:<name_w$}  {:>seen_w$}  {:>miss_w$.0}%  {:<types_w$}  {:>unique_w$}  {}\n",
-                display_name,
-                profile.seen_count,
-                miss_pct,
-                types_str,
-                unique_str,
-                examples_str,
-                name_w = name_width,
-                seen_w = seen_width,
-                miss_w = miss_width,
-                types_w = types_width,
-                unique_w = unique_width,
-            ));
+            for (name, profile) in &entries {
+                let row = DiscoveryRow::from_profile(self.total_events, name, profile);
+                output.push_str(&pad_right_display(
+                    &truncate_for_display(&row.name, widths.name),
+                    widths.name,
+                ));
+                output.push_str("  ");
+                output.push_str(&pad_left_display(&row.seen_count.to_string(), widths.seen));
+                output.push_str("  ");
+                output.push_str(&pad_left_display(&format!("{:.0}%", row.miss_pct), widths.miss));
+                output.push_str("  ");
+                output.push_str(&pad_right_display(
+                    &truncate_for_display(&row.types, widths.types),
+                    widths.types,
+                ));
+                output.push_str("  ");
+                output.push_str(&pad_left_display(&row.unique, widths.unique));
+                output.push('\n');
+                if !row.examples.is_empty() {
+                    output.push_str("  ");
+                    output.push_str(&truncate_for_display(
+                        &row.examples,
+                        terminal_width.saturating_sub(2),
+                    ));
+                    output.push('\n');
+                }
+            }
+        } else {
+            for (idx, (name, profile)) in entries.iter().enumerate() {
+                let row = DiscoveryRow::from_profile(self.total_events, name, profile);
+                if idx > 0 {
+                    output.push('\n');
+                }
+                output.push_str(&truncate_for_display(&row.name, terminal_width));
+                output.push('\n');
+                output.push_str(&format!("  seen: {}  miss: {:.0}%\n", row.seen_count, row.miss_pct));
+                output.push_str("  type: ");
+                output.push_str(&truncate_for_display(&row.types, terminal_width.saturating_sub(8)));
+                output.push('\n');
+                output.push_str("  unique: ");
+                output.push_str(&truncate_for_display(
+                    &row.unique,
+                    terminal_width.saturating_sub(10),
+                ));
+                output.push('\n');
+                if !row.examples.is_empty() {
+                    output.push_str("  examples: ");
+                    output.push_str(&truncate_for_display(
+                        &row.examples,
+                        terminal_width.saturating_sub(12),
+                    ));
+                    output.push('\n');
+                }
+            }
         }
 
         if self.capped {
@@ -444,7 +486,7 @@ impl FieldDiscovery {
         }
         if self.flatten_depth_capped {
             output.push_str(&format!(
-                "\n(Nested field flattening stopped at depth {}; deeper children are not shown.)\n",
+                "\nNote: Nested field flattening stopped at depth {}; deeper children are not shown.\n",
                 MAX_FLATTEN_DEPTH
             ));
         }
@@ -642,6 +684,132 @@ fn truncate_for_display(s: &str, max_chars: usize) -> std::string::String {
     let mut out = s.chars().take(keep).collect::<std::string::String>();
     out.push_str("...");
     out
+}
+
+fn display_width(s: &str) -> usize {
+    UnicodeWidthStr::width(s)
+}
+
+fn pad_right_display(s: &str, width: usize) -> std::string::String {
+    let current = display_width(s);
+    if current >= width {
+        return s.to_string();
+    }
+    format!("{s}{}", " ".repeat(width - current))
+}
+
+fn pad_left_display(s: &str, width: usize) -> std::string::String {
+    let current = display_width(s);
+    if current >= width {
+        return s.to_string();
+    }
+    format!("{}{s}", " ".repeat(width - current))
+}
+
+struct TableWidths {
+    name: usize,
+    seen: usize,
+    miss: usize,
+    types: usize,
+    unique: usize,
+    examples: usize,
+}
+
+impl TableWidths {
+    fn for_full_table(
+        terminal_width: usize,
+        max_name_width: usize,
+        max_types_width: usize,
+    ) -> Option<Self> {
+        let seen = 6;
+        let miss = 5;
+        let unique = 8;
+        let separators = 10;
+        let min_name = 12;
+        let min_types = 8;
+        let min_examples = 12;
+        let available = terminal_width.checked_sub(seen + miss + unique + separators)?;
+        if available < min_name + min_types + min_examples {
+            return None;
+        }
+
+        let name = max_name_width.min(24).max(min_name);
+        let types = max_types_width.min(18).max(min_types);
+        let examples = available.saturating_sub(name + types);
+        if examples < min_examples {
+            return None;
+        }
+
+        Some(Self {
+            name,
+            seen,
+            miss,
+            types,
+            unique,
+            examples,
+        })
+    }
+
+    fn for_compact_table(
+        terminal_width: usize,
+        max_name_width: usize,
+        max_types_width: usize,
+    ) -> Option<Self> {
+        let seen = 6;
+        let miss = 5;
+        let unique = 8;
+        let separators = 8;
+        let min_name = 12;
+        let min_types = 5;
+        let available = terminal_width.checked_sub(seen + miss + unique + separators)?;
+        if available < min_name + min_types {
+            return None;
+        }
+
+        let types = max_types_width.min((available / 3).max(min_types));
+        let name = available.saturating_sub(types);
+        if name < min_name || types < min_types {
+            return None;
+        }
+
+        Some(Self {
+            name: name.min(max_name_width.max(min_name)),
+            seen,
+            miss,
+            types,
+            unique,
+            examples: 0,
+        })
+    }
+}
+
+struct DiscoveryRow {
+    name: std::string::String,
+    seen_count: usize,
+    miss_pct: f64,
+    types: std::string::String,
+    unique: std::string::String,
+    examples: std::string::String,
+}
+
+impl DiscoveryRow {
+    fn from_profile(total_events: usize, name: &str, profile: &FieldProfile) -> Self {
+        let missing = total_events.saturating_sub(profile.seen_count);
+        let miss_pct = if total_events > 0 {
+            (missing as f64 / total_events as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        Self {
+            name: name.to_string(),
+            seen_count: profile.seen_count,
+            miss_pct,
+            types: format_types(profile),
+            unique: format_cardinality(profile),
+            examples: format_examples(profile),
+        }
+    }
 }
 
 // ── thread-local accumulator ──────────────────────────────────────────
@@ -879,11 +1047,42 @@ mod tests {
         discovery.observe_event(&fields);
 
         let table = discovery.format_table();
-        assert!(table.contains("Field Discovery"));
-        assert!(table.contains("1 events scanned"));
+        assert!(table.contains("Scanned 1 events"));
         assert!(table.contains("level"));
         assert!(table.contains("msg"));
         assert!(table.contains("string"));
+    }
+
+    #[test]
+    fn test_format_table_compact_layout_on_medium_width() {
+        let mut discovery = FieldDiscovery::new();
+        let mut fields = IndexMap::new();
+        fields.insert(
+            "very.long.field.name".to_string(),
+            make_string("this is a long example value"),
+        );
+        discovery.observe_event(&fields);
+
+        let table = discovery.format_table_for_width(56);
+        assert!(table.contains("Field"));
+        assert!(!table.contains("Examples\n"));
+        assert!(!table.contains("  examples: "));
+        assert!(table.lines().any(|line| line.starts_with("  ")));
+    }
+
+    #[test]
+    fn test_format_table_stacked_layout_on_small_width() {
+        let mut discovery = FieldDiscovery::new();
+        let mut fields = IndexMap::new();
+        fields.insert("request_id".to_string(), make_string("req_001"));
+        discovery.observe_event(&fields);
+
+        let table = discovery.format_table_for_width(38);
+        assert!(table.contains("request_id\n"));
+        assert!(table.contains("  seen: 1  miss: 0%"));
+        assert!(table.contains("  type: string"));
+        assert!(table.contains("  unique: 1"));
+        assert!(table.contains("  examples: req_001"));
     }
 
     #[test]
@@ -905,7 +1104,7 @@ mod tests {
     fn test_empty_discovery() {
         let discovery = FieldDiscovery::new();
         let table = discovery.format_table();
-        assert!(table.contains("0 events scanned"));
+        assert!(table.contains("Scanned 0 events"));
         assert!(table.contains("no fields found"));
     }
 
