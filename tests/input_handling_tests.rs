@@ -572,7 +572,10 @@ fn test_merge_ts_assumes_each_file_is_already_sorted() {
         ],
     );
 
-    assert_eq!(exit_code, 0, "Should merge files successfully");
+    assert_ne!(
+        exit_code, 0,
+        "Recoverable merge-ts errors should still produce a non-zero exit"
+    );
     let messages: Vec<String> = stdout
         .lines()
         .map(|line| {
@@ -585,4 +588,169 @@ fn test_merge_ts_assumes_each_file_is_already_sorted() {
         })
         .collect();
     assert_eq!(messages, vec!["b", "c", "d", "a"]);
+}
+
+#[test]
+fn test_merge_ts_warns_and_skips_missing_timestamps_in_resilient_mode() {
+    let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
+    let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
+
+    temp_file1
+        .write_all(
+            b"{\"ts\":\"2025-01-01T00:00:02Z\",\"msg\":\"b\"}\n{\"msg\":\"missing\"}\n{\"ts\":\"2025-01-01T00:00:04Z\",\"msg\":\"d\"}\n",
+        )
+        .expect("Failed to write to temp file");
+    temp_file2
+        .write_all(
+            b"{\"ts\":\"2025-01-01T00:00:01Z\",\"msg\":\"a\"}\n{\"ts\":\"2025-01-01T00:00:03Z\",\"msg\":\"c\"}\n",
+        )
+        .expect("Failed to write to temp file");
+
+    let (stdout, stderr, exit_code) = run_kelora_with_files(
+        &["-f", "json", "-F", "json", "--merge-ts"],
+        &[
+            temp_file1.path().to_str().unwrap(),
+            temp_file2.path().to_str().unwrap(),
+        ],
+    );
+
+    assert_ne!(
+        exit_code, 0,
+        "Recoverable merge-ts errors should still produce a non-zero exit"
+    );
+    let messages: Vec<String> = stdout
+        .lines()
+        .map(|line| {
+            serde_json::from_str::<serde_json::Value>(line)
+                .expect("Output line should be JSON")
+                .get("msg")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect();
+    assert_eq!(messages, vec!["a", "b", "c", "d"]);
+    assert!(
+        stderr.contains("parse error"),
+        "Expected resilient-mode error summary, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_merge_ts_missing_timestamps_fail_in_strict_mode() {
+    let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
+    let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
+
+    temp_file1
+        .write_all(
+            b"{\"ts\":\"2025-01-01T00:00:02Z\",\"msg\":\"b\"}\n{\"msg\":\"missing\"}\n{\"ts\":\"2025-01-01T00:00:04Z\",\"msg\":\"d\"}\n",
+        )
+        .expect("Failed to write to temp file");
+    temp_file2
+        .write_all(b"{\"ts\":\"2025-01-01T00:00:01Z\",\"msg\":\"a\"}\n")
+        .expect("Failed to write to temp file");
+
+    let (stdout, stderr, exit_code) = run_kelora_with_files(
+        &["-f", "json", "-F", "json", "--merge-ts", "--strict"],
+        &[
+            temp_file1.path().to_str().unwrap(),
+            temp_file2.path().to_str().unwrap(),
+        ],
+    );
+
+    assert_ne!(
+        exit_code, 0,
+        "Strict mode should fail on missing timestamps"
+    );
+    assert!(stdout.contains("\"msg\":\"a\""));
+    assert!(stdout.contains("\"msg\":\"b\""));
+    assert!(
+        stderr.contains("--merge-ts requires a timestamp for every event"),
+        "Expected strict-mode failure to mention missing timestamp, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_merge_ts_warns_on_disordered_events_in_resilient_mode() {
+    let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
+    let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
+
+    temp_file1
+        .write_all(
+            b"{\"ts\":\"2025-01-01T00:00:04Z\",\"msg\":\"d\"}\n{\"ts\":\"2025-01-01T00:00:01Z\",\"msg\":\"a\"}\n",
+        )
+        .expect("Failed to write to temp file");
+    temp_file2
+        .write_all(
+            b"{\"ts\":\"2025-01-01T00:00:02Z\",\"msg\":\"b\"}\n{\"ts\":\"2025-01-01T00:00:03Z\",\"msg\":\"c\"}\n",
+        )
+        .expect("Failed to write to temp file");
+
+    let (stdout, stderr, exit_code) = run_kelora_with_files(
+        &["-f", "json", "-F", "json", "--merge-ts"],
+        &[
+            temp_file1.path().to_str().unwrap(),
+            temp_file2.path().to_str().unwrap(),
+        ],
+    );
+
+    assert_ne!(
+        exit_code, 0,
+        "Recoverable merge-ts errors should still produce a non-zero exit"
+    );
+    let messages: Vec<String> = stdout
+        .lines()
+        .map(|line| {
+            serde_json::from_str::<serde_json::Value>(line)
+                .expect("Output line should be JSON")
+                .get("msg")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect();
+    assert_eq!(messages, vec!["b", "c", "d", "a"]);
+    assert!(
+        stderr.contains("parse error"),
+        "Expected resilient-mode error summary, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_merge_ts_disordered_events_fail_in_strict_mode() {
+    let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
+    let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
+
+    temp_file1
+        .write_all(
+            b"{\"ts\":\"2025-01-01T00:00:04Z\",\"msg\":\"d\"}\n{\"ts\":\"2025-01-01T00:00:01Z\",\"msg\":\"a\"}\n",
+        )
+        .expect("Failed to write to temp file");
+    temp_file2
+        .write_all(
+            b"{\"ts\":\"2025-01-01T00:00:02Z\",\"msg\":\"b\"}\n{\"ts\":\"2025-01-01T00:00:03Z\",\"msg\":\"c\"}\n",
+        )
+        .expect("Failed to write to temp file");
+
+    let (stdout, stderr, exit_code) = run_kelora_with_files(
+        &["-f", "json", "-F", "json", "--merge-ts", "--strict"],
+        &[
+            temp_file1.path().to_str().unwrap(),
+            temp_file2.path().to_str().unwrap(),
+        ],
+    );
+
+    assert_ne!(exit_code, 0, "Strict mode should fail on disordered input");
+    assert!(stdout.contains("\"msg\":\"b\""));
+    assert!(stdout.contains("\"msg\":\"c\""));
+    assert!(stdout.contains("\"msg\":\"d\""));
+    assert!(!stdout.contains("\"msg\":\"a\""));
+    assert!(
+        stderr.contains("is not sorted at line"),
+        "Expected strict-mode failure to mention disordered input, got: {}",
+        stderr
+    );
 }

@@ -193,6 +193,10 @@ Do **not** expect `--merge-ts` to repair disorder within a file. If one file
 contains `10:04` followed later by `10:01`, Kelora will only discover `10:01`
 after `10:04` has already been emitted.
 
+In resilient mode, events without a usable timestamp are skipped and per-file
+disorder is tolerated, but the run still exits non-zero because input errors
+occurred. With `--strict`, either condition becomes a fatal error immediately.
+
 ```bash
 kelora -j api-1.jsonl api-2.jsonl api-3.jsonl --merge-ts -J
 ```

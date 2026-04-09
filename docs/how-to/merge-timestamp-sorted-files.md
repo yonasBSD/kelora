@@ -102,6 +102,8 @@ Poor fits:
 - `--merge-ts` is incompatible with `--parallel`
 - Auto-detection must resolve to a concrete format before merging
 - If one file is internally out of order, the final output may also be out of order
+- Events without usable timestamps are skipped in resilient mode and fail immediately with `--strict`
+- Resilient mode still exits non-zero when merge input errors occur; it is best-effort, not fully successful
 
 When you suspect disorder inside a file, inspect a sample first:
 

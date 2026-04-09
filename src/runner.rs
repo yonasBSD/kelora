@@ -28,9 +28,9 @@ use crate::readers;
 use crate::rhai_functions::file_ops::{self, FileOpMode};
 use crate::rhai_functions::tracking::{self, TrackingSnapshot};
 use crate::stats::{
-    get_thread_stats, set_collect_stats, stats_add_error, stats_add_line_filtered,
-    stats_add_line_output, stats_add_line_read, stats_finish_processing, stats_start_timer,
-    ProcessingStats,
+    get_thread_stats, set_collect_stats, stats_add_error, stats_add_line_error,
+    stats_add_line_filtered, stats_add_line_output, stats_add_line_read, stats_finish_processing,
+    stats_start_timer, ProcessingStats,
 };
 use crate::{rhai_functions, stats};
 
@@ -301,10 +301,19 @@ enum MergeTimestampParser {
     Generic(Box<dyn pipeline::EventParser>),
 }
 
+enum MergeTimestampResult {
+    SkipLine,
+    MissingTimestamp,
+    Timestamp(chrono::DateTime<chrono::Utc>),
+}
+
 enum ReaderMessage {
     Line {
         line: String,
         filename: Option<String>,
+    },
+    RecoverableError {
+        message: String,
     },
     Error {
         error: io::Error,
@@ -708,7 +717,7 @@ fn parse_merge_timestamp(
     parser: &mut MergeTimestampParser,
     line: &str,
     ts_config: &crate::timestamp::TsConfig,
-) -> Result<Option<chrono::DateTime<chrono::Utc>>> {
+) -> Result<MergeTimestampResult> {
     let mut event = match parser {
         MergeTimestampParser::Generic(parser) => parser.parse(line)?,
     };
@@ -719,13 +728,22 @@ fn parse_merge_timestamp(
         .and_then(|v| v.clone().try_cast::<bool>())
         .unwrap_or(false)
     {
-        return Ok(None);
+        return Ok(MergeTimestampResult::SkipLine);
     }
 
     // Force timestamp extraction with merge-time configuration.
     event.parsed_ts = None;
     event.extract_timestamp_with_config(None, ts_config);
-    Ok(event.parsed_ts)
+    match event.parsed_ts {
+        Some(timestamp) => Ok(MergeTimestampResult::Timestamp(timestamp)),
+        None => Ok(MergeTimestampResult::MissingTimestamp),
+    }
+}
+
+fn emit_merge_recoverable_error(sender: &Sender<ReaderMessage>, message: String) -> bool {
+    sender
+        .send(ReaderMessage::RecoverableError { message })
+        .is_ok()
 }
 
 fn spawn_merged_file_reader(
@@ -753,6 +771,8 @@ fn spawn_merged_file_reader(
         }
 
         let mut heap: BinaryHeap<Reverse<(MergeKey, MergeState)>> = BinaryHeap::new();
+        let mut previous_timestamps: Vec<Option<chrono::DateTime<chrono::Utc>>> =
+            vec![None; readers.len()];
         let ts_config = crate::timestamp::TsConfig {
             custom_field: Some(reader.ts_field.clone()),
             custom_format: reader.ts_format.clone(),
@@ -770,19 +790,44 @@ fn spawn_merged_file_reader(
                 *line_number += 1;
                 let line = line.trim_end_matches(&['\n', '\r'][..]).to_string();
                 let parse_line = preprocess_merge_line(&line, extract_prefix, &reader.prefix_sep);
-                match parse_merge_timestamp(parser, &parse_line, &ts_config)? {
-                    Some(timestamp) => {
+                match parse_merge_timestamp(parser, &parse_line, &ts_config) {
+                    Ok(MergeTimestampResult::Timestamp(timestamp)) => {
                         let key = MergeKey {
                             timestamp,
                             file_index,
                             line_number: *line_number,
                         };
                         let state = MergeState { file_index, line };
+                        previous_timestamps[file_index] = Some(timestamp);
                         heap.push(Reverse((key, state)));
                         break;
                     }
-                    None => {
+                    Ok(MergeTimestampResult::SkipLine) => {
                         // Header/skip line for this format; continue scanning.
+                        continue;
+                    }
+                    Ok(MergeTimestampResult::MissingTimestamp) => {
+                        if !emit_merge_recoverable_error(
+                            &sender,
+                            format!(
+                                "--merge-ts requires a timestamp for every event in '{}' at line {}",
+                                reader.files[file_index], *line_number
+                            ),
+                        ) {
+                            return Ok(());
+                        }
+                        continue;
+                    }
+                    Err(e) => {
+                        if !emit_merge_recoverable_error(
+                            &sender,
+                            format!(
+                                "failed to parse line for --merge-ts in '{}' at line {}: {}",
+                                reader.files[file_index], *line_number, e
+                            ),
+                        ) {
+                            return Ok(());
+                        }
                         continue;
                     }
                 }
@@ -824,10 +869,21 @@ fn spawn_merged_file_reader(
                 let next_line = next_line.trim_end_matches(&['\n', '\r'][..]).to_string();
                 let parse_line =
                     preprocess_merge_line(&next_line, extract_prefix, &reader.prefix_sep);
-                match parse_merge_timestamp(parser, &parse_line, &ts_config).map_err(|e| {
-                    anyhow::anyhow!("failed to parse timestamp in '{}': {}", filename, e)
-                })? {
-                    Some(timestamp) => {
+                match parse_merge_timestamp(parser, &parse_line, &ts_config) {
+                    Ok(MergeTimestampResult::Timestamp(timestamp)) => {
+                        if let Some(previous) = previous_timestamps[state.file_index] {
+                            if timestamp < previous
+                                && !emit_merge_recoverable_error(
+                                    &sender,
+                                    format!(
+                                        "input for '{}' is not sorted at line {}: {} < previous {}",
+                                        filename, *line_number, timestamp, previous
+                                    ),
+                                )
+                            {
+                                return Ok(());
+                            }
+                        }
                         let key = MergeKey {
                             timestamp,
                             file_index: state.file_index,
@@ -837,10 +893,35 @@ fn spawn_merged_file_reader(
                             file_index: state.file_index,
                             line: next_line,
                         };
+                        previous_timestamps[state.file_index] = Some(timestamp);
                         heap.push(Reverse((key, next_state)));
                         break;
                     }
-                    None => continue,
+                    Ok(MergeTimestampResult::SkipLine) => continue,
+                    Ok(MergeTimestampResult::MissingTimestamp) => {
+                        if !emit_merge_recoverable_error(
+                            &sender,
+                            format!(
+                                "--merge-ts requires a timestamp for every event in '{}' at line {}",
+                                filename, *line_number
+                            ),
+                        ) {
+                            return Ok(());
+                        }
+                        continue;
+                    }
+                    Err(e) => {
+                        if !emit_merge_recoverable_error(
+                            &sender,
+                            format!(
+                                "failed to parse line for --merge-ts in '{}' at line {}: {}",
+                                filename, *line_number, e
+                            ),
+                        ) {
+                            return Ok(());
+                        }
+                        continue;
+                    }
                 }
             }
         }
@@ -1172,6 +1253,14 @@ fn handle_reader_message<W: Write>(
             )? {
                 ProcessingResult::Continue => Ok(false),
                 ProcessingResult::TakeLimitExhausted | ProcessingResult::Stop => Ok(true),
+            }
+        }
+        ReaderMessage::RecoverableError { message } => {
+            stats_add_line_error();
+            if config.processing.strict {
+                Err(anyhow::anyhow!(message))
+            } else {
+                Ok(false)
             }
         }
         ReaderMessage::Eof => Ok(true),
