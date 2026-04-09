@@ -547,3 +547,42 @@ fn test_merge_ts_rejects_csv_for_now() {
         "No events should be emitted for unsupported format"
     );
 }
+
+#[test]
+fn test_merge_ts_assumes_each_file_is_already_sorted() {
+    let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
+    let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
+
+    temp_file1
+        .write_all(
+            b"{\"ts\":\"2025-01-01T00:00:04Z\",\"msg\":\"d\"}\n{\"ts\":\"2025-01-01T00:00:01Z\",\"msg\":\"a\"}\n",
+        )
+        .expect("Failed to write to temp file");
+    temp_file2
+        .write_all(
+            b"{\"ts\":\"2025-01-01T00:00:02Z\",\"msg\":\"b\"}\n{\"ts\":\"2025-01-01T00:00:03Z\",\"msg\":\"c\"}\n",
+        )
+        .expect("Failed to write to temp file");
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_files(
+        &["-f", "json", "-F", "json", "--merge-ts"],
+        &[
+            temp_file1.path().to_str().unwrap(),
+            temp_file2.path().to_str().unwrap(),
+        ],
+    );
+
+    assert_eq!(exit_code, 0, "Should merge files successfully");
+    let messages: Vec<String> = stdout
+        .lines()
+        .map(|line| {
+            serde_json::from_str::<serde_json::Value>(line)
+                .expect("Output line should be JSON")
+                .get("msg")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect();
+    assert_eq!(messages, vec!["b", "c", "d", "a"]);
+}

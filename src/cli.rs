@@ -136,7 +136,7 @@ pub struct Cli {
     )]
     pub file_order: FileOrder,
 
-    /// Merge events from multiple input files by timestamp (chronological order).
+    /// Merge timestamp-sorted input files by timestamp; each file must already be in chronological order.
     #[arg(long = "merge-ts", help_heading = "Input Options")]
     pub merge_ts: bool,
 
