@@ -196,6 +196,8 @@ after `10:04` has already been emitted.
 In resilient mode, events without a usable timestamp are skipped and per-file
 disorder is tolerated, but the run still exits non-zero because input errors
 occurred. With `--strict`, either condition becomes a fatal error immediately.
+If your timestamps live in a non-standard field, specify it explicitly with
+`--ts-field <field>`.
 
 ```bash
 kelora -j api-1.jsonl api-2.jsonl api-3.jsonl --merge-ts -J

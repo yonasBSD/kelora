@@ -280,7 +280,7 @@ struct MergedFileReader {
     cols_sep: Option<String>,
     extract_prefix: Option<String>,
     prefix_sep: String,
-    ts_field: String,
+    ts_field: Option<String>,
     ts_format: Option<String>,
     default_timezone: Option<String>,
 }
@@ -351,11 +351,7 @@ fn run_pipeline_sequential<W: Write>(
                 cols_sep: config.input.cols_sep.clone(),
                 extract_prefix: config.input.extract_prefix.clone(),
                 prefix_sep: config.input.prefix_sep.clone(),
-                ts_field: config
-                    .input
-                    .ts_field
-                    .clone()
-                    .unwrap_or_else(|| "ts".to_string()),
+                ts_field: config.input.ts_field.clone(),
                 ts_format: config.input.ts_format.clone(),
                 default_timezone: config.input.default_timezone.clone(),
             })
@@ -506,11 +502,7 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
                 cols_sep: final_config.input.cols_sep.clone(),
                 extract_prefix: final_config.input.extract_prefix.clone(),
                 prefix_sep: final_config.input.prefix_sep.clone(),
-                ts_field: final_config
-                    .input
-                    .ts_field
-                    .clone()
-                    .unwrap_or_else(|| "ts".to_string()),
+                ts_field: final_config.input.ts_field.clone(),
                 ts_format: final_config.input.ts_format.clone(),
                 default_timezone: final_config.input.default_timezone.clone(),
             })
@@ -775,7 +767,7 @@ fn spawn_merged_file_reader(
         let mut previous_timestamps: Vec<Option<chrono::DateTime<chrono::Utc>>> =
             vec![None; readers.len()];
         let ts_config = crate::timestamp::TsConfig {
-            custom_field: Some(reader.ts_field.clone()),
+            custom_field: reader.ts_field.clone(),
             custom_format: reader.ts_format.clone(),
             default_timezone: reader.default_timezone.clone(),
         };
@@ -811,7 +803,7 @@ fn spawn_merged_file_reader(
                         if !emit_merge_recoverable_error(
                             &sender,
                             format!(
-                                "--merge-ts requires a timestamp for every event in '{}' at line {}",
+                                "--merge-ts requires a timestamp for every event in '{}' at line {}. Hint: Specify --ts-field <field> if your timestamps use a non-default field name.",
                                 reader.files[file_index], *line_number
                             ),
                         ) {
@@ -903,7 +895,7 @@ fn spawn_merged_file_reader(
                         if !emit_merge_recoverable_error(
                             &sender,
                             format!(
-                                "--merge-ts requires a timestamp for every event in '{}' at line {}",
+                                "--merge-ts requires a timestamp for every event in '{}' at line {}. Hint: Specify --ts-field <field> if your timestamps use a non-default field name.",
                                 filename, *line_number
                             ),
                         ) {

@@ -78,7 +78,9 @@ operations work, a streaming merge is usually the better tradeoff.
 
 ## Recommended Usage Pattern
 
-Be explicit about the parser so Kelora can extract timestamps predictably:
+Be explicit about the parser so Kelora can extract timestamps predictably.
+Kelora auto-detects common timestamp field names such as `timestamp` and `ts`;
+add `--ts-field <field>` only when your data uses a different key:
 
 ```bash
 kelora -j shard-*.jsonl --merge-ts -J
@@ -102,7 +104,7 @@ Poor fits:
 - `--merge-ts` is incompatible with `--parallel`
 - Auto-detection must resolve to a concrete format before merging
 - If one file is internally out of order, the final output may also be out of order
-- Events without usable timestamps are skipped in resilient mode and fail immediately with `--strict`
+- Events without usable timestamps are skipped in resilient mode and fail immediately with `--strict`; use `--ts-field <field>` when the timestamp is stored under a non-default key
 - Resilient mode still exits non-zero when merge input errors occur; it is best-effort, not fully successful
 
 When you suspect disorder inside a file, inspect a sample first:

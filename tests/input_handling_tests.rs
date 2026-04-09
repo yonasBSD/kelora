@@ -475,6 +475,45 @@ fn test_merge_ts_merges_files_chronologically() {
 }
 
 #[test]
+fn test_merge_ts_auto_detects_standard_timestamp_field_names() {
+    let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
+    let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
+
+    temp_file1
+        .write_all(
+            b"{\"timestamp\":\"2025-01-01T00:00:02Z\",\"msg\":\"b\"}\n{\"timestamp\":\"2025-01-01T00:00:04Z\",\"msg\":\"d\"}\n",
+        )
+        .expect("Failed to write to temp file");
+    temp_file2
+        .write_all(
+            b"{\"timestamp\":\"2025-01-01T00:00:01Z\",\"msg\":\"a\"}\n{\"timestamp\":\"2025-01-01T00:00:03Z\",\"msg\":\"c\"}\n",
+        )
+        .expect("Failed to write to temp file");
+
+    let (stdout, _stderr, exit_code) = run_kelora_with_files(
+        &["-f", "json", "-F", "json", "--merge-ts"],
+        &[
+            temp_file1.path().to_str().unwrap(),
+            temp_file2.path().to_str().unwrap(),
+        ],
+    );
+
+    assert_eq!(exit_code, 0, "Should merge files successfully");
+    let messages: Vec<String> = stdout
+        .lines()
+        .map(|line| {
+            serde_json::from_str::<serde_json::Value>(line)
+                .expect("Output line should be JSON")
+                .get("msg")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect();
+    assert_eq!(messages, vec!["a", "b", "c", "d"]);
+}
+
+#[test]
 fn test_merge_ts_rejects_parallel_mode() {
     let (stdout, stderr, exit_code) = run_kelora(&["-f", "json", "--parallel", "--merge-ts"]);
     assert_ne!(exit_code, 0, "Expected validation error");
@@ -668,6 +707,11 @@ fn test_merge_ts_missing_timestamps_fail_in_strict_mode() {
     assert!(
         stderr.contains("--merge-ts requires a timestamp for every event"),
         "Expected strict-mode failure to mention missing timestamp, got: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("--ts-field"),
+        "Expected strict-mode failure to suggest --ts-field override, got: {}",
         stderr
     );
 }
