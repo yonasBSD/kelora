@@ -353,6 +353,32 @@ The following names cannot be used: `original_line`, `parsed_ts`, `fields`
 - Detects once, applies to all lines
 - Not suitable for mixed-format files — use **cascade mode** instead
 
+### Auto-Detection Per File
+
+**Syntax:** `-f auto-per-file`
+
+**Description:** Automatically detect format from the first non-empty line of
+each input file, then apply that parser to the rest of the file.
+
+**Good fit:** Batch runs where each file is internally consistent, but
+different files use different formats.
+
+**Example Usage:**
+```bash
+# JSON app logs and logfmt worker logs in one invocation
+kelora -f auto-per-file -J logs/api/*.log logs/workers/*.log
+
+# Aggregate error events across mixed file formats without splitting first
+kelora -f auto-per-file --levels error,warn logs/**/* -J
+```
+
+**Notes:**
+
+- Detects once per file
+- Uses the same first-non-empty-line semantics as `-f auto`
+- For mixed formats within a single file, use **cascade mode** instead
+- Not supported with `--parallel` or `--merge-ts`
+
 ### Cascade Mode
 
 **Syntax:** `-f <fmt1>,<fmt2>[,…]` (comma-separated list of simple formats)
