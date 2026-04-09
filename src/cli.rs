@@ -112,7 +112,7 @@ pub struct Cli {
 
     /// Input format. Available formats: auto (default), json, line, raw, logfmt, syslog, cef, csv, tsv, csvnh, tsvnh, combined, cols:<spec>, regex:<pattern>.
     /// Use cols:<spec> for column parsing, regex:<pattern> for regex parsing with named groups, and csv/tsv with optional type annotations.
-    /// Cascade mode: pass a comma-separated list (e.g. 'json,line') to try each parser in order; adds an '_format' field to each event.
+    /// Cascade mode: pass a comma-separated list (e.g. 'json,logfmt,line') to try each parser in order; the first success wins, so put 'line' last as a fallback. Adds an '_format' field to each event.
     /// Examples: -f json, -f json,line, -f 'regex:(?P<code:int>\\d+) (?P<msg>.*)', -f 'cols:ts level *msg', -f 'csv status:int bytes:int'
     #[arg(
         short = 'f',

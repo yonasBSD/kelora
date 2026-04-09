@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Cascade format mode** - Added cascade parsing mode for mixed-format streams.
 - **Chronological merge for sorted files** - Added `--merge-ts` to merge multiple timestamp-sorted inputs into one chronological stream with a memory-bounded k-way merge. This is intended for already-sorted files, requires a concrete input format, works beyond JSON, and reports missing timestamps, parse failures, and per-file disorder clearly.
 - **New Rhai output helpers** - Added `human_bytes`, `human_bytes_si`, `format_decimals`, and `format_percent`.
-- **New Rhai text formatting helpers** - Added Unicode-width-aware `pad_left`, `pad_right`, and `shorten`.
+- **New Rhai text formatting helpers** - Added Unicode-width-aware `ljust`, `rjust`, `center`, and `shorten` string helpers.
 - **New Rhai ANSI styling helpers** - Added `red`, `green`, `yellow`, `blue`, `cyan`, `magenta`, `bold`, and `dim`.
 - **New Rhai chart helpers** - Added `bar` and `sparkline` helpers for end-of-stream metrics output.
 - **New Rhai projection helpers** - Added `map.keep()` and `map.drop()` for event field projection.

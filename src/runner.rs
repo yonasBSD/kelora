@@ -29,8 +29,9 @@ use crate::rhai_functions::file_ops::{self, FileOpMode};
 use crate::rhai_functions::tracking::{self, TrackingSnapshot};
 use crate::stats::{
     get_thread_stats, set_collect_stats, stats_add_error, stats_add_line_error,
-    stats_add_line_filtered, stats_add_line_output, stats_add_line_read, stats_finish_processing,
-    stats_start_timer, ProcessingStats,
+    stats_add_line_filtered, stats_add_line_output, stats_add_line_read,
+    stats_add_recoverable_error_sample, stats_finish_processing, stats_start_timer,
+    ProcessingStats,
 };
 use crate::{rhai_functions, stats};
 
@@ -1257,6 +1258,7 @@ fn handle_reader_message<W: Write>(
         }
         ReaderMessage::RecoverableError { message } => {
             stats_add_line_error();
+            stats_add_recoverable_error_sample(&message);
             if config.processing.strict {
                 Err(anyhow::anyhow!(message))
             } else {

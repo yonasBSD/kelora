@@ -1369,6 +1369,8 @@ Color and style helpers are chainable — they compose by stacking SGR codes:
 #### `bar(value, max, width)`
 Render a fixed-width Unicode bar showing `value / max`.
 
+This is the primary form and the one to prefer in examples and scripts.
+
 - Uses eighth-block characters for sub-cell resolution
 - Clamps values outside `0..max`
 - Returns spaces when `max <= 0`
@@ -1380,6 +1382,11 @@ bar(3, 8, 4)                                          // "█▌  "
 
 #### `bar(ratio, width)`
 Render a bar from a pre-normalized ratio in `0..1`.
+
+This is the convenience form when you already have a ratio.
+
+There is no two-argument `bar(value, max)` form. Use `bar(value, max, width)`
+or `bar(ratio, width)`.
 
 ```rhai
 bar(0.42, 10)                                         // "████▏     "

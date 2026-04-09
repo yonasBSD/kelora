@@ -27,6 +27,7 @@ pub struct ProcessingStats {
     pub files_processed: usize,
     pub files_failed_to_open: usize, // Files that failed to open (I/O errors)
     pub failed_file_samples: Vec<String>,
+    pub recoverable_error_samples: Vec<String>,
     pub script_executions: usize,
     pub errors: usize, // Kept for backward compatibility, but lines_errors is more specific
     pub processing_time: Duration,
@@ -63,6 +64,8 @@ static COLLECT_STATS: AtomicBool = AtomicBool::new(true);
 static FILES_FAILED_TO_OPEN: AtomicUsize = AtomicUsize::new(0);
 static FAILED_FILE_SAMPLES: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
 const MAX_FAILED_FILE_SAMPLES: usize = 3;
+static RECOVERABLE_ERROR_SAMPLES: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
+const MAX_RECOVERABLE_ERROR_SAMPLES: usize = 3;
 
 pub fn set_collect_stats(enabled: bool) {
     COLLECT_STATS.store(enabled, Ordering::Relaxed);
@@ -83,6 +86,22 @@ fn push_failed_file_sample(path: &str) {
 
 fn failed_file_samples() -> Vec<String> {
     FAILED_FILE_SAMPLES
+        .get()
+        .and_then(|samples| samples.lock().ok().map(|v| v.clone()))
+        .unwrap_or_default()
+}
+
+fn push_recoverable_error_sample(message: &str) {
+    let samples = RECOVERABLE_ERROR_SAMPLES.get_or_init(|| Mutex::new(Vec::new()));
+    if let Ok(mut list) = samples.lock() {
+        if list.len() < MAX_RECOVERABLE_ERROR_SAMPLES && !list.iter().any(|m| m == message) {
+            list.push(message.to_string());
+        }
+    }
+}
+
+fn recoverable_error_samples() -> Vec<String> {
+    RECOVERABLE_ERROR_SAMPLES
         .get()
         .and_then(|samples| samples.lock().ok().map(|v| v.clone()))
         .unwrap_or_default()
@@ -223,6 +242,13 @@ pub fn stats_add_line_error() {
     });
 }
 
+pub fn stats_add_recoverable_error_sample(message: &str) {
+    if !stats_enabled() {
+        return;
+    }
+    push_recoverable_error_sample(message);
+}
+
 pub fn stats_add_assertion_failure(expression: &str) {
     if !stats_enabled() {
         return;
@@ -268,6 +294,7 @@ pub fn get_thread_stats() -> ProcessingStats {
         // Merge in atomic counter for file failures (can happen on any thread)
         s.files_failed_to_open = FILES_FAILED_TO_OPEN.load(Ordering::Relaxed);
         s.failed_file_samples = failed_file_samples();
+        s.recoverable_error_samples = recoverable_error_samples();
         s
     })
 }
@@ -811,11 +838,15 @@ impl ProcessingStats {
 
         // Show parse errors
         if self.lines_errors > 0 {
-            parts.push(format!(
+            let mut message = format!(
                 "{} parse error{}",
                 self.lines_errors,
                 if self.lines_errors == 1 { "" } else { "s" }
-            ));
+            );
+            if let Some(sample) = self.recoverable_error_samples.first() {
+                message.push_str(&format!(" (first: {})", sample));
+            }
+            parts.push(message);
         }
 
         // Show events filtered (could indicate filter errors converted to false)
@@ -906,6 +937,16 @@ mod tests {
         THREAD_STATS.with(|stats| {
             *stats.borrow_mut() = ProcessingStats::new();
         });
+        FILES_FAILED_TO_OPEN.store(0, Ordering::Relaxed);
+        if let Some(samples) = FAILED_FILE_SAMPLES.get() {
+            samples.lock().expect("failed file sample lock").clear();
+        }
+        if let Some(samples) = RECOVERABLE_ERROR_SAMPLES.get() {
+            samples
+                .lock()
+                .expect("recoverable error sample lock")
+                .clear();
+        }
     }
 
     #[test]
@@ -974,5 +1015,21 @@ mod tests {
             .expect("field stats");
         assert_eq!(field_stats.detected, 2);
         assert_eq!(field_stats.parsed, 1);
+    }
+
+    #[test]
+    fn error_summary_includes_first_recoverable_error_sample() {
+        reset_thread_stats();
+
+        stats_add_line_error();
+        stats_add_recoverable_error_sample(
+            "input for 'api.log' is not sorted at line 42: 2026-04-09T10:01:00Z < previous 2026-04-09T10:04:00Z",
+        );
+
+        let summary = get_thread_stats().format_error_summary();
+
+        assert!(summary.contains("1 parse error"));
+        assert!(summary.contains("api.log"));
+        assert!(summary.contains("not sorted at line 42"));
     }
 }
