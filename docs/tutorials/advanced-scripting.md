@@ -237,6 +237,7 @@ reuses it across multiple commands.
 
     kelora -j examples/errors_exec_transform.jsonl \
       -I classifiers.rhai \
+      --filter 'classify_status(e.status) != "ok"' \
       -e 'e.severity = classify_status(e.status)' \
       -k timestamp,status,severity \
       -J -n 3
@@ -263,6 +264,7 @@ reuses it across multiple commands.
 
     kelora -j examples/errors_exec_transform.jsonl \
       -I classifiers.rhai \
+      --filter 'classify_status(e.status) != "ok"' \
       -e 'e.severity = classify_status(e.status)' \
       -k timestamp,status,severity \
       -J -n 3
@@ -277,6 +279,9 @@ kelora -j app.jsonl --exec-file transforms.rhai
 
 Put shared helpers under `scripts/` or `dev/` and version them alongside your
 pipeline definitions.
+
+When you use `--include` with `--filter`, keep the included file limited to
+function definitions. Top-level statements are rejected in filter-stage includes.
 
 ## Step 7 – Understand Error Handling Semantics
 

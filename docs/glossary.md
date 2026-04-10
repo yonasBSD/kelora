@@ -88,7 +88,7 @@ A probabilistic data structure for estimating the cardinality (unique count) of 
 ## L
 
 ### Level
-The severity or importance of a log event. Common levels: DEBUG, INFO, WARN, ERROR, CRITICAL. Can be filtered with `-l` (include) or `-L` (exclude). Case-insensitive. See [Basics Tutorial](tutorials/basics.md#part-5-level-filtering-l-l).
+The severity or importance of a log event. Common levels: DEBUG, INFO, WARN, ERROR, CRITICAL. Can be filtered with `-l` (include) or `-L` (exclude). Case-insensitive. See [Basics Tutorial](tutorials/basics.md#level-filtering).
 
 ### Line-Level Processing
 Operations performed on raw string lines before parsing into events. Includes line filtering (`--ignore-lines`, `--keep-lines`), line skipping (`--skip-lines`), and multiline aggregation. See [Processing Architecture](concepts/pipeline-model.md#layer-2-line-level-processing).

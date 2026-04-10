@@ -29,7 +29,7 @@ Use the `pseudonym()` function to create consistent tokens per domain.
 kelora -j examples/security_audit.jsonl \
   -e 'e.user_id = pseudonym(e.user_email, "users")' \
   -e 'e.session_id = pseudonym(e.session_token, "sessions")' \
-  -e 'e.user_email = (); e.session_token = ()' \
+  -e 'e = e.drop(["user_email", "session_token"])' \
   -F json
 ```
 

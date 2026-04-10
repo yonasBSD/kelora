@@ -485,9 +485,20 @@ This progressive refinement lets you work with smaller datasets at each stage.
 
 **Scenario**: Logs contain both structured JSON and unstructured text. Extract errors from both.
 
-### Approach 1: Process Each Format Separately
+### Approach 1: Use Cascade Mode
 
-For best results with mixed formats, use preprocessing:
+For line-by-line mixed streams, cascade mode is the simplest approach:
+
+```bash
+# Parse JSON when possible, fall back to plain text
+kelora -f json,line examples/mixed_format.log \
+  --filter '(e._format == "json" && e.level == "ERROR") || (e._format == "line" && e.line.contains("ERROR"))' \
+  -k _format,timestamp,message,line
+```
+
+### Approach 2: Process Each Format Separately
+
+If the split logic is more irregular than a simple parser cascade, preprocess upstream:
 
 ```bash
 # Extract and analyze JSON errors
@@ -499,33 +510,9 @@ grep -v '^{' examples/mixed_format.log | \
   kelora -f line --filter 'e.line.contains("ERROR")' -k line
 ```
 
-### Approach 2: Fallback Parsing
-
-Handle as line format and parse JSON where possible:
-
-```bash
-kelora examples/mixed_format.log \
-  -f line \
-  --exec '
-    // Try to parse as JSON
-    if e.line.starts_with("{") {
-      let parsed = e.line.parse_json();
-      if parsed != () {
-        e.level = parsed.get_path("level", "UNKNOWN");
-        e.message = parsed.get_path("message", "");
-      }
-    } else {
-      // Plain text - extract level
-      if e.line.contains("ERROR") {
-        e.level = "ERROR";
-      }
-    }
-  ' \
-  --filter 'e.get_path("level") == "ERROR"' \
-  -k line_num,level,message
-```
-
-**Best practice:** Separate formats upstream with `grep` for best performance and accuracy.
+**Best practice:** Use cascade mode first for standard mixed streams. Fall back to
+preprocessing when the file needs custom routing rules that parser selection
+alone cannot express.
 
 ---
 

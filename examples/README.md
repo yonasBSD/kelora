@@ -21,6 +21,10 @@ kelora examples/web_access.log --filter 'e.status >= 400'
 # Using Rhai helper functions for enrichment
 kelora --include examples/helpers.rhai examples/api_logs.jsonl \
   --exec 'e.severity = classify_severity(e.level, e.get_path("response_time", 0.0))'
+
+# Reuse included helpers directly from --filter
+kelora --include examples/helpers.rhai examples/api_logs.jsonl \
+  --filter 'is_problem(e)'
 ```
 
 Then run `kelora --help-examples` for common patterns and usage recipes.
@@ -285,7 +289,7 @@ Semantic field resolution for cross-format log analysis. Different log formats u
 ```bash
 # Filter slow requests regardless of field naming convention
 kelora --include examples/resolve_fields.rhai -f json logs.jsonl \
-  --exec 'if resolve_duration(e) > 1000 { e } else { () }'
+  --filter 'resolve_duration(e) > 1000'
 
 # Aggregate by user across mixed log sources
 kelora --include examples/resolve_fields.rhai -f json *.jsonl \

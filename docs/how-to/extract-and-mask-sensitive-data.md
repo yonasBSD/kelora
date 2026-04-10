@@ -26,15 +26,15 @@ Remove fields you definitely do not need, or rebuild each event with only the es
 
 ```bash
 kelora -j examples/security_audit.jsonl \
-  -e 'e.password = (); e.token = (); e.session = ()' \
-  -e 'let keep = #{timestamp: e.timestamp, service: e.service, message: e.message}; e = keep' \
+  -e 'e = e.drop(["password", "token", "session"])' \
+  -e 'e = e.keep(["timestamp", "service", "message"])' \
   -F json
 ```
 
 Tips:
 
-- Assigning `()` deletes a field.
-- Rebuilding the event (as above) ensures no unexpected data leaks.
+- `drop([...])` removes a batch of known-sensitive fields.
+- `keep([...])` whitelists the final output shape so unexpected fields do not leak through.
 - `--exclude-keys field1,field2` works when the data is already flat.
 
 ## Step 3: Mask Direct Identifiers
