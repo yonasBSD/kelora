@@ -146,8 +146,10 @@ pub struct FieldProfile {
     pub type_counts: HashMap<FieldType, usize>,
     /// Cardinality tracker (skipped for map/array types).
     cardinality: CardinalityTracker,
-    /// Reservoir sample of distinct values (display strings).
-    pub samples: Vec<std::string::String>,
+    /// Reservoir sample of distinct values as JSON-compatible scalars.
+    pub samples: Vec<serde_json::Value>,
+    /// Human-readable rendering of `samples`, kept in lockstep for reports.
+    pub samples_display: Vec<std::string::String>,
     /// Hashes of values currently present in `samples` plus deduplication history.
     /// Capped at `MAX_DEDUP_TRACKING` to bound memory.
     sample_hashes: HashSet<u64>,
@@ -166,6 +168,7 @@ impl FieldProfile {
             type_counts: HashMap::new(),
             cardinality: CardinalityTracker::new(),
             samples: Vec::new(),
+            samples_display: Vec::new(),
             sample_hashes: HashSet::new(),
             distinct_samples_seen: 0,
             array_size_range: None,
@@ -205,10 +208,11 @@ impl FieldProfile {
             _ => {
                 // Scalar: track cardinality and samples
                 let display = scalar_display(value);
+                let sample_value = scalar_to_json(value);
                 let hash = hash_value(&ft, &display);
 
                 self.cardinality.insert(hash);
-                self.add_sample(hash, &display);
+                self.add_sample(hash, sample_value, &display);
             }
         }
     }
@@ -216,7 +220,7 @@ impl FieldProfile {
     /// Add a scalar value to the reservoir sample using Algorithm R.
     /// Distinct values are preferred: a bounded hash set deduplicates the
     /// first `MAX_DEDUP_TRACKING` distinct values seen.
-    fn add_sample(&mut self, hash: u64, display: &str) {
+    fn add_sample(&mut self, hash: u64, sample: serde_json::Value, display: &str) {
         if self.sample_hashes.len() < MAX_DEDUP_TRACKING {
             if !self.sample_hashes.insert(hash) {
                 return;
@@ -228,12 +232,14 @@ impl FieldProfile {
         self.distinct_samples_seen += 1;
 
         if self.samples.len() < MAX_SAMPLES {
-            self.samples.push(truncate_sample(display));
+            self.samples.push(sample);
+            self.samples_display.push(truncate_sample(display));
         } else {
             // Algorithm R: replace random slot with probability K/i.
             let idx = fastrand::usize(0..self.distinct_samples_seen);
             if idx < MAX_SAMPLES {
-                self.samples[idx] = truncate_sample(display);
+                self.samples[idx] = sample;
+                self.samples_display[idx] = truncate_sample(display);
             }
         }
     }
@@ -363,9 +369,7 @@ impl FieldDiscovery {
             .map(|(name, profile)| DiscoveryRow::from_profile(self.total_events, name, profile))
             .collect();
 
-        if let Some(widths) =
-            TableWidths::for_full_table(terminal_width, &rows)
-        {
+        if let Some(widths) = TableWidths::for_full_table(terminal_width, &rows) {
             output.push_str(&pad_right_display("Field", widths.name));
             output.push_str("  ");
             output.push_str(&pad_right_display("Type", widths.types));
@@ -390,16 +394,17 @@ impl FieldDiscovery {
                 output.push_str("  ");
                 output.push_str(&pad_left_display(&row.seen_count.to_string(), widths.seen));
                 output.push_str("  ");
-                output.push_str(&pad_left_display(&format!("{:.0}%", row.miss_pct), widths.miss));
+                output.push_str(&pad_left_display(
+                    &format!("{:.0}%", row.miss_pct),
+                    widths.miss,
+                ));
                 output.push_str("  ");
                 output.push_str(&pad_left_display(&row.unique, widths.unique));
                 output.push_str("  ");
                 output.push_str(&truncate_for_display(&row.examples, widths.examples));
                 output.push('\n');
             }
-        } else if let Some(widths) =
-            TableWidths::for_compact_table(terminal_width, &rows)
-        {
+        } else if let Some(widths) = TableWidths::for_compact_table(terminal_width, &rows) {
             output.push_str(&pad_right_display("Field", widths.name));
             output.push_str("  ");
             output.push_str(&pad_right_display("Type", widths.types));
@@ -424,7 +429,10 @@ impl FieldDiscovery {
                 output.push_str("  ");
                 output.push_str(&pad_left_display(&row.seen_count.to_string(), widths.seen));
                 output.push_str("  ");
-                output.push_str(&pad_left_display(&format!("{:.0}%", row.miss_pct), widths.miss));
+                output.push_str(&pad_left_display(
+                    &format!("{:.0}%", row.miss_pct),
+                    widths.miss,
+                ));
                 output.push_str("  ");
                 output.push_str(&pad_left_display(&row.unique, widths.unique));
                 output.push('\n');
@@ -444,9 +452,15 @@ impl FieldDiscovery {
                 }
                 output.push_str(&truncate_for_display(&row.name, terminal_width));
                 output.push('\n');
-                output.push_str(&format!("  seen: {}  miss: {:.0}%\n", row.seen_count, row.miss_pct));
+                output.push_str(&format!(
+                    "  seen: {}  miss: {:.0}%\n",
+                    row.seen_count, row.miss_pct
+                ));
                 output.push_str("  type: ");
-                output.push_str(&truncate_for_display(&row.types, terminal_width.saturating_sub(8)));
+                output.push_str(&truncate_for_display(
+                    &row.types,
+                    terminal_width.saturating_sub(8),
+                ));
                 output.push('\n');
                 output.push_str("  unique: ");
                 output.push_str(&truncate_for_display(
@@ -509,6 +523,7 @@ impl FieldDiscovery {
                     "exact": card_exact,
                 },
                 "samples": profile.samples,
+                "samples_display": profile.samples_display,
             });
 
             if let Some((lo, hi)) = profile.array_size_range {
@@ -597,11 +612,11 @@ fn format_cardinality(profile: &FieldProfile) -> std::string::String {
 
 /// Format the examples column.
 fn format_examples(profile: &FieldProfile) -> std::string::String {
-    if profile.samples.is_empty() {
+    if profile.samples_display.is_empty() {
         return std::string::String::new();
     }
 
-    let joined = profile.samples.join(", ");
+    let joined = profile.samples_display.join(", ");
     if joined.chars().count() > 60 {
         truncate_for_display(&joined, 60)
     } else {
@@ -637,6 +652,44 @@ fn scalar_display(value: &Dynamic) -> std::string::String {
         }
     }
     value.to_string()
+}
+
+/// Convert a scalar Dynamic into a JSON-compatible value for machine-readable
+/// discovery output. Non-JSON-native scalar types fall back to strings.
+fn scalar_to_json(value: &Dynamic) -> serde_json::Value {
+    if value.is_string() {
+        value
+            .clone()
+            .into_string()
+            .map(serde_json::Value::String)
+            .unwrap_or(serde_json::Value::Null)
+    } else if value.is_int() {
+        value
+            .as_int()
+            .map(|i| serde_json::Value::Number(serde_json::Number::from(i)))
+            .unwrap_or(serde_json::Value::Null)
+    } else if value.is_float() {
+        value
+            .as_float()
+            .ok()
+            .and_then(serde_json::Number::from_f64)
+            .map(serde_json::Value::Number)
+            .unwrap_or(serde_json::Value::Null)
+    } else if value.is_bool() {
+        value
+            .as_bool()
+            .map(serde_json::Value::Bool)
+            .unwrap_or(serde_json::Value::Null)
+    } else if value.is_char() {
+        value
+            .as_char()
+            .map(|c| serde_json::Value::String(c.to_string()))
+            .unwrap_or(serde_json::Value::Null)
+    } else if value.is_unit() {
+        serde_json::Value::Null
+    } else {
+        serde_json::Value::String(value.to_string())
+    }
 }
 
 /// Hash a value with a type prefix to avoid int/string conflation.
@@ -712,7 +765,8 @@ impl TableWidths {
         let min_types = 6;
         let min_examples = 8;
         let max_name = row_width(rows, |row| display_width(&row.name), "Field").clamp(min_name, 40);
-        let max_types = row_width(rows, |row| display_width(&row.types), "Type").clamp(min_types, 30);
+        let max_types =
+            row_width(rows, |row| display_width(&row.types), "Type").clamp(min_types, 30);
         let max_examples = row_width(rows, |row| display_width(&row.examples), "Examples");
         let available = terminal_width.checked_sub(seen + miss + unique + separators)?;
         if available < min_name + min_types + min_examples {
@@ -751,7 +805,8 @@ impl TableWidths {
         let min_name = 12;
         let min_types = 6;
         let max_name = row_width(rows, |row| display_width(&row.name), "Field").clamp(min_name, 40);
-        let max_types = row_width(rows, |row| display_width(&row.types), "Type").clamp(min_types, 30);
+        let max_types =
+            row_width(rows, |row| display_width(&row.types), "Type").clamp(min_types, 30);
         let available = terminal_width.checked_sub(seen + miss + unique + separators)?;
         if available < min_name + min_types {
             return None;
@@ -942,6 +997,7 @@ mod tests {
         assert!(exact);
         assert_eq!(card, 2); // "hello" and "world"
         assert_eq!(profile.samples.len(), 2);
+        assert_eq!(profile.samples_display.len(), 2);
     }
 
     #[test]
@@ -1122,6 +1178,8 @@ mod tests {
         assert_eq!(parsed["fields"][0]["name"], "level");
         assert_eq!(parsed["fields"][0]["seen"], 1);
         assert_eq!(parsed["fields"][0]["cardinality"]["exact"], true);
+        assert_eq!(parsed["fields"][0]["samples"][0], "INFO");
+        assert_eq!(parsed["fields"][0]["samples_display"][0], "INFO");
     }
 
     #[test]
@@ -1139,6 +1197,7 @@ mod tests {
             profile.observe(&make_string(&format!("value_{}", i)));
         }
         assert_eq!(profile.samples.len(), MAX_SAMPLES);
+        assert_eq!(profile.samples_display.len(), MAX_SAMPLES);
     }
 
     #[test]
@@ -1156,7 +1215,7 @@ mod tests {
                 profile.observe(&make_string(&format!("rare_{i}")));
             }
             total_rare_in_samples += profile
-                .samples
+                .samples_display
                 .iter()
                 .filter(|s| s.starts_with("rare_"))
                 .count();
