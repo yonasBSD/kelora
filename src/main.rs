@@ -96,7 +96,10 @@ fn main() -> Result<()> {
         Ok(cfg) => cfg,
         Err(e) => {
             stderr
-                .writeln(&config::format_error_message_auto(&format!("Error: {:#}", e)))
+                .writeln(&config::format_error_message_auto(&format!(
+                    "Error: {:#}",
+                    e
+                )))
                 .unwrap_or(());
             std::process::exit(ExitCode::InvalidUsage as i32);
         }
