@@ -75,7 +75,7 @@ fn main() -> Result<()> {
     // Validate CLI argument combinations
     if let Err(e) = validate_cli_args(&cli) {
         stderr
-            .writeln(&format!("kelora: Error: {}", e))
+            .writeln(&config::format_error_message_auto(&format!("Error: {}", e)))
             .unwrap_or(());
         ExitCode::InvalidUsage.exit();
     }
@@ -85,7 +85,7 @@ fn main() -> Result<()> {
         Ok(stages) => stages,
         Err(e) => {
             stderr
-                .writeln(&format!("kelora: Error: {}", e))
+                .writeln(&config::format_error_message_auto(&format!("Error: {}", e)))
                 .unwrap_or(());
             ExitCode::InvalidUsage.exit();
         }
@@ -95,7 +95,9 @@ fn main() -> Result<()> {
     let mut config = match KeloraConfig::from_cli(&cli) {
         Ok(cfg) => cfg,
         Err(e) => {
-            stderr.writeln(&format!("kelora: {:#}", e)).unwrap_or(());
+            stderr
+                .writeln(&config::format_error_message_auto(&format!("Error: {:#}", e)))
+                .unwrap_or(());
             std::process::exit(ExitCode::InvalidUsage as i32);
         }
     };

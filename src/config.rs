@@ -1302,9 +1302,8 @@ fn parse_cascade_spec(spec: &str) -> anyhow::Result<InputFormat> {
     for (idx, fmt) in formats.iter().enumerate() {
         if matches!(fmt, InputFormat::Line | InputFormat::Raw) && idx != formats.len() - 1 {
             return Err(anyhow::anyhow!(
-                "catch-all format '{}' must be last in cascade '{}'; later formats would never run",
-                fmt.cascade_name(),
-                spec
+                "'{}' must be the last format in a cascade list; later formats would never run",
+                fmt.cascade_name()
             ));
         }
     }
@@ -1775,7 +1774,7 @@ mod tests {
             .expect_err("line before the last position should be rejected");
         let message = err.to_string();
         assert!(message.contains("line"));
-        assert!(message.contains("must be last"));
+        assert!(message.contains("must be the last format"));
     }
 
     #[test]
@@ -1784,7 +1783,7 @@ mod tests {
             .expect_err("raw before the last position should be rejected");
         let message = err.to_string();
         assert!(message.contains("raw"));
-        assert!(message.contains("must be last"));
+        assert!(message.contains("must be the last format"));
     }
 
     #[test]
