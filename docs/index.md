@@ -158,7 +158,7 @@ See **[Power-User Techniques](how-to/power-user-techniques.md)** for real-world 
 **[→ How-To Guides](how-to/index.md)** - Solve specific problems (including [debugging](how-to/debug-issues.md))
 
 Need to reconstruct one timeline from several already-ordered log shards? See
-[Merge Timestamp-Sorted Files](how-to/merge-timestamp-sorted-files.md).
+[Merge Sorted Files by Timestamp](how-to/merge-timestamp-sorted-files.md).
 
 For deeper understanding, see [Concepts](concepts/index.md). For complete reference, see [Glossary](glossary.md), [Functions](reference/functions.md), [Formats](reference/formats.md), and [CLI options](reference/cli-reference.md).
 

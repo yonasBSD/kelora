@@ -31,4 +31,4 @@ Pick the scenario that matches your job-to-be-done and follow the playbook. Each
 
 ## Integration & Workflow
 - [Integrate Kelora with External Tools](integrate-external-tools.md)
-- [Merge Timestamp-Sorted Files](merge-timestamp-sorted-files.md)
+- [Merge Sorted Files by Timestamp](merge-timestamp-sorted-files.md)

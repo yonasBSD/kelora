@@ -377,7 +377,7 @@ kelora -f auto-per-file --levels error,warn logs/**/* -J
 - Detects once per file
 - Uses the same first-non-empty-line semantics as `-f auto`
 - For mixed formats within a single file, use **cascade mode** instead
-- Not supported with `--parallel` or `--merge-ts`
+- Not supported with `--parallel` or `--merge-sorted`
 
 ### Cascade Mode
 

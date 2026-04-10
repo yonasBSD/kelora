@@ -436,7 +436,7 @@ fn test_no_input_parallel_mode() {
 }
 
 #[test]
-fn test_merge_ts_merges_files_chronologically() {
+fn test_merge_sorted_merges_files_chronologically() {
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
 
@@ -452,7 +452,7 @@ fn test_merge_ts_merges_files_chronologically() {
         .expect("Failed to write to temp file");
 
     let (stdout, _stderr, exit_code) = run_kelora_with_files(
-        &["-f", "json", "-F", "json", "--merge-ts"],
+        &["-f", "json", "-F", "json", "--merge-sorted"],
         &[
             temp_file1.path().to_str().unwrap(),
             temp_file2.path().to_str().unwrap(),
@@ -475,7 +475,7 @@ fn test_merge_ts_merges_files_chronologically() {
 }
 
 #[test]
-fn test_merge_ts_auto_detects_standard_timestamp_field_names() {
+fn test_merge_sorted_auto_detects_standard_timestamp_field_names() {
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
 
@@ -491,7 +491,7 @@ fn test_merge_ts_auto_detects_standard_timestamp_field_names() {
         .expect("Failed to write to temp file");
 
     let (stdout, _stderr, exit_code) = run_kelora_with_files(
-        &["-f", "json", "-F", "json", "--merge-ts"],
+        &["-f", "json", "-F", "json", "--merge-sorted"],
         &[
             temp_file1.path().to_str().unwrap(),
             temp_file2.path().to_str().unwrap(),
@@ -514,11 +514,11 @@ fn test_merge_ts_auto_detects_standard_timestamp_field_names() {
 }
 
 #[test]
-fn test_merge_ts_rejects_parallel_mode() {
-    let (stdout, stderr, exit_code) = run_kelora(&["-f", "json", "--parallel", "--merge-ts"]);
+fn test_merge_sorted_rejects_parallel_mode() {
+    let (stdout, stderr, exit_code) = run_kelora(&["-f", "json", "--parallel", "--merge-sorted"]);
     assert_ne!(exit_code, 0, "Expected validation error");
     assert!(
-        stderr.contains("--merge-ts is not supported with --parallel"),
+        stderr.contains("--merge-sorted is not supported with --parallel"),
         "Unexpected error message: {}",
         stderr
     );
@@ -526,7 +526,7 @@ fn test_merge_ts_rejects_parallel_mode() {
 }
 
 #[test]
-fn test_merge_ts_supports_logfmt() {
+fn test_merge_sorted_supports_logfmt() {
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
 
@@ -538,7 +538,7 @@ fn test_merge_ts_supports_logfmt() {
         .expect("Failed to write to temp file");
 
     let (stdout, _stderr, exit_code) = run_kelora_with_files(
-        &["-f", "logfmt", "-F", "json", "--merge-ts"],
+        &["-f", "logfmt", "-F", "json", "--merge-sorted"],
         &[
             temp_file1.path().to_str().unwrap(),
             temp_file2.path().to_str().unwrap(),
@@ -561,7 +561,7 @@ fn test_merge_ts_supports_logfmt() {
 }
 
 #[test]
-fn test_merge_ts_rejects_csv_for_now() {
+fn test_merge_sorted_rejects_csv_for_now() {
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
 
@@ -573,7 +573,7 @@ fn test_merge_ts_rejects_csv_for_now() {
         .expect("Failed to write to temp file");
 
     let (stdout, _stderr, exit_code) = run_kelora_with_files(
-        &["-f", "csv", "-F", "json", "--merge-ts"],
+        &["-f", "csv", "-F", "json", "--merge-sorted"],
         &[
             temp_file1.path().to_str().unwrap(),
             temp_file2.path().to_str().unwrap(),
@@ -588,7 +588,7 @@ fn test_merge_ts_rejects_csv_for_now() {
 }
 
 #[test]
-fn test_merge_ts_assumes_each_file_is_already_sorted() {
+fn test_merge_sorted_assumes_each_file_is_already_sorted() {
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
 
@@ -604,7 +604,7 @@ fn test_merge_ts_assumes_each_file_is_already_sorted() {
         .expect("Failed to write to temp file");
 
     let (stdout, _stderr, exit_code) = run_kelora_with_files(
-        &["-f", "json", "-F", "json", "--merge-ts"],
+        &["-f", "json", "-F", "json", "--merge-sorted"],
         &[
             temp_file1.path().to_str().unwrap(),
             temp_file2.path().to_str().unwrap(),
@@ -613,7 +613,7 @@ fn test_merge_ts_assumes_each_file_is_already_sorted() {
 
     assert_ne!(
         exit_code, 0,
-        "merge-ts should fail when an input file is not timestamp-sorted"
+        "merge-sorted should fail when an input file is not timestamp-sorted"
     );
     let messages: Vec<String> = stdout
         .lines()
@@ -630,7 +630,7 @@ fn test_merge_ts_assumes_each_file_is_already_sorted() {
 }
 
 #[test]
-fn test_merge_ts_warns_and_skips_missing_timestamps_in_resilient_mode() {
+fn test_merge_sorted_missing_timestamps_fail_immediately_in_streaming_mode() {
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
 
@@ -646,7 +646,7 @@ fn test_merge_ts_warns_and_skips_missing_timestamps_in_resilient_mode() {
         .expect("Failed to write to temp file");
 
     let (stdout, stderr, exit_code) = run_kelora_with_files(
-        &["-f", "json", "-F", "json", "--merge-ts"],
+        &["-f", "json", "-F", "json", "--merge-sorted"],
         &[
             temp_file1.path().to_str().unwrap(),
             temp_file2.path().to_str().unwrap(),
@@ -655,7 +655,7 @@ fn test_merge_ts_warns_and_skips_missing_timestamps_in_resilient_mode() {
 
     assert_ne!(
         exit_code, 0,
-        "Recoverable merge-ts errors should still produce a non-zero exit"
+        "merge-sorted should fail when a later event is missing a timestamp"
     );
     let messages: Vec<String> = stdout
         .lines()
@@ -668,16 +668,16 @@ fn test_merge_ts_warns_and_skips_missing_timestamps_in_resilient_mode() {
                 .to_string()
         })
         .collect();
-    assert_eq!(messages, vec!["a", "b", "c", "d"]);
+    assert_eq!(messages, vec!["a", "b"]);
     assert!(
-        stderr.contains("parse error"),
-        "Expected resilient-mode error summary, got: {}",
+        stderr.contains("--merge-sorted requires a timestamp for every event"),
+        "Expected immediate merge failure, got: {}",
         stderr
     );
 }
 
 #[test]
-fn test_merge_ts_missing_timestamps_fail_in_strict_mode() {
+fn test_merge_sorted_missing_timestamps_fail_in_strict_mode() {
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
 
@@ -691,7 +691,7 @@ fn test_merge_ts_missing_timestamps_fail_in_strict_mode() {
         .expect("Failed to write to temp file");
 
     let (stdout, stderr, exit_code) = run_kelora_with_files(
-        &["-f", "json", "-F", "json", "--merge-ts", "--strict"],
+        &["-f", "json", "-F", "json", "--merge-sorted", "--strict"],
         &[
             temp_file1.path().to_str().unwrap(),
             temp_file2.path().to_str().unwrap(),
@@ -705,7 +705,7 @@ fn test_merge_ts_missing_timestamps_fail_in_strict_mode() {
     assert!(stdout.contains("\"msg\":\"a\""));
     assert!(stdout.contains("\"msg\":\"b\""));
     assert!(
-        stderr.contains("--merge-ts requires a timestamp for every event"),
+        stderr.contains("--merge-sorted requires a timestamp for every event"),
         "Expected strict-mode failure to mention missing timestamp, got: {}",
         stderr
     );
@@ -717,7 +717,7 @@ fn test_merge_ts_missing_timestamps_fail_in_strict_mode() {
 }
 
 #[test]
-fn test_merge_ts_fails_fast_on_disordered_events() {
+fn test_merge_sorted_fails_fast_on_disordered_events() {
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
 
@@ -733,7 +733,7 @@ fn test_merge_ts_fails_fast_on_disordered_events() {
         .expect("Failed to write to temp file");
 
     let (stdout, stderr, exit_code) = run_kelora_with_files(
-        &["-f", "json", "-F", "json", "--merge-ts"],
+        &["-f", "json", "-F", "json", "--merge-sorted"],
         &[
             temp_file1.path().to_str().unwrap(),
             temp_file2.path().to_str().unwrap(),
@@ -742,7 +742,7 @@ fn test_merge_ts_fails_fast_on_disordered_events() {
 
     assert_ne!(
         exit_code, 0,
-        "merge-ts should fail when an input file is not timestamp-sorted"
+        "merge-sorted should fail when an input file is not timestamp-sorted"
     );
     let messages: Vec<String> = stdout
         .lines()
@@ -769,7 +769,7 @@ fn test_merge_ts_fails_fast_on_disordered_events() {
 }
 
 #[test]
-fn test_merge_ts_disordered_events_fail_in_strict_mode() {
+fn test_merge_sorted_disordered_events_fail_in_strict_mode() {
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
 
@@ -785,7 +785,7 @@ fn test_merge_ts_disordered_events_fail_in_strict_mode() {
         .expect("Failed to write to temp file");
 
     let (stdout, stderr, exit_code) = run_kelora_with_files(
-        &["-f", "json", "-F", "json", "--merge-ts", "--strict"],
+        &["-f", "json", "-F", "json", "--merge-sorted", "--strict"],
         &[
             temp_file1.path().to_str().unwrap(),
             temp_file2.path().to_str().unwrap(),
@@ -805,6 +805,38 @@ fn test_merge_ts_disordered_events_fail_in_strict_mode() {
     assert!(
         stderr.contains("earlier than the previous event"),
         "Expected strict-mode failure to mention disordered input, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_merge_sorted_fails_before_output_when_file_has_no_initial_mergeable_event() {
+    let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
+    let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
+
+    temp_file1
+        .write_all(b"{\"msg\":\"missing\"}\n")
+        .expect("Failed to write to temp file");
+    temp_file2
+        .write_all(b"{\"ts\":\"2025-01-01T00:00:01Z\",\"msg\":\"a\"}\n")
+        .expect("Failed to write to temp file");
+
+    let (stdout, stderr, exit_code) = run_kelora_with_files(
+        &["-f", "json", "-F", "json", "--merge-sorted"],
+        &[
+            temp_file1.path().to_str().unwrap(),
+            temp_file2.path().to_str().unwrap(),
+        ],
+    );
+
+    assert_ne!(exit_code, 0, "merge-sorted should fail during priming");
+    assert!(
+        stdout.is_empty(),
+        "priming failures should happen before output"
+    );
+    assert!(
+        stderr.contains("--merge-sorted requires a timestamp for every event"),
+        "Expected priming failure to mention missing timestamp, got: {}",
         stderr
     );
 }

@@ -66,6 +66,7 @@ static FILES_FAILED_TO_OPEN: AtomicUsize = AtomicUsize::new(0);
 static FAILED_FILE_SAMPLES: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
 const MAX_FAILED_FILE_SAMPLES: usize = 3;
 static RECOVERABLE_ERROR_SAMPLES: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
+#[cfg(test)]
 const MAX_RECOVERABLE_ERROR_SAMPLES: usize = 3;
 
 pub fn set_collect_stats(enabled: bool) {
@@ -92,6 +93,7 @@ fn failed_file_samples() -> Vec<String> {
         .unwrap_or_default()
 }
 
+#[cfg(test)]
 fn push_recoverable_error_sample(message: &str) {
     let samples = RECOVERABLE_ERROR_SAMPLES.get_or_init(|| Mutex::new(Vec::new()));
     if let Ok(mut list) = samples.lock() {
@@ -256,6 +258,7 @@ pub fn stats_add_line_error() {
     });
 }
 
+#[cfg(test)]
 pub fn stats_add_recoverable_error_sample(message: &str) {
     if !stats_enabled() {
         return;

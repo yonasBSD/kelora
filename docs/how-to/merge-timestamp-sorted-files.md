@@ -1,4 +1,4 @@
-# Merge Timestamp-Sorted Files
+# Merge Sorted Files by Timestamp
 
 Combine multiple log files into one chronological stream without loading
 everything into memory first.
@@ -10,10 +10,10 @@ everything into memory first.
 - You want to reconstruct a single incident timeline across those files.
 - The files are large enough that pre-sorting them would be expensive or awkward.
 
-## What `--merge-ts` Actually Guarantees
+## What `--merge-sorted` Actually Guarantees
 
-`--merge-ts` merges **already sorted** inputs. It does not perform a full global
-sort over all events in all files.
+`--merge-sorted` merges **already sorted** inputs. It does not perform a full
+global sort over all events in all files.
 
 Kelora keeps one pending event from each input file, emits the earliest
 timestamp, then advances only that file. The result is efficient and
@@ -23,8 +23,9 @@ streaming-friendly:
 - Output becomes available immediately instead of after a full read/sort pass.
 - Large archive sets remain practical to process in one command.
 
-The tradeoff is straightforward: if a single file is out of order, Kelora
-aborts at the first out-of-order event instead of guessing.
+The tradeoff is straightforward: Kelora is strict about mergeability. If one
+file is out of order, missing timestamps, or cannot be parsed well enough to
+extract timestamps, the merge aborts instead of guessing.
 
 ## Practical Example
 
@@ -39,7 +40,7 @@ You want one merged view for an outage investigation.
 
 ```bash
 kelora -j api-a.jsonl api-b.jsonl worker.jsonl \
-  --merge-ts \
+  --merge-sorted \
   -k timestamp,service,level,message
 ```
 
@@ -64,8 +65,8 @@ In practice, many log sources are naturally append-only and already ordered:
 - One collector output per host
 - One rotated file per process
 
-For those cases, `--merge-ts` solves the real problem: **merge several ordered
-streams into one ordered stream**.
+For those cases, `--merge-sorted` solves the real problem: **merge several
+ordered streams into one ordered stream**.
 
 A true global sort would require one of these heavier approaches:
 
@@ -83,8 +84,8 @@ Kelora auto-detects common timestamp field names such as `timestamp` and `ts`;
 add `--ts-field <field>` only when your data uses a different key:
 
 ```bash
-kelora -j shard-*.jsonl --merge-ts -J
-kelora -f logfmt app-*.log --merge-ts --ts-field ts -F json
+kelora -j shard-*.jsonl --merge-sorted -J
+kelora -f logfmt app-*.log --merge-sorted --ts-field ts -F json
 ```
 
 Good fits:
@@ -97,15 +98,16 @@ Poor fits:
 
 - Files known to contain clock rewrites or backfilled old events
 - Inputs that mix unrelated formats line by line
-- CSV/TSV workflows, which are not supported by `--merge-ts` today
+- CSV/TSV workflows, which are not supported by `--merge-sorted` today
 
 ## Common Gotchas
 
-- `--merge-ts` is incompatible with `--parallel`
+- `--merge-sorted` is incompatible with `--parallel`
 - Auto-detection must resolve to a concrete format before merging
-- If one file is internally out of order, `--merge-ts` aborts at the first offending event
-- Events without usable timestamps are skipped in resilient mode and fail immediately with `--strict`; use `--ts-field <field>` when the timestamp is stored under a non-default key
-- Output already emitted before the failure remains valid; Kelora stops instead of trying to recover ordering
+- Before emitting the first event, Kelora must find one timestamped event in every input file
+- If one file is internally out of order, `--merge-sorted` aborts at the first offending event
+- Missing timestamps and merge-time parse failures are fatal in all modes; use `--ts-field <field>` when the timestamp is stored under a non-default key
+- Output is still streamed. If a late merge error occurs after some events were emitted, that prefix remains valid; Kelora stops instead of trying to recover ordering
 
 When you suspect disorder inside a file, inspect a sample first:
 
@@ -119,7 +121,7 @@ Merge first, then apply your normal filters:
 
 ```bash
 kelora -j api-*.jsonl worker-*.jsonl \
-  --merge-ts \
+  --merge-sorted \
   --since '2026-04-09 09:40' \
   --until '2026-04-09 10:00' \
   -l error,warn \
@@ -131,6 +133,6 @@ logged to its own ordered file.
 
 ## See Also
 
-- [CLI Reference](../reference/cli-reference.md#merge-ts) for the flag contract and constraints
+- [CLI Reference](../reference/cli-reference.md#merge-sorted) for the flag contract and constraints
 - [Process Archives at Scale](batch-process-archives.md) for throughput and batch-processing tradeoffs
 - [Integrate Kelora with External Tools](integrate-external-tools.md) when you need a heavier external sort or pre-filter step

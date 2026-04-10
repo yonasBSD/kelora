@@ -177,31 +177,35 @@ Control file processing order.
 kelora --file-order mtime logs/*.log
 ```
 
-#### `--merge-ts` {#merge-ts}
+#### `--merge-sorted` {#merge-sorted}
 
-Merge multiple timestamp-sorted input files into one chronological stream.
+Merge multiple already-sorted input files into one chronological stream.
 
 Kelora does this as a streaming k-way merge: it keeps one pending event per
 input file and emits the earliest timestamp currently visible. This is fast and
 memory-bounded, but it is **not** a full global sort.
 
-Use `--merge-ts` when:
+Use `--merge-sorted` when:
 
 - Each input file is already in chronological order on its own
 - You want one merged timeline across rotated shards, hosts, or services
 - The dataset is too large to sort as a separate pre-processing step
 
-Do **not** expect `--merge-ts` to repair disorder within a file. If one file
+Do **not** expect `--merge-sorted` to repair disorder within a file. If one file
 contains `10:04` followed later by `10:01`, Kelora aborts as soon as it
 discovers that out-of-order event.
 
-Events without a usable timestamp are still skipped in resilient mode and fail
-immediately with `--strict`. Per-file disorder is always fatal because it would
-break the chronological output guarantee. If your timestamps live in a
-non-standard field, specify it explicitly with `--ts-field <field>`.
+Before emitting output, Kelora must find one timestamped event in every input
+file. Missing timestamps, merge-time parse failures, and per-file disorder are
+always fatal because they would break the chronological output guarantee. If
+your timestamps live in a non-standard field, specify it explicitly with
+`--ts-field <field>`.
+
+Output remains streamed. If a late merge error occurs after some events were
+already emitted, that prefix remains valid and the command exits non-zero.
 
 ```bash
-kelora -j api-1.jsonl api-2.jsonl api-3.jsonl --merge-ts -J
+kelora -j api-1.jsonl api-2.jsonl api-3.jsonl --merge-sorted -J
 ```
 
 Practical examples:
@@ -216,7 +220,7 @@ Current constraints:
 - Not supported with `--parallel` or manual thread overrides
 - Not yet supported for CSV/TSV inputs
 
-See [Merge Timestamp-Sorted Files](../how-to/merge-timestamp-sorted-files.md)
+See [Merge Sorted Files by Timestamp](../how-to/merge-timestamp-sorted-files.md)
 for a full walkthrough and tradeoff discussion.
 
 ### Line Filtering

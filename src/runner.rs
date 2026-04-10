@@ -28,9 +28,8 @@ use crate::readers;
 use crate::rhai_functions::file_ops::{self, FileOpMode};
 use crate::rhai_functions::tracking::{self, TrackingSnapshot};
 use crate::stats::{
-    get_thread_stats, set_collect_stats, stats_add_error, stats_add_line_error,
-    stats_add_line_filtered, stats_add_line_output, stats_add_line_read,
-    stats_add_recoverable_error_sample, stats_finish_processing, stats_start_timer,
+    get_thread_stats, set_collect_stats, stats_add_error, stats_add_line_filtered,
+    stats_add_line_output, stats_add_line_read, stats_finish_processing, stats_start_timer,
     ProcessingStats,
 };
 use crate::{rhai_functions, stats};
@@ -111,7 +110,7 @@ pub fn run_pipeline_with_kelora_config<W: Write + Send + 'static>(
 
     if use_parallel && config.input.merge_ts {
         return Err(anyhow::anyhow!(
-            "--merge-ts is not supported with --parallel or thread overrides. Rerun without --parallel."
+            "--merge-sorted is not supported with --parallel or thread overrides. Rerun without --parallel."
         ));
     }
 
@@ -323,9 +322,6 @@ enum ReaderMessage {
     Line {
         line: String,
         filename: Option<String>,
-    },
-    RecoverableError {
-        message: String,
     },
     Error {
         error: io::Error,
@@ -763,12 +759,12 @@ fn build_simple_merge_parser(
         }
         config::InputFormat::Auto => {
             return Err(anyhow::anyhow!(
-                "--merge-ts requires a concrete input format after auto-detection"
+                "--merge-sorted requires a concrete input format after auto-detection"
             ));
         }
         config::InputFormat::AutoPerFile => {
             return Err(anyhow::anyhow!(
-                "--merge-ts is not supported with -f auto-per-file"
+                "--merge-sorted is not supported with -f auto-per-file"
             ));
         }
         config::InputFormat::Csv(_)
@@ -794,7 +790,7 @@ fn build_merge_timestamp_parser(
         | config::InputFormat::Csvnh
         | config::InputFormat::Tsvnh => {
             return Err(anyhow::anyhow!(
-                "--merge-ts is not yet supported for CSV/TSV formats (header semantics across merged files)"
+                "--merge-sorted is not yet supported for CSV/TSV formats (header semantics across merged files)"
             ));
         }
         other => MergeTimestampParser::Generic(build_simple_merge_parser(other, strict, cols_sep)?),
@@ -838,12 +834,6 @@ fn parse_merge_timestamp(
     }
 }
 
-fn emit_merge_recoverable_error(sender: &Sender<ReaderMessage>, message: String) -> bool {
-    sender
-        .send(ReaderMessage::RecoverableError { message })
-        .is_ok()
-}
-
 fn emit_merge_fatal_error(sender: &Sender<ReaderMessage>, message: String) -> bool {
     sender
         .send(ReaderMessage::Error {
@@ -851,6 +841,31 @@ fn emit_merge_fatal_error(sender: &Sender<ReaderMessage>, message: String) -> bo
             filename: None,
         })
         .is_ok()
+}
+
+fn missing_merge_timestamp_message(filename: &str, line_number: usize) -> String {
+    format!(
+        "--merge-sorted requires a timestamp for every event in '{}' at line {}. Hint: Specify --ts-field <field> if your timestamps use a non-default field name.",
+        filename, line_number
+    )
+}
+
+fn parse_merge_failure_message(
+    filename: &str,
+    line_number: usize,
+    error: &anyhow::Error,
+) -> String {
+    format!(
+        "failed to parse line for --merge-sorted in '{}' at line {}: {}",
+        filename, line_number, error
+    )
+}
+
+fn empty_merge_file_message(filename: &str) -> String {
+    format!(
+        "--merge-sorted requires each input file to produce at least one timestamped event; '{}' did not.",
+        filename
+    )
 }
 
 fn spawn_merged_file_reader(
@@ -892,6 +907,14 @@ fn spawn_merged_file_reader(
                 let mut line = String::new();
                 let read = file_reader.read_line(&mut line)?;
                 if read == 0 {
+                    if previous_timestamps[file_index].is_none()
+                        && !emit_merge_fatal_error(
+                            &sender,
+                            empty_merge_file_message(&reader.files[file_index]),
+                        )
+                    {
+                        return Ok(());
+                    }
                     break;
                 }
                 *line_number += 1;
@@ -914,28 +937,29 @@ fn spawn_merged_file_reader(
                         continue;
                     }
                     Ok(MergeTimestampResult::MissingTimestamp) => {
-                        if !emit_merge_recoverable_error(
+                        if !emit_merge_fatal_error(
                             &sender,
-                            format!(
-                                "--merge-ts requires a timestamp for every event in '{}' at line {}. Hint: Specify --ts-field <field> if your timestamps use a non-default field name.",
-                                reader.files[file_index], *line_number
+                            missing_merge_timestamp_message(
+                                &reader.files[file_index],
+                                *line_number,
                             ),
                         ) {
                             return Ok(());
                         }
-                        continue;
+                        return Ok(());
                     }
                     Err(e) => {
-                        if !emit_merge_recoverable_error(
+                        if !emit_merge_fatal_error(
                             &sender,
-                            format!(
-                                "failed to parse line for --merge-ts in '{}' at line {}: {}",
-                                reader.files[file_index], *line_number, e
+                            parse_merge_failure_message(
+                                &reader.files[file_index],
+                                *line_number,
+                                &e,
                             ),
                         ) {
                             return Ok(());
                         }
-                        continue;
+                        return Ok(());
                     }
                 }
             }
@@ -1009,28 +1033,22 @@ fn spawn_merged_file_reader(
                     }
                     Ok(MergeTimestampResult::SkipLine) => continue,
                     Ok(MergeTimestampResult::MissingTimestamp) => {
-                        if !emit_merge_recoverable_error(
+                        if !emit_merge_fatal_error(
                             &sender,
-                            format!(
-                                "--merge-ts requires a timestamp for every event in '{}' at line {}. Hint: Specify --ts-field <field> if your timestamps use a non-default field name.",
-                                filename, *line_number
-                            ),
+                            missing_merge_timestamp_message(&filename, *line_number),
                         ) {
                             return Ok(());
                         }
-                        continue;
+                        return Ok(());
                     }
                     Err(e) => {
-                        if !emit_merge_recoverable_error(
+                        if !emit_merge_fatal_error(
                             &sender,
-                            format!(
-                                "failed to parse line for --merge-ts in '{}' at line {}: {}",
-                                filename, *line_number, e
-                            ),
+                            parse_merge_failure_message(&filename, *line_number, &e),
                         ) {
                             return Ok(());
                         }
-                        continue;
+                        return Ok(());
                     }
                 }
             }
@@ -1402,15 +1420,6 @@ fn handle_reader_message<W: Write>(
             )? {
                 ProcessingResult::Continue => Ok(false),
                 ProcessingResult::TakeLimitExhausted | ProcessingResult::Stop => Ok(true),
-            }
-        }
-        ReaderMessage::RecoverableError { message } => {
-            stats_add_line_error();
-            stats_add_recoverable_error_sample(&message);
-            if config.processing.strict {
-                Err(anyhow::anyhow!(message))
-            } else {
-                Ok(false)
             }
         }
         ReaderMessage::Eof => Ok(true),
