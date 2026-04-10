@@ -1234,7 +1234,10 @@ mod tests {
 
     #[test]
     fn test_scalar_to_json_preserves_scalar_types() {
-        assert_eq!(scalar_to_json(&make_string("hello")), serde_json::json!("hello"));
+        assert_eq!(
+            scalar_to_json(&make_string("hello")),
+            serde_json::json!("hello")
+        );
         assert_eq!(scalar_to_json(&make_int(42)), serde_json::json!(42));
         assert_eq!(scalar_to_json(&make_float(2.5)), serde_json::json!(2.5));
         assert_eq!(scalar_to_json(&make_bool(true)), serde_json::json!(true));
@@ -1261,10 +1264,22 @@ mod tests {
         let before = profile.samples.clone();
         let examples = format_examples(&profile);
 
-        assert!(examples.contains("hello"), "string sample should render: {examples}");
-        assert!(examples.contains("42"), "int sample should render: {examples}");
-        assert!(examples.contains("true"), "bool sample should render: {examples}");
-        assert_eq!(profile.samples, before, "display formatting must not mutate samples");
+        assert!(
+            examples.contains("hello"),
+            "string sample should render: {examples}"
+        );
+        assert!(
+            examples.contains("42"),
+            "int sample should render: {examples}"
+        );
+        assert!(
+            examples.contains("true"),
+            "bool sample should render: {examples}"
+        );
+        assert_eq!(
+            profile.samples, before,
+            "display formatting must not mutate samples"
+        );
     }
 
     #[test]
