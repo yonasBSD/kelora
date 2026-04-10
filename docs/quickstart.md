@@ -70,7 +70,7 @@ Most first-run problems come from one of these cases:
 - **Wrong parser**: Try `-j`, `-f logfmt`, `-f combined`, or `-f 'cols:...'` explicitly instead of relying on auto-detection.
 - **Wrong field name**: Run `--discover` first to inspect parsed fields and sample values. If you're debugging a filtered or transformed pipeline, use `--discover-final` instead.
 - **Filter too strict**: Remove filters and re-add them one at a time.
-- **Mixed-format file**: If your file mixes JSON lines and plain text, process them separately. See [Integrate Kelora with External Tools](how-to/integrate-external-tools.md).
+- **Mixed-format file**: If your file mixes JSON lines and plain text, use cascade mode, for example `-f json,line`.
 - **Nothing matches your level/timestamp assumptions**: Prefer explicit filters like `e.level == "ERROR"` and confirm timestamp field names with `--stats`.
 
 When in doubt, start here:
