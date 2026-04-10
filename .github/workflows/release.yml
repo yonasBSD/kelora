@@ -179,13 +179,27 @@ jobs:
         run: |
           ditto -c -k --keepParent "target/${{ matrix.target }}/release/kelora" "kelora-${{ matrix.target }}.zip"
 
+      - name: Validate Apple notarization access
+        if: runner.os == 'macOS' && matrix.needs_signing && vars.ENABLE_MACOS_SIGNING == 'true'
+        run: |
+          echo "Checking Apple notarization access for team ${APPLE_TEAM_ID}..."
+          xcrun notarytool history \
+            --apple-id "${APPLE_ID}" \
+            --password "${APPLE_APP_PASSWORD}" \
+            --team-id "${APPLE_TEAM_ID}" \
+            --output-format json > /dev/null
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
       - name: Notarize macOS Binary
         if: runner.os == 'macOS' && matrix.needs_signing && vars.ENABLE_MACOS_SIGNING == 'true'
         run: |
           xcrun notarytool submit "kelora-${{ matrix.target }}.zip" \
-            --apple-id "${{ secrets.APPLE_ID }}" \
-            --password "${{ secrets.APPLE_APP_PASSWORD }}" \
-            --team-id "${{ secrets.APPLE_TEAM_ID }}" \
+            --apple-id "${APPLE_ID}" \
+            --password "${APPLE_APP_PASSWORD}" \
+            --team-id "${APPLE_TEAM_ID}" \
             --wait
 
           # Extract the binary back
@@ -193,6 +207,10 @@ jobs:
 
           # Verify signing
           codesign -vvv --deep --strict "target/${{ matrix.target }}/release/kelora"
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Compress to .tar.gz (Unix)
         if: matrix.archive == 'tar.gz'
