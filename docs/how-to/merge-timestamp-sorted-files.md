@@ -23,8 +23,8 @@ streaming-friendly:
 - Output becomes available immediately instead of after a full read/sort pass.
 - Large archive sets remain practical to process in one command.
 
-The tradeoff is straightforward: if a single file is out of order, the merged
-output can also become out of order.
+The tradeoff is straightforward: if a single file is out of order, Kelora
+aborts at the first out-of-order event instead of guessing.
 
 ## Practical Example
 
@@ -103,9 +103,9 @@ Poor fits:
 
 - `--merge-ts` is incompatible with `--parallel`
 - Auto-detection must resolve to a concrete format before merging
-- If one file is internally out of order, the final output may also be out of order
+- If one file is internally out of order, `--merge-ts` aborts at the first offending event
 - Events without usable timestamps are skipped in resilient mode and fail immediately with `--strict`; use `--ts-field <field>` when the timestamp is stored under a non-default key
-- Resilient mode still exits non-zero when merge input errors occur; it is best-effort, not fully successful
+- Output already emitted before the failure remains valid; Kelora stops instead of trying to recover ordering
 
 When you suspect disorder inside a file, inspect a sample first:
 

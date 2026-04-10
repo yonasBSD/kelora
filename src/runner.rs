@@ -844,6 +844,15 @@ fn emit_merge_recoverable_error(sender: &Sender<ReaderMessage>, message: String)
         .is_ok()
 }
 
+fn emit_merge_fatal_error(sender: &Sender<ReaderMessage>, message: String) -> bool {
+    sender
+        .send(ReaderMessage::Error {
+            error: io::Error::other(message),
+            filename: None,
+        })
+        .is_ok()
+}
+
 fn spawn_merged_file_reader(
     reader: MergedFileReader,
     sender: Sender<ReaderMessage>,
@@ -971,14 +980,17 @@ fn spawn_merged_file_reader(
                     Ok(MergeTimestampResult::Timestamp(timestamp)) => {
                         if let Some(previous) = previous_timestamps[state.file_index] {
                             if timestamp < previous
-                                && !emit_merge_recoverable_error(
+                                && !emit_merge_fatal_error(
                                     &sender,
                                     format!(
-                                        "input for '{}' is not sorted at line {}: {} < previous {}",
+                                        "input is not sorted by timestamp: event at '{}' line {} is earlier than the previous event ({} < {})",
                                         filename, *line_number, timestamp, previous
                                     ),
                                 )
                             {
+                                return Ok(());
+                            }
+                            if timestamp < previous {
                                 return Ok(());
                             }
                         }

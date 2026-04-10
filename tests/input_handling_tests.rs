@@ -613,7 +613,7 @@ fn test_merge_ts_assumes_each_file_is_already_sorted() {
 
     assert_ne!(
         exit_code, 0,
-        "Recoverable merge-ts errors should still produce a non-zero exit"
+        "merge-ts should fail when an input file is not timestamp-sorted"
     );
     let messages: Vec<String> = stdout
         .lines()
@@ -626,7 +626,7 @@ fn test_merge_ts_assumes_each_file_is_already_sorted() {
                 .to_string()
         })
         .collect();
-    assert_eq!(messages, vec!["b", "c", "d", "a"]);
+    assert_eq!(messages, vec!["b", "c", "d"]);
 }
 
 #[test]
@@ -717,7 +717,7 @@ fn test_merge_ts_missing_timestamps_fail_in_strict_mode() {
 }
 
 #[test]
-fn test_merge_ts_warns_on_disordered_events_in_resilient_mode() {
+fn test_merge_ts_fails_fast_on_disordered_events() {
     let mut temp_file1 = NamedTempFile::new().expect("Failed to create temp file");
     let mut temp_file2 = NamedTempFile::new().expect("Failed to create temp file");
 
@@ -742,7 +742,7 @@ fn test_merge_ts_warns_on_disordered_events_in_resilient_mode() {
 
     assert_ne!(
         exit_code, 0,
-        "Recoverable merge-ts errors should still produce a non-zero exit"
+        "merge-ts should fail when an input file is not timestamp-sorted"
     );
     let messages: Vec<String> = stdout
         .lines()
@@ -755,10 +755,15 @@ fn test_merge_ts_warns_on_disordered_events_in_resilient_mode() {
                 .to_string()
         })
         .collect();
-    assert_eq!(messages, vec!["b", "c", "d", "a"]);
+    assert_eq!(messages, vec!["b", "c", "d"]);
     assert!(
-        stderr.contains("parse error"),
-        "Expected resilient-mode error summary, got: {}",
+        stderr.contains("input is not sorted by timestamp"),
+        "Expected disordered-input failure, got: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("earlier than the previous event"),
+        "Expected disordered-input details, got: {}",
         stderr
     );
 }
@@ -793,7 +798,12 @@ fn test_merge_ts_disordered_events_fail_in_strict_mode() {
     assert!(stdout.contains("\"msg\":\"d\""));
     assert!(!stdout.contains("\"msg\":\"a\""));
     assert!(
-        stderr.contains("is not sorted at line"),
+        stderr.contains("input is not sorted by timestamp"),
+        "Expected strict-mode failure to mention disordered input, got: {}",
+        stderr
+    );
+    assert!(
+        stderr.contains("earlier than the previous event"),
         "Expected strict-mode failure to mention disordered input, got: {}",
         stderr
     );

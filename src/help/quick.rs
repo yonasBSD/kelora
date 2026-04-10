@@ -36,7 +36,7 @@ Common Options:
   -m, --metrics                 Show only the tracked metrics
   --discover                    Profile field names, types, and sample values (sequential only)
   --drain                       Summarize log templates (requires -k/--keys, sequential only)
-  --merge-ts                    Chronologically merge timestamp-sorted files (sequential only)
+  --merge-ts                    Merge timestamp-sorted files chronologically; aborts on disorder (sequential only)
 
 Interactive Mode:
   kelora                     Run without arguments to enter interactive mode

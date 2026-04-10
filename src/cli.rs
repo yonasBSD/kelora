@@ -137,7 +137,7 @@ pub struct Cli {
     )]
     pub file_order: FileOrder,
 
-    /// Merge timestamp-sorted input files by timestamp; each file must already be in chronological order.
+    /// Merge timestamp-sorted input files by timestamp; aborts if any file is out of order.
     #[arg(long = "merge-ts", help_heading = "Input Options")]
     pub merge_ts: bool,
 
