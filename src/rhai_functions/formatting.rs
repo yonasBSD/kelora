@@ -116,6 +116,9 @@ pub fn register_functions(engine: &mut Engine) {
     // columns representing value/max as a fraction, using Unicode eighth-blocks
     // for sub-cell resolution. Overflow (value > max) clamps to full; negative
     // values and a non-positive max render as an empty-width pad.
+    //
+    // This is the single, unambiguous form. For a pre-normalized ratio, pass
+    // max as 1 (e.g. `bar(0.42, 1, 20)`).
     engine.register_fn("bar", |value: f64, max: f64, width: i64| -> String {
         bar_impl(value / max, width)
     });
@@ -133,10 +136,6 @@ pub fn register_functions(engine: &mut Engine) {
     });
     engine.register_fn("bar", |value: i64, max: f64, width: i64| -> String {
         bar_impl(value as f64 / max, width)
-    });
-    // bar(ratio, width): render with a pre-normalized ratio in 0..1.
-    engine.register_fn("bar", |ratio: f64, width: i64| -> String {
-        bar_impl(ratio, width)
     });
 
     // sparkline(array): render a sparkline scaled 0..max(array) from an

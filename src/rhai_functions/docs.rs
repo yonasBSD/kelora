@@ -231,16 +231,14 @@ text.shorten(n [,marker])            If text exceeds width n, keep start and app
 text.shorten_middle(n [,marker])     If text exceeds width n, keep both ends, insert marker (default "…") in the middle.
                                      Useful for paths/URLs/IDs where both ends are informative.
                                      Examples: path.shorten_middle(30) → "/home/user/proj…formatting.rs"
-bar(value, max, width)               Primary form: render horizontal bar of `width` cells showing value/max,
-                                     using Unicode
-                                     eighth-blocks (▏▎▍▌▋▊▉█) for sub-cell resolution. Pads with spaces so
-                                     the result has exactly `width` display columns. Values outside 0..max
-                                     are clamped; max<=0 renders empty.
-                                     Examples: bar(7, 10, 10) → "███████   "
-                                               bar(3, 8, 4)   → "█▌  "
-bar(ratio, width)                    Convenience form when you already have a ratio in 0..1.
-                                     Example: bar(0.42, 10) → "████▏     "
-                                     Note: there is no two-argument bar(value, max) form.
+bar(value, max, width)               Render a horizontal bar of `width` cells showing value/max,
+                                     using Unicode eighth-blocks (▏▎▍▌▋▊▉█) for sub-cell resolution.
+                                     Pads with spaces so the result has exactly `width` display columns.
+                                     Values outside 0..max are clamped; max<=0 renders empty.
+                                     For a pre-normalized ratio, pass max as 1 (e.g. bar(0.42, 1, 10)).
+                                     Examples: bar(7, 10, 10)  → "███████   "
+                                               bar(3, 8, 4)    → "█▌  "
+                                               bar(0.42, 1, 10) → "████▏     "
 sparkline(array)                     Render an array of numbers as a single-line sparkline (▁▂▃▄▅▆▇█)
                                      scaled to 0..max(array). Negatives and non-numerics render as space.
                                      Empty arrays return "".

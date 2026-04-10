@@ -16,7 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **New Rhai output helpers** - Added `human_bytes`, `human_bytes_si`, `format_decimals`, and `format_percent`.
 - **New Rhai text formatting helpers** - Added Unicode-width-aware `ljust`, `rjust`, `center`, and `shorten` string helpers.
 - **New Rhai ANSI styling helpers** - Added `red`, `green`, `yellow`, `blue`, `cyan`, `magenta`, `bold`, and `dim`.
-- **New Rhai chart helpers** - Added `bar` and `sparkline` helpers for end-of-stream metrics output.
+- **New Rhai chart helpers** - Added `bar(value, max, width)` and `sparkline(array)` helpers for end-of-stream metrics output. For a pre-normalized ratio, pass `max` as `1` (e.g. `bar(0.42, 1, 10)`).
 - **New Rhai projection helpers** - Added `map.keep()` and `map.drop()` for event field projection.
 - **New Rhai time/random helpers** - Added `dt.ceil_to()` and `sample_prob()`.
 - **New PII validators** - Added `ssn` and `phone` pattern validators to `normalized()`, including SSA-aware SSN checks and NANP-aware validation for US/CA numbers plus permissive support for other international numbers.
