@@ -148,8 +148,6 @@ pub struct FieldProfile {
     cardinality: CardinalityTracker,
     /// Reservoir sample of distinct values as JSON-compatible scalars.
     pub samples: Vec<serde_json::Value>,
-    /// Human-readable rendering of `samples`, kept in lockstep for reports.
-    pub samples_display: Vec<std::string::String>,
     /// Hashes of values currently present in `samples` plus deduplication history.
     /// Capped at `MAX_DEDUP_TRACKING` to bound memory.
     sample_hashes: HashSet<u64>,
@@ -168,7 +166,6 @@ impl FieldProfile {
             type_counts: HashMap::new(),
             cardinality: CardinalityTracker::new(),
             samples: Vec::new(),
-            samples_display: Vec::new(),
             sample_hashes: HashSet::new(),
             distinct_samples_seen: 0,
             array_size_range: None,
@@ -212,7 +209,7 @@ impl FieldProfile {
                 let hash = hash_value(&ft, &display);
 
                 self.cardinality.insert(hash);
-                self.add_sample(hash, sample_value, &display);
+                self.add_sample(hash, sample_value);
             }
         }
     }
@@ -220,7 +217,7 @@ impl FieldProfile {
     /// Add a scalar value to the reservoir sample using Algorithm R.
     /// Distinct values are preferred: a bounded hash set deduplicates the
     /// first `MAX_DEDUP_TRACKING` distinct values seen.
-    fn add_sample(&mut self, hash: u64, sample: serde_json::Value, display: &str) {
+    fn add_sample(&mut self, hash: u64, sample: serde_json::Value) {
         if self.sample_hashes.len() < MAX_DEDUP_TRACKING {
             if !self.sample_hashes.insert(hash) {
                 return;
@@ -233,13 +230,11 @@ impl FieldProfile {
 
         if self.samples.len() < MAX_SAMPLES {
             self.samples.push(sample);
-            self.samples_display.push(truncate_sample(display));
         } else {
             // Algorithm R: replace random slot with probability K/i.
             let idx = fastrand::usize(0..self.distinct_samples_seen);
             if idx < MAX_SAMPLES {
                 self.samples[idx] = sample;
-                self.samples_display[idx] = truncate_sample(display);
             }
         }
     }
@@ -523,7 +518,6 @@ impl FieldDiscovery {
                     "exact": card_exact,
                 },
                 "samples": profile.samples,
-                "samples_display": profile.samples_display,
             });
 
             if let Some((lo, hi)) = profile.array_size_range {
@@ -612,11 +606,16 @@ fn format_cardinality(profile: &FieldProfile) -> std::string::String {
 
 /// Format the examples column.
 fn format_examples(profile: &FieldProfile) -> std::string::String {
-    if profile.samples_display.is_empty() {
+    if profile.samples.is_empty() {
         return std::string::String::new();
     }
 
-    let joined = profile.samples_display.join(", ");
+    let joined = profile
+        .samples
+        .iter()
+        .map(sample_json_display)
+        .collect::<Vec<_>>()
+        .join(", ");
     if joined.chars().count() > 60 {
         truncate_for_display(&joined, 60)
     } else {
@@ -689,6 +688,14 @@ fn scalar_to_json(value: &Dynamic) -> serde_json::Value {
         serde_json::Value::Null
     } else {
         serde_json::Value::String(value.to_string())
+    }
+}
+
+fn sample_json_display(value: &serde_json::Value) -> std::string::String {
+    match value {
+        serde_json::Value::String(s) => truncate_sample(s),
+        serde_json::Value::Null => "null".to_string(),
+        _ => truncate_sample(&value.to_string()),
     }
 }
 
@@ -997,7 +1004,6 @@ mod tests {
         assert!(exact);
         assert_eq!(card, 2); // "hello" and "world"
         assert_eq!(profile.samples.len(), 2);
-        assert_eq!(profile.samples_display.len(), 2);
     }
 
     #[test]
@@ -1179,7 +1185,6 @@ mod tests {
         assert_eq!(parsed["fields"][0]["seen"], 1);
         assert_eq!(parsed["fields"][0]["cardinality"]["exact"], true);
         assert_eq!(parsed["fields"][0]["samples"][0], "INFO");
-        assert_eq!(parsed["fields"][0]["samples_display"][0], "INFO");
     }
 
     #[test]
@@ -1197,7 +1202,6 @@ mod tests {
             profile.observe(&make_string(&format!("value_{}", i)));
         }
         assert_eq!(profile.samples.len(), MAX_SAMPLES);
-        assert_eq!(profile.samples_display.len(), MAX_SAMPLES);
     }
 
     #[test]
@@ -1215,9 +1219,9 @@ mod tests {
                 profile.observe(&make_string(&format!("rare_{i}")));
             }
             total_rare_in_samples += profile
-                .samples_display
+                .samples
                 .iter()
-                .filter(|s| s.starts_with("rare_"))
+                .filter(|s| s.as_str().is_some_and(|s| s.starts_with("rare_")))
                 .count();
         }
         // Expected ≈ 8 * (20/21) ≈ 7.6 rare samples per trial.
@@ -1225,6 +1229,57 @@ mod tests {
         assert!(
             total_rare_in_samples > trials * 4,
             "reservoir should surface rare distinct values; got {total_rare_in_samples} across {trials} trials",
+        );
+    }
+
+    #[test]
+    fn test_scalar_to_json_preserves_scalar_types() {
+        assert_eq!(scalar_to_json(&make_string("hello")), serde_json::json!("hello"));
+        assert_eq!(scalar_to_json(&make_int(42)), serde_json::json!(42));
+        assert_eq!(scalar_to_json(&make_float(2.5)), serde_json::json!(2.5));
+        assert_eq!(scalar_to_json(&make_bool(true)), serde_json::json!(true));
+        assert_eq!(scalar_to_json(&make_null()), serde_json::Value::Null);
+        assert_eq!(scalar_to_json(&Dynamic::from('x')), serde_json::json!("x"));
+    }
+
+    #[test]
+    fn test_scalar_to_json_preserves_escaped_strings() {
+        let value = make_string("line1\nline2\t\"quoted\"\\backslash");
+        assert_eq!(
+            scalar_to_json(&value),
+            serde_json::json!("line1\nline2\t\"quoted\"\\backslash")
+        );
+    }
+
+    #[test]
+    fn test_format_examples_renders_typed_samples_without_mutating_them() {
+        let mut profile = FieldProfile::new();
+        profile.observe(&make_string("hello"));
+        profile.observe(&make_int(42));
+        profile.observe(&make_bool(true));
+
+        let before = profile.samples.clone();
+        let examples = format_examples(&profile);
+
+        assert!(examples.contains("hello"), "string sample should render: {examples}");
+        assert!(examples.contains("42"), "int sample should render: {examples}");
+        assert!(examples.contains("true"), "bool sample should render: {examples}");
+        assert_eq!(profile.samples, before, "display formatting must not mutate samples");
+    }
+
+    #[test]
+    fn test_long_string_samples_not_truncated_in_json() {
+        let long = "x".repeat(MAX_SAMPLE_LEN + 40);
+        let mut profile = FieldProfile::new();
+        profile.observe(&make_string(&long));
+
+        assert_eq!(profile.samples.len(), 1);
+        assert_eq!(profile.samples[0], serde_json::json!(long));
+
+        let examples = format_examples(&profile);
+        assert!(
+            examples.chars().count() <= 60,
+            "table examples should remain display-truncated: {examples}"
         );
     }
 

@@ -71,7 +71,6 @@ fn test_discover_json_profiles_nested_input_fields() {
         .find(|field| field["name"] == "bytes")
         .expect("bytes field should exist");
     assert_eq!(bytes["samples"][0], 1536);
-    assert_eq!(bytes["samples_display"][0], "1536");
 }
 
 #[test]
@@ -141,7 +140,6 @@ fn test_discover_output_scope_profiles_post_filter_post_exec_fields() {
         .find(|field| field["name"] == "pretty")
         .expect("pretty field should exist");
     assert_eq!(pretty["samples"][0], "1.5 KiB");
-    assert_eq!(pretty["samples_display"][0], "1.5 KiB");
 }
 
 #[test]
