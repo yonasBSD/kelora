@@ -78,7 +78,7 @@ auto-per-file
   Try each format in order, first success wins (per line)
   Examples: -f json,line          (noisy JSON with plain-text fallback)
             -f json,logfmt,line   (structured streams with fallback)
-  Put broader fallbacks like 'line' last so stricter parsers get first shot
+  Put catch-all fallbacks like 'line' or 'raw' last so stricter parsers get first shot
   Adds an '_format' field to each event with the winning format name
   Stats (--stats) include per-format event counts
   Allowed in cascade: json, line, raw, logfmt, syslog, cef, combined

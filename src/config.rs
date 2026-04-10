@@ -1298,6 +1298,17 @@ fn parse_cascade_spec(spec: &str) -> anyhow::Result<InputFormat> {
         }
         formats.push(fmt);
     }
+
+    for (idx, fmt) in formats.iter().enumerate() {
+        if matches!(fmt, InputFormat::Line | InputFormat::Raw) && idx != formats.len() - 1 {
+            return Err(anyhow::anyhow!(
+                "catch-all format '{}' must be last in cascade '{}'; later formats would never run",
+                fmt.cascade_name(),
+                spec
+            ));
+        }
+    }
+
     Ok(InputFormat::Cascade(formats))
 }
 
@@ -1756,5 +1767,34 @@ mod tests {
 
         let keys = config.output.get_effective_keys();
         assert_eq!(keys, vec!["alpha".to_string(), "beta".to_string()]);
+    }
+
+    #[test]
+    fn parse_cascade_spec_rejects_line_before_last_position() {
+        let err = parse_input_format_spec("json,line,logfmt")
+            .expect_err("line before the last position should be rejected");
+        let message = err.to_string();
+        assert!(message.contains("line"));
+        assert!(message.contains("must be last"));
+    }
+
+    #[test]
+    fn parse_cascade_spec_rejects_raw_before_last_position() {
+        let err = parse_input_format_spec("json,raw,logfmt")
+            .expect_err("raw before the last position should be rejected");
+        let message = err.to_string();
+        assert!(message.contains("raw"));
+        assert!(message.contains("must be last"));
+    }
+
+    #[test]
+    fn parse_cascade_spec_allows_catch_all_last() {
+        let parsed = parse_input_format_spec("json,logfmt,line")
+            .expect("line should be allowed as the final fallback");
+        assert!(matches!(parsed, InputFormat::Cascade(_)));
+
+        let parsed = parse_input_format_spec("json,logfmt,raw")
+            .expect("raw should be allowed as the final fallback");
+        assert!(matches!(parsed, InputFormat::Cascade(_)));
     }
 }
