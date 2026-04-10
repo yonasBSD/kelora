@@ -899,17 +899,17 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// Whether field discovery is active (set once at startup).
 static ENABLED: AtomicBool = AtomicBool::new(false);
 
-/// Which observation point to use.
-static SCOPE_OUTPUT: AtomicBool = AtomicBool::new(false);
+/// Whether discovery should observe final emitted fields.
+static DISCOVER_FINAL: AtomicBool = AtomicBool::new(false);
 
 thread_local! {
     static THREAD_DISCOVERY: RefCell<FieldDiscovery> = RefCell::new(FieldDiscovery::new());
 }
 
 /// Enable field discovery (called once at startup).
-pub fn enable(output_scope: bool) {
+pub fn enable(discover_final: bool) {
     ENABLED.store(true, Ordering::Relaxed);
-    SCOPE_OUTPUT.store(output_scope, Ordering::Relaxed);
+    DISCOVER_FINAL.store(discover_final, Ordering::Relaxed);
 }
 
 /// Whether field discovery is active.
@@ -917,9 +917,9 @@ pub fn is_enabled() -> bool {
     ENABLED.load(Ordering::Relaxed)
 }
 
-/// Whether we should observe at the output (post-filter) point.
-pub fn is_output_scope() -> bool {
-    SCOPE_OUTPUT.load(Ordering::Relaxed)
+/// Whether we should observe final emitted fields.
+pub fn is_discover_final() -> bool {
+    DISCOVER_FINAL.load(Ordering::Relaxed)
 }
 
 /// Observe an event's fields (called from the pipeline).

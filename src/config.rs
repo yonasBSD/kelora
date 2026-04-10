@@ -59,7 +59,7 @@ pub struct OutputConfig {
     pub metrics_file: Option<String>,
     pub drain: Option<crate::cli::DrainFormat>,
     pub discover_fields: Option<crate::cli::DiscoverFieldsFormat>,
-    pub discover_fields_scope: crate::cli::DiscoverFieldsScope,
+    pub discover_final: bool,
     pub mark_gaps: Option<chrono::Duration>,
     /// Timestamp formatting configuration (display-only)
     pub timestamp_formatting: TimestampFormatConfig,
@@ -917,7 +917,11 @@ impl KeloraConfig {
         let metrics_with_events = cli.with_metrics;
         let suppress_events_for_metrics = metrics_format.is_some() && !metrics_with_events;
         let suppress_events_for_drain = cli.drain.is_some();
-        let suppress_events_for_discover = cli.discover_fields.is_some();
+        let discover_fields = cli
+            .discover_fields
+            .clone()
+            .or(cli.discover_final_fields.clone());
+        let suppress_events_for_discover = discover_fields.is_some();
 
         // Combine suppressions from stats/metrics data-only modes
         if suppress_events_for_stats
@@ -1010,8 +1014,8 @@ impl KeloraConfig {
                 metrics_with_events,
                 metrics_file,
                 drain: cli.drain.clone(),
-                discover_fields: cli.discover_fields.clone(),
-                discover_fields_scope: cli.discover_fields_scope.clone(),
+                discover_fields,
+                discover_final: cli.discover_final_fields.is_some(),
                 mark_gaps: None,
                 timestamp_formatting: create_timestamp_format_config(cli, default_timezone.clone()),
             },
@@ -1111,7 +1115,7 @@ impl Default for KeloraConfig {
                 metrics_file: None,
                 drain: None,
                 discover_fields: None,
-                discover_fields_scope: crate::cli::DiscoverFieldsScope::Input,
+                discover_final: false,
                 mark_gaps: None,
                 timestamp_formatting: TimestampFormatConfig::default(),
             },

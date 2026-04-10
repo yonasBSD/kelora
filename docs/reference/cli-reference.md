@@ -1169,16 +1169,22 @@ kelora -j app.log --discover
 kelora -j app.log --discover=json
 ```
 
-#### `--discover-scope <SCOPE>`
+#### `--discover-final`
 
-Choose where field discovery observes data:
+Profile final emitted fields instead of parsed input fields.
+Use this when you want to inspect the schema after filters and scripts have run.
 
-- `input` (default) - Profile parsed fields before scripts/filters
-- `output` - Profile fields after scripts and filters
+**Formats:**
+
+- `table` (default) - Human-readable summary
+- `json` - Machine-readable output
 
 ```bash
 # Discover only fields that survive filtering/transforms
-kelora -j app.log --discover --discover-scope=output --filter 'e.level == "ERROR"'
+kelora -j app.log --discover-final --filter 'e.level == "ERROR"'
+
+# JSON output of final fields
+kelora -j app.log --discover-final=json --filter 'e.level == "ERROR"'
 ```
 
 ## Configuration Options

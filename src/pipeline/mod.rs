@@ -384,7 +384,7 @@ impl Pipeline {
 
                     // Field discovery: observe input fields (pre-script)
                     if crate::field_discovery::is_enabled()
-                        && !crate::field_discovery::is_output_scope()
+                        && !crate::field_discovery::is_discover_final()
                     {
                         crate::field_discovery::observe_event_fields(&e.fields);
                     }
@@ -595,7 +595,7 @@ impl Pipeline {
 
                         // Field discovery: observe output fields (post-filter)
                         if crate::field_discovery::is_enabled()
-                            && crate::field_discovery::is_output_scope()
+                            && crate::field_discovery::is_discover_final()
                         {
                             crate::field_discovery::observe_event_fields(&event.fields);
                         }
@@ -694,7 +694,7 @@ impl Pipeline {
 
                             // Field discovery: observe output fields (post-filter)
                             if crate::field_discovery::is_enabled()
-                                && crate::field_discovery::is_output_scope()
+                                && crate::field_discovery::is_discover_final()
                             {
                                 crate::field_discovery::observe_event_fields(&event.fields);
                             }
@@ -840,7 +840,7 @@ impl Pipeline {
 
                 // Field discovery: observe input fields (pre-script)
                 if crate::field_discovery::is_enabled()
-                    && !crate::field_discovery::is_output_scope()
+                    && !crate::field_discovery::is_discover_final()
                 {
                     crate::field_discovery::observe_event_fields(&e.fields);
                 }

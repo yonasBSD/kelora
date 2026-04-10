@@ -98,9 +98,9 @@ pub fn validate_cli_args(cli: &Cli) -> Result<()> {
     // Check --discover and --drain conflicts with parallel mode
     let implies_parallel = cli.parallel || cli.threads > 0 || cli.batch_size.is_some();
 
-    if cli.discover_fields.is_some() && implies_parallel {
+    if (cli.discover_fields.is_some() || cli.discover_final_fields.is_some()) && implies_parallel {
         return Err(anyhow::anyhow!(
-            "--discover is not supported with --parallel or thread overrides. Rerun without --parallel to use field discovery."
+            "--discover and --discover-final are not supported with --parallel or thread overrides. Rerun without --parallel to use field discovery."
         ));
     }
 

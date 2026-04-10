@@ -74,7 +74,7 @@ fn test_discover_json_profiles_nested_input_fields() {
 }
 
 #[test]
-fn test_discover_output_scope_profiles_post_filter_post_exec_fields() {
+fn test_discover_final_profiles_post_filter_post_exec_fields() {
     let input = r#"{"level":"info","keep":true,"bytes":1536}
 {"level":"error","keep":false,"bytes":2048}"#;
 
@@ -86,20 +86,15 @@ fn test_discover_output_scope_profiles_post_filter_post_exec_fields() {
             "e.keep",
             "--exec",
             r#"e.pretty = human_bytes(e.bytes); e = e.keep(["level","pretty"])"#,
-            "--discover=json",
-            "--discover-scope=output",
+            "--discover-final=json",
         ],
         input,
     );
 
-    assert_eq!(
-        exit_code, 0,
-        "discover output scope should succeed: {}",
-        stderr
-    );
+    assert_eq!(exit_code, 0, "discover final should succeed: {}", stderr);
     assert!(
         stderr.is_empty(),
-        "discover output scope should not emit stderr on success: {}",
+        "discover final should not emit stderr on success: {}",
         stderr
     );
 
@@ -158,8 +153,30 @@ fn test_discover_rejects_parallel_mode_at_cli_validation() {
         "validation errors should not emit stdout"
     );
     assert!(
-        stderr.contains("--discover is not supported with --parallel"),
+        stderr.contains("--discover and --discover-final are not supported with --parallel"),
         "expected clear validation message, got: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_discover_and_discover_final_conflict() {
+    let (stdout, stderr, exit_code) = run_kelora_with_input(
+        &["-f", "json", "--discover", "--discover-final"],
+        r#"{"x":1}"#,
+    );
+
+    assert_eq!(
+        exit_code, 2,
+        "conflicting discover flags should be usage errors"
+    );
+    assert!(
+        stdout.is_empty(),
+        "validation errors should not emit stdout"
+    );
+    assert!(
+        stderr.contains("--discover") && stderr.contains("--discover-final"),
+        "expected conflict message to mention both flags, got: {}",
         stderr
     );
 }

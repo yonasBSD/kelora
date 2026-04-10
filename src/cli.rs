@@ -68,13 +68,6 @@ pub enum DiscoverFieldsFormat {
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, Default)]
-pub enum DiscoverFieldsScope {
-    #[default]
-    Input,
-    Output,
-}
-
-#[derive(clap::ValueEnum, Clone, Debug, Default)]
 pub enum DrainFormat {
     #[default]
     Table,
@@ -650,21 +643,25 @@ pub struct Cli {
         require_equals = true,
         num_args = 0..=1,
         default_missing_value = "table",
+        conflicts_with = "discover_final_fields",
         help_heading = "Field Discovery",
         help = "Profile fields: names, inferred types, cardinality estimates, and sample values.\nNested maps and arrays are flattened to 3 levels (e.g. user.name, user.roles[]).\nImplies -q/--quiet (events suppressed). Sequential mode only.\n\nFormats: table (default), json\n\nExamples:\n  --discover          Table summary\n  --discover=json     Machine-readable JSON"
     )]
     pub discover_fields: Option<DiscoverFieldsFormat>,
 
-    /// Scope for --discover: input (pre-script, default) or output (post-filter).
+    /// Profile final emitted fields instead of parsed input fields.
     #[arg(
-        long = "discover-scope",
+        long = "discover-final",
         value_enum,
-        value_name = "SCOPE",
-        default_value = "input",
+        value_name = "FORMAT",
+        require_equals = true,
+        num_args = 0..=1,
+        default_missing_value = "table",
+        conflicts_with = "discover_fields",
         help_heading = "Field Discovery",
-        help = "Observation point for --discover.\n\n  input   Profile raw parsed fields (default)\n  output  Profile fields after scripts and filters"
+        help = "Profile final emitted fields after scripts and filters.\nImplies -q/--quiet (events suppressed). Sequential mode only.\n\nFormats: table (default), json\n\nExamples:\n  --discover-final          Table summary of final fields\n  --discover-final=json     Machine-readable JSON of final fields"
     )]
-    pub discover_fields_scope: DiscoverFieldsScope,
+    pub discover_final_fields: Option<DiscoverFieldsFormat>,
 
     /// Specify custom configuration file path
     #[arg(long = "config-file", help_heading = "Configuration Options")]

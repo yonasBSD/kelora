@@ -106,14 +106,14 @@ If you want machine-readable output for tooling, use JSON:
 kelora -j examples/basics.jsonl --discover=json
 ```
 
-If you're profiling the result after filters or transforms, switch to output scope. This is the version you want when you care about the fields that survive your pipeline, not just the raw parsed input:
+If you're profiling the result after filters or transforms, use `--discover-final`. This is the version you want when you care about the fields that survive your pipeline, not just the raw parsed input:
 
 ```bash
-kelora -j examples/basics.jsonl --discover --discover-scope=output \
+kelora -j examples/basics.jsonl --discover-final \
   --filter 'e.level == "ERROR"'
 ```
 
-Use `--discover` early when exploring a new file. Once you start adding `--filter`, `--exec`, or other transformations, `--discover --discover-scope=output` becomes the better inspection tool because it shows the schema after your pipeline logic runs.
+Use `--discover` early when exploring a new file. Once you start adding `--filter`, `--exec`, or other transformations, `--discover-final` becomes the better inspection tool because it shows the schema after your pipeline logic runs.
 
 ---
 

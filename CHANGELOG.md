@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **Per-file auto-detection** - Added `-f auto-per-file` for batches where each file is internally consistent but different files use different formats.
 - **`--include` now works with `--filter`** - Helper functions defined in an include file (`-I`) can be called from `--filter` expressions. Include files used with `--filter` must contain only function definitions; top-level statements are rejected with a clear error.
-- **Schema discovery mode** - Added `--discover[=table|json]` for stream schema profiling, plus `--discover-scope` to inspect either parsed input fields or post-filter/post-transform output fields. Discovery includes nested field flattening, reservoir-sampled examples, and cap warnings for high-cardinality streams.
+- **Schema discovery mode** - Added `--discover[=table|json]` for parsed-input schema profiling and `--discover-final[=table|json]` for post-filter/post-transform output schema profiling. Discovery includes nested field flattening, reservoir-sampled examples, and cap warnings for high-cardinality streams.
 - **Cascade format mode** - Added cascade parsing mode for mixed-format streams.
 - **Chronological merge for sorted files** - Added `--merge-sorted` to merge multiple already-sorted inputs into one chronological stream with a memory-bounded k-way merge. This is intended for structured batch files with reliable timestamps, requires a concrete input format, works beyond JSON, and aborts on missing timestamps, merge-time parse failures, and per-file disorder.
 - **New Rhai output helpers** - Added `human_bytes`, `human_bytes_si`, `format_decimals`, and `format_percent`.
