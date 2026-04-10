@@ -17,7 +17,7 @@
 // Usage examples:
 //   # Filter slow requests regardless of field naming
 //   kelora --include examples/resolve_fields.rhai -f json logs.jsonl \
-//     --exec 'if resolve_duration(e) > 1000 { e } else { () }'
+//     --filter 'resolve_duration(e) > 1000'
 //
 //   # Normalize user field across different log sources
 //   kelora --include examples/resolve_fields.rhai -f json logs.jsonl \
