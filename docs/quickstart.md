@@ -68,7 +68,7 @@ Try one of these:
 Most first-run problems come from one of these cases:
 
 - **Wrong parser**: Try `-j`, `-f logfmt`, `-f combined`, or `-f 'cols:...'` explicitly instead of relying on auto-detection.
-- **Wrong field name**: Run with `--stats` first to see discovered keys, then update your filter to match.
+- **Wrong field name**: Run `--discover` first to inspect parsed fields and sample values. If you're debugging a filtered or transformed pipeline, use `--discover --discover-scope=output` instead.
 - **Filter too strict**: Remove filters and re-add them one at a time.
 - **Mixed-format file**: If your file mixes JSON lines and plain text, process them separately. See [Integrate Kelora with External Tools](how-to/integrate-external-tools.md).
 - **Nothing matches your level/timestamp assumptions**: Prefer explicit filters like `e.level == "ERROR"` and confirm timestamp field names with `--stats`.
@@ -76,6 +76,8 @@ Most first-run problems come from one of these cases:
 When in doubt, start here:
 
 ```bash
+kelora your.log --discover
+kelora your.log --discover --discover-scope=output --filter 'e.level == "ERROR"'
 kelora your.log --stats
 kelora your.log --take 5
 ```
@@ -100,7 +102,7 @@ You've seen Kelora in action. Next, learn how it works:
 
 Follow this sequence to build your Kelora skills systematically:
 
-1. **[Tutorial: Basics](tutorials/basics.md)** (30 min) - Master input formats (`-f`, `-j`), display options (`-k`, `-b`, `-c`), level filtering (`-l`, `-L`), and output formats (`-F`, `-J`). Learn what events are and how to work with them.
+1. **[Tutorial: Basics](tutorials/basics.md)** (30 min) - Master input formats (`-f`, `-j`), field discovery (`--discover`), display options (`-k`, `-b`, `-c`), level filtering (`-l`, `-L`), and output formats (`-F`, `-J`). Learn what events are and how to work with them.
 
 2. **[Tutorial: Introduction to Rhai](tutorials/intro-to-rhai.md)** (20 min) - Learn to write filter expressions and simple transforms. Understand how to access event fields, use conditionals, and convert types safely.
 

@@ -5,6 +5,7 @@ Master the essential commands for reading logs, controlling display output, and 
 ## What You'll Learn
 
 - Specify input formats with `-f` and `-j`
+- Inspect available fields quickly with `--discover`
 - Control what fields are displayed with `-b`, `-c`, `-k`, and `-K`
 - Filter events by log level with `-l` and `-L`
 - Export data in different formats with `-F` and `-J`
@@ -77,7 +78,46 @@ For details on each format (including examples and field mappings), see the **[F
 
 ---
 
-## Part 2: Understanding the Default Display
+## Part 2: Discover Available Fields (`--discover`)
+
+Before writing filters or choosing display keys, it helps to see what Kelora actually parsed.
+
+```bash exec="on" source="above" result="ansi"
+kelora -j examples/basics.jsonl --discover
+```
+
+`--discover` gives you a field profile instead of printing events. The default table shows:
+
+- Field names
+- How often each field appears (`Seen` and `Miss%`)
+- Inferred types
+- Unique value counts
+- Example values
+
+This is often the fastest way to answer questions like:
+
+- "Is the field called `message`, `msg`, or `text`?"
+- "Did this parser produce numbers or strings?"
+- "What nested keys are present in this file?"
+
+If you want machine-readable output for tooling, use JSON:
+
+```bash
+kelora -j examples/basics.jsonl --discover=json
+```
+
+If you're profiling the result after filters or transforms, switch to output scope. This is the version you want when you care about the fields that survive your pipeline, not just the raw parsed input:
+
+```bash
+kelora -j examples/basics.jsonl --discover --discover-scope=output \
+  --filter 'e.level == "ERROR"'
+```
+
+Use `--discover` early when exploring a new file. Once you start adding `--filter`, `--exec`, or other transformations, `--discover --discover-scope=output` becomes the better inspection tool because it shows the schema after your pipeline logic runs.
+
+---
+
+## Part 3: Understanding the Default Display
 
 Let's examine what Kelora shows by default:
 
@@ -102,7 +142,7 @@ kelora -j examples/basics.jsonl
 
 ---
 
-## Part 3: Understanding Events
+## Part 4: Understanding Events
 
 Before we dive into display options, let's clarify what an **event** is and how you'll work with it in filters and scripts.
 
@@ -147,7 +187,7 @@ You'll encounter `e` throughout the documentation. Remember: `e` = the current e
 
 ---
 
-## Part 4: Display Modifiers (`-b`, `-c`, `-k`, `-K`)
+## Part 5: Display Modifiers (`-b`, `-c`, `-k`, `-K`)
 
 Most workflows use `-k` to select specific fields. The other modifiers are useful in specific situations.
 
@@ -193,7 +233,7 @@ kelora -j examples/basics.jsonl -K service,version
 
 ---
 
-## Part 5: Level Filtering (`-l`, `-L`)
+## Part 6: Level Filtering (`-l`, `-L`)
 
 ### Include Levels (`-l`) - Show Only Specific Log Levels
 
@@ -223,7 +263,7 @@ kelora -j examples/basics.jsonl -L debug,info
 
 ---
 
-## Part 6: Output Formats (`-F`, `-J`)
+## Part 7: Output Formats (`-F`, `-J`)
 
 The default `key='value'` format is great for reading, but sometimes you need machine-readable output.
 
