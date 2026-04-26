@@ -15,6 +15,12 @@ This layered architecture enables efficient streaming with low memory usage whil
 ![Kelora Pipeline Architecture](pipeline-model.png#only-light)
 ![Kelora Pipeline Architecture](pipeline-model-dark.png#only-dark)
 
+**Diagram summary:** Kelora runs `--begin` once to prepare shared `conf`, streams each event through input, line-level, parser, script, fixed post-processing, and output stages, then runs `--end` with final metrics. In `--parallel` mode, batches run through independent worker pipelines and merge output, metrics, and stats afterward.
+
+<span class="visually-hidden">
+Pipeline diagram description: the top lifecycle scope shows `--begin`, `conf`, `metrics`, and `--end`. The main per-event streaming pipeline flows from inputs to reader, line processing, parser, event context, user stages, fixed stages, limiter, formatter, and output. Dashed arrows show read-only access from `conf` to user stages and `track_*` updates from user stages to metrics. The bottom parallel mode row shows batch lines, worker pipelines, merge output, and merge metrics, with a note that spans force sequential mode.
+</span>
+
 ## Quick Start: What You'll Use Most
 
 **For typical log analysis**, you only interact with these stages:
