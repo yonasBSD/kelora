@@ -4,6 +4,27 @@ All notable changes to Kelora will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+
+- **`--discover-depth=0` for unlimited flattening** - Pass `--discover-depth=0` to fully flatten deeply nested JSON during field discovery, removing the previous hard-coded 3-level cap.
+
+### Changed
+
+- **`--discover` examples in inspect style** - String samples are now quoted and escaped (`"hello"`, `""`, `\n`) matching `-F inspect` rendering, so types are unambiguous at a glance.
+- **`--discover` uses full terminal width** - The hard 60-char cap on the examples column is gone; examples grow to fill the available terminal width. Compact layout also spans the full width instead of truncating at ~82 chars.
+- **`--discover` tighter field column** - The Field column no longer pads to a 12-char floor, so narrow field names don't waste horizontal space.
+- **Parse error summaries include filenames** - Parse error messages now show which file the error came from, making multi-file runs easier to debug.
+
+### Fixed
+
+- **`track_stats` metrics now usable in `--end` and `span_close`** - Percentile, average, and cardinality sketches were exposed as raw blobs, making `metrics["foo_p95"]` unusable. They are now properly finalized to scalar values.
+- **Exec error counts no longer silently undercounted** - The exec stage's atomic-rollback path was discarding `track_error` writes; error counters now survive rollback.
+- **`--discover` HLL cardinality clamped to observation count** - The HyperLogLog estimate could exceed the number of times a field was seen; it is now clamped so "Uniq > Seen" rows no longer appear.
+- **`--discover` empty strings render as `""`** - Previously showed a bare gap that looked like a stray separator.
+- **Grok alias lookup order** - Fixed unordered alias lookup when building match names.
+
 ## [1.5.0] - 2026-04-10
 
 ### Added
@@ -711,6 +732,9 @@ _Initial release (yanked)._
 
 ---
 
+[Unreleased]: https://github.com/dloss/kelora/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/dloss/kelora/compare/v1.4.10...v1.5.0
+[1.4.10]: https://github.com/dloss/kelora/compare/v1.4.3...v1.4.10
 [1.4.3]: https://github.com/dloss/kelora/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/dloss/kelora/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/dloss/kelora/compare/v1.4.0...v1.4.1
