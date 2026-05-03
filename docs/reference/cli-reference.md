@@ -1150,7 +1150,7 @@ kelora -j app.log --drain=json -k message
 
 Profile observed fields across the stream: field names, inferred types, cardinality estimates, and sample values.
 Nested maps and arrays are flattened into dotted paths up to 3 levels deep by default (e.g. `user.name`, `user.roles[]`);
-use [`--discover-depth`](#--discover-depth-n) to change the limit (or pass `0` for unlimited).
+use [`--discover-depth`](#-discover-depth-n) to change the limit (or pass `0` for unlimited).
 Example values are drawn via reservoir sampling so rare distinct values surface even on long streams.
 When deeper nesting is present, the table output adds an explicit note that flattening stopped at the depth cap,
 and JSON output includes `flatten_depth_limit` and `flatten_depth_capped`.

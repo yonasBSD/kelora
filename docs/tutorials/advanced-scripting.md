@@ -96,7 +96,8 @@ available to later filters or transformations.
 
     ```bash
     kelora -j examples/security_audit.jsonl \
-      -e 'e.user_alias = pseudonym(e.user, "users"); e.ip_masked = e.ip.mask_ip(1)' \
+      -e 'if e.has("user") { e.user_alias = pseudonym(e.user, "users"); }
+          if e.has("ip") { e.ip_masked = e.ip.mask_ip(1); }' \
       -k timestamp,event,user_alias,ip_masked
     ```
 
@@ -104,7 +105,8 @@ available to later filters or transformations.
 
     ```bash exec="on" source="above" result="ansi"
     kelora -j examples/security_audit.jsonl \
-      -e 'e.user_alias = pseudonym(e.user, "users"); e.ip_masked = e.ip.mask_ip(1)' \
+      -e 'if e.has("user") { e.user_alias = pseudonym(e.user, "users"); }
+          if e.has("ip") { e.ip_masked = e.ip.mask_ip(1); }' \
       -k timestamp,event,user_alias,ip_masked
     ```
 
