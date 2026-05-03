@@ -12,13 +12,14 @@ Kelora's processing model consists of three distinct layers operating on differe
 
 This layered architecture enables efficient streaming with low memory usage while supporting both sequential and parallel processing modes.
 
-![Kelora Pipeline Architecture](pipeline-model.png#only-light)
-![Kelora Pipeline Architecture](pipeline-model-dark.png#only-dark)
+[![Kelora pipeline data flow showing a concrete log line moving through decompression, raw-line filtering, multiline aggregation, parsing, CLI-ordered user stages, fixed event stages, formatting, and output](pipeline-data-flow.png)](pipeline-data-flow.png)
 
-**Diagram summary:** Kelora runs `--begin` once to prepare shared `conf`, streams each event through input, line-level, parser, script, fixed post-processing, and output stages, then runs `--end` with final metrics. In `--parallel` mode, batches run through independent worker pipelines and merge output, metrics, and stats afterward.
+_Click the diagram to open it full-size._
+
+**Diagram summary:** Kelora runs raw-line options before parsing, then parses complete event strings into event maps. User stages (`--filter`, `--levels`, `--exec`, `--assert`, and related flags) run in CLI order. Fixed event stages such as timestamp filtering, key selection, and `--take` run afterward.
 
 <span class="visually-hidden">
-Pipeline diagram description: the top lifecycle scope shows `--begin`, `conf`, `metrics`, and `--end`. The main per-event streaming pipeline flows from inputs to reader, line processing, parser, event context, user stages, fixed stages, limiter, formatter, and output. Dashed arrows show read-only access from `conf` to user stages and `track_*` updates from user stages to metrics. The bottom parallel mode row shows batch lines, worker pipelines, merge output, and merge metrics, with a note that spans force sequential mode.
+Pipeline diagram description: a sample compressed input file becomes raw log lines, then line processing drops unwanted lines before parsing. Multiline aggregation can combine stack traces into one event string. The parser creates event map `e`, user stages run in CLI order, fixed event stages run afterward, and the formatter emits structured output. A lifecycle rail shows `--begin`, `conf`, `track_*` metrics updates, and `--end`.
 </span>
 
 ## Quick Start: What You'll Use Most
@@ -248,18 +249,27 @@ Each stage processes the output of the previous stage sequentially.
 
 **User-controlled stages** (run in the order you specify them on the CLI):
 
-1. `--filter`, `--levels`, `--exclude-levels`, `--exec`, `--exec-file`
+1. `--filter`, `--levels`, `--exclude-levels`, `--exec`, `--exec-file`, `--assert`
 
-**Fixed-position filters** (always run after user-controlled stages, regardless of CLI order):
+**Fixed-position event stages** (always run after user-controlled stages, regardless of CLI order):
 
 2. **Timestamp filtering** – `--since`, `--until`
-3. **Key filtering** – `--keys`, `--exclude-keys`
+3. **Timestamp conversion** – `--normalize-ts`
+4. **Drain summary** – `--drain` (sequential only)
+5. **Key filtering** – `--keys`, `--exclude-keys`
+6. **Take limit** – `--take`
 
 Place `--levels` before heavy transforms to prune work early, or add another `--levels` after a script if you synthesise a level field there.
 
 ### Span Processing
 
 Groups events into spans for aggregation:
+
+[![Kelora span processing showing span metadata assignment before user stages, dropped events excluded from span.events, emitted events recorded into the active span, and span-close hooks receiving span summaries](pipeline-span-processing.png)](pipeline-span-processing.png)
+
+_Click the diagram to open it full-size._
+
+**Diagram summary:** Kelora assigns span metadata before user stages run, but only emitted events are stored in `span.events`. Dropped events are marked as filtered and excluded from the span buffer. When a span closes, `--span-close` runs once with the span binding and per-span metric deltas.
 
 **Count-based Spans:**
 ```bash
@@ -277,11 +287,11 @@ Closes span on aligned time windows (5m, 1h, 30s, etc.).
 
 **Span Processing Flow:**
 
-1. Event passes through filters/execs
-2. Span processor assigns `span_id` and `SpanStatus`
-3. Event processed with span context
-4. When span closes → `--span-close` hook executes
-5. Hook has access to `meta.span_id`, `meta.span_start`, `meta.span_end`, `metrics`
+1. Parser creates an event map
+2. Span processor assigns pending span metadata (`meta.span_id`, `meta.span_status`, `meta.span_start`, `meta.span_end`)
+3. User stages and fixed event stages run
+4. Only emitted events are recorded in `span.events`; dropped events are marked filtered and excluded
+5. When span closes → `--span-close` hook executes with `span` and `metrics`
 
 **Constraints:**
 
@@ -346,30 +356,40 @@ kelora -j app.log \
 
 Kelora's `--parallel` mode is **batch-parallel**, not stage-parallel.
 
+[![Kelora parallel mode showing line batches, optional multiline chunking before workers, independent worker pipelines, ordering buffer, merged output, and merged metrics](pipeline-parallel-mode.png)](pipeline-parallel-mode.png)
+
+_Click the diagram to open it full-size._
+
+**Diagram summary:** Parallel mode batches raw lines. Without multiline, workers receive line batches directly. With multiline enabled, a chunker thread builds complete event strings before worker processing. Workers run independent pipeline instances, then Kelora merges results, ordering, metrics, and stats.
+
 ### Architecture
 
 ```
 Sequential:  Line → Line filters → Multiline → Parse → Script stages → Output
              (one at a time)
 
-Parallel:    Batch of lines → Worker pool
-             Each worker: Line filters → Multiline → Parse → Script stages
+Parallel:    Lines → Line filters → Line batches
+             Without multiline: batches → Worker pool
+             With multiline: batches → Chunker thread → Event batches → Worker pool
+             Each worker: Parse → Script stages → Fixed stages
              Results → Ordering buffer → Output
 ```
 
 Where:
 
-- **Line filters** = `--skip-lines`, `--ignore-lines`, `--section-start`, etc.
+- **Line filters** = `--skip-lines`, section selection, `--keep-lines`, `--ignore-lines`
 - **Multiline** = Event boundary detection (aggregates multiple lines into events)
-- **Script stages** = `--filter` and `--exec` in CLI order
+- **Script stages** = `--filter`, `--levels`, `--exclude-levels`, `--exec`, `--assert`, and `--exec-file` in CLI order
 
 ### How It Works
 
-1. **Reader thread** batches lines (default: 1000 lines, 200ms timeout)
-2. **Worker pool** processes batches independently (default: CPU count workers)
-3. Each worker has its own Pipeline instance
-4. **Results merged** with ordering preservation (default) or unordered (`--unordered`)
-5. **Stats/metrics merged** from all workers
+1. **Reader thread** reads lines from input
+2. **Batcher thread** applies early line processing and batches surviving lines (default: 1000 lines, 200ms timeout)
+3. With multiline enabled, a **chunker thread** converts line batches into complete event strings before worker processing
+4. **Worker pool** processes batches independently (default: CPU count workers)
+5. Each worker has its own Pipeline instance
+6. **Results merged** with ordering preservation (default) or unordered (`--unordered`)
+7. **Stats/metrics merged** from all workers
 
 **Configuration:**
 ```bash
@@ -389,9 +409,9 @@ kelora -j large.log \
 
 **Multiline Behavior:**
 
-- Multiline chunking happens **per-batch**
-- Event boundaries may not span batch boundaries
-- Consider larger batch sizes for multiline workloads
+- With multiline enabled, a dedicated chunker thread creates complete event strings before workers run
+- This avoids splitting multiline events at line-batch boundaries
+- Multiline workloads may still parallelize less efficiently because chunking is a shared upstream step
 
 **Ordering:**
 
@@ -530,7 +550,7 @@ kelora -j app.log --strict
 │  Layer 2: Line-Level Processing         │
 ├─────────────────────────────────────────┤
 │  • --skip-lines (skip first N)          │
-│  • --section-start/through (sections)   │
+│  • --section-from/through (sections)    │
 │  • --ignore-lines/--keep-lines (regex)  │
 │  • Multiline chunker (event boundaries) │
 └──────────────┬──────────────────────────┘
@@ -540,11 +560,11 @@ kelora -j app.log --strict
 ├─────────────────────────────────────────┤
 │  • Parser → Event map                   │
 │  • Span preparation (assign span_id)    │
-│  • Script stages (--filter/--exec)      │
-│    - User stages in CLI order           │
-│    - Timestamp filtering (--since)      │
-│    - Level filtering (--levels)         │
-│    - Key filtering (--keys)             │
+│  • User stages in CLI order             │
+│    - --filter/--levels/--exec/--assert  │
+│  • Fixed event stages                   │
+│    - --since/--until, --keys, etc.      │
+│  • Take limiter (--take)                │
 │  • Span close hooks (--span-close)      │
 │  • Output formatting                    │
 └──────────────┬──────────────────────────┘
@@ -555,10 +575,10 @@ kelora -j app.log --strict
 
 **Parallel Mode Differences:**
 ```
-Line batching (1000 lines) → Worker pool
+Reader → line filtering/batching → optional multiline chunker → Worker pool
 Each worker independently:
 
-  - Line-level processing
+  - Parse event strings
   - Event-level processing
 Results → Ordering buffer → Merged output
 Metrics → GlobalTracker → Merged stats
