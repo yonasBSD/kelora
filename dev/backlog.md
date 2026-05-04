@@ -2,6 +2,10 @@
 
 Combined list of new features and technical debt items. All features here are parallel-safe and fit the streaming pipeline architecture.
 
+See also: [v2 behavior notes](v2-behavior-notes.md) for candidate breaking
+changes around resiliency, parser strictness, config validation, and scored
+auto-format detection.
+
 ---
 
 ## New Rhai Functions
