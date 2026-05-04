@@ -8,8 +8,8 @@ Kelora uses standard Unix exit codes to indicate success or failure:
 
 | Code | Name | Meaning | Cause |
 |------|------|---------|-------|
-| `0` | Success | No errors occurred | Clean processing, no parse/filter/exec/file errors |
-| `1` | General Error | Processing errors occurred | Parse errors, filter errors, exec errors, file I/O failures |
+| `0` | Success | Processing completed successfully | Clean processing, or recovered filter/exec errors in resilient mode |
+| `1` | General Error | Processing errors occurred | Parse errors, assertion failures, file I/O failures, strict-mode runtime errors |
 | `2` | Usage Error | Invalid command-line usage | Invalid flags, incompatible options, configuration errors |
 
 ## Signal Exit Codes
@@ -24,9 +24,9 @@ When Kelora is interrupted by signals:
 
 ## Exit Code 0: Success
 
-Indicates **successful processing** with no errors. All lines parsed successfully, no filter/exec errors, and processing completed normally.
+Indicates **successful processing**. All required input was processed, and no unrecovered processing failure occurred.
 
-**Important:** Filtering events is **not** an error. If all events are filtered out, exit code is still `0`.
+**Important:** Filtering events is **not** an error. If all events are filtered out, exit code is still `0`. In resilient mode, recovered filter and exec runtime errors are reported as diagnostics but also exit `0`; use `--strict` when runtime errors should fail the process.
 
 ```bash
 # Returns 0 - filtering is not an error
@@ -42,26 +42,27 @@ echo $?
 
 ## Exit Code 1: Processing Errors
 
-Indicates errors occurred during processing. Five types:
+Indicates unrecovered errors occurred during processing. Four common types:
 
 | Error Type | Cause | Example |
 |------------|-------|---------|
 | **Parse errors** | Lines couldn't be parsed in specified format | Invalid JSON/logfmt syntax |
-| **Filter errors** | `--filter` expressions failed during evaluation | Missing field access, type errors |
-| **Exec errors** | `--exec` scripts failed during execution | Runtime errors in Rhai code |
 | **Assertion failures** | `--assert` expressions evaluated to false | Data quality violations, missing required fields |
 | **File I/O failures** | Individual files failed to open or decompress | Permission denied, file not readable, decompression failed |
+| **Strict-mode runtime errors** | Filter/exec expressions failed while `--strict` was enabled | Missing field access, type errors |
 
 ### Resilient Mode (Default)
 
-Errors are recorded but processing continues. Exit code `1` returned at the end if any errors occurred:
+Errors are recorded but processing continues. Recovered filter and exec runtime errors are warnings and do not change the exit code:
 
 ```bash
 kelora -j app.log --exec 'e.result = e.value.to_int()'
 # ... processing continues despite errors ...
 echo $?
-1  # Errors occurred but processing completed
+0  # Recovered runtime errors were reported, but processing completed
 ```
+
+For automation, use `--strict` to fail on script/runtime errors, and use `--assert` to fail on explicit data-quality requirements.
 
 ### Strict Mode
 
@@ -85,10 +86,10 @@ echo $?
 ```bash
 # Parse error
 echo '{invalid json}' | kelora -j
-# Filter error
-kelora -j app.log --filter 'e.missing_field.to_int()'
-# Exec error
-kelora -j app.log --exec 'e.result = e.invalid.to_int()'
+# Strict-mode filter error
+kelora -j --strict app.log --filter 'e.missing_field.to_int()'
+# Strict-mode exec error
+kelora -j --strict app.log --exec 'e.result = e.invalid.to_int()'
 # Assertion failure
 kelora -j app.log --assert 'e.has("user_id")'
 # File I/O error (some files failed)
@@ -137,7 +138,7 @@ echo $?
 
 | Mode | Behavior | Exit Code 1 Timing | Use Case |
 |------|----------|-------------------|----------|
-| **Resilient** (default) | Continue on errors | At end if any errors occurred | Production, collect all errors |
+| **Resilient** (default) | Continue on recovered runtime errors | At end only for unrecovered failures | Production, exploratory analysis |
 | **Strict** (`--strict`) | Abort on first error | Immediately on first error | Validation, fail-fast |
 | **Parallel** (`--parallel`) | Same as sequential | Same as non-parallel | Performance (exit code behavior unchanged) |
 

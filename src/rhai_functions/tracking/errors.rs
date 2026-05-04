@@ -202,9 +202,21 @@ pub fn track_error(
     });
 }
 
+#[cfg(test)]
 pub fn has_errors_in_tracking(snapshot: &TrackingSnapshot) -> bool {
+    has_errors_in_tracking_with_policy(snapshot, true)
+}
+
+pub fn has_errors_in_tracking_with_policy(
+    snapshot: &TrackingSnapshot,
+    include_recovered_runtime_errors: bool,
+) -> bool {
     for (key, value) in &snapshot.internal {
-        if let Some(_error_type) = key.strip_prefix("__kelora_error_count_") {
+        if let Some(error_type) = key.strip_prefix("__kelora_error_count_") {
+            if !include_recovered_runtime_errors && is_recovered_runtime_error(error_type) {
+                continue;
+            }
+
             if let Ok(count) = value.as_int() {
                 if count > 0 {
                     return true;
@@ -213,6 +225,10 @@ pub fn has_errors_in_tracking(snapshot: &TrackingSnapshot) -> bool {
         }
     }
     false
+}
+
+fn is_recovered_runtime_error(error_type: &str) -> bool {
+    matches!(error_type, "exec" | "filter")
 }
 
 pub fn format_fatal_error_line(snapshot: &TrackingSnapshot) -> String {
@@ -297,7 +313,7 @@ pub fn extract_error_summary_from_tracking(
     snapshot: &TrackingSnapshot,
     verbose: u8,
     stats: Option<&ProcessingStats>,
-    _config: Option<&crate::config::KeloraConfig>,
+    config: Option<&crate::config::KeloraConfig>,
 ) -> Option<String> {
     let mut total_errors = 0;
     let mut error_types = Vec::new();
@@ -347,6 +363,24 @@ pub fn extract_error_summary_from_tracking(
             &primary_error_type[1..],
             total_errors
         ));
+    }
+
+    if config.is_some_and(|c| !c.processing.strict)
+        && is_recovered_runtime_error(primary_error_type)
+    {
+        if let Some(stats) = stats {
+            if stats.events_created > 0 {
+                let pct = (total_errors as f64 / stats.events_created as f64) * 100.0;
+                if total_errors as usize >= stats.events_created {
+                    summary.push_str(", affecting every event");
+                    summary.push_str(
+                        "\n  This usually means a script bug or field-name typo. Use --strict to fail immediately, or --verbose to inspect each error.",
+                    );
+                } else if pct >= 90.0 {
+                    summary.push_str(&format!(", affecting {:.1}% of events", pct));
+                }
+            }
+        }
     }
 
     let mut shown_samples = 0;

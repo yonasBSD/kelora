@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **Breaking: resilient-mode runtime errors no longer fail the process** - In default resilient mode, recovered `--filter` and `--exec` runtime errors are reported as diagnostics but exit `0`. Use `--strict` to fail on runtime errors, or `--assert` to fail on explicit data-quality rules.
 - **`--discover` examples in inspect style** - String samples are now quoted and escaped (`"hello"`, `""`, `\n`) matching `-F inspect` rendering, so types are unambiguous at a glance.
 - **`--discover` uses full terminal width** - The hard 60-char cap on the examples column is gone; examples grow to fill the available terminal width. Compact layout also spans the full width instead of truncating at ~82 chars.
 - **`--discover` tighter field column** - The Field column no longer pads to a 12-char floor, so narrow field names don't waste horizontal space.

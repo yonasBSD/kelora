@@ -1267,8 +1267,8 @@ Kelora uses standard Unix exit codes to indicate success or failure:
 
 | Code | Meaning |
 |------|---------|
-| `0` | Success - no errors occurred |
-| `1` | Processing errors (parse/filter/exec/assertion/file errors) |
+| `0` | Success - no unrecovered processing failure occurred |
+| `1` | Processing errors (parse/assertion/file errors, strict-mode filter/exec errors) |
 | `2` | Usage errors (invalid flags, incompatible options, config errors) |
 | `130` | Interrupted (Ctrl+C / SIGINT) |
 | `141` | Broken pipe (SIGPIPE - normal in pipelines) |

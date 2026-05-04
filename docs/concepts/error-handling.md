@@ -20,7 +20,8 @@ In resilient mode (default), Kelora continues processing even when errors occur:
 - **Parse errors**: Skip unparseable lines, continue with next line
 - **Filter errors**: Treat as `false`, skip event
 - **Transform errors**: Return original event unchanged (atomic rollback)
-- **Summary**: Show error count at end
+- **Summary**: Show recovered runtime errors as warnings at end
+- **Exit code**: `0` for recovered filter/exec errors; `1` for parse errors, assertion failures, and file I/O failures
 
 ### When to Use
 
@@ -68,6 +69,7 @@ If `e.timestamp` is missing or invalid:
 - Event is skipped
 - Error is recorded
 - Processing continues
+- Exit code remains `0` unless an unrecovered error also occurs
 
 ## Strict Mode
 
@@ -276,8 +278,8 @@ Kelora uses standard Unix exit codes:
 
 | Code | Meaning |
 |------|---------|
-| `0` | Success (no errors) |
-| `1` | Processing errors (parse/filter/exec/file errors) |
+| `0` | Success (no unrecovered processing failure) |
+| `1` | Processing errors (parse/assertion/file errors, strict-mode filter/exec errors) |
 | `2` | Invalid usage (CLI errors, incompatible flags) |
 | `130` | Interrupted (Ctrl+C) |
 | `141` | Broken pipe (normal in Unix pipelines) |

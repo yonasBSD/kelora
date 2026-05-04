@@ -387,6 +387,7 @@ meta.parsed_ts                        // Parsed UTC timestamp before scripts (or
 - Parse errors → skip line, continue
 - Filter errors → treat as false, drop event
 - Exec errors → rollback, keep original event
+- Recovered filter/exec errors are warnings and exit 0
 
 **Strict mode (`--strict`):**
 

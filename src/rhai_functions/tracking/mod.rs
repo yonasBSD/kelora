@@ -9,9 +9,11 @@ mod rank;
 mod state;
 #[cfg(test)]
 use errors::format_error_location;
+#[cfg(test)]
+pub use errors::has_errors_in_tracking;
 pub use errors::{
-    extract_error_summary_from_tracking, format_fatal_error_line, has_errors_in_tracking,
-    track_error,
+    extract_error_summary_from_tracking, format_fatal_error_line,
+    has_errors_in_tracking_with_policy, track_error,
 };
 pub use format::{format_metrics_json, format_metrics_output};
 use merge::{

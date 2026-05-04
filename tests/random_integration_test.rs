@@ -111,10 +111,36 @@ fn test_rand_int_invalid_range() {
         input,
     );
 
-    assert_eq!(exit_code, 1, "kelora should exit with error code 1");
+    assert_eq!(
+        exit_code, 0,
+        "default resilient exec errors should not fail the process"
+    );
     assert!(
         stderr.contains("Exec errors") || stderr.contains("Rhai error"),
         "Error message should mention Exec or Rhai error. stderr: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_rand_int_invalid_range_strict() {
+    let input = r#"{"message": "test"}"#;
+
+    let (_stdout, stderr, exit_code) = run_kelora_with_file(
+        &[
+            "-f",
+            "json",
+            "--strict",
+            "-e",
+            "e.bad_id = rand_int(999, 100)",
+        ],
+        input,
+    );
+
+    assert_eq!(exit_code, 1, "strict exec errors should fail the process");
+    assert!(
+        stderr.contains("Pipeline error") || stderr.contains("exec error"),
+        "Error message should mention the strict exec failure. stderr: {}",
         stderr
     );
 }

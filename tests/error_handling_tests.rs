@@ -240,13 +240,31 @@ fn test_exec_type_errors_are_reported_in_default_summary() {
     let (_stdout, stderr, exit_code) =
         run_kelora_with_input(&["-f", "json", "--exec", "e.level / 5"], input);
 
-    assert_ne!(
+    assert_eq!(
         exit_code, 0,
-        "runtime exec errors should affect the exit code"
+        "default resilient runtime exec errors should not affect the exit code"
     );
     assert!(
         stderr.contains("Exec errors:") || stderr.contains("Mixed errors:"),
         "stderr should include a runtime error summary: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_exec_type_errors_fail_in_strict_mode() {
+    let input = r#"{"level": "INFO"}"#;
+
+    let (_stdout, stderr, exit_code) =
+        run_kelora_with_input(&["-f", "json", "--strict", "--exec", "e.level / 5"], input);
+
+    assert_ne!(
+        exit_code, 0,
+        "strict runtime exec errors should affect the exit code"
+    );
+    assert!(
+        stderr.contains("Pipeline error") || stderr.contains("exec error"),
+        "stderr should include a strict exec failure: {}",
         stderr
     );
 }

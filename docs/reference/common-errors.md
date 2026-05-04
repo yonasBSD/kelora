@@ -345,8 +345,8 @@ Kelora uses standard exit codes:
 
 | Code | Meaning | Common Cause |
 |------|---------|--------------|
-| `0` | Success | No errors occurred |
-| `1` | Processing errors | Parse errors, filter errors, exec errors, file I/O failures |
+| `0` | Success | No unrecovered processing failure occurred |
+| `1` | Processing errors | Parse errors, assertion failures, file I/O failures, strict-mode runtime errors |
 | `2` | Usage errors | Invalid flags, incompatible options, bad config |
 | `130` | Interrupted | Ctrl+C (SIGINT) |
 | `141` | Broken pipe | Normal in pipelines with `head` |

@@ -196,6 +196,7 @@ ERROR HANDLING MODES:
     • Parse errors → skip line, continue
     • Filter errors → treat as false, drop event
     • Exec errors → rollback, keep original event
+    • Recovered filter/exec errors are warnings and exit 0
   --strict mode:
     • Any error → abort with exit code 1
 

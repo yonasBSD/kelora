@@ -120,7 +120,7 @@ Alternatives:
   ```
 
 ## Validate and Hand Off
-- Inspect `--stats` output to ensure parse error counts are zero (exit code 1 indicates parse/runtime failures).
+- Inspect `--stats` output to ensure parse error counts are zero. Exit code `1` indicates unrecovered failures; use `--strict` when recovered runtime errors should also fail the run.
 - Sample a few events with `--take 20` before exporting to confirm filters captured the right incidents.
 - Note any masking or redaction you applied so downstream teams know whether to consult raw logs.
 

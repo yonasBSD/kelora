@@ -12,8 +12,8 @@ This document defines what Kelora is, what it is not, and the design constraints
 * A **streaming pipeline**: Input → Parsing → Processing (Rhai) → Output
 * A **scriptable processor** for filtering, mutation, enrichment, and event shaping
 * A tool that supports batch and live-stream workflows (stdin/files)
-* A system with explicit resiliency modes: resilient default, strict fail-fast
-* A tool for composable automation in CI and shell pipelines
+* A system with explicit error policies: resilient exploratory default, strict fail-fast validation, and assertion-based data-quality gates
+* A tool for composable automation in CI and shell pipelines through explicit policy flags
 
 ---
 
@@ -57,7 +57,7 @@ This document defines what Kelora is, what it is not, and the design constraints
 | Core identity | Scriptable CLI log processor, not a platform |
 | Event model | Each input unit becomes a structured event with typed values |
 | Core fields | `ts`, `level`, `msg` are first-class and consistently handled |
-| Error model | Resilient by default; strict mode for fail-fast correctness |
+| Error model | Resilient by default for messy logs; recovered runtime errors are diagnostics, while `--strict` and `--assert` define automation failure policy |
 | Type model | Explicit conversion over implicit coercion |
 | Performance model | Configurable parallelism, ordering, and batching |
 | Output model | Multiple output formats; keep stdout data-clean and stderr diagnostic |
@@ -80,8 +80,10 @@ The execution path is intentionally simple:
 
 ## 🧪 RESILIENCY MODEL
 
-* **Resilient mode (default)**: continue processing and report issues clearly
-* **Strict mode**: abort on first relevant parse/runtime failure
+* **Resilient mode (default)**: continue processing, recover per-event filter/exec runtime errors, report them clearly as diagnostics, and exit `0` unless an unrecovered failure occurs
+* **Unrecovered failures**: parse errors, file I/O failures, assertion failures, and explicit process exits fail the run
+* **Strict mode**: abort on the first relevant parse/runtime failure and exit non-zero
+* **Assertion policy**: use `--assert` when missing or malformed data should fail the run
 * Diagnostics go to stderr; valid event output goes to stdout
 * Suppression flags exist, but are explicit and intentional
 

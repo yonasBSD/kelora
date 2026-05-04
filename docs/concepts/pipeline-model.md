@@ -506,7 +506,8 @@ In parallel mode:
 - **Parse errors:** Skip line, continue processing
 - **Filter errors:** Treat as `false`, skip event
 - **Transform errors:** Return original event unchanged
-- **Summary:** Show error count at end
+- **Summary:** Show recovered runtime errors as warnings at end
+- **Exit code:** Recovered filter/exec errors exit `0`; use `--strict` to fail on them
 
 ```bash
 kelora -j app.log --verbose  # Show errors as they occur

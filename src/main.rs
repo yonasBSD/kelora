@@ -377,11 +377,17 @@ fn main() -> Result<()> {
         .as_ref()
         .and_then(|stats| stats.timestamp_override_warning.clone());
 
-    // Determine exit code based on whether any errors occurred during processing
+    // Determine exit code based on unrecovered processing failures. In default
+    // resilient mode, filter/exec runtime errors are diagnostics, not failures.
     let mut had_errors = {
         let tracking_errors = tracking_data
             .as_ref()
-            .map(crate::rhai_functions::tracking::has_errors_in_tracking)
+            .map(|tracking| {
+                crate::rhai_functions::tracking::has_errors_in_tracking_with_policy(
+                    tracking,
+                    config.processing.strict,
+                )
+            })
             .unwrap_or(false);
         let stats_errors = final_stats
             .as_ref()
@@ -639,13 +645,21 @@ fn handle_pipeline_success(
                 }
 
                 let stats_summary = s.format_error_summary();
-                if !stats_summary.is_empty() {
+                let stats_summary_empty = stats_summary.is_empty();
+                if !stats_summary_empty {
                     summaries.push(stats_summary);
                 }
 
                 if !summaries.is_empty() {
                     let combined = summaries.join("; ");
-                    let mut formatted = config.format_error_message(&combined);
+                    let only_recovered_runtime_errors = tracking_summary.is_some()
+                        && stats_summary_empty
+                        && !config.processing.strict;
+                    let mut formatted = if only_recovered_runtime_errors {
+                        config.format_warning_message(&combined)
+                    } else {
+                        config.format_error_message(&combined)
+                    };
                     if !events_were_output {
                         formatted = formatted.trim_start_matches('\n').to_string();
                     }
