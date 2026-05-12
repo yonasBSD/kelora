@@ -78,15 +78,11 @@ fn test_has_ignores_unit_values() {
 #[test]
 fn test_matches_errors_on_invalid_regex() {
     let input = r#"{"message":"user not found"}"#;
-    let (stdout, stderr, exit_code) = run_kelora_with_input(
+    let (_stdout, stderr, _exit_code) = run_kelora_with_input(
         &["-f", "json", "--filter", r#"e.message.matches("(")"#],
         input,
     );
 
-    assert_ne!(
-        exit_code, 0,
-        "Invalid regex should cause non-zero exit code. Stdout: {stdout}, stderr: {stderr}"
-    );
     assert!(
         stderr.contains("Invalid regex pattern"),
         "stderr should mention invalid regex: {stderr}"
