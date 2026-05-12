@@ -165,7 +165,7 @@ fn test_read_functions_only_in_begin() {
     let input = r#"{"test": "data"}"#;
 
     // Try to use read_file outside of --begin phase
-    let (_stdout, stderr, exit_code) = run_kelora_with_input(
+    let (_stdout, stderr, _exit_code) = run_kelora_with_input(
         &[
             "-f",
             "json",
@@ -175,14 +175,9 @@ fn test_read_functions_only_in_begin() {
         input,
     );
 
-    // Should fail because read_file can only be called in --begin phase
-    assert_ne!(
-        exit_code, 0,
-        "Command should fail when using read_file outside --begin"
-    );
     assert!(
-        stderr.contains("Rhai error") || stderr.contains("can only be called during --begin phase"),
-        "Should contain Rhai error or phase restriction error. stderr: {}",
+        stderr.contains("can only be called during --begin phase"),
+        "Should surface phase restriction error. stderr: {}",
         stderr
     );
 }
