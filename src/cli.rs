@@ -266,7 +266,7 @@ pub struct Cli {
         short = 'I',
         long = "include",
         help_heading = "Processing Options",
-        help = "Include a Rhai file before the adjacent script stage.\n\nPosition on the command line determines which stage the file applies to:\n  --include placed before --exec/-e     → loaded into that exec stage\n  --include placed before --filter       → loaded into that filter stage\n  --include placed before all stages     → loaded into the begin stage\n\nWhen used with --filter, the include file must contain only function\ndefinitions. Top-level statements (side effects) are rejected with an error.\n\nExample:\n  kelora -I helpers.rhai --filter 'is_error(e.level)' app.log"
+        help = "Include a Rhai file of helper functions, loaded into the adjacent script stage.\n\nCommand-line position selects which stage the file applies to:\n  --include before a --filter/--exec    → that filter/exec stage\n  --include before the first stage       → the --begin stage (if present)\n  --include after the last stage         → the --end stage (if present)\n\nEach stage has its own scope: an include's functions are only visible to\nthe stage it is attached to. Repeat --include to share helpers across\nseveral stages. An include that attaches to begin/end has no effect unless\nthat --begin/--end stage exists.\n\nWhen used with --filter, the include file must contain only function\ndefinitions. Top-level statements (side effects) are rejected with an error.\n\nExample:\n  kelora -I helpers.rhai --filter 'is_error(e.level)' app.log"
     )]
     pub includes: Vec<String>,
 
@@ -1055,25 +1055,31 @@ impl Cli {
     ) -> Result<(Option<String>, Option<String>)> {
         let (begin_includes, end_includes) = get_begin_end_includes(matches)?;
 
-        let processed_begin = if let Some(ref begin_script) = self.begin {
-            Some(preprocess_script_with_includes(
+        // Includes only become a begin/end script when there is an explicit
+        // --begin/--end to attach them to. We deliberately do NOT synthesize a
+        // begin/end stage out of includes alone:
+        //   - Each stage has its own function namespace, so an include placed
+        //     before the first filter/exec stage is already loaded into that
+        //     stage by get_ordered_script_stages. Also materializing it as a
+        //     phantom begin stage produced a second copy whose only observable
+        //     effect was re-running the include's top-level statements at
+        //     startup (double execution).
+        //   - With no --begin/--end script, that phantom stage's function
+        //     definitions live in a namespace no user code runs in, so it never
+        //     served a purpose.
+        let processed_begin = match self.begin {
+            Some(ref begin_script) => Some(preprocess_script_with_includes(
                 begin_script,
                 &begin_includes,
-            )?)
-        } else if !begin_includes.is_empty() {
-            // If we have includes but no begin script, create one from includes only
-            Some(preprocess_script_with_includes("", &begin_includes)?)
-        } else {
-            None
+            )?),
+            None => None,
         };
 
-        let processed_end = if let Some(ref end_script) = self.end {
-            Some(preprocess_script_with_includes(end_script, &end_includes)?)
-        } else if !end_includes.is_empty() {
-            // If we have includes but no end script, create one from includes only
-            Some(preprocess_script_with_includes("", &end_includes)?)
-        } else {
-            None
+        let processed_end = match self.end {
+            Some(ref end_script) => {
+                Some(preprocess_script_with_includes(end_script, &end_includes)?)
+            }
+            None => None,
         };
 
         Ok((processed_begin, processed_end))
@@ -1512,7 +1518,12 @@ mod tests {
     }
 
     #[test]
-    fn include_only_before_begin_creates_begin_stage() {
+    fn include_before_first_stage_without_begin_creates_no_begin_stage() {
+        // An include placed before the first filter/exec stage, with no
+        // explicit --begin, must NOT synthesize a phantom begin stage: the
+        // include is already loaded into the following exec stage, and a
+        // begin-from-includes copy would only re-run its top-level statements
+        // at startup (the double-execution bug).
         let mut include_file = NamedTempFile::new().expect("temp file");
         writeln!(include_file, "print('auto setup');").expect("write include");
         let include_path = include_file.path().to_str().unwrap().to_string();
@@ -1530,10 +1541,38 @@ mod tests {
             .get_processed_begin_end(&matches)
             .expect("should process begin/end");
 
-        assert!(begin.is_some());
-        let begin_script = begin.unwrap();
-        assert!(begin_script.contains("print('auto setup');"));
-
+        assert!(
+            begin.is_none(),
+            "include before the first stage must not create a begin stage without --begin"
+        );
         assert!(end.is_none());
+    }
+
+    #[test]
+    fn trailing_include_without_end_creates_no_end_stage() {
+        // An include after all filter/exec stages, with no explicit --end, has
+        // nothing to attach to and must not synthesize a phantom end stage.
+        let mut include_file = NamedTempFile::new().expect("temp file");
+        writeln!(include_file, "print('auto teardown');").expect("write include");
+        let include_path = include_file.path().to_str().unwrap().to_string();
+
+        let args = vec![
+            "kelora".to_string(),
+            "--exec".to_string(),
+            "e.processed = true;".to_string(),
+            "-I".to_string(),
+            include_path,
+        ];
+
+        let (cli, matches) = parse_cli(&args);
+        let (begin, end) = cli
+            .get_processed_begin_end(&matches)
+            .expect("should process begin/end");
+
+        assert!(begin.is_none());
+        assert!(
+            end.is_none(),
+            "trailing include must not create an end stage without --end"
+        );
     }
 }

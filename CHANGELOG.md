@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **`--discover` tighter field column** - The Field column no longer pads to a 12-char floor, so narrow field names don't waste horizontal space.
 - **Parse error summaries include filenames** - Parse error messages now show which file the error came from, making multi-file runs easier to debug.
 - **Breaking: invalid `--input-tz` is rejected** - An unrecognized `--input-tz` value (e.g. a typo like `Europe/Berln`) now fails fast during configuration validation with exit code 2, instead of silently falling back to the machine's local time. Silent fallback could shift every timestamp — and thus time filters and span boundaries — without any visible error. Use `local`, `UTC`, or a valid IANA timezone name.
+- **`--include` no longer double-executes before the first stage** - An `--include` placed before the first `--filter`/`--exec` stage was loaded into both that stage and a synthesized begin stage, so any top-level statements in the include ran twice (once at startup, then per event). Includes now only form a begin/end script when an explicit `--begin`/`--end` is present; otherwise the include is loaded solely into the adjacent stage. Helper-function-only includes (the documented use) are unaffected; `--begin`/`--end` with includes still work.
 
 ### Fixed
 
