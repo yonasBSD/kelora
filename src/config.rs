@@ -855,7 +855,7 @@ impl KeloraConfig {
             EmojiMode::Auto
         };
 
-        let default_timezone = determine_default_timezone(cli);
+        let default_timezone = determine_default_timezone(cli)?;
         let mut quiet_events = cli.quiet;
         // Diagnostics: positive flag enables, negative flag disables (last one wins via overrides_with)
         let mut suppress_diagnostics = if cli.diagnostics {
@@ -1386,25 +1386,35 @@ fn create_context_config(cli: &crate::Cli) -> anyhow::Result<ContextConfig> {
 
 /// Determine the default timezone based on CLI options and environment
 /// Following the new spec: --input-tz defaults to UTC
-fn determine_default_timezone(cli: &crate::Cli) -> Option<String> {
+fn determine_default_timezone(cli: &crate::Cli) -> anyhow::Result<Option<String>> {
     // Priority 1: --input-tz option
     if let Some(ref input_tz) = cli.input_tz {
         if input_tz == "local" {
-            return None; // None means local time
-        } else {
-            return Some(input_tz.clone());
+            return Ok(None); // None means local time
         }
+        // Validate explicit timezones up front so a typo fails fast at config
+        // time instead of silently falling back to the machine's local time
+        // (which would shift every timestamp, and thus time filters and span
+        // boundaries, without any visible error).
+        if input_tz.parse::<chrono_tz::Tz>().is_err() {
+            anyhow::bail!(
+                "Invalid --input-tz '{}': expected 'local', 'UTC', or an IANA timezone name \
+                 (e.g. Europe/Berlin, America/New_York)",
+                input_tz
+            );
+        }
+        return Ok(Some(input_tz.clone()));
     }
 
     // Priority 2: TZ environment variable
     if let Ok(tz) = std::env::var("TZ") {
         if !tz.is_empty() {
-            return Some(tz);
+            return Ok(Some(tz));
         }
     }
 
     // DEFAULT: UTC (per spec, --input-tz defaults to UTC)
-    Some("UTC".to_string())
+    Ok(Some("UTC".to_string()))
 }
 
 fn parse_span_config(cli: &crate::Cli) -> anyhow::Result<Option<SpanConfig>> {
@@ -1673,7 +1683,7 @@ mod tests {
         with_env_lock(&["TZ"], || {
             std::env::remove_var("TZ");
             let cli = Cli::parse_from(["kelora"]);
-            let tz = super::determine_default_timezone(&cli);
+            let tz = super::determine_default_timezone(&cli).unwrap();
             assert_eq!(tz.as_deref(), Some("UTC"));
         });
     }
@@ -1683,7 +1693,7 @@ mod tests {
         with_env_lock(&["TZ"], || {
             std::env::remove_var("TZ");
             let cli = Cli::parse_from(["kelora", "--input-tz", "local"]);
-            let tz = super::determine_default_timezone(&cli);
+            let tz = super::determine_default_timezone(&cli).unwrap();
             assert_eq!(tz, None);
         });
     }
@@ -1693,7 +1703,7 @@ mod tests {
         with_env_lock(&["TZ"], || {
             std::env::set_var("TZ", "America/New_York");
             let cli = Cli::parse_from(["kelora", "--input-tz", "Europe/Berlin"]);
-            let tz = super::determine_default_timezone(&cli);
+            let tz = super::determine_default_timezone(&cli).unwrap();
             assert_eq!(tz.as_deref(), Some("Europe/Berlin"));
         });
     }
@@ -1703,8 +1713,38 @@ mod tests {
         with_env_lock(&["TZ"], || {
             std::env::set_var("TZ", "Asia/Tokyo");
             let cli = Cli::parse_from(["kelora"]);
-            let tz = super::determine_default_timezone(&cli);
+            let tz = super::determine_default_timezone(&cli).unwrap();
             assert_eq!(tz.as_deref(), Some("Asia/Tokyo"));
+        });
+    }
+
+    #[test]
+    fn determine_default_timezone_rejects_invalid_input_tz() {
+        with_env_lock(&["TZ"], || {
+            std::env::remove_var("TZ");
+            let cli = Cli::parse_from(["kelora", "--input-tz", "Europe/Berln"]);
+            let result = super::determine_default_timezone(&cli);
+            assert!(
+                result.is_err(),
+                "Invalid --input-tz should be rejected, got: {:?}",
+                result
+            );
+            let msg = result.unwrap_err().to_string();
+            assert!(
+                msg.contains("Invalid --input-tz") && msg.contains("Europe/Berln"),
+                "Error should name the bad timezone, got: {}",
+                msg
+            );
+        });
+    }
+
+    #[test]
+    fn determine_default_timezone_accepts_utc_explicitly() {
+        with_env_lock(&["TZ"], || {
+            std::env::remove_var("TZ");
+            let cli = Cli::parse_from(["kelora", "--input-tz", "UTC"]);
+            let tz = super::determine_default_timezone(&cli).unwrap();
+            assert_eq!(tz.as_deref(), Some("UTC"));
         });
     }
 
