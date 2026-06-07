@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **`--discover` uses full terminal width** - The hard 60-char cap on the examples column is gone; examples grow to fill the available terminal width. Compact layout also spans the full width instead of truncating at ~82 chars.
 - **`--discover` tighter field column** - The Field column no longer pads to a 12-char floor, so narrow field names don't waste horizontal space.
 - **Parse error summaries include filenames** - Parse error messages now show which file the error came from, making multi-file runs easier to debug.
+- **Breaking: invalid `--input-tz` is rejected** - An unrecognized `--input-tz` value (e.g. a typo like `Europe/Berln`) now fails fast during configuration validation with exit code 2, instead of silently falling back to the machine's local time. Silent fallback could shift every timestamp — and thus time filters and span boundaries — without any visible error. Use `local`, `UTC`, or a valid IANA timezone name.
 
 ### Fixed
 
