@@ -2,10 +2,10 @@
 use anyhow::{anyhow, Context, Result};
 use std::collections::HashMap;
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Configuration file handler for kelora
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ConfigFile {
     pub defaults: Option<String>,
     pub aliases: HashMap<String, String>,
@@ -136,19 +136,28 @@ impl ConfigFile {
             .with_context(|| format!("Failed to read config file: {}", path.display()))?;
 
         // Parse the INI content
-        let config = Self::parse_ini_content(&content)?;
+        let config = Self::parse_ini_content(&content, path)?;
 
         Ok(config)
     }
 
-    /// Parse INI content from string
-    fn parse_ini_content(content: &str) -> Result<Self> {
+    /// Parse INI content from string.
+    ///
+    /// Validation is strict: unknown root keys, unknown sections, and lines
+    /// that are neither a comment, a `[section]` header, nor a `key = value`
+    /// pair are errors that name the file and line. Silently ignoring them
+    /// would let a typo (e.g. `defualts` or `[alias]`) change pipeline
+    /// behavior without any visible signal.
+    fn parse_ini_content(content: &str, path: &Path) -> Result<Self> {
         let mut defaults = None;
         let mut aliases = HashMap::new();
         let mut current_section = String::new();
 
-        for line in content.lines() {
-            let line = line.trim();
+        let loc = |line_no: usize| format!("{}:{}", path.display(), line_no);
+
+        for (idx, raw_line) in content.lines().enumerate() {
+            let line_no = idx + 1;
+            let line = raw_line.trim();
 
             // Skip empty lines and comments
             if line.is_empty() || line.starts_with(';') || line.starts_with('#') {
@@ -157,31 +166,76 @@ impl ConfigFile {
 
             // Check for section headers
             if line.starts_with('[') && line.ends_with(']') {
-                current_section = line[1..line.len() - 1].to_string();
+                let name = line[1..line.len() - 1].trim();
+                match name {
+                    "aliases" => {
+                        current_section = name.to_string();
+                    }
+                    "" => {
+                        return Err(anyhow!(
+                            "config error in {}: empty section header '[]'",
+                            loc(line_no)
+                        ));
+                    }
+                    _ => {
+                        let hint = if name.eq_ignore_ascii_case("aliases") {
+                            " (did you mean '[aliases]'? section names are case-sensitive)"
+                        } else {
+                            " (the only supported section is '[aliases]')"
+                        };
+                        return Err(anyhow!(
+                            "config error in {}: unknown section '[{}]'{}",
+                            loc(line_no),
+                            name,
+                            hint
+                        ));
+                    }
+                }
                 continue;
             }
 
-            // Parse key=value pairs
-            if let Some(eq_pos) = line.find('=') {
-                let key = line[..eq_pos].trim();
-                let value = line[eq_pos + 1..].trim();
+            // Everything else must be a key = value pair
+            let Some(eq_pos) = line.find('=') else {
+                return Err(anyhow!(
+                    "config error in {}: expected a '[section]' header or 'key = value' line, found: {}",
+                    loc(line_no),
+                    line
+                ));
+            };
 
-                if current_section.is_empty() {
-                    // Root-level configuration
-                    if key == "defaults" {
-                        defaults = Some(value.to_string());
-                    }
-                    // Ignore unknown root-level keys
+            let key = line[..eq_pos].trim();
+            let value = line[eq_pos + 1..].trim();
+
+            if key.is_empty() {
+                return Err(anyhow!(
+                    "config error in {}: missing key before '='",
+                    loc(line_no)
+                ));
+            }
+
+            if current_section.is_empty() {
+                // Root-level configuration: only `defaults` is supported.
+                if key == "defaults" {
+                    defaults = Some(value.to_string());
                 } else {
-                    match current_section.as_str() {
-                        "aliases" => {
-                            aliases.insert(key.to_string(), value.to_string());
-                        }
-                        _ => {
-                            // Ignore unknown sections
-                        }
-                    }
+                    let hint = if key.eq_ignore_ascii_case("defaults") {
+                        " (did you mean 'defaults'? keys are case-sensitive)".to_string()
+                    } else {
+                        " (the only supported root key is 'defaults'; put aliases under an '[aliases]' section)".to_string()
+                    };
+                    return Err(anyhow!(
+                        "config error in {}: unknown key '{}'{}",
+                        loc(line_no),
+                        key,
+                        hint
+                    ));
                 }
+            } else {
+                // Inside a known section. Currently only `[aliases]`, whose
+                // keys are user-defined alias names, so any non-empty key is
+                // accepted.
+                debug_assert_eq!(current_section, "aliases");
+                aliases.insert(key.to_string(), value.to_string());
             }
         }
 
@@ -979,5 +1033,85 @@ mod tests {
         // Remaining paths should be user config paths
         let user_paths = ConfigFile::get_user_config_paths();
         assert_eq!(&paths[1..], &user_paths[..]);
+    }
+
+    fn load_str(content: &str) -> Result<ConfigFile> {
+        let mut file = NamedTempFile::new().unwrap();
+        write!(file, "{}", content).unwrap();
+        file.flush().unwrap();
+        ConfigFile::load_from_path(&file.path().to_path_buf())
+    }
+
+    #[test]
+    fn strict_config_accepts_valid_content() {
+        let config = load_str(
+            "# a comment\n\
+             defaults = -f json\n\
+             \n\
+             [aliases]\n\
+             errors = -l error\n",
+        )
+        .expect("valid config should load");
+        assert_eq!(config.defaults, Some("-f json".to_string()));
+        assert_eq!(config.aliases.get("errors"), Some(&"-l error".to_string()));
+    }
+
+    #[test]
+    fn strict_config_rejects_unknown_root_key() {
+        let err = load_str("defualts = -f json\n").unwrap_err().to_string();
+        assert!(err.contains("unknown key 'defualts'"), "got: {}", err);
+        assert!(err.contains("'defaults'"), "got: {}", err);
+        assert!(err.contains(":1"), "should name the line, got: {}", err);
+    }
+
+    #[test]
+    fn strict_config_rejects_unknown_section() {
+        let err = load_str("[alias]\nerrors = -l error\n")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("unknown section '[alias]'"), "got: {}", err);
+        assert!(err.contains("'[aliases]'"), "got: {}", err);
+    }
+
+    #[test]
+    fn strict_config_hints_case_mismatch() {
+        let key_err = load_str("Defaults = -f json\n").unwrap_err().to_string();
+        assert!(
+            key_err.contains("did you mean 'defaults'") && key_err.contains("case-sensitive"),
+            "got: {}",
+            key_err
+        );
+
+        let section_err = load_str("[Aliases]\nerrors = -l error\n")
+            .unwrap_err()
+            .to_string();
+        assert!(
+            section_err.contains("did you mean '[aliases]'")
+                && section_err.contains("case-sensitive"),
+            "got: {}",
+            section_err
+        );
+    }
+
+    #[test]
+    fn strict_config_rejects_truly_unknown_section() {
+        let err = load_str("[settings]\nfoo = bar\n").unwrap_err().to_string();
+        assert!(err.contains("unknown section '[settings]'"), "got: {}", err);
+        assert!(err.contains("'[aliases]'"), "got: {}", err);
+    }
+
+    #[test]
+    fn strict_config_rejects_malformed_line() {
+        let err = load_str("defaults = -f json\ngarbage line without equals\n")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("key = value"), "got: {}", err);
+        assert!(err.contains(":2"), "should point at line 2, got: {}", err);
+    }
+
+    #[test]
+    fn strict_config_rejects_empty_key() {
+        let err = load_str("[aliases]\n= -l error\n").unwrap_err().to_string();
+        assert!(err.contains("missing key before '='"), "got: {}", err);
     }
 }
