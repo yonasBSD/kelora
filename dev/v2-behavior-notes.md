@@ -42,35 +42,54 @@ Candidate v2 behavior:
 
 Rationale: silent column loss is worse than a visible recovered error.
 
-### Validate Config Files Strictly
+### Validate Config Files Strictly (done)
 
-Config parsing currently ignores unknown root keys and unknown sections.
+Config parsing previously ignored unknown root keys and unknown sections.
 
-Candidate v2 behavior:
-- Unknown root keys, unknown sections, and malformed lines are config errors.
-- Keep an explicit compatibility flag only if real users need it, e.g.
-  `--config-lenient`.
+v2 behavior (implemented):
+- Unknown root keys, unknown sections, empty keys, and malformed lines are now
+  config errors that name the file and line, with a "did you mean" hint for case
+  mismatches. Only `defaults` (root) and `[aliases]` are recognized.
+- No `--config-lenient` flag: the schema is tiny, `.kelora.ini` is local and
+  user-controlled, and `--ignore-config` / `--config-file` already cover
+  skipping or redirecting config. Revisit only if a real forward-compat need
+  appears (a `version =` key would be cleaner than a blanket lenient switch).
 
 Rationale: config typos should not silently change pipeline behavior.
 
-### Error on Unused Includes
+### Includes With No Adjacent Filter/Exec Stage (resolved — premise was wrong)
 
-`--include` with no following script stage is currently ignored.
+Original claim: "`--include` with no following script stage is currently
+ignored", proposed as a CLI usage error.
 
-Candidate v2 behavior:
-- Treat trailing or otherwise unused includes as CLI usage errors.
+On investigation this premise was incorrect. Includes are never silently
+dropped: `get_begin_end_includes` routes an include placed before the first
+filter/exec stage to the `--begin` stage and one placed after the last to the
+`--end` stage, while `get_ordered_script_stages` attaches in-between includes to
+the next filter/exec stage. So `--exec '…' -I helpers.rhai --end 'helper()'`
+already works — the "trailing" include feeds `--end`. Making unused includes an
+error would have broken that valid pattern.
 
-Rationale: a user who passed an include almost certainly expected it to affect
-the run.
+The investigation did surface a real bug instead: an include placed before the
+first filter/exec stage was loaded into *both* that stage and a synthesized
+begin stage. Because each stage has its own function namespace, duplicate
+function definitions were harmless, but any top-level statements in the include
+executed twice (once at startup, then per event). Fixed by only forming a
+begin/end script from includes when an explicit `--begin`/`--end` is present;
+otherwise the include loads solely into the adjacent stage. The `--include` help
+text was also clarified.
 
-### Reject Invalid Timestamp Timezones
+No remaining v2 action here.
 
-Invalid timestamp timezone configuration currently falls back to local time.
+### Reject Invalid Timestamp Timezones (done)
 
-Candidate v2 behavior:
-- Invalid `--input-tz` values fail during configuration validation.
-- Runtime timestamp parsing should not substitute local time for an invalid
-  explicit timezone.
+Invalid timestamp timezone configuration previously fell back to local time.
+
+v2 behavior (implemented):
+- Invalid `--input-tz` values now fail during configuration validation with a
+  clear message and exit code 2, instead of silently substituting local time
+  (which would shift every timestamp, and thus time filters and span
+  boundaries). `local`, `UTC`, the `TZ` env var, and the default are unchanged.
 
 Rationale: timezone fallback can shift time filters and span boundaries without
 making the mistake visible.
