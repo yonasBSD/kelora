@@ -7,22 +7,31 @@ data loss.
 
 ## High-Value Breaking Changes
 
-### Enforce Typed Parser Conversions
+### Enforce Typed Parser Conversions (done)
 
 Typed parser annotations should mean "this field has this type", not "try this
 type and silently fall back to string".
 
-Current behavior:
-- `status:int` can become `"abc"` in resilient mode.
-- Regex and cols typed captures can do the same.
+Previous behavior:
+- `status:int` could become `"abc"` in resilient mode (regex/cols/csv).
+- `cols` additionally ignored `--strict` for conversions entirely.
 
-Candidate v2 behavior:
-- Type conversion failures become parse/recovered errors regardless of
-  `--strict`.
-- `--strict` controls whether the run aborts immediately.
-- Resilient mode records the error and applies the standard parse-error policy.
-- If fallback remains useful, expose it explicitly, e.g.
-  `--type-error=string|skip|error`.
+v2 behavior (implemented):
+- A value that cannot satisfy its declared type becomes `()` (explicitly
+  absent, e.g. JSON `null`) in resilient mode; the rest of the row is kept.
+  `--strict` still aborts on the failure.
+- Implemented in the shared `convert_value_to_type`, so regex/cols/csv now
+  behave identically; the `cols` `--strict` bug is fixed.
+- No `--type-error` flag. The three modes a flag would have offered already
+  exist, more flexibly, in the script layer: keep-as-string = don't annotate;
+  drop-the-field = `to_int(x)` (→ `()`); custom fallback = `to_int_or(x, d)`;
+  hard error = `--strict`. A CLI flag would re-implement `to_int_or` less
+  expressively.
+
+Why `()` rather than "treat as a parse error and skip the line": skipping would
+drop the whole event on a single sentinel value (e.g. `-` in a `bytes:int`
+column), trading one silent harm for a larger one. `()` mirrors how `cols`
+already represents a missing column and how `to_int()` already reports failure.
 
 Rationale: type annotations are schema declarations. Silent type drift makes
 downstream Rhai scripts and CSV/JSON consumers harder to reason about.

@@ -54,7 +54,7 @@ impl RegexParser {
     /// - Type conversion failures will cause an error
     ///
     /// In lenient mode (default):
-    /// - Type conversion failures will fall back to string
+    /// - Type conversion failures set the field to () (explicitly absent)
     ///
     /// Note: Lines that don't match the pattern always return an error,
     /// regardless of strict mode (handled at pipeline level).
@@ -419,17 +419,8 @@ mod tests {
         let parser = RegexParser::new(r"(?P<num:int>[a-z]+)").unwrap();
         let event = parser.parse("abc").unwrap();
 
-        // Lenient mode: falls back to string
-        assert_eq!(
-            event
-                .fields
-                .get("num")
-                .unwrap()
-                .clone()
-                .into_string()
-                .unwrap(),
-            "abc"
-        );
+        // Lenient mode: uncoercible value becomes () (explicitly absent)
+        assert!(event.fields.get("num").unwrap().is_unit());
     }
 
     #[test]

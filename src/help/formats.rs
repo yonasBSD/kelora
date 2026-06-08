@@ -63,6 +63,13 @@ regex:<pattern>
   Types: (?P<name:int>...), (?P<name:float>...), (?P<name:bool>...)
   Note: Pattern automatically anchored with ^...$
 
+Type annotations (csv/tsv/cols/regex)
+  A type annotation declares the field's type. A value that cannot satisfy it
+  becomes () (explicitly absent), and the rest of the row is kept; with --strict
+  the run aborts instead. For tolerant coercion with a fallback you choose, drop
+  the annotation and convert in a script stage, e.g.
+    -f csv --exec 'e.status = to_int_or(e.status, 0)'
+
 auto (default)
   Auto-detect format from first non-empty line
   Detection order: json → syslog → cef → combined → logfmt → csv → line
