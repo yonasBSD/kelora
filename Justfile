@@ -83,28 +83,16 @@ check-subprocess-usage:
 # Run all checks (fmt, lint, audit, deny, test)
 check: fmt lint audit deny check-no-networking check-subprocess-usage test
 
-# Run benchmark suite
+# Run benchmark suite (throughput: lines/s, MB/s)
 bench:
-    ./benchmarks/run_benchmarks.sh
+    python3 benchmarks/bench_simple_cases.py
 
-# Run quick benchmarks (10k dataset only)
+# Run quick benchmarks (50k dataset)
 bench-quick:
-    ./benchmarks/run_benchmarks.sh --quick
+    python3 benchmarks/bench_simple_cases.py --quick
 
 # Update benchmark baseline
 bench-update:
-    ./benchmarks/run_benchmarks.sh --update-baseline
-
-# Benchmark common simple cases (throughput: lines/s, MB/s)
-bench-simple:
-    python3 benchmarks/bench_simple_cases.py
-
-# Quick simple-cases benchmark (50k dataset)
-bench-simple-quick:
-    python3 benchmarks/bench_simple_cases.py --quick
-
-# Update simple-cases benchmark baseline
-bench-simple-update:
     python3 benchmarks/bench_simple_cases.py --update-baseline
 
 # Generate comparison datasets for external tool benchmarks
