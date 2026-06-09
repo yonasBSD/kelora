@@ -1,6 +1,11 @@
 use anyhow::Result;
 use crossbeam_channel::unbounded;
 use std::collections::BTreeSet;
+
+// Fast allocator: the streaming hot path is allocation-bound (per-event IndexMap
+// inserts, Dynamic/Event clones). mimalloc cuts that churn versus the system malloc.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 use std::io::IsTerminal;
 use std::sync::atomic::Ordering;
 
