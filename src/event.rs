@@ -230,7 +230,7 @@ pub fn json_to_dynamic(value: &serde_json::Value) -> Dynamic {
 /// Owned variant that avoids cloning strings/numbers when possible.
 pub fn json_to_dynamic_owned(value: serde_json::Value) -> Dynamic {
     match value {
-        serde_json::Value::String(s) => Dynamic::from(s.clone()),
+        serde_json::Value::String(s) => Dynamic::from(s),
         serde_json::Value::Number(n) => {
             // Try i64 first for signed integers
             if let Some(i) = n.as_i64() {
@@ -442,6 +442,16 @@ impl Event {
             parsed_ts: None,
             context_type: ContextType::None,
             timestamp_stats_recorded: false,
+        }
+    }
+
+    /// Construct an event from a prebuilt field map (e.g. parsed directly
+    /// from JSON), avoiding a second insert pass.
+    pub fn with_fields(original_line: String, fields: FieldMap) -> Self {
+        Self {
+            fields,
+            original_line,
+            ..Default::default()
         }
     }
 

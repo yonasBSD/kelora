@@ -1,6 +1,140 @@
-use crate::event::Event;
+use crate::event::{Event, FieldMap};
 use crate::pipeline::EventParser;
 use anyhow::Result;
+use rhai::Dynamic;
+use serde::de::{Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
+use std::fmt;
+
+/// A `rhai::Dynamic` deserialized directly from JSON, skipping the
+/// `serde_json::Value` intermediate tree. Number/nesting semantics mirror
+/// [`crate::event::json_to_dynamic_owned`] exactly.
+struct DynamicValue(Dynamic);
+
+struct DynVisitor;
+
+impl<'de> Visitor<'de> for DynVisitor {
+    type Value = Dynamic;
+
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("any JSON value")
+    }
+
+    fn visit_bool<E>(self, v: bool) -> Result<Dynamic, E> {
+        Ok(Dynamic::from(v))
+    }
+
+    fn visit_i64<E>(self, v: i64) -> Result<Dynamic, E> {
+        Ok(Dynamic::from(v))
+    }
+
+    fn visit_u64<E>(self, v: u64) -> Result<Dynamic, E> {
+        // Match json_to_dynamic_owned: prefer i64, fall back to u64 to avoid precision loss.
+        Ok(if v <= i64::MAX as u64 {
+            Dynamic::from(v as i64)
+        } else {
+            Dynamic::from(v)
+        })
+    }
+
+    fn visit_f64<E>(self, v: f64) -> Result<Dynamic, E> {
+        Ok(Dynamic::from(v))
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Dynamic, E> {
+        Ok(Dynamic::from(v.to_string()))
+    }
+
+    fn visit_string<E>(self, v: String) -> Result<Dynamic, E> {
+        Ok(Dynamic::from(v))
+    }
+
+    fn visit_unit<E>(self) -> Result<Dynamic, E> {
+        Ok(Dynamic::UNIT)
+    }
+
+    fn visit_none<E>(self) -> Result<Dynamic, E> {
+        Ok(Dynamic::UNIT)
+    }
+
+    fn visit_some<D>(self, deserializer: D) -> Result<Dynamic, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_any(self)
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Dynamic, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut arr = rhai::Array::with_capacity(seq.size_hint().unwrap_or(0));
+        while let Some(DynamicValue(v)) = seq.next_element()? {
+            arr.push(v);
+        }
+        Ok(Dynamic::from(arr))
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Dynamic, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        let mut m = rhai::Map::new();
+        while let Some(k) = map.next_key::<String>()? {
+            let DynamicValue(v) = map.next_value()?;
+            m.insert(k.into(), v);
+        }
+        Ok(Dynamic::from(m))
+    }
+}
+
+impl<'de> Deserialize<'de> for DynamicValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_any(DynVisitor).map(DynamicValue)
+    }
+}
+
+/// Top-level object: deserialized straight into a `FieldMap`, avoiding both the
+/// `serde_json::Value::Object` indexmap and a second pass to build our map.
+struct EventFields(FieldMap);
+
+struct FieldMapVisitor;
+
+impl<'de> Visitor<'de> for FieldMapVisitor {
+    type Value = FieldMap;
+
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("a JSON object")
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<FieldMap, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        let mut fields = FieldMap::with_capacity_and_hasher(
+            map.size_hint().unwrap_or(0),
+            ahash::RandomState::default(),
+        );
+        while let Some(k) = map.next_key::<String>()? {
+            let DynamicValue(v) = map.next_value()?;
+            fields.insert(k, v);
+        }
+        Ok(fields)
+    }
+}
+
+impl<'de> Deserialize<'de> for EventFields {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer
+            .deserialize_map(FieldMapVisitor)
+            .map(EventFields)
+    }
+}
 
 pub struct JsonlParser {
     auto_timestamp: bool,
@@ -32,26 +166,23 @@ impl EventParser for JsonlParser {
     fn parse(&self, line: &str) -> Result<Event> {
         let line = line.trim_end_matches('\n').trim_end_matches('\r');
 
-        let json_value: serde_json::Value =
-            serde_json::from_str(line).map_err(|e| anyhow::anyhow!("Invalid JSON: {}", e))?;
-
-        if let serde_json::Value::Object(map) = json_value {
-            // Pre-allocate HashMap with capacity based on JSON object size
-            let mut event = Event::with_capacity(line.to_string(), map.len());
-
-            for (key, value) in map {
-                // Convert serde_json::Value to rhai::Dynamic using owned conversion to avoid clones
-                let dynamic_value = crate::event::json_to_dynamic_owned(value);
-                event.set_field(key, dynamic_value);
-            }
-
+        // Fast path: objects (the overwhelmingly common case) deserialize
+        // straight into the FieldMap, skipping the serde_json::Value tree.
+        // Non-objects fall through to the slow path purely to reproduce the
+        // exact "Expected JSON object" error.
+        if line.trim_start().as_bytes().first() == Some(&b'{') {
+            let EventFields(fields) =
+                serde_json::from_str(line).map_err(|e| anyhow::anyhow!("Invalid JSON: {}", e))?;
+            let mut event = Event::with_fields(line.to_string(), fields);
             if self.auto_timestamp {
                 event.extract_timestamp();
             }
-            Ok(event)
-        } else {
-            Err(anyhow::anyhow!("Expected JSON object, got: {}", json_value))
+            return Ok(event);
         }
+
+        let json_value: serde_json::Value =
+            serde_json::from_str(line).map_err(|e| anyhow::anyhow!("Invalid JSON: {}", e))?;
+        Err(anyhow::anyhow!("Expected JSON object, got: {}", json_value))
     }
 }
 
