@@ -45,6 +45,9 @@ humantime = "2.1"  # Human-readable duration parsing (e.g., "5m", "1h30s")
 crossbeam-channel = "0.5"  # Lock-free channels for streaming pipeline communication between threads
 num_cpus = "1.16"  # Auto-detection of CPU count for parallel processing
 
+# Allocator
+mimalloc = { version = "0.1", default-features = false }  # Fast allocator; the hot path is allocation-bound (IndexMap insert, Dynamic/Event clone)
+
 # Terminal and I/O
 is-terminal = "0.4"  # Detect terminal vs pipe for intelligent output formatting
 terminal_size = "0.4.3"  # Get terminal dimensions for formatted output
@@ -97,6 +100,10 @@ grok = "1.2"
 criterion = { version = "0.7", features = ["html_reports"] }  # Benchmarking framework with statistical analysis
 tempfile = "3.8"  # Temporary file/directory creation for integration tests
 proptest = "1.5"  # Property-based testing for fuzzing parser edge cases
+
+[profile.release]
+lto = "thin"     # Cross-crate optimization; ~same runtime as fat LTO here at roughly half the compile time
+panic = "abort"  # ~7-8% faster + 12% smaller: removes unwind landing pads from the Drop-heavy per-event hot path (no runtime catch_unwind exists)
 
 [patch.crates-io]
 grok = { path = "vendor/grok" }

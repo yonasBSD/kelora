@@ -70,6 +70,7 @@ just docs-build         # Build locally
 - 0: Success
 - 1: Parse/runtime errors
 - 2: Invalid CLI usage
+- 134: SIGABRT — internal thread panic (a bug). The release profile uses `panic = "abort"`, so an unexpected panic in a reader/worker/sink thread aborts the process (134) rather than unwinding to exit 1. These paths already terminated the run before; only the code changed.
 
 **Stability:** Prefer avoiding breaking changes; document and justify any that are necessary.
 

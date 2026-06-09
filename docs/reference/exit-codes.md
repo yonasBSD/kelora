@@ -19,8 +19,16 @@ When Kelora is interrupted by signals:
 | Code | Signal | Meaning |
 |------|--------|---------|
 | `130` | SIGINT | Interrupted by Ctrl+C |
+| `134` | SIGABRT | Internal thread panic (a bug — please report) |
 | `141` | SIGPIPE | Broken pipe (normal in Unix pipelines) |
 | `143` | SIGTERM | Terminated by system or user |
+
+Exit code `134` only appears on an unexpected internal panic in one of Kelora's
+processing threads (reader, worker, or sink). The release binary is built with
+`panic = "abort"`, so such a panic aborts the process immediately rather than
+unwinding. These are always bugs — the same conditions previously terminated the
+run with exit `1`/`101`; only the reported code changed. Please report any
+occurrence.
 
 ## Exit Code 0: Success
 
