@@ -8,20 +8,31 @@ use super::utils::{dynamic_to_json, format_dynamic_value, indent_multiline_value
 
 /// Utility function for single-quote string escaping for default formatter
 /// Escapes single quotes, backslashes, newlines, tabs, and carriage returns
+fn escape_single_quote_into(input: &str, output: &mut String) {
+    // Escape directly into the caller's buffer, copying unescaped runs in bulk.
+    // All escaped characters are ASCII, so byte indexing is safe on UTF-8 input
+    // (multibyte continuation/lead bytes are >= 0x80 and never match an arm).
+    let bytes = input.as_bytes();
+    let mut start = 0;
+    for (i, &b) in bytes.iter().enumerate() {
+        let esc: &str = match b {
+            b'\'' => "\\'",
+            b'\\' => "\\\\",
+            b'\n' => "\\n",
+            b'\t' => "\\t",
+            b'\r' => "\\r",
+            _ => continue,
+        };
+        output.push_str(&input[start..i]);
+        output.push_str(esc);
+        start = i + 1;
+    }
+    output.push_str(&input[start..]);
+}
+
 fn escape_single_quote_string(input: &str) -> String {
     let mut output = String::with_capacity(input.len() + 10); // Some extra space for escapes
-
-    for ch in input.chars() {
-        match ch {
-            '\'' => output.push_str("\\'"),
-            '\\' => output.push_str("\\\\"),
-            '\n' => output.push_str("\\n"),
-            '\t' => output.push_str("\\t"),
-            '\r' => output.push_str("\\r"),
-            _ => output.push(ch),
-        }
-    }
-
+    escape_single_quote_into(input, &mut output);
     output
 }
 
@@ -114,7 +125,7 @@ impl DefaultFormatter {
             if !color.is_empty() {
                 output.push_str(color);
             }
-            output.push_str(&escape_single_quote_string(&string_val));
+            escape_single_quote_into(&string_val, output);
             // Reset color before closing quote
             if !color.is_empty() {
                 output.push_str(self.colors.reset);
@@ -299,10 +310,10 @@ impl DefaultFormatter {
 
     /// Format a Dynamic value for default output, preserving nested structures
     fn format_default_value(&self, value: &Dynamic) -> (String, bool) {
-        // Check if this is a complex nested structure and render it as JSON so the type is explicit
-        if value.clone().try_cast::<rhai::Map>().is_some()
-            || value.clone().try_cast::<rhai::Array>().is_some()
-        {
+        // Check if this is a complex nested structure and render it as JSON so the type is explicit.
+        // Use is::<T>() rather than clone().try_cast() to avoid cloning the value (twice) just to
+        // probe its type — this runs for every scalar field in the default output path.
+        if value.is::<rhai::Map>() || value.is::<rhai::Array>() {
             let json_value = dynamic_to_json(value);
             let serialized = if self.pretty_nested {
                 serde_json::to_string_pretty(&json_value)

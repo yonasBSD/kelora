@@ -232,8 +232,46 @@ impl CsvParser {
         }
     }
 
+    /// Build a typed Dynamic value for a field, honoring the type map and strict mode.
+    fn build_value(&self, header: &str, field: &str) -> Result<Dynamic> {
+        if let Some(field_type) = self.type_map.get(header) {
+            // convert_value_to_type handles strict mode internally:
+            // - strict=true: returns Err on failure
+            // - strict=false: returns Ok(string) on failure
+            convert_value_to_type(field, field_type, self.strict).map_err(|e| {
+                anyhow::anyhow!("Type conversion failed for field '{}': {}", header, e)
+            })
+        } else {
+            // No type annotation, store as string
+            Ok(Dynamic::from(field.to_string()))
+        }
+    }
+
     /// Parse a data line using the initialized headers
     fn parse_data_line(&self, line: &str) -> Result<Event> {
+        // Fast path: when the line contains no quote characters, the csv crate's
+        // default behavior is byte-for-byte identical to splitting on the delimiter
+        // (no trimming, no escape handling). This avoids constructing a fresh
+        // csv::Reader — with its 8 KB internal buffer — for every single line.
+        if !line.as_bytes().contains(&b'"') {
+            let mut event = Event::with_capacity(line.to_string(), self.headers.len());
+            for (i, field) in line.split(self.delimiter as char).enumerate() {
+                match self.headers.get(i) {
+                    Some(header) => {
+                        let value = self.build_value(header, field)?;
+                        event.set_field(header.clone(), value);
+                    }
+                    // No matching header: extra columns are ignored (matches csv path).
+                    None => break,
+                }
+            }
+            if self.auto_timestamp {
+                event.extract_timestamp();
+            }
+            return Ok(event);
+        }
+
+        // Slow path: quoted fields require the full csv parser.
         let mut reader = ReaderBuilder::new()
             .delimiter(self.delimiter)
             .has_headers(false)
@@ -247,19 +285,7 @@ impl CsvParser {
             // Map CSV fields to event using local headers
             for (i, field) in record.iter().enumerate() {
                 if let Some(header) = self.headers.get(i) {
-                    // Check if this field has a type annotation
-                    let value = if let Some(field_type) = self.type_map.get(header) {
-                        // convert_value_to_type handles strict mode internally:
-                        // - strict=true: returns Err on failure
-                        // - strict=false: returns Ok(string) on failure
-                        convert_value_to_type(field, field_type, self.strict).map_err(|e| {
-                            anyhow::anyhow!("Type conversion failed for field '{}': {}", header, e)
-                        })?
-                    } else {
-                        // No type annotation, store as string
-                        Dynamic::from(field.to_string())
-                    };
-
+                    let value = self.build_value(header, field)?;
                     event.set_field(header.clone(), value);
                 }
             }
@@ -304,6 +330,88 @@ impl EventParser for CsvParser {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Reference splitter: run the real csv crate over a single line and collect
+    /// its fields. This is exactly the slow path the fast path must agree with.
+    fn csv_crate_fields(line: &str, delimiter: u8) -> Vec<String> {
+        let mut reader = ReaderBuilder::new()
+            .delimiter(delimiter)
+            .has_headers(false)
+            .flexible(true)
+            .from_reader(line.as_bytes());
+        let record = reader
+            .records()
+            .next()
+            .expect("non-empty line")
+            .expect("valid record");
+        record.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// Differential test: for lines containing no quote character, the fast
+    /// `str::split` path must produce exactly the same fields as the csv crate.
+    #[test]
+    fn fast_path_matches_csv_crate_for_unquoted_lines() {
+        // Tricky inputs, none containing a double quote.
+        let cases = [
+            "a,b,c",
+            "Alice,25,New York",
+            "a,,b",              // empty middle field
+            ",a,b",              // leading empty field
+            "a,b,",              // trailing empty field
+            ",,",                // all empty
+            "single",            // no delimiter at all
+            " a , b , c ",       // surrounding whitespace must be preserved (Trim::None)
+            "a\\,b\\n",          // literal backslashes are not escapes
+            "café,naïve,日本語", // multibyte UTF-8 around ASCII delimiters
+            "tab\tinside",       // a tab inside a comma-delimited field is just data
+            "1,2,3,4,5,6,7,8",   // more fields than headers
+        ];
+
+        for &line in &cases {
+            let expected = csv_crate_fields(line, b',');
+
+            // Headers wide enough to capture every field the csv crate produced.
+            let headers: Vec<String> = (1..=expected.len()).map(|i| format!("c{i}")).collect();
+            let parser =
+                CsvParser::new_csv_with_headers(headers.clone()).with_auto_timestamp(false);
+
+            let event = parser.parse(line).expect("fast path parse");
+
+            for (i, header) in headers.iter().enumerate() {
+                let got = event
+                    .fields
+                    .get(header.as_str())
+                    .map(|v| v.to_string())
+                    .unwrap_or_default();
+                assert_eq!(
+                    got, expected[i],
+                    "mismatch on line {line:?} field {header}: fast={got:?} csv={:?}",
+                    expected[i]
+                );
+            }
+        }
+    }
+
+    /// The same guarantee for the tab dialect.
+    #[test]
+    fn fast_path_matches_csv_crate_for_unquoted_tsv() {
+        let cases = ["a\tb\tc", "a\t\tb", "\ta\tb", " a \t b ", "one"];
+        for &line in &cases {
+            let expected = csv_crate_fields(line, b'\t');
+            let headers: Vec<String> = (1..=expected.len()).map(|i| format!("c{i}")).collect();
+            let parser =
+                CsvParser::new_tsv_with_headers(headers.clone()).with_auto_timestamp(false);
+            let event = parser.parse(line).expect("fast path parse");
+            for (i, header) in headers.iter().enumerate() {
+                let got = event
+                    .fields
+                    .get(header.as_str())
+                    .map(|v| v.to_string())
+                    .unwrap_or_default();
+                assert_eq!(got, expected[i], "tsv mismatch on {line:?} field {header}");
+            }
+        }
+    }
 
     #[test]
     fn test_csv_with_headers() {
