@@ -101,10 +101,9 @@ impl LogfmtFormatter {
 
     /// Format a Dynamic value for logfmt output, flattening nested structures
     fn format_logfmt_value(&self, value: &Dynamic) -> String {
-        // Check if this is a complex nested structure
-        if value.clone().try_cast::<rhai::Map>().is_some()
-            || value.clone().try_cast::<rhai::Array>().is_some()
-        {
+        // Check if this is a complex nested structure. Use is::<T>() rather than
+        // clone().try_cast() to avoid cloning every scalar value just to probe its type.
+        if value.is::<rhai::Map>() || value.is::<rhai::Array>() {
             // Flatten nested structures using underscore style for logfmt safety
             let flattened = flatten_dynamic(value, FlattenStyle::Underscore, 0);
 
