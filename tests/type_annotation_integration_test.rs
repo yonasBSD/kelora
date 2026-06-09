@@ -165,7 +165,8 @@ fn test_cols_type_annotations_with_separator() {
 
 #[test]
 fn test_type_conversion_resilient_mode() {
-    // In resilient mode, invalid conversions should fallback to string
+    // In resilient mode, a value that can't satisfy its declared type becomes
+    // () (explicitly absent) rather than a misleading string. The row is kept.
     let input = "status,bytes\n200,1024\ninvalid,not_a_number";
 
     let (stdout, _stderr, exit_code) =
@@ -180,10 +181,18 @@ fn test_type_conversion_resilient_mode() {
     assert_eq!(first["status"].as_i64().unwrap(), 200);
     assert_eq!(first["bytes"].as_i64().unwrap(), 1024);
 
-    // Second line should fallback to strings in resilient mode
+    // Second line: uncoercible values become () -> JSON null (key preserved)
     let second: serde_json::Value = serde_json::from_str(lines[1]).expect("Should parse JSON");
-    assert_eq!(second["status"].as_str().unwrap(), "invalid");
-    assert_eq!(second["bytes"].as_str().unwrap(), "not_a_number");
+    assert!(
+        second["status"].is_null(),
+        "status should be null, got: {}",
+        second["status"]
+    );
+    assert!(
+        second["bytes"].is_null(),
+        "bytes should be null, got: {}",
+        second["bytes"]
+    );
 }
 
 #[test]

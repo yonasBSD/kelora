@@ -62,11 +62,20 @@ pub fn parse_field_with_type(spec: &str) -> Result<(String, Option<FieldType>), 
 /// # Arguments
 /// * `value` - The string value to convert
 /// * `field_type` - The target type
-/// * `strict` - If true, return error on conversion failure; if false, return string
+/// * `strict` - If true, return error on conversion failure; if false, the
+///   field becomes `()` (unit / explicitly absent)
 ///
 /// # Returns
-/// * `Ok(Dynamic)` - Successfully converted value
+/// * `Ok(Dynamic)` - Successfully converted value, or `()` on failure in
+///   resilient mode
 /// * `Err(String)` - Conversion error (only in strict mode)
+///
+/// Resilient mode deliberately yields `()` rather than the original string:
+/// a `field:int` annotation declares the field's type, so a value that cannot
+/// satisfy it is treated as absent (like a missing column) rather than silently
+/// kept as a misleading number-shaped string. For tolerant coercion with a
+/// chosen fallback, drop the annotation and use `to_int`/`to_int_or` in a
+/// script stage instead.
 pub fn convert_value_to_type(
     value: &str,
     field_type: &FieldType,
@@ -80,8 +89,8 @@ pub fn convert_value_to_type(
                     if strict {
                         Err(format!("Cannot convert '{}' to int", value))
                     } else {
-                        // Resilient mode: fall back to string
-                        Ok(Dynamic::from(value.to_string()))
+                        // Resilient mode: field becomes () (explicitly absent)
+                        Ok(Dynamic::UNIT)
                     }
                 }
             }
@@ -93,8 +102,8 @@ pub fn convert_value_to_type(
                     if strict {
                         Err(format!("Cannot convert '{}' to float", value))
                     } else {
-                        // Resilient mode: fall back to string
-                        Ok(Dynamic::from(value.to_string()))
+                        // Resilient mode: field becomes () (explicitly absent)
+                        Ok(Dynamic::UNIT)
                     }
                 }
             }
@@ -107,8 +116,8 @@ pub fn convert_value_to_type(
                     if strict {
                         Err(format!("Cannot convert '{}' to bool", value))
                     } else {
-                        // Resilient mode: fall back to string
-                        Ok(Dynamic::from(value.to_string()))
+                        // Resilient mode: field becomes () (explicitly absent)
+                        Ok(Dynamic::UNIT)
                     }
                 }
             }
@@ -171,9 +180,9 @@ mod tests {
         let result = convert_value_to_type("abc", &FieldType::Int, true);
         assert!(result.is_err());
 
-        // Invalid integer - resilient mode
+        // Invalid integer - resilient mode: field becomes () (explicitly absent)
         let result = convert_value_to_type("abc", &FieldType::Int, false).unwrap();
-        assert_eq!(result.clone().into_string().unwrap(), "abc");
+        assert!(result.is_unit());
     }
 
     #[test]
@@ -186,9 +195,9 @@ mod tests {
         let result = convert_value_to_type("abc", &FieldType::Float, true);
         assert!(result.is_err());
 
-        // Invalid float - resilient mode
+        // Invalid float - resilient mode: field becomes () (explicitly absent)
         let result = convert_value_to_type("abc", &FieldType::Float, false).unwrap();
-        assert_eq!(result.clone().into_string().unwrap(), "abc");
+        assert!(result.is_unit());
     }
 
     #[test]
@@ -229,9 +238,9 @@ mod tests {
         let result = convert_value_to_type("maybe", &FieldType::Bool, true);
         assert!(result.is_err());
 
-        // Invalid bool - resilient mode
+        // Invalid bool - resilient mode: field becomes () (explicitly absent)
         let result = convert_value_to_type("maybe", &FieldType::Bool, false).unwrap();
-        assert_eq!(result.clone().into_string().unwrap(), "maybe");
+        assert!(result.is_unit());
     }
 
     #[test]
@@ -261,10 +270,12 @@ mod tests {
         }
 
         #[test]
-        fn prop_convert_int_non_strict_preserves_input(input in "[A-Za-z!@#$%^&* ]+") {
+        fn prop_convert_int_non_strict_yields_unit_on_failure(input in "[A-Za-z!@#$%^&* ]+") {
             prop_assume!(input.parse::<i64>().is_err());
+            // Resilient mode: an uncoercible value becomes () (explicitly absent),
+            // not the original string.
             let converted = convert_value_to_type(&input, &FieldType::Int, false).unwrap();
-            prop_assert_eq!(converted.into_string().unwrap(), input);
+            prop_assert!(converted.is_unit());
         }
     }
 }

@@ -126,8 +126,19 @@ impl EventParser for ColsParser {
                     let converted_value = if let Some(field_type) = combined_types.get(&*key) {
                         // Get string representation for conversion
                         if let Ok(str_value) = value.clone().into_string() {
-                            convert_value_to_type(&str_value, field_type, self.strict)
-                                .unwrap_or(value)
+                            // Propagate so --strict aborts and resilient mode
+                            // yields () — same as regex/csv (the shared
+                            // convert_value_to_type decides which).
+                            convert_value_to_type(&str_value, field_type, self.strict).map_err(
+                                |e| {
+                                    anyhow::anyhow!(
+                                        "Type conversion error for field '{}' (value: '{}'): {}",
+                                        key,
+                                        str_value,
+                                        e
+                                    )
+                                },
+                            )?
                         } else {
                             value
                         }
