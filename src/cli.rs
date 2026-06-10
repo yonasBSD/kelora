@@ -599,7 +599,7 @@ pub struct Cli {
     pub no_emoji: bool,
 
     /// Enable parallel processing (default: sequential processing).
-    #[arg(long = "parallel", help_heading = "Performance Options")]
+    #[arg(short = 'P', long = "parallel", help_heading = "Performance Options")]
     pub parallel: bool,
 
     /// Disable parallel processing explicitly (default mode is sequential).

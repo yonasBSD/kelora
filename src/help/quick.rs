@@ -38,6 +38,7 @@ Common Options:
   --discover                    Profile field names, types, and sample values (sequential only)
   --drain                       Summarize log templates (requires -k/--keys, sequential only)
   --merge-sorted                Merge already-sorted files by timestamp; aborts on missing timestamps, parse failures, or disorder (sequential only)
+  -P, --parallel                Process in parallel for high-throughput batch analysis (sequential by default)
 
 More Help:
   kelora --help              Full CLI reference (all 100+ options grouped by category)
