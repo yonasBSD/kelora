@@ -49,6 +49,8 @@ just docs-build         # Build locally
 
 ## Key Development Conventions
 
+**Builds:** Use dev builds (`cargo build`, `./target/debug/kelora`) during normal development. Release builds are heavily optimized and slow to compile — use `--release` / `./target/release/kelora` only for performance work (benchmarking, profiling).
+
 **Architecture:** Streaming pipeline: Input → Parsing → Processing (Rhai) → Output
 
 **Fuzzing (manual only):**
