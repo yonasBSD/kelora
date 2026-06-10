@@ -283,6 +283,53 @@ impl FieldProfile {
 }
 
 /// Accumulator for field discovery across an entire stream.
+/// Which input parser(s) produced the discovered fields.
+///
+/// Surfaced in the discover footer (and JSON output) so the field table is
+/// self-documenting: the parser is the lens every row was read through, and a
+/// mis-detected format is the usual explanation for a garbled table. Built at
+/// the render site from config + processing stats (see `main.rs`).
+#[derive(Debug, Clone)]
+pub struct FormatSummary {
+    /// Canonical format name, or `"mixed"` when several parsers contributed.
+    pub format: std::string::String,
+    /// How the format was chosen: `auto`, `explicit`, `per-file`, or `cascade`.
+    pub detection: &'static str,
+    /// Per-format counts for the multi-format modes (`per-file`, `cascade`);
+    /// empty for single-format runs.
+    pub counts: Vec<(std::string::String, usize)>,
+    /// Unit for `counts`: `"files"` (per-file) or `"events"` (cascade).
+    pub unit: &'static str,
+}
+
+impl FormatSummary {
+    /// Render the fragment shown after the event count in the table footer,
+    /// e.g. `format: cef (auto-detected)` or `formats: cef 3, json 1 (files)`.
+    fn footer_fragment(&self) -> std::string::String {
+        if self.counts.len() > 1 {
+            let parts: Vec<std::string::String> = self
+                .counts
+                .iter()
+                .map(|(name, count)| format!("{} {}", name, count))
+                .collect();
+            format!("formats: {} ({})", parts.join(", "), self.unit)
+        } else {
+            let name = self
+                .counts
+                .first()
+                .map(|(n, _)| n.as_str())
+                .unwrap_or(&self.format);
+            let tag = match self.detection {
+                "auto" => " (auto-detected)",
+                "per-file" => " (per-file)",
+                "cascade" => " (cascade)",
+                _ => "",
+            };
+            format!("format: {}{}", name, tag)
+        }
+    }
+}
+
 pub struct FieldDiscovery {
     /// Per-field profiles, insertion-ordered.
     pub fields: IndexMap<std::string::String, FieldProfile>,
@@ -294,6 +341,9 @@ pub struct FieldDiscovery {
     flatten_depth_capped: bool,
     /// Configured depth limit for nested field flattening.
     flatten_depth: usize,
+    /// Which parser(s) produced these fields; set at the render site. `None`
+    /// suppresses the format line in the footer/JSON.
+    pub format_summary: Option<FormatSummary>,
 }
 
 impl Default for FieldDiscovery {
@@ -319,6 +369,7 @@ impl FieldDiscovery {
             capped: false,
             flatten_depth_capped: false,
             flatten_depth,
+            format_summary: None,
         }
     }
 
@@ -420,7 +471,8 @@ impl FieldDiscovery {
         let glyphs = Glyphs::new(use_unicode);
 
         if self.fields.is_empty() {
-            return format!("Scanned {} events: no fields found\n", self.total_events);
+            // No trailing newline; the caller's `writeln` terminates the line.
+            return format!("Scanned {} events: no fields found", self.total_events);
         }
 
         let mut output = std::string::String::new();
@@ -572,8 +624,16 @@ impl FieldDiscovery {
         }
 
         // Event count as a quiet footer summary rather than a prominent header,
-        // so the column headers land on line 1 (friendlier for `… | head`).
-        output.push_str(&format!("\n{} events scanned\n", self.total_events));
+        // so the column headers land on line 1 (friendlier for `… | head`). The
+        // input parser is appended here so the table says which lens produced it.
+        // No trailing newline: the caller's `writeln` terminates the last line,
+        // matching the JSON path and avoiding a stray blank line.
+        output.push_str(&format!("\n{} events scanned", self.total_events));
+        if let Some(summary) = &self.format_summary {
+            let sep = if use_unicode { " · " } else { " | " };
+            output.push_str(sep);
+            output.push_str(&summary.footer_fragment());
+        }
 
         output
     }
@@ -618,13 +678,27 @@ impl FieldDiscovery {
             fields_json.push(field_obj);
         }
 
-        let result = serde_json::json!({
+        let mut result = serde_json::json!({
             "total_events": self.total_events,
             "fields": fields_json,
             "truncated": self.capped,
             "flatten_depth_limit": self.flatten_depth,
             "flatten_depth_capped": self.flatten_depth_capped,
         });
+
+        if let Some(summary) = &self.format_summary {
+            result["format"] = serde_json::json!(summary.format);
+            result["format_detection"] = serde_json::json!(summary.detection);
+            if !summary.counts.is_empty() {
+                let counts: serde_json::Map<std::string::String, serde_json::Value> = summary
+                    .counts
+                    .iter()
+                    .map(|(name, count)| (name.clone(), serde_json::json!(count)))
+                    .collect();
+                result["format_counts"] = serde_json::Value::Object(counts);
+                result["format_count_unit"] = serde_json::json!(summary.unit);
+            }
+        }
 
         serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string())
     }
@@ -1329,6 +1403,104 @@ mod tests {
         assert!(table.contains("level"));
         assert!(table.contains("msg"));
         assert!(table.contains("string"));
+        // The render carries no trailing newline; the caller's writeln adds it.
+        assert!(table.ends_with("1 events scanned"));
+    }
+
+    fn discovery_with_one_field() -> FieldDiscovery {
+        let mut discovery = FieldDiscovery::new();
+        let mut fields = IndexMap::new();
+        fields.insert("level".to_string(), make_string("INFO"));
+        discovery.observe_event(&fields);
+        discovery
+    }
+
+    #[test]
+    fn test_footer_format_single_auto() {
+        let mut discovery = discovery_with_one_field();
+        discovery.format_summary = Some(FormatSummary {
+            format: "cef".to_string(),
+            detection: "auto",
+            counts: vec![],
+            unit: "",
+        });
+        // Unicode footer uses the middle-dot separator.
+        let table = discovery.format_table(true);
+        assert!(table.contains("1 events scanned \u{b7} format: cef (auto-detected)"));
+        // ASCII fallback uses the pipe separator.
+        let ascii = discovery.format_table_for_width(80, false);
+        assert!(ascii.contains("1 events scanned | format: cef (auto-detected)"));
+    }
+
+    #[test]
+    fn test_footer_format_explicit_has_no_tag() {
+        let mut discovery = discovery_with_one_field();
+        discovery.format_summary = Some(FormatSummary {
+            format: "line".to_string(),
+            detection: "explicit",
+            counts: vec![],
+            unit: "",
+        });
+        let table = discovery.format_table(true);
+        assert!(table.contains("format: line"));
+        assert!(!table.contains("auto-detected"));
+        assert!(!table.contains('('));
+    }
+
+    #[test]
+    fn test_footer_format_multi_lists_counts_with_unit() {
+        let mut discovery = discovery_with_one_field();
+        discovery.format_summary = Some(FormatSummary {
+            format: "mixed".to_string(),
+            detection: "cascade",
+            counts: vec![("cef".to_string(), 12), ("json".to_string(), 3)],
+            unit: "events",
+        });
+        let table = discovery.format_table(true);
+        assert!(table.contains("formats: cef 12, json 3 (events)"));
+    }
+
+    #[test]
+    fn test_footer_format_absent_when_no_summary() {
+        let discovery = discovery_with_one_field();
+        let table = discovery.format_table(true);
+        assert!(table.contains("1 events scanned"));
+        assert!(!table.contains("format:"));
+        assert!(!table.contains("formats:"));
+    }
+
+    #[test]
+    fn test_format_json_includes_format_keys() {
+        let mut discovery = discovery_with_one_field();
+        discovery.format_summary = Some(FormatSummary {
+            format: "mixed".to_string(),
+            detection: "per-file",
+            counts: vec![("cef".to_string(), 3), ("json".to_string(), 1)],
+            unit: "files",
+        });
+        let json: serde_json::Value =
+            serde_json::from_str(&discovery.format_json()).expect("valid json");
+        assert_eq!(json["format"], "mixed");
+        assert_eq!(json["format_detection"], "per-file");
+        assert_eq!(json["format_counts"]["cef"], 3);
+        assert_eq!(json["format_counts"]["json"], 1);
+        assert_eq!(json["format_count_unit"], "files");
+    }
+
+    #[test]
+    fn test_format_json_omits_counts_for_single_format() {
+        let mut discovery = discovery_with_one_field();
+        discovery.format_summary = Some(FormatSummary {
+            format: "cef".to_string(),
+            detection: "auto",
+            counts: vec![],
+            unit: "",
+        });
+        let json: serde_json::Value =
+            serde_json::from_str(&discovery.format_json()).expect("valid json");
+        assert_eq!(json["format"], "cef");
+        assert_eq!(json["format_detection"], "auto");
+        assert!(json.get("format_counts").is_none());
     }
 
     #[test]

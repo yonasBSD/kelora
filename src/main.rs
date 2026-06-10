@@ -490,10 +490,85 @@ fn maybe_print_zero_results_hint(
     stderr.writeln(&hint).unwrap_or(());
 }
 
+/// Build the discover footer's format summary from the requested input format
+/// and the run's processing stats. Returns `None` when no format is known
+/// (e.g. stats disabled, or an empty/auto run that detected nothing).
+fn build_discover_format_summary(
+    format: &config::InputFormat,
+    stats: Option<&stats::ProcessingStats>,
+) -> Option<field_discovery::FormatSummary> {
+    use field_discovery::FormatSummary;
+    let stats = stats?;
+
+    match format {
+        config::InputFormat::Auto => {
+            let name = stats.detected_format.clone()?;
+            // Guard against the unresolved sentinel if detection never ran.
+            if name == "auto" {
+                return None;
+            }
+            Some(FormatSummary {
+                format: name,
+                detection: "auto",
+                counts: Vec::new(),
+                unit: "",
+            })
+        }
+        config::InputFormat::AutoPerFile => {
+            let counts: Vec<(String, usize)> = stats
+                .detected_format_counts
+                .iter()
+                .map(|(name, count)| (name.clone(), *count))
+                .collect();
+            if counts.is_empty() {
+                return None;
+            }
+            let format = if counts.len() == 1 {
+                counts[0].0.clone()
+            } else {
+                "mixed".to_string()
+            };
+            Some(FormatSummary {
+                format,
+                detection: "per-file",
+                counts,
+                unit: "files",
+            })
+        }
+        f if f.is_cascade() => {
+            let counts: Vec<(String, usize)> = stats
+                .cascade_format_counts
+                .iter()
+                .map(|(name, count)| (name.clone(), *count))
+                .collect();
+            if counts.is_empty() {
+                return None;
+            }
+            let format = if counts.len() == 1 {
+                counts[0].0.clone()
+            } else {
+                "mixed".to_string()
+            };
+            Some(FormatSummary {
+                format,
+                detection: "cascade",
+                counts,
+                unit: "events",
+            })
+        }
+        other => Some(FormatSummary {
+            format: other.to_display_string(),
+            detection: "explicit",
+            counts: Vec::new(),
+            unit: "",
+        }),
+    }
+}
+
 /// Handle successful pipeline execution - process metrics, stats, and warnings
 fn handle_pipeline_success(
     config: &KeloraConfig,
-    pipeline_result: PipelineResult,
+    mut pipeline_result: PipelineResult,
     stdout: &mut SafeStdout,
     stderr: &mut SafeStderr,
     diagnostics_allowed_runtime: bool,
@@ -604,7 +679,10 @@ fn handle_pipeline_success(
 
     // Print field discovery results if requested
     if !SHOULD_TERMINATE.load(Ordering::Relaxed) {
-        if let Some(ref discovery) = pipeline_result.field_discovery {
+        let format_summary =
+            build_discover_format_summary(&config.input.format, pipeline_result.stats.as_ref());
+        if let Some(discovery) = pipeline_result.field_discovery.as_mut() {
+            discovery.format_summary = format_summary;
             let formatted = match config.output.discover_fields {
                 Some(cli::DiscoverFieldsFormat::Json) => discovery.format_json(),
                 _ => {

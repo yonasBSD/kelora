@@ -167,10 +167,9 @@ fn run_pipeline_parallel<W: Write + Send + 'static>(
             let mut new_config = config.clone();
             new_config.input.format = detected_format.format.clone();
 
-            // Update detected format in stats if stats are enabled
-            if config.output.stats.is_some() {
-                stats::stats_set_detected_format(new_config.input.format.to_display_string());
-            }
+            // Record the detected format so the discover footer / --stats can
+            // show it. The setter self-gates on whether stats collection is on.
+            stats::stats_set_detected_format(new_config.input.format.to_display_string());
 
             let was_auto_detected_non_line = detected_format.detected_non_line();
 
@@ -395,10 +394,9 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         let mut final_config = config.clone();
         final_config.input.format = detected_format.format.clone();
 
-        // Set detected format in stats if stats are enabled
-        if config.output.stats.is_some() {
-            stats::stats_set_detected_format(final_config.input.format.to_display_string());
-        }
+        // Record the detected format so the discover footer / --stats can show
+        // it. The setter self-gates on whether stats collection is enabled.
+        stats::stats_set_detected_format(final_config.input.format.to_display_string());
 
         let input = SequentialInput::Stdin(Box::new(peekable_reader));
         run_pipeline_sequential_internal(&final_config, output, ctrl_rx, input)?;
@@ -485,10 +483,9 @@ fn run_pipeline_sequential_with_auto_detection<W: Write>(
         let mut final_config = config.clone();
         final_config.input.format = detected_format.format.clone();
 
-        // Set detected format in stats if stats are enabled
-        if config.output.stats.is_some() {
-            stats::stats_set_detected_format(final_config.input.format.to_display_string());
-        }
+        // Record the detected format so the discover footer / --stats can show
+        // it. The setter self-gates on whether stats collection is enabled.
+        stats::stats_set_detected_format(final_config.input.format.to_display_string());
 
         let input = if final_config.input.merge_ts {
             SequentialInput::MergedFiles(MergedFileReader {
@@ -1353,9 +1350,8 @@ fn handle_reader_message<W: Write>(
             *last_filename = None;
             *current_input_format = detected.format.clone();
 
-            if config.output.stats.is_some() {
-                stats::stats_add_detected_format_hit(&detected.format.to_display_string());
-            }
+            // Self-gates on stats collection; also feeds the discover footer.
+            stats::stats_add_detected_format_hit(&detected.format.to_display_string());
 
             replace_pipeline_parser(pipeline, pipeline_ctx, config, &detected.format, None, None)?;
 
