@@ -142,33 +142,37 @@ pub struct Cli {
     #[arg(long = "head", help_heading = "Input Options")]
     pub head: Option<usize>,
 
-    /// Start emitting sections from the matching line (inclusive)
+    /// Start emitting sections from the line matching this regex (inclusive). Unanchored; use ^...$ to match a whole line
     #[arg(
         long = "section-from",
+        value_name = "REGEX",
         help_heading = "Input Options",
         conflicts_with = "section_after"
     )]
     pub section_from: Option<String>,
 
-    /// Start emitting sections after the matching line (exclusive start)
+    /// Start emitting sections after the line matching this regex (exclusive start). Unanchored; use ^...$ to match a whole line
     #[arg(
         long = "section-after",
+        value_name = "REGEX",
         help_heading = "Input Options",
         conflicts_with = "section_from"
     )]
     pub section_after: Option<String>,
 
-    /// Stop before the matching line (exclusive end)
+    /// Stop before the line matching this regex (exclusive end). Unanchored; use ^...$ to match a whole line
     #[arg(
         long = "section-before",
+        value_name = "REGEX",
         help_heading = "Input Options",
         conflicts_with = "section_through"
     )]
     pub section_before: Option<String>,
 
-    /// Stop after emitting the matching line (inclusive end)
+    /// Stop after emitting the line matching this regex (inclusive end). Unanchored; use ^...$ to match a whole line
     #[arg(
         long = "section-through",
+        value_name = "REGEX",
         help_heading = "Input Options",
         conflicts_with = "section_before"
     )]
@@ -200,7 +204,7 @@ pub struct Cli {
 
     /// Assume timezone for input timestamps without timezone info (default: UTC).
     /// Use 'local' for system local time.
-    /// Examples: 'UTC', 'local', 'Europe/Berlin'.
+    /// Examples: 'Europe/Berlin', 'local', 'UTC' 
     #[arg(long = "input-tz", help_heading = "Input Options")]
     pub input_tz: Option<String>,
 
