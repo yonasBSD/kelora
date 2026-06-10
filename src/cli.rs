@@ -91,7 +91,7 @@ pub enum ShellCompletion {
 #[command(name = "kelora")]
 #[command(about = "A command-line log analysis tool with embedded Rhai scripting")]
 #[command(
-    long_about = "A command-line log analysis tool with embedded Rhai scripting\n\nINTERACTIVE MODE:\n  Run 'kelora' without arguments to enter interactive mode - a readline-based REPL\n  with command history, automatic glob expansion, and proper quote handling.\n  Especially helpful on Windows where shell quoting is difficult.\n\nMODES:\n  (default)   Sequential processing - best for streaming/interactive use\n  --parallel  Parallel processing - best for high-throughput batch analysis\n\nCOMMON EXAMPLES:\n  kelora access.log --levels error,critical\n  kelora -j app.json --exec 'e.duration_ms = e.end_time - e.start_time'\n  kelora nginx.log -f combined --keys method,status,path\n\nNeed a quick reference?  kelora -h\n\nSee also: --help-rhai for scripting stages, --help-functions for the full built-in catalogue"
+    long_about = "A command-line log analysis tool with embedded Rhai scripting\n\nProcesses logs through a streaming pipeline: parse -> filter/transform (Rhai) -> format.\nRuns sequentially by default; add --parallel for high-throughput batch analysis.\n\nRun 'kelora' with no arguments for interactive mode - a readline-based REPL with command\nhistory, glob expansion, and proper quoting (especially helpful on Windows).\n\nFor a quick reference with worked examples, run:  kelora -h\n\nSee also: --help-rhai for scripting stages, --help-functions for the full built-in catalogue"
 )]
 #[command(author = "Dirk Loss <mail@dirk-loss.de>")]
 #[command(version)]
@@ -125,6 +125,7 @@ pub struct Cli {
     #[arg(
         long = "file-order",
         value_enum,
+        value_name = "ORDER",
         default_value = "cli",
         help_heading = "Input Options"
     )]
@@ -135,14 +136,15 @@ pub struct Cli {
     pub merge_ts: bool,
 
     /// Skip the first N input lines
-    #[arg(long = "skip-lines", help_heading = "Input Options")]
+    #[arg(long = "skip-lines", value_name = "N", help_heading = "Input Options")]
     pub skip_lines: Option<usize>,
 
     /// Read only the first N input lines (stops I/O early, complementing --take which limits output events)
-    #[arg(long = "head", help_heading = "Input Options")]
+    #[arg(long = "head", value_name = "N", help_heading = "Input Options")]
     pub head: Option<usize>,
 
-    /// Start emitting sections from the line matching this regex (inclusive). Unanchored; use ^...$ to match a whole line
+    /// Start emitting sections from the line matching this regex (inclusive start).
+    /// All --section-* regexes are unanchored; use ^...$ to match a whole line.
     #[arg(
         long = "section-from",
         value_name = "REGEX",
@@ -151,7 +153,7 @@ pub struct Cli {
     )]
     pub section_from: Option<String>,
 
-    /// Start emitting sections after the line matching this regex (exclusive start). Unanchored; use ^...$ to match a whole line
+    /// Start emitting sections after the line matching this regex (exclusive start)
     #[arg(
         long = "section-after",
         value_name = "REGEX",
@@ -160,7 +162,7 @@ pub struct Cli {
     )]
     pub section_after: Option<String>,
 
-    /// Stop before the line matching this regex (exclusive end). Unanchored; use ^...$ to match a whole line
+    /// Stop before the line matching this regex (exclusive end)
     #[arg(
         long = "section-before",
         value_name = "REGEX",
@@ -169,7 +171,7 @@ pub struct Cli {
     )]
     pub section_before: Option<String>,
 
-    /// Stop after emitting the line matching this regex (inclusive end). Unanchored; use ^...$ to match a whole line
+    /// Stop after emitting the line matching this regex (inclusive end)
     #[arg(
         long = "section-through",
         value_name = "REGEX",
@@ -181,67 +183,96 @@ pub struct Cli {
     /// Maximum number of sections to process (default: -1 for unlimited)
     #[arg(
         long = "max-sections",
+        value_name = "N",
         default_value = "-1",
         help_heading = "Input Options"
     )]
     pub max_sections: i64,
 
     /// Keep only input lines matching this regex pattern (applied before ignore-lines)
-    #[arg(long = "keep-lines", help_heading = "Input Options")]
+    #[arg(
+        long = "keep-lines",
+        value_name = "REGEX",
+        help_heading = "Input Options"
+    )]
     pub keep_lines: Option<String>,
 
     /// Ignore input lines matching this regex pattern
-    #[arg(long = "ignore-lines", help_heading = "Input Options")]
+    #[arg(
+        long = "ignore-lines",
+        value_name = "REGEX",
+        help_heading = "Input Options"
+    )]
     pub ignore_lines: Option<String>,
 
     /// Custom timestamp field name for parsing
-    #[arg(long = "ts-field", help_heading = "Input Options")]
+    #[arg(
+        long = "ts-field",
+        value_name = "FIELD",
+        help_heading = "Input Options"
+    )]
     pub ts_field: Option<String>,
 
     /// Custom timestamp format for parsing (uses chrono format strings)
-    #[arg(long = "ts-format", help_heading = "Input Options")]
+    #[arg(
+        long = "ts-format",
+        value_name = "FORMAT",
+        help_heading = "Input Options"
+    )]
     pub ts_format: Option<String>,
 
     /// Assume timezone for input timestamps without timezone info (default: UTC).
     /// Use 'local' for system local time.
-    /// Examples: 'Europe/Berlin', 'local', 'UTC' 
-    #[arg(long = "input-tz", help_heading = "Input Options")]
+    /// Examples: 'Europe/Berlin', 'local', 'UTC'
+    #[arg(long = "input-tz", value_name = "TZ", help_heading = "Input Options")]
     pub input_tz: Option<String>,
 
     /// Multi-line event detection strategy. Supply values like `timestamp`,
     /// `timestamp:format=%Y-%m-%d %H-%M-%S`, `regex:match=^START`, or
     /// `regex:match=^START:end=^END$`. See `kelora --help-multiline` for details.
-    #[arg(short = 'M', long = "multiline", help_heading = "Input Options")]
+    #[arg(
+        short = 'M',
+        long = "multiline",
+        value_name = "STRATEGY",
+        help_heading = "Input Options"
+    )]
     pub multiline: Option<String>,
 
     /// Join multiline lines with: space (default), newline, or empty
     #[arg(
         long = "multiline-join",
         value_enum,
+        value_name = "JOIN",
         default_value_t = MultilineJoin::Space,
         help_heading = "Input Options"
     )]
     pub multiline_join: MultilineJoin,
 
     /// Extract text before separator to specified field (runs before parsing)
-    #[arg(long = "extract-prefix", help_heading = "Input Options")]
+    #[arg(
+        long = "extract-prefix",
+        value_name = "FIELD",
+        help_heading = "Input Options"
+    )]
     pub extract_prefix: Option<String>,
 
     /// Separator string for prefix extraction (default: pipe '|')
     #[arg(
         long = "prefix-sep",
+        value_name = "SEP",
         default_value = "|",
         help_heading = "Input Options"
     )]
     pub prefix_sep: String,
 
     /// Column separator for cols:<spec> format (default: whitespace)
-    #[arg(long = "cols-sep", help_heading = "Input Options")]
+    #[arg(long = "cols-sep", value_name = "SEP", help_heading = "Input Options")]
     pub cols_sep: Option<String>,
 
     /// Pre-run a Rhai script before any other stage runs.
     #[arg(
         long = "begin",
+        value_name = "EXPR",
         help_heading = "Processing Options",
         help = "Pre-run a Rhai script before any other stage runs.\n\nTypical use: seed the global `conf` map with lookup tables or shared context.\n\nHelpers available only here:\n  read_lines(path) -> Array<String>  # UTF-8, one entry per line\n  read_file(path)  -> String         # UTF-8, entire file contents\n\nData stored in `conf` becomes read-only afterwards. See --help-rhai for stage order."
     )]
@@ -249,33 +280,49 @@ pub struct Cli {
 
     #[arg(
         long = "filter",
+        value_name = "EXPR",
         help_heading = "Processing Options",
         help = "Boolean filter expression; events where it evaluates to true are kept.\n\nCan be combined with --include (-I) to call helper functions defined in an\ninclude file. Include files used with --filter must contain only function\ndefinitions — top-level statements are rejected with an error.\n\nExample:\n  kelora -I helpers.rhai --filter 'is_error(e.level)' app.log\n\nSee --help-rhai for expression syntax."
     )]
     pub filters: Vec<String>,
 
     /// Transform/process exec scripts evaluated on each event. See --help-rhai for stage semantics.
-    #[arg(short = 'e', long = "exec", help_heading = "Processing Options")]
+    #[arg(
+        short = 'e',
+        long = "exec",
+        value_name = "EXPR",
+        help_heading = "Processing Options"
+    )]
     pub execs: Vec<String>,
 
     /// Execute script from file (contents run in the exec stage).
-    #[arg(short = 'E', long = "exec-file", help_heading = "Processing Options")]
+    #[arg(
+        short = 'E',
+        long = "exec-file",
+        value_name = "FILE",
+        help_heading = "Processing Options"
+    )]
     pub exec_files: Vec<String>,
 
     /// Assertion expressions that must evaluate to true. Violations are reported to stderr;
     /// processing continues unless --strict is enabled. See --help-rhai for expression syntax.
-    #[arg(long = "assert", help_heading = "Processing Options")]
+    #[arg(
+        long = "assert",
+        value_name = "EXPR",
+        help_heading = "Processing Options"
+    )]
     pub asserts: Vec<String>,
     #[arg(
         short = 'I',
         long = "include",
+        value_name = "FILE",
         help_heading = "Processing Options",
         help = "Include a Rhai file of helper functions, loaded into the adjacent script stage.\n\nCommand-line position selects which stage the file applies to:\n  --include before a --filter/--exec    → that filter/exec stage\n  --include before the first stage       → the --begin stage (if present)\n  --include after the last stage         → the --end stage (if present)\n\nEach stage has its own scope: an include's functions are only visible to\nthe stage it is attached to. Repeat --include to share helpers across\nseveral stages. An include that attaches to begin/end has no effect unless\nthat --begin/--end stage exists.\n\nWhen used with --filter, the include file must contain only function\ndefinitions. Top-level statements (side effects) are rejected with an error.\n\nExample:\n  kelora -I helpers.rhai --filter 'is_error(e.level)' app.log"
     )]
     pub includes: Vec<String>,
 
     /// Run once after processing completes (post-processing stage). Ideal for summarising metrics or emitting reports. The global `metrics` map from track_*() calls is accessible here.
-    #[arg(long = "end", help_heading = "Processing Options")]
+    #[arg(long = "end", value_name = "EXPR", help_heading = "Processing Options")]
     pub end: Option<String>,
 
     /// Allow Rhai scripts to create directories and write files on disk (required for file helpers like append_file or mkdir).
@@ -283,7 +330,7 @@ pub struct Cli {
     pub allow_fs_writes: bool,
 
     /// Enable access to a sliding window of N+1 recent events (needed for window_* functions).
-    #[arg(long = "window", help_heading = "Processing Options")]
+    #[arg(long = "window", value_name = "N", help_heading = "Processing Options")]
     pub window_size: Option<usize>,
 
     /// Aggregate events into fixed-size spans (count or duration) before running a span-close hook.
@@ -307,6 +354,7 @@ pub struct Cli {
     /// Rhai snippet executed once every time a span closes.
     #[arg(
         long = "span-close",
+        value_name = "EXPR",
         help_heading = "Processing Options",
         help = "Run a Rhai snippet when each span closes. Within the hook, read span.start, span.end, span.id, span.events, span.size, and span.metrics for span context."
     )]
@@ -319,6 +367,7 @@ pub struct Cli {
     /// Disable strict error handling (resilient mode)
     #[arg(
         long = "no-strict",
+        hide = true,
         help_heading = "Error Handling",
         overrides_with = "strict"
     )]
@@ -369,27 +418,35 @@ pub struct Cli {
     /// Start showing entries on or newer than the specified date
     #[arg(
         long = "since",
+        value_name = "TIME",
         help_heading = "Filtering Options",
-        help = "Accepts journalctl-style timestamps (e.g., 2024-01-15T12:00:00Z, '2024-01-15 12:00', '1h', '-30m', 'yesterday'). Can also use 'until+DURATION', 'until-DURATION', 'now+DURATION', or 'now-DURATION' anchors."
+        help = "Keep only events at or after this time.\n\nAccepts journalctl-style timestamps (e.g., 2024-01-15T12:00:00Z, '2024-01-15 12:00', '1h', '-30m', 'yesterday'). Can also use 'until+DURATION', 'until-DURATION', 'now+DURATION', or 'now-DURATION' anchors. See --help-time."
     )]
     pub since: Option<String>,
 
     /// Stop showing entries on or older than the specified date
     #[arg(
         long = "until",
+        value_name = "TIME",
         help_heading = "Filtering Options",
-        help = "Accepts journalctl-style timestamps (e.g., 2024-01-15T12:00:00Z, '2024-01-15 12:00', '1h', '+30m', 'tomorrow'). Can also use 'since+DURATION', 'since-DURATION', 'now+DURATION', or 'now-DURATION' anchors."
+        help = "Keep only events at or before this time.\n\nAccepts journalctl-style timestamps (e.g., 2024-01-15T12:00:00Z, '2024-01-15 12:00', '1h', '+30m', 'tomorrow'). Can also use 'since+DURATION', 'since-DURATION', 'now+DURATION', or 'now-DURATION' anchors. See --help-time."
     )]
     pub until: Option<String>,
 
     /// Limit output to the first N events
-    #[arg(short = 'n', long = "take", help_heading = "Filtering Options")]
+    #[arg(
+        short = 'n',
+        long = "take",
+        value_name = "N",
+        help_heading = "Filtering Options"
+    )]
     pub take: Option<usize>,
 
     /// Show N lines before each match (requires filtering)
     #[arg(
         short = 'B',
         long = "before-context",
+        value_name = "N",
         help_heading = "Filtering Options"
     )]
     pub before_context: Option<usize>,
@@ -398,12 +455,18 @@ pub struct Cli {
     #[arg(
         short = 'A',
         long = "after-context",
+        value_name = "N",
         help_heading = "Filtering Options"
     )]
     pub after_context: Option<usize>,
 
     /// Show N lines before and after each match (requires filtering)
-    #[arg(short = 'C', long = "context", help_heading = "Filtering Options")]
+    #[arg(
+        short = 'C',
+        long = "context",
+        value_name = "N",
+        help_heading = "Filtering Options"
+    )]
     pub context: Option<usize>,
 
     /// Output format
@@ -411,6 +474,7 @@ pub struct Cli {
         short = 'F',
         long = "output-format",
         value_enum,
+        value_name = "FORMAT",
         default_value = "default",
         help = "Output format.\n\nFormats:\n  default   Colored key-value output\n  json      JSON Lines (one object per line)\n  logfmt    Key=value pairs on one line\n  inspect   Debug view with type information\n  levelmap  Compact level timeline\n  keymap    First-character map for one selected field\n  tailmap   Percentile map for one numeric field\n  csv       Comma-separated with header row\n  tsv       Tab-separated with header row\n  csvnh     CSV without header row\n  tsvnh     TSV without header row\n\nSee --help-formats for requirements, extracted fields, and examples.",
         help_heading = "Output Options"
@@ -430,7 +494,12 @@ pub struct Cli {
     pub core: bool,
 
     /// Output file for formatted events
-    #[arg(short = 'o', long = "output-file", help_heading = "Output Options")]
+    #[arg(
+        short = 'o',
+        long = "output-file",
+        value_name = "FILE",
+        help_heading = "Output Options"
+    )]
     pub output_file: Option<String>,
 
     /// Suppress events (formatter output)
@@ -442,7 +511,7 @@ pub struct Cli {
     pub diagnostics: bool,
 
     /// Suppress diagnostics and error summaries (fatal line still allowed).
-    #[arg(long = "no-diagnostics", help_heading = "Output Options", overrides_with_all = ["diagnostics", "no_diagnostics"])]
+    #[arg(long = "no-diagnostics", hide = true, help_heading = "Output Options", overrides_with_all = ["diagnostics", "no_diagnostics"])]
     pub no_diagnostics: bool,
 
     /// Silence pipeline stdout/stderr emitters (events/diagnostics/stats/terminal metrics); script output still allowed. Metrics files still write.
@@ -450,7 +519,7 @@ pub struct Cli {
     pub silent: bool,
 
     /// Disable a silent default coming from config.
-    #[arg(long = "no-silent", help_heading = "Output Options")]
+    #[arg(long = "no-silent", hide = true, help_heading = "Output Options")]
     pub no_silent: bool,
 
     /// Enable Rhai print/eprint output
@@ -458,10 +527,10 @@ pub struct Cli {
     pub script_output: bool,
 
     /// Suppress Rhai print/eprint and side-effect warnings (implied by data-only modes).
-    #[arg(long = "no-script-output", help_heading = "Output Options", overrides_with_all = ["script_output", "no_script_output"])]
+    #[arg(long = "no-script-output", hide = true, help_heading = "Output Options", overrides_with_all = ["script_output", "no_script_output"])]
     pub no_script_output: bool,
 
-    /// Output only field values (default: false).
+    /// Output only field values (omit keys).
     #[arg(short = 'b', long = "brief", help_heading = "Default Format Options")]
     pub brief: bool,
 
@@ -469,7 +538,7 @@ pub struct Cli {
     #[arg(long = "expand-nested", help_heading = "Default Format Options")]
     pub expand_nested: bool,
 
-    /// Enable word-wrapping (default: on).
+    /// Enable word-wrapping (on by default; use to re-enable if disabled in config).
     #[arg(long = "wrap", help_heading = "Default Format Options")]
     pub wrap: bool,
 
@@ -536,29 +605,36 @@ pub struct Cli {
     /// Disable parallel processing explicitly (default mode is sequential).
     #[arg(
         long = "no-parallel",
+        hide = true,
         help_heading = "Performance Options",
         overrides_with = "parallel"
     )]
     pub no_parallel: bool,
 
-    /// Number of worker threads
+    /// Number of worker threads (0 = auto-detect, one per available core)
     #[arg(
         long = "threads",
+        value_name = "N",
         default_value_t = 0,
         help_heading = "Performance Options"
     )]
     pub threads: usize,
 
-    /// Batch size for parallel processing
-    #[arg(long = "batch-size", help_heading = "Performance Options")]
+    /// Batch size (events per batch) for parallel processing
+    #[arg(
+        long = "batch-size",
+        value_name = "N",
+        help_heading = "Performance Options"
+    )]
     pub batch_size: Option<usize>,
 
     /// Batch timeout in milliseconds
     #[arg(
         long = "batch-timeout",
+        value_name = "MS",
         default_value_t = 200,
         help_heading = "Performance Options",
-        help = "Flush partially full parallel batches after this idle period. Lower values reduce latency; higher values improve throughput."
+        help = "Flush partially full parallel batches after this idle period (milliseconds). Lower values reduce latency; higher values improve throughput."
     )]
     pub batch_timeout: u64,
 
@@ -583,6 +659,7 @@ pub struct Cli {
     /// Disable processing statistics explicitly (default: off).
     #[arg(
         long = "no-stats",
+        hide = true,
         help_heading = "Metrics and Stats",
         overrides_with = "stats"
     )]
@@ -609,6 +686,7 @@ pub struct Cli {
     /// Disable tracked metrics explicitly (default: off).
     #[arg(
         long = "no-metrics",
+        hide = true,
         help_heading = "Metrics and Stats",
         overrides_with = "metrics"
     )]
@@ -621,6 +699,7 @@ pub struct Cli {
     /// Write metrics to file (JSON format). Can combine with -m for both table and file.
     #[arg(
         long = "metrics-file",
+        value_name = "FILE",
         help_heading = "Metrics and Stats",
         help = "Persist the metrics map (populated by track_*()) to disk as JSON."
     )]
@@ -677,7 +756,11 @@ pub struct Cli {
     pub discover_depth: Option<usize>,
 
     /// Specify custom configuration file path
-    #[arg(long = "config-file", help_heading = "Configuration Options")]
+    #[arg(
+        long = "config-file",
+        value_name = "FILE",
+        help_heading = "Configuration Options"
+    )]
     pub config_file: Option<String>,
 
     /// Ignore configuration file
@@ -685,11 +768,20 @@ pub struct Cli {
     pub ignore_config: bool,
 
     /// Use alias from configuration file
-    #[arg(short = 'a', long = "alias", help_heading = "Configuration Options")]
+    #[arg(
+        short = 'a',
+        long = "alias",
+        value_name = "NAME",
+        help_heading = "Configuration Options"
+    )]
     pub alias: Vec<String>,
 
     /// Save current command as alias to configuration file
-    #[arg(long = "save-alias", help_heading = "Configuration Options")]
+    #[arg(
+        long = "save-alias",
+        value_name = "NAME",
+        help_heading = "Configuration Options"
+    )]
     pub save_alias: Option<String>,
 
     /// Show configuration file and exit
