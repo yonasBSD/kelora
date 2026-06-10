@@ -607,7 +607,13 @@ fn handle_pipeline_success(
         if let Some(ref discovery) = pipeline_result.field_discovery {
             let formatted = match config.output.discover_fields {
                 Some(cli::DiscoverFieldsFormat::Json) => discovery.format_json(),
-                _ => discovery.format_table(),
+                _ => {
+                    let use_unicode = crate::tty::should_use_emoji_with_mode(
+                        &config.output.emoji,
+                        &config.output.color,
+                    );
+                    discovery.format_table(use_unicode)
+                }
             };
             stdout.writeln(&formatted).unwrap_or(());
         }
