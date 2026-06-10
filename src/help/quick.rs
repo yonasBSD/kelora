@@ -10,14 +10,14 @@ Usage:
 
 Quick Examples:
   kelora -f logfmt -l error simple_logfmt.log
-  kelora -f json,line mixed.log --filter 'e._format == "json"'
+  kelora -f json,line mixed_format.log --filter 'e._format == "json"'
   kelora -f auto-per-file -F json services/*/*.log
   kelora web_access_large.log.gz --stats
   kelora simple_json.jsonl --filter 'e.service == "database"' --exec 'e.duration_s = e.get_path("duration_ms", 0) / 1000' -k timestamp,message,duration_s
   kelora simple_json.jsonl --since 2024-01-15T10:01:00Z --until now -l warn,error --stats
   kelora audit.jsonl --exec 'track_count(e.action)' --metrics
-  kelora api.jsonl --discover
-  kelora app.jsonl --drain -k message
+  kelora api_logs.jsonl --discover
+  kelora app_monitoring.jsonl --drain -k message
   kelora -f json --merge-sorted app-*.jsonl
   kelora payments_latency.jsonl --parallel --filter 'e.duration_ms > 500' -k order_id,duration_ms,status
   tail -f app.log | kelora -j -l error,warn
@@ -25,10 +25,11 @@ Quick Examples:
 Common Options:
   -f, --input-format <FORMAT>   Choose parser (auto, auto-per-file, json, line, raw, logfmt, syslog, cef, csv, tsv, csvnh, tsvnh, combined, cols:<spec>, regex:<pattern>, or cascade list e.g. json,line)
   -j                            Shortcut for -f json
-  --filter <expr>               Keep events where expression is true (can repeat; run in the order given)
-  -l, --levels <levels>         Keep only these log levels (comma-separated)
-  -e, --exec <expr>             Transform events or emit metrics (can repeat; run in the order given)
-  -k, --keys <fields>           Pick or reorder output fields
+  --filter <EXPR>               Keep events where expression is true (can repeat; run in the order given)
+  -l, --levels <LEVELS>         Keep only these log levels (comma-separated)
+  --since/--until <TIME>        Keep events within a time range (journalctl-style; see --help-time)
+  -e, --exec <EXPR>             Transform events or emit metrics (can repeat; run in the order given)
+  -k, --keys <KEYS>             Pick or reorder output fields
   -F, --output-format <FORMAT>  Output format (default/json/logfmt/inspect/levelmap/keymap/tailmap/csv/tsv/csvnh/tsvnh)
   -q, --quiet                   Suppress event output (-s/--stats and -m/--metrics imply this)
   -n, --take <N>                Limit output to first N events
@@ -37,11 +38,6 @@ Common Options:
   --discover                    Profile field names, types, and sample values (sequential only)
   --drain                       Summarize log templates (requires -k/--keys, sequential only)
   --merge-sorted                Merge already-sorted files by timestamp; aborts on missing timestamps, parse failures, or disorder (sequential only)
-
-Interactive Mode:
-  kelora                     Run without arguments to enter interactive mode
-                             (readline-based REPL with history, glob expansion,
-                             and proper quoting - especially helpful on Windows)
 
 More Help:
   kelora --help              Full CLI reference (all 100+ options grouped by category)
