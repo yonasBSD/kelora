@@ -18,37 +18,35 @@ VARIABLES & TYPES:
   x = "hello";                         Dynamic typing: variables can change type
 
 OPERATORS:
-  Arithmetic:  +  -  *  /  %  **       (power: 2**3 == 8)
+  Arithmetic:  +  -  *  /  %  **       Power: 2**3 == 8
   Comparison:  ==  !=  <  >  <=  >=
   Logical:     &&  ||  !
   Bitwise:     &  |  ^  <<  >>
-  Assignment:  =  +=  -=  *=  /=  %=  &=  |=  ^=  <<=  >>=
-  Range:       1..5  1..=5            (exclusive/inclusive, for loops only)
-  Membership:  "key" in map            (check map key existence)
+  Assignment:  =   +=  -=  *=   /=  %=  
+               &=  |=  ^=  <<=  >>=
+  Range:       1..5  1..=5             Exclusive/inclusive, for loops only
+  Membership:  "key" in map            Check map key existence
+  Null-coalescing: a ?? b              Returns a if it is not (), otherwise b
+                   a() ?? b()          b() is only evaluated if a() is ()
 
 STRING INTERPOLATION:
-  Rhai supports string interpolation using ${...} syntax within backtick strings:
+  Use ${...} syntax within backtick strings (not double quotes):
 
-  let name = "Alice";
-  let age = 30;
+  let age = 30; let name = "Alice";
   let msg = `Hello, ${name}! You are ${age} years old.`;
 
-  Complex expressions:
   let x = 10, y = 20;
   let result = `Sum: ${x + y}, Product: ${x * y}`;
 
-  Nested interpolations allowed:
   let status = "active";
-  let msg = `User ${name} is ${`currently ${status}`}`;
-
-  Note: Interpolation only works with backtick strings (`text`), not double quotes ("text")
+  let msg = `User ${name} is ${`currently ${status}`}`; // Nested interpolations allowed
 
 RAW STRINGS:
   Wrap strings with #"..."# to disable escape sequences (perfect for regexes):
 
-  let regex = #"\d{3}-\d{2}-\d{4}"#;       No escaping needed (vs "\\d{3}-\\d{2}-\\d{4}")
-  let path = #"C:\Users\data"#;            Windows paths work naturally
-  let s = ##"Contains "quotes""##;         Use multiple # to include " inside
+  let regex = #"\d{3}-\d{2}-\d{4}"#;   No escaping needed (vs "\\d{3}-\\d{2}-\\d{4}")
+  let path = #"C:\Users\data"#;        Windows paths work naturally
+  let s = ##"Contains "quotes""##;     Use multiple # to include " inside
 
 CONTROL FLOW:
   if x > 10 {                          If-else (braces required)
@@ -63,7 +61,7 @@ CONTROL FLOW:
       1 => "one",
       2 | 3 => "two or three",
       4..=6 => "four to six",
-      _ => "other"                     (underscore = default)
+      _ => "other"                     Underscore for the default case
   }
 
 LOOPS:
@@ -84,11 +82,12 @@ FUNCTIONS & CLOSURES:
   [1,2,3].map(|x| x * 2)               Common in array methods
   [1,2,3].filter(|x| x > 1)            Predicate closures
 
-FUNCTION-AS-METHOD SYNTAX (Rhai special feature):
-  extract_regex(e.line, "\d+")            Function call style
-  e.line.extract_regex("\d+")             Method call style (same thing!)
+FUNCTION-AS-METHOD SYNTAX:
+  Rhai allows calling any function as a method on its first argument:
 
-  Rhai allows calling any function as a method on its first argument.
+  extract_regex(e.line, "\d+")         Function call style
+  e.line.extract_regex("\d+")          Method call style (same thing!)
+
   Use method style for chaining: e.url.extract_domain().lower().strip()
 
 RHAI QUIRKS & GOTCHAS:
@@ -100,7 +99,7 @@ RHAI QUIRKS & GOTCHAS:
   • let required for new variables (x = 1 errors if x not declared)
   • Arrays/maps are reference types: modifying copies affects original
   • Last expression in block is return value (no return needed)
-  • Single-line comments: // ... (multi-line: /* ... */)
+  • Single-line comments: // ...  Multi-line: /* ... */
   • Function calls without parens ok if no args: e.len (same as e.len())
 
 KELORA PIPELINE STAGES:
@@ -110,7 +109,7 @@ KELORA PIPELINE STAGES:
   --exec-file     Same as --exec, reads script from file
   --end           Post-run once after processing; access global `metrics` map for reports
 
-Prerequisites: --allow-fs-writes (file I/O), --window N (windowing), --metrics (tracking)
+  Prerequisites: --allow-fs-writes (file I/O), --window N (windowing), --metrics (tracking)
 
 VARIABLE SCOPE BETWEEN STAGES:
   Each --exec stage runs in ISOLATION. Local variables (let) do NOT persist:
@@ -127,29 +126,38 @@ KELORA EVENT ACCESS:
   e.nested.field                       Nested field traversal (maps)
   e.scores[1]                          Array indexing (0-based, negative ok: -1 = last)
   e.headers["user-agent"]              Bracket notation for special chars in keys
+  e.field ?? default                   
 
   "field" in e                         Check top-level field exists
   e.has("field")                       Same check, method style
-  e.get("field", "default")            Get top-level with default fallback
   e.has_path("user.role")              Check nested path exists (safe)
+  e.field ?? "default"                 Get top-level using null-coalescing operater 
+  e.get("field", "default")            Get top-level with default fallback (for chaining)
   e.get_path("user.role", "guest")     Get nested with default fallback
 
   e.field = ()                         Remove field (unit assignment)
   e = ()                               Remove entire event (becomes empty, filtered out)
 
-MISSING FIELDS (the one rule to remember):
+MISSING FIELDS:
   A missing field is () (unit/null) — access never throws by itself.
-  What () does next depends on the operation, which is why it can feel
-  surprising:
+  What () does next depends on the operation, which is why it can feel surprising:
+
     e.missing == "x"                   ok    -> false (comparisons tolerate ())
     e.missing + "ms"                   ok    -> "ms" (string concat tolerates ())
     e.missing + 1                      ERROR (no arithmetic on ())
     e.missing.to_upper()               ERROR (no methods on ())
     e.user.role  (user absent)         ERROR (can't traverse into ())
 
-  Two safe idioms cover every case:
-    - Guard first:  if e.has("dur") { e.dur + 1 }   /  e.has_path("user.role")
-    - Read a default:  e.get("dur", 0) + 1   /  e.get_path("user.role", "guest")
+    a ?? b              // returns 'a' if it is not (), otherwise 'b'
+    a() ?? b();         // b() is only evaluated if a() is ()
+  
+  Safe idioms:
+    e.dur ?? 1                         Read a default
+    e.get("dur", 0) + 1                Method-style
+    e.get_path("user.name", "none")     For dotted paths
+    if e.has("dur") { e.dur + 1 }      Guard first
+    e.dur ?? e.dur + 1                 Null-coalescing op
+  
   has/get work on top-level keys; has_path/get_path also walk dotted paths.
 
 EVENT METADATA:
@@ -159,14 +167,14 @@ EVENT METADATA:
   meta.filename                        Source filename (available for named files; () for stdin)
   meta.parsed_ts                       Parsed UTC timestamp before scripts (or () if missing)
 
-  # Example: Track errors by filename
+  Example: Track errors by filename
   --exec 'if e.level == "ERROR" { track_count("file", meta.filename) }'
 
-  # Example: Debug with line numbers
+  Example: Debug with line numbers
   --filter 'e.status >= 500' --exec 'eprint("Error at line " + meta.line_num)'
 
-  # Example: Bucket by the already-parsed timestamp — no to_datetime() needed.
-  # meta.parsed_ts is a datetime, so round_to/format/etc. work directly.
+  Example: Bucket by the already-parsed timestamp — no to_datetime() needed.
+  meta.parsed_ts is a datetime, so round_to/format/etc. work directly.
   --exec 'track_count("hour", meta.parsed_ts.round_to("1h").to_iso())'
 
 ARRAY & MAP OPERATIONS:
