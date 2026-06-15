@@ -409,20 +409,29 @@ x = 1                                 // Error: x not declared
 let name = 'alice';                   // Error: single quotes not allowed
 if x > 5: print("big")                // Error: colon not allowed, braces required
 "5" + 3                               // Error: no implicit conversion
+let n = state["x"] = 1;               // Error: assignment is not an expression
 
 // ✅ Correct
 let x = 1;                            // Declare with let
 let name = "alice";                   // Double quotes
 if x > 5 { print("big"); }            // Braces required
 "5".to_int() + 3                      // Explicit conversion
+state["x"] = 1; let n = state["x"];   // Assign, then read on separate statements
 ```
 
 **Special behaviors:**
 
 - Last expression in block is return value (no `return` needed)
 - Semicolons recommended but often optional
-- Function calls without args: `e.len` same as `e.len()`
 - No implicit type conversion (use `to_int()`, `to_float()`, etc.)
+- Map keys: `m.key` and `m["key"]` are equivalent for static identifier keys — use whichever reads better. Brackets are required for dynamic or non-identifier keys (`state[e.user]`, `e["user-agent"]`); `m.user-agent` parses as subtraction, not a key
+
+### Calling style (in practice)
+
+- Built-in functions: either style — chain with method style. `e.msg.to_upper().trim()` or `to_upper(e.msg)`.
+- Your own helpers (`--include` or inline `fn f(x)`): function-style only — `is_problem(e)`, not `e.is_problem()` (that fails with `Function not found`).
+- Fields & state keys: `e.field` / `state.key` for plain names; brackets for dynamic or non-identifier keys — `e[var]`, `e["user-agent"]`, `state[e.user]`.
+- Length/keys of a map: use `len(e)` / `keys(e)` (or `e.len()`); bare `e.len` reads a field named `len`, not the count.
 
 ## Quick Reference
 
