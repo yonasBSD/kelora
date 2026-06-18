@@ -894,6 +894,9 @@ mod tests {
         // Minute-precision timestamps are documented in --help / --help-time as
         // journalctl-compatible (e.g. "2024-01-15 12:00") and must parse the same
         // way regardless of T- vs space-separator or trailing zone marker.
+        // The zone-less forms ("12:00", "T12:00") are interpreted in the default
+        // timezone; pin it to UTC so the assertions don't depend on the host's
+        // local zone (otherwise e.g. CET would yield 11:00 here but 12:00 in CI).
         for input in [
             "2024-01-15 12:00",
             "2024-01-15T12:00",
@@ -903,7 +906,7 @@ mod tests {
             "2024-01-15 12:00+0000",
         ] {
             let mut parser = AdaptiveTsParser::new();
-            let result = parser.parse_ts(input);
+            let result = parser.parse_ts_with_config(input, None, Some("UTC"));
             assert!(result.is_some(), "failed to parse {input:?}");
             let dt = result.unwrap();
             assert_eq!(dt.year(), 2024, "{input:?}");
