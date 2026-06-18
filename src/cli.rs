@@ -1334,14 +1334,23 @@ fn is_simple_field_ident(s: &str) -> bool {
 }
 
 /// Build the value accessor for a metrics-sugar field. Simple identifiers use
-/// cheap property access (`e.field`, which yields `()` for missing fields);
-/// dotted/bracket/special paths use `get_path`, which also yields `()` when
-/// absent — so missing values are skipped by the track_* functions either way.
+/// cheap property access (`e.field`, which yields `()` for missing fields).
+///
+/// Dotted/bracket/special paths are ambiguous: a column literally named
+/// `ip.dst` (common in CSV/TSV headers) collides with the nested-path syntax
+/// `ip.dst`. We resolve it the way `-k` does — prefer a literal top-level key
+/// of that exact name, and only fall back to nested `get_path` traversal when
+/// no such key exists. Events are kept as nested maps (JSON is never flattened
+/// to dotted keys), so `field in e` is true *only* for a literal dotted column,
+/// leaving nested-JSON access on `get_path`'s documented path unchanged. Both
+/// branches yield `()` when absent, so missing values are skipped by the
+/// track_* functions either way.
 fn field_value_accessor(field: &str) -> String {
     if is_simple_field_ident(field) {
         format!("e.{field}")
     } else {
-        format!("get_path(e, {})", rhai_string_literal(field))
+        let literal = rhai_string_literal(field);
+        format!("(if {literal} in e {{ e[{literal}] }} else {{ get_path(e, {literal}) }})")
     }
 }
 
@@ -1887,6 +1896,38 @@ mod tests {
         assert!(
             end.is_none(),
             "trailing include must not create an end stage without --end"
+        );
+    }
+
+    #[test]
+    fn field_value_accessor_simple_ident_uses_property_access() {
+        assert_eq!(field_value_accessor("level"), "e.level");
+        assert_eq!(field_value_accessor("user_id"), "e.user_id");
+    }
+
+    #[test]
+    fn field_value_accessor_dotted_name_prefers_literal_then_nested() {
+        // A dotted field name (e.g. a flat CSV column literally named `ip.dst`,
+        // or a nested JSON path `user.id`) must try the literal top-level key
+        // first and only fall back to nested traversal. This keeps `--freq`/
+        // `--describe`/`--card` consistent with `-k` for literal dotted columns
+        // while preserving the documented nested-path behavior for JSON.
+        assert_eq!(
+            field_value_accessor("ip.dst"),
+            "(if \"ip.dst\" in e { e[\"ip.dst\"] } else { get_path(e, \"ip.dst\") })"
+        );
+    }
+
+    #[test]
+    fn synthesize_freq_stage_uses_dotted_accessor() {
+        assert_eq!(
+            synthesize_freq_stage("ip.dst").expect("freq stage"),
+            "track_freq(\"ip.dst\", (if \"ip.dst\" in e { e[\"ip.dst\"] } else { get_path(e, \"ip.dst\") }))"
+        );
+        // Simple identifiers keep the cheap property accessor.
+        assert_eq!(
+            synthesize_freq_stage("level").expect("freq stage"),
+            "track_freq(\"level\", e.level)"
         );
     }
 }
